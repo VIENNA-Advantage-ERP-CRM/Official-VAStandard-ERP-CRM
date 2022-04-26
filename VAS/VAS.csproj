@@ -49,6 +49,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="BaseLibrary">
+      <HintPath>..\ViennaAdvantageWeb\Dll\BaseLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="CoreLibrary">
+      <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -105,6 +111,21 @@
       <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.7\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="VAModelAD">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
+    </Reference>
+    <Reference Include="VAPrintLib">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VAPrintLib.dll</HintPath>
+    </Reference>
+    <Reference Include="ViennaBase">
+      <HintPath>..\ViennaAdvantageWeb\Dll\ViennaBase.dll</HintPath>
+    </Reference>
+    <Reference Include="VIS">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VIS.dll</HintPath>
+    </Reference>
+    <Reference Include="VISLogic">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VISLogic.dll</HintPath>
+    </Reference>
     <Reference Include="WebGrease">
       <Private>True</Private>
       <HintPath>..\packages\WebGrease.1.6.0\lib\WebGrease.dll</HintPath>
@@ -112,6 +133,9 @@
     <Reference Include="Antlr3.Runtime">
       <Private>True</Private>
       <HintPath>..\packages\Antlr.3.5.0.2\lib\Antlr3.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="XModel">
+      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -32,10 +32,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BaseLibrary">
-      <HintPath>..\BaseLibrary\bin\Debug\BaseLibrary.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\BaseLibrary.dll</HintPath>
     </Reference>
     <Reference Include="CoreLibrary">
-      <HintPath>..\CoreLibrary\bin\Debug\CoreLibrary.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
     </Reference>
     <Reference Include="ModelLibrary">
       <HintPath>..\ModelLibrary\bin\Debug\ModelLibrary.dll</HintPath>
@@ -53,13 +53,13 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
     <Reference Include="VAModelAD">
-      <HintPath>..\VAModelAD\bin\Debug\VAModelAD.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
     </Reference>
     <Reference Include="VIS">
-      <HintPath>..\VIS\bin\VIS.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VIS.dll</HintPath>
     </Reference>
     <Reference Include="XModel">
-      <HintPath>..\XModel\bin\Debug\XModel.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
