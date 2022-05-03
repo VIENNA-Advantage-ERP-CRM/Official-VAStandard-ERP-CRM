@@ -344,7 +344,7 @@ namespace VAdvantage.Model
             }
 
             // VIS0060: Set Trx Org from Shipment/Receipt to Confirmation
-            if(ship.GetAD_OrgTrx_ID() > 0)
+            if (ship.GetAD_OrgTrx_ID() > 0)
             {
                 Set_Value("AD_OrgTrx_ID", ship.GetAD_OrgTrx_ID());
             }
@@ -798,23 +798,43 @@ namespace VAdvantage.Model
             }
             #endregion
 
-            // Created By Sunil 17/9/2016
-            // Complete Shipment
-            //MInOut io = new MInOut(GetCtx(), GetM_InOut_ID(), Get_TrxName());
-            //if (io.GetDocStatus() == DOCSTATUS_Reversed)
-            //{
-            //    GetCtx().SetContext("DifferenceQty_", "0");
-            //    VoidIt(); //To set document void if MR is aleady in reversed case
-            //    SetDocAction(DOCACTION_Void);
-            //    return DocActionVariables.STATUS_VOIDED;
-            //}
-            //else if (io.GetDocStatus() == DOCSTATUS_Completed || io.GetDocStatus() == DOCSTATUS_Closed)
-            //{
-            //    SetProcessed(true);
-            //    //Not to Complete MR/Shipment when it is already comepleted/ handled case when a completed record generates a confirmation
-            //}
-            //else
-            //{
+            //	All lines
+            bool internalInventory = false; //Arpit
+            for (int i = 0; i < lines.Length; i++)
+            {
+                MInOutLineConfirm confirmLine = lines[i];
+
+                confirmLine.Set_TrxName(Get_TrxName());
+                if (!confirmLine.ProcessLine(inout.IsSOTrx(), GetConfirmType()))
+                {
+                    GetCtx().SetContext("DifferenceQty_", "0");
+                    _processMsg = "ShipLine not saved - " + confirmLine;
+                    return DocActionVariables.STATUS_INVALID;
+                }
+                if (confirmLine.IsFullyConfirmed())
+                {
+                    confirmLine.SetProcessed(true);
+                    confirmLine.Save(Get_TrxName());
+                }
+                else
+                {
+                    if (CreateDifferenceDoc(inout, confirmLine))
+                    {
+                        internalInventory = true;
+                        confirmLine.SetProcessed(true);
+                        confirmLine.Save(Get_TrxName());
+                    }
+                    else
+                    {
+                        GetCtx().SetContext("DifferenceQty_", "0");
+                        log.Log(Level.SEVERE, "Scrapped=" + confirmLine.GetScrappedQty()
+                            + " - Difference=" + confirmLine.GetDifferenceQty());
+
+                        return DocActionVariables.STATUS_INVALID;
+                    }
+                }
+            }	//	for all lines
+
             MInOut io = new MInOut(GetCtx(), GetM_InOut_ID(), Get_TrxName());
             SetProcessed(true);
             if (!Save(Get_TrxName()))
@@ -852,43 +872,6 @@ namespace VAdvantage.Model
                 _processMsg = io.GetProcessMsg() + " Shipment Not Completed";
                 return DocActionVariables.STATUS_INVALID;
             }
-
-            //	All lines
-            bool internalInventory = false; //Arpit
-            for (int i = 0; i < lines.Length; i++)
-            {
-                MInOutLineConfirm confirmLine = lines[i];
-
-                confirmLine.Set_TrxName(Get_TrxName());
-                if (!confirmLine.ProcessLine(inout.IsSOTrx(), GetConfirmType()))
-                {
-                    GetCtx().SetContext("DifferenceQty_", "0");
-                    _processMsg = "ShipLine not saved - " + confirmLine;
-                    return DocActionVariables.STATUS_INVALID;
-                }
-                if (confirmLine.IsFullyConfirmed())
-                {
-                    confirmLine.SetProcessed(true);
-                    confirmLine.Save(Get_TrxName());
-                }
-                else
-                {
-                    if (CreateDifferenceDoc(inout, confirmLine))
-                    {
-                        internalInventory = true;
-                        confirmLine.SetProcessed(true);
-                        confirmLine.Save(Get_TrxName());
-                    }
-                    else
-                    {
-                        GetCtx().SetContext("DifferenceQty_", "0");
-                        log.Log(Level.SEVERE, "Scrapped=" + confirmLine.GetScrappedQty()
-                            + " - Difference=" + confirmLine.GetDifferenceQty());
-
-                        return DocActionVariables.STATUS_INVALID;
-                    }
-                }
-            }	//	for all lines
 
             //To freeze Quality Control Lines
             FreezeQualityControlLines();
@@ -1042,7 +1025,7 @@ namespace VAdvantage.Model
                 }
                 /**End**/
 
-                
+
                 // Now save Splitted Document
                 if (!splitLine.Save(Get_TrxName()))
                 {
