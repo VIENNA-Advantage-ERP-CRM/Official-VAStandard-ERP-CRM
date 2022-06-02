@@ -126,8 +126,8 @@
             //Top Div
             $self.topDiv = $("<div id='" + "topDiv_" + $self.windowNo + "'  class='vis-archive-l-s-head vis-frm-ls-top' style='padding: 0;'>" +
                 "<div id='" + "btnSpaceDiv_" + $self.windowNo + "' class='vis-l-s-headwrp'>" +
-                       "<button id='" + "btnToggelDiv_" + $self.windowNo + "' class='vis-archive-sb-t-button' >" +
-                       "<i class='vis vis-arrow-left'></i></button></div></div>");
+                "<button id='" + "btnToggelDiv_" + $self.windowNo + "' class='vis-archive-sb-t-button' >" +
+                "<i class='vis vis-arrow-left'></i></button></div></div>");
 
             var invoicecol = $("<div class='vis-frm-contenthead'>");//width: 100%;
             invoicecol.append($self.lblInvoice.getControl().addClass("VIS_Pref_Label_Font"));
@@ -442,7 +442,7 @@
             //}
 
             $self.chkSameBPartner = $("<input id='" + "chkSameBPartner_" + $self.windowNo + "' type='checkbox' class='VIS_Pref_automatic'>" +
-               "<span><label id='" + "lblSameBPartner_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same BPartner</label></span>");
+                "<span><label id='" + "lblSameBPartner_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same BPartner</label></span>");
 
             this.chkSameBPartnerDiv.append($self.chkSameBPartner);
 
@@ -451,7 +451,7 @@
             //    this.chkSameProductDiv = $("<div style='float: left; margin-right: 15px;'>");
             //}
             $self.chkSameProduct = $("<input id='" + "chkSameProduct_" + $self.windowNo + "' type='checkbox' class='VIS_Pref_automatic'>" +
-               "<span><label id='" + "lblSameProduct_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same Product</label></span>");
+                "<span><label id='" + "lblSameProduct_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same Product</label></span>");
 
             this.chkSameProductDiv.append($self.chkSameProduct);
 
@@ -460,13 +460,13 @@
             //    this.chkSameQtyDiv = $("<div style='float: left; margin-right: 15px;'>");
             //}
             $self.chkSameQty = $("<input id='" + "chkSameQty_" + $self.windowNo + "' type='checkbox' class='VIS_Pref_automatic'>" +
-               "<span><label id='" + "lblSameQty_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same Quantity</label></span>");
+                "<span><label id='" + "lblSameQty_" + $self.windowNo + "' class='VIS_Pref_Label_Font'>Same Quantity</label></span>");
 
             this.chkSameQtyDiv.append($self.chkSameQty);
 
             //Button controls initialization
             $self.btnSearch = $("<input id='" + "btnSearch_" + $self.windowNo + "' class='VIS_Pref_btn-2' style='margin-top: 0px;' type='button' value='Search'>");
-            $self.btnProcess = $("<Button id='" + "btnProcess_" + $self.windowNo + "' style='margin-top: 0px;' class='VIS_Pref_btn-2'>"+ VIS.Msg.getMsg("Match") +"</Button>");
+            $self.btnProcess = $("<Button id='" + "btnProcess_" + $self.windowNo + "' style='margin-top: 0px;' class='VIS_Pref_btn-2'>" + VIS.Msg.getMsg("Match") + "</Button>");
 
 
             $self.lblInvoice.getControl().text(VIS.Msg.translate(VIS.Env.getCtx(), "Invoice"));
@@ -680,7 +680,7 @@
             $self.txtDifference.setValue(_xMatched);
             //  Status Info
             $self.lblStatusInfo.getControl().text($self.cmbMatchFrom.getControl().find('option:selected').val()
-              + "# = " + $self.vdgvInvoice.records.length + " -" + $self.cmbMatchTo.getControl().find('option:selected').val() + "# = " + $self.vdgvReceipt.records.length);
+                + "# = " + $self.vdgvInvoice.records.length + " -" + $self.cmbMatchTo.getControl().find('option:selected').val() + "# = " + $self.vdgvReceipt.records.length);
             $self.lblStatusCount.getControl().text(0);
         }
 
@@ -1208,11 +1208,13 @@
                 $self.arrListColumns.push({ field: "Line_K", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Line"), sortable: true, size: '11%', hidden: true });
                 $self.arrListColumns.push({ field: "M_Product_ID", caption: VIS.Msg.translate(VIS.Env.getCtx(), "M_Product_ID"), sortable: true, size: '11%', hidden: false });
                 $self.arrListColumns.push({ field: "M_Product_ID_K", caption: VIS.Msg.translate(VIS.Env.getCtx(), "M_Product_ID"), sortable: true, size: '11%', hidden: true });
-                $self.arrListColumns.push({ field: "Qty", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Qty"), sortable: true, size: '11%', hidden: false,
+                $self.arrListColumns.push({
+                    field: "Qty", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Qty"), sortable: true, size: '11%', hidden: false,
                     render: function (record, index, col_index) {
                         var val = VIS.Utility.Util.getValueOfDecimal(record["Qty"]);
                         return (val).toLocaleString();
-                    } });
+                    }
+                });
                 $self.arrListColumns.push({ field: "Matched", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Matched"), sortable: true, size: '11%', hidden: false });
             }
 
@@ -1575,6 +1577,12 @@
             return this.$root;
         };
 
+        this.refreshUI = function () {
+            /*Refresh Grid on Focus*/
+            this.vdgvInvoice.refresh();
+            this.vdgvReceipt.refresh();
+        };
+
         this.callConsolidate = function () {
             $.ajax({
                 url: VIS.Application.contextUrl + "Common/Consolidate",
@@ -1704,8 +1712,10 @@
         this.frame.getContentGrid().append(this.getRoot());
         this.display();
         this.callConsolidate();
+    };
 
-
+    VMatch.prototype.refresh = function () {
+        this.refreshUI();
     };
 
     //Must implement dispose
