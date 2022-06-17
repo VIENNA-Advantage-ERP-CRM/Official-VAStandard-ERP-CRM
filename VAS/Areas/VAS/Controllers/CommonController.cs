@@ -3041,6 +3041,7 @@ namespace VIS.Controllers
                     pSetting.CurrentPage = pageNo;
                     pSetting.TotalPage = (totalRec % pageSize) == 0 ? (totalRec / pageSize) : ((totalRec / pageSize) + 1);
                     obj.pSetting = pSetting;
+                    obj.Precision = ASchema.GetStdPrecision();
                 }
             }
             return obj;
@@ -3618,6 +3619,7 @@ namespace VIS.Controllers
         public List<List<object>> Data { get; set; }
         public CommonModel.PageSetting pSetting { get; internal set; }
         public string DebitandCredit { get; set; }
+        public int Precision { get; set; }
     }
 
     public class GetOrderDataCommonsProperties

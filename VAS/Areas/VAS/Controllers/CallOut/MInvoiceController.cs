@@ -10,7 +10,7 @@ using VIS.Models;
 
 namespace VIS.Controllers
 {
-    public class MInvoiceController:Controller
+    public class MInvoiceController : Controller
     {
         public ActionResult Index()
         {
@@ -19,16 +19,34 @@ namespace VIS.Controllers
 
         public JsonResult GetInvoice(string fields)
         {
-            
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MInvoiceModel objInvoice = new MInvoiceModel();
-                retJSON = JsonConvert.SerializeObject(objInvoice.GetInvoice(ctx,fields));
-            }          
+                retJSON = JsonConvert.SerializeObject(objInvoice.GetInvoice(ctx, fields));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get Invoice Product Info
+        /// </summary>
+        /// <param name="fields">Parameters</param>
+        /// <returns>Product Info</returns>
+        public JsonResult GetInvoiceProductInfo(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel objInvoice = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(objInvoice.GetInvoiceProductInfo(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         public JsonResult GetTax(string fields)
         {
 
@@ -49,11 +67,11 @@ namespace VIS.Controllers
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                MInvoiceModel obj = new MInvoiceModel();                
+                MInvoiceModel obj = new MInvoiceModel();
                 retJSON = JsonConvert.SerializeObject(obj.GetInvPaySchedDetail(fields));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-            
+
         }
 
         public JsonResult GetInvoiceDetails(string fields)
@@ -116,5 +134,5 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-    }   
+    }
 }

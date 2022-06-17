@@ -126,7 +126,7 @@ namespace VIS.Controllers
         /// <param name="DateTrx">Transaction Date </param>
         /// <param name="AD_Org_ID"> Trx_Organisation_ID </param>
         /// <returns>Return Empty if period is OPEN else it will return ErrorMsg</returns>
-        public string CheckPeriodState(string DateTrx,int AD_Org_ID)
+        public string CheckPeriodState(string DateTrx, int AD_Org_ID)
         {
             Ctx ct = Session["ctx"] as Ctx;
             DateTime date = Convert.ToDateTime(DateTrx);
@@ -152,7 +152,7 @@ namespace VIS.Controllers
         /// <param name="srchText">Search Document No</param>
         /// <param name="isInterComp">Inter Company Flag</param>
         /// <returns>No of unallocated payments</returns>
-        public JsonResult GetPayments(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, int page, int size,int c_docType_ID,string docBaseType, int PaymentMethod_ID, DateTime? fromDate, DateTime? toDate,string srchText, bool isInterComp)
+        public JsonResult GetPayments(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, int page, int size, int c_docType_ID, string docBaseType, int PaymentMethod_ID, DateTime? fromDate, DateTime? toDate, string srchText, bool isInterComp)
         {
             Ctx ct = Session["ctx"] as Ctx;
             PaymentAllocation payments = new PaymentAllocation(ct);
@@ -175,7 +175,7 @@ namespace VIS.Controllers
         /// <param name="srchText">Search for Document No</param>
         /// <param name="isInterComp">Inter Company Flag</param>
         /// <returns>No of unallocated Cash Lines</returns>
-        public JsonResult GetCashJounral(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, int page, int size, DateTime? fromDate, DateTime? toDate,string paymentType_ID,string srchText, bool isInterComp)
+        public JsonResult GetCashJounral(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, int page, int size, DateTime? fromDate, DateTime? toDate, string paymentType_ID, string srchText, bool isInterComp)
         {
             Ctx ct = Session["ctx"] as Ctx;
             PaymentAllocation payments = new PaymentAllocation(ct);
@@ -203,12 +203,17 @@ namespace VIS.Controllers
         /// <param name="conversionDate">ConversionType Date</param>
         /// <param name="srchText">Search the Document No</param>
         /// <param name="isInterComp">Inter Company Flag</param>
+        /// <param name="conversionType_ID">Conversion Type ID</param>
         /// <returns></returns>
-        public JsonResult GetInvoice(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, string date, int page, int size, string docNo, int c_docType_ID,string docBaseType, int PaymentMethod_ID, DateTime? fromDate, DateTime? toDate, string conversionDate,string srchText, bool isInterComp)
+        public JsonResult GetInvoice(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, bool isInterBPartner, bool chk, string date,
+            int page, int size, string docNo, int c_docType_ID, string docBaseType, int PaymentMethod_ID, DateTime? fromDate,
+            DateTime? toDate, string conversionDate, string srchText, bool isInterComp, int? conversionType_ID)
         {
             Ctx ct = Session["ctx"] as Ctx;
             PaymentAllocation payments = new PaymentAllocation(ct);
-            return Json(JsonConvert.SerializeObject(payments.GetInvoice(AD_Org_ID,_C_Currency_ID, _C_BPartner_ID, isInterBPartner, chk, date, page, size, docNo, c_docType_ID, docBaseType, PaymentMethod_ID, fromDate, toDate, conversionDate, srchText, isInterComp)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(payments.GetInvoice(AD_Org_ID, _C_Currency_ID, _C_BPartner_ID, isInterBPartner, chk,
+                date, page, size, docNo, c_docType_ID, docBaseType, PaymentMethod_ID, fromDate, toDate,
+                conversionDate, srchText, isInterComp, conversionType_ID)), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -316,11 +321,11 @@ namespace VIS.Controllers
         /// <paramref name="chk"/>MultiCurrency 
         /// <param name="isInterComp">Inter Company Flag</param>
         /// <returns>No of unallocated GL Lines</returns>
-        public JsonResult GetGLData(int AD_Org_ID,int _C_Currency_ID, int _C_BPartner_ID, int page, int size, DateTime? fromDate, DateTime? toDate,string srchText,bool chk, bool isInterComp)
+        public JsonResult GetGLData(int AD_Org_ID, int _C_Currency_ID, int _C_BPartner_ID, int page, int size, DateTime? fromDate, DateTime? toDate, string srchText, bool chk, bool isInterComp)
         {
             Ctx ct = Session["ctx"] as Ctx;
             PaymentAllocation payments = new PaymentAllocation(ct);
-            return Json(JsonConvert.SerializeObject(payments.GetGLData(AD_Org_ID,_C_Currency_ID, _C_BPartner_ID, page, size, fromDate, toDate, srchText, chk, isInterComp)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(payments.GetGLData(AD_Org_ID, _C_Currency_ID, _C_BPartner_ID, page, size, fromDate, toDate, srchText, chk, isInterComp)), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -375,7 +380,7 @@ namespace VIS.Controllers
             }
 
             PaymentAllocation payments = new PaymentAllocation(ct);
-            msg = payments.SaveGLData(pData, iData, cData, gData, date, Util.GetValueOfInt(_windowNo), Util.GetValueOfInt(C_Currency_ID), Util.GetValueOfInt(C_BPartner_ID), Util.GetValueOfInt(AD_Org_ID), Util.GetValueOfInt(C_CurrencyType_ID), dateAcct,applied, discount, open, payment, writeOff, Convert.ToDateTime(conversionDate), Util.GetValueOfBool(chk));
+            msg = payments.SaveGLData(pData, iData, cData, gData, date, Util.GetValueOfInt(_windowNo), Util.GetValueOfInt(C_Currency_ID), Util.GetValueOfInt(C_BPartner_ID), Util.GetValueOfInt(AD_Org_ID), Util.GetValueOfInt(C_CurrencyType_ID), dateAcct, applied, discount, open, payment, writeOff, Convert.ToDateTime(conversionDate), Util.GetValueOfBool(chk));
             return msg;
         }
 
