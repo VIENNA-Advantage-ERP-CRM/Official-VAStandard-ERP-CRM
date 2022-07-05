@@ -140,12 +140,12 @@
 
         var oldC_DocType_ID = Util.getValueOfInt(mTab.getValue("C_DocType_ID"));
 
-        var sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',d.IsReleaseDocument,"			//	1..3
-            + "d.IsDocNoControlled,s.CurrentNext,s.CurrentNextSys,"     //  4..6
-            + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx "              //	7..9
-            + "FROM C_DocType d "
-            + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
-            + "WHERE C_DocType_ID=@param1";	//	#1
+        //var sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',d.IsReleaseDocument,"			//	1..3
+        //    + "d.IsDocNoControlled,s.CurrentNext,s.CurrentNextSys,"     //  4..6
+        //    + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx "              //	7..9
+        //    + "FROM C_DocType d "
+        //    + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
+        //    + "WHERE C_DocType_ID=@param1";	//	#1
         var idr = null;
         //var param = new SqlParameter[1];
         var p = [];
@@ -154,18 +154,20 @@
             var AD_Sequence_ID = 0;
             //	Get old AD_SeqNo for comparison
             if (!newDocNo && Util.getValueOfInt(oldC_DocType_ID) != 0) {
-                p[0] = new VIS.DB.SqlParam("@param1", oldC_DocType_ID);
-
+                // p[0] = new VIS.DB.SqlParam("@param1", oldC_DocType_ID);
                 //param[0] = new SqlParameter("@param1", oldC_DocType_ID);
-                idr = VIS.DB.executeReader(sql, p);
-                if (idr.read()) {
+                //idr = VIS.DB.executeReader(sql, p);
+               //if (idr.read()) {
+                idr = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", oldC_DocType_ID.toString());
+                if (idr != null) {
                     //AD_Sequence_ID = Util.getValueOfInt(idr.tables[0].rows[0].cells["currentnextsys"]);
-                    AD_Sequence_ID = Util.getValueOfInt(idr.get("currentnextsys"));
+                    AD_Sequence_ID = Util.getValueOfInt(idr["CurrentNextSys"]);
                 }
-                idr.close();
+                //idr.close();
             }
-            p[0] = new VIS.DB.SqlParam("@param1", C_DocType_ID);
-            idr = VIS.DB.executeReader(sql, p);
+            //p[0] = new VIS.DB.SqlParam("@param1", C_DocType_ID);
+            //idr = VIS.DB.executeReader(sql, p);
+            idr = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());
 
             p.length = 0;
             p = null;
@@ -174,12 +176,12 @@
             var IsSOTrx = true;
             var isReturnTrx = false;
             var DocTypeValue = "";
-            if (idr.read())		//	we found document type
+            //if (idr.read())		//	we found document type
+            if (idr != null)
             {
-
                 //	Set Context:	Document Sub Type for Sales Orders
-                DocSubTypeSO = idr.get("docsubtypeso");
-                DocTypeValue = idr.get("value");
+                DocSubTypeSO = idr["DocSubTypeSO"];
+                DocTypeValue = idr["Value"];
 
                 if (DocSubTypeSO == null)
                     DocSubTypeSO = "--";
@@ -190,7 +192,7 @@
                     ctx.setContext(windowNo, "BlanketOrderType", DocSubTypeSO);
                     mTab.setValue("BlanketOrderType", DocSubTypeSO);
                 }
-                else if (Util.getValueOfString(idr.get("IsReleaseDocument")).equals("Y")) {
+                else if (Util.getValueOfString(idr["IsReleaseDocument"]).equals("Y")) {
                     mTab.setValue("BlanketOrderType", "BO");
                 }
                 else {
@@ -204,11 +206,11 @@
                     mTab.setValue("IsDropShip", "N");
 
                 //	IsSOTrx
-                if ("N" == idr.get("issotrx"))
+                if ("N" == idr["IsSOTrx"])
                     IsSOTrx = false;
 
                 //IsReturnTrx
-                isReturnTrx = idr.get("isreturntrx") == "Y" ? true : false;
+                isReturnTrx = idr["IsReturnTrx"] == "Y" ? true : false;
 
                 //	Skip these steps for RMA. These are copied from the Original Order
                 if (!isReturnTrx) {
@@ -235,7 +237,7 @@
 
 
                     //	Set Context:
-                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(idr.get("hascharges")));
+                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(idr["HasCharges"]));
                 }
                 else // Returns
                 {
@@ -246,19 +248,19 @@
                 }
 
                 //	DocumentNo
-                if (idr.get("isdocnocontrolled") == "Y")			//	IsDocNoControlled
+                if (idr["IsDocNoControlled"] == "Y")			//	IsDocNoControlled
                 {
-                    if (!newDocNo && AD_Sequence_ID != Util.getValueOfInt(idr.get("ad_sequence_id")))
+                    if (!newDocNo && AD_Sequence_ID != Util.getValueOfInt(idr["AD_Sequence_ID"]))
                         newDocNo = true;
                     if (newDocNo)  //Temporaly Commented By Sarab
                         //if (Ini.isPropertyBool(Ini.P_VIENNASYS) && Env.getCtx().getAD_Client_ID() < 1000000) 
                         if (VIS.Ini.getLocalStorage(VIS.IniConstants.P_VIENNASYS) && ctx.getAD_Client_ID() < 1000000)
-                            mTab.setValue("DocumentNo", "<" + idr.tables[0].rows[0].cells["currentnextsys"] + ">");
+                            mTab.setValue("DocumentNo", "<" + Util.getValueOfInt(idr["CurrentNextSys"]) + ">");
                         else
-                            mTab.setValue("DocumentNo", "<" + idr.tables[0].rows[0].cells["currentnext"] + ">");
+                            mTab.setValue("DocumentNo", "<" + Util.getValueOfString(idr["CurrentNext"]) + ">");
                 }
             }
-            idr.close();
+            //idr.close();
 
             // Skip remaining steps for RMA
             if (isReturnTrx) {
@@ -273,20 +275,23 @@
                 ;
             else {
                 var C_BPartner_ID = ctx.getContextAsInt(windowNo, "C_BPartner_ID");
-                sql = "SELECT PaymentRule,C_PaymentTerm_ID,"            //  1..2
-                    + "InvoiceRule,DeliveryRule,"                       //  3..4
-                    + "FreightCostRule,DeliveryViaRule, "               //  5..6
-                    + "PaymentRulePO,PO_PaymentTerm_ID "
-                    + "FROM C_BPartner "
-                    + "WHERE C_BPartner_ID=" + C_BPartner_ID;		//	#1
+                var dr = null;
+                //sql = "SELECT PaymentRule,C_PaymentTerm_ID,"            //  1..2
+                //    + "InvoiceRule,DeliveryRule,"                       //  3..4
+                //    + "FreightCostRule,DeliveryViaRule, "               //  5..6
+                //    + "PaymentRulePO,PO_PaymentTerm_ID "
+                //    + "FROM C_BPartner "
+                //    + "WHERE C_BPartner_ID=" + C_BPartner_ID;		//	#1
                 if (C_BPartner_ID != 0) {
-                    idr = VIS.DB.executeReader(sql, null);
+                    //idr = VIS.DB.executeReader(sql, null);
+                    dr = VIS.dataContext.getJSONRecord("MBPartner/GetBPDocTypeData", C_BPartner_ID.toString());
                 }
 
-                if (idr.read()) {
+                //if (idr.read()) {
+                if (dr != null) {
                     //	PaymentRule
                     //var s = Util.getValueOfString(idr[IsSOTrx ? "PaymentRule" : "PaymentRulePO"]);
-                    var s = idr.get(IsSOTrx ? "paymentrule" : "paymentrulepo");
+                    var s = dr[IsSOTrx ? "PaymentRule" : "PaymentRulePO"];
                     if (s != null && s.length != 0) {
                         if (IsSOTrx && (s == "B") || (s == "S") || (s == "U"))	//	No Cash/Check/Transfer for SO_Trx
                             s = "P";										//  Payment Term
@@ -296,29 +301,29 @@
                     }
                     //	Payment Term
                     //var ii = Util.getValueOfInt(idr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"]);
-                    var ii = idr.get(IsSOTrx ? "c_paymentterm_id" : "po_paymentterm_id");
+                    var ii = dr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"];
 
                     //if (!idr.wasNull())
-                    if (idr != null)
+                    //if (idr != null)
                         mTab.setValue("C_PaymentTerm_ID", ii);
                     //	InvoiceRule
-                    s = idr.get("invoicerule");
+                    s = dr["InvoiceRule"];
                     if (s != null && s.length != 0)
                         mTab.setValue("InvoiceRule", s);
                     //	DeliveryRule
-                    s = idr.get("deliveryrule");
+                    s = dr["DeliveryRule"];
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryRule", s);
                     //	FreightCostRule
-                    s = idr.get("freightcostrule");
+                    s = dr["FreightCostRule"];
                     if (s != null && s.length != 0)
                         mTab.setValue("FreightCostRule", s);
                     //	DeliveryViaRule
-                    s = idr.get("deliveryviarule");
+                    s = dr["DeliveryViaRule"];
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryViaRule", s);
                 }
-                idr.close();
+                //idr.close();
             }   //  re-read customer rules
         }
         catch (err) {
@@ -1299,16 +1304,18 @@
             var isSOTrx = ctx.isSOTrx(windowNo);
             if (isSOTrx) {
                 // JID_0161 // change here now will check credit settings on field only on Business Partner Header // Lokesh Chauhan 15 July 2019 
-                sql = "SELECT bp.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable" +
-                    " FROM C_BPartner_Location p INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = p.C_BPartner_ID) WHERE p.C_BPartner_Location_ID = " + C_BPartner_Location_ID;
-                dr = VIS.DB.executeReader(sql);
-                if (dr.read()) {
-                    var CreditStatus = dr.getString("CreditStatusSettingOn");
+                //sql = "SELECT bp.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable" +
+                //    " FROM C_BPartner_Location p INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = p.C_BPartner_ID) WHERE p.C_BPartner_Location_ID = " + C_BPartner_Location_ID;
+                //dr = VIS.DB.executeReader(sql);
+                dr = VIS.dataContext.getJSONRecord("MBPartner/GetLocationData", C_BPartner_Location_ID.toString());
+                //if (dr.read()) {
+                if (dr != null) {
+                    var CreditStatus = Util.getValueOfString(dr["CreditStatusSettingOn"]);
                     if (CreditStatus == "CL") {
-                        var CreditLimit = Util.getValueOfDouble(dr.get("so_creditlimit"));
+                        var CreditLimit = Util.getValueOfDouble(dr["SO_CreditLimit"]);
                         //	var SOCreditStatus = dr.getString("SOCreditStatus");
                         if (CreditLimit != 0) {
-                            var CreditAvailable = Util.getValueOfDouble(dr.get("creditavailable"));
+                            var CreditAvailable = Util.getValueOfDouble(dr["CreditAvailable"]);
                             if (dr != null && CreditAvailable <= 0) {
                                 //VIS.ADialog.info("CreditLimitOver", null, "", "");
                                 VIS.ADialog.info("CreditOver", null, "", "");
@@ -1628,24 +1635,26 @@
                 this.log.warning("init");
             }
 
-            sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
-                + "plv.M_PriceList_Version_ID,plv.ValidFrom "
-                + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
-                + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
-                + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
-                + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
-            //	Use net price list - may not be future
+            //sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
+            //    + "plv.M_PriceList_Version_ID,plv.ValidFrom "
+            //    + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
+            //    + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
+            //    + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
+            //    + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
+            //    + "ORDER BY plv.ValidFrom DESC";
+            ////	Use net price list - may not be future
 
-            dr = VIS.DB.executeReader(sql);
-            if (dr.read()) {
+            //dr = VIS.DB.executeReader(sql);
+            dr = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListData", value.toString());
+            /*if (dr.read()) {*/
                 //DataRow dr = ds.Tables[0].Rows[i];
                 //	Tax Included
-                mTab.setValue("IsTaxIncluded", "Y" == dr.get("istaxincluded").toString());
+            if (dr != null) {
+                mTab.setValue("IsTaxIncluded", "Y" == dr["IsTaxIncluded"]);
                 //	Price Limit Enforce
-                ctx.setContext(windowNo, "EnforcePriceLimit", dr.get("enforcepricelimit").toString());
+                ctx.setContext(windowNo, "EnforcePriceLimit", dr["EnforcePriceLimit"]);
                 //	Currency
-                var ii = Util.getValueOfInt(dr.get("c_currency_id"));
+                var ii = dr["C_Currency_ID"];
 
                 var CurrencyPresent = Util.getValueOfInt(mTab.getValue("C_Currency_ID")); //Price List from BSO/BPO window
                 var C_Order_Blanket = Util.getValueOfDecimal(mTab.getValue("C_Order_Blanket"))
@@ -1654,11 +1663,11 @@
                 else {
                     mTab.setValue("C_Currency_ID", ii);
                 }
-                var prislst = Util.getValueOfInt(dr.get("m_pricelist_version_id"));
+                var prislst = dr["M_PriceList_Version_ID"];
                 //	PriceList Version
                 ctx.setContext(windowNo, "M_PriceList_Version_ID", prislst);
             }
-            dr.close();
+            //dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -11538,39 +11547,41 @@
         var dr = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", paramString);
 
         try {
-            //	Charges - Set Context
-            ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(dr["HasCharges"]));
+            if (dr != null) {
+                //	Charges - Set Context
+                ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(dr["HasCharges"]));
 
-            //	DocumentNo
-            if (dr["IsDocNoControlled"] == "Y") {
-                mTab.setValue("DocumentNo", "<" + Util.getValueOfString(dr["CurrentNext"]) + ">");
-            }
-
-            //  DocBaseType - Set Context
-            var s = Util.getValueOfString(dr["DocBaseType"]);
-            ctx.setContext(windowNo, "DocBaseType", s);
-
-            //  AP Check & AR Credit Memo
-            if (s.startsWith("AP")) {
-                mTab.setValue("PaymentRule", "S");    //  Check
-            }
-            else if (s.endsWith("C")) {
-                mTab.setValue("PaymentRule", "P");    //  OnCredit
-            }
-
-            // set Value Of Treat As Discount - in case of AP Credit memo only
-            if (mTab.getField("TreatAsDiscount") != null) {
-                if (s.equals("APC")) {
-                    mTab.setValue("TreatAsDiscount", Util.getValueOfBoolean(dr["TreatAsDiscount"]));
+                //	DocumentNo
+                if (dr["IsDocNoControlled"] == "Y") {
+                    mTab.setValue("DocumentNo", "<" + Util.getValueOfString(dr["CurrentNext"]) + ">");
                 }
-                else {
-                    mTab.setValue("TreatAsDiscount", false);
-                }
-            }
 
-            //set isreturntrx
-            if (mTab.getField("IsReturnTrx") != null) {
-                mTab.setValue("IsReturnTrx", Util.getValueOfBoolean(dr["IsReturnTrx"]));
+                //  DocBaseType - Set Context
+                var s = Util.getValueOfString(dr["DocBaseType"]);
+                ctx.setContext(windowNo, "DocBaseType", s);
+
+                //  AP Check & AR Credit Memo
+                if (s.startsWith("AP")) {
+                    mTab.setValue("PaymentRule", "S");    //  Check
+                }
+                else if (s.endsWith("C")) {
+                    mTab.setValue("PaymentRule", "P");    //  OnCredit
+                }
+
+                // set Value Of Treat As Discount - in case of AP Credit memo only
+                if (mTab.getField("TreatAsDiscount") != null) {
+                    if (s.equals("APC")) {
+                        mTab.setValue("TreatAsDiscount", Util.getValueOfBoolean(dr["TreatAsDiscount"]));
+                    }
+                    else {
+                        mTab.setValue("TreatAsDiscount", false);
+                    }
+                }
+
+                //set isreturntrx
+                if (mTab.getField("IsReturnTrx") != null) {
+                    mTab.setValue("IsReturnTrx", Util.getValueOfBoolean(dr["IsReturnTrx"]));
+                }
             }
         }
         catch (err) {
@@ -12979,33 +12990,35 @@
             if (M_PriceList_ID == null || M_PriceList_ID == 0)
                 return "";
 
-            sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
-                + "plv.M_PriceList_Version_ID,plv.ValidFrom "
-                + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
-                + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
-                + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
-                + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
+            //sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
+            //    + "plv.M_PriceList_Version_ID,plv.ValidFrom "
+            //    + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
+            //    + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
+            //    + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
+            //    + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
+            //    + "ORDER BY plv.ValidFrom DESC";
             //	Use newest price list - may not be future
 
             //DataSet ds = VIS.DB..executeDataset(sql, null);
             //for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
 
-            dr = VIS.DB.executeReader(sql);
-            if (dr.read()) {
+            //dr = VIS.DB.executeReader(sql);
+            dr = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListData", value.toString());
+            //if (dr.read()) {
+            if (dr != null) {
                 //DataRow dr = ds.Tables[0].Rows[i];
                 //	Tax Included
-                mTab.setValue("IsTaxIncluded", (Boolean)("Y".equals(dr.get("istaxincluded"))));
+                mTab.setValue("IsTaxIncluded", (Boolean)("Y".equals(dr["IsTaxIncluded"])));
                 //	Price Limit Enforce
-                ctx.setContext(windowNo, "EnforcePriceLimit", dr.get("enforcepricelimit"));
+                ctx.setContext(windowNo, "EnforcePriceLimit", dr["EnforcePriceLimit"]);
                 //	Currency
-                var ii = Util.getValueOfInt(dr.get("c_currency_id"));
+                var ii = Util.getValueOfInt(dr["C_Currency_ID"]);
                 mTab.setValue("C_Currency_ID", ii);
-                var prislst = Util.getValueOfInt(dr.get("m_pricelist_version_id"));
+                var prislst = dr["M_PriceList_Version_ID"];
                 //	PriceList Version
                 ctx.setContext(windowNo, "M_PriceList_Version_ID", prislst);
             }
-            dr.close();
+            //dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -16514,18 +16527,21 @@
         if (C_DocType_ID == null || C_DocType_ID == 0) {
             return "";
         }
-        var sql = "SELECT d.docBaseType, d.IsDocNoControlled, s.CurrentNext, d.IsReturnTrx "
-            + "FROM C_DocType d, AD_Sequence s "
-            + "WHERE C_DocType_ID=" + C_DocType_ID		//	1
-            + " AND d.DocNoSequence_ID=s.AD_Sequence_ID(+)";
-        var dr = null;
+        //var sql = "SELECT d.docBaseType, d.IsDocNoControlled, s.CurrentNext, d.IsReturnTrx "
+        //    + "FROM C_DocType d, AD_Sequence s "
+        //    + "WHERE C_DocType_ID=" + C_DocType_ID		//	1
+        //    + " AND d.DocNoSequence_ID=s.AD_Sequence_ID(+)";
+        // var dr = null;
+        var paramString = C_DocType_ID.toString();
+        var dr = VIS.dataContext.getJSONRecord("MInOut/GetDocTypeData", paramString);
         try {
             ctx.setContext(windowNo, "C_DocTypeTarget_ID", C_DocType_ID);
-            dr = VIS.DB.executeReader(sql, null, null);
-            if (dr.read()) {
+            //dr = VIS.DB.executeReader(sql, null, null);
+            //if (dr.read()) {
                 //	Set Movement Type
-                var docBaseType = dr.get("docbasetype");
-                var isReturnTrx = dr.get("isreturntrx") == "Y";
+            if (dr != null) {
+                var docBaseType = Util.getValueOfString(dr["docBaseType"]);
+                var isReturnTrx = dr["IsReturnTrx"] == "Y";
                 if (docBaseType.equals("MMS") && !isReturnTrx)					//	Material Shipments
                 {
                     mTab.setValue("MovementType", "C-");				//	Customer Shipments
@@ -16544,11 +16560,11 @@
                 }
 
                 //	DocumentNo
-                if (dr.get("isdocnocontrolled") == "Y") {
-                    mTab.setValue("DocumentNo", "<" + dr.get("currentnext") + ">");
+                if (dr["IsDocNoControlled"] == "Y") {
+                    mTab.setValue("DocumentNo", "<" + Util.getValueOfString(dr["CurrentNext"]) + ">");
                 }
             }
-            dr.close();
+            //dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -16706,22 +16722,24 @@
         }
         this.setCalloutActive(true);
 
-        var sql = "SELECT w.AD_Org_ID, l.M_Locator_ID "
-            + "FROM M_Warehouse w"
-            + " LEFT OUTER JOIN M_Locator l ON (l.M_Warehouse_ID=w.M_Warehouse_ID AND l.IsDefault='Y') "
-            + "WHERE w.M_Warehouse_ID=" + M_Warehouse_ID;		//	1
-        var dr = null;
+        //var sql = "SELECT w.AD_Org_ID, l.M_Locator_ID "
+        //    + "FROM M_Warehouse w"
+        //    + " LEFT OUTER JOIN M_Locator l ON (l.M_Warehouse_ID=w.M_Warehouse_ID AND l.IsDefault='Y') "
+        //    + "WHERE w.M_Warehouse_ID=" + M_Warehouse_ID;		//	1
+        //var dr = null;
+        var dr = VIS.dataContext.getJSONRecord("MInOut/GetWarehouse", value.toString());
         try {
-            dr = VIS.DB.executeReader(sql, null, null);
-            if (dr.read()) {
+            //dr = VIS.DB.executeReader(sql, null, null);
+            //if (dr.read()) {
+            if (dr != null) {
                 //	Org
-                var ii = Util.getValueOfInt(dr.get("ad_org_id"));//.getInt(1));
+                var ii = Util.getValueOfInt(dr["AD_Org_ID"]);//.getInt(1));
                 var AD_Org_ID = ctx.getContextAsInt(windowNo, "AD_Org_ID");
                 if (AD_Org_ID != ii) {
                     mTab.setValue("AD_Org_ID", ii);
                 }
                 //	Locator
-                ii = Util.getValueOfInt(dr.get("m_locator_id"));// new int(dr.getInt(2));
+                ii = Util.getValueOfInt(dr["M_Locator_ID"]);// new int(dr.getInt(2));
                 //if (dr.wasNull())
                 if (ii == 0) {
                     ctx.setContext(windowNo, 0, "M_Locator_ID", null);
@@ -16731,7 +16749,7 @@
                     ctx.setContext(windowNo, "M_Locator_ID", ii);
                 }
             }
-            dr.close();
+            //dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -20632,9 +20650,10 @@
             return "";
         }
         this.setCalloutActive(true);
-        var Note = Util.getValueOfString(VIS.DB.executeScalar("select documentnote from c_paymentterm where c_paymentterm_id=" + value));
+        //var Note = Util.getValueOfString(VIS.DB.executeScalar("select documentnote from c_paymentterm where c_paymentterm_id=" + value));
+        var Note = VIS.dataContext.getJSONRecord("MPaymentTerm/GetPaymentNote", value.toString());
         if (Note != null) {
-            mTab.setValue("description", Note);
+            mTab.setValue("description", Note["DocumentNote"]);
         }
         this.setCalloutActive(false);
         return "";
