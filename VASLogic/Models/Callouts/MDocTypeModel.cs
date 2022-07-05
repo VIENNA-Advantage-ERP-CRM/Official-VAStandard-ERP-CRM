@@ -45,7 +45,7 @@ namespace VIS.Models
             Dictionary<string, object> result = null;
             string sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',d.IsDocNoControlled,"
             + "s.CurrentNext, d.DocBaseType, s.CurrentNextSys, "
-            + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx, d.TreatAsDiscount "
+            + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx, d.TreatAsDiscount,d.IsReleaseDocument "
             + "FROM C_DocType d "
             + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
             + "WHERE C_DocType_ID=" + C_DocType_ID;		//	1
@@ -66,6 +66,7 @@ namespace VIS.Models
                 result["IsBlanketTrx"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReturnTrx"]);
                 // JID_0244
                 result["TreatAsDiscount"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["TreatAsDiscount"]);
+                result["IsReleaseDocument"]= Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReleaseDocument"]);
             }
             return result;
 
