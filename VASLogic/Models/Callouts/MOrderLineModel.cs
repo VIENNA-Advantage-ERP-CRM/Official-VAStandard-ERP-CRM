@@ -2224,5 +2224,25 @@ namespace VIS.Models
             return Util.GetValueOfInt(DB.ExecuteScalar("Select NoOfMonths from C_Frequency where C_Frequency_ID=" + _frequency_Id, null, null));
 
         }
+
+        /// <summary>
+        /// Get Order Line ID on Requisition
+        /// </summary>
+        /// <param name="fields">Requisition ID</param>
+        /// <returns>OrderLine ID</returns>
+        public int GetReqOrderLine(string fields)
+        {
+            string[] paramString = fields.Split(',');
+            var sql = "SELECT C_OrderLine_ID FROM C_OrderLine"
+                + " WHERE C_Order_ID ="
+                + " (SELECT C_Order_ID "
+                + " FROM C_Order "
+                + " WHERE DocumentNo="
+                + " (SELECT DocumentNo FROM M_Requisition WHERE M_Requisition.M_Requisition_id = " + Util.GetValueOfInt(paramString[0]) + ")"
+                + " AND AD_Client_ID =" + Util.GetValueOfInt(paramString[1]) + ")"
+                + " AND M_Product_ID=" + Util.GetValueOfInt(paramString[2]);
+            int OrderLine_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            return OrderLine_ID;
+        }
     }
 }

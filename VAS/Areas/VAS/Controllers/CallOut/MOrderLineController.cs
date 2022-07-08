@@ -258,5 +258,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get Order Line ID on Requisition
+        /// </summary>
+        /// <param name="fields">Requisition ID</param>
+        /// <returns>OrderLine ID</returns>
+        public JsonResult GetReqOrderLine(string fields)
+        {
+            String retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MOrderLineModel objOrderLine = new MOrderLineModel();
+                retJSON = JsonConvert.SerializeObject(objOrderLine.GetReqOrderLine(fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
