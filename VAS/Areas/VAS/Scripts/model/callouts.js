@@ -3280,16 +3280,27 @@
             mTab.setValue("FreightCostRule", order["FreightCostRule"]);
 
             //-------------Anuj 04-09-2015-------------------------
-            var _CountVA009 = Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
-            if (_CountVA009 > 0) {
-                var paymthd_id = VIS.DB.executeScalar("SELECT VA009_PaymentMethod_ID FROM C_Order WHERE C_Order_ID=" + C_Order_ID);
-                if (paymthd_id > 0) {
-                    mTab.setValue("VA009_PaymentMethod_ID", paymthd_id);
-                    var PaymentBasetype = VIS.DB.executeScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID=" + paymthd_id);
-                    if (PaymentBasetype != "W" && PaymentBasetype != null) {
-                        //if (PaymentBasetype != null) {
-                        mTab.setValue("PaymentMethod", PaymentBasetype);
-                        mTab.setValue("PaymentRule", PaymentBasetype);
+            //var _CountVA009 = Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
+            //if (_CountVA009 > 0) {
+
+            var DataPrefix = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "VA009_");
+            if (DataPrefix["VA009_"]) {
+                //var paymthd_id = VIS.DB.executeScalar("SELECT VA009_PaymentMethod_ID FROM C_Order WHERE C_Order_ID=" + C_Order_ID);
+                //if (paymthd_id > 0) {
+
+                var paramString = DataPrefix["VA009_"].toString() + "," + C_Order_ID.toString();
+                dr = VIS.dataContext.getJSONRecord("MOrder/GetPaymentMethod", paramString);
+                if (dr != null) {
+                    var paymthd_id = Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]);
+                    if (paymthd_id > 0) {
+                        mTab.setValue("VA009_PaymentMethod_ID", paymthd_id);
+                        //var PaymentBasetype = VIS.DB.executeScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID=" + paymthd_id);
+                        var PaymentBasetype = Util.getValueOfString(dr["VA009_PaymentBaseType"]);
+                        if (PaymentBasetype != "W" && PaymentBasetype != null) {
+                            //if (PaymentBasetype != null) {
+                            mTab.setValue("PaymentMethod", PaymentBasetype);
+                            mTab.setValue("PaymentRule", PaymentBasetype);
+                        }
                     }
                 }
             }
@@ -4223,13 +4234,18 @@
         var ts = ctx.getContext("DateAcct");
         //DateTime ts = new DateTime(ctx.getContextAsTime(windowNo, "DateAcct"));     // from
         // C_Cash
-        var sql = "SELECT EndingBalance FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID + " AND" +
-            " AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + " AND " +
-            "c_cash_id IN (SELECT Max(c_cash_id) FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID
-            + "AND AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + ") AND Processed='Y'";
-        var idr = null;
+
+        var param = C_CashBook_ID.toString() + "," + AD_Client_ID.toString() + "," + AD_Org_ID.toString();
+        var beginningBalance = VIS.dataContext.getJSONRecord("MCashJournal/GetBeginningBalCalc", param);
+
+
+        //var sql = "SELECT EndingBalance FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID + " AND" +
+        //    " AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + " AND " +
+        //    "c_cash_id IN (SELECT Max(c_cash_id) FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID
+        //    + "AND AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + ") AND Processed='Y'";
+        //var idr = null;
         try {
-            idr = VIS.DB.executeReader(sql, null, null);
+            //idr = VIS.DB.executeReader(sql, null, null);
             //pstmt.setInt(1, C_CashBook_ID.intValue());
             //pstmt.setInt(2, AD_Client_ID.intValue());
             //pstmt.setInt(3, AD_Org_ID.intValue());
@@ -4237,8 +4253,10 @@
             //pstmt.setInt(5, AD_Client_ID.intValue());
             //pstmt.setInt(6, AD_Org_ID.intValue());
             //ResultSet rs = pstmt.executeQuery();
-            if (idr.read()) {
-                var beginningBalance = Util.getValueOfDecimal(idr.get(0));//.getBigDecimal(1);
+            //if (idr.read()) {
+                //var beginningBalance = Util.getValueOfDecimal(idr.get(0));//.getBigDecimal(1);
+
+            if (beginningBalance > 0) {
                 mTab.setValue("BeginningBalance", beginningBalance);
             }
             else {
@@ -4297,8 +4315,10 @@
                 return "";
             }
             paramString = C_BankAccount_ID.toString();
-            var qry = "SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID = " + C_BankAccount_ID;
-            var currency = Util.getValueOfInt(VIS.DB.executeScalar(qry, null, null));
+            //var qry = "SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID = " + C_BankAccount_ID;
+            //var currency = Util.getValueOfInt(VIS.DB.executeScalar(qry, null, null));
+
+            var currency = Util.getValueOfInt(VIS.dataContext.getJSONRecord("MPayment/GetBankAcctCurrency", paramString));
             mTab.setValue("C_Currency_ID", currency);
         }
         if (payAmt != 0) {
@@ -4409,7 +4429,9 @@
         //decimal BeginAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(" select CompletedBalance from c_cashbook where c_cashbook_id=" + value));
         //tab.SetValue("BeginningBalance", BeginAmt);
         //Added By Manjot Changes Done to  Set Beginning Balance
-        var TotalAmt = Util.getValueOfDecimal(VIS.DB.executeScalar(" select sum(nvl(CompletedBalance,0)) + sum(nvl(runningbalance,0)) as TotalBal from c_cashbook where c_cashbook_id=" + value));
+        //var TotalAmt = Util.getValueOfDecimal(VIS.DB.executeScalar(" select sum(nvl(CompletedBalance,0)) + sum(nvl(runningbalance,0)) as TotalBal from c_cashbook where c_cashbook_id=" + value));
+
+        var TotalAmt = VIS.dataContext.getJSONRecord("MCashBook/GetBegiBalance", value.toString());
         mTab.setValue("BeginningBalance", TotalAmt);
         this.setCalloutActive(false);
         return "";
@@ -4557,8 +4579,10 @@
         if (result > 0) {
             //ShowMessage.Info("Can't change UOM due to Transactions happens based on existing UOM", true, null, null);
             VIS.ADialog.info("Can't change UOM due to Transactions happens based on existing UOM");
-            sql = "select c_uom_id from m_product where m_product_id =  " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
-            var uom_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            //sql = "select c_uom_id from m_product where m_product_id =  " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
+            //var uom_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+
+            var uom_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", mTab.getValue("M_Product_ID").toString());
             mTab.setValue("C_UOM_ID", uom_ID);
         }
         this.setCalloutActive(false);
@@ -4670,32 +4694,37 @@
 
         //	get values
         var id = Util.getValueOfInt(mTab.getValue("C_ProjectTask_ID"));
-        var Sql = "SELECT C_Project_ID FROM C_ProjectPhase WHERE C_ProjectPhase_id IN (select C_ProjectPhase_id from" +
-            " C_ProjectTask WHERE C_ProjectTask_ID=" + id + ")";
-        var projID = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+        //var Sql = "SELECT C_Project_ID FROM C_ProjectPhase WHERE C_ProjectPhase_id IN (select C_ProjectPhase_id from" +
+        //    " C_ProjectTask WHERE C_ProjectTask_ID=" + id + ")";
+        //var projID = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
 
-        if (id == 0) {
-            projID = Util.getValueOfInt(mTab.getValue("C_Project_ID"));
+        //if (id == 0) {
+        //    projID = Util.getValueOfInt(mTab.getValue("C_Project_ID"));
+        //}
+
+        //var query = "SELECT PriceLimit FROM M_ProductPrice WHERE M_PriceList_Version_ID = (SELECT c.m_pricelist_version_id FROM  c_project c WHERE c.c_project_Id=" + projID + ")  AND M_Product_id=" + Util.getValueOfInt(mTab.getValue("M_Product_ID"));
+
+        ////get price on the basis of Attribute and UOM if selected
+        //if (mTab.findColumn("M_AttributeSetInstance_ID") > 0) {
+        //    query += " AND NVL(M_AttributeSetInstance_ID,0)=" + Util.getValueOfInt(mTab.getValue("M_AttributeSetInstance_ID"));
+        //}
+
+        //if (mTab.findColumn("C_UOM_ID") > 0) {
+        //    //if uom is not selected then get baseUom
+        //    if (Util.getValueOfInt(mTab.getValue("C_UOM_ID")) > 0) {
+        //        query += " AND C_UOM_ID =" + Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
+        //    }
+        //    else {
+        //        query += " AND C_UOM_ID = (SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.getValueOfInt(mTab.getValue("M_Product_ID")) + ")";
+        //    }
+        //}
+        //var PriceLimit = Util.getValueOfDecimal(VIS.DB.executeScalar(query, null, null));
+
+
+        var dr = VIS.dataContext.getJSONRecord("MProject/GetProjectDetail", id.toString())
+        if (dr != null) {
+            PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]); 
         }
-
-        var query = "SELECT PriceLimit FROM M_ProductPrice WHERE M_PriceList_Version_ID = (SELECT c.m_pricelist_version_id FROM  c_project c WHERE c.c_project_Id=" + projID + ")  AND M_Product_id=" + Util.getValueOfInt(mTab.getValue("M_Product_ID"));
-
-        //get price on the basis of Attribute and UOM if selected
-        if (mTab.findColumn("M_AttributeSetInstance_ID") > 0) {
-            query += " AND NVL(M_AttributeSetInstance_ID,0)=" + Util.getValueOfInt(mTab.getValue("M_AttributeSetInstance_ID"));
-        }
-
-        if (mTab.findColumn("C_UOM_ID") > 0) {
-            //if uom is not selected then get baseUom
-            if (Util.getValueOfInt(mTab.getValue("C_UOM_ID")) > 0) {
-                query += " AND C_UOM_ID =" + Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
-            }
-            else {
-                query += " AND C_UOM_ID = (SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.getValueOfInt(mTab.getValue("M_Product_ID")) + ")";
-            }
-        }
-        var PriceLimit = Util.getValueOfDecimal(VIS.DB.executeScalar(query, null, null));
-
         PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
         if (PlannedQty == null) {
             PlannedQty = Envs.ONE;
@@ -12740,7 +12769,9 @@
                 if (M_PriceList_ID == 0) {
                     return false;
                 }
-                ss = VIS.DB.executeScalar("SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + M_PriceList_ID, null, null).toString();
+                //ss = VIS.DB.executeScalar("SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + M_PriceList_ID, null, null).toString();
+
+                ss = VIS.dataContext.getJSONRecord("MPriceList/GetTaxIncluded", M_PriceList_ID.toString());
                 if (ss == null) {
                     ss = "N";
                 }
