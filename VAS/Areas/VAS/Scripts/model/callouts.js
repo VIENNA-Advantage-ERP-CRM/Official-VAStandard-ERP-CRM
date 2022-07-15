@@ -13572,9 +13572,11 @@
     CalloutMovement.prototype.Product = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
         if (value == null || value.toString() == "") {
-            if (Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(*) FROM AD_column WHERE ad_table_id = " +
-                " (SELECT ad_table_id   FROM ad_table   WHERE upper(tablename) = upper('M_MovementLine'))" +
-                " and upper(columnname) = 'C_UOM_ID'", null, null)) > 0) {
+            var count = VIS.dataContext.getJSONRecord("MInventoryLine/GetUOMColumn", "");
+            if (count > 0) {
+            //if (Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(*) FROM AD_column WHERE ad_table_id = " +
+            //    " (SELECT ad_table_id   FROM ad_table   WHERE upper(tablename) = upper('M_MovementLine'))" +
+            //    " and upper(columnname) = 'C_UOM_ID'", null, null)) > 0) {
                 mTab.setValue("MovementQty", 1);
                 mTab.setValue("QtyEntered", 1);
             }
@@ -13600,12 +13602,16 @@
             mTab.setValue("M_AttributeSetInstance_ID", null);
 
             // change by Shivani 
-            var sql = "SELECT COUNT(*) FROM AD_column WHERE ad_table_id = " +
-                " (SELECT ad_table_id   FROM ad_table   WHERE upper(tablename) = upper('M_MovementLine'))" +
-                " and upper(columnname) = 'C_UOM_ID'";
-            if (Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null)) > 0) {
-                sql = "select c_uom_id from m_product where m_product_id=" + M_Product_ID;
-                var c_uom_id = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            //var sql = "SELECT COUNT(*) FROM AD_column WHERE ad_table_id = " +
+            //    " (SELECT ad_table_id   FROM ad_table   WHERE upper(tablename) = upper('M_MovementLine'))" +
+            //    " and upper(columnname) = 'C_UOM_ID'";
+            //if (Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null)) > 0) {
+                //sql = "select c_uom_id from m_product where m_product_id=" + M_Product_ID;
+                //var c_uom_id = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+
+            var count = VIS.dataContext.getJSONRecord("MInventoryLine/GetUOMColumn", "");
+            if (count > 0) {
+                var c_uom_id = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", M_Product_ID.toString());
                 mTab.setValue("C_UOM_ID", c_uom_id);
                 if (value != oldValue) {
 
@@ -16997,29 +17003,38 @@
             mTab.setValue("C_UOM_ID", C_UOM_ID);
             var qtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
             mTab.setValue("MovementQty", qtyEntered);
-            var qryBP = "SELECT C_BPartner_ID FROM M_InOut WHERE M_InOut_ID = " + Util.getValueOfInt(mTab.getValue("M_InOut_ID"));
-            var bpartner = Util.getValueOfInt(VIS.DB.executeScalar(qryBP));
-            var qryUom = "SELECT vdr.C_UOM_ID FROM M_Product p LEFT JOIN M_Product_Po vdr ON p.M_Product_ID= vdr.M_Product_ID WHERE p.M_Product_ID=" + M_Product_ID + " AND vdr.C_BPartner_ID = " + bpartner;
-            var uom = Util.getValueOfInt(VIS.DB.executeScalar(qryUom));
-            if (C_UOM_ID != 0) {
-                if (C_UOM_ID != uom && uom != 0) {
-                    var Res = Util.getValueOfDecimal(VIS.DB.executeScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND M_Product_ID= " + M_Product_ID + " AND IsActive='Y'"));
-                    if (Res > 0) {
-                        mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Res);
-                        //OrdQty = MUOMConversion.ConvertProductTo(GetCtx(), _M_Product_ID, UOM, OrdQty);
-                    }
-                    else {
-                        var res = Util.getValueOfDecimal(VIS.DB.executeScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND IsActive='Y'"));
-                        if (res > 0) {
-                            mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Res);
-                            //OrdQty = MUOMConversion.Convert(GetCtx(), prdUOM, UOM, OrdQty);
-                        }
-                    }
-                    mTab.setValue("C_UOM_ID", uom);
-                }
-                else {
-                    mTab.setValue("C_UOM_ID", C_UOM_ID);
-                }
+            //var qryBP = "SELECT C_BPartner_ID FROM M_InOut WHERE M_InOut_ID = " + Util.getValueOfInt(mTab.getValue("M_InOut_ID"));
+            //var bpartner = Util.getValueOfInt(VIS.DB.executeScalar(qryBP));
+            //var qryUom = "SELECT vdr.C_UOM_ID FROM M_Product p LEFT JOIN M_Product_Po vdr ON p.M_Product_ID= vdr.M_Product_ID WHERE p.M_Product_ID=" + M_Product_ID + " AND vdr.C_BPartner_ID = " + bpartner;
+            //var uom = Util.getValueOfInt(VIS.DB.executeScalar(qryUom));
+            //if (C_UOM_ID != 0) {
+            //    if (C_UOM_ID != uom && uom != 0) {
+            //        var Res = Util.getValueOfDecimal(VIS.DB.executeScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND M_Product_ID= " + M_Product_ID + " AND IsActive='Y'"));
+            //        if (Res > 0) {
+            //            mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Res);
+            //            //OrdQty = MUOMConversion.ConvertProductTo(GetCtx(), _M_Product_ID, UOM, OrdQty);
+            //        }
+            //        else {
+            //            var res = Util.getValueOfDecimal(VIS.DB.executeScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND IsActive='Y'"));
+            //            if (res > 0) {
+            //                mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Res);
+            //                //OrdQty = MUOMConversion.Convert(GetCtx(), prdUOM, UOM, OrdQty);
+            //            }
+            //        }
+            //        mTab.setValue("C_UOM_ID", uom);
+            //    }
+
+
+            var params = mTab.getValue("M_InOut_ID").toString() + "," + M_Product_ID.toString() + "," + C_UOM_ID.toString();
+            var dr = VIS.dataContext.getJSONRecord("MInOut/GetUOMConv", params);
+            if (dr != null)
+            {
+                mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Util.getValueOfDecimal(dr["multiplyrate"]));
+                mTab.setValue("C_UOM_ID", Util.getValueOfInt(dr["uom"]));
+            }
+            else
+            {
+                mTab.setValue("C_UOM_ID", C_UOM_ID);
             }
 
             //190 - Get Print description from product and set print desc

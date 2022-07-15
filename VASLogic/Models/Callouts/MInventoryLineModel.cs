@@ -73,5 +73,19 @@ namespace VIS.Models
             }
             return Attribute_ID;
         }
+
+        /// <summary>
+        /// Get Count for UOM column on Inventory move
+        /// </summary>
+        /// <param name="ctx">ctx</param>
+        /// <returns>count</returns>
+        public int GetUOMColumn(Ctx ctx)
+        {
+            string sql = "SELECT COUNT(*) FROM AD_Column WHERE AD_Table_ID = " +
+                " (SELECT AD_Table_ID FROM AD_Table WHERE UPPER(TableName) = UPPER('M_MovementLine'))" +
+                " AND UPPER(ColumnName) = 'C_UOM_ID'";
+            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql,null,null));
+            return count;
+        }
     }
 }
