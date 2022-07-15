@@ -68,5 +68,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get Tax Included
+        /// </summary>
+        /// <param name="fields">PriceList_ID</param>
+        /// <returns>IsTaxIncluded</returns>
+        public JsonResult GetTaxIncluded(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MPriceListModel objPriceList = new MPriceListModel();
+                retJSON = JsonConvert.SerializeObject(objPriceList.GetTaxIncluded(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

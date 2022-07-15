@@ -166,11 +166,12 @@ namespace VIS.Models
                 + "p.PaymentRule, p.POReference, p.SO_Description, p.IsDiscountPrinted, ";
             if (countVA009)
             {
-                sql += " p.VA009_PaymentMethod_ID, ";
+                sql += " p.VA009_PaymentMethod_ID,p.VA009_PO_PaymentMethod_ID, ";
             }
             sql += "p.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0)-NVL(p.SO_CreditUsed,0) AS CreditAvailable,"
                 + " l.C_BPartner_Location_ID,c.AD_User_ID, p.SOCreditStatus,"
-                + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID "
+                + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID, "
+                + " p.SalesRep_ID,p.IsSalesRep, p.C_Withholding_ID, p.C_IncoTerm_ID,p.C_IncoTermPO_ID "
                 + "FROM C_BPartner p"
                 + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
                 + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
@@ -191,6 +192,7 @@ namespace VIS.Models
                     retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
                     retDic["VA009_PaymentBaseType"] = Util.GetValueOfString(DB.ExecuteScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID="
                         + Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]), null, null));
+                    retDic["VA009_PO_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PO_PaymentMethod_ID"]);
                 }
                 retDic["CreditStatusSettingOn"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["CreditStatusSettingOn"]);
                 retDic["SO_CreditLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["SO_CreditLimit"]);
@@ -201,6 +203,11 @@ namespace VIS.Models
                 retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
                 retDic["AD_User_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
                 retDic["SOCreditStatus"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["SOCreditStatus"]);
+                retDic["SalesRep_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["SalesRep_ID"]);
+                retDic["IsSalesRep"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSalesRep"]);
+                retDic["C_Withholding_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Withholding_ID"]);
+                retDic["C_IncoTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]);
+                retDic["C_IncoTermPO_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
             }
             return retDic;
         }

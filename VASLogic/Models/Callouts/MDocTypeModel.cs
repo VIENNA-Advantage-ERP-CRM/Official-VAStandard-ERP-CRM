@@ -45,7 +45,7 @@ namespace VIS.Models
             Dictionary<string, object> result = null;
             string sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',d.IsDocNoControlled,"
             + "s.CurrentNext, d.DocBaseType, s.CurrentNextSys, "
-            + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx, d.TreatAsDiscount "
+            + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx, d.value, d.IsBlanketTrx, d.TreatAsDiscount,d.IsReleaseDocument "
             + "FROM C_DocType d "
             + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
             + "WHERE C_DocType_ID=" + C_DocType_ID;		//	1
@@ -66,9 +66,24 @@ namespace VIS.Models
                 result["IsBlanketTrx"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReturnTrx"]);
                 // JID_0244
                 result["TreatAsDiscount"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["TreatAsDiscount"]);
+                result["IsReleaseDocument"]= Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReleaseDocument"]);
             }
             return result;
 
+        }
+
+        /// <summary>
+        /// Getting Doc Sub Type
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="fields">DocType_ID</param>
+        /// <returns>DocSubType</returns>
+        public string GetDocSubType(Ctx ctx, string fields)
+        {
+            string sql = "SELECT dc.DocSubTypeSO FROM C_DocType dc INNER JOIN C_DocBaseType db ON(dc.DocBaseType = db.DocBaseType)"
+                        + "WHERE C_DocType_ID=" + Util.GetValueOfInt(fields) + " AND db.DocBaseType='SOO' AND dc.DocSubTypeSO IN ('WR','WI')";
+            string DocSubTypeSO = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+            return DocSubTypeSO;
         }
     }
 }

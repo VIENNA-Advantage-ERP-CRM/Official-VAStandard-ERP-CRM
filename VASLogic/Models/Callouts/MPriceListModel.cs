@@ -108,5 +108,18 @@ namespace VIS.Models
             }
             return retDic;
         }
+
+        /// <summary>
+        /// Get Tax Included
+        /// </summary>
+        /// <param name="ctx">Ctx</param>
+        /// <param name="fields">PriceList_ID</param>
+        /// <returns>IsTaxIncluded</returns>
+        public string GetTaxIncluded(Ctx ctx, string fields)
+        {
+            string sql = "SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + Util.GetValueOfInt(fields);
+            string IsTaxIncluded = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+            return IsTaxIncluded;
+        }
     }
 }

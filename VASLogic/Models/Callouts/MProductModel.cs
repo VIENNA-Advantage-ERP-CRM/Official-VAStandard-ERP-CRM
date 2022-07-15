@@ -105,5 +105,31 @@ namespace VIS.Models
             string sql = "SELECT C_RevenueRecognition_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + Util.GetValueOfInt(fields);
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
+
+
+        /// <summary>
+        /// Get AttributeSet
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">C_Product_ID</param>
+        /// <returns>AttributeSet_ID</returns>
+        public int GetAttributeSet(Ctx ctx, string fields)
+        {
+            string sql = "SELECT M_AttributeSet_ID FROM M_Product WHERE M_Product_ID = " + Util.GetValueOfInt(fields);
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
+
+        /// <summary>
+        /// Get Product Attribute
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">C_Product_ID</param>
+        /// <returns>Attribute_ID</returns>
+        public int GetProductAttribute(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            string sql = "SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC = '" + paramValue[0] + "' AND M_Product_ID = " + Util.GetValueOfInt(paramValue[1]);
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
     }
 }

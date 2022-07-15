@@ -64,5 +64,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Getting Doc Sub Type
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>DocSubType</returns>
+        public JsonResult GetDocSubType(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MDocTypeModel objDocType = new MDocTypeModel();
+                retJSON = JsonConvert.SerializeObject(objDocType.GetDocSubType(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
