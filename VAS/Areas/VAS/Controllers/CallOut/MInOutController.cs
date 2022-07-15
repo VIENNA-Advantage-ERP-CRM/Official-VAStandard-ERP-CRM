@@ -140,7 +140,7 @@ namespace VIS.Controllers
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MInOutModel objInOut = new MInOutModel();
-                objInOut.GetUOMConversion(ctx, fields);
+                retJSON = JsonConvert.SerializeObject(objInOut.GetUOMConversion(ctx, fields));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

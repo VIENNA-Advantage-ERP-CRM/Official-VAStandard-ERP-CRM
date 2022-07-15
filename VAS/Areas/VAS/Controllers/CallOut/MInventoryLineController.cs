@@ -68,19 +68,5 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-
-        /// <summary>
-        /// Get Count for UOM column on Inventory move
-        /// </summary>
-        /// <returns>count</returns>
-        public JsonResult GetUOMColumn()
-        {
-            int count = 0;
-            Ctx ctx = Session["ctx"] as Ctx;
-            MInventoryLineModel objInventoryLine = new MInventoryLineModel();
-            count = objInventoryLine.GetUOMColumn(ctx);
-            return Json(JsonConvert.SerializeObject(count), JsonRequestBehavior.AllowGet);
-        }
-
     }
 }
