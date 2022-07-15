@@ -68,6 +68,5 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-      
     }
 }
