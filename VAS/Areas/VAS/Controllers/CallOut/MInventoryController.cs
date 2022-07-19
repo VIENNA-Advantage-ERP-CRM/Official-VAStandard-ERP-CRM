@@ -58,6 +58,23 @@ namespace VIS.Controllers
                 retJSON = JsonConvert.SerializeObject(objInventoryLine.GetMInventory(ctx, fields));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);            
-        }     
+        }
+
+        /// <summary>
+        /// Get Current Qty from Product Transaction
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>Current qty</returns>
+        public JsonResult GetCurrentQty(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInventoryModel objInventoryLine = new MInventoryModel();
+                retJSON = JsonConvert.SerializeObject(objInventoryLine.GetCurrentQty(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
