@@ -158,12 +158,11 @@ namespace VIS.Models
         // Added by Bharat on 12/May/2017
         public Dictionary<string, object> GetBPartnerData(Ctx ctx, string fields)
         {
-            string[] paramValue = fields.Split(',');
-            bool countVA009 = Util.GetValueOfBool(paramValue[0]);
-            int C_BPartner_ID = Util.GetValueOfInt(paramValue[1]);
+            bool countVA009 = Env.IsModuleInstalled("VA009_");
+            int C_BPartner_ID = Util.GetValueOfInt(fields);
             Dictionary<string, object> retDic = null;
             string sql = "SELECT p.AD_Language, p.C_PaymentTerm_ID, COALESCE(p.M_PriceList_ID, g.M_PriceList_ID) AS M_PriceList_ID,"
-                + "p.PaymentRule, p.POReference, p.SO_Description, p.IsDiscountPrinted, ";
+                + "p.PaymentRule, p.POReference, p.SO_Description, p.IsDiscountPrinted, p.C_IncoTerm_ID,p.C_IncoTermPO_ID, ";
             if (countVA009)
             {
                 sql += " p.VA009_PaymentMethod_ID, ";
@@ -186,6 +185,9 @@ namespace VIS.Models
                 retDic["POReference"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["POReference"]);
                 retDic["SO_Description"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["SO_Description"]);
                 retDic["IsDiscountPrinted"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsDiscountPrinted"]);
+                retDic["C_IncoTerm_ID"]=Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]);
+                retDic["C_IncoTermPO_ID"]= Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
+                retDic["countVA009"] = countVA009 ? 1 : 0;
                 if (countVA009)
                 {
                     retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
@@ -220,6 +222,7 @@ namespace VIS.Models
                 retDic["CreditStatusSettingOn"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["CreditStatusSettingOn"]);
                 retDic["SO_CreditLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["SO_CreditLimit"]);
                 retDic["CreditAvailable"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CreditAvailable"]);
+                
             }
             return retDic;
         }
@@ -432,6 +435,7 @@ namespace VIS.Models
                 retDic["C_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_PaymentTerm_ID"]);
                 retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
                 retDic["PaymentRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PaymentRule"]);
+                retDic["PaymentRulePO"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PaymentRulePO"]);
                 retDic["POReference"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["POReference"]);
                 retDic["SO_Description"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["SO_Description"]);
                 retDic["IsDiscountPrinted"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsDiscountPrinted"]);

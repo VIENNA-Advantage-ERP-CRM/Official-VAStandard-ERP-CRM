@@ -108,5 +108,16 @@ namespace VIS.Models
             }
             return retDic;
         }
+        public int GetPriceListUOM(Ctx ctx, int  _M_Product_ID)
+        {
+            if (Env.IsModuleInstalled("ED011_"))
+            {
+                string sql = " SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_PRoduct_ID = " + _M_Product_ID;
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            }
+            return 0;
+            
+
+        }
     }
 }

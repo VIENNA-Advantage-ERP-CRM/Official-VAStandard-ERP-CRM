@@ -142,7 +142,17 @@ namespace VIS.Models
 
             return result;
         }
-
+        /// <summary>
+        /// Getting BeginBAl Fields via cashbook Change
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="C_CashBook_ID"></param>
+        /// <returns>BeginBAl</returns>
+        public decimal GetBeginBalance(Ctx ctx, int C_CashBook_ID)
+        {
+            string sql = "select sum(nvl(CompletedBalance, 0)) + sum(nvl(runningbalance, 0)) as TotalBal from c_cashbook where c_cashbook_id = " + C_CashBook_ID + "";
+            return Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+        }
     }
-
 }
+

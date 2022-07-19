@@ -16,6 +16,11 @@ namespace VIS.Controllers
         {
             return View();
         }
+        /// <summary>
+        /// calculated Tax
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public JsonResult CalculateTax(string fields)
         {
             
@@ -41,6 +46,11 @@ namespace VIS.Controllers
 
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Getting Tax_ID
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public JsonResult Get_Tax_ID(string fields)
         {
            

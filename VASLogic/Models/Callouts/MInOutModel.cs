@@ -81,7 +81,7 @@ namespace VIS.Models
                     retValue["IsReturnTrx"] = _ds.Tables[0].Rows[0]["IsReturnTrx"].ToString();
                 }
             }
-            catch (Exception e)
+            catch (Exception )
             {
                 if (_ds != null)
                 {

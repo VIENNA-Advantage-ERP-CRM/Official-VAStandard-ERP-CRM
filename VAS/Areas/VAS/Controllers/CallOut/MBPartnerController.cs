@@ -19,6 +19,11 @@ namespace VIS.Controllers
         {
             return View();
         }
+        /// <summary>
+        /// Getting B Partner Data
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public JsonResult GetBPartner(string fields)
         {            
             string retJSON = "";      

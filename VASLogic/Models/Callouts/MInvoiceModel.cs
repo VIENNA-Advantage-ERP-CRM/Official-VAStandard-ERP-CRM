@@ -1549,5 +1549,48 @@ namespace VIS.Models
             return stdPrecision;
 
         }
+        /// <summary>
+        /// Getting Tax Included Details
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns>string value</returns>
+        public string GetTaxInclude(int M_PriceList_ID)
+        {
+            string sql = "SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + M_PriceList_ID + "";
+            return Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+
+        }
+        /// <summary>
+        /// Getting Price List
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns>Dictionary data</returns>
+        public Dictionary<String, object> GetPriceList(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            //Creating Object
+            Dictionary<String, object> retDic = new Dictionary<string, object>();
+            string sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
+                + "plv.M_PriceList_Version_ID,plv.ValidFrom "
+                + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
+                + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
+                + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
+                + " AND pl.M_PriceList_ID=" + paramValue[0]				
+                + "ORDER BY plv.ValidFrom DESC";
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic["IsTaxIncluded"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsTaxIncluded"]);
+                retDic["EnforcePriceLimit"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["EnforcePriceLimit"]);
+                retDic["C_Currency_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]);
+                retDic["M_PriceList_Version_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_Version_ID"]);
+
+            }
+            return retDic;
+
+        }
+
     }
 }

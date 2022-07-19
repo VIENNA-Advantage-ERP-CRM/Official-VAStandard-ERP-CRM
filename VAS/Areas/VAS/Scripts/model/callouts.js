@@ -4210,35 +4210,24 @@
         var ts = ctx.getContext("DateAcct");
         //DateTime ts = new DateTime(ctx.getContextAsTime(windowNo, "DateAcct"));     // from
         // C_Cash
-        var sql = "SELECT EndingBalance FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID + " AND" +
-            " AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + " AND " +
-            "c_cash_id IN (SELECT Max(c_cash_id) FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID
-            + "AND AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + ") AND Processed='Y'";
+        //var sql = "SELECT EndingBalance FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID + " AND" +///Commented by Nisha
+        //    " AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + " AND " +
+        //    "c_cash_id IN (SELECT Max(c_cash_id) FROM C_Cash WHERE C_CashBook_ID=" + C_CashBook_ID
+        //    + "AND AD_Client_ID=" + AD_Client_ID + " AND AD_Org_ID=" + AD_Org_ID + ") AND Processed='Y'";
         var idr = null;
         try {
-            idr = VIS.DB.executeReader(sql, null, null);
-            //pstmt.setInt(1, C_CashBook_ID.intValue());
-            //pstmt.setInt(2, AD_Client_ID.intValue());
-            //pstmt.setInt(3, AD_Org_ID.intValue());
-            //pstmt.setInt(4, C_CashBook_ID.intValue());
-            //pstmt.setInt(5, AD_Client_ID.intValue());
-            //pstmt.setInt(6, AD_Org_ID.intValue());
-            //ResultSet rs = pstmt.executeQuery();
-            if (idr.read()) {
-                var beginningBalance = Util.getValueOfDecimal(idr.get(0));//.getBigDecimal(1);
-                mTab.setValue("BeginningBalance", beginningBalance);
-            }
-            else {
-                //var zero = 0;
-                mTab.setValue("BeginningBalance", 0);
-            }
+            var paramValue = C_CashBook_ID.toString() + "," + AD_Org_ID.toString() + "," + AD_Client_ID.toString();
+            idr = VIS.dataContext.getJSONRecord("MCashJournal/GetBeginningBalCalc", paramValue);//Created by Nisha
 
-            idr.close();
+            var beginningBalance = Util.getValueOfDecimal(idr);//.getBigDecimal(1);
+            mTab.setValue("BeginningBalance", beginningBalance);
+
+
         }
         catch (err) {
-            if (idr != null) {
-                idr.close();
-            }
+            //if (idr != null) {
+            //    idr.close();
+            //}
             this.log.log(Level.SEVERE, "Beginning balance", err);
             this.setCalloutActive(false);
             //return e.getLocalizedMessage();
@@ -4284,8 +4273,8 @@
                 return "";
             }
             paramString = C_BankAccount_ID.toString();
-            var qry = "SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID = " + C_BankAccount_ID;
-            var currency = Util.getValueOfInt(VIS.DB.executeScalar(qry, null, null));
+            // var qry = "SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID = " + C_BankAccount_ID;
+            var currency = VIS.dataContext.getJSONRecord("MCashBook/GetBankAcctCurrency", paramString);
             mTab.setValue("C_Currency_ID", currency);
         }
         if (payAmt != 0) {
@@ -4396,7 +4385,9 @@
         //decimal BeginAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(" select CompletedBalance from c_cashbook where c_cashbook_id=" + value));
         //tab.SetValue("BeginningBalance", BeginAmt);
         //Added By Manjot Changes Done to  Set Beginning Balance
-        var TotalAmt = Util.getValueOfDecimal(VIS.DB.executeScalar(" select sum(nvl(CompletedBalance,0)) + sum(nvl(runningbalance,0)) as TotalBal from c_cashbook where c_cashbook_id=" + value));
+        //var TotalAmt = Util.getValueOfDecimal(VIS.DB.executeScalar(" select sum(nvl(CompletedBalance,0)) + sum(nvl(runningbalance,0)) as TotalBal from c_cashbook where c_cashbook_id=" + value));
+        param = value.toString();
+        var TotalAmt = VIS.dataContext.getJSONRecord("MCashJournal/GetBeginBalance", param);
         mTab.setValue("BeginningBalance", TotalAmt);
         this.setCalloutActive(false);
         return "";
@@ -4523,22 +4514,24 @@
             return "";
         }
 
-        if (mTab.getValue("M_Product_id") == null) {
-            return "";
-        }
+      ////  if (mTab.getValue("M_Product_id") == null) {
+      //      return "";
+        //  }
+  
         this.setCalloutActive(true);
 
         // 26-09-2011 Lokesh Chauhan
 
         // If values are in The Transaction Tab then restrict user so that UOM can't be changed or set to what it was previously.
-        var sql = "select count(*) from m_transaction where m_product_id = " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
-        var result = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
-
+        //var sql = "select count(*) from m_transaction where m_product_id = " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
+        var fields = mTab.getValue("M_Product_ID").toString();
+        var result = VIS.dataContext.getJSONRecord("MProduct/GetUOMCount", fields);//Created by Nisha
         if (result > 0) {
             //ShowMessage.Info("Can't change UOM due to Transactions happens based on existing UOM", true, null, null);
             VIS.ADialog.info("Can't change UOM due to Transactions happens based on existing UOM");
-            sql = "select c_uom_id from m_product where m_product_id =  " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
-            var uom_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            /*sql = "select c_uom_id from m_product where m_product_id =  " + Util.getValueOfInt(mTab.getValue("M_Product_id"));*/
+            //var fields = M_Product_id.toString();
+            var uom_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", fields);
             mTab.setValue("C_UOM_ID", uom_ID);
         }
         this.setCalloutActive(false);
@@ -11628,37 +11621,38 @@
             //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
 
             //-----------------ANuj----Code----------
-            var sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
-                + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
-                + " p.SO_Description,p.IsDiscountPrinted, p.C_IncoTerm_ID,p.C_IncoTermPO_ID, ";
+            //var sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
+            //    + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
+            //    + " p.SO_Description,p.IsDiscountPrinted, p.C_IncoTerm_ID,p.C_IncoTermPO_ID, ";
 
-            var _CountVA009 = Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
-            if (_CountVA009 > 0) {
-                //VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
-                sql += " p.VA009_PaymentMethod_ID, p.VA009_PO_PaymentMethod_ID, ";
-                //p.VA009_PO_PaymentMethod_ID, ";
-            }
+            //var _CountVA009 = Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
+            //if (_CountVA009 > 0) {
+            //    //VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
+            //    sql += " p.VA009_PaymentMethod_ID, p.VA009_PO_PaymentMethod_ID, ";
+            //    //p.VA009_PO_PaymentMethod_ID, ";
+            //}
 
-            sql += "p.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable,"
-                + " l.C_BPartner_Location_ID,c.AD_User_ID,"
-                + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID, "
-                + " p.SalesRep_ID,p.IsSalesRep, p.C_Withholding_ID "
-                + " FROM C_BPartner p"
-                + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
-                + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
-                + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
-                + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
+            //sql += "p.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable,"
+            //    + " l.C_BPartner_Location_ID,c.AD_User_ID,"
+            //    + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID, "
+            //    + " p.SalesRep_ID,p.IsSalesRep, p.C_Withholding_ID "
+            //    + " FROM C_BPartner p"
+            //    + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
+            //    + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
+            //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
+            //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
 
             var isSOTrx = ctx.isSOTrx(windowNo);
-            var dr = null;
+            var idr = null;
             var drl = null;
+            var locID = null;
             try {
+                //var fields = C_BPartner_ID.toString();
+                var idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", C_BPartner_ID);
 
-                dr = VIS.DB.executeReader(sql, null, null);
-
-                if (dr.read()) {
+               /* if (dr.read())*/{
                     //	PriceList & IsTaxIncluded & Currency
-                    var ii = Util.getValueOfInt(dr.get(isSOTrx ? "m_pricelist_id" : "po_pricelist_id"));
+                    var ii = Util.getValueOfInt(idr[isSOTrx ? "M_PriceList_ID" : "PO_PriceList_ID"]);
                     if (ii > 0) {
                         mTab.setValue("M_PriceList_ID", ii);
                     }
@@ -11673,12 +11667,12 @@
 
                     //	PaymentRule
                     //Inco Term
-                    var IncoTerm = Util.getValueOfInt(dr.get(isSOTrx ? "C_IncoTerm_ID" : "C_IncoTermPO_ID"));
+                    var IncoTerm = Util.getValueOfInt(idr[isSOTrx ? "C_IncoTerm_ID" : "C_IncoTermPO_ID"]);
                     if (IncoTerm > 0) {
                         mTab.setValue("C_IncoTerm_ID", IncoTerm);
                     }
 
-                    var s = Util.getValueOfString(dr.get(isSOTrx ? "paymentrule" : "paymentrulepo"));
+                    var s = Util.getValueOfString(idr[isSOTrx ? "PaymentRule" : "PaymentRulePO"]);
                     if (s != null && s.length != 0) {
                         if (ctx.getContext("DocBaseType").toString().endsWith("C"))	//	Credits are Payment Term
                         {
@@ -11691,9 +11685,11 @@
                         mTab.setValue("PaymentRule", s);
                     }
 
-                    var _CountVA009 = Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
+
+                    var _CountVA009 = Util.getValueOfInt(idr["countVA009"]);
                     if (_CountVA009 > 0) {
-                        var _PaymentMethod_ID = Util.getValueOfInt(dr.get("VA009_PaymentMethod_ID"));
+                        var _PaymentMethod_ID = Util.getValueOfInt(idr["VA009_PaymentMethod_ID"]);
+                        var PaymentBasetype = Util.getValueOfString(idr["VA009_PaymentBaseType"]);
                         ////VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
                         var isvendor = 'N';
                         var bpdtl = VIS.dataContext.getJSONRecord("MBPartner/GetBPDetails", C_BPartner_ID);
@@ -11733,7 +11729,8 @@
                             mTab.setValue("VA009_PaymentMethod_ID", null);
                         else {
                             mTab.setValue("VA009_PaymentMethod_ID", _PaymentMethod_ID);
-                            var PaymentBasetype = VIS.DB.executeScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID=" + _PaymentMethod_ID);
+                            /* var PaymentBasetype = VIS.DB.executeScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID=" + _PaymentMethod_ID);*/
+                            //var PaymentBasetype = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", _PaymentMethod_ID);//Created by Nisha
                             if (PaymentBasetype != null) {
                                 //if (PaymentBasetype != null) {
                                 mTab.setValue("PaymentMethod", PaymentBasetype);
@@ -11758,13 +11755,13 @@
                     if (PaymentTermPresent > 0 && C_Order_Blanket > 0) {
                     }
                     else {
-                        ii = Util.getValueOfInt(dr.get(isSOTrx ? "c_paymentterm_id" : "po_paymentterm_id"));
+                        ii = Util.getValueOfInt(idr[isSOTrx ? "C_PaymentTerm_ID" : "C_PaymentTerm_ID"]);
                         if (ii > 0) {
                             mTab.setValue("C_PaymentTerm_ID", ii);
                         }
                     }
                     //	Location
-                    var locID = Util.getValueOfInt(dr.get("c_bpartner_location_id"));
+                    var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
                     //	overwritten by InfoBP selection - works only if InfoWindow
                     //	was used otherwise creates error (uses last value, may bevar  to differnt BP)
                     if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
@@ -11781,7 +11778,7 @@
                     }
 
                     //	Contact - overwritten by InfoBP selection
-                    var contID = Util.getValueOfInt(dr.get("ad_user_id"));
+                    var contID = Util.getValueOfInt(idr["AD_User_ID"]);
                     if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
                         var cont = ctx.getContext("AD_User_ID");
                         if (cont && cont.toString().length > 0) {
@@ -11803,41 +11800,37 @@
                     //    }
                     //}
                     //Code End here
+
+
                     //	CreditAvailable
                     if (isSOTrx) {
-                        //var CreditLimit = Util.getValueOfDouble(dr.get("so_creditlimit"));
-                        //if (CreditLimit != 0) {
-                        //    var CreditAvailable = Util.getValueOfDouble(dr.get("creditavailable"));
-                        //    if (CreditAvailable < 0) {
-                        //        VIS.ADialog.info("CreditLimitOver");
-                        //    }
-                        //}
-                        var CreditStatus = dr.getString("CreditStatusSettingOn");
+                        CreditStatus = Util.getValueOfString(idr["CreditStatusSettingOn"]);
                         if (CreditStatus == "CH") {
-                            var CreditLimit = Util.getValueOfDouble(dr.get("so_creditlimit"));
+                             CreditLimit = Util.getValueOfDouble(idr["SO_CreditLimit"]);
                             //	var SOCreditStatus = dr.getString("SOCreditStatus");
                             if (CreditLimit != 0) {
-                                var CreditAvailable = Util.getValueOfDouble(dr.get("creditavailable"));
-                                if (dr != null && CreditAvailable <= 0) {
+                                 CreditAvailable = Util.getValueOfDouble(idr["CreditAvailable"]);
+                                if (idr != null && CreditAvailable <= 0) {
                                     //VIS.ADialog.info("CreditLimitOver", null, "", "");
                                     VIS.ADialog.info("CreditOver");
                                 }
                             }
                         }
-                        else {
-                            var locId = Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID"));
+                        else
+                        {
+                             locID = Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID"));
                             // JID_0161 // change here now will check credit settings on field only on Business Partner Header // Lokesh Chauhan 15 July 2019 
-                            sql = "SELECT bp.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable" +
-                                " FROM C_BPartner_Location p INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = p.C_BPartner_ID) WHERE p.C_BPartner_Location_ID = " + locId;
-                            drl = VIS.DB.executeReader(sql);
-                            if (drl.read()) {
-                                CreditStatus = drl.getString("CreditStatusSettingOn");
+                            //sql = "SELECT bp.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0) - NVL(p.SO_CreditUsed,0) AS CreditAvailable" +
+                            //    " FROM C_BPartner_Location p INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = p.C_BPartner_ID) WHERE p.C_BPartner_Location_ID = " + locId;
+                            drl = VIS.dataContext.getJSONRecord("MBPartner/GetLocationData", locID);//Created by Nisha
+                            {
+                                CreditStatus = Util.getValueOfString(drl["CreditStatusSettingOn"]);
                                 if (CreditStatus == "CL") {
-                                    var CreditLimit = Util.getValueOfDouble(drl.get("so_creditlimit"));
+                                    CreditLimit = Util.getValueOfDouble(drl["SO_CreditLimit"]);
                                     //	var SOCreditStatus = dr.getString("SOCreditStatus");
                                     if (CreditLimit != 0) {
-                                        var CreditAvailable = Util.getValueOfDouble(drl.get("creditavailable"));
-                                        if (dr != null && CreditAvailable <= 0) {
+                                        CreditAvailable = Util.getValueOfDouble(drl["CreditAvailable"]);
+                                        if (drl != null && CreditAvailable <= 0) {
                                             //VIS.ADialog.info("CreditLimitOver", null, "", "");
                                             VIS.ADialog.info("CreditOver");
                                         }
@@ -11848,7 +11841,7 @@
                     }
 
                     //	PO Reference
-                    s = Util.getValueOfString(dr.get("poreference"));
+                    s = Util.getValueOfString(idr["POReference"]);
                     if (s != null && s.length != 0) {
                         mTab.setValue("POReference", s);
                     }
@@ -11856,12 +11849,12 @@
                         mTab.setValue("POReference", null);
                     }
                     //	SO Description
-                    s = Util.getValueOfString(dr.get("so_description"));
+                    s = Util.getValueOfString(idr["SO_Description"]);
                     if (s != null && s.toString().trim().length != 0) {
                         mTab.setValue("Description", s);
                     }
                     //	IsDiscountPrinted
-                    s = Util.getValueOfString(dr.get("isdiscountprinted"));
+                    s = Util.getValueOfString(idr["IsDiscountPrinted"]);
                     if (s != null && s.toString().trim().length != 0) {
                         mTab.setValue("IsDiscountPrinted", s);
                     }
@@ -11871,25 +11864,25 @@
                     // set withholding tax defined on vendor/customer
                     //mTab.setValue("C_Withholding_ID", Util.getValueOfInt(dr.get("C_Withholding_ID")));
                 }
-                dr.close();
+                //idr.close();
             }
             catch (err) {
                 this.setCalloutActive(false);
-                if (dr != null) {
-                    dr.close();
+                if (idr != null) {
+                   // idr.close();
                 }
                 if (drl != null) {
-                    drl.close();
+                    //drl.close();
                 }
                 this.log.log(Level.SEVERE, "bPartner", err);
                 return err.message;
             }
             finally {
-                if (dr != null) {
-                    dr.close();
+                if (idr != null) {
+                    //idr.close();
                 }
                 if (drl != null) {
-                    drl.close();
+                    //drl.close();
                 }
             }
         }
@@ -12268,7 +12261,7 @@
         try {
             /**** Start Amit For Tax Type Module ****/
             var taxRule = "";
-            var sql = "";
+            //var sql = "";
             // JID_1449: Tax is not working in case of charge on invoice line
             var params = Util.getValueOfString(mTab.getValue("C_Invoice_ID")).concat(",", Util.getValueOfString(mTab.getValue("M_Product_ID")) +
                 "," + Util.getValueOfString(mTab.getValue("C_Charge_ID")));
@@ -12701,19 +12694,23 @@
         //  
 
         //var ctx = Env.getContext();
-        var ss = ctx.getContext("IsTaxIncluded");
+        var idr = ctx.getContext("IsTaxIncluded");
         try {
             //	Not Set Yet
-            if (ss.toString().length == 0) {
+            if (idr.toString().length == 0) {
                 var M_PriceList_ID = ctx.getContextAsInt(windowNo, "M_PriceList_ID");
                 if (M_PriceList_ID == 0) {
                     return false;
                 }
-                ss = VIS.DB.executeScalar("SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + M_PriceList_ID, null, null).toString();
-                if (ss == null) {
-                    ss = "N";
+                //ss = VIS.DB.executeScalar("SELECT IsTaxIncluded FROM M_PriceList WHERE M_PriceList_ID=" + M_PriceList_ID, null, null).toString();
+                var param = M_PriceList_ID.toString();
+                 idr = VIS.dataContext.getJSONRecord("MInvoice/GetTaxInclude", param);
+
+                if (idr == null) {
+                    idr = "N";
+
                 }
-                ctx.setContext(windowNo, "IsTaxIncluded", ss);
+                ctx.setContext(windowNo, "IsTaxIncluded", idr);
             }
         }
         catch (err) {
@@ -12721,7 +12718,7 @@
             this.log.severe(err.toString());
         }
         ctx = windowNo = mTab = mField = value = oldValue = null;
-        return "Y" == ss;
+        return "Y" == idr;
     };
 
     /**
@@ -12969,7 +12966,7 @@
     /// <returns>null or error message</returns>
     CalloutInvoice.prototype.PriceList = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
-        var sql = "";
+        var paramString = "";
         var dr = null;
         try {
             if (value == null || value.toString() == "") {
@@ -12978,40 +12975,39 @@
             var M_PriceList_ID = Util.getValueOfInt(value.toString());
             if (M_PriceList_ID == null || M_PriceList_ID == 0)
                 return "";
-
-            sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
-                + "plv.M_PriceList_Version_ID,plv.ValidFrom "
-                + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
-                + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
-                + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
-                + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
+            //Commented by Nisha
+            //sql = "SELECT pl.IsTaxIncluded,pl.EnforcePriceLimit,pl.C_Currency_ID,c.StdPrecision,"
+            //    + "plv.M_PriceList_Version_ID,plv.ValidFrom "
+            //    + "FROM M_PriceList pl,C_Currency c,M_PriceList_Version plv "
+            //    + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
+            //    + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
+            //    + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
+            //    + "ORDER BY plv.ValidFrom DESC";
             //	Use newest price list - may not be future
 
             //DataSet ds = VIS.DB..executeDataset(sql, null);
             //for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+            paramString = M_PriceList_ID.toString();
+            dr = VIS.dataContext.getJSONRecord("MInvoice/GetPriceList", paramString);                //DataRow dr = ds.Tables[0].Rows[i]
+            // if (dr.read()) {
+            //	Tax Included
+            mTab.setValue("IsTaxIncluded", (Boolean)("Y".equals(dr["IsTaxIncluded"])));
+            //	Price Limit Enforce
+            ctx.setContext(windowNo, "EnforcePriceLimit", dr["EnforcePriceLimit"]);
+            //	Currency
+            var ii = Util.getValueOfInt(dr["C_Currency_ID"]);
+            mTab.setValue("C_Currency_ID", ii);
+            var prislst = Util.getValueOfInt(dr["M_PriceList_Version_ID"]);
+            //	PriceList Version
+            ctx.setContext(windowNo, "M_PriceList_Version_ID", prislst);
+            //
 
-            dr = VIS.DB.executeReader(sql);
-            if (dr.read()) {
-                //DataRow dr = ds.Tables[0].Rows[i];
-                //	Tax Included
-                mTab.setValue("IsTaxIncluded", (Boolean)("Y".equals(dr.get("istaxincluded"))));
-                //	Price Limit Enforce
-                ctx.setContext(windowNo, "EnforcePriceLimit", dr.get("enforcepricelimit"));
-                //	Currency
-                var ii = Util.getValueOfInt(dr.get("c_currency_id"));
-                mTab.setValue("C_Currency_ID", ii);
-                var prislst = Util.getValueOfInt(dr.get("m_pricelist_version_id"));
-                //	PriceList Version
-                ctx.setContext(windowNo, "M_PriceList_Version_ID", prislst);
-            }
-            dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (dr != null)
-                dr.close();
-            this.log.log(Level.severe, sql, err);
+            /*if (dr != null)*/
+               // dr.close();
+            //this.log.log(Level.severe, sql, err);
             return err.message;
             //MessageBox.Show("Callout--PriceList");
         }
@@ -13111,99 +13107,103 @@
         if (C_BPartner_ID == null || C_BPartner_ID == 0) {
             return "";
         }
-        var sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
-            + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
-            + " p.SO_Description,p.IsDiscountPrinted,"
-            + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
-            + " l.C_BPartner_Location_ID,c.AD_User_ID,"
-            + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID "
-            + "FROM C_BPartner p"
-            + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
-            + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
-            + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
-            + "WHERE p.C_BPartner_ID=@Param1 AND p.IsActive='Y'";		//	#1
+        //var sql ="SELECT p.AD_Language,p.C_PaymentTerm_ID,"
+        //    + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
+        //    + " p.SO_Description,p.IsDiscountPrinted,"
+        //    + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
+        //    + " l.C_BPartner_Location_ID,c.AD_User_ID,"
+        //    + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID "
+        //    + "FROM C_BPartner p"
+        //    + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
+        //    + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
+        //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
+        //    + "WHERE p.C_BPartner_ID=@Param1 AND p.IsActive='Y'";		//	#1
 
         var IsSOTrx = ctx.isSOTrx();
-        var Param = [];
+        // var Param = [];
         //SqlParameter[] Param = new SqlParameter[1];
         var idr = null;
         try {
-            Param[0] = new VIS.DB.SqlParam("@Param1", C_BPartner_ID);
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
-                //	PaymentRule
-                // var s = Util.getValueOfString(idr[]);
-                var s = Util.getValueOfString(idr.get((IsSOTrx ? "paymentrule" : "paymentrulepo")));
-                if (s != null && s.length != 0) {
-                    if (ctx.getContext("DocBaseType").endsWith("C"))// .endsWith("C"))	//	Credits are Payment Term
-                    {
-                        s = "P";
-                    }
-                    else if (this.isSOTrx && (s == "S") || (s == "U"))	//	No Check/Transfer for SO_Trx
-                    {
-                        s = "P";											//  Payment Term
-                    }
-                }
-                //  Payment Term
-                //  var ii = Util.getValueOfInt(idr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"]);
-                var ii = Util.getValueOfInt(idr.get((IsSOTrx ? "c_paymentterm_id" : "po_paymentterm_id")));
-                if (ii > 0) {
-                    mTab.setValue("C_PaymentTerm_ID", ii);
-                }
-                //	Location
-                //var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
-                var locID = Util.getValueOfInt(idr.get("c_bpartner_location_id"));
-                //	overwritten by InfoBP selection - works only if InfoWindow
-                //	was used otherwise creates error (uses last value, may belong to differnt BP)
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var loc = ctx.getContext("C_BPartner_Location_ID");
-                    if (loc.toString().length > 0) {
-                        locID = Util.getValueOfInt(loc);
-                    }
-                }
-                if (locID == 0) {
-                    mTab.setValue("C_BPartner_Location_ID", null);
-                }
-                else {
-                    mTab.setValue("C_BPartner_Location_ID", Util.getValueOfInt(locID));
-                }
+            // Param[0] = new VIS.DB.SqlParam("@Param1", C_BPartner_ID);
+            //idr = VIS.DB.executeReader(sql, Param, null);
+            var fields = C_BPartner_ID.toString();
+            idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPDataForProvisionalInvoice", fields);
+            /* if (idr.read()) {*/
 
-                //	Contact - overwritten by InfoBP selection
-                //var contID = Util.getValueOfInt(idr["AD_User_ID"]);
-                var contID = Util.getValueOfInt(idr.get("ad_user_id"));
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var cont = ctx.getContext("AD_User_ID");
-                    if (cont.toString().length > 0) {
-                        contID = Util.getValueOfInt(cont);
-                    }
+            //	PaymentRule
+            // var s = Util.getValueOfString(idr[]);
+            //var s = Util.getValueOfString(idr.get((IsSOTrx ? "paymentrule" : "paymentrulepo")));
+            var s = Util.getValueOfString(idr[IsSOTrx ? "PaymentRule" : "PaymentRulePO"]);
+            if (s != null && s.length != 0) {
+                if (ctx.getContext("DocBaseType").endsWith("C"))// .endsWith("C"))	//	Credits are Payment Term
+                {
+                    s = "P";
                 }
-                if (contID == 0) {
-                    mTab.setValue("AD_User_ID", null);
+                else if (this.isSOTrx && (s == "S") || (s == "U"))	//	No Check/Transfer for SO_Trx
+                {
+                    s = "P";											//  Payment Term
                 }
-                else {
-                    mTab.setValue("AD_User_ID", Util.getValueOfInt(contID));
+            }
+            //  Payment Term
+            //  var ii = Util.getValueOfInt(idr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"]);
+            var ii = Util.getValueOfInt(idr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"]);
+            if (ii > 0) {
+                mTab.setValue("C_PaymentTerm_ID", ii);
+            }
+            //	Location
+            var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
+            //var locID = Util.getValueOfInt(idr.get("c_bpartner_location_id"));
+            //	overwritten by InfoBP selection - works only if InfoWindow
+            //	was used otherwise creates error (uses last value, may belong to differnt BP)
+            if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
+                var loc = ctx.getContext("C_BPartner_Location_ID");
+                if (loc.toString().length > 0) {
+                    locID = Util.getValueOfInt(loc);
                 }
-                //	CreditAvailable
-                if (IsSOTrx) {
-                    var CreditLimit = Util.getValueOfDouble(idr.get("so_creditlimit"));
-                    if (CreditLimit != 0) {
-                        var CreditAvailable = Util.getValueOfDouble(idr.get("creditavailable"));
-                        if (idr == null && CreditAvailable < 0) {
-                            // ShowMessage.Info("CreditLimitOver", null, "", "");
-                            VIS.ADialog.info("CreditLimitOver");
-                        }
+            }
+            if (locID == 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            else {
+                mTab.setValue("C_BPartner_Location_ID", Util.getValueOfInt(locID));
+            }
+
+            //	Contact - overwritten by InfoBP selection
+            var contID = Util.getValueOfInt(idr["AD_User_ID"]);
+            // var contID = Util.getValueOfInt(idr["ad_user_id"]);
+            if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
+                var cont = ctx.getContext("AD_User_ID");
+                if (cont.toString().length > 0) {
+                    contID = Util.getValueOfInt(cont);
+                }
+            }
+            if (contID == 0) {
+                mTab.setValue("AD_User_ID", null);
+            }
+            else {
+                mTab.setValue("AD_User_ID", Util.getValueOfInt(contID));
+            }
+            //	CreditAvailable
+            if (IsSOTrx) {
+                var CreditLimit = Util.getValueOfDouble(idr["SO_CreditLimit"]);
+                if (CreditLimit != 0) {
+                    var CreditAvailable = Util.getValueOfDouble(idr["CreditAvailable"]);
+                    if (idr == null && CreditAvailable < 0) {
+                        // ShowMessage.Info("CreditLimitOver", null, "", "");
+                        VIS.ADialog.info("CreditLimitOver");
                     }
                 }
             }
-            idr.close();
+            /*}*/
+            //idr.close();
 
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.severe, sql, err);
+            //if (idr != null) {
+            //    idr.close();
+            //}
+            //  this.log.log(Level.severe, sql, err);
             return err.message;
         }
         //
@@ -13236,29 +13236,21 @@
     /// <param name="windowNo">current Window No</param>
     /// <param name="mTab"> Model Tab</param>
     CalloutInvoiceBatch.prototype.SetDocumentNo = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        //	Get last line
-        //  
+         //C_InvoiceBatchLine_ID=100
         var C_InvoiceBatch_ID = ctx.getContextAsInt(windowNo, "C_InvoiceBatch_ID");
-        var sql = "SELECT COALESCE(MAX(C_InvoiceBatchLine_ID),0) FROM C_InvoiceBatchLine WHERE C_InvoiceBatch_ID=" + C_InvoiceBatch_ID;
-
+        //var sql = "SELECT COALESCE(MAX(C_InvoiceBatchLine_ID),0) FROM C_InvoiceBatchLine WHERE C_InvoiceBatch_ID=" + C_InvoiceBatch_ID;//Commented by Nisha
+       var C_InvoiceBatchLine_ID = VIS.dataContext.getJSONRecord("MInvoiceBatchLine/GetMaxLines", C_InvoiceBatch_ID)
         // var C_InvoiceBatchLine_ID = VIS.DB.getSQLValue(null, sql, C_InvoiceBatch_ID);
-        var C_InvoiceBatchLine_ID = VIS.DB.executeScalar(sql);
+        //var C_InvoiceBatchLine_ID = VIS.DB.executeScalar(sql);
         if (C_InvoiceBatchLine_ID == 0) {
             return;
         }
-
-
         var paramString = C_InvoiceBatchLine_ID.toString();
-
         //Get product price information
         var dr = null;
         dr = VIS.dataContext.getJSONRecord("MInvoiceBatchLine/GetInvoiceBatchLine", paramString);
 
-
-
-
-
-        //MInvoiceBatchLine last = new MInvoiceBatchLine(Env.GetCtx(), C_InvoiceBatchLine_ID, null);
+    //MInvoiceBatchLine last = new MInvoiceBatchLine(Env.GetCtx(), C_InvoiceBatchLine_ID, null);
         //MInvoiceBatchLine last = new MInvoiceBatchLine(ctx, C_InvoiceBatchLine_ID, null);
         //	Need to Increase when different DocType or BP
         var C_DocType_ID = ctx.getContextAsInt(windowNo, "C_DocType_ID");
@@ -13308,25 +13300,26 @@
         if (C_Charge_ID == null || Util.getValueOfInt(C_Charge_ID) == 0) {
             return "";
         }
-        var sql = "SELECT ChargeAmt FROM C_Charge WHERE C_Charge_ID=@Param1";
-        var Param = [];
+        //var sql = "SELECT ChargeAmt FROM C_Charge WHERE C_Charge_ID=@Param1";//commented by nisha
+        // var Param = [];commented by nisha
         // SqlParameter[] Param = new SqlParameter[1];
-        var idr = null;
+        var ChargeAmount = 0;
         try {
-            Param[0] = new VIS.DB.SqlParam("@Param1", C_Charge_ID);
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
-                mTab.setValue("PriceEntered", Util.getValueOfDecimal(idr.get(0)));
-            }
-            idr.close();
+            //Param[0] = new VIS.DB.SqlParam("@Param1", C_Charge_ID);//commented by nisha
+            var param = C_Charge_ID.toString();
+            ChargeAmount = VIS.dataContext.getJSONRecord("MInvoiceBatchLine/GetCharges", param);
+            //if (idr.read()) {
+            mTab.setValue("PriceEntered", Util.getValueOfDecimal(ChargeAmount));
+            //}
+            //idr.close();
 
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.severe, sql, err);
+            //if (idr != null) {
+            //    idr.close();//commented by nisha
+            //}
+           // this.log.log(Level.severe, sql, err);
             return err.message;
         }
         //
@@ -14847,7 +14840,7 @@
         if (ii == null) {
             return "";
         }
-        var C_Invoice_ID = ii;// ii.intValue();
+        var C_Invoice_ID = ii;//ii.intValue();
         if (C_Invoice_ID == 0) {
             return "";
         }
@@ -14897,41 +14890,42 @@
 
         var PayDate = ctx.getContext("PayDate");
         this.setCalloutActive(true);
-
         var OpenAmt = VIS.Env.ZERO;
-
-
         var DiscountAmt = VIS.Env.ZERO;
         var isSOTrx = false;//            Boolean.FALSE;
-        var sql = "SELECT currencyConvert(invoiceOpen(i.C_Invoice_ID, 0), i.C_Currency_ID,"
-            + "ba.C_Currency_ID, i.DateInvoiced, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) as OpenAmt,"
-            + " paymentTermDiscount(i.GrandTotal,i.C_Currency_ID,i.C_PaymentTerm_ID,i.DateInvoiced,'" + PayDate + "') As DiscountAmt, i.IsSOTrx "
-            + "FROM C_Invoice_v i, C_BankAccount ba "
-            + "WHERE i.C_Invoice_ID=@Param2 AND ba.C_BankAccount_ID=@Param3";	//	#1..2
-        var Param = [];
+        //var sql = "SELECT currencyConvert(invoiceOpen(i.C_Invoice_ID, 0), i.C_Currency_ID,"
+        //    + "ba.C_Currency_ID, i.DateInvoiced, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) as OpenAmt,"
+        //    + " paymentTermDiscount(i.GrandTotal,i.C_Currency_ID,i.C_PaymentTerm_ID,i.DateInvoiced,'" + PayDate + "') As DiscountAmt, i.IsSOTrx "
+        //    + "FROM C_Invoice_v i, C_BankAccount ba "
+        //    + "WHERE i.C_Invoice_ID=@Param2 AND ba.C_BankAccount_ID=@Param3";	//	#1..2
+        //var Param = [];
         //SqlParameter[] Param = new SqlParameter[3];
         var idr = null;
         try {
             //Param[0] = new VIS.DB.SqlParam("@Param1", PayDate);  //Temporary Commented By Sarab
-            Param[0] = new VIS.DB.SqlParam("@Param2", C_Invoice_ID);
-            Param[1] = new VIS.DB.SqlParam("@Param3", C_BankAccount_ID);
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
-                OpenAmt = idr.get("openamt");
-                DiscountAmt = idr.get("discountamt");
-                IsSOTrx = "Y" == idr.get("issotrx");
+            //Param[0] = new VIS.DB.SqlParam("@Param2", C_Invoice_ID);
+            //Param[1] = new VIS.DB.SqlParam("@Param3", C_BankAccount_ID);
+            // idr = VIS.DB.executeReader(sql, Param, null);
+            var fields = C_Invoice_ID.toString() + ", " + C_BankAccount_ID.toString() + "," + PayDate.toString();//Created By Nisha
+            idr = VIS.dataContext.getJSONRecord("MPaySelection/GetInvoice", fields);//Created by Nisha
+
+            if (Object.keys(idr).length > 0) {
+                OpenAmt = Util.getValueOfDecimal(idr["OpenAmt"]);
+                DiscountAmt = Util.getValueOfDecimal(idr["DiscountAmt"]);
+                IsSOTrx = "Y" == Util.getValueOfString(idr["IsSOTrx"]);
+                }
+                //idr.close();
             }
-            idr.close();
-        }
+        
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.SEVERE, sql, err);
+            //if (idr != null) {
+            //    idr.close();
+            //}
+            //this.log.log(Level.SEVERE, sql, err);
         }
 
-        this.log.fine(" - OpenAmt=" + OpenAmt + " (Invoice=" + C_Invoice_ID + ",BankAcct=" + C_BankAccount_ID + ")");
+        this.log.fine("-OpenAmt=" + OpenAmt + " (Invoice=" + C_Invoice_ID + ",BankAcct=" + C_BankAccount_ID + ")");
         mTab.setValue("OpenAmt", OpenAmt);
         mTab.setValue("PayAmt", (OpenAmt - DiscountAmt));
         mTab.setValue("DiscountAmt", DiscountAmt);
@@ -15054,10 +15048,13 @@
         if (value == null || value.toString() == "") {
             return "";
         }
-        var sql = "";
+        //var sql = "";
+        var C_Currency_ID = 0;
         try {
-            sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + Util.getValueOfInt(value);
-            var C_Currency_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            //sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + Util.getValueOfInt(value);
+            //var C_Currency_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            var param = value.toString();
+            C_Currency_ID = VIS.dataContext.getJSONRecord("MCurrency/GetCurrenyID", param);
             mTab.setValue("C_Currency_ID", C_Currency_ID);
         }
         catch (err) {
@@ -15594,19 +15591,24 @@
         var M_PriceList_ID = ctx.getContextAsInt(windowNo, "M_PriceList_ID");
         var M_Attribute_ID = ctx.getContextAsInt(windowNo, "M_AttributeSetInstance_ID");
         if (M_PriceList_ID != 0) {
-            var query = "Select M_PriceList_Version_ID from M_ProductPrice where M_Product_id=" + Util.getValueOfInt(M_Product_ID) +
-                " and M_PriceList_Version_ID in (select m_pricelist_version_id from m_pricelist_version" +
-                " where m_pricelist_id = " + M_PriceList_ID + " and isactive='Y')";
-            var M_PriceList_Version_ID = Util.getValueOfInt(VIS.DB.executeScalar(query, null, null));
-            if (M_PriceList_Version_ID != 0) {
-                query = "Select PriceStd from M_ProductPrice where M_PriceList_Version_ID=" + M_PriceList_Version_ID + " and M_Product_id=" + Util.getValueOfInt(M_Product_ID) + " and M_AttributeSetInstance_ID=" + Util.getValueOfInt(M_Attribute_ID);
-                var PriceStd = Util.getValueOfDecimal(VIS.DB.executeScalar(query, null, null));
-                //ForcastLine.SetPriceStd(PriceStd);
-                mTab.setValue("PriceStd", PriceStd);
-                mTab.setValue("UnitPrice", PriceStd);
-                mTab.setValue("PriceStd", (PriceStd * Util.getValueOfDecimal(mTab.getValue("QtyEntered"))));
-                mTab.setValue("TotalPrice", (PriceStd * Util.getValueOfDecimal(mTab.getValue("QtyEntered"))));
-            }
+            //var query = "Select M_PriceList_Version_ID from M_ProductPrice where M_Product_id=" + Util.getValueOfInt(M_Product_ID) +
+            //    " and M_PriceList_Version_ID in (select m_pricelist_version_id from m_pricelist_version" +
+            //    " where m_pricelist_id = " + M_PriceList_ID + " and isactive='Y')";
+            //var M_PriceList_Version_ID = Util.getValueOfInt(VIS.DB.executeScalar(query, null, null));
+            var fields = M_Product_ID.toString() + ", " + M_PriceList_ID.toString() + "," + M_Attribute_ID.toString();
+            var PriceStd = VIS.dataContext.getJSONRecord("MTeamForcast/GetProductInfo", fields);
+            //if (M_PriceList_Version_ID != 0) {
+            //query = "Select PriceStd from M_ProductPrice where M_PriceList_Version_ID=" + M_PriceList_Version_ID + " and M_Product_id=" + Util.getValueOfInt(M_Product_ID) + " and M_AttributeSetInstance_ID=" + Util.getValueOfInt(M_Attribute_ID);
+            // var PriceStd = Util.getValueOfDecimal(VIS.DB.executeScalar(query, null, null));//Commented By Nisha
+            //var PriceStd = VIS.dataContext.getJSONRecord("MTeamForcast/GetProductInfo", fields);
+            //ForcastLine.SetPriceStd(PriceStd);
+            mTab.setValue("PriceStd", Util.getValueOfDecimal(PriceStd));
+            mTab.setValue("UnitPrice", Util.getValueOfDecimal(PriceStd));
+            //Commented by Nisha
+            //mTab.setValue("PriceStd", PriceStd);
+            //mTab.setValue("UnitPrice", PriceStd);
+            mTab.setValue("PriceStd", PriceStd * Util.getValueOfDecimal(mTab.getValue("QtyEntered")));
+            mTab.setValue("TotalPrice",PriceStd* Util.getValueOfDecimal(mTab.getValue("QtyEntered")));
         }
         else {
             // ShowMessage.info("PriceLisetNotFound", true, null, null);
@@ -15643,7 +15645,7 @@
         }
         catch (err) {
             this.setCalloutActive(false);
-            this.log.log(Level.SEVERE, sql, err);
+            //this.log.log(Level.SEVERE, sql, err);
             return err
         }
         this.setCalloutActive(false);
@@ -16019,8 +16021,10 @@
         }
         try {
             this.setCalloutActive(true);
-            var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(value);
-            var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));
+            //var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(value);//commented by Nisha
+            //var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));
+            var param = value.toString();
+            var rate = VIS.dataContext.getJSONRecord("MTaxAmt/GetRate", param);
             if (rate != 0) {
                 var taxAmt = (Util.getValueOfDecimal(mTab.getValue("ApprovedExpenseAmt")) * rate) / 100;
                 taxAmt = taxAmt.toFixed(2);
@@ -16047,8 +16051,10 @@
         }
         try {
             this.setCalloutActive(true);
-            var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(mTab.getValue("C_Tax_ID"));
-            var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));
+            //var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(mTab.getValue("C_Tax_ID"));//Commented By Nisha
+            //var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));//Commented By Nisha
+            var param = mTab.getValue("C_Tax_ID").toString();
+            var rate = VIS.dataContext.getJSONRecord("MTaxAmt/GetRate", param);
             if (rate != 0) {
                 var taxAmt = (Util.getValueOfDecimal(value) * rate) / 100;
                 taxAmt = taxAmt.toFixed(2);
@@ -16149,7 +16155,7 @@
             }
         }
         catch (err) {
-            this.log.log(Level.SEVERE, sql, err);
+            // this.log.log(Level.SEVERE, sql, err);
             this.setCalloutActive(false);
             return err.message;
         }
@@ -18106,7 +18112,7 @@
             mTab.setValue("OutStandingAmount", "");
             return "";
         }
-        /*
+
         this.setCalloutActive(true);
         var amounts = "";
         var bp_BusinessPartner = mTab.getValue("C_BPartner_ID");
@@ -18116,161 +18122,144 @@
             this.setCalloutActive(false);
             return "";
         }
-        var paramString = bp_BusinessPartner.toString() + "," + asOnDate.toString();
+        var paramString = "N , " + bp_BusinessPartner.toString() + "," + asOnDate.toString();
         try {
             amounts = VIS.dataContext.getJSONRecord("MPayment/GetOutStandingAmt", paramString); //in difference currency
+            mTab.setValue("OutStandingAmount", amounts);
         }
         catch (err) {
             //this.log.log(Level.SEVERE, sql, err);
             this.setCalloutActive(false);
             return err.message;
-            {
-                //Arpit
-                mTab.setValue("OutStandingAmount", amounts);
-            }
         }
-        mTab.setValue("OutStandingAmount", amounts);
         this.setCalloutActive(false);
-        */
-        this.setCalloutActive(true);
 
-        var bp_BusinessPartner = mTab.getValue("C_BPartner_ID");
-        var asOnDate = mTab.getValue("AsOnDate");
-        asOnDate = VIS.DB.to_date(asOnDate, true);
+        //Commented By Nisha
+
+        //var bp_BusinessPartner = mTab.getValue("C_BPartner_ID");
+        //var asOnDate = mTab.getValue("AsOnDate");
+        //asOnDate = VIS.DB.to_date(asOnDate, true);
         // changed by Bharat on 06 April 2017 for AP Payment and AR Receipt cases
-        var sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts FROM " +
-            "(SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN, COUNT (*) OVER () CNT FROM " +
-            "(SELECT iso_code || ':' || SUM(OpenAmt) AS ConvertPrice " +
-            "FROM (SELECT c.iso_code,  invoiceOpen (i.C_Invoice_ID,i.C_InvoicePaySchedule_ID)*MultiplierAP AS OpenAmt  FROM C_Invoice_V i " +
-            "LEFT JOIN C_Currency C ON C.C_Currency_ID=i.C_Currency_ID " +
-            "LEFT JOIN C_InvoicePaySchedule IPS ON IPS.c_invoice_ID = i.c_invoice_ID " +
-            "WHERE i.docstatus IN ('CO','CL') " +
-            "AND i.IsActive ='Y' " +
-            "AND i.ispaid ='N' " +
-            "AND ips.duedate IS NOT NULL " +
-            "AND NVL(ips.dueamt,0)!=0 " +
-            "AND i.c_bpartner_id = " + bp_BusinessPartner +
-            "AND to_date(ips.duedate,'dd-mm-yyyy')" +
-            "<= ( CASE " +
-            "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
-            "THEN to_date(sysdate,'dd-mm-yyyy') " +
-            "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
-            "END ) " +
-            "UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
-            "FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
-            "LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
-            "AND p.C_BPARTNER_ID = " + bp_BusinessPartner + " AND p.DocStatus     IN ('CO','CL') " +
-            "AND to_date(pay.DateTrx,'dd-mm-yyyy')" +
-            "<=( CASE " +
-            "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
-            "THEN to_date(sysdate,'dd-mm-yyyy') " +
-            "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
-            "END ) " +
-            ") " +
-            "GROUP BY iso_code " +
-            ") " +
-            ") " +
-            "WHERE RN = CNT START WITH RN = 1 CONNECT BY RN = PRIOR RN + 1 ";
+        //var sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts FROM " +
+        //    "(SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN, COUNT (*) OVER () CNT FROM " +
+        //    "(SELECT iso_code || ':' || SUM(OpenAmt) AS ConvertPrice " +
+        //    "FROM (SELECT c.iso_code,  invoiceOpen (i.C_Invoice_ID,i.C_InvoicePaySchedule_ID)*MultiplierAP AS OpenAmt  FROM C_Invoice_V i " +
+        //    "LEFT JOIN C_Currency C ON C.C_Currency_ID=i.C_Currency_ID " +
+        //    "LEFT JOIN C_InvoicePaySchedule IPS ON IPS.c_invoice_ID = i.c_invoice_ID " +
+        //    "WHERE i.docstatus IN ('CO','CL') " +
+        //    "AND i.IsActive ='Y' " +
+        //    "AND i.ispaid ='N' " +
+        //    "AND ips.duedate IS NOT NULL " +
+        //    "AND NVL(ips.dueamt,0)!=0 " +
+        //    "AND i.c_bpartner_id = " + bp_BusinessPartner +
+        //    "AND to_date(ips.duedate,'dd-mm-yyyy')" +
+        //    "<= ( CASE " +
+        //    "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
+        //    "THEN to_date(sysdate,'dd-mm-yyyy') " +
+        //    "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
+        //    "END ) " +
+        //    "UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
+        //    "FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
+        //    "LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
+        //    "AND p.C_BPARTNER_ID = " + bp_BusinessPartner + " AND p.DocStatus     IN ('CO','CL') " +
+        //    "AND to_date(pay.DateTrx,'dd-mm-yyyy')" +
+        //    "<=( CASE " +
+        //    "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
+        //    "THEN to_date(sysdate,'dd-mm-yyyy') " +
+        //    "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
+        //    "END ) " +
+        //    ") " +
+        //    "GROUP BY iso_code " +
+        //    ") " +
+        //    ") " +
+        //    "WHERE RN = CNT START WITH RN = 1 CONNECT BY RN = PRIOR RN + 1 ";
 
-        var idr = null;
-        try {
-            idr = VIS.DB.executeReader(sql, null, null);
-            if (idr.read()) {
-                var amounts = idr.get("amounts");
-                /*Edited By Arpit Rai on 6th March,2017
-                changed by Bharat on 06 April 2017 for PDC Payable and PDC Receivable cases
-                 To set PDC amount in outstanding balance in PDC window & Payment window */
-                sql = "";
-                sql = "Select COUNT(AD_ModuleInfo_ID) From AD_ModuleInfo Where Prefix='VA027_' AND IsActive='Y'";
-                var count = Util.getValueOfInt(VIS.DB.executeScalar(sql));
-                if (count > 0) {
-                    sql = "";
-                    sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts\
-                    FROM (SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN,\
-                    COUNT (*) OVER () CNT FROM  \
-                    (SELECT ' PDC-'||iso_code|| ':'|| ROUND(SUM(PdcDue),2) AS ConvertPrice \
-                    FROM (SELECT c.iso_code, \
-                    CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                     THEN chk.VA027_ChequeAmount \
-                     ELSE pdc.VA027_PayAmt END AS PdcDue \
-                      FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
-                      ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
-                      INNER JOIN C_Currency C ON C.C_Currency_ID=PDC.C_Currency_ID \
-                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID\
-                      WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDR'\
-                      AND pdc.DocStatus = 'CO' \
-                      AND pdc.VA027_PAYMENTGENERATED ='N'\
-                      AND pdc.VA027_PaymentStatus !=3\
-                      AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
-                       AND PDC.c_bpartner_id = " + bp_BusinessPartner +
-                        " UNION SELECT c.iso_code, \
-                       CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                        THEN chk.VA027_ChequeAmount*-1 \
-                        ELSE pdc.VA027_PayAmt*-1 END AS PdcDue \
-                        FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
-                        ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
-                        INNER JOIN C_Currency C ON C.C_Currency_ID=pdc.C_Currency_ID \
-                        INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID \
-                        WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDP' \
-                        AND pdc.VA027_PAYMENTGENERATED ='N' \
-                        AND pdc.VA027_PaymentStatus !=3 \
-                        AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
-                       AND pdc.c_bpartner_id = " + bp_BusinessPartner +
-                        ") GROUP BY iso_code \
-                      )\
-                     )\
-                     WHERE RN = CNT\
-                    START WITH RN = 1\
-                     CONNECT BY RN = PRIOR RN + 1";
-                    idr = null;
-                    try {
-                        idr = VIS.DB.executeReader(sql, null, null);
-                        if (idr.read()) {
-                            if (idr.get("amounts") != null && idr.get("amounts").toUpper().indexOf("NULL") == -1)
-                                amounts = amounts + ' PDC-' + idr.get("amounts");
-                        }
-                    }
-                    catch (err) {
-                        if (idr != null) {
-                            idr.close();
-                            idr = null;
-                        }
-                        this.log.log(Level.SEVERE, sql, err);
-                        this.setCalloutActive(false);
-                        return err.message;
-                    }
-                }
-                //Arpit
-                mTab.setValue("OutStandingAmount", amounts);
-            }
-            idr.close();
-        }
-        catch (err) {
-            if (idr != null) {
-                idr.close();
-                idr = null;
-            }
-            this.log.log(Level.SEVERE, sql, err);
-            this.setCalloutActive(false);
-            return err.message;
-        }
-        this.setCalloutActive(false);
+        //var idr = null;
+        //try {
+        //        var amounts = idr("amounts");
+        /*Edited By Arpit Rai on 6th March,2017
+        changed by Bharat on 06 April 2017 for PDC Payable and PDC Receivable cases
+         To set PDC amount in outstanding balance in PDC window & Payment window */
+        // sql = "";
+        //sql = "Select COUNT(AD_ModuleInfo_ID) From AD_ModuleInfo Where Prefix='VA027_' AND IsActive='Y'";
+        // var count = Util.getValueOfInt(VIS.DB.executeScalar(sql));
+        //if (count > 0) {
+        //    sql = "";
+        //    sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts\
+        //    FROM (SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN,\
+        //    COUNT (*) OVER () CNT FROM  \
+        //    (SELECT ' PDC-'||iso_code|| ':'|| ROUND(SUM(PdcDue),2) AS ConvertPrice \
+        //    FROM (SELECT c.iso_code, \
+        //    CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
+        //     THEN chk.VA027_ChequeAmount \
+        //     ELSE pdc.VA027_PayAmt END AS PdcDue \
+        //      FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
+        //      ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
+        //      INNER JOIN C_Currency C ON C.C_Currency_ID=PDC.C_Currency_ID \
+        //      INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID\
+        //      WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDR'\
+        //      AND pdc.DocStatus = 'CO' \
+        //      AND pdc.VA027_PAYMENTGENERATED ='N'\
+        //      AND pdc.VA027_PaymentStatus !=3\
+        //      AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
+        //      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
+        //        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
+        //        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
+        //       AND PDC.c_bpartner_id = " + bp_BusinessPartner +
+        //        " UNION SELECT c.iso_code, \
+        //       CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
+        //        THEN chk.VA027_ChequeAmount*-1 \
+        //        ELSE pdc.VA027_PayAmt*-1 END AS PdcDue \
+        //        FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
+        //        ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
+        //        INNER JOIN C_Currency C ON C.C_Currency_ID=pdc.C_Currency_ID \
+        //        INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID \
+        //        WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDP' \
+        //        AND pdc.VA027_PAYMENTGENERATED ='N' \
+        //        AND pdc.VA027_PaymentStatus !=3 \
+        //        AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
+        //      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
+        //        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
+        //        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
+        //       AND pdc.c_bpartner_id = " + bp_BusinessPartner +
+        //        ") GROUP BY iso_code \
+        //      )\
+        //     )\
+        //     WHERE RN = CNT\
+        //    START WITH RN = 1\
+        /*//     CONNECT*/ /*BY RN = PRIOR RN + 1";*/
+        //idr = null;
+        //try {
+        //    //idr = VIS.DB.executeReader(sql, null, null);
+        //        if (idr("amounts") != null && idr("amounts").toUpper().indexOf("NULL") == -1)
+        //            amounts = amounts + ' PDC-' + idr("amounts");
+
+        //}
+        //catch (err) {
+        //    if (idr != null) {
+        //       // idr.close();
+        //        idr = null;
+        //    }
+        //this.log.log(Level.SEVERE, sql, err);
+        //this.setCalloutActive(false);
+        //return err.message;
+        // }
+        //Arpit
+        //    mTab.setValue("OutStandingAmount", amounts);
+        //}
+        //catch (err) {
+        //    if (idr != null) {
+
+        //    }
+        //        /* this.log.log(Level.SEVERE, sql, err);*/
+        //        this.setCalloutActive(false);
+        //        return err.message;
+
+        //}
+        //this.setCalloutActive(false);
         return "";
     };
     // End 22/2/2017 Manish
-
-
-
-
-
-
-
     /// <summary>
     /// Payment_Amounts.
     /// Change of:
@@ -18647,7 +18636,7 @@
             }
             catch (err) {
                 this.setCalloutActive(false);
-                this.log.log(Level.SEVERE, sql, err);
+                // this.log.log(Level.SEVERE, sql, err);
                 return err;
             }
         }
@@ -21188,11 +21177,12 @@
             mTab.setValue("M_AttributeSetInstance_ID", null);
         }
         try {
-            if (Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_' ")) > 0) {
-                var _M_Product_ID = Util.getValueOfInt(value);
-                var _C_UOM_ID = Util.getValueOfInt(VIS.DB.executeScalar("SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_PRoduct_ID = " + _M_Product_ID));
-                mTab.setValue("C_UOM_ID", _C_UOM_ID);
-            }
+            //if (Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_' ")) > 0) {
+            var _M_Product_ID = Util.getValueOfInt(value);
+            // var _C_UOM_ID = Util.getValueOfInt(VIS.DB.executeScalar("SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_PRoduct_ID = " + _M_Product_ID));
+            //C_UOM_ID = _M_Product_ID.toString();
+            _C_UOM_ID = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListUOM", _M_Product_ID)
+            mTab.setValue("C_UOM_ID", _C_UOM_ID);
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -21638,23 +21628,25 @@
 
         this.setCalloutActive(true);
         try {
+            //Commented By Nisha
 
-            var Ptax = 0;
-            var yr = 0, pDim = 0;
-            var ds = null;
-            ds = VIS.DB.executeDataSet("SELECT ProfitBeforeTax,C_Year_ID,C_ProfitAndLoss_ID FROM C_ProfitLoss WHERE C_ProfitLoss_ID=" + value, null, null);
-            if (ds != null) {
+            //var Ptax = 0;
+            //var yr = 0, pDim = 0;
+            //var ds = null;
+            //ds = VIS.DB.executeDataSet("SELECT ProfitBeforeTax,C_Year_ID,C_ProfitAndLoss_ID FROM C_ProfitLoss WHERE C_ProfitLoss_ID=" + value, null, null);
+            //if (ds != null) {
 
-                if (ds.tables[0].rows.length > 0) {
+            //    if (ds.tables[0].rows.length > 0) {
 
-                    Ptax = Util.getValueOfDecimal(ds.getTables()[0].getRows()[0].getCell("ProfitBeforeTax"));
-                    yr = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_Year_ID"));
-                    pDim = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_ProfitAndLoss_ID"));
-                    mTab.setValue("ProfitBeforeTax", Ptax);
-                    mTab.setValue("C_Year_ID", yr);
-                    mTab.setValue("C_ProfitAndLoss_ID", pDim);
-                }
-            }
+            //        Ptax = Util.getValueOfDecimal(ds.getTables()[0].getRows()[0].getCell("ProfitBeforeTax"));
+            //        yr = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_Year_ID"));
+            //        pDim = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_ProfitAndLoss_ID"));
+            var param = value;//Created By Nisha
+            idr = VIS.dataContext.getJSONRecord("MProfitTax/GetBeforeTax", param);//Created by Nisha
+
+            mTab.setValue("ProfitBeforeTax", Util.getValueOfDecimal(idr["ProfitBeforeTax"]));
+            mTab.setValue("C_Year_ID", Util.getValueOfInt(idr["C_Year_ID"]));
+            mTab.setValue("C_ProfitAndLoss_ID", Util.getValueOfInt(idr["C_ProfitAndLoss_ID"]));
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -22640,6 +22632,6 @@
         return "";
     };
     VIS.Model.CalloutAzureBlob = CalloutAzureBlob;
-    //VIS264**************CalloutAzureBlob End*************
 
+    //VIS264**************CalloutAzureBlob End*************
 })(VIS, jQuery);

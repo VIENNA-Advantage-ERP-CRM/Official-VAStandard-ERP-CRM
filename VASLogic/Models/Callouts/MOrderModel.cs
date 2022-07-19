@@ -167,7 +167,7 @@ namespace VIS.Models
             string[] paramValue = fields.Split(',');
             bool isSOTrx = false;
             int incoTerm_ID = 0, referenceID = 0;
-            string tableName = "", refColumn = "", qry = "";
+            string tableName = "", refColumn = "";
             isSOTrx = Util.GetValueOfBool(paramValue[0]);
             tableName = Util.GetValueOfString(paramValue[1]);
             refColumn = Util.GetValueOfString(paramValue[2]);

@@ -44,6 +44,12 @@ namespace VIS.Models
             //result["M_Product_ID"] = product.GetM_Product_ID().ToString();
             return result;
         }
+        /// <summary>
+        /// Get Product Type
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public string GetProductType(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
@@ -71,17 +77,17 @@ namespace VIS.Models
             
         }
         /// <summary>
-        /// Get C
+        /// Get UOM_ID
         /// </summary>
         /// <param name="fields"></param>
-        /// <returns></returns>
-        public int GetC_UOM_ID(Ctx ctx,string fields)
+        /// <returns>ID</returns>
+        public int GetC_UOM_ID(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
             int M_Product_ID;
             M_Product_ID = Util.GetValueOfInt(paramValue[0].ToString());
             return MProduct.Get(ctx, M_Product_ID).GetC_UOM_ID();
-           
+
         }
 
         //Added By amit
@@ -105,5 +111,18 @@ namespace VIS.Models
             string sql = "SELECT C_RevenueRecognition_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + Util.GetValueOfInt(fields);
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
+        /// <summary>
+        /// Getting Counts Of Transaction
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="M_Product_ID"></param>
+        /// <returns>Transction</returns>
+        public int GetUOMCount(Ctx ctx, int M_Product_ID)
+        {
+            string sql = "select count(*) from m_transaction where m_product_id = " +M_Product_ID;
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
+
+
     }
 }

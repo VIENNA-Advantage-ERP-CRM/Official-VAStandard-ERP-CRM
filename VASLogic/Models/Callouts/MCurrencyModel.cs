@@ -1,5 +1,7 @@
-﻿using System;
+﻿using CoreLibrary.DataBase;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Web;
 using VAdvantage.Model;
@@ -16,8 +18,8 @@ namespace VIS.Models
         /// <param name="fields"></param>
         /// <returns></returns>
         public Dictionary<string, string> GetCurrency(Ctx ctx, string fields)
-        {         
-            string[] paramValue = fields.Split(',');                
+        {
+            string[] paramValue = fields.Split(',');
             //Assign parameter value
             int C_Currency_ID = Util.GetValueOfInt(paramValue[0].ToString());
             //End Assign parameter
@@ -26,5 +28,16 @@ namespace VIS.Models
             result["StdPrecision"] = currency.GetStdPrecision().ToString();
             return result;
         }
+        /// <summary>
+        /// Getting Currency ID
+        /// </summary>
+        /// <param name="ID"></param>
+        /// <returns></returns>
+        public int GetCurrenyID(int M_Pricelist_ID)
+        {
+           string sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + M_Pricelist_ID + "";
+           return Util.GetValueOfInt( DB.ExecuteScalar(sql, null, null));
+        }
     }
+    
 }

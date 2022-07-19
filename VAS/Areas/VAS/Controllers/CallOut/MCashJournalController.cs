@@ -64,6 +64,18 @@ namespace VIS.Controllers
             MCashJournalModel objCJModel = new MCashJournalModel();
             return Json(JsonConvert.SerializeObject(objCJModel.ConvertedAmt(ctx, fields)), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Getting Begining Bal
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>beginning balance</returns>
+        public JsonResult GetBeginBalance(string fields)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            MCashJournalModel objCJModel = new MCashJournalModel();
+            return Json(JsonConvert.SerializeObject(objCJModel.GetBeginBalance(ctx, Util.GetValueOfInt(fields))), JsonRequestBehavior.AllowGet);
+        }
+
 
     }
 }

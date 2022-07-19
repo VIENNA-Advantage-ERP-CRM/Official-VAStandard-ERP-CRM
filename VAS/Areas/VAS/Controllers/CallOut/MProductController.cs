@@ -16,7 +16,11 @@ namespace VIS.Controllers
         {
             return View();
         }
-
+        /// <summary>
+        /// Getting Product Details
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Product</returns>
         public JsonResult GetProduct(string fields)
         {
             
@@ -41,6 +45,11 @@ namespace VIS.Controllers
             }           
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Getting UOM_ID 
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>ID</returns>
         public JsonResult GetC_UOM_ID(string fields)
         {
            
@@ -53,6 +62,11 @@ namespace VIS.Controllers
             }            
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Getting Product Types
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Product Types</returns>
         public JsonResult GetProductType(string fields)
         {
            
@@ -91,6 +105,22 @@ namespace VIS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 MProductModel objProduct = new MProductModel();
                 retJSON = JsonConvert.SerializeObject(objProduct.GetRevenuRecognition(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// Counts of Transaction
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Transction</returns>
+        public JsonResult GetUOMCount(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MProductModel objProduct = new MProductModel();
+                retJSON = JsonConvert.SerializeObject(objProduct.GetUOMCount(ctx,Util.GetValueOfInt(fields)));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

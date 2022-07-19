@@ -70,6 +70,12 @@ namespace VIS.Models
             return Tax_ID;
 
         }
+        /// <summary>
+        /// Getting Tax_ID
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public int Get_Tax_ID(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');

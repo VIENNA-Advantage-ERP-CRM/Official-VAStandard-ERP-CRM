@@ -1,53 +1,52 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
-using Newtonsoft.Json;
-using VAdvantage.Model;
 using VAdvantage.Utility;
-using VIS.Models;
+using VASLogic.Models.Callouts;
 
-namespace VIS.Controllers
+namespace VAS.Areas.VAS.Controllers.CallOut
 {
-    public class MCurrencyController:Controller
+    public class MTaxAmtController : Controller
     {
+        // GET: VAS/MTaxAmt
         public ActionResult Index()
         {
             return View();
         }
         /// <summary>
-        /// Getting Currency
+        /// Get Rate
         /// </summary>
-        /// <param name="fields"></param>
-        /// <returns></returns>
-
-        public JsonResult GetCurrency(string fields)
+        /// <param name="Id"></param>
+        /// <returns>Json</returns>
+        public JsonResult GetRate(string fields)
         {
-           
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                MCurrencyModel objCurrency = new MCurrencyModel();
-                retJSON = JsonConvert.SerializeObject(objCurrency.GetCurrency(ctx,fields));
-            }            
+                MTaxAmtModel objAmt = new MTaxAmtModel();
+                retJSON = JsonConvert.SerializeObject(objAmt.GetRate(Util.GetValueOfInt(fields)));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
         /// <summary>
-        /// Getting Currency ID
+        /// Getting Exp Amount 
         /// </summary>
-        /// <param name="fields"></param>
+        /// <param name="Id"></param>
         /// <returns></returns>
-        public JsonResult GetCurrenyID(string fields)
+        public JsonResult GetExpAmt(int Id)
         {
 
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                MCurrencyModel objCurrency = new MCurrencyModel();
-                retJSON = JsonConvert.SerializeObject(objCurrency.GetCurrenyID(Util.GetValueOfInt(fields)));
+                MTaxAmtModel objAmt = new MTaxAmtModel();
+                retJSON = JsonConvert.SerializeObject(objAmt.GetExpAmt(Id));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

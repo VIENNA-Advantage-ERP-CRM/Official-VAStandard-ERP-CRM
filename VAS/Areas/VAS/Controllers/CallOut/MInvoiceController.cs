@@ -134,5 +134,37 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Getting Tax Included Details
+        /// </summary> 
+        /// <param name="fields"></param>
+        /// <returns>Included Tax</returns>
+        public JsonResult GetTaxInclude(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel objInvoice = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(objInvoice.GetTaxInclude(Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// Getting Price List
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Price List</returns>
+        public JsonResult GetPriceList(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel objInvoice = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(objInvoice.GetPriceList(ctx,fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

@@ -50,5 +50,22 @@ namespace VIS.Areas.VIS.Controllers.CallOut
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// Get ProductInfo
+        /// </summary>
+        /// <param name="fields">product</param>
+        /// <returns>Json</returns>
+        public JsonResult GetProductInfo(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MTeamForcastModel objProduct = new MTeamForcastModel();
+                retJSON = JsonConvert.SerializeObject(objProduct.GetProductInfo(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+       }
+        
     }
 }

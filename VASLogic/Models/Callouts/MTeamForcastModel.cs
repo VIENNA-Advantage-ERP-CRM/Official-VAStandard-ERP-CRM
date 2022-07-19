@@ -18,8 +18,8 @@ namespace VIS.Models
         /// <returns></returns>
         public int GetSupervisor(Ctx ctx, int C_Team_ID)
         {
-           string sql="SELECT SUpervisor_ID FROM C_Team WHERE C_Team_ID="+ C_Team_ID;
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql));       
+            string sql = "SELECT SUpervisor_ID FROM C_Team WHERE C_Team_ID=" + C_Team_ID;
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql));
         }
 
         /// <summary>
@@ -50,6 +50,29 @@ namespace VIS.Models
                 }
             }
             return retDic;
+        }
+        /// <summary>
+        /// Getting Product from C_ForcastLine Window
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns>Price</returns>
+        public decimal? GetProductInfo(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            var query = "Select M_PriceList_Version_ID from M_ProductPrice where M_Product_id=" + paramValue[0] +
+              " and M_PriceList_Version_ID in (select m_pricelist_version_id from m_pricelist_version" +
+              " where m_pricelist_id = " + paramValue[1] + " and isactive='Y')";
+            int M_PriceList_Version_ID = Util.GetValueOfInt(DB.ExecuteScalar(query, null, null));
+            if (M_PriceList_Version_ID != 0)
+            {
+                string sql = "Select PriceStd from M_ProductPrice where M_PriceList_Version_ID=" + M_PriceList_Version_ID + " and M_Product_id=" +
+                             paramValue[0] + " and M_AttributeSetInstance_ID=" + paramValue[2] + "";
+                var PriceStd = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+                return PriceStd;
+            }
+            return 0;
+
         }
     }
 }

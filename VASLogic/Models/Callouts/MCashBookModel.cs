@@ -87,7 +87,7 @@ namespace VIS.Models
                 retValue.CurrTo = currTo;
                 retValue.Amt = amt;
             }
-            catch (Exception e)
+            catch (Exception)
             {
 
             }
@@ -166,6 +166,8 @@ namespace VIS.Models
             int Currency_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID = " + Util.GetValueOfInt(fields)));
             return Currency_ID;
         }
+        
+
         // End Changes Mohit
 
     }
