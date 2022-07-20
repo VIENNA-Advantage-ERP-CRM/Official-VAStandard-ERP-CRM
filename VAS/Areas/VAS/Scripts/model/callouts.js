@@ -11231,76 +11231,79 @@
     CalloutInventory.prototype.SetQtyBook = function (AD_Org_ID, M_AttributeSetInstance_ID, M_Product_ID, M_Locator_ID, MovementDate, M_ProductContainer_ID) {
         //  
         // Set QtyBook from first storage location
-        var bd = null;
-        var query = "", qry = "";
-        var result = 0;
+        //var query = "", qry = "";
+        //var result = 0;
+       
+        //var tsDate = "TO_DATE( '" + (Number(MovementDate.getMonth()) + 1) + "-" + MovementDate.getDate() + "-" + MovementDate.getFullYear() + "', 'MM-DD-YYYY')";     // GlobalVariable.TO_DATE(MovementDate, true);
+        //if (isContainerApplicable) {
+        //    query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = " + tsDate +
+        //        " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+        //}
+        //else {
+        //    query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = " + tsDate +
+        //        " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
+        //}
+        //result = Util.getValueOfInt(VIS.DB.executeScalar(query));
+        //if (result > 0) {
+        //    if (isContainerApplicable) {
+        //        qry = "SELECT  NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
+        //            "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= " + tsDate + "  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
+        //            ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
+        //            ")  AND  M_Product_ID = " + M_Product_ID +
+        //            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+        //    }
+        //    else {
+        //        qry = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
+        //            "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= " + tsDate + "  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
+        //            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
+        //    }
+        //    bd = Util.getValueOfDecimal(VIS.DB.executeScalar(qry));
+        //}
+        //else {
+        //    if (isContainerApplicable) {
+        //        query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID +
+        //            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+        //    }
+        //    else {
+        //        query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID +
+        //            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
+        //    }
+        //    result = Util.getValueOfInt(VIS.DB.executeScalar(query));
+        //    if (result > 0) {
+        //        if (isContainerApplicable) {
+        //            qry = "SELECT NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
+        //                " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //                " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
+        //                ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //                " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
+        //                ")  AND  M_Product_ID = " + M_Product_ID +
+        //                " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+        //        }
+        //        else {
+        //            qry = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
+        //                " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //                " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
+        //                " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
+        //                " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
+        //        }
+        //        bd = Util.getValueOfDecimal(VIS.DB.executeScalar(qry));
+        //    }
+        //}
         var isContainerApplicable = false;
         if (VIS.context.ctx["#PRODUCT_CONTAINER_APPLICABLE"] != undefined) {
             isContainerApplicable = VIS.context.ctx["#PRODUCT_CONTAINER_APPLICABLE"].equals("Y", true);
         }
-        var tsDate = "TO_DATE( '" + (Number(MovementDate.getMonth()) + 1) + "-" + MovementDate.getDate() + "-" + MovementDate.getFullYear() + "', 'MM-DD-YYYY')";     // GlobalVariable.TO_DATE(MovementDate, true);
-        if (isContainerApplicable) {
-            query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = " + tsDate +
-                " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-        }
-        else {
-            query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = " + tsDate +
-                " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-        }
-        result = Util.getValueOfInt(VIS.DB.executeScalar(query));
-        if (result > 0) {
-            if (isContainerApplicable) {
-                qry = "SELECT  NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                    "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= " + tsDate + "  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                    " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                    ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                    " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                    ")  AND  M_Product_ID = " + M_Product_ID +
-                    " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-            }
-            else {
-                qry = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                    "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= " + tsDate + "  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                    " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                    " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
-                    " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-            }
-            bd = Util.getValueOfDecimal(VIS.DB.executeScalar(qry));
-        }
-        else {
-            if (isContainerApplicable) {
-                query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID +
-                    " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-            }
-            else {
-                query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID +
-                    " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-            }
-            result = Util.getValueOfInt(VIS.DB.executeScalar(query));
-            if (result > 0) {
-                if (isContainerApplicable) {
-                    qry = "SELECT NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                        " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                        ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                        ")  AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-                }
-                else {
-                    qry = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                        " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < " + tsDate + " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-                }
-                bd = Util.getValueOfDecimal(VIS.DB.executeScalar(qry));
-            }
-        }
-        if (bd != null) {
-            return bd;
-        }
-        return 0;
+
+        var tsDate = (Number(MovementDate.getMonth()) + 1) + "-" + MovementDate.getDate() + "-" + MovementDate.getFullYear();
+        var params = isContainerApplicable.toString() + "," + tsDate.toString() + "," + M_Product_ID.toString() + "," + M_Locator_ID.toString()
+            + "," + M_AttributeSetInstance_ID.toString() + "," + M_ProductContainer_ID.toString() + "," + AD_Org_ID.toString();
+
+        var bd = VIS.dataContext.getJSONRecord("MInventory/GetCurrentQty", params);
+        return bd;
     };
 
     // Callout added by mohit to get UOM conversion on Physical inventory line and internal use inventory line against the selected UOM.- 12 June 20018
@@ -17019,15 +17022,15 @@
             var dr = VIS.dataContext.getJSONRecord("MInOut/GetUOMConv", params);
             if (dr != null)
             {
-                if (Util.getValueOfInt(dr["C_UOM_ID"]) != Util.getValueOfInt(dr["uom"]) && Util.getValueOfInt(dr["uom"]) != 0) {
+                if (dr["C_UOM_ID"] != dr["uom"] && dr["uom"] != 0) {
                     //mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Util.getValueOfDecimal(dr["multiplyrate"]));
 
                     mTab.setValue("QtyEntered", dr["qtyentered"]);
-                    mTab.setValue("C_UOM_ID", Util.getValueOfInt(dr["uom"]));
+                    mTab.setValue("C_UOM_ID", dr["uom"]);
                 }
                 else {
                     //mTab.setValue("C_UOM_ID", C_UOM_ID);
-                    mTab.setValue("C_UOM_ID", Util.getValueOfInt(dr["C_UOM_ID"]));
+                    mTab.setValue("C_UOM_ID", dr["C_UOM_ID"]);
                 }
             }
             
