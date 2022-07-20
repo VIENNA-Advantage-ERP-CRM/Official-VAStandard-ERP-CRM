@@ -131,5 +131,17 @@ namespace VIS.Models
             string sql = "SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC = '" + paramValue[0] + "' AND M_Product_ID = " + Util.GetValueOfInt(paramValue[1]);
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
+
+        /// <summary>
+        /// Get Counts Of Transaction
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Transction COUNT</returns>
+        public int GetTransactionCount(Ctx ctx, int M_Product_ID)
+        {
+            string sql = "SELECT COUNT(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = " + M_Product_ID;
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
     }
 }
