@@ -18115,7 +18115,7 @@
             mTab.setValue("OutStandingAmount", "");
             return "";
         }
-        /*
+
         this.setCalloutActive(true);
         var amounts = "";
         var bp_BusinessPartner = mTab.getValue("C_BPartner_ID");
@@ -18125,154 +18125,18 @@
             this.setCalloutActive(false);
             return "";
         }
-        var paramString = bp_BusinessPartner.toString() + "," + asOnDate.toString();
+        var paramString = "N," + bp_BusinessPartner.toString() + "," + asOnDate.toString();
         try {
             amounts = VIS.dataContext.getJSONRecord("MPayment/GetOutStandingAmt", paramString); //in difference currency
+            mTab.setValue("OutStandingAmount", amounts);
         }
         catch (err) {
-            //this.log.log(Level.SEVERE, sql, err);
             this.setCalloutActive(false);
-            return err.message;
-            {
-                //Arpit
-                mTab.setValue("OutStandingAmount", amounts);
-            }
-        }
-        mTab.setValue("OutStandingAmount", amounts);
-        this.setCalloutActive(false);
-        */
-        this.setCalloutActive(true);
-
-        var bp_BusinessPartner = mTab.getValue("C_BPartner_ID");
-        var asOnDate = mTab.getValue("AsOnDate");
-        asOnDate = VIS.DB.to_date(asOnDate, true);
-        // changed by Bharat on 06 April 2017 for AP Payment and AR Receipt cases
-        var sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts FROM " +
-            "(SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN, COUNT (*) OVER () CNT FROM " +
-            "(SELECT iso_code || ':' || SUM(OpenAmt) AS ConvertPrice " +
-            "FROM (SELECT c.iso_code,  invoiceOpen (i.C_Invoice_ID,i.C_InvoicePaySchedule_ID)*MultiplierAP AS OpenAmt  FROM C_Invoice_V i " +
-            "LEFT JOIN C_Currency C ON C.C_Currency_ID=i.C_Currency_ID " +
-            "LEFT JOIN C_InvoicePaySchedule IPS ON IPS.c_invoice_ID = i.c_invoice_ID " +
-            "WHERE i.docstatus IN ('CO','CL') " +
-            "AND i.IsActive ='Y' " +
-            "AND i.ispaid ='N' " +
-            "AND ips.duedate IS NOT NULL " +
-            "AND NVL(ips.dueamt,0)!=0 " +
-            "AND i.c_bpartner_id = " + bp_BusinessPartner +
-            "AND to_date(ips.duedate,'dd-mm-yyyy')" +
-            "<= ( CASE " +
-            "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
-            "THEN to_date(sysdate,'dd-mm-yyyy') " +
-            "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
-            "END ) " +
-            "UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
-            "FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
-            "LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
-            "AND p.C_BPARTNER_ID = " + bp_BusinessPartner + " AND p.DocStatus     IN ('CO','CL') " +
-            "AND to_date(pay.DateTrx,'dd-mm-yyyy')" +
-            "<=( CASE " +
-            "WHEN to_date(" + asOnDate + ",'dd-mm-yyyy')>to_date(sysdate,'dd-mm-yyyy') " +
-            "THEN to_date(sysdate,'dd-mm-yyyy') " +
-            "ELSE to_date(" + asOnDate + ",'dd-mm-yyyy') " +
-            "END ) " +
-            ") " +
-            "GROUP BY iso_code " +
-            ") " +
-            ") " +
-            "WHERE RN = CNT START WITH RN = 1 CONNECT BY RN = PRIOR RN + 1 ";
-
-        var idr = null;
-        try {
-            idr = VIS.DB.executeReader(sql, null, null);
-            if (idr.read()) {
-                var amounts = idr.get("amounts");
-                /*Edited By Arpit Rai on 6th March,2017
-                changed by Bharat on 06 April 2017 for PDC Payable and PDC Receivable cases
-                 To set PDC amount in outstanding balance in PDC window & Payment window */
-                sql = "";
-                sql = "Select COUNT(AD_ModuleInfo_ID) From AD_ModuleInfo Where Prefix='VA027_' AND IsActive='Y'";
-                var count = Util.getValueOfInt(VIS.DB.executeScalar(sql));
-                if (count > 0) {
-                    sql = "";
-                    sql = "SELECT LTRIM(MAX(SYS_CONNECT_BY_PATH( ConvertPrice, ',')),',') amounts\
-                    FROM (SELECT ConvertPrice, ROW_NUMBER () OVER (ORDER BY ConvertPrice ) RN,\
-                    COUNT (*) OVER () CNT FROM  \
-                    (SELECT ' PDC-'||iso_code|| ':'|| ROUND(SUM(PdcDue),2) AS ConvertPrice \
-                    FROM (SELECT c.iso_code, \
-                    CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                     THEN chk.VA027_ChequeAmount \
-                     ELSE pdc.VA027_PayAmt END AS PdcDue \
-                      FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
-                      ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
-                      INNER JOIN C_Currency C ON C.C_Currency_ID=PDC.C_Currency_ID \
-                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID\
-                      WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDR'\
-                      AND pdc.DocStatus = 'CO' \
-                      AND pdc.VA027_PAYMENTGENERATED ='N'\
-                      AND pdc.VA027_PaymentStatus !=3\
-                      AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
-                       AND PDC.c_bpartner_id = " + bp_BusinessPartner +
-                        " UNION SELECT c.iso_code, \
-                       CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                        THEN chk.VA027_ChequeAmount*-1 \
-                        ELSE pdc.VA027_PayAmt*-1 END AS PdcDue \
-                        FROM VA027_PostDatedCheck pdc LEFT JOIN VA027_ChequeDetails chk \
-                        ON chk.VA027_PostDatedCheck_ID = pdc.VA027_PostDatedCheck_ID \
-                        INNER JOIN C_Currency C ON C.C_Currency_ID=pdc.C_Currency_ID \
-                        INNER JOIN C_DocType doc ON doc.C_DocType_ID = pdc.C_DocType_ID \
-                        WHERE pdc.IsActive ='Y' AND doc.DocBaseType = 'PDP' \
-                        AND pdc.VA027_PAYMENTGENERATED ='N' \
-                        AND pdc.VA027_PaymentStatus !=3 \
-                        AND ( CASE WHEN (pdc.VA027_MultiCheque = 'Y') \
-                      THEN to_date(chk.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "ELSE to_date(pdc.VA027_CheckDate,'dd-mm-yyyy') " +
-                        "END ) <= to_date(" + asOnDate + ", 'dd-mm-yyyy') \
-                       AND pdc.c_bpartner_id = " + bp_BusinessPartner +
-                        ") GROUP BY iso_code \
-                      )\
-                     )\
-                     WHERE RN = CNT\
-                    START WITH RN = 1\
-                     CONNECT BY RN = PRIOR RN + 1";
-                    idr = null;
-                    try {
-                        idr = VIS.DB.executeReader(sql, null, null);
-                        if (idr.read()) {
-                            if (idr.get("amounts") != null && idr.get("amounts").toUpper().indexOf("NULL") == -1)
-                                amounts = amounts + ' PDC-' + idr.get("amounts");
-                        }
-                    }
-                    catch (err) {
-                        if (idr != null) {
-                            idr.close();
-                            idr = null;
-                        }
-                        this.log.log(Level.SEVERE, sql, err);
-                        this.setCalloutActive(false);
-                        return err.message;
-                    }
-                }
-                //Arpit
-                mTab.setValue("OutStandingAmount", amounts);
-            }
-            idr.close();
-        }
-        catch (err) {
-            if (idr != null) {
-                idr.close();
-                idr = null;
-            }
-            this.log.log(Level.SEVERE, sql, err);
-            this.setCalloutActive(false);
-            return err.message;
         }
         this.setCalloutActive(false);
+
         return "";
     };
-    // End 22/2/2017 Manish
 
 
 
