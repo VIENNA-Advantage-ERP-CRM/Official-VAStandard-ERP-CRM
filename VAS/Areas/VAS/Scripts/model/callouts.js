@@ -14957,43 +14957,28 @@
         if (C_Invoice_ID == 0) {
             return "";
         }
-        var C_BankAccount_ID = ctx.getContextAsInt(windowNo, "C_BankAccount_ID");
-        //var PayDate = CommonFunctions.CovertMilliToDate(ctx.getContextAsTime("PayDate"));// new DateTime(ctx.getContextAsTime("PayDate"));
 
-        var PayDate = ctx.getContext("PayDate");
         this.setCalloutActive(true);
 
+        var C_BankAccount_ID = ctx.getContextAsInt(windowNo, "C_BankAccount_ID");
+        var PayDate = ctx.getContext("PayDate");
         var OpenAmt = VIS.Env.ZERO;
-
-
         var DiscountAmt = VIS.Env.ZERO;
-        var isSOTrx = false;//            Boolean.FALSE;
-        var sql = "SELECT currencyConvert(invoiceOpen(i.C_Invoice_ID, 0), i.C_Currency_ID,"
-            + "ba.C_Currency_ID, i.DateInvoiced, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) as OpenAmt,"
-            + " paymentTermDiscount(i.GrandTotal,i.C_Currency_ID,i.C_PaymentTerm_ID,i.DateInvoiced,'" + PayDate + "') As DiscountAmt, i.IsSOTrx "
-            + "FROM C_Invoice_v i, C_BankAccount ba "
-            + "WHERE i.C_Invoice_ID=@Param2 AND ba.C_BankAccount_ID=@Param3";	//	#1..2
-        var Param = [];
-        //SqlParameter[] Param = new SqlParameter[3];
+        var isSOTrx = false;
+
+
         var idr = null;
         try {
-            //Param[0] = new VIS.DB.SqlParam("@Param1", PayDate);  //Temporary Commented By Sarab
-            Param[0] = new VIS.DB.SqlParam("@Param2", C_Invoice_ID);
-            Param[1] = new VIS.DB.SqlParam("@Param3", C_BankAccount_ID);
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
-                OpenAmt = idr.get("openamt");
-                DiscountAmt = idr.get("discountamt");
-                IsSOTrx = "Y" == idr.get("issotrx");
+            var fields = C_Invoice_ID.toString() + ", " + C_BankAccount_ID.toString() + "," + PayDate.toString();
+            idr = VIS.dataContext.getJSONRecord("MInvoice/GetInvoiceOpenDetail", fields);
+            if (idr != null && Object.keys(idr).length > 0) {
+                OpenAmt = Util.getValueOfDecimal(idr["OpenAmt"]);
+                DiscountAmt = Util.getValueOfDecimal(idr["DiscountAmt"]);
+                IsSOTrx = "Y" == Util.getValueOfString(idr["IsSOTrx"]);
             }
-            idr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.SEVERE, sql, err);
         }
 
         this.log.fine(" - OpenAmt=" + OpenAmt + " (Invoice=" + C_Invoice_ID + ",BankAcct=" + C_BankAccount_ID + ")");
@@ -15001,7 +14986,7 @@
         mTab.setValue("PayAmt", (OpenAmt - DiscountAmt));
         mTab.setValue("DiscountAmt", DiscountAmt);
         mTab.setValue("DifferenceAmt", VIS.Env.ZERO);
-        mTab.setValue("IsSOTrx", isSOTrx ? "Y" : "N");
+        mTab.setValue("IsSOTrx", isSOTrx);
 
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
