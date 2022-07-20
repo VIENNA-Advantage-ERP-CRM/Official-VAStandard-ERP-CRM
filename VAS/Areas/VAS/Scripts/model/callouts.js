@@ -11744,6 +11744,7 @@
                     var DataPrefix = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "VA009_");
                     if (DataPrefix["VA009_"]) {
                         var _PaymentMethod_ID = Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]);
+                        var PaymentBasetype = Util.getValueOfString(dr["VA009_PaymentBaseType"]);
                         ////VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
                         var isvendor = 'N';
                         var bpdtl = VIS.dataContext.getJSONRecord("MBPartner/GetBPDetails", C_BPartner_ID);
@@ -11783,7 +11784,6 @@
                             mTab.setValue("VA009_PaymentMethod_ID", null);
                         else {
                             mTab.setValue("VA009_PaymentMethod_ID", _PaymentMethod_ID);
-                            var PaymentBasetype = VIS.DB.executeScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID=" + _PaymentMethod_ID);
                             if (PaymentBasetype != null) {
                                 //if (PaymentBasetype != null) {
                                 mTab.setValue("PaymentMethod", PaymentBasetype);
@@ -11844,32 +11844,15 @@
                     else {
                         mTab.setValue("AD_User_ID", contID);
                     }
-                    //Arpit 15th Apr,2017 -To set SalesRepID
-                    //var isSalesRep = Util.getValueOfBoolean(dr.get("issalesrep"))
-                    //if (isSalesRep) {
-                    //    var SalesRepID = Util.getValueOfInt(dr.get("salesrep_id"));
-                    //    if (SalesRepID > 0) {
-                    //        mTab.setValue("SalesRep_ID", contID);
-                    //    }
-                    //}
-                    //Code End here
+
                     //	CreditAvailable
                     if (isSOTrx) {
-                        //var CreditLimit = Util.getValueOfDouble(dr.get("so_creditlimit"));
-                        //if (CreditLimit != 0) {
-                        //    var CreditAvailable = Util.getValueOfDouble(dr.get("creditavailable"));
-                        //    if (CreditAvailable < 0) {
-                        //        VIS.ADialog.info("CreditLimitOver");
-                        //    }
-                        //}
                         var CreditStatus = dr["CreditStatusSettingOn"];
                         if (CreditStatus == "CH") {
                             var CreditLimit = Util.getValueOfDouble(dr["SO_CreditLimit"]);
-                            //	var SOCreditStatus = dr.getString("SOCreditStatus");
                             if (CreditLimit != 0) {
                                 var CreditAvailable = Util.getValueOfDouble(dr["CreditAvailable"]);
                                 if (dr != null && CreditAvailable <= 0) {
-                                    //VIS.ADialog.info("CreditLimitOver", null, "", "");
                                     VIS.ADialog.info("CreditOver");
                                 }
                             }
@@ -11882,7 +11865,7 @@
                             //drl = VIS.DB.executeReader(sql);
 
                             dr1 = VIS.dataContext.getJSONRecord("MBPartner/GetLocationData", locId.toString());
-                            if (drl.read()) {
+                            if (drl != null) {
                                 CreditStatus = drl["CreditStatusSettingOn"];
                                 if (CreditStatus == "CL") {
                                     var CreditLimit = Util.getValueOfDouble(drl["SO_CreditLimit"]);
@@ -11890,7 +11873,6 @@
                                     if (CreditLimit != 0) {
                                         var CreditAvailable = Util.getValueOfDouble(drl["CreditAvailable"]);
                                         if (dr != null && CreditAvailable <= 0) {
-                                            //VIS.ADialog.info("CreditLimitOver", null, "", "");
                                             VIS.ADialog.info("CreditOver");
                                         }
                                     }
@@ -11927,22 +11909,10 @@
             }
             catch (err) {
                 this.setCalloutActive(false);
-                if (dr != null) {
-                    dr.close();
-                }
-                if (drl != null) {
-                    drl.close();
-                }
                 this.log.log(Level.SEVERE, "bPartner", err);
                 return err.message;
             }
             finally {
-                if (dr != null) {
-                    dr.close();
-                }
-                if (drl != null) {
-                    drl.close();
-                }
             }
         }
         catch (err) {
@@ -13061,15 +13031,11 @@
                 //	PriceList Version
                 ctx.setContext(windowNo, "M_PriceList_Version_ID", prislst);
             }
-            //dr.close();
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (dr != null)
-                dr.close();
-            this.log.log(Level.severe, sql, err);
+            this.log.log(Level.severe, null, err);
             return err.message;
-            //MessageBox.Show("Callout--PriceList");
         }
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
