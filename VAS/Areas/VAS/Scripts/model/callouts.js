@@ -21714,29 +21714,17 @@
 
         this.setCalloutActive(true);
         try {
-
-            var Ptax = 0;
-            var yr = 0, pDim = 0;
-            var ds = null;
-            ds = VIS.DB.executeDataSet("SELECT ProfitBeforeTax,C_Year_ID,C_ProfitAndLoss_ID FROM C_ProfitLoss WHERE C_ProfitLoss_ID=" + value, null, null);
-            if (ds != null) {
-
-                if (ds.tables[0].rows.length > 0) {
-
-                    Ptax = Util.getValueOfDecimal(ds.getTables()[0].getRows()[0].getCell("ProfitBeforeTax"));
-                    yr = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_Year_ID"));
-                    pDim = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("C_ProfitAndLoss_ID"));
-                    mTab.setValue("ProfitBeforeTax", Ptax);
-                    mTab.setValue("C_Year_ID", yr);
-                    mTab.setValue("C_ProfitAndLoss_ID", pDim);
-                }
+            var idr = VIS.dataContext.getJSONRecord("MProfitTax/GetProfitLossDetails", value.toString());
+            if (Object.keys(idr).length > 0) {
+                mTab.setValue("ProfitBeforeTax", Util.getValueOfDecimal(idr["ProfitBeforeTax"]));
+                mTab.setValue("C_Year_ID", Util.getValueOfInt(idr["C_Year_ID"]));
+                mTab.setValue("C_ProfitAndLoss_ID", Util.getValueOfInt(idr["C_ProfitAndLoss_ID"]));
             }
         }
         catch (err) {
             this.setCalloutActive(false);
-            this.log.severe(err.toString()); // SD
+            this.log.severe(err.toString());
         }
-
 
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
