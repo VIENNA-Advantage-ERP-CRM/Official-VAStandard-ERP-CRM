@@ -124,7 +124,7 @@ namespace VIS.Models
             try
             {
                 string[] paramValue = fields.Split(',');                
-                bool countVA027 = Util.GetValueOfBool(paramValue[0]);
+                bool countVA027 = Env.IsModuleInstalled("VA027_");
                 int bp_BusinessPartner = Util.GetValueOfInt(paramValue[1]);
                 DateTime? asOnDate = Util.GetValueOfDateTime(paramValue[2]);
                 int Client_ID = ctx.GetAD_Client_ID();

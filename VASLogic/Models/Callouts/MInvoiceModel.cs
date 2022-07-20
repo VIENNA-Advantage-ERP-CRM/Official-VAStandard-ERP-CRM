@@ -1549,5 +1549,37 @@ namespace VIS.Models
             return stdPrecision;
 
         }
+
+
+        /// <summary>
+        /// On payment Selection Window : Get Invoice Detail
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">Invoice ID, Bank Account ID, Pay Date</param>
+        /// <returns>Get Invoice Detail</returns>
+        public Dictionary<String, object> GetInvoiceOpenDetail(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            //Creating Object
+            Dictionary<String, object> retDic = new Dictionary<string, object>();
+            var sql = "SELECT currencyConvert(invoiceOpen(i.C_Invoice_ID, 0), i.C_Currency_ID,"
+            + "ba.C_Currency_ID, i.DateInvoiced, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) as OpenAmt,"
+            + " paymentTermDiscount(i.GrandTotal,i.C_Currency_ID,i.C_PaymentTerm_ID,i.DateInvoiced,'" + paramValue[2] + "') As DiscountAmt, i.IsSOTrx "
+            + "FROM C_Invoice_v i, C_BankAccount ba "
+            + "WHERE i.C_Invoice_ID=" + paramValue[0] + "AND ba.C_BankAccount_ID=" + paramValue[1] + "";
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic["OpenAmt"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["OpenAmt"]);
+                retDic["DiscountAmt"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DiscountAmt"]);
+                retDic["IsSOTrx"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]);
+                return retDic;
+            }
+            else
+            {
+                return null;
+            }
+            
+        }
     }
 }
