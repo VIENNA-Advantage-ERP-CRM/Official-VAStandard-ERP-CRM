@@ -16080,8 +16080,7 @@
         }
         try {
             this.setCalloutActive(true);
-            var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(value);
-            var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));
+            var rate = VIS.dataContext.getJSONRecord("MTax/GetTaxRate", Util.getValueOfInt(value));
             if (rate != 0) {
                 var taxAmt = (Util.getValueOfDecimal(mTab.getValue("ApprovedExpenseAmt")) * rate) / 100;
                 taxAmt = taxAmt.toFixed(2);
@@ -16108,8 +16107,7 @@
         }
         try {
             this.setCalloutActive(true);
-            var sql = "select Rate from C_Tax where C_Tax_ID = " + Util.getValueOfInt(mTab.getValue("C_Tax_ID"));
-            var rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sql, null, null));
+            var rate = VIS.dataContext.getJSONRecord("MTax/GetTaxRate", Util.getValueOfInt(mTab.getValue("C_Tax_ID")));
             if (rate != 0) {
                 var taxAmt = (Util.getValueOfDecimal(value) * rate) / 100;
                 taxAmt = taxAmt.toFixed(2);
