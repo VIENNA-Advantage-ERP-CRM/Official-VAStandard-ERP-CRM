@@ -15121,11 +15121,11 @@
         if (value == null || value.toString() == "") {
             return "";
         }
-        var sql = "";
         try {
-            sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + Util.getValueOfInt(value);
-            var C_Currency_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
-            mTab.setValue("C_Currency_ID", C_Currency_ID);
+            var PriceListData = VIS.dataContext.getJSONRecord("MPriceList/GetPriceList", value.toString());
+            if (PriceListData != null) {
+                mTab.setValue("C_Currency_ID", PriceListData.C_Currency_ID);
+            }
         }
         catch (err) {
             this.setCalloutActive(false);

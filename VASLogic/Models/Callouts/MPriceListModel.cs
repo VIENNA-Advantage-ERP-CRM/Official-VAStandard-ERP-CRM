@@ -29,15 +29,16 @@ namespace VIS.Models
                 M_PriceList_ID = Util.GetValueOfInt(paramValue[0].ToString());
                 //End Assign parameter value
 
-                MPriceList prcLst = new MPriceList(ctx, M_PriceList_ID, null);
+                MPriceList prcLst =  MPriceList.Get(ctx, M_PriceList_ID, null);
                 Dictionary<String, String> retDic = new Dictionary<string, string>();
                 // Reset Orig Shipment
-                MCurrency crncy = new MCurrency(ctx, prcLst.GetC_Currency_ID(), null);
+                MCurrency crncy = MCurrency.Get(ctx, prcLst.GetC_Currency_ID());
                 retDic["PriceListPrecision"] = prcLst.GetPricePrecision().ToString();
                 //JID_1744  Precision should be as per currency percision 
                 retDic["StdPrecision"] = crncy.GetStdPrecision().ToString();
                 retDic["EnforcePriceLimit"] = prcLst.IsEnforcePriceLimit() ? "Y" : "N";
                 retDic["IsTaxIncluded"] = prcLst.IsTaxIncluded() ? "Y" : "N";
+                retDic["C_Currency_ID"] = prcLst.GetC_Currency_ID().ToString();
                 return retDic;
             }
             else
