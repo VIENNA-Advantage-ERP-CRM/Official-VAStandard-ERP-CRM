@@ -43,86 +43,33 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             bool isContainerApplicable = Util.GetValueOfBool(paramValue[0].ToString());
-            string tsDate = Util.GetValueOfString(paramValue[1].ToString());
+            DateTime? tsDate = Util.GetValueOfDateTime(paramValue[1].ToString());
             int M_Product_ID = Util.GetValueOfInt(paramValue[2].ToString());
             int M_Locator_ID = Util.GetValueOfInt(paramValue[3].ToString());
             int M_AttributeSetInstance_ID = Util.GetValueOfInt(paramValue[4].ToString());
             int M_ProductContainer_ID = Util.GetValueOfInt(paramValue[5].ToString());
-            int AD_Org_ID= Util.GetValueOfInt(paramValue[6].ToString());
-            string query = string.Empty;
+            int AD_Org_ID = Util.GetValueOfInt(paramValue[6].ToString());
             string sql = string.Empty;
             decimal currentqty = 0;
-            int result = 0;
 
             if (isContainerApplicable)
             {
-                query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = TO_DATE('" + tsDate + "', 'MM - DD - YYYY')" +
-                    " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+                sql = @"SELECT DISTINCT FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty
+                           FROM M_Transaction t
+                           WHERE t.MovementDate <=" + GlobalVariable.TO_DATE(tsDate, true) + @" 
+                           AND t.M_Locator_ID                       = " + M_Locator_ID + @"
+                           AND t.M_Product_ID                       = " + M_Product_ID + @"
+                           AND NVL(t.M_AttributeSetInstance_ID , 0) = COALESCE(" + M_AttributeSetInstance_ID + @",0)
+                           AND NVL(t.M_ProductContainer_ID, 0)              = " + M_ProductContainer_ID;
             }
             else
             {
-                query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = TO_DATE('" + tsDate + "', 'MM - DD - YYYY')" +
-                    " AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
+                sql = @"SELECT DISTINCT First_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM M_Transaction t 
+                        INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(tsDate, true) +
+                        " AND t.AD_Org_ID = " + AD_Org_ID + " AND t.M_Locator_ID = " + M_Locator_ID +
+                        " AND t.M_Product_ID = " + M_Product_ID + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + M_AttributeSetInstance_ID;
             }
-            result = Util.GetValueOfInt(DB.ExecuteScalar(query,null,null));
-            if (result > 0)
-            {
-                if (isContainerApplicable)
-                {
-                    sql = "SELECT  NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                        "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= TO_DATE('" + tsDate + "', 'MM - DD - YYYY')  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                        ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                        ")  AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-                }
-                else
-                {
-                    sql = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                        "(SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate <= TO_DATE('" + tsDate + "', 'MM - DD - YYYY')  AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                        " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-                }
-                currentqty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql,null,null));
-            }
-            else
-            {
-                if (isContainerApplicable)
-                {
-                    query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < TO_DATE('" + tsDate + "', 'MM - DD - YYYY') AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-                }
-                else
-                {
-                    query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate < TO_DATE('" + tsDate + "', 'MM - DD - YYYY') AND  M_Product_ID = " + M_Product_ID +
-                        " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-                }
-                result = Util.GetValueOfInt(DB.ExecuteScalar(query, null, null));
-                if (result > 0)
-                {
-                    if (isContainerApplicable)
-                    {
-                        sql = "SELECT NVL(ContainerCurrentQty, 0) AS currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                            " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < TO_DATE('" + tsDate + "', 'MM - DD - YYYY') AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                            ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID +
-                            ")  AND  M_Product_ID = " + M_Product_ID +
-                            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + " AND NVL(M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
-                    }
-                    else
-                    {
-                        sql = "SELECT currentqty FROM M_Transaction WHERE M_Transaction_ID = (SELECT MAX(M_Transaction_ID)   FROM M_Transaction  WHERE movementdate = " +
-                            " (SELECT MAX(movementdate) FROM M_Transaction WHERE movementdate < TO_DATE('" + tsDate + "', 'MM - DD - YYYY')AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND  M_Product_ID = " + M_Product_ID + " AND M_Locator_ID = " + M_Locator_ID +
-                            " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID + ") AND AD_Org_ID = " + AD_Org_ID + " AND  M_Product_ID = " + M_Product_ID +
-                            " AND M_Locator_ID = " + M_Locator_ID + " AND M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID;
-                    }
-                    currentqty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
-                }
-            }
+            currentqty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
             return currentqty;
         }
     }

@@ -11299,7 +11299,6 @@
         //        bd = Util.getValueOfDecimal(VIS.DB.executeScalar(qry));
         //    }
         //}
-        var bd = null;
         var isContainerApplicable = false;
         if (VIS.context.ctx["#PRODUCT_CONTAINER_APPLICABLE"] != undefined) {
             isContainerApplicable = VIS.context.ctx["#PRODUCT_CONTAINER_APPLICABLE"].equals("Y", true);
@@ -11310,10 +11309,7 @@
             + "," + M_AttributeSetInstance_ID.toString() + "," + M_ProductContainer_ID.toString() + "," + AD_Org_ID.toString();
 
         var bd = VIS.dataContext.getJSONRecord("MInventory/GetCurrentQty", params);
-        if (bd != null) {
-            return bd;
-        }
-        return 0;
+        return bd;
     };
 
     // Callout added by mohit to get UOM conversion on Physical inventory line and internal use inventory line against the selected UOM.- 12 June 20018
