@@ -157,7 +157,7 @@
                 // p[0] = new VIS.DB.SqlParam("@param1", oldC_DocType_ID);
                 //param[0] = new SqlParameter("@param1", oldC_DocType_ID);
                 //idr = VIS.DB.executeReader(sql, p);
-               //if (idr.read()) {
+                //if (idr.read()) {
                 idr = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", oldC_DocType_ID.toString());
                 if (idr != null) {
                     //AD_Sequence_ID = Util.getValueOfInt(idr.tables[0].rows[0].cells["currentnextsys"]);
@@ -177,8 +177,7 @@
             var isReturnTrx = false;
             var DocTypeValue = "";
             //if (idr.read())		//	we found document type
-            if (idr != null)
-            {
+            if (idr != null) {
                 //	Set Context:	Document Sub Type for Sales Orders
                 DocSubTypeSO = idr["DocSubTypeSO"];
                 DocTypeValue = idr["Value"];
@@ -305,7 +304,7 @@
 
                     //if (!idr.wasNull())
                     //if (idr != null)
-                        mTab.setValue("C_PaymentTerm_ID", ii);
+                    mTab.setValue("C_PaymentTerm_ID", ii);
                     //	InvoiceRule
                     s = dr["InvoiceRule"];
                     if (s != null && s.length != 0)
@@ -1458,27 +1457,27 @@
 
             //dr = VIS.DB.executeReader(sql);
             //if (dr.read()) {
-                //DataRow dr = ds.Tables[0].Rows[i];
-                //	PriceList (indirect: IsTaxIncluded & Currency)
-                ////var PriceListPresent = Util.getValueOfInt(mTab.getValue("M_PriceList_ID")); //Price List from BSO/BPO window
-                ////if (PriceListPresent > 0) {
-                ////}
-                ////else {
-                ////    var ii = Util.getValueOfInt(dr.get(isSOTrx ? "m_pricelist_id" : "po_pricelist_id"));
-                ////    if (ii != 0)
+            //DataRow dr = ds.Tables[0].Rows[i];
+            //	PriceList (indirect: IsTaxIncluded & Currency)
+            ////var PriceListPresent = Util.getValueOfInt(mTab.getValue("M_PriceList_ID")); //Price List from BSO/BPO window
+            ////if (PriceListPresent > 0) {
+            ////}
+            ////else {
+            ////    var ii = Util.getValueOfInt(dr.get(isSOTrx ? "m_pricelist_id" : "po_pricelist_id"));
+            ////    if (ii != 0)
 
-                ////        mTab.setValue("M_PriceList_ID", ii);
-                ////}
-                //Code commented by Arpit Rai on 31st March,2017 ----Not to set defualt price list in context
-                //asked by Mandeep Sir
-                /*   else {	//	get default PriceList
-                   var iCont = ctx.getContextAsInt(windowNo, "#M_PriceList_ID", false);
-                   //var iCont = ctx.getContextAsInt("#M_PriceList_ID");//Sarab
-                   if (iCont != 0)
-                       mTab.setValue("M_PriceList_ID", Util.getValueOfInt(iCont));
-               }*/ //Arpit
+            ////        mTab.setValue("M_PriceList_ID", ii);
+            ////}
+            //Code commented by Arpit Rai on 31st March,2017 ----Not to set defualt price list in context
+            //asked by Mandeep Sir
+            /*   else {	//	get default PriceList
+               var iCont = ctx.getContextAsInt(windowNo, "#M_PriceList_ID", false);
+               //var iCont = ctx.getContextAsInt("#M_PriceList_ID");//Sarab
+               if (iCont != 0)
+                   mTab.setValue("M_PriceList_ID", Util.getValueOfInt(iCont));
+           }*/ //Arpit
             if (dr != null) {
-                    var bill_Location_ID = Util.getValueOfInt(dr["Bill_Location_ID"]);
+                var bill_Location_ID = Util.getValueOfInt(dr["Bill_Location_ID"]);
                 //	overwritten by InfoBP selection - works only if InfoWindow
                 //	was used otherwise creates error (uses last value, may belong to differnt BP)
                 if (bill_BPartner_ID.toString() == (ctx.getContext("C_BPartner_ID"))) {
@@ -1517,7 +1516,7 @@
                 }
 
                 //	PO Reference
-                    var s = dr["POReference"];
+                var s = dr["POReference"];
 
                 // Order Reference should not be set by Bill To BPartner; only by BPartner.
                 /* if (s != null && s.length() != 0)
@@ -1525,11 +1524,11 @@
                 else
                     mTab.setValue("POReference", null);*/
                 //	SO Description
-                    s = dr["SO_Description"];
+                s = dr["SO_Description"];
                 if (s != null && s.toString().trim().length != 0)
                     mTab.setValue("Description", s);
                 //	IsDiscountPrinted
-                    s = dr["IsDiscountPrinted"];
+                s = dr["IsDiscountPrinted"];
                 if (s != null && s.toString().length != 0)
                     mTab.setValue("IsDiscountPrinted", s);
                 else
@@ -1547,8 +1546,7 @@
                 {
                     mTab.setValue("PaymentRule", XC_PAYMENTRULE_Cash);
                 }
-                else
-                {
+                else {
                     //	PaymentRule
                     s = dr[isSOTrx ? "PaymentRule" : "PaymentRulePO"];
                     if (s != null && s.toString().length != 0) {
@@ -1648,8 +1646,8 @@
             //dr = VIS.DB.executeReader(sql);
             dr = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListData", value.toString());
             /*if (dr.read()) {*/
-                //DataRow dr = ds.Tables[0].Rows[i];
-                //	Tax Included
+            //DataRow dr = ds.Tables[0].Rows[i];
+            //	Tax Included
             if (dr != null) {
                 mTab.setValue("IsTaxIncluded", "Y" == dr["IsTaxIncluded"]);
                 //	Price Limit Enforce
@@ -4254,7 +4252,7 @@
             //pstmt.setInt(6, AD_Org_ID.intValue());
             //ResultSet rs = pstmt.executeQuery();
             //if (idr.read()) {
-                //var beginningBalance = Util.getValueOfDecimal(idr.get(0));//.getBigDecimal(1);
+            //var beginningBalance = Util.getValueOfDecimal(idr.get(0));//.getBigDecimal(1);
 
             if (beginningBalance > 0) {
                 mTab.setValue("BeginningBalance", beginningBalance);
@@ -4717,7 +4715,7 @@
 
         var dr = VIS.dataContext.getJSONRecord("MProject/GetProjectDetail", id.toString())
         if (dr != null) {
-            PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]); 
+            PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]);
         }
         PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
         if (PlannedQty == null) {
@@ -11702,7 +11700,7 @@
 
                 //dr = VIS.DB.executeReader(sql, null, null);
                 //if (dr.read()) {
-                    //	PriceList & IsTaxIncluded & Currency
+                //	PriceList & IsTaxIncluded & Currency
                 if (dr != null) {
                     var ii = Util.getValueOfInt(dr[isSOTrx ? "M_PriceList_ID" : "PO_PriceList_ID"]);
                     if (ii > 0) {
@@ -13191,8 +13189,8 @@
 
             idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", C_BPartner_ID.toString());
             //if (idr.read()) {
-                //	PaymentRule
-                // var s = Util.getValueOfString(idr[]);
+            //	PaymentRule
+            // var s = Util.getValueOfString(idr[]);
             if (idr != null) {
                 var s = Util.getValueOfString(idr[(IsSOTrx ? "PaymentRule" : "PaymentRulePO")]);
                 if (s != null && s.length != 0) {
@@ -13571,7 +13569,7 @@
             //    " and upper(columnname) = 'C_UOM_ID'", null, null)) > 0) {
             mTab.setValue("MovementQty", 1);
             mTab.setValue("QtyEntered", 1);
-        //}
+            //}
             return "";
         }
 
@@ -13598,42 +13596,42 @@
             //    " (SELECT ad_table_id   FROM ad_table   WHERE upper(tablename) = upper('M_MovementLine'))" +
             //    " and upper(columnname) = 'C_UOM_ID'";
             //if (Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null)) > 0) {
-                //sql = "select c_uom_id from m_product where m_product_id=" + M_Product_ID;
-                //var c_uom_id = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            //sql = "select c_uom_id from m_product where m_product_id=" + M_Product_ID;
+            //var c_uom_id = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
 
-                var c_uom_id = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", M_Product_ID.toString());
-                mTab.setValue("C_UOM_ID", c_uom_id);
-                if (value != oldValue) {
+            var c_uom_id = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", M_Product_ID.toString());
+            mTab.setValue("C_UOM_ID", c_uom_id);
+            if (value != oldValue) {
 
-                    mTab.setValue("MovementQty", 1);
-                    mTab.setValue("QtyEntered", 1);
-                }
+                mTab.setValue("MovementQty", 1);
+                mTab.setValue("QtyEntered", 1);
+            }
 
-                // var c_uom_id = Util.getValueOfInt(value);
+            // var c_uom_id = Util.getValueOfInt(value);
 
-                c_uom_id = Util.getValueOfDecimal(mTab.getValue("C_UOM_ID"));
-                var QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
-                M_Product_ID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
+            c_uom_id = Util.getValueOfDecimal(mTab.getValue("C_UOM_ID"));
+            var QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
+            M_Product_ID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
 
-                var paramStr = M_Product_ID.toString().concat(',').concat(c_uom_id.toString()).concat(',').concat(QtyEntered.toString());
-                var pc = VIS.dataContext.getJSONRecord("MUOMConversion/ConvertProductFrom", paramStr);
-                QtyOrdered = pc;
+            var paramStr = M_Product_ID.toString().concat(',').concat(c_uom_id.toString()).concat(',').concat(QtyEntered.toString());
+            var pc = VIS.dataContext.getJSONRecord("MUOMConversion/ConvertProductFrom", paramStr);
+            QtyOrdered = pc;
 
-                var conversion = false
-                if (QtyOrdered != null) {
-                    conversion = QtyEntered != QtyOrdered;
-                }
-                if (QtyOrdered == null) {
-                    conversion = false;
-                    QtyOrdered = 1;
-                }
-                if (conversion) {
-                    mTab.setValue("MovementQty", QtyOrdered);
-                }
-                else {
-                    mTab.setValue("MovementQty", (QtyOrdered * QtyEntered));
-                }
-           // }
+            var conversion = false
+            if (QtyOrdered != null) {
+                conversion = QtyEntered != QtyOrdered;
+            }
+            if (QtyOrdered == null) {
+                conversion = false;
+                QtyOrdered = 1;
+            }
+            if (conversion) {
+                mTab.setValue("MovementQty", QtyOrdered);
+            }
+            else {
+                mTab.setValue("MovementQty", (QtyOrdered * QtyEntered));
+            }
+            // }
         }
         catch (err) {
             this.setCalloutActive(false);
@@ -15661,14 +15659,11 @@
         var M_PriceList_ID = ctx.getContextAsInt(windowNo, "M_PriceList_ID");
         var M_Attribute_ID = ctx.getContextAsInt(windowNo, "M_AttributeSetInstance_ID");
         if (M_PriceList_ID != 0) {
-            var query = "Select M_PriceList_Version_ID from M_ProductPrice where M_Product_id=" + Util.getValueOfInt(M_Product_ID) +
-                " and M_PriceList_Version_ID in (select m_pricelist_version_id from m_pricelist_version" +
-                " where m_pricelist_id = " + M_PriceList_ID + " and isactive='Y')";
-            var M_PriceList_Version_ID = Util.getValueOfInt(VIS.DB.executeScalar(query, null, null));
-            if (M_PriceList_Version_ID != 0) {
-                query = "Select PriceStd from M_ProductPrice where M_PriceList_Version_ID=" + M_PriceList_Version_ID + " and M_Product_id=" + Util.getValueOfInt(M_Product_ID) + " and M_AttributeSetInstance_ID=" + Util.getValueOfInt(M_Attribute_ID);
-                var PriceStd = Util.getValueOfDecimal(VIS.DB.executeScalar(query, null, null));
-                //ForcastLine.SetPriceStd(PriceStd);
+
+            var fields = M_Product_ID.toString() + ", " + M_PriceList_ID.toString() + "," + M_Attribute_ID.toString();
+            var PriceStd = VIS.dataContext.getJSONRecord("MTeamForcast/GetProductPrice", fields);
+
+            if (PriceStd != 0) {
                 mTab.setValue("PriceStd", PriceStd);
                 mTab.setValue("UnitPrice", PriceStd);
                 mTab.setValue("PriceStd", (PriceStd * Util.getValueOfDecimal(mTab.getValue("QtyEntered"))));
@@ -15676,7 +15671,6 @@
             }
         }
         else {
-            // ShowMessage.info("PriceLisetNotFound", true, null, null);
             VIS.ADialog.info("PriceLisetNotFound");
         }
         ctx = windowNo = mTab = mField = value = oldValue = null;
@@ -16592,7 +16586,7 @@
             ctx.setContext(windowNo, "C_DocTypeTarget_ID", C_DocType_ID);
             //dr = VIS.DB.executeReader(sql, null, null);
             //if (dr.read()) {
-                //	Set Movement Type
+            //	Set Movement Type
             if (dr != null) {
                 var docBaseType = Util.getValueOfString(dr["docBaseType"]);
                 var isReturnTrx = dr["IsReturnTrx"] == "Y";
@@ -17015,10 +17009,9 @@
             var qtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
             mTab.setValue("MovementQty", qtyEntered);
             var params = mTab.getValue("M_InOut_ID").toString() + "," + M_Product_ID.toString() + "," + qtyEntered.toString() + ","
-                                        + ctx.getContextAsInt(windowNo, "C_BPartner_ID").toString();
+                + ctx.getContextAsInt(windowNo, "C_BPartner_ID").toString();
             var dr = VIS.dataContext.getJSONRecord("MInOut/GetUOMConv", params);
-            if (dr != null)
-            {
+            if (dr != null) {
                 if (Util.getValueOfInt(dr["C_UOM_ID"]) != Util.getValueOfInt(dr["uom"]) && Util.getValueOfInt(dr["uom"]) != 0) {
                     //mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Util.getValueOfDecimal(dr["multiplyrate"]));
 
@@ -17030,7 +17023,7 @@
                     mTab.setValue("C_UOM_ID", Util.getValueOfInt(dr["C_UOM_ID"]));
                 }
             }
-            
+
 
             //190 - Get Print description from product and set print desc
             var prod = VIS.dataContext.getJSONRecord("MProduct/GetProduct", M_Product_ID.toString());
