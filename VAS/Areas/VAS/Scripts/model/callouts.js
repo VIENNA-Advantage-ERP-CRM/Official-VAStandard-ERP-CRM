@@ -21267,11 +21267,8 @@
             mTab.setValue("M_AttributeSetInstance_ID", null);
         }
         try {
-            if (Util.getValueOfInt(VIS.DB.executeScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_' ")) > 0) {
-                var _M_Product_ID = Util.getValueOfInt(value);
-                var _C_UOM_ID = Util.getValueOfInt(VIS.DB.executeScalar("SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_PRoduct_ID = " + _M_Product_ID));
-                mTab.setValue("C_UOM_ID", _C_UOM_ID);
-            }
+            var _C_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", value.toString());
+            mTab.setValue("C_UOM_ID", _C_UOM_ID);
         }
         catch (err) {
             this.setCalloutActive(false);
