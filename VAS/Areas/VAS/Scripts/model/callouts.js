@@ -4570,20 +4570,14 @@
         }
         this.setCalloutActive(true);
 
-        // 26-09-2011 Lokesh Chauhan
-
         // If values are in The Transaction Tab then restrict user so that UOM can't be changed or set to what it was previously.
-        var sql = "select count(*) from m_transaction where m_product_id = " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
-        var result = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+        var fields = mTab.getValue("M_Product_ID").toString();
+        var result = VIS.dataContext.getJSONRecord("MProduct/GetTransactionCount", fields);//Created by Nisha
 
         if (result > 0) {
-            //ShowMessage.Info("Can't change UOM due to Transactions happens based on existing UOM", true, null, null);
             VIS.ADialog.info("Can't change UOM due to Transactions happens based on existing UOM");
-            //sql = "select c_uom_id from m_product where m_product_id =  " + Util.getValueOfInt(mTab.getValue("M_Product_id"));
-            //var uom_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
-
-            var uom_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", mTab.getValue("M_Product_ID").toString());
-            mTab.setValue("C_UOM_ID", uom_ID);
+            //var uom_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", mTab.getValue("M_Product_ID").toString());
+            mTab.setValue("C_UOM_ID", oldValue);
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
