@@ -13167,30 +13167,13 @@
         if (C_BPartner_ID == null || C_BPartner_ID == 0) {
             return "";
         }
-        //var sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
-        //    + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
-        //    + " p.SO_Description,p.IsDiscountPrinted,"
-        //    + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
-        //    + " l.C_BPartner_Location_ID,c.AD_User_ID,"
-        //    + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID "
-        //    + "FROM C_BPartner p"
-        //    + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
-        //    + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
-        //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
-        //    + "WHERE p.C_BPartner_ID=@Param1 AND p.IsActive='Y'";		//	#1
-
         var IsSOTrx = ctx.isSOTrx();
-        var Param = [];
-        //SqlParameter[] Param = new SqlParameter[1];
         var idr = null;
         try {
-            //Param[0] = new VIS.DB.SqlParam("@Param1", C_BPartner_ID);
-            //idr = VIS.DB.executeReader(sql, Param, null);
 
             idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", C_BPartner_ID.toString());
-            //if (idr.read()) {
+
             //	PaymentRule
-            // var s = Util.getValueOfString(idr[]);
             if (idr != null) {
                 var s = Util.getValueOfString(idr[(IsSOTrx ? "PaymentRule" : "PaymentRulePO")]);
                 if (s != null && s.length != 0) {
@@ -13204,13 +13187,11 @@
                     }
                 }
                 //  Payment Term
-                //  var ii = Util.getValueOfInt(idr[IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"]);
                 var ii = Util.getValueOfInt(idr[(IsSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID")]);
                 if (ii > 0) {
                     mTab.setValue("C_PaymentTerm_ID", ii);
                 }
                 //	Location
-                //var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
                 var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
                 //	overwritten by InfoBP selection - works only if InfoWindow
                 //	was used otherwise creates error (uses last value, may belong to differnt BP)
@@ -13228,7 +13209,6 @@
                 }
 
                 //	Contact - overwritten by InfoBP selection
-                //var contID = Util.getValueOfInt(idr["AD_User_ID"]);
                 var contID = Util.getValueOfInt(idr["AD_User_ID"]);
                 if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
                     var cont = ctx.getContext("AD_User_ID");
@@ -13248,21 +13228,15 @@
                     if (CreditLimit != 0) {
                         var CreditAvailable = Util.getValueOfDouble(idr["CreditAvailable"]);
                         if (idr == null && CreditAvailable < 0) {
-                            // ShowMessage.Info("CreditLimitOver", null, "", "");
                             VIS.ADialog.info("CreditLimitOver");
                         }
                     }
                 }
             }
-            //idr.close();
 
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.severe, sql, err);
             return err.message;
         }
         //
@@ -13298,41 +13272,25 @@
         //	Get last line
         //  
         var C_InvoiceBatch_ID = ctx.getContextAsInt(windowNo, "C_InvoiceBatch_ID");
-        var sql = "SELECT COALESCE(MAX(C_InvoiceBatchLine_ID),0) FROM C_InvoiceBatchLine WHERE C_InvoiceBatch_ID=" + C_InvoiceBatch_ID;
 
-        // var C_InvoiceBatchLine_ID = VIS.DB.getSQLValue(null, sql, C_InvoiceBatch_ID);
-        var C_InvoiceBatchLine_ID = VIS.DB.executeScalar(sql);
-        if (C_InvoiceBatchLine_ID == 0) {
-            return;
-        }
-
-
-        var paramString = C_InvoiceBatchLine_ID.toString();
+        var paramString = C_InvoiceBatch_ID.toString();
 
         //Get product price information
         var dr = null;
-        dr = VIS.dataContext.getJSONRecord("MInvoiceBatchLine/GetInvoiceBatchLine", paramString);
+        dr = VIS.dataContext.getJSONRecord("MInvoiceBatchLine/GetInvoiceBatchLineDetail", paramString);
+        if (dr == null) {
+            return;
+        }
 
-
-
-
-
-        //MInvoiceBatchLine last = new MInvoiceBatchLine(Env.GetCtx(), C_InvoiceBatchLine_ID, null);
-        //MInvoiceBatchLine last = new MInvoiceBatchLine(ctx, C_InvoiceBatchLine_ID, null);
         //	Need to Increase when different DocType or BP
         var C_DocType_ID = ctx.getContextAsInt(windowNo, "C_DocType_ID");
         var C_BPartner_ID = ctx.getContextAsInt(windowNo, "C_BPartner_ID");
-        //if (C_DocType_ID == last.GetC_DocType_ID()
-        //    && C_BPartner_ID == last.GetC_BPartner_ID())
-        //{
-        //    return;
-        //}
+
         if (C_DocType_ID == dr["C_DocType_ID"]
             && C_BPartner_ID == dr["C_BPartner_ID"]) {
             return;
         }
         //	New Number
-        //var oldDocNo = last.getDocumentNo();
         var oldDocNo = dr["DocumentNo"];
         if (oldDocNo == null) {
             return;
@@ -13367,25 +13325,14 @@
         if (C_Charge_ID == null || Util.getValueOfInt(C_Charge_ID) == 0) {
             return "";
         }
-        var sql = "SELECT ChargeAmt FROM C_Charge WHERE C_Charge_ID=@Param1";
-        var Param = [];
-        // SqlParameter[] Param = new SqlParameter[1];
-        var idr = null;
-        try {
-            Param[0] = new VIS.DB.SqlParam("@Param1", C_Charge_ID);
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
-                mTab.setValue("PriceEntered", Util.getValueOfDecimal(idr.get(0)));
-            }
-            idr.close();
 
+        try {
+            var chargeAmt = VIS.dataContext.getJSONRecord("MCharge/GetCharge", C_Charge_ID.toString());
+            mTab.setValue("PriceEntered", Util.getValueOfDecimal(chargeAmt));
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
-            this.log.log(Level.severe, sql, err);
+            this.log.log(Level.severe, null, err);
             return err.message;
         }
         //
