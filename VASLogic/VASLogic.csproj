@@ -100,6 +100,7 @@
     <Compile Include="Models\Callouts\MProductLocatorModel.cs" />
     <Compile Include="Models\Callouts\MProductModel.cs" />
     <Compile Include="Models\Callouts\MProductPricingModel.cs" />
+    <Compile Include="Models\Callouts\MProfitTaxModel.cs" />
     <Compile Include="Models\Callouts\MProjectModel.cs" />
     <Compile Include="Models\Callouts\MRequestTypeModel.cs" />
     <Compile Include="Models\Callouts\MStorageModel.cs" />

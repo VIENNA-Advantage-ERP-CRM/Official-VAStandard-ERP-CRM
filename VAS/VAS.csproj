@@ -166,6 +166,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MProductionLineController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MProductLocatorController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MProductPricingController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MProfitTaxController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MProjectController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MRequestController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MRequestTypeController.cs" />
