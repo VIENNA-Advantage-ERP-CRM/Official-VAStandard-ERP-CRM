@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
+using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 
@@ -28,6 +29,25 @@ namespace VIS.Models
             int R_Status_ID = rt.GetDefaultR_Status_ID();
             return R_Status_ID;
         }
-     
+
+        /// <summary>
+        /// Get Mail text on Request
+        /// </summary>
+        /// <param name="MailText_ID">MailText_ID</param>
+        /// <returns>Result</returns>
+        public string GetMailText(int MailText_ID)
+        {
+            return Util.GetValueOfString(DB.ExecuteScalar("SELECT MailText FROM R_MailText WHERE R_MailText_ID=" + MailText_ID, null, null));
+        }
+
+        /// <summary>
+        /// Get Response text on Request
+        /// </summary>
+        /// <param name="Response_ID">Response ID</param>
+        /// <returns>Result</returns>
+        public string GetResponseText(int Response_ID)
+        {
+            return Util.GetValueOfString(DB.ExecuteScalar("SELECT ResponseText FROM R_StandardResponse WHERE R_StandardResponse_ID=" + Response_ID, null, null));
+        }
     }
 }

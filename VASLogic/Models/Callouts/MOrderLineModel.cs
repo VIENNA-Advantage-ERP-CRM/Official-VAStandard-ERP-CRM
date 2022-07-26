@@ -2244,5 +2244,15 @@ namespace VIS.Models
             int OrderLine_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return OrderLine_ID;
         }
+
+        /// <summary>
+        /// Get No Of Days from Frequency
+        /// </summary>
+        /// <param name="_frequency_Id">Frequency ID</param>
+        /// <returns>NoOfDays</returns>
+        public int GetNoOfDays(int _frequency_Id)
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT NoOfDays FROM C_Frequency WHERE C_Frequency_ID=" + _frequency_Id, null, null));
+        }
     }
 }

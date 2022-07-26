@@ -3638,8 +3638,6 @@
     /// <returns></returns>
 
     CalloutAssignment.prototype.Product = function (ctx, windowNo, mTab, mField, value, oldValue) {
-
-
         if (value == null || value.toString() == "") {
             return "";
         }
@@ -3656,26 +3654,29 @@
         var name = null;
         var description = null;
         var Qty = null;
-        var sql = "SELECT p.M_Product_ID, ra.Name, ra.Description, ra.Qty "
-            + "FROM S_ResourceAssignment ra"
-            + " INNER JOIN M_Product p ON (p.S_Resource_ID=ra.S_Resource_ID) "
-            + "WHERE ra.S_ResourceAssignment_ID=" + S_ResourceAssignment_ID;
-        var idr = null;
+        //var sql = "SELECT p.M_Product_ID, ra.Name, ra.Description, ra.Qty "
+        //    + "FROM S_ResourceAssignment ra"
+        //    + " INNER JOIN M_Product p ON (p.S_Resource_ID=ra.S_Resource_ID) "
+        //    + "WHERE ra.S_ResourceAssignment_ID=" + S_ResourceAssignment_ID;
+        //var idr = null;
         try {
-            idr = VIS.DB.executeReader(sql, null, null);
-            if (idr.read()) {
-                M_Product_ID = Util.getValueOfInt(idr.get(0));//.getInt (1);
-                name = Util.getValueOfString(idr.get(1));//.getString(2);
-                description = Util.getValueOfString(idr.get(2));//.getString(3);
-                Qty = Util.getValueOfDecimal(idr.get(3));//.getBigDecimal(4);
+            //idr = VIS.DB.executeReader(sql, null, null);
+            //if (idr.read()) {
+
+            var dr = VIS.dataContext.getJSONRecord("MProduct/GetResourceAssignmntDet", S_ResourceAssignment_ID.toString());
+            if (dr != null) {
+                M_Product_ID = Util.getValueOfInt(dr["M_Product_ID"]);//.getInt (1);
+                name = Util.getValueOfString(dr["Name"]);//.getString(2);
+                description = Util.getValueOfString(dr["Description"]);//.getString(3);
+                Qty = Util.getValueOfDecimal(dr["Qty"]);//.getBigDecimal(4);
             }
-            idr.close();
+           // idr.close();
         }
         catch (err) {
-            if (idr != null) {
-                idr.close();
-                idr = null;
-            }
+            //if (idr != null) {
+            //    idr.close();
+            //    idr = null;
+            //}
             this.setCalloutActive(false);
             this.log.log(Level.SEVERE, "product", err);
         }
@@ -14277,33 +14278,35 @@
         if (value == null || value.toString() == "") {
             return "";
         }
-        var R_MailText_ID = Util.getValueOfInt(value);
-        var sql = "SELECT MailHeader, MailText FROM R_MailText "
-            + "WHERE R_MailText_ID=@Param1";
-        var Param = [];
+        //var R_MailText_ID = Util.getValueOfInt(value);
+        //var sql = "SELECT MailHeader, MailText FROM R_MailText "
+        //    + "WHERE R_MailText_ID=@Param1";
+        //var Param = [];
         //SqlParameter[] Param = new SqlParameter[1];
-        var idr = null;
-        try {
+        //var idr = null;
             //PreparedStatement pstmt = DataBase.prepareStatement(sql, null);
 
             //pstmt.setInt(1, R_MailText_ID.intValue());
-            Param[0] = new VIS.DB.SqlParam("@Param1", Util.getValueOfInt(R_MailText_ID));
+           // Param[0] = new VIS.DB.SqlParam("@Param1", Util.getValueOfInt(R_MailText_ID));
             //ResultSet rs = pstmt.executeQuery();
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
+            //idr = VIS.DB.executeReader(sql, Param, null);
+            //if (idr.read()) {
                 //String txt = rs.getString(2);
-                var txt = idr.get("mailtext");
+        //var txt = idr.get("mailtext");
+
+        try {
+        var txt = VIS.dataContext.getJSONRecord("MRequestType/GetMailText", value.toString());
                 txt = VIS.Env.parseContext(ctx, windowNo, txt, false, true);
                 mTab.setValue("Result", txt);
-            }
-            idr.close();
+            //}
+            //idr.close();
 
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
+            //if (idr != null) {
+            //    idr.close();
+            //}
             this.log.log(Level.SEVERE, sql, err);
         }
         ctx = windowNo = mTab = mField = value = oldValue = null;
@@ -14327,33 +14330,35 @@
         if (value == null || value.toString() == "") {
             return "";
         }
-        var R_StandardResponse_ID = Util.getValueOfInt(value);
-        var sql = "SELECT Name, ResponseText FROM R_StandardResponse "
-            + "WHERE R_StandardResponse_ID=@Param1";
-        var Param = [];
+        //var R_StandardResponse_ID = Util.getValueOfInt(value);
+        //var sql = "SELECT Name, ResponseText FROM R_StandardResponse "
+        //    + "WHERE R_StandardResponse_ID=@Param1";
+        //var Param = [];
         //SqlParameter[] Param = new SqlParameter[1];
-        var idr = null;
-        try {
+        //var idr = null;
             //PreparedStatement pstmt = DataBase.prepareStatement(sql, null);
-            Param[0] = new VIS.DB.SqlParam("@Param1", Util.getValueOfInt(R_StandardResponse_ID));
+            //Param[0] = new VIS.DB.SqlParam("@Param1", Util.getValueOfInt(R_StandardResponse_ID));
             //pstmt.setInt(1, R_StandardResponse_ID.intValue());
             //ResultSet rs = pstmt.executeQuery();
-            idr = VIS.DB.executeReader(sql, Param, null);
-            if (idr.read()) {
+            //idr = VIS.DB.executeReader(sql, Param, null);
+            //if (idr.read()) {
                 //tring txt = rs.getString(2);
                 //var txt = Util.getValueOfString(idr[1]);
-                var txt = idr.get("responsetext");
+                //var txt = idr.get("responsetext");
+
+        try {
+            var txt = VIS.dataContext.getJSONRecord("MRequestType/GetResponseText", value.toString());
                 txt = VIS.Env.parseContext(ctx, windowNo, txt, false, true);
                 mTab.setValue("Result", txt);
-            }
-            idr.close();
+            //}
+           // idr.close();
 
         }
         catch (err) {
             this.setCalloutActive(false);
-            if (idr != null) {
-                idr.close();
-            }
+            //if (idr != null) {
+            //    idr.close();
+            //}
             this.log.log(Level.SEVERE, sql, err);
         }
         ctx = windowNo = mTab = mField = value = oldValue = null;
@@ -15034,10 +15039,12 @@
             return ""; //Must sir but it was not the case
         }
         var SDate = new Date(mTab.getValue("StartDate"));
-        var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
+        //var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
         //var Sql = "Select NoOfDays from C_Frequency where C_Frequency_ID=" + frequency; //By Sarab
-        var Sql = "Select NoOfMonths from C_Frequency where C_Frequency_ID=" + frequency;
-        var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+        //var Sql = "Select NoOfMonths from C_Frequency where C_Frequency_ID=" + frequency;
+        //var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+
+        var months = VIS.dataContext.getJSONRecord("MOrderLine/GetNoOfMonths", Util.getValueOfString(mTab.getValue("C_Frequency_ID")));
         var invoice = Util.getValueOfInt(mTab.getValue("NoofCycle"));
         //var End = SDate.addDays(days * invoice);     //By sarab 
         //var End = SDate.setMonth(SDate.getMonth() + (days * invoice));        // By Karan
@@ -15261,10 +15268,11 @@
 
         var SDate = Util.getValueOfDateTime(mTab.getValue("StartDate"));
         var Edate = mTab.getValue("EndDate");
-        var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
+       // var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
+        //var Sql = "Select NoOfDays from C_Frequency where C_Frequency_ID=" + frequency;
+        //var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
 
-        var Sql = "Select NoOfDays from C_Frequency where C_Frequency_ID=" + frequency;
-        var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+        var days = VIS.dataContext.getJSONRecord("MOrderLine/GetNoOfDays", Util.getValueOfString(mTab.getValue("C_Frequency_ID")));
         var totaldays = (Edate - SDate).Days;
         var count = totaldays / days;
         mTab.setValue("TotalInvoice", count);
@@ -15318,10 +15326,12 @@
         if (value == null || value.toString() == "") {
             return "";
         }
+        //var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
+        //var Sql = "Select NoOfDays from C_Frequency where C_Frequency_ID=" + frequency;
+        //var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+
         var SDate = new Date(mTab.getValue("StartDate"));
-        var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
-        var Sql = "Select NoOfDays from C_Frequency where C_Frequency_ID=" + frequency;
-        var days = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+        var days = VIS.dataContext.getJSONRecord("MOrderLine/GetNoOfDays", Util.getValueOfString(mTab.getValue("C_Frequency_ID")));
         var totalInvoice = Util.getValueOfInt(mTab.getValue("TotalInvoice"));
         var cycles = totalInvoice * days;
         //var endDate =SDate.addDays(Util.getValueOfDouble(cycles));
@@ -15337,9 +15347,11 @@
         if (value == null || value.toString() == "") {
             return "";
         }
-        var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
-        var Sql = "Select NoOfMonths from C_Frequency where C_Frequency_ID=" + frequency;
-        var months = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+        //var frequency = Util.getValueOfInt(mTab.getValue("C_Frequency_ID"));
+        //var Sql = "Select NoOfMonths from C_Frequency where C_Frequency_ID=" + frequency;
+        //var months = Util.getValueOfInt(VIS.DB.executeScalar(Sql, null, null));
+
+        var months = VIS.dataContext.getJSONRecord("MOrderLine/GetNoOfMonths", Util.getValueOfString(mTab.getValue("C_Frequency_ID")));
         var totalInvoice = Util.getValueOfInt(mTab.getValue("TotalInvoice"));
         var SDate = new Date(value);
         var startDate = new Date(value);

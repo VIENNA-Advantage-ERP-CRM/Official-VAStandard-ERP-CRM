@@ -128,5 +128,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get resource assignment details
+        /// </summary>
+        /// <param name="fields">ResourceAssignment_ID</param>
+        /// <returns>Result</returns>
+        public JsonResult GetResourceAssignmntDet(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MProductModel objProduct = new MProductModel();
+                retJSON = JsonConvert.SerializeObject(objProduct.GetResourceAssignmntDet(ctx, Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
