@@ -141,7 +141,24 @@ namespace VIS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 MProductModel objProduct = new MProductModel();
+
                 retJSON = JsonConvert.SerializeObject(objProduct.GetResourceAssignmntDet(ctx, Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        
+        /// Counts of Transaction
+        /// </summary>
+        /// <param name="fields">Product ID</param>
+        /// <returns>Transction Count</returns>
+        public JsonResult GetTransactionCount(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MProductModel objProduct = new MProductModel();
+                retJSON = JsonConvert.SerializeObject(objProduct.GetTransactionCount(ctx, Util.GetValueOfInt(fields)));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

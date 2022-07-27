@@ -134,5 +134,23 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// On payment Selection Window : Get Invoice Detail
+        /// </summary>
+        /// <param name="fields">Invoice ID, Bank Account ID, Pay Date</param>
+        /// <returns>Get Invoice Detail></returns>
+        public JsonResult GetInvoiceOpenDetail(string fields)
+        {
+
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel ObjpaySelection = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(ObjpaySelection.GetInvoiceOpenDetail(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

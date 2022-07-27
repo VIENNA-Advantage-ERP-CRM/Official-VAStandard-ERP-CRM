@@ -157,5 +157,16 @@ namespace VIS.Models
             }
             return retDic;
         }
+
+        /// Get Counts Of Transaction
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Transction COUNT</returns>
+        public int GetTransactionCount(Ctx ctx, int M_Product_ID)
+        {
+            string sql = "SELECT COUNT(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = " + M_Product_ID;
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
     }
 }

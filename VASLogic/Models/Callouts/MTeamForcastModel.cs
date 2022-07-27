@@ -51,5 +51,22 @@ namespace VIS.Models
             }
             return retDic;
         }
+
+        /// <summary>
+        /// Get Standard Price 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">Product, PriceList and AtributeSetInstance</param>
+        /// <returns>Std Price</returns>
+        public decimal GetProductPrice(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            String query = @"SELECT pp.PriceStd FROM M_ProductPrice pp 
+                         INNER JOIN M_PriceList_Version plv ON(pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID)
+                         WHERE plv.M_PriceList_ID = " + paramValue[1] + @" AND plv.IsActive = 'Y' and pp.IsActive = 'Y'
+                         AND pp.M_Product_ID = " + paramValue[0] + @" AND pp.M_AttributeSetInstance_ID =" + paramValue[2] + @"
+                         ORDER BY plv.ValidFrom DESC";
+            return Util.GetValueOfDecimal(DB.ExecuteScalar(query, null, null));
+        }
     }
 }
