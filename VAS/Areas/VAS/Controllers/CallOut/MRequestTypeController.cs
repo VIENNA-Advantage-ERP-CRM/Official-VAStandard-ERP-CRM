@@ -33,7 +33,39 @@ namespace VIS.Controllers
             }        
             return Json(retJSON , JsonRequestBehavior.AllowGet);
         }
-     
 
+        /// <summary>
+        /// Get Mail text on Request
+        /// </summary>
+        /// <param name="fields">MailText_ID</param>
+        /// <returns>Result</returns>
+        public JsonResult GetMailText(string fields)
+        {
+            String retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MRequestTypeModel rt = new MRequestTypeModel();
+                retJSON = JsonConvert.SerializeObject(rt.GetMailText(Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Get Response text on Request
+        /// </summary>
+        /// <param name="fields">Response ID</param>
+        /// <returns>Result</returns>
+        public JsonResult GetResponseText(string fields)
+        {
+            String retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MRequestTypeModel rt = new MRequestTypeModel();
+                retJSON = JsonConvert.SerializeObject(rt.GetResponseText(Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

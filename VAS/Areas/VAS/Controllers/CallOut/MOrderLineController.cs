@@ -275,5 +275,23 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get No Of Days from Frequency
+        /// </summary>
+        /// <param name="fields">Frequency ID</param>
+        /// <returns>NoOfDays</returns>
+        public JsonResult GetNoOfDays(string fields)
+        {
+
+            String retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MOrderLineModel objOrderLine = new MOrderLineModel();
+                retJSON = JsonConvert.SerializeObject(objOrderLine.GetNoOfDays(Util.GetValueOfInt(fields)));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
