@@ -6280,27 +6280,20 @@ namespace VAdvantage.Model
                     _processMsg = Msg.GetMsg(GetCtx(), "PaymentmustvoidedFirst");
                     return false;
                 }
-
                 MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
                 String DocSubTypeSO = dt.GetDocSubTypeSO();
                 MOrderLine[] lines = null;
-
-                
                 //When order is PrePay And also completed then user can not reactivate the order
                 //Updated By VIS_317
                 if (MDocType.DOCSUBTYPESO_PrepayOrder.Equals(DocSubTypeSO))
                 {
-                    if(MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))
-                       
+                    if(MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))                      
                     {
-                        // log.SaveError("VIS_NotReactivateOrder", "");
                         _processMsg= Msg.GetMsg(GetCtx(), "VIS_NotReactivateOrder");
                         return false;
                     }
-                   
                 }
-
-                // Added by Vivek on 08/11/2017 assigned by Mukesh sirf
+             // Added by Vivek on 08/11/2017 assigned by Mukesh sirf
                 // return false if linked document is in completed or closed stage
                 if (MDocType.DOCSUBTYPESO_OnCreditOrder.Equals(DocSubTypeSO)    //	(W)illCall(I)nvoice
                     || MDocType.DOCSUBTYPESO_WarehouseOrder.Equals(DocSubTypeSO)    //	(W)illCall(P)ickup	
