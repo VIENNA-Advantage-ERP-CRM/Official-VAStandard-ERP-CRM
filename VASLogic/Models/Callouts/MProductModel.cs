@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Web;
 using VAdvantage.DataBase;
@@ -133,6 +134,30 @@ namespace VIS.Models
         }
 
         /// <summary>
+        /// Get resource assignment details
+        /// </summary>
+        /// <param name="S_ResourceAssignment_ID">ResourceAssignment_ID</param>
+        /// /// <param name="ctx">ctx</param>
+        /// <returns>Result</returns>
+        public Dictionary<String, Object> GetResourceAssignmntDet(Ctx ctx, int S_ResourceAssignment_ID)
+        {
+            Dictionary<string, object> retDic = null;
+            string sql = "SELECT p.M_Product_ID, ra.Name, ra.Description, ra.Qty "
+            + "FROM S_ResourceAssignment ra"
+            + " INNER JOIN M_Product p ON (p.S_Resource_ID=ra.S_Resource_ID) "
+            + "WHERE ra.S_ResourceAssignment_ID=" + S_ResourceAssignment_ID;		//	1
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+                retDic["M_Product_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]);
+                retDic["Name"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]);
+                retDic["Description"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["Description"]);
+                retDic["Qty"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]);
+            }
+            return retDic;
+        }
+
         /// Get Counts Of Transaction
         /// </summary>
         /// <param name="ctx">Context</param>
