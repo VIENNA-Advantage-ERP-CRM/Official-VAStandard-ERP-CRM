@@ -78,6 +78,7 @@
     <Compile Include="Models\Callouts\MChargeModel.cs" />
     <Compile Include="Models\Callouts\MConversionRateModel.cs" />
     <Compile Include="Models\Callouts\MCurrencyModel.cs" />
+    <Compile Include="Models\Callouts\MDiscountSchemaModel.cs" />
     <Compile Include="Models\Callouts\MDocTypeModel.cs" />
     <Compile Include="Models\Callouts\MExpenseReportModel.cs" />
     <Compile Include="Models\Callouts\MInOutLineModel.cs" />
@@ -100,6 +101,7 @@
     <Compile Include="Models\Callouts\MProductLocatorModel.cs" />
     <Compile Include="Models\Callouts\MProductModel.cs" />
     <Compile Include="Models\Callouts\MProductPricingModel.cs" />
+    <Compile Include="Models\Callouts\MProfitTaxModel.cs" />
     <Compile Include="Models\Callouts\MProjectModel.cs" />
     <Compile Include="Models\Callouts\MRequestTypeModel.cs" />
     <Compile Include="Models\Callouts\MStorageModel.cs" />
