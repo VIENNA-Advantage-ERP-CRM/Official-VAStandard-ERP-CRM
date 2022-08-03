@@ -1088,7 +1088,7 @@
                 }
                 //
                 this.log.fine("amt - PriceEntered=" + PriceEntered
-                    + " -> PriceActual=" + PriceActual);
+                    + "-> PriceActual=" + PriceActual);
                 mTab.setValue("PriceActual", PriceActual);
                 mTab.setValue("PriceEntered", PriceEntered);
             }
@@ -1097,13 +1097,13 @@
             var OverwritePriceLimit = false;
             //var epl = ctx.getContext("EnforcePriceLimit");
             var enforce = isSOTrx && epl != null && epl == "Y";
-            if (epl == "") {
-                var paramString = Util.getValueOfInt(mTab.getValue("C_Invoice_ID")).toString();
-                var C_Invoice = VIS.dataContext.getJSONRecord("MInvoice/GetInvoice", paramString);
-                var sql = "SELECT EnforcePriceLimit FROM M_PriceList WHERE IsActive = 'Y' AND M_PriceList_ID = " + C_Invoice["M_PriceList_ID"];
-                epl = VIS.DB.executeScalar(sql);
-                enforce = (C_Invoice["IsSOTrx"] && epl != null && epl == "Y");
-            }
+            //if (epl == "") {
+            //    var paramString = Util.getValueOfInt(mTab.getValue("C_Invoice_ID")).toString();
+            //    var C_Invoice = VIS.dataContext.getJSONRecord("MInvoice/GetInvoice", paramString);
+            //    //var sql = "SELECT EnforcePriceLimit FROM M_PriceList WHERE IsActive = 'Y' AND M_PriceList_ID = " + C_Invoice["M_PriceList_ID"];
+            //    //epl = VIS.DB.executeScalar(sql);
+            //    enforce = (C_Invoice["IsSOTrx"] && epl != null && epl == "Y");
+            //}
 
             OverwritePriceLimit = VIS.MRole.getDefault().getIsOverwritePriceLimit();
             if (enforce && OverwritePriceLimit) {
