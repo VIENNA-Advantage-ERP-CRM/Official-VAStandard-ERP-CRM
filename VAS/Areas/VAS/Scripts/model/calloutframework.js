@@ -252,8 +252,10 @@
             return "";
         }
         this.setCalloutActive(true);
-        var sql = "UPDATE RC_ViewColumn SET IsGroupBy='N' WHERE RC_View_ID=" + mTab.getValue("RC_View_ID") + " AND RC_ViewColumn_ID NOT IN(" + mTab.getValue("RC_ViewColumn_ID") + ")";
-        var count = VIS.DB.executeQuery(sql);
+        //var sql = "UPDATE RC_ViewColumn SET IsGroupBy='N' WHERE RC_View_ID=" + mTab.getValue("RC_View_ID") + " AND RC_ViewColumn_ID NOT IN(" + mTab.getValue("RC_ViewColumn_ID") + ")";
+        //var count = VIS.DB.executeQuery(sql);
+        var paramstring = mTab.getValue("RC_View_ID").toString() + "," + mTab.getValue("RC_ViewColumn_ID").toString();
+        VIS.dataContext.getJSONRecord("MFramework/UpdateGroupByChecked", paramstring);
         this.setCalloutActive(false);
         return "";
 
@@ -364,7 +366,8 @@
         this.setCalloutActive(true);
         var wfType = Util.getValueOfString(value.toString());
         if (wfType == "R") {
-            var ID = Util.getValueOfInt(VIS.DB.executeScalar("SELECT AD_Table_ID FROM AD_Table WHERE IsActive='Y' AND TableName= 'VADMS_MetaData'"));
+            //var ID = Util.getValueOfInt(VIS.DB.executeScalar("SELECT AD_Table_ID FROM AD_Table WHERE IsActive='Y' AND TableName= 'VADMS_MetaData'"));
+            var ID = VIS.dataContext.getJSONRecord("MFramework/GetWorkflowType", null);
             if (ID == 0) {
                 VIS.ADialog.info("No_VADMS", null, "", "");
                 //ShowMessage.Error("No_VADMS", true);
@@ -381,8 +384,8 @@
             return "";
         }
         this.setCalloutActive(true);
-
-        if ((Util.getValueOfString(VIS.DB.executeScalar("SELECT ColumnName FROM AD_Column WHERE AD_Column_ID=" + value))).toLower() == "C_GenAttributeSetInstance_ID".toLower()) {
+        var ColumnName = VIS.dataContext.getJSONRecord("MFramework/GetIsGenericAttribute", Util.getValueOfInt(value));
+        if (ColumnName.toLower() == "C_GenAttributeSetInstance_ID".toLower()) {
             ctx.setContext(windowNo, "IsGenericAttribute", "Y");
         }
         else {

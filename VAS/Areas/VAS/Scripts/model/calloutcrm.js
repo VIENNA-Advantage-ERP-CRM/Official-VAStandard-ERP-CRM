@@ -148,22 +148,25 @@
         }
         var sql = "";
         try {
-            sql = "select M_PriceList_ID from M_PriceList_Version where M_PriceList_Version_ID = " + Util.getValueOfInt(value);
-            var M_PriceList_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
-            if (M_PriceList_ID != 0) {
-                mTab.setValue("M_PriceList_ID", M_PriceList_ID);
+            //sql ="select M_PriceList_ID from M_PriceList_Version where M_PriceList_Version_ID = " + Util.getValueOfInt(value);
+            //var M_PriceList_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            var ds = VIS.dataContext.getJSONRecord("MPriceList/GetM_PriceList", Util.getValueOfInt(value));
+            if (ds != null && Object.keys(ds).length > 0) {
+                if (ds.M_PriceList_ID != 0) {
+                    mTab.setValue("M_PriceList_ID", ds.M_PriceList_ID);
 
-                sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + M_PriceList_ID;
-                var C_Currency_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
-                if (C_Currency_ID != 0) {
-                    mTab.setValue("C_Currency_ID", C_Currency_ID);
-                }
-                else {
-                    //  ShowMessage.Info("CurrencyNotDefinedForThePriceList", true, null, null);
-                    VIS.ADialog.info("CurrencyNotDefinedForThePriceList");
+                    //sql = "select C_Currency_id from m_pricelist where m_pricelist_ID = " + M_PriceList_ID;
+                    //var C_Currency_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+                    //var C_Currency_ID = VIS.dataContext.getJSONRecord("MPriceList/GetC_Currency", Util.getValueOfInt(M_PriceList_ID));
+                    if (ds.C_Currency_id != 0) {
+                        mTab.setValue("C_Currency_ID", ds.C_Currency_id);
+                    }
+                    else {
+                        //  ShowMessage.Info("CurrencyNotDefinedForThePriceList", true, null, null);
+                        VIS.ADialog.info("CurrencyNotDefinedForThePriceList");
+                    }
                 }
             }
-
         }
         catch (err) {
             this.setCalloutActive(false);
