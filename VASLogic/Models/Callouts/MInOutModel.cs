@@ -144,5 +144,29 @@ namespace VIS.Models
             }
             return retValue;
         }
+        /// <summary>
+        /// Get Product Details 
+        /// </summary>
+        /// <param name="ctx">Parameters</param>
+        /// <param name="fields"></param>
+        /// <returns>Product id, Quantity, Attribute Id,totalConfirmedAndScrapped</returns>
+        public Dictionary<string, object> GetProductDetails(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            Dictionary<string, object> obj = null;
+            string sql = @"SELECT (SELECT  SUM(ConfirmedQty + scrappedqty) FROM M_PackageLine WHERE  M_Package_ID=" + paramValue[1] + " and m_inoutline_id =  " + paramValue[2]+") AS" +
+                         " totalConfirmedAndScrapped ,M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + paramValue[0];
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                obj = new Dictionary<string, object>();
+                obj["totalConfirmedAndScrapped"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["totalConfirmedAndScrapped"]);
+                obj["M_Product_ID"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["M_Product_ID"]);
+                obj["Movementqty"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["movementqty"]);
+                obj["M_AttributeSetInstance_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
+            }
+            return obj;
+        }
+       
     }
 }

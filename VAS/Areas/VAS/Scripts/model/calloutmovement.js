@@ -223,30 +223,22 @@
             return "";
         this.setCalloutActive(true);
         try {
-            sql = "SELECT M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + Util.getValueOfInt(value);
+            //sql = "SELECT M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + Util.getValueOfInt(value);
             // var M_Product_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
 
-            var ds = VIS.DB.executeDataSet(sql);
-
+            //var ds = VIS.DB.executeDataSet(sql);
+            var paramString = value.toString() + "," + mTab.getValue("M_Package_ID").toString() + "," + mTab.getValue("M_InOutLine_ID").toString();
+            var idr = VIS.dataContext.getJSONRecord("MInOut/GetProductDetails", paramString);
             var movementqty = 0;
-            if (ds.getTables().length > 0) {
-                if (ds.getTables()[0].getRows().length > 0) {
-                    var product = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("M_Product_ID"));
-                    movementqty = Util.getValueOfDecimal(ds.getTables()[0].getRows()[0].getCell("movementqty"));
-                    var attribute = Util.getValueOfInt(ds.getTables()[0].getRows()[0].getCell("M_AttributeSetInstance_ID"))
-
-
-                }
+            if (idr != null && Object.keys(idr).length > 0) {
+                movementqty = Util.getValueOfDecimal(idr.Movementqty);
+                //sql = "SELECT  SUM(ConfirmedQty + scrappedqty) FROM M_PackageLine WHERE  M_Package_ID=" + mTab.getValue("M_Package_ID") + " and m_inoutline_id =  " + mTab.getValue("M_InOutLine_ID");
+                //var totalConfirmedAndScrapped = Util.getValueOfDecimal(VIS.DB.executeScalar(sql))
+                mTab.setValue("M_Product_ID", Util.getValueOfInt(idr.M_Product_ID));
+                mTab.setValue("Qty", movementqty - Util.getValueOfInt(idr.totalConfirmedAndScrapped));
+                mTab.setValue("M_AttributeSetInstance_ID", Util.getValueOfInt(idr.M_AttributeSetInstance_ID));
+                mTab.setValue("DTD001_IsConfirm", true);
             }
-
-            sql = "SELECT  SUM(ConfirmedQty + scrappedqty) FROM M_PackageLine WHERE  M_Package_ID=" + mTab.getValue("M_Package_ID") + " and m_inoutline_id =  " + mTab.getValue("M_InOutLine_ID");
-            var totalConfirmedAndScrapped = Util.getValueOfDecimal(VIS.DB.executeScalar(sql))
-
-            mTab.setValue("M_Product_ID", product);
-            mTab.setValue("Qty", movementqty - totalConfirmedAndScrapped);
-            mTab.setValue("M_AttributeSetInstance_ID", attribute);
-            mTab.setValue("DTD001_IsConfirm", true);
-
         }
         catch (err) {
             this.setCalloutActive(false);

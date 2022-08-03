@@ -176,6 +176,21 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-
+        /// <summary>
+        /// Get Product shipment details
+        /// </summary>
+        /// <param name="fields">List of Parameters</param>
+        /// <returns>Data in JSON Format</returns>
+        public JsonResult GetProductDetails(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MInOutModel objInOut = new MInOutModel();
+                retJSON = JsonConvert.SerializeObject(objInOut.GetProductDetails(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
