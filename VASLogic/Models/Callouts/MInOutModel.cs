@@ -112,7 +112,7 @@ namespace VIS.Models
                 C_BPartner_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_BPartner_ID FROM M_InOut WHERE M_InOut_ID =" + Util.GetValueOfInt(paramString[0]), null, null));
             }
             int C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID =" + M_Product_ID, null, null));
-            
+
             try
             {
                 retValue = new Dictionary<string, object>();
@@ -129,7 +129,7 @@ namespace VIS.Models
                         //}
 
                         retValue["qtyentered"] = MUOMConversion.ConvertProductFrom(ctx, M_Product_ID, uom, QtyEntered);
-                        if(retValue["qtyentered"] ==  null)
+                        if (retValue["qtyentered"] == null)
                         {
                             retValue["qtyentered"] = QtyEntered;
                         }
@@ -154,19 +154,20 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             Dictionary<string, object> obj = null;
-            string sql = @"SELECT (SELECT  SUM(ConfirmedQty + scrappedqty) FROM M_PackageLine WHERE  M_Package_ID=" + paramValue[1] + " and m_inoutline_id =  " + paramValue[2]+") AS" +
-                         " totalConfirmedAndScrapped ,M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + paramValue[0];
+            string sql1 = "SELECT SUM(ConfirmedQty +scrappedqty) FROM M_PackageLine WHERE M_Package_ID = " + paramValue[1] + " and m_inoutline_id = " + paramValue[2];
+            obj = new Dictionary<string, object>();
+            obj["totalConfirmedAndScrapped"] = Util.GetValueOfDecimal(DB.ExecuteScalar(sql1, null, null));
+            string sql = @"SELECT M_Product_ID , movementqty , M_AttributeSetInstance_ID FROM M_InOutLine WHERE M_InOutLine_ID=" + paramValue[0];
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                obj = new Dictionary<string, object>();
-                obj["totalConfirmedAndScrapped"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["totalConfirmedAndScrapped"]);
+
                 obj["M_Product_ID"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["M_Product_ID"]);
                 obj["Movementqty"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["movementqty"]);
                 obj["M_AttributeSetInstance_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
             }
             return obj;
         }
-       
+
     }
 }

@@ -130,8 +130,9 @@ namespace VIS.Models
         public Dictionary<string, object> GetM_PriceList(Ctx ctx, string fields)
         {
             Dictionary<string, object> obj = null;
-            string sql = @"SELECT (SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID = " + Util.GetValueOfInt(fields) + "" +
-                        ") AS M_PriceList_ID, C_Currency_id FROM m_pricelist WHERE m_pricelist_ID =(SELECT M_PriceList_ID FROM M_PriceList_Version WHERE M_PriceList_Version_ID = " + Util.GetValueOfInt(fields) + ")";
+            string sql = @"SELECT  PL.M_PriceList_ID, PL.C_Currency_id FROM m_pricelist PL
+                          INNER JOIN  M_PriceList_Version PLV ON PL.M_PriceList_ID = PLV.M_PriceList_ID
+                          WHERE PLV.M_PriceList_Version_ID =" + Util.GetValueOfInt(fields);
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
