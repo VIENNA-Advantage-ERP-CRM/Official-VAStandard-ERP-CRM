@@ -47,7 +47,6 @@
     };
 
     CalloutSetAttributeCode.prototype.FillUPC = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        var sql = "";
         var manu_ID = 0;
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
@@ -55,8 +54,9 @@
         var AttrCode = ctx.getContext(windowNo, "AttrCode");
         this.setCalloutActive(true);
         if (Util.getValueOfString(AttrCode) != "") {
-            sql = "SELECT Count(*) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = '" + AttrCode + "'";
-            manu_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
+            manu_ID = VIS.dataContext.getJSONRecord("MProduct/GetManufacturer",null);
+            //sql = "SELECT Count(*) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = '" + AttrCode + "'";
+            //manu_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
             if (manu_ID > 0) {
                 this.setCalloutActive(false);
                 return VIS.Msg.getMsg("Attribute Code Already Exist");
