@@ -122,5 +122,18 @@ namespace VIS.Controllers
             retJSON = JsonConvert.SerializeObject(objBPModel.GetBPDataForProvisionalInvoice(ctx, fields));
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// LoadBPartnerOrderData
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>JSON Data</returns>
+        public JsonResult LoadBPartnerOrderData(string fields)
+        {
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            MBPartnerModel objBPModel = new MBPartnerModel();
+            retJSON = JsonConvert.SerializeObject(objBPModel.LoadBPartnerOrderData(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

@@ -343,20 +343,22 @@
             var AD_Sequence_ID = 0;
             //DataSet ds = new DataSet();
             var ds = null;
-            ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());
+            /*ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());*/
             //	Get old AD_SeqNo for comparison
             if (!newDocNo && oldC_DocType_ID != 0) {
-                ds = ds + oldC_DocType_ID;
+                ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", oldC_DocType_ID.toString());
+                //ds = ds + oldC_DocType_ID;
                 //ds = VIS.DB.executeDataset(sql, null);
                 //ds.setInt(1, oldC_DocType_ID.intValue());
                 //ResultSet dr = ds.executeQuery();
                 for (var i = 0; i < Object.keys(ds).length; i++) {
                     // DataRow dr = ds.Tables[0].Rows[i];
-                    AD_Sequence_ID = Util.getValueOfInt(ds.AD_Sequence_ID);
+                    AD_Sequence_ID = Util.getValueOfInt(ds[i].AD_Sequence_ID);
                 }
             }
             else {
-                ds = ds + C_DocType_ID;
+                ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());
+                //ds = ds + C_DocType_ID;
                 //ds = VIS.DB.executeDataset(sql, null);
             }
             var DocSubTypeSO = "";
@@ -366,7 +368,7 @@
             for (var i = 0; i < Object.keys(ds).length; i++) {
                 // DataRow dr = ds.Tables[0].Rows[i];
                 //	Set Context:	Document Sub Type for Sales Orders
-                DocSubTypeSO = Util.getValueOfString(ds.DocSubTypeSO);
+                DocSubTypeSO = Util.getValueOfString(ds[i].DocSubTypeSO);
                 if (DocSubTypeSO == null)
                     DocSubTypeSO = "--";
                 ctx.setContext(windowNo, "OrderType", DocSubTypeSO);
@@ -375,11 +377,11 @@
                     mTab.setValue("IsDropShip", "N");
 
                 //	IsSOTrx
-                if ("N".toString().equals(Util.getValueOfString(ds.IsSOTrx)))
+                if ("N".toString().equals(Util.getValueOfString(ds[i].IsSOTrx)))
                     isSOTrx = false;
 
                 //IsReturnTrx
-                isReturnTrx = "Y".toString().equals(Util.getValueOfString(ds.IsReturnTrx));
+                isReturnTrx = "Y".toString().equals(Util.getValueOfString(ds[i].IsReturnTrx));
 
                 //	Skip these steps for RMA. These are copied from the Original Order
                 if (!isReturnTrx) {
@@ -405,7 +407,7 @@
                         mTab.setValue("PaymentRule", PAYMENTRULE_OnCredit);
 
                     //	Set Context:
-                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(ds.HasCharges));
+                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(ds[i].HasCharges));
                 }
                 else // Returns
                 {
@@ -416,7 +418,7 @@
                 }
 
                 //	DocumentNo
-                if (ds[3].toString().equals("Y"))			//	IsDocNoControlled
+                if (ds[i].CurrentNext.toString().equals("Y"))			//	IsDocNoControlled
                 {
                     if (!newDocNo && AD_Sequence_ID != Util.getValueOfInt(ds.AD_Sequence_ID))
                         newDocNo = true;
@@ -461,7 +463,7 @@
                     //	PaymentRule
 
                     //var s = dr[isSOTrx ? "PaymentRule" : "PaymentRulePO"].toString();
-                    var s = Util.getValueOfString(isSOTrx ? ds.paymentrule : ds.paymentrulepo);
+                    var s = Util.getValueOfString(isSOTrx ? ds[i].paymentrule : ds[i].paymentrulepo);
                     if (s != null && s.toString().length != 0) {
                         if (isSOTrx && (s.toString().equals("B") || s.toString().equals("S") || s.toString().equals("U")))           	//	No Cash/Check/Transfer for SO_Trx
                             s = "P";										//  Payment Term
@@ -471,25 +473,25 @@
                     }
                     //	Payment Term
                     //var ii = Util.getValueOfInt(dr[isSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"].toString());
-                    var ii = Util.getValueOfInt(isSOTrx ? ds.c_paymentterm_id : ds.po_paymentterm_id);
+                    var ii = Util.getValueOfInt(isSOTrx ? ds[i].c_paymentterm_id : ds[i].po_paymentterm_id);
                     //if (!dr.wasNull())
                     if (ii != null) {
                         mTab.setValue("C_PaymentTerm_ID", ii);
                     }
                     //	InvoiceRule
-                    s = ds[2].toString();
+                    s = ds[i].InvoiceRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("InvoiceRule", s);
                     //	DeliveryRule
-                    s = ds[3].toString();
+                    s = ds[i].DeliveryRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryRule", s);
                     //	FreightCostRule
-                    s = ds[4].toString();
+                    s = ds[i].FreightCostRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("FreightCostRule", s);
                     //	DeliveryViaRule
-                    s = ds[5].toString();
+                    s = ds[i].DeliveryViaRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryViaRule", s);
                 }
