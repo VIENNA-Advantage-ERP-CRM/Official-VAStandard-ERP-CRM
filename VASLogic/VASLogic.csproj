@@ -78,6 +78,7 @@
     <Compile Include="Models\Callouts\MChargeModel.cs" />
     <Compile Include="Models\Callouts\MConversionRateModel.cs" />
     <Compile Include="Models\Callouts\MCurrencyModel.cs" />
+    <Compile Include="Models\Callouts\MDiscountSchemaModel.cs" />
     <Compile Include="Models\Callouts\MDocTypeModel.cs" />
     <Compile Include="Models\Callouts\MExpenseReportModel.cs" />
     <Compile Include="Models\Callouts\MInOutLineModel.cs" />

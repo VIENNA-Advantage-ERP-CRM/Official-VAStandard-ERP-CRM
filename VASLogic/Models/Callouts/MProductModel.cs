@@ -11,7 +11,7 @@ namespace VIS.Models
 {
     public class MProductModel
     {
-        public Dictionary<string, string> GetProduct(Ctx ctx,string fields)
+        public Dictionary<string, string> GetProduct(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
 
@@ -30,8 +30,8 @@ namespace VIS.Models
             result["IsStocked"] = product.IsStocked() ? "Y" : "N";
             if (M_Product_ID > 0)
             {
-                if(M_Warehouse_ID>0)
-                result["M_Locator_ID"] = MProductLocator.GetFirstM_Locator_ID(product, M_Warehouse_ID).ToString();
+                if (M_Warehouse_ID > 0)
+                    result["M_Locator_ID"] = MProductLocator.GetFirstM_Locator_ID(product, M_Warehouse_ID).ToString();
             }
             result["DocumentNote"] = product.GetDocumentNote();
             //if (product.GetM_Product_Category_ID() > 0)
@@ -51,38 +51,38 @@ namespace VIS.Models
 
             //Assign parameter value
             int M_Product_ID = Util.GetValueOfInt(paramValue[0].ToString());
-          
-             MProduct prod = new MProduct(ctx, M_Product_ID, null);
-             return prod.GetProductType(); ;
-            
-            
-        }  
+
+            MProduct prod = new MProduct(ctx, M_Product_ID, null);
+            return prod.GetProductType(); ;
+
+
+        }
         /// <summary>
         /// Get UPM Precision
         /// </summary>
         /// <param name="ctx"></param>
         /// <param name="fields"></param>
         /// <returns></returns>
-        public int GetUOMPrecision(Ctx ctx,string fields)
+        public int GetUOMPrecision(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
             int M_Product_ID;
             M_Product_ID = Util.GetValueOfInt(paramValue[0].ToString());
             return MProduct.Get(ctx, M_Product_ID).GetUOMPrecision();
-            
+
         }
         /// <summary>
         /// Get C
         /// </summary>
         /// <param name="fields"></param>
         /// <returns></returns>
-        public int GetC_UOM_ID(Ctx ctx,string fields)
+        public int GetC_UOM_ID(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
             int M_Product_ID;
             M_Product_ID = Util.GetValueOfInt(paramValue[0].ToString());
             return MProduct.Get(ctx, M_Product_ID).GetC_UOM_ID();
-           
+
         }
 
         //Added By amit
@@ -166,6 +166,28 @@ namespace VIS.Models
         public int GetTransactionCount(Ctx ctx, int M_Product_ID)
         {
             string sql = "SELECT COUNT(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = " + M_Product_ID;
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
+        /// <summary>
+        /// GetPOUOM
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>Get UOM_ID from M_Product_PO</returns>
+        public int GetPOUOM(string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            string sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + paramValue[0] + " AND M_Product_ID = " + paramValue[1];
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
+        /// <summary>
+        /// GetUOMID
+        /// </summary>
+        /// <param name="M_Product_ID">M_Product_ID</param>
+        /// <returns>Get UOM_ID from M_Product </returns>
+        public int GetUOMID(string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            string sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + paramValue[0];
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
     }

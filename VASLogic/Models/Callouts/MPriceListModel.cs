@@ -122,5 +122,26 @@ namespace VIS.Models
             string IsTaxIncluded = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
             return IsTaxIncluded;
         }
+        /// <summary>
+        ///This method is used to Get Price list
+        /// </summary>
+        /// <param name="fields">M_PriceList_Version_ID</param>
+        /// <returns>M_PriceList id</returns>
+        public Dictionary<string, object> GetM_PriceList(Ctx ctx, string fields)
+        {
+            Dictionary<string, object> obj = null;
+            string sql = @"SELECT  PL.M_PriceList_ID, PL.C_Currency_id FROM m_pricelist PL
+                          INNER JOIN  M_PriceList_Version PLV ON PL.M_PriceList_ID = PLV.M_PriceList_ID
+                          WHERE PLV.M_PriceList_Version_ID =" + Util.GetValueOfInt(fields);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                obj = new Dictionary<string, object>();
+                obj["M_PriceList_ID"] = ds.Tables[0].Rows[0]["M_PriceList_ID"];
+                obj["C_Currency_id"] = ds.Tables[0].Rows[0]["C_Currency_id"];
+            }
+            return obj;
+        }
+       
     }
 }
