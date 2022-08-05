@@ -81,6 +81,7 @@
     <Compile Include="Models\Callouts\MDiscountSchemaModel.cs" />
     <Compile Include="Models\Callouts\MDocTypeModel.cs" />
     <Compile Include="Models\Callouts\MExpenseReportModel.cs" />
+    <Compile Include="Models\Callouts\MFrameworkModel.cs" />
     <Compile Include="Models\Callouts\MInOutLineModel.cs" />
     <Compile Include="Models\Callouts\MInOutModel.cs" />
     <Compile Include="Models\Callouts\MInventoryLineModel.cs" />
