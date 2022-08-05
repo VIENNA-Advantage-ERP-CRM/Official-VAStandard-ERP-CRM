@@ -162,5 +162,27 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// GetPOUOM
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>JSON Datas</returns>
+        public JsonResult GetPOUOM(string fields)
+        {
+            MProductModel model = new MProductModel();
+            var value = model.GetPOUOM(fields);
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// GetUOMID
+        /// </summary>
+        /// <param name="M_Product_ID">M_Product_ID</param>
+        /// <returns>JSON Data</returns>
+        public JsonResult GetUOMID(string fields)
+        {
+            MProductModel model = new MProductModel();
+            var value = model.GetUOMID(fields);
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
     }
 }
