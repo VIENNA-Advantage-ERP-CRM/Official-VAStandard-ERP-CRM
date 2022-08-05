@@ -190,5 +190,14 @@ namespace VIS.Models
             string sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + paramValue[0];
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
+        /// <summary>
+        /// GetManufacturer
+        /// </summary>
+        /// <returns>GetManufacturer</returns>
+        public int GetManufacturer()
+        {
+            string sql = "SELECT Count(M_Manufacturer_ID) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = 'AttrCode'";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
     }
 }
