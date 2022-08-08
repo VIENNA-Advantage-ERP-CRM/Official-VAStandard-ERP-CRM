@@ -85,5 +85,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This method is used to Get Price list
+        /// </summary>
+        /// <param name="fields">M_PriceList_Version_ID</param>
+        /// <returns>M_PriceList id</returns>
+        public JsonResult GetM_PriceList(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MPriceListModel objPriceList = new MPriceListModel();
+                retJSON = JsonConvert.SerializeObject(objPriceList.GetM_PriceList(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

@@ -10,7 +10,7 @@ using VIS.Models;
 
 namespace VIS.Controllers
 {
-    public class MProductController:Controller
+    public class MProductController : Controller
     {
         public ActionResult Index()
         {
@@ -19,43 +19,43 @@ namespace VIS.Controllers
 
         public JsonResult GetProduct(string fields)
         {
-            
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MProductModel objProduct = new MProductModel();
-                retJSON = JsonConvert.SerializeObject(objProduct.GetProduct(ctx,fields));
-            }          
+                retJSON = JsonConvert.SerializeObject(objProduct.GetProduct(ctx, fields));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }    
+        }
         public JsonResult GetUOMPrecision(string fields)
         {
-            
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MProductModel objProduct = new MProductModel();
                 retJSON = JsonConvert.SerializeObject(objProduct.GetUOMPrecision(ctx, fields));
-            }           
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
         public JsonResult GetC_UOM_ID(string fields)
         {
-           
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MProductModel objProduct = new MProductModel();
-                retJSON = JsonConvert.SerializeObject(objProduct.GetC_UOM_ID(ctx,fields));
-            }            
+                retJSON = JsonConvert.SerializeObject(objProduct.GetC_UOM_ID(ctx, fields));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
         public JsonResult GetProductType(string fields)
         {
-           
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
@@ -85,7 +85,7 @@ namespace VIS.Controllers
         /// <returns>C_REVENUERECOGNITION_ID</returns>
         public JsonResult GetRevenuRecognition(string fields)
         {
-            string retJSON = ""; 
+            string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
@@ -146,7 +146,7 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-        
+
         /// Counts of Transaction
         /// </summary>
         /// <param name="fields">Product ID</param>
@@ -162,5 +162,38 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// GetPOUOM
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>JSON Datas</returns>
+        public JsonResult GetPOUOM(string fields)
+        {
+            MProductModel model = new MProductModel();
+            var value = model.GetPOUOM(fields);
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// GetUOMID
+        /// </summary>
+        /// <param name="M_Product_ID">M_Product_ID</param>
+        /// <returns>JSON Data</returns>
+        public JsonResult GetUOMID(string fields)
+        {
+            MProductModel model = new MProductModel();
+            var value = model.GetUOMID(fields);
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// GetManufacturer
+        /// </summary>
+        /// <returns>JSON Data</returns>
+        public JsonResult GetManufacturer()
+        {
+            MProductModel model = new MProductModel();
+            var value = model.GetManufacturer();
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

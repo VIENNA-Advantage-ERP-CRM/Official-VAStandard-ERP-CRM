@@ -466,5 +466,68 @@ namespace VIS.Models
             }
             return retDic;
         }
+        /// <summary>
+        /// LoadBPartnerOrderData
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">fields</param>
+        /// <returns> Load BPartner Order Data</returns>
+        public Dictionary<string, object> LoadBPartnerOrderData(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int C_BPartner_ID = Util.GetValueOfInt(paramValue[0]);
+            Dictionary<string, object> retDic = null;
+            string sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
+                  + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
+                  + " p.SO_Description,p.IsDiscountPrinted,"
+                  + " p.InvoiceRule,p.DeliveryRule,p.FreightCostRule,DeliveryViaRule,"
+                  + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
+                  + " lship.C_BPartner_Location_ID,c.AD_User_ID,"
+                  + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
+                  + " lbill.C_BPartner_Location_ID AS Bill_Location_ID, p.SOCreditStatus, lbill.IsShipTo "
+                  + "FROM C_BPartner p"
+                  + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
+                  + " LEFT OUTER JOIN C_BPartner_Location lbill ON (p.C_BPartner_ID=lbill.C_BPartner_ID AND lbill.IsBillTo='Y' AND lbill.IsActive='Y')"
+                  + " LEFT OUTER JOIN C_BPartner_Location lship ON (p.C_BPartner_ID=lship.C_BPartner_ID AND lship.IsShipTo='Y' AND lship.IsActive='Y')"
+                  + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
+                  + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+                retDic["C_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_PaymentTerm_ID"]);
+                retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                retDic["PaymentRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PaymentRule"]);
+                retDic["POReference"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["POReference"]);
+                retDic["SO_Description"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["SO_Description"]);
+                retDic["SalesRep_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["SalesRep_ID"]);
+                retDic["IsDiscountPrinted"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsDiscountPrinted"]);
+                retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
+                retDic["VA009_PaymentBaseType"] = Util.GetValueOfString(DB.ExecuteScalar("SELECT VA009_PaymentBaseType FROM VA009_PaymentMethod WHERE VA009_PaymentMethod_ID="
+                    + Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]), null, null));
+                retDic["VA009_PO_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PO_PaymentMethod_ID"]);
+                retDic["InvoiceRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["InvoiceRule"]);
+                retDic["DeliveryRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["DeliveryRule"]);
+                retDic["FreightCostRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["FreightCostRule"]);
+                retDic["DeliveryViaRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["DeliveryViaRule"]);
+                retDic["CreditStatusSettingOn"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["CreditStatusSettingOn"]);
+                retDic["SO_CreditLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["SO_CreditLimit"]);
+                retDic["CreditAvailable"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CreditAvailable"]);
+                retDic["PO_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PO_PriceList_ID"]);
+                retDic["PaymentRulePO"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PaymentRulePO"]);
+                retDic["PO_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PO_PaymentTerm_ID"]);
+                retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
+                retDic["AD_User_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
+                retDic["Bill_BPartner_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_BPartnerRelation_ID FROM C_BP_Relation WHERE C_BPartner_ID = " + C_BPartner_ID, null, null));
+                retDic["Bill_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Bill_Location_ID"]);
+                retDic["SOCreditStatus"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["SOCreditStatus"]);
+                retDic["IsShipTo"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsShipTo"]);
+                retDic["C_IncoTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]);
+                retDic["C_IncoTermPO_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
+
+            }
+            return retDic;
+        }
     }
 }

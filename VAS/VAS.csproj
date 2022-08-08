@@ -147,6 +147,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MDiscountSchemaController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MDocTypeController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MExpenseReportController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MFrameworkController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MInOutController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MInOutLineController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MInventoryController.cs" />

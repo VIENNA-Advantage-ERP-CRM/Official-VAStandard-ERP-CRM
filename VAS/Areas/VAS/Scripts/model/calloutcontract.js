@@ -121,7 +121,7 @@
     };
     VIS.Model.CalloutContract = CalloutContract;
     //***************CalloutContract End ************
-    
+
 
     //****************CalloutContractQty Start ******
     function CalloutContractQty() {
@@ -329,43 +329,46 @@
                 newDocNo = true;
             var oldC_DocType_ID = mTab.getValue("C_DocType_ID");
 
-            sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',"			//	1..3
-                + "d.IsDocNoControlled,s.CurrentNext,s.CurrentNextSys,"     //  4..6
-                + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx "              //	7..9
-                /*//jz right outer join
-                + "FROM C_DocType d, AD_Sequence s "
-                + "WHERE C_DocType_ID=?"	//	#1
-                + " AND d.DocNoSequence_ID=s.AD_Sequence_ID(+)"; */
-                + "FROM C_DocType d "
-                + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
-                + "WHERE C_DocType_ID=";	//	#1
+            //sql = "SELECT d.DocSubTypeSO,d.HasCharges,'N',"			//	1..3
+            //    + "d.IsDocNoControlled,s.CurrentNext,s.CurrentNextSys,"     //  4..6
+            //    + "s.AD_Sequence_ID,d.IsSOTrx, d.IsReturnTrx "              //	7..9
+            //    /*//jz right outer join
+            //    + "FROM C_DocType d, AD_Sequence s "
+            //    + "WHERE C_DocType_ID=?"	//	#1
+            //    + " AND d.DocNoSequence_ID=s.AD_Sequence_ID(+)"; */
+            //    + "FROM C_DocType d "
+            //    + "LEFT OUTER JOIN AD_Sequence s ON (d.DocNoSequence_ID=s.AD_Sequence_ID) "
+            //    + "WHERE C_DocType_ID=";	//	#1
 
             var AD_Sequence_ID = 0;
             //DataSet ds = new DataSet();
             var ds = null;
+            /*ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());*/
             //	Get old AD_SeqNo for comparison
             if (!newDocNo && oldC_DocType_ID != 0) {
-                sql = sql + oldC_DocType_ID;
-                ds = VIS.DB.executeDataset(sql, null);
+                ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", oldC_DocType_ID.toString());
+                //ds = ds + oldC_DocType_ID;
+                //ds = VIS.DB.executeDataset(sql, null);
                 //ds.setInt(1, oldC_DocType_ID.intValue());
                 //ResultSet dr = ds.executeQuery();
-                for (var i = 0; i < ds.getTables()[0].rows.count; i++) {
+                for (var i = 0; i < Object.keys(ds).length; i++) {
                     // DataRow dr = ds.Tables[0].Rows[i];
-                    AD_Sequence_ID = Util.getValueOfInt(ds.getRows()[i].getCell("AD_Sequence_ID"));
+                    AD_Sequence_ID = Util.getValueOfInt(ds[i].AD_Sequence_ID);
                 }
             }
             else {
-                sql = sql + C_DocType_ID;
-                ds = VIS.DB.executeDataset(sql, null);
+                ds = VIS.dataContext.getJSONRecord("MDocType/GetDocTypeData", C_DocType_ID.toString());
+                //ds = ds + C_DocType_ID;
+                //ds = VIS.DB.executeDataset(sql, null);
             }
             var DocSubTypeSO = "";
             var isSOTrx = true;
             var isReturnTrx = false;
             //	we found document type
-            for (var i = 0; i < ds.getTables()[0].rows.count; i++) {
+            for (var i = 0; i < Object.keys(ds).length; i++) {
                 // DataRow dr = ds.Tables[0].Rows[i];
                 //	Set Context:	Document Sub Type for Sales Orders
-                DocSubTypeSO = Util.getValueOfString(ds.getRows()[i].getCell("DocSubTypeSO"));
+                DocSubTypeSO = Util.getValueOfString(ds[i].DocSubTypeSO);
                 if (DocSubTypeSO == null)
                     DocSubTypeSO = "--";
                 ctx.setContext(windowNo, "OrderType", DocSubTypeSO);
@@ -374,11 +377,11 @@
                     mTab.setValue("IsDropShip", "N");
 
                 //	IsSOTrx
-                if ("N".toString().equals(Util.getValueOfString(ds.getRows()[i].getCell("IsSOTrx"))))
+                if ("N".toString().equals(Util.getValueOfString(ds[i].IsSOTrx)))
                     isSOTrx = false;
 
                 //IsReturnTrx
-                isReturnTrx = "Y".toString().equals(Util.getValueOfString(ds.getRows()[i].getCell("IsReturnTrx")));
+                isReturnTrx = "Y".toString().equals(Util.getValueOfString(ds[i].IsReturnTrx));
 
                 //	Skip these steps for RMA. These are copied from the Original Order
                 if (!isReturnTrx) {
@@ -404,7 +407,7 @@
                         mTab.setValue("PaymentRule", PAYMENTRULE_OnCredit);
 
                     //	Set Context:
-                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(ds.getRows()[i].getCell("HasCharges")));
+                    ctx.setContext(windowNo, "HasCharges", Util.getValueOfString(ds[i].HasCharges));
                 }
                 else // Returns
                 {
@@ -415,9 +418,9 @@
                 }
 
                 //	DocumentNo
-                if (dr[3].toString().equals("Y"))			//	IsDocNoControlled
+                if (ds[i].CurrentNext.toString().equals("Y"))			//	IsDocNoControlled
                 {
-                    if (!newDocNo && AD_Sequence_ID != Util.getValueOfInt(ds.getRows()[i].getCell("AD_Sequence_ID")))
+                    if (!newDocNo && AD_Sequence_ID != Util.getValueOfInt(ds.AD_Sequence_ID))
                         newDocNo = true;
                     if (newDocNo)
                         try {
@@ -427,7 +430,7 @@
                             //}
                             //else
                             //{
-                            mTab.setValue("DocumentNo", "<" + Util.getValueOfString(ds.getRows()[i].getCell("CurrentNext")) + ">");
+                            mTab.setValue("DocumentNo", "<" + Util.getValueOfString(ds[i].CurrentNext) + ">");
                             // }
                         }
                         catch (err) {
@@ -447,19 +450,20 @@
             }
             else {
                 var C_BPartner_ID = ctx.getContextAsInt(windowNo, "C_BPartner_ID");
-                sql = "SELECT PaymentRule,C_PaymentTerm_ID,"            //  1..2
-                    + "InvoiceRule,DeliveryRule,"                       //  3..4
-                    + "FreightCostRule,DeliveryViaRule, "               //  5..6
-                    + "PaymentRulePO,PO_PaymentTerm_ID "
-                    + "FROM C_BPartner "
-                    + "WHERE C_BPartner_ID=" + C_BPartner_ID;		//	#1
-                ds = VIS.DB.executeDataset(sql, null);
-                for (var i = 0; i < ds.getTables()[0].rows.count; i++) {
-                    var dr = ds.getTables()[0].rows[i];
+                //sql = "SELECT PaymentRule,C_PaymentTerm_ID,"            //  1..2
+                //    + "InvoiceRule,DeliveryRule,"                       //  3..4
+                //    + "FreightCostRule,DeliveryViaRule, "               //  5..6
+                //    + "PaymentRulePO,PO_PaymentTerm_ID "
+                //    + "FROM C_BPartner "
+                //    + "WHERE C_BPartner_ID=" + C_BPartner_ID;		//	#1
+                //ds = VIS.DB.executeDataset(sql, null);
+                ds = VIS.dataContext.getJSONRecord("MBPartner/GetBPDocTypeData", C_BPartner_ID.toString());
+                for (var i = 0; i < Object.keys(ds).length; i++) {
+
                     //	PaymentRule
 
                     //var s = dr[isSOTrx ? "PaymentRule" : "PaymentRulePO"].toString();
-                    var s = Util.getValueOfString(dr.get(isSOTrx ? "paymentrule" : "paymentrulepo"));
+                    var s = Util.getValueOfString(isSOTrx ? ds[i].paymentrule : ds[i].paymentrulepo);
                     if (s != null && s.toString().length != 0) {
                         if (isSOTrx && (s.toString().equals("B") || s.toString().equals("S") || s.toString().equals("U")))           	//	No Cash/Check/Transfer for SO_Trx
                             s = "P";										//  Payment Term
@@ -469,25 +473,25 @@
                     }
                     //	Payment Term
                     //var ii = Util.getValueOfInt(dr[isSOTrx ? "C_PaymentTerm_ID" : "PO_PaymentTerm_ID"].toString());
-                    var ii = Util.getValueOfInt(dr.get(isSOTrx ? "c_paymentterm_id" : "po_paymentterm_id"));
+                    var ii = Util.getValueOfInt(isSOTrx ? ds[i].c_paymentterm_id : ds[i].po_paymentterm_id);
                     //if (!dr.wasNull())
-                    if (dr != null) {
+                    if (ii != null) {
                         mTab.setValue("C_PaymentTerm_ID", ii);
                     }
                     //	InvoiceRule
-                    s = dr[2].toString();
+                    s = ds[i].InvoiceRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("InvoiceRule", s);
                     //	DeliveryRule
-                    s = dr[3].toString();
+                    s = ds[i].DeliveryRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryRule", s);
                     //	FreightCostRule
-                    s = dr[4].toString();
+                    s = ds[i].FreightCostRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("FreightCostRule", s);
                     //	DeliveryViaRule
-                    s = dr[5].toString();
+                    s = ds[i].DeliveryViaRule.toString();
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryViaRule", s);
                 }
@@ -590,154 +594,157 @@
 
             this.setCalloutActive(true);
 
-            sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
-                + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
-                + " p.SO_Description,p.IsDiscountPrinted,"
-                + " p.InvoiceRule,p.DeliveryRule,p.FreightCostRule,DeliveryViaRule,"
-                + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
-                + " lship.C_BPartner_Location_ID,c.AD_User_ID,"
-                + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
-                + " lbill.C_BPartner_Location_ID AS Bill_Location_ID, p.SOCreditStatus, lbill.IsShipTo "
-                + "FROM C_BPartner p"
-                + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
-                + " LEFT OUTER JOIN C_BPartner_Location lbill ON (p.C_BPartner_ID=lbill.C_BPartner_ID AND lbill.IsBillTo='Y' AND lbill.IsActive='Y')"
-                + " LEFT OUTER JOIN C_BPartner_Location lship ON (p.C_BPartner_ID=lship.C_BPartner_ID AND lship.IsShipTo='Y' AND lship.IsActive='Y')"
-                + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
-                + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
+            //sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID,"
+            //    + " COALESCE(p.M_PriceList_ID,g.M_PriceList_ID) AS M_PriceList_ID, p.PaymentRule,p.POReference,"
+            //    + " p.SO_Description,p.IsDiscountPrinted,"
+            //    + " p.InvoiceRule,p.DeliveryRule,p.FreightCostRule,DeliveryViaRule,"
+            //    + " p.SO_CreditLimit, p.SO_CreditLimit-p.SO_CreditUsed AS CreditAvailable,"
+            //    + " lship.C_BPartner_Location_ID,c.AD_User_ID,"
+            //    + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
+            //    + " lbill.C_BPartner_Location_ID AS Bill_Location_ID, p.SOCreditStatus, lbill.IsShipTo "
+            //    + "FROM C_BPartner p"
+            //    + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
+            //    + " LEFT OUTER JOIN C_BPartner_Location lbill ON (p.C_BPartner_ID=lbill.C_BPartner_ID AND lbill.IsBillTo='Y' AND lbill.IsActive='Y')"
+            //    + " LEFT OUTER JOIN C_BPartner_Location lship ON (p.C_BPartner_ID=lship.C_BPartner_ID AND lship.IsShipTo='Y' AND lship.IsActive='Y')"
+            //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
+            //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
             var isSOTrx = ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y";
 
-            var ds = VIS.DB.executeDataset(sql, null);
-            for (var i = 0; i < ds.getTables()[0].rows.count; i++) {
-                var dr = ds.getTables()[0].rows[i];
-                //	PriceList (indirect: IsTaxIncluded & Currency)
-                var ii = Util.getValueOfInt(dr.get(isSOTrx ? "m_pricelist_id" : "po_pricelist_id"));
-                if (dr != null && ii != 0) {
-                    mTab.setValue("M_PriceList_ID", ii);
-                }
+            var ds = VIS.dataContext.getJSONRecord("MBPartner/LoadBPartnerOrderData", C_BPartner_ID.toString());
+            // var ds = VIS.DB.executeDataset(sql, null);
+            if (ds != null && Object.keys(ds).length > 0) {
+                for (var i = 0; i < Object.keys(ds).length; i++) {
+                    //var dr = ds;
+                    //	PriceList (indirect: IsTaxIncluded & Currency)
+                    var ii = Util.getValueOfInt(isSOTrx ? ds.m_pricelist_id : ds.po_pricelist_id);
+                    if (ii != 0) {
+                        mTab.setValue("M_PriceList_ID", ii);
+                    }
 
-                // JID_0364: If price list not available at BP, user need to select it manually
+                    // JID_0364: If price list not available at BP, user need to select it manually
 
-                //else {	//	get default PriceList
-                //    var i1 = ctx.getContextAsInt("#M_PriceList_ID");
-                //    if (i1 != 0)
-                //        mTab.setValue("M_PriceList_ID", i1);
-                //}
-                //	Bill-To BPartner
-                mTab.setValue("Bill_BPartner_ID", C_BPartner_ID);
-                var bill_Location_ID = Util.getValueOfInt(dr.get("bill_location_id"));
-                if (bill_Location_ID == 0)
-                    mTab.setValue("Bill_Location_ID", null);
-                else
-                    mTab.setValue("Bill_Location_ID", bill_Location_ID);
+                    //else {	//	get default PriceList
+                    //    var i1 = ctx.getContextAsInt("#M_PriceList_ID");
+                    //    if (i1 != 0)
+                    //        mTab.setValue("M_PriceList_ID", i1);
+                    //}
+                    //	Bill-To BPartner
+                    mTab.setValue("Bill_BPartner_ID", C_BPartner_ID);
+                    var bill_Location_ID = Util.getValueOfInt(ds.bill_location_id);
+                    if (bill_Location_ID == 0)
+                        mTab.setValue("Bill_Location_ID", null);
+                    else
+                        mTab.setValue("Bill_Location_ID", bill_Location_ID);
 
-                // Ship-To Location
-                var shipTo_ID = Util.getValueOfInt(dr.get("c_bpartner_location_id"));
-                //	overwritten by InfoBP selection - works only if InfoWindow
-                //	was used otherwise creates error (uses last value, may belong to differnt BP)
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var loc = ctx.getContext("C_BPartner_Location_ID");
-                    if (loc.toString().length > 0)
-                        shipTo_ID = int.Parse(loc);
-                }
-                if (shipTo_ID == 0)
-                    mTab.setValue("C_BPartner_Location_ID", null);
-                else {
-                    mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
-                    if ("Y".toString().equals(Util.getValueOfString(dr.get("isshipto"))))	//	set the same
-                        mTab.setValue("Bill_Location_ID", shipTo_ID);
-                }
-                //	Contact - overwritten by InfoBP selection
-                var contID = Util.getValueOfInt(dr.get("ad_user_id").toString());
-                if (C_BPartner_ID.toString().toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var cont = ctx.getContext("AD_User_ID");
-                    if (cont.toString().length > 0)
-                        contID = Util.getValueOfInt(cont);
-                }
-                if (contID == 0)
-                    mTab.setValue("AD_User_ID", null);
-                else {
-                    mTab.setValue("AD_User_ID", contID);
-                    mTab.setValue("Bill_User_ID", contID);
-                }
+                    // Ship-To Location
+                    var shipTo_ID = Util.getValueOfInt(ds.c_bpartner_location_id);
+                    //	overwritten by InfoBP selection - works only if InfoWindow
+                    //	was used otherwise creates error (uses last value, may belong to differnt BP)
+                    if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
+                        var loc = ctx.getContext("C_BPartner_Location_ID");
+                        if (loc.toString().length > 0)
+                            shipTo_ID = int.Parse(loc);
+                    }
+                    if (shipTo_ID == 0)
+                        mTab.setValue("C_BPartner_Location_ID", null);
+                    else {
+                        mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
+                        if ("Y".toString().equals(Util.getValueOfString(ds.isshipto)))	//	set the same
+                            mTab.setValue("Bill_Location_ID", shipTo_ID);
+                    }
+                    //	Contact - overwritten by InfoBP selection
+                    var contID = Util.getValueOfInt(ds.ad_user_id.toString());
+                    if (C_BPartner_ID.toString().toString().equals(ctx.getContext("C_BPartner_ID"))) {
+                        var cont = ctx.getContext("AD_User_ID");
+                        if (cont.toString().length > 0)
+                            contID = Util.getValueOfInt(cont);
+                    }
+                    if (contID == 0)
+                        mTab.setValue("AD_User_ID", null);
+                    else {
+                        mTab.setValue("AD_User_ID", contID);
+                        mTab.setValue("Bill_User_ID", contID);
+                    }
 
-                //	CreditAvailable 
-                if (isSOTrx) {
-                    var CreditLimit = Util.getValueOfDouble(dr.get("so_creditlimit"));
-                    //	var SOCreditStatus = dr.getString("SOCreditStatus");
-                    if (CreditLimit != 0) {
-                        var CreditAvailable = Util.getValueOfDouble(dr.get("creditavailable"));
-                        if (dr != null && CreditAvailable < 0) {
-                            //mTab.fireDataStatusEEvent("CreditLimitOver",
-                            //    DisplayType.getNumberFormat(DisplayType.Amount).format(CreditAvailable),
-                            //    false);
-                            // MessageBox.Show("Create fireDataStatusEEvent");
+                    //	CreditAvailable 
+                    if (isSOTrx) {
+                        var CreditLimit = Util.getValueOfDouble(ds.so_creditlimit);
+                        //	var SOCreditStatus = dr.getString("SOCreditStatus");
+                        if (CreditLimit != 0) {
+                            var CreditAvailable = Util.getValueOfDouble(ds.creditavailable);
+                            if (CreditAvailable < 0) {
+                                //mTab.fireDataStatusEEvent("CreditLimitOver",
+                                //    DisplayType.getNumberFormat(DisplayType.Amount).format(CreditAvailable),
+                                //    false);
+                                // MessageBox.Show("Create fireDataStatusEEvent");
+                            }
                         }
                     }
-                }
 
-                //	VAdvantage.Model.PO Reference
-                var s = dr.get("poreference").toString();
-                if (s != null && s.toString().length != 0)
-                    mTab.setValue("POReference", s);
-                // should not be reset to null if we entered already value! VHARCQ, accepted YS makes sense that way
-                // TODO: should get checked and removed if no longer needed!
-                /*else
-                    mTab.setValue("POReference", null);*/
+                    //	VAdvantage.Model.PO Reference
+                    var s = ds.poreference.toString();
+                    if (s != null && s.toString().length != 0)
+                        mTab.setValue("POReference", s);
+                    // should not be reset to null if we entered already value! VHARCQ, accepted YS makes sense that way
+                    // TODO: should get checked and removed if no longer needed!
+                    /*else
+                        mTab.setValue("POReference", null);*/
 
-                //	SO Description
-                s = Util.getValueOfString(dr.get("so_description"));
-                if (s != null && s.toString().trim().length != 0)
-                    mTab.setValue("Description", s);
-                //	IsDiscountPrinted
-                s = Util.getValueOfString(dr.get("isdiscountprinted"));
-                if (s != null && s.toString().length != 0)
-                    mTab.setValue("IsDiscountPrinted", s);
-                else
-                    mTab.setValue("IsDiscountPrinted", "N");
+                    //	SO Description
+                    s = Util.getValueOfString(ds.so_description);
+                    if (s != null && s.toString().trim().length != 0)
+                        mTab.setValue("Description", s);
+                    //	IsDiscountPrinted
+                    s = Util.getValueOfString(ds.isdiscountprinted);
+                    if (s != null && s.toString().length != 0)
+                        mTab.setValue("IsDiscountPrinted", s);
+                    else
+                        mTab.setValue("IsDiscountPrinted", "N");
 
-                //	Defaults, if not Walkin Receipt or Walkin Invoice
-                var OrderType = ctx.getContext("OrderType");
-                mTab.setValue("InvoiceRule", INVOICERULE_AfterDelivery);
-                mTab.setValue("DeliveryRule", DELIVERYRULE_Availability);
-                mTab.setValue("PaymentRule", PAYMENTRULE_OnCredit);
-                if (OrderType.toString().equals(DocSubTypeSO_Prepay)) {
-                    mTab.setValue("InvoiceRule", INVOICERULE_Immediate);
-                    mTab.setValue("DeliveryRule", DELIVERYRULE_AfterReceipt);
-                }
-                else if (OrderType.toString().equals(MOrder.DocSubTypeSO_POS))	//  for POS
-                    mTab.setValue("PaymentRule", PAYMENTRULE_Cash);
-                else {
-                    //	PaymentRule
-                    s = dr[isSOTrx ? "PaymentRule" : "PaymentRulePO"].toString();
-                    if (s != null && s.length != 0) {
-                        if (s.toString().equals("B"))				//	No Cache in Non POS
-                            s = "P";
-                        if (isSOTrx && (s.toString().equals("S") || s.toString().equals("U")))	//	No Check/Transfer for SO_Trx
-                            s = "P";										//  Payment Term
-                        mTab.setValue("PaymentRule", s);
+                    //	Defaults, if not Walkin Receipt or Walkin Invoice
+                    var OrderType = ctx.getContext("OrderType");
+                    mTab.setValue("InvoiceRule", INVOICERULE_AfterDelivery);
+                    mTab.setValue("DeliveryRule", DELIVERYRULE_Availability);
+                    mTab.setValue("PaymentRule", PAYMENTRULE_OnCredit);
+                    if (OrderType.toString().equals(DocSubTypeSO_Prepay)) {
+                        mTab.setValue("InvoiceRule", INVOICERULE_Immediate);
+                        mTab.setValue("DeliveryRule", DELIVERYRULE_AfterReceipt);
                     }
-                    //	Payment Term
-                    ii = Util.getValueOfInt(dr.get(isSOTrx ? "c_paymentterm_id" : "po_paymentterm_id"));
-                    if (dr != null && ii != 0)//ii=0 when dr return ""
-                    {
-                        mTab.setValue("C_PaymentTerm_ID", ii);
+                    else if (OrderType.toString().equals(MOrder.DocSubTypeSO_POS))	//  for POS
+                        mTab.setValue("PaymentRule", PAYMENTRULE_Cash);
+                    else {
+                        //	PaymentRule
+                        s = isSOTrx ? ds.PaymentRule : ds.PaymentRulePO.toString();
+                        if (s != null && s.length != 0) {
+                            if (s.toString().equals("B"))				//	No Cache in Non POS
+                                s = "P";
+                            if (isSOTrx && (s.toString().equals("S") || s.toString().equals("U")))	//	No Check/Transfer for SO_Trx
+                                s = "P";										//  Payment Term
+                            mTab.setValue("PaymentRule", s);
+                        }
+                        //	Payment Term
+                        ii = Util.getValueOfInt(isSOTrx ? ds.c_paymentterm_id : ds.po_paymentterm_id);
+                        if (ii != 0)//ii=0 when dr return ""
+                        {
+                            mTab.setValue("C_PaymentTerm_ID", ii);
+                        }
+                        //	InvoiceRule
+                        s = Util.getValueOfString(ds.invoicerule);
+                        if (s != null && s.length != 0)
+                            mTab.setValue("InvoiceRule", s);
+                        //	DeliveryRule
+                        s = Util.getValueOfString(ds.deliveryrule);
+                        if (s != null && s.length != 0)
+                            mTab.setValue("DeliveryRule", s);
+                        //	FreightCostRule
+                        s = Util.getValueOfString(ds.freightcostrule);
+                        if (s != null && s.length != 0)
+                            mTab.setValue("FreightCostRule", s);
+                        //	DeliveryViaRule
+                        s = Util.getValueOfString(ds.deliveryviarule);
+                        if (s != null && s.length != 0)
+                            mTab.setValue("DeliveryViaRule", s);
                     }
-                    //	InvoiceRule
-                    s = Util.getValueOfString(dr.get("invoicerule"));
-                    if (s != null && s.length != 0)
-                        mTab.setValue("InvoiceRule", s);
-                    //	DeliveryRule
-                    s = Util.getValueOfString(dr.get("deliveryrule"));
-                    if (s != null && s.length != 0)
-                        mTab.setValue("DeliveryRule", s);
-                    //	FreightCostRule
-                    s = Util.getValueOfString(dr.get("freightcostrule"));
-                    if (s != null && s.length != 0)
-                        mTab.setValue("FreightCostRule", s);
-                    //	DeliveryViaRule
-                    s = Util.getValueOfString(dr.get("deliveryviarule"));
-                    if (s != null && s.length != 0)
-                        mTab.setValue("DeliveryViaRule", s);
                 }
             }
         }
@@ -825,20 +832,26 @@
             //}
 
             /***** Bharat ****/
-            var sql = "SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_'";
-            countEd011 = Util.getValueOfInt(VIS.DB.executeScalar(sql));
+            var DataPrefix = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "ED011_");
+            //var sql = "SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_'";
+            //countEd011 = Util.getValueOfInt(VIS.DB.executeScalar(sql));
             var purchasingUom = 0;
-            if (countEd011 > 0) {
-                sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) +
-                    " AND M_Product_ID = " + M_Product_ID;
-                purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
-
+            if (DataPrefix["ED011_"]) {
+                var C_BPartner_ID = Util.getValueOfInt(mTab.getValue("C_BPartner_ID"));
+                var paramString = C_BPartner_ID.toString() + "," + M_Product_ID.toString();
+                //sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) +
+                // " AND M_Product_ID = " + M_Product_ID;
+                //purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
+                purchasingUom = VIS.dataContext.getJSONRecord("MProduct/GetPOUOM", paramString);
                 if (purchasingUom > 0 && isSOTrx == false) {
                     mTab.setValue("C_UOM_ID", purchasingUom);
                 }
                 else {
-                    sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
-                    mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
+                    var paramString = M_Product_ID.toString();
+                    var c_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetUOMID", paramString);
+                    //sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
+                    //mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
+                    mTab.setValue("C_UOM_ID", c_UOM_ID);
                 }
             }
             var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"))
@@ -1049,20 +1062,26 @@
                 //}
 
                 /***** Bharat ****/
-                var sql = "SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_'";
-                countEd011 = Util.getValueOfInt(VIS.DB.executeScalar(sql));
+                var DataPrefix = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "ED011_");
+                //var sql = "SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='ED011_'";
+                //countEd011 = Util.getValueOfInt(VIS.DB.executeScalar(sql));
                 var purchasingUom = 0;
-                if (countEd011 > 0) {
-                    sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) +
-                        " AND M_Product_ID = " + M_Product_ID;
-                    purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
-
+                if (DataPrefix > 0) {
+                    var C_BPartner_ID = Util.getValueOfInt(mTab.getValue("C_BPartner_ID"));
+                    var paramString = C_BPartner_ID.toString() + "," + M_Product_ID.toString();
+                    // sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) +
+                    //     " AND M_Product_ID = " + M_Product_ID;
+                    //purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
+                    purchasingUom = VIS.dataContext.getJSONRecord("MProduct/GetPOUOM", paramString);
                     if (purchasingUom > 0 && isSOTrx == false) {
                         mTab.setValue("C_UOM_ID", purchasingUom);
                     }
                     else {
-                        sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
-                        mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
+                        var paramString =  M_Product_ID.toString();
+                        var c_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetUOMID", paramString);
+                       // sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
+                        //mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
+                        mTab.setValue("C_UOM_ID", c_UOM_ID );
                     }
                 }
                 var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"))
