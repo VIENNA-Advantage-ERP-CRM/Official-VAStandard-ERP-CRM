@@ -161,12 +161,19 @@
             //    + " LEFT OUTER JOIN C_BPartner_Location l ON (p.C_BPartner_ID=l.C_BPartner_ID AND l.IsBillTo='Y' AND l.IsActive='Y')"
             //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
             //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
+            var _CountVA009 = false;
+            var paramString = "VA009_";
+            var module = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", paramString);
+            if (module != null) {
+                _CountVA009 = module["VA009_"];
+            }
 
+            paramString = _CountVA009.toString() + "," + C_BPartner_ID.toString();
             var isSOTrx = ctx.isSOTrx(windowNo);
             var dr = null;
             var drl = null;
             try {
-                dr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", C_BPartner_ID.toString());
+                dr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", paramString);
 
                 //dr = VIS.DB.executeReader(sql, null, null);
                 //if (dr.read()) {

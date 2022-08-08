@@ -57,8 +57,8 @@
         var IsSOTrx = ctx.isSOTrx();
         var idr = null;
         try {
-
-            idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", C_BPartner_ID.toString());
+            var paramString = false.toString() + "," + C_BPartner_ID.toString();
+            idr = VIS.dataContext.getJSONRecord("MBPartner/GetBPartnerData", paramString);
 
             //	PaymentRule
             if (idr != null) {
