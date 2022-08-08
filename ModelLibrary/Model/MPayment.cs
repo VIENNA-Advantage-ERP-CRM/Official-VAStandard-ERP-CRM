@@ -3300,8 +3300,17 @@ namespace VAdvantage.Model
             // Auto check work-Mohit-7 March 2020
             MBankAccount bnkAct = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
-            if (GetTenderType().Equals(X_C_Payment.TENDERTYPE_Check) && bnkAct.IsChkNoAutoControl() && !IsReversal())
-            {
+           if (GetTenderType().Equals(X_C_Payment.TENDERTYPE_Check) && bnkAct.IsChkNoAutoControl() && !IsReversal())
+           {
+                //VIS_317 When Payment Method ID (Payment window) not equals to Payment Method ID on (Bank Account Document ''Bank Window'') with Check No.
+                //if user pass the check number manually than payment status would be completed. 
+                string PayCount ="SELECT COUNT(VA009_PaymentMethod_ID) FROM C_BankAccountDoc WHERE C_BankAccount_ID="+GetC_BankAccount_ID()+" AND EndChkNumber >= CurrentNext AND IsActive='Y' AND VA009_PaymentMethod_ID= " + GetVA009_PaymentMethod_ID();
+                int Count = Util.GetValueOfInt(DB.ExecuteScalar(PayCount, null, null));
+                if(Count == 0)
+                {
+                    SetIsOverrideAutoCheck(true);
+                   
+                }
                 //Rakesh(VA228):When override autocheck is set false execute autocheck functionality
                 if (!IsOverrideAutoCheck())
                 {
@@ -3322,10 +3331,9 @@ namespace VAdvantage.Model
                             log.Info("" + _processMsg + ": Payment Document No " + GetDocumentNo());
                             return DocActionVariables.STATUS_INVALID;
                         }
-                    }
+                    }                  
                 }
             }
-
             if (!UpdateUnMatchedBalanceForAccount())
             {
                 return DocActionVariables.STATUS_INVALID;
