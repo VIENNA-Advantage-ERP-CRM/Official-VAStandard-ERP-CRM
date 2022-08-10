@@ -79,6 +79,16 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-
+        /// <summary>
+        /// GetProfiletype
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>JSON Data</returns>
+        public JsonResult GetProfiletype(string fields)
+        {
+            MExpenseReportModel model = new MExpenseReportModel();
+            var value = model.GetProfiletype(fields);
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
+        }
     }
 }
