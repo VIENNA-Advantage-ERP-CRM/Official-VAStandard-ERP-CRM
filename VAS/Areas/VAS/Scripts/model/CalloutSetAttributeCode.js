@@ -54,7 +54,7 @@
         var AttrCode = ctx.getContext(windowNo, "AttrCode");
         this.setCalloutActive(true);
         if (Util.getValueOfString(AttrCode) != "") {
-            manu_ID = VIS.dataContext.getJSONRecord("MProduct/GetManufacturer",null);
+            manu_ID = VIS.dataContext.getJSONRecord("MProduct/GetManufacturer", AttrCode.toString());
             //sql = "SELECT Count(*) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = '" + AttrCode + "'";
             //manu_ID = Util.getValueOfInt(VIS.DB.executeScalar(sql, null, null));
             if (manu_ID > 0) {
