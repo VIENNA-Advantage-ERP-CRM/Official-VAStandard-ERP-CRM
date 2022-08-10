@@ -187,11 +187,12 @@ namespace VIS.Controllers
         /// <summary>
         /// GetManufacturer
         /// </summary>
+        /// <param name="fields">fields</param>
         /// <returns>JSON Data</returns>
-        public JsonResult GetManufacturer()
+        public JsonResult GetManufacturer(string fields)
         {
             MProductModel model = new MProductModel();
-            var value = model.GetManufacturer();
+            var value = model.GetManufacturer(fields);
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
 
