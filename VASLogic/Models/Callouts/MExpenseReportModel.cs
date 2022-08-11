@@ -167,6 +167,16 @@ namespace VIS.Models
             int chargeAmt = Util.GetValueOfInt(DB.ExecuteScalar("SELECT ChargeAmt FROM C_Charge WHERE C_Charge_ID = " + Util.GetValueOfInt(fields), null, null));
             return chargeAmt;
         }
+        /// <summary>
+        /// GetProfiletype
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>ProfileType</returns>
+        public string GetProfiletype(string fields)
+        {
+             return Util.GetValueOfString(DB.ExecuteScalar("SELECT ProfileType from S_Resource WHERE AD_User_ID =  " + Util.GetValueOfInt(fields), null, null));
+           
+        }
     }
 }
 
