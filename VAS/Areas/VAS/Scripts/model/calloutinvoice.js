@@ -162,7 +162,7 @@
             //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
             //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
             var _CountVA009 = false;
-            var module = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", paramString);
+            var module = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "VA009_");
             if (module != null) {
                 _CountVA009 = module["VA009_"];
             }
