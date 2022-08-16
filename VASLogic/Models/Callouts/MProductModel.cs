@@ -193,10 +193,11 @@ namespace VIS.Models
         /// <summary>
         /// GetManufacturer
         /// </summary>
-        /// <returns>GetManufacturer</returns>
-        public int GetManufacturer()
+        /// <param name="fields">fields</param>
+        /// <returns>Count</returns>
+        public int GetManufacturer(string fields)
         {
-            string sql = "SELECT Count(M_Manufacturer_ID) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = 'AttrCode'";
+            string sql = "SELECT Count(M_Manufacturer_ID) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = '" + fields + "'";
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
     }

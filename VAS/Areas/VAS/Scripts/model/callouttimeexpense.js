@@ -29,8 +29,10 @@
         try {
             this.setCalloutActive(true);
             // Util.getValueOfInt(value);
-            var sql = "select ProfileType from S_Resource where AD_User_ID = " + Util.getValueOfInt(value);
-            var pType = Util.getValueOfString(VIS.DB.executeScalar(sql, null, null));
+            var paramstring = Util.getValueOfInt(value).toString();
+            var pType = VIS.dataContext.getJSONRecord("MExpenseReport/GetProfiletype", paramstring);
+            //var sql = "select ProfileType from S_Resource where AD_User_ID = " + Util.getValueOfInt(value);
+            //var pType = Util.getValueOfString(VIS.DB.executeScalar(sql, null, null));
             if (pType != "") {
                 if (pType.toUpper() == "I") {
                     mTab.setValue("IsInternal", true);
