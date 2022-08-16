@@ -2326,13 +2326,14 @@ namespace VAdvantage.Model
                     //Commented By VIS 317 
                     //if (GetC_Order_ID() != 0)
                     {
-                        //Couny PaySchedule Against Particular Order
+                        //Count PaySchedule Against Particular Order
                         int _countschedule = Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA009_OrderPaySchedule Where C_Order_ID IN (SELECT CO.C_Order_ID FROM C_InvoiceLine CL INNER JOIN C_OrderLine CO ON CL.C_OrderLine_ID=CO.C_OrderLine_ID WHERE CL.C_Invoice_ID ="+GetC_Invoice_ID()+ ")AND VA009_Ispaid='N'"));
                         {
                             //if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA009_OrderPaySchedule Where C_Order_ID IN (SELECT CO.C_Order_ID FROM C_InvoiceLine CL INNER JOIN C_OrderLine CO ON CL.C_OrderLine_ID = CO.C_OrderLine_ID WHERE CL.C_Invoice_ID =" + GetC_Invoice_ID() +") AND VA009_Ispaid='Y'")) != _countschedule)
                             if(_countschedule > 0)
                             {
-                                _processMsg = "Please Do Advance Payment for Order";
+                                // _processMsg = "Please Do Advance Payment for Order";
+                                _processMsg = Msg.GetMsg(Env.GetCtx(), "VIS_PayAdvance");
                                 return DocActionVariables.STATUS_INVALID;
                             }
                         }
