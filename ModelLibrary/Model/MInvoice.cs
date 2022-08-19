@@ -2316,45 +2316,40 @@ namespace VAdvantage.Model
 
             // Check for Advance Payment Against Order added by vivek on 16/06/2016 by Siddharth
             if (GetDescription() != null && GetDescription().Contains("{->"))
-            { }
+            { 
+            }
             else
             {
                 if (Env.IsModuleInstalled("VA009_"))
                 {
-                    MPaymentTerm payterm = new MPaymentTerm(GetCtx(), GetC_PaymentTerm_ID(), Get_TrxName());
-                    if (GetC_Order_ID() != 0)
+                    //Count Unpaid Schedule Against Order ,if Found than return Advance payment message.
+                    int _countschedule = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(VA009_OrderPaySchedule_ID) FROM VA009_OrderPaySchedule
+                        WHERE C_Order_ID IN (SELECT CO.C_Order_ID FROM C_InvoiceLine CL INNER JOIN C_OrderLine CO ON CL.C_OrderLine_ID=CO.C_OrderLine_ID 
+                        WHERE CL.C_Invoice_ID =" + GetC_Invoice_ID()+ ")AND VA009_Ispaid='N'"));
+                    if(_countschedule>0)
                     {
-                        int _countschedule = Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID()));
-                        if (_countschedule > 0)
-                        {
-                            if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID() + " AND VA009_Ispaid='Y'")) != _countschedule)
-                            {
-                                _processMsg = "Please Do Advance Payment for Order";
-                                return DocActionVariables.STATUS_INVALID;
-                            }
-                        }
+                        _processMsg = Msg.GetMsg(Env.GetCtx(), "VIS_PayAdvance");
+                        return DocActionVariables.STATUS_INVALID;
                     }
-                    else
+                    //VIS_317 Check for Payment term is Advance or Not.
+                    if (Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(CASE WHEN C_PaymentTerm.VA009_Advance != COALESCE(C_PaySchedule.VA009_Advance, 'N') 
+                        THEN 1 ELSE 0 END )AS IsAdvance FROM C_PaymentTerm LEFT JOIN C_PaySchedule ON C_PaymentTerm.C_PaymentTerm_ID = C_PaySchedule.C_PaymentTerm_ID
+                        WHERE C_PaymentTerm.C_PaymentTerm_ID = " + GetC_PaymentTerm_ID())) > 0)
                     {
-                        if (payterm.IsVA009_Advance())
+                        //VIS_317
+                        //If Payment Term Is Advance than system will check for there is any lines exist which is created without order Reference or through Independent Invoice.
+                        int _OrdCount = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(TOTAL) FROM (SELECT COUNT(VA009_OrderPaySchedule_ID)AS TOTAL
+                        FROM VA009_OrderPaySchedule WHERE IsActive = 'Y' AND VA009_IsPaid='N' AND C_Order_ID= " + GetC_Order_ID() + 
+                        @"UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
+                        WHERE C_Invoice_ID = "+GetC_Invoice_ID()+" AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0)"));
+                        if (_OrdCount > 0)
                         {
-                            // JID_0383: if payment term is selected as advnace. System should give error "Please do the advance payment".
-                            _processMsg = Msg.GetMsg(GetCtx(), "VIS_SelectAdvancePayment");
+                            _processMsg = Msg.GetMsg(Env.GetCtx(), "VIS_SelectAdvancePaymentTerm");
                             return DocActionVariables.STATUS_INVALID;
                         }
-                        else if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_PaySchedule_ID) FROM C_PaySchedule WHERE IsActive = 'Y' AND C_PaymentTerm_ID=" + GetC_PaymentTerm_ID())) > 0)
-                        {
-                            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_PaySchedule_ID) FROM C_PaySchedule WHERE IsActive = 'Y' AND IsValid = 'Y' AND C_PaymentTerm_ID="
-                                                                    + GetC_PaymentTerm_ID() + " AND VA009_Advance='Y'")) == 1)
-                            {
-                                _processMsg = Msg.GetMsg(GetCtx(), "PaymentTermIsInValid");
-                                return DocActionVariables.STATUS_INVALID;
-                            }
-                        }
-                    }
+                    }                  
                 }
             }
-
             //// set backup withholding tax amount
             if (!IsReversal() && Get_ColumnIndex("C_Withholding_ID") > 0 && GetC_Withholding_ID() > 0)
             {

@@ -1559,9 +1559,6 @@ namespace VIS.Controllers
             inout.Save();
             return true;
         }
-
-
-
         public bool SaveInvoiceData(Ctx ctx, List<Dictionary<string, string>> model, string selectedItems, int C_Order_ID, int C_Invoice_ID, int M_InOut_ID, int C_ProvisionalInvoice_ID)
         {
             int lineNo = 0;
@@ -1584,15 +1581,17 @@ namespace VIS.Controllers
                     }
                 }
             }
-
-
             MInOut _inout = null;
             if (M_InOut_ID > 0)
             {
                 _inout = new MInOut(ctx, M_InOut_ID, null);
                 // Chnage by Mohit Asked by Amardeep Sir 02/03/2016
                 _invoice.SetPOReference(_inout.GetPOReference());
-
+                //VIS_317 Get Order id from MInout class Object And Set in the C_Order_ID.
+                if (_invoice.GetC_Order_ID()<=0)
+                {
+                    _invoice.SetC_Order_ID(_inout.GetC_Order_ID());
+                }
                 // Added by Bharat on 29 Jan 2018 to set Inco Term from Order
 
                 if (_invoice.Get_ColumnIndex("C_IncoTerm_ID") > 0)
@@ -1632,7 +1631,8 @@ namespace VIS.Controllers
 
                 _invoice.Save();
             }
-            if (_inout != null && _inout.GetM_InOut_ID() != 0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+                if (_inout != null && _inout.GetM_InOut_ID() != 0
                 && _inout.GetC_Invoice_ID() == 0)	//	only first time
             {
                 _inout.SetC_Invoice_ID(C_Invoice_ID);
