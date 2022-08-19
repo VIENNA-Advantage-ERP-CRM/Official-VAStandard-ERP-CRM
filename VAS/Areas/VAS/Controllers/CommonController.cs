@@ -1572,7 +1572,6 @@ namespace VIS.Controllers
             if (C_Invoice_ID > 0)
             {
                 _invoice = new MInvoice(ctx, C_Invoice_ID, null);
-               // _order= new MOrder(ctx, _invoice.GetC_Order_ID(),null);
                 // Added By VA228(Rakesh Kumar): Set Provisional Invoice Reference
                 if (C_ProvisionalInvoice_ID > 0)
                 {
