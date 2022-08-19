@@ -50,10 +50,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BaseLibrary">
-      <HintPath>..\ViennaAdvantageWeb\Dll\BaseLibrary.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\BaseLibrary.dll</HintPath>
     </Reference>
     <Reference Include="CoreLibrary">
-      <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\CoreLibrary.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -106,19 +106,19 @@
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="VAModelAD">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\VAModelAD.dll</HintPath>
     </Reference>
     <Reference Include="VAPrintLib">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VAPrintLib.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\VAPrintLib.dll</HintPath>
     </Reference>
     <Reference Include="ViennaBase">
-      <HintPath>..\ViennaAdvantageWeb\Dll\ViennaBase.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\ViennaBase.dll</HintPath>
     </Reference>
     <Reference Include="VIS">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VIS.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\VIS.dll</HintPath>
     </Reference>
     <Reference Include="VISLogic">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VISLogic.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\VISLogic.dll</HintPath>
     </Reference>
     <Reference Include="WebGrease">
       <Private>True</Private>
@@ -129,11 +129,10 @@
       <HintPath>..\packages\Antlr.3.5.0.2\lib\Antlr3.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="XModel">
-      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
+      <HintPath>..\..\BreakageDLL\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Areas\VAS\Controllers\AccountFormController.cs" />
     <Compile Include="Areas\VAS\Controllers\AcctViewerDataController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MAcctSchemaController.cs" />
@@ -182,7 +181,6 @@
     <Compile Include="Areas\VAS\Controllers\ForecastFormController.cs" />
     <Compile Include="Areas\VAS\Controllers\GlJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
-    <Compile Include="Areas\VAS\Controllers\MessageController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentController.cs" />
@@ -248,7 +246,6 @@
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
     <Content Include="Areas\VAS\Views\web.config" />
-    <Content Include="Areas\VAS\Views\AccountForm\Index.cshtml" />
     <Content Include="Areas\VAS\Views\PaymentAllocation\Index.cshtml" />
     <None Include="packages.config" />
     <Content Include="Areas\VAS\Scripts\app\forms\acctviewer.js" />
