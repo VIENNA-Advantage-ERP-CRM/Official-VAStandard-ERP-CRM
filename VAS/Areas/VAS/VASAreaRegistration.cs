@@ -28,7 +28,7 @@ namespace VAS
             //modScript.Include(
             //      "~/Areas/VAS/Scripts/app/forms/createforecast.js",
             //    "~/Areas/VAS/Scripts/app/forms/glDimensionValue.js",
-            //      "~/Areas/VAS/Scripts/app/forms/vallocation.js",                
+            //      "~/Areas/VAS/Scripts/app/forms/vallocation.js",
             //    "~/Areas/VAS/Scripts/app/forms/vcreatefrom.js",
             //    "~/Areas/VAS/Scripts/app/forms/vcreatefrominvoice.js",
             //    "~/Areas/VAS/Scripts/app/forms/vcreatefromshipment.js",
