@@ -117,6 +117,20 @@ namespace VAdvantage.Model
                     MOrder order = MOrder.CopyFrom(from, dateDoc,
                         from.GetC_DocType_ID(), false, false, Get_TrxName());
                     run.SetC_Order_ID(order.GetC_Order_ID());
+                    order.AddDescription(Msg.GetMsg(from.GetCtx(), "RecurringDocument") + from.GetDocumentNo());
+                    if (!order.Save(Get_TrxName()))
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateOrder") + pp.GetName());
+                        }
+                        else
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateOrder"));
+                        }
+                        throw new Exception(Msg.GetMsg(from.GetCtx(), "CouldNotCreateOrder") + (pp != null ? pp.GetName() : ""));
+                    }
                     msg += order.GetDocumentNo();
                 }
                 else if (GetRecurringType().Equals(MRecurring.RECURRINGTYPE_Invoice))
@@ -145,12 +159,29 @@ namespace VAdvantage.Model
                 }
                 else if (GetRecurringType().Equals(MRecurring.RECURRINGTYPE_Project))
                 {
-                    MProject project = MProject.CopyFrom(GetCtx(), GetC_Project_ID(), dateDoc, Get_TrxName());
+                    MProject from = new MProject(GetCtx(), GetC_Project_ID(), Get_TrxName());
+                    MProject project = MProject.CopyFrom(GetCtx(), GetC_Project_ID(), dateDoc, Get_TrxName());      
                     run.SetC_Project_ID(project.GetC_Project_ID());
+                    project.SetDescription(Msg.GetMsg(from.GetCtx(), "RecurringDocument") + from.GetValue());
+                   
+                    if (!project.Save(Get_TrxName()))
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                           // from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateProject") + pp.GetName());
+                        }
+                        else
+                        {
+                            //from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateProject"));
+                        }
+                        throw new Exception(Msg.GetMsg(from.GetCtx(), "CouldNotCreateProject") + (pp != null ? pp.GetName() : ""));
+                    }
                     msg += project.GetValue();
                 }
                 else if (GetRecurringType().Equals(MRecurring.RECURRINGTYPE_GLJournalBatch)) //Changes to GL Journal Batch by Arpit
                 {
+                    MJournalBatch from = new MJournalBatch(GetCtx(), GetGL_JournalBatch_ID(), Get_TrxName());
                     MJournalBatch journal = MJournalBatch.CopyFrom(GetCtx(), GetGL_JournalBatch_ID(), dateDoc, Get_TrxName());
                     if (journal.Get_ID() <= 0)
                     {
@@ -158,19 +189,48 @@ namespace VAdvantage.Model
                         throw new Exception(String.IsNullOrEmpty(error) ? "Could not create Journal Batch" : error);
                     }
                     run.SetGL_JournalBatch_ID(journal.GetGL_JournalBatch_ID());
+                    journal.SetDescription(Msg.GetMsg(from.GetCtx(), "RecurringDocument") + from.GetDocumentNo());
+                    if (!journal.Save(Get_TrxName()))
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournalBatch") + pp.GetName());
+                        }
+                        else
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournalBatch"));
+                        }
+                        throw new Exception(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournalBatch") + (pp != null ? pp.GetName() : ""));
+                    }
                     msg += journal.GetDocumentNo();
                 }
                 //Added by Arpit on 14th, Dec,2016
                 else if (GetRecurringType().Equals(MRecurring.RECURRINGTYPE_GLJournal))
                 {
-                    MJournal Journal = MJournal.CopyFrom(GetCtx(), GetGL_Journal_ID(), dateDoc, Get_TrxName());
-                    if (Journal.Get_ID() <= 0)
+                    MJournal from = new MJournal(GetCtx(), GetGL_Journal_ID(), Get_TrxName());
+                    MJournal journal = MJournal.CopyFrom(GetCtx(), GetGL_Journal_ID(), dateDoc, Get_TrxName());
+                    if (journal.Get_ID() <= 0)
                     {
-                        String error = Journal.GetProcessMsg();
+                        String error = journal.GetProcessMsg();
                         throw new Exception(String.IsNullOrEmpty(error) ? "Could not create Journal" : error);
                     }
-                    run.SetGL_Journal_ID(Journal.GetGL_Journal_ID());
-                    msg += Journal.GetDocumentNo();
+                    run.SetGL_Journal_ID(journal.GetGL_Journal_ID());
+                    journal.AddDescription(Msg.GetMsg(from.GetCtx(), "RecurringDocument") + from.GetDocumentNo());
+                    if (!journal.Save(Get_TrxName()))
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournal") + pp.GetName());
+                        }
+                        else
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournal"));
+                        }
+                        throw new Exception(Msg.GetMsg(from.GetCtx(), "CouldNotCreateJournal") + (pp != null ? pp.GetName() : ""));
+                    }
+                    msg += journal.GetDocumentNo();
                 }
 
                 //End here
@@ -185,6 +245,20 @@ namespace VAdvantage.Model
                         throw new Exception(String.IsNullOrEmpty(error) ? "Could not create Payment" : error);
                     }
                     run.SetC_Payment_ID(payment.GetC_Payment_ID());
+                    payment.AddDescription(Msg.GetMsg(from.GetCtx(), "RecurringDocument") + from.GetDocumentNo());
+                    if (!payment.Save(Get_TrxName()))
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreatePayment") + pp.GetName());
+                        }
+                        else
+                        {
+                            from.SetProcessMsg(Msg.GetMsg(from.GetCtx(), "CouldNotCreatePayment"));
+                        }
+                        throw new Exception(Msg.GetMsg(from.GetCtx(), "CouldNotCreatePayment") + (pp != null ? pp.GetName() : ""));
+                    }
                     msg += payment.GetDocumentNo();
                 }
                 else
