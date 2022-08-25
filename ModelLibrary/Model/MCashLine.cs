@@ -664,6 +664,10 @@ namespace VAdvantage.Model
                 {
 
                 }
+                else if (CASHTYPE_Order.Equals(GetCashType()))
+                {
+                    // Not to change currency with cashbook currency when Order selected 
+                }
                 else	//	Cash 
                     SetC_Currency_ID(GetCashBook().GetC_Currency_ID());
 
