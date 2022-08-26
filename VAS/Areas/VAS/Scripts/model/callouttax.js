@@ -26,7 +26,7 @@
             var StdPrecision = 0;
             var IsTaxIncluded = false;
 
-            var currency = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListData", mTab.getValue("M_PriceList_ID").toString());
+            var currency = VIS.dataContext.getJSONRecord("MPriceList/GetPriceListData", Util.getValueOfInt(mTab.getValue("M_PriceList_ID")).toString());
             if (currency != null) {
                 StdPrecision = currency["StdPrecision"];
                 IsTaxIncluded = "Y" == currency["IsTaxIncluded"];
