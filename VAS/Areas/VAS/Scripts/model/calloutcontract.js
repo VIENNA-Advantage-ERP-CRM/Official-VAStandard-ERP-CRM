@@ -986,8 +986,9 @@
         //var Discount=Env.ZERO;
         //var taxamt =VIS.Env.ZERO;
         C_Tax_ID = Util.getValueOfInt(mTab.getValue("C_Tax_ID"));
-        var sqltax = "select rate from c_tax WHERE c_tax_id=" + C_Tax_ID + "";
-        Rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sqltax, null, null));
+        //var sqltax = "select rate from c_tax WHERE c_tax_id=" + C_Tax_ID + "";
+        //Rate = Util.getValueOfDecimal(VIS.DB.executeScalar(sqltax, null, null));
+        Rate = VIS.dataContext.getJSONRecord("MTax/GetTaxRate", C_Tax_ID.toString());
         LineAmount = this.Amt(ctx, windowNo, mTab, mField, value);
         var LineNetAmt = Util.getValueOfDecimal(mTab.getValue("LineNetAmt"));
         TotalRate = Util.getValueOfDecimal((Util.getValueOfDecimal(LineNetAmt) * Util.getValueOfDecimal(Rate)) / 100);
