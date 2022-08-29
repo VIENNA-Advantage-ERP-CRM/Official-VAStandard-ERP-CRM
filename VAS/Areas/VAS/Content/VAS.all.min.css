@@ -1,14 +1,5 @@
-﻿/*Version 1.0.0.1*/
-/* Minification failed. Returning unminified contents.
-(46,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(47,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-primary'
-(69,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-secondary'
-(117,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(118,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(147,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(201,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-primary'
-(202,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-primary'
- */
+﻿/*Version 1.0.1.0*/
+
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
