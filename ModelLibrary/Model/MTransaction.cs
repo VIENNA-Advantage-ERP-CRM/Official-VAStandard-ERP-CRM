@@ -439,11 +439,11 @@ namespace VAdvantage.Model
             param[0].SqlDbType = SqlDbType.Date;
             param[0].Direction = ParameterDirection.Input;
 
-            param[1] = new SqlParameter("p_TableName", TableName.ToUpper());
+            param[1] = new SqlParameter("p_tablename", TableName.ToUpper());
             param[1].SqlDbType = SqlDbType.VarChar;
             param[1].Direction = ParameterDirection.Input;
 
-            param[2] = new SqlParameter("p_Record_ID", Record_ID);
+            param[2] = new SqlParameter("p_record_id", Record_ID);
             param[2].SqlDbType = SqlDbType.Int;
             param[2].Direction = ParameterDirection.Input;
 
