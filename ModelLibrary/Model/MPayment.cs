@@ -1140,11 +1140,11 @@ namespace VAdvantage.Model
         public string GetChecknumber(int payMethod_ID, int BankAccount_ID, Trx trx)
         {
             SqlParameter[] param = new SqlParameter[3];
-            param[0] = new SqlParameter("P_BANKACCOUNTID", BankAccount_ID);
+            param[0] = new SqlParameter("p_bankaccountid", BankAccount_ID);
             param[0].SqlDbType = SqlDbType.Int;
             param[0].Direction = ParameterDirection.Input;
 
-            param[1] = new SqlParameter("p_PAYMETHODID", payMethod_ID);
+            param[1] = new SqlParameter("p_paymethodid", payMethod_ID);
             param[1].SqlDbType = SqlDbType.Int;
             param[1].Direction = ParameterDirection.Input;
 
