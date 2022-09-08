@@ -102,7 +102,7 @@ namespace VAdvantage.Model
             MInOutLine[] shiplines = ship.GetLines(false);
             int _noOfLines = Util.GetValueOfInt(shiplines.Length);
 
-            String _Sql = @"SELECT inotln.M_InOutLine_ID, iolnconf.M_InOutLineConfirm_ID,  inotln.m_product_id   ,  pr.va010_qualityplan_id    ,  
+            String _Sql = @"SELECT inotln.M_InOutLine_ID,inout.AD_Org_ID,iolnconf.M_InOutLineConfirm_ID,  inotln.m_product_id   ,  pr.va010_qualityplan_id    ,  
                           inotln.qtyentered   FROM M_InOutLine inotln
                         INNER JOIN M_Product pr   ON (inotln.M_Product_ID=pr.M_Product_ID) 
                         INNER JOIN m_inoutlineconfirm iolnconf     ON (inotln.m_inoutline_id= iolnconf.m_inoutline_id)
@@ -117,7 +117,7 @@ namespace VAdvantage.Model
             List<int> CurrentLoopProduct = new List<int>();
             List<int> ProductQty = new List<int>();
             List<int> InOutConfirmLine_ID = new List<int>();
-
+            int orgid = 0;
             try
             {
                 ds = DB.ExecuteDataset(_Sql, null, ship.Get_TrxName());
@@ -131,6 +131,7 @@ namespace VAdvantage.Model
                         //}
                         //currProduct_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]);
                         CurrentLoopProduct.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        orgid=Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                         ProductQty.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["QtyEntered"]));
                         CurrentLoopQty = Util.GetValueOfInt(ds.Tables[0].Rows[i]["QtyEntered"]);
                         InOutConfirmLine_ID.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_InOutLineConfirm_ID"]));
@@ -153,7 +154,7 @@ namespace VAdvantage.Model
                         //}
                         //else
                         //{
-                        CreateParameters(CurrentLoopProduct, ProductQty, m_InoutConfirm_ID, _currentPlanQlty_ID, CurrentLoopQty, InOutConfirmLine_ID, ctx, ship.Get_TrxName());
+                        CreateParameters(orgid, CurrentLoopProduct, ProductQty, m_InoutConfirm_ID, _currentPlanQlty_ID, CurrentLoopQty, InOutConfirmLine_ID, ctx, ship.Get_TrxName());
                         CurrentLoopProduct.Clear();
                         ProductQty.Clear();
                         _currentPlanQlty_ID = 0;
@@ -177,8 +178,20 @@ namespace VAdvantage.Model
 
         }
         //  // Change By Arpit to Create Parameters 24 Aug,2017
-        //On the Basis of User defined % for each quantity of Product to verify
-        public static void CreateParameters(List<int> _ProductList, List<int> _ProductQty, int M_InoutConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_InOutConfirmLine_ID, Ctx ctx, Trx Trx_Name)
+
+        /// <summary>
+        ///  On the Basis of User defined % for each quantity of Product to verify
+        /// </summary>
+        /// <param name="orgid">orgid</param>
+        /// <param name="_ProductList">_ProductList</param>
+        /// <param name="_ProductQty">_ProductQty</param>
+        /// <param name="M_InoutConfirm_ID">M_InoutConfirm_ID</param>
+        /// <param name="VA010_QUalityPlan_ID">VA010_QUalityPlan_ID</param>
+        /// <param name="CurrentQty">CurrentQty</param>
+        /// <param name="M_InOutConfirmLine_ID">M_InOutConfirmLine_ID</param>
+        /// <param name="ctx">Context</param>
+        /// <param name="Trx_Name">Trx_Name</param>
+        public static void CreateParameters(int orgid, List<int> _ProductList, List<int> _ProductQty, int M_InoutConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_InOutConfirmLine_ID, Ctx ctx, Trx Trx_Name)
         {
             StringBuilder _sql = new StringBuilder();
             DataSet _ds = new DataSet();
@@ -187,7 +200,7 @@ namespace VAdvantage.Model
             try
             {
 
-
+                
                 _sql.Clear();
                 _sql.Append(@"SELECT NVL(VA010_PercentQtyToVerify,0)VA010_PercentQtyToVerify,
                                 NVL(VA010_ReceiptQtyFrom,0) VA010_ReceiptQtyFrom,
@@ -257,7 +270,7 @@ namespace VAdvantage.Model
                                 pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
                                 pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
                                 pos.Set_ValueNoCheck("AD_Client_ID", ctx.GetAD_Client_ID());
-                                pos.Set_ValueNoCheck("AD_Org_ID", ctx.GetAD_Org_ID());
+                                pos.Set_ValueNoCheck("AD_Org_ID", orgid);
 
                                 if (pos.Save(Trx_Name))
                                 {
