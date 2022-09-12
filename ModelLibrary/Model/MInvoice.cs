@@ -2341,7 +2341,7 @@ namespace VAdvantage.Model
                         int _OrdCount = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(TOTAL) FROM (SELECT COUNT(VA009_OrderPaySchedule_ID)AS TOTAL
                         FROM VA009_OrderPaySchedule WHERE IsActive = 'Y' AND VA009_IsPaid='N' AND C_Order_ID= " + GetC_Order_ID() + 
                         @"UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
-                        WHERE C_Invoice_ID = "+GetC_Invoice_ID()+" AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0)"));
+                        WHERE C_Invoice_ID = "+GetC_Invoice_ID()+" AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0)t"));
                         if (_OrdCount > 0)
                         {
                             _processMsg = Msg.GetMsg(Env.GetCtx(), "VIS_SelectAdvancePaymentTerm");
