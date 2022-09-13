@@ -276,8 +276,6 @@ namespace VAdvantage.Model
                 SetTotalLines(Env.ZERO);
                 SetGrandTotal(Env.ZERO);
             }
-
-
         }
 
         /*  Project Constructor
@@ -2345,6 +2343,12 @@ namespace VAdvantage.Model
                     SetM_Warehouse_ID(org.GetM_Warehouse_ID());
                 }
 
+                //update the promised date on change of order date
+                if (Is_ValueChanged("DateOrdered") && GetDateOrdered() > GetDatePromised())
+                {
+                    SetDatePromised(GetDateOrdered());
+                }
+
                 //	Warehouse Org
                 MWarehouse wh = null;
                 if (newRecord
@@ -2658,6 +2662,12 @@ namespace VAdvantage.Model
                         }
                     }
                 }
+
+
+             
+
+
+
             }
             catch
             {

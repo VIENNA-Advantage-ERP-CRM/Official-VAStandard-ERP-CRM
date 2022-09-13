@@ -89,6 +89,7 @@ namespace ViennaAdvantageServer.Process
                 contact.SetAD_Client_ID(order.GetAD_Client_ID());
                 contact.SetAD_Org_ID(order.GetAD_Org_ID());
                 //---------------------End ------------------
+                contact.SetContractType(X_C_Contract.CONTRACTTYPE_AccountsReceivable);
                 contact.SetDescription(order.GetDescription());
                 contact.SetC_Order_ID(order.GetC_Order_ID());
                 contact.SetC_OrderLine_ID(line.GetC_OrderLine_ID());
