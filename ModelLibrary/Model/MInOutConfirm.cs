@@ -131,7 +131,7 @@ namespace VAdvantage.Model
                         //}
                         //currProduct_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]);
                         CurrentLoopProduct.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
-                        orgid=Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                        orgid = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                         ProductQty.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["QtyEntered"]));
                         CurrentLoopQty = Util.GetValueOfInt(ds.Tables[0].Rows[i]["QtyEntered"]);
                         InOutConfirmLine_ID.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_InOutLineConfirm_ID"]));
@@ -200,7 +200,7 @@ namespace VAdvantage.Model
             try
             {
 
-                
+
                 _sql.Clear();
                 _sql.Append(@"SELECT NVL(VA010_PercentQtyToVerify,0)VA010_PercentQtyToVerify,
                                 NVL(VA010_ReceiptQtyFrom,0) VA010_ReceiptQtyFrom,
@@ -807,6 +807,8 @@ namespace VAdvantage.Model
                 {
                     Get_TrxName().Rollback();
                     log.Severe("Exception When Checking actual value at Quality Control Tab - " + ex.Message);
+                    _processMsg = "Exception When Checking actual value at Quality Control Tab - " + ex.Message;
+                    return DocActionVariables.STATUS_INVALID;
                 }
             }
             #endregion

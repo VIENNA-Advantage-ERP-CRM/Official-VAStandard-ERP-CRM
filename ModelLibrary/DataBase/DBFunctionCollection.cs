@@ -441,19 +441,19 @@ namespace VAdvantage.DataBase
             {
                 sql.Append(@"SELECT SUBSTR(Sys_Connect_By_Path (Name, ','),2) AS Product FROM
                             (SELECT Name, Row_Number () Over (Order By Name ) Rn, COUNT (*) OVER () cnt 
-                            FROM ((SELECT DISTINCT Prod.Name AS Name FROM Va010_Shipconfparameters Shp 
+                            FROM ((SELECT DISTINCT Prod.Name AS Name FROM VA010_Shipconfparameters Shp 
                             INNER JOIN M_Product Prod ON prod.m_product_id = shp.m_product_id 
-                            WHERE ( NVL(Shp.Va010_Actualvalue,0)) = 0 AND Shp.Isactive = 'Y' 
+                            WHERE ( NVL(Shp.VA010_Actualvalue,0)) = 0 AND Shp.Isactive = 'Y' 
                             AND Shp.M_Inoutlineconfirm_Id IN (" + mInOutLinesConfirm + @"))))
                             WHERE rn = cnt START WITH rn = 1 CONNECT BY Rn = Prior Rn + 1");
             }
             else if (DB.IsPostgreSQL())
             {
                 sql.Append(@"SELECT string_agg(Name, ', ') AS Product FROM 
-                            (SELECT DISTINCT Prod.Name AS Name FROM Va010_Shipconfparameters Shp 
+                            (SELECT DISTINCT Prod.Name AS Name FROM VA010_Shipconfparameters Shp 
                             INNER JOIN M_Product Prod ON prod.m_product_id = shp.m_product_id 
-                            WHERE NVL(Shp.Va010_Actualvalue,0) = 0 AND Shp.Isactive = 'Y' 
-                            AND Shp.M_Inoutlineconfirm_Id IN (" + mInOutLinesConfirm + "))s t");
+                            WHERE NVL(Shp.VA010_Actualvalue::int, 0) = 0 AND Shp.Isactive = 'Y' 
+                            AND Shp.M_Inoutlineconfirm_Id IN (" + mInOutLinesConfirm + ")) t");
             }
             return sql.ToString();
         }
