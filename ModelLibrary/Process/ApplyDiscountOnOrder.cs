@@ -144,7 +144,7 @@ namespace VAdvantage.Process
 
                     #region EnforcePriceLimit
                     //VA230:Check if EnforcePriceLimit true on selected pricelist
-                    if (isEnforcePriceLimit)
+                    if (isEnforcePriceLimit && obj.IsSOTrx())
                     {
                         //Check null dataset
                         if (dsProductPrice != null && dsProductPrice.Tables.Count > 0)
