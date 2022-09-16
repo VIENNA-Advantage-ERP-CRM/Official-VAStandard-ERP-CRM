@@ -89,10 +89,24 @@ namespace VAdvantage.Acct
                 if (line.GetElementType() == null)
                 {
                     DocLine docLine = new DocLine(line, this);
+
                     //  --  Source Amounts
-                    docLine.SetAmount(line.GetAmtSourceDr(), line.GetAmtSourceCr());
-                    docLine.SetC_Currency_ID(line.GetC_Currency_ID());
-                    docLine.SetConversionRate(line.GetCurrencyRate() == 0 ? 1 : line.GetCurrencyRate());
+                    // VIS_0045: DevOps Task 1657
+                    // When Posting Accounting Schema match with Header Accounting Schema
+                    if (this._ass != null && this._ass.Length == 1 && this._ass[0].GetC_AcctSchema_ID() == _C_AcctSchema_ID)
+                    {
+                        docLine.SetAmount(line.GetAmtSourceDr(), line.GetAmtSourceCr());
+                        docLine.SetC_Currency_ID(line.GetC_Currency_ID());
+                        docLine.SetConversionRate(line.GetCurrencyRate() == 0 ? 1 : line.GetCurrencyRate());
+                    }
+                    else
+                    {
+                        // When Posting Accounting Schema not match with Header Accounting Schema
+                        // then post with Accounted Value
+                        docLine.SetAmount(line.GetAmtAcctDr(), line.GetAmtAcctCr());
+                        docLine.SetC_Currency_ID(journal.GetC_Currency_ID());
+                    }
+
                     //  --  Converted Amounts
                     // no need to update converted amount here
                     //docLine.SetConvertedAmt(_C_AcctSchema_ID, line.GetAmtAcctDr(), line.GetAmtAcctCr());
@@ -130,14 +144,14 @@ namespace VAdvantage.Acct
                             lDim = new X_GL_LineDimension(GetCtx(), dr, null);
 
                             docLine = new DocLine(lDim, this);
+
                             //  --  Source Amounts
-
-
-                            //decimal cRate = line.GetCurrencyRate();
-                            //if (cRate == 0)
-                            //{
-                            //    cRate = 1;
-                            //}
+                            // Get Rate from the GL Line
+                            decimal cRate = line.GetCurrencyRate();
+                            if (cRate == 0)
+                            {
+                                cRate = 1;
+                            }
                             //decimal amtAcctCr = 0;
                             //decimal amtAcctDr = 0;
 
@@ -146,20 +160,44 @@ namespace VAdvantage.Acct
 
                             if (line.GetAmtSourceDr() != 0)
                             {
-                                //amtAcctDr = lDim.GetAmount() * cRate;
-                                docLine.SetAmount(lDim.GetAmount(), 0);
-                                //amtAcctDr = Decimal.Round(amtAcctDr, mSc.GetStdPrecision());
-
+                                // VIS_0045: DevOps Task 1657
+                                // When Posting Accounting Schema match with Header Accounting Schema
+                                if (this._ass != null && this._ass.Length == 1 && this._ass[0].GetC_AcctSchema_ID() == _C_AcctSchema_ID)
+                                {
+                                    docLine.SetAmount(lDim.GetAmount(), 0);
+                                }
+                                else
+                                {
+                                    // When Posting Accounting Schema not match with Header Accounting Schema
+                                    // then post with Accounted Value
+                                    docLine.SetAmount(lDim.GetAmount() * cRate, 0);
+                                }
                             }
                             else
                             {
-                                //amtAcctCr = lDim.GetAmount() * cRate;
-                                docLine.SetAmount(0, lDim.GetAmount());
-                                //amtAcctCr = Decimal.Round(lDim.GetAmount(), mSc.GetStdPrecision());
+                                // VIS_0045: DevOps Task 1657
+                                // When Posting Accounting Schema match with Header Accounting Schema
+                                if (this._ass != null && this._ass.Length == 1 && this._ass[0].GetC_AcctSchema_ID() == _C_AcctSchema_ID)
+                                {
+                                    docLine.SetAmount(0, lDim.GetAmount());
+                                }
+                                else
+                                {
+                                    // When Posting Accounting Schema not match with Header Accounting Schema
+                                    // then post with Accounted Value
+                                    docLine.SetAmount(0, lDim.GetAmount() * cRate);
+                                }
                             }
 
-                            docLine.SetC_Currency_ID(line.GetC_Currency_ID());
-                            docLine.SetConversionRate(line.GetCurrencyRate() == 0 ? 1 : line.GetCurrencyRate());
+                            if (this._ass != null && this._ass.Length == 1 && this._ass[0].GetC_AcctSchema_ID() == _C_AcctSchema_ID)
+                            {
+                                docLine.SetC_Currency_ID(line.GetC_Currency_ID());
+                                docLine.SetConversionRate(line.GetCurrencyRate() == 0 ? 1 : line.GetCurrencyRate());
+                            }
+                            else
+                            {
+                                docLine.SetC_Currency_ID(journal.GetC_Currency_ID());
+                            }
 
                             //  --  Converted Amounts
                             // no need to update converted amount here
@@ -309,18 +347,21 @@ namespace VAdvantage.Acct
                     // need to Post GL Journal for Multiple Accounting Schema that's why commented this condition
                     //if (_lines[i].GetC_AcctSchema_ID() == as1.GetC_AcctSchema_ID())
                     //{
+                    if (as1.GetC_AcctSchema_ID() != _C_AcctSchema_ID && this.GetC_Currency_ID() == _lines[i].GetC_Currency_ID())
+                    {
+                        // when Header Accounting Schema not matched with Accounting SChema and line and Document Currency Same
+                        // then pick Conversion rate from Assign Accounting Schema Tab
+                        _lines[i].SetConversionRate(conversionRate);
+                    }
                     // set conversion rate on line, so that amount to be converted based on that multiply rate 
-                    if (as1.GetC_AcctSchema_ID() != _C_AcctSchema_ID && _lines[i].GetC_Currency_ID() != as1.GetC_Currency_ID())
+                    else if (as1.GetC_AcctSchema_ID() != _C_AcctSchema_ID && _lines[i].GetC_Currency_ID() != as1.GetC_Currency_ID())
                     {
                         conversionRate = MConversionRate.GetRate(_lines[i].GetC_Currency_ID(), as1.GetC_Currency_ID(),
                             _lines[i].GetDateAcct(), _lines[i].GetC_ConversionType_ID(),
                             as1.GetAD_Client_ID(), _lines[i].GetAD_Org_ID());
                         _lines[i].SetConversionRate(conversionRate);
                     }
-                    else if (as1.GetC_AcctSchema_ID() != _C_AcctSchema_ID)
-                    {
-                        _lines[i].SetConversionRate(conversionRate);
-                    }
+
 
                     fact.CreateLine(_lines[i],
                                     _lines[i].GetAccount(),
