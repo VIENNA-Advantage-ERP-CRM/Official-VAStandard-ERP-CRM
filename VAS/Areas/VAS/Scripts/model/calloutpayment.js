@@ -185,7 +185,7 @@
         }
 
         //  Payment Date
-        var ts = new Date(mTab.getValue("DateTrx"));
+        var ts = mTab.getValue("DateTrx");
         var tsDate;
         if (ts == null) {
             //ts = DateTime.Now.Date; //new DateTime(CommonFunctions.CurrentTimeMillis());
