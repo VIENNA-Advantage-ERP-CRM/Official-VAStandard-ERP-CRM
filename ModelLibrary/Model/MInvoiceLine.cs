@@ -4397,7 +4397,7 @@ namespace VAdvantage.Model
                         FROM C_InvoiceLine INNER JOIN C_OrderLine ON C_InvoiceLine.C_OrderLine_ID=C_OrderLine.C_OrderLine_ID
                         INNER JOIN C_Order ON C_OrderLine.C_Order_ID = C_Order.C_Order_ID
                         WHERE C_InvoiceLine.C_Invoice_ID =  " + GetC_Invoice_ID();
-            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql, null);
+            int no = DataBase.DB.GetSQLValue(Get_Trx(), sql);
             if (no > 0)
             {
                 no = DB.ExecuteQuery("UPDATE C_Invoice SET IsHoldPayment = 'Y' WHERE C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_Trx());
