@@ -236,7 +236,7 @@ namespace VAdvantage.Model
                 foreach (DataRow dr in ds.Tables[0].Rows)
                 {
                     MMatchPO mpo = new MMatchPO(ctx, dr, trxName);
-                    if (qty.CompareTo(mpo.GetQty()) == 0)
+                    if (qty.CompareTo(mpo.GetQty()) == 0|| qty.CompareTo(mpo.GetQty()) != 0)
                     {
                         if (iLine != null)
                         {
@@ -676,6 +676,27 @@ namespace VAdvantage.Model
                 }
             }
 
+            //OnOrderQty + Qtydelivered is not greater than QtyOrdered then return false
+            if (_isInOutLineChange)
+            {
+                MOrderLine obj = GetOrderLine();
+                if ((obj.GetQtyOrdered() + obj.GetQtyDelivered()) > obj.GetQtyOrdered())
+                {
+                    log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
+                    return false;
+                }
+            }
+
+            //Qty + QtyInvoiced is not greater than QtyOrdered then return false
+            if (_isInvoiceLineChange)
+            {
+                MOrderLine obj = GetOrderLine();
+                if ((GetQty() + obj.GetQtyInvoiced()) > obj.GetQtyOrdered())
+                {
+                    log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
+                    return false;
+                }
+            }
             return true;
         }
 
