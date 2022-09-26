@@ -4126,7 +4126,7 @@ namespace VAdvantage.Model
                         //Info.Append(" - @C_Invoice_ID@: ").Append(invoice.GetDocumentNo());
                         //Info.Append(" & @C_Invoice_ID@ No: ").Append(invoice.GetDocumentNo()).Append(" generated successfully");
                         //(1052)correct process message
-                        Info.Append(Msg.GetMsg(GetCtx(), "InvNo")).Append(invoice.GetDocumentNo());
+                       Info.Append(Msg.GetMsg(GetCtx(), "InvNo")).Append(invoice.GetDocumentNo());
                         _processMsg += Info.ToString();
 
                         String msg = invoice.GetProcessMsg();
@@ -6679,12 +6679,12 @@ namespace VAdvantage.Model
                     _payment.SetDocAction(DOCACTION_Close);
                     if (_payment.Save())
                     {
-                        info.Append(" & @C_Payment_ID@: " + _payment.GetDocumentNo());
+                        info.Append(" & Payment: " + _payment.GetDocumentNo());
                     }
                 }
                 else
                 {
-                    info.Append(" & @C_Payment_ID@: " + _payment.GetDocumentNo() + " (" + _payment.GetProcessMsg() + ")");
+                    info.Append(" & Payment: " + _payment.GetDocumentNo() + " (" + _payment.GetProcessMsg() + ")");
                     //TO reverse the eftects of completion  of payment because Alocation is generating always if we don't rolback it will set invoice as Paid
                     Get_Trx().Rollback();
                 }
