@@ -143,7 +143,7 @@ namespace VAdvantage.Model
                 if (Env.IsModuleInstalled("VA027_")) // If Post dated Check Module is Installed..
                     sql += " UNION ALL SELECT count(*) as total FROM VA027_POSTDATEDCHECK WHERE AD_Client_ID= " + GetAD_Client_ID() + " AND C_BANKACCOUNT_ID =" + GetC_BankAccount_ID();
 
-                sql += ")";
+                sql += ") t";
 
                 if (Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0)
                 {
