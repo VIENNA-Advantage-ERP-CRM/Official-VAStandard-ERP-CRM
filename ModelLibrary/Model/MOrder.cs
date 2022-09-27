@@ -6679,12 +6679,13 @@ namespace VAdvantage.Model
                     _payment.SetDocAction(DOCACTION_Close);
                     if (_payment.Save())
                     {
-                        info.Append(" & Payment: " + _payment.GetDocumentNo());
+                        info.Append("& @C_Payment_ID@: " + _payment.GetDocumentNo());
                     }
                 }
                 else
+
                 {
-                    info.Append(" & Payment: " + _payment.GetDocumentNo() + " (" + _payment.GetProcessMsg() + ")");
+                    info.Append("& @C_Payment_ID@: " + _payment.GetDocumentNo() + " (" + _payment.GetProcessMsg() + ")");
                     //TO reverse the eftects of completion  of payment because Alocation is generating always if we don't rolback it will set invoice as Paid
                     Get_Trx().Rollback();
                 }
