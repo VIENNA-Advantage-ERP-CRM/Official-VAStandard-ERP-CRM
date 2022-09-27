@@ -173,6 +173,7 @@
                 if (ds != null) {
                     if (countDTD001) {
                         mTab.setValue("ProductType", ds["ProductType"]);
+                        mTab.setValue("DTD001_IsConsumable", ds["DTD001_IsConsumable"]);
                     }
                     else {
                         mTab.setValue("ProductType", "");
@@ -209,7 +210,7 @@
                             mTab.setValue("VA038_AmortizationTemplate_ID", 0);
                         }
                     }
-                }
+       }
             }
             //if (result != null) {
             //    if (result.tables[0].rows.length > 0) {

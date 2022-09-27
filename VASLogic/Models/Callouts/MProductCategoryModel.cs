@@ -58,6 +58,11 @@ namespace VIS.Models
                     retDic["VA038_AmortizationTemplate_ID"] = Util.GetValueOfString(astGrp.Get_Value("VA038_AmortizationTemplate_ID"));
                 }
             }
+
+            if (pc.Get_ColumnIndex("DTD001_IsConsumable") > 0)
+            {
+                retDic["DTD001_IsConsumable"] = Util.GetValueOfString(pc.Get_Value("DTD001_IsConsumable"));
+            }
             return retDic;
         }
     }
