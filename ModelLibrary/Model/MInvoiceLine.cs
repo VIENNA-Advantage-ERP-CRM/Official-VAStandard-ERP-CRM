@@ -2710,7 +2710,7 @@ namespace VAdvantage.Model
 
                 MProduct product = MProduct.Get(GetCtx(), GetM_Product_ID());
                 DataSet ds = new DataSet();
-                String sql = @"SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp., pp.C_UOM_ID) AS PriceStd,
+                String sql = @"SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID, pp.C_UOM_ID) AS PriceStd,
                                 bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID)     AS PriceList,
                                 bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID)    AS PriceLimit,
                                 p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit,pl.IsTaxIncluded
