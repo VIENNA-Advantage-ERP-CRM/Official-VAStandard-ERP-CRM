@@ -153,6 +153,7 @@ namespace ViennaAdvantage.Process
             {
                 return product.GetName() + " @NotValid@ @M_BOM_ID@";
             }
+            //VIS_336 : Changes done for checking records exist in BOM and BOM Component tab.
             string Sql = @"SELECT COUNT(M_BOMProduct_ID) FROM M_BOMProduct WHERE M_BOM_ID IN (SELECT M_BOM_ID FROM M_BOM WHERE M_Product_ID=" + product.GetM_Product_ID() + " AND ISACTIVE='Y')" +
                           "AND ISACTIVE='Y' ";
             int Count = Util.GetValueOfInt(DB.ExecuteScalar(Sql));
@@ -160,6 +161,7 @@ namespace ViennaAdvantage.Process
             {
                 return product.GetName() + " @VAS_BomNotDefined@";
             }
+
             _product = product;
             //	Check Old Product BOM Structure
             log.Config(_product.GetName());
