@@ -1588,7 +1588,7 @@ namespace VIS.Controllers
                 // Chnage by Mohit Asked by Amardeep Sir 02/03/2016
                 _invoice.SetPOReference(_inout.GetPOReference());
                 //VIS_317 Get Order id from MInout class Object And Set in the C_Order_ID.
-                if (_invoice.GetC_Order_ID()<=0)
+                if (_invoice.GetC_Order_ID() <= 0)
                 {
                     _invoice.SetC_Order_ID(_inout.GetC_Order_ID());
                 }
@@ -1631,9 +1631,9 @@ namespace VIS.Controllers
 
                 _invoice.Save();
             }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-                if (_inout != null && _inout.GetM_InOut_ID() != 0
-                && _inout.GetC_Invoice_ID() == 0)	//	only first time
+
+            if (_inout != null && _inout.GetM_InOut_ID() != 0
+            && _inout.GetC_Invoice_ID() == 0)	//	only first time
             {
                 _inout.SetC_Invoice_ID(C_Invoice_ID);
                 _inout.Save();
@@ -2111,6 +2111,7 @@ namespace VIS.Controllers
             MBankStatement bs = new MBankStatement(ctx, C_BankStatement_ID, null);
 
             int _bpartner_Id = 0;
+            string _ChargeType = null;
             int pageno = 1;
             int lineno = 10;
             string _sql = null;
@@ -2158,6 +2159,7 @@ namespace VIS.Controllers
                 if (type == "P")
                 {
                     bsl.SetC_Payment_ID(C_Payment_ID);
+
                     //Rakesh(VA228):Get BPartner,CheckNo
                     DataSet ds = DB.ExecuteDataset("SELECT C_BPartner_ID,CheckNo,Checkdate,VA009_PaymentMethod_ID,TenderType FROM C_Payment WHERE IsActive='Y' AND C_Payment_ID=" + C_Payment_ID, null, null);
                     if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -2183,10 +2185,24 @@ namespace VIS.Controllers
                 else
                 {
                     bsl.SetC_CashLine_ID(C_Payment_ID);
-                    //Get C_BPartner_ID
-                    _bpartner_Id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_BPartner_ID FROM C_CashLine WHERE IsActive='Y' AND C_CashLine_ID=" + C_Payment_ID, null, null));
-                }
+                    //Devops BUG 1709
+                    //if ChargeType is Contra than Contra set in VoucherType field of BankstatementLine Table.
+                    //Also Update ContraType By (Cash to Bank).
+                    DataSet ds = DB.ExecuteDataset(@"SELECT CL.C_BPartner_ID,CH.DTD001_ChargeType FROM C_CashLine CL 
+                                     LEFT JOIN C_Charge CH ON CL.C_Charge_Id = CH.C_Charge_Id 
+                                     WHERE CL.C_CashLine_ID=" + bsl.GetC_CashLine_ID());
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        _bpartner_Id = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_ID"]);
+                        _ChargeType = Util.GetValueOfString(ds.Tables[0].Rows[0]["DTD001_ChargeType"]);
+                        if (type == "C" && _ChargeType == "CON")
+                        {
+                            bsl.SetVA012_VoucherType("C");
+                            bsl.SetVA012_ContraType("CB");
+                        }
+                    }
 
+                }
                 //set C_BPartner_ID
                 bsl.SetC_BPartner_ID(_bpartner_Id);
                 bsl.SetC_Currency_ID(C_Currency_ID);
@@ -2276,6 +2292,7 @@ namespace VIS.Controllers
             public string AuthCode { get; set; }
             public string CheckNo { get; set; }
             public int C_ConversionType_ID { get; set; }
+
         }
         public class DataObject
         {
@@ -2329,6 +2346,7 @@ namespace VIS.Controllers
         public string lblStatusInfo { get; set; }
         public string ErrorMsg { get; set; }
         public string DocumentText { get; set; }
+
 
         public string GenerateInvoices(Ctx ctx, string whereClause)
         {
@@ -2438,7 +2456,7 @@ namespace VIS.Controllers
             statusBar += no.ToString();
 
             //	Prepare Process
-            int AD_Process_ID = 199;	  // M_InOutCreate - Vframwork.Process.InOutGenerate
+            int AD_Process_ID = 199;      // M_InOutCreate - Vframwork.Process.InOutGenerate
             MPInstance instance = new MPInstance(ctx, AD_Process_ID, 0);
             if (!instance.Save())
             {
@@ -2640,7 +2658,7 @@ namespace VIS.Controllers
 
                     MInOutLine sLine = new MInOutLine(ctx, M_InOutLine_ID, trx);
                     MInOut ship = new MInOut(ctx, sLine.GetM_InOut_ID(), trx);
-                    if (invoice)	//	Shipment - Invoice
+                    if (invoice)    //	Shipment - Invoice
                     {
                         //	Update Invoice Line
                         MInvoiceLine iLine = new MInvoiceLine(ctx, Line_ID, trx);
@@ -2750,7 +2768,7 @@ namespace VIS.Controllers
                             }
                         }
                     }
-                    else	//	Shipment - Order
+                    else    //	Shipment - Order
                     {
                         //	Update Shipment Line
                         sLine.SetC_OrderLine_ID(Line_ID);
@@ -2764,7 +2782,7 @@ namespace VIS.Controllers
                         {
                             //	Update Order Line
                             MOrderLine oLine = new MOrderLine(ctx, Line_ID, trx);
-                            if (oLine.Get_ID() != 0)	//	other in MInOut.completeIt
+                            if (oLine.Get_ID() != 0)    //	other in MInOut.completeIt
                             {
                                 //oLine.SetQtyReserved(oLine.GetQtyReserved().subtract(qty));
                                 oLine.SetQtyReserved(Decimal.Subtract(oLine.GetQtyReserved(), qty));
