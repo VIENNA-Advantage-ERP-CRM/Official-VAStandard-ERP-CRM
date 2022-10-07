@@ -285,12 +285,15 @@ namespace ViennaAdvantage.Process
 
                 if (pp.IsBOM() && BOMproduct.GetM_ProductBOMVersion_ID() > 0)
                 {
-                    //return ValidateProduct(pp, bom.GetBOMType(), bom.GetBOMUse());
-                    if (_products.Contains(pp))
-                    {
-                        log.Warning(_product.GetName() + " recursively includes " + pp.GetName());
-                        return false;
-                    }
+                //return ValidateProduct(pp, bom.GetBOMType(), bom.GetBOMUse());
+
+               // VIS_336:changes made for verifying duplicate records in BOM Component tab. 
+
+                    //if (_products.Contains(pp))
+                    //{
+                    //    log.Warning(_product.GetName() + " recursively includes " + pp.GetName());
+                    //    return false;
+                    //}
                     _products.Add(pp);
 
                     if (!pp.IsVerified())
