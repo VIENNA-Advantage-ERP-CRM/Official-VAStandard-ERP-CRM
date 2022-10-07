@@ -1376,7 +1376,7 @@ namespace VAdvantage.Model
                             {
                                 //log.SaveError("FillMandatory", Msg.GetElement(GetCtx(), "DTD001_AttributeNumber"));
                                 //ShowMessage.Info("a", true, "Product is not of Attribute Type", null); 
-                                log.SaveError("Error",Msg.GetElement(GetCtx(), "DTD001_Attribute"));   //VIS_0336:Message and label change
+                                log.SaveError("DTD001_NonAttributeTypeProduct","");   //VIS_0336:Message and label change
                                 return false;
                             }
                         }
