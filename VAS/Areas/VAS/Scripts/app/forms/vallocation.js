@@ -286,7 +286,7 @@
         //initialize();
 
         this.Initialize = function () {
-            _C_Currency_ID = ctx.getContextAsInt("$C_Currency_ID");   //  default
+            _C_Currency_ID = ctx.getContextAsInt("$C_Currency_ID");//  default
             countVA009 = executeScalar("VIS_131");
             fillLookups();
             loadDocType();
@@ -2704,6 +2704,9 @@
                     }
                     if (VIS.context.getContextAsInt("#AD_Org_ID") > 0) {
                         $OrgFilter.val(VIS.context.getContextAsInt("#AD_Org_ID"));
+                        //Task_1455
+                        //VIS_317 Set the value of Organization in Context.
+                        ctx.setContext($self.windowNo, "OrgID", VIS.context.getContextAsInt("#AD_Org_ID"));
                         //$OrgFilter.removeClass('vis-ev-col-mandatory');
                         $OrgFilter.removeClass('vis-ev-col-mandatory');
                     }
