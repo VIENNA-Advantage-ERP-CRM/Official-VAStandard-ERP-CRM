@@ -92,6 +92,23 @@
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
+
+    //Set Rat = 0
+    CalloutTax.prototype.SetTaxrat = function (ctx, windowNo, mTab, mField, value, oldValue) {
+
+        if (value == null || value == 0 || value.toString() == "" || this.isCalloutActive()) {
+            return "";
+        }
+
+        this.setCalloutActive(true);
+        var taxexempt = mTab.getValue("IsTaxExempt");
+        if (taxexempt != 0) {
+            mTab.setValue("Rate", 0);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    }
     VIS.Model.CalloutTax = CalloutTax;
     //***********CalloutTax End *************
 
