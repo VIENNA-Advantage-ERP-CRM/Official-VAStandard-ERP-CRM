@@ -63,7 +63,7 @@
         return "";
     };
     /**
-     * Set TaxExempt and TaxExemptReason AT Invoice Line and Ordert Line
+     *  VIS319  Set TaxExempt and TaxExemptReason AT Invoice Line and Ordert Line
      * @param {any} ctx
      * @param {any} windowNo
      * @param {any} mTab
@@ -93,8 +93,17 @@
         return "";
     };
 
-    //Set Rat = 0
-    CalloutTax.prototype.SetTaxrat = function (ctx, windowNo, mTab, mField, value, oldValue) {
+    /**
+     * VIS319_: When TaxExempt is true then Rate should be zero
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    
+    CalloutTax.prototype.SetTaxRate = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if (value == null || value == 0 || value.toString() == "" || this.isCalloutActive()) {
             return "";
@@ -102,7 +111,7 @@
 
         this.setCalloutActive(true);
         var taxexempt = mTab.getValue("IsTaxExempt");
-        if (taxexempt != 0) {
+        if (taxexempt == true) {
             mTab.setValue("Rate", 0);
         }
         this.setCalloutActive(false);
@@ -110,7 +119,7 @@
         return "";
     }
     VIS.Model.CalloutTax = CalloutTax;
-    //***********CalloutTax End *************
+    //***********CalloutTax End *************\s
 
     //************CalloutTaxAmt Start***************
     function CalloutTaxAmt() {
