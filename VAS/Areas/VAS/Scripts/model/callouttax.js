@@ -111,7 +111,7 @@
 
         this.setCalloutActive(true);
         var taxexempt = mTab.getValue("IsTaxExempt");
-        if (taxexempt == true) {
+        if (taxexempt) {
             mTab.setValue("Rate", 0);
         }
         this.setCalloutActive(false);
@@ -119,7 +119,7 @@
         return "";
     }
     VIS.Model.CalloutTax = CalloutTax;
-    //***********CalloutTax End *************\s
+    //***********CalloutTax End *************
 
     //************CalloutTaxAmt Start***************
     function CalloutTaxAmt() {
