@@ -49,5 +49,16 @@ namespace VIS.Models
         {
             return Util.GetValueOfString(DB.ExecuteScalar("SELECT ResponseText FROM R_StandardResponse WHERE R_StandardResponse_ID=" + Response_ID, null, null));
         }
+
+        /// <summary>
+        /// Get Resolution text on Request
+        /// </summary>
+        /// <param name="Resolution_ID"></param>
+        /// <returns>Result</returns>
+        public string GetResolutionText(int Resolution_ID) //VIS_0336 this method is for fetching the comments(help) of selected resolution in request window.
+        {
+            return Util.GetValueOfString(DB.ExecuteScalar("SELECT HELP FROM R_Resolution WHERE R_Resolution_ID=" + Resolution_ID, null, null));
+        }
+
     }
 }
