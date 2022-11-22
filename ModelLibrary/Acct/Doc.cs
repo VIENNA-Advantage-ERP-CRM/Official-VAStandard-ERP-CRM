@@ -52,7 +52,7 @@ namespace VAdvantage.Acct
         //Log	per Document			
         protected VLogger log = null;
         //Accounting Schema Array     
-        private MAcctSchema[] _ass = null;
+        public MAcctSchema[] _ass = null;
         // Context						
         private Ctx _ctx = null;
         //Transaction Name			

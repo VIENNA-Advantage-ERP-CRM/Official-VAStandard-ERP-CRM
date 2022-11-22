@@ -161,7 +161,7 @@ namespace VAdvantage.Model
         public static void CreateConfirmParameters(MMovement move, int M_MoveConfirm_ID, Ctx ctx)
         {
             String _Sql = @" SELECT movln.M_MovementLine_ID,  mlnconf.M_MovementLineConfirm_ID,  movln.M_Product_ID , 
-                           pr.VA010_QualityPlan_ID ,  movln.MovementQty  FROM M_MovementLine movln INNER JOIN M_Product pr  
+                           pr.VA010_QualityPlan_ID ,  movln.MovementQty ,mlnconf.AD_Org_ID FROM M_MovementLine movln INNER JOIN M_Product pr  
                              ON (movln.M_Product_ID =pr.M_Product_ID) INNER JOIN m_movementlineconfirm mlnconf   
                              ON (movln.m_movementline_id=mlnconf.m_movementline_id) 
                              inner join m_movementconfirm mconf  on (mlnconf.m_movementconfirm_ID= mconf.m_movementconfirm_id)
@@ -173,7 +173,7 @@ namespace VAdvantage.Model
             List<int> CurrentLoopProduct = new List<int>();
             List<int> ProductQty = new List<int>();
             List<int> MoveConfirmLine_ID = new List<int>();
-
+            int OrgID = 0;
             try
             {
 
@@ -191,6 +191,7 @@ namespace VAdvantage.Model
                         ProductQty.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["MovementQty"]));
                         CurrentLoopQty = Util.GetValueOfInt(ds.Tables[0].Rows[i]["MovementQty"]);
                         MoveConfirmLine_ID.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_MovementLineConfirm_ID"]));
+                        OrgID=Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                         //if (i < ds.Tables[0].Rows.Count - 1)
                         //{
                         //    if (_currentPlanQlty_ID == Util.GetValueOfInt(ds.Tables[0].Rows[i + 1]["VA010_QualityPlan_ID"])
@@ -210,7 +211,7 @@ namespace VAdvantage.Model
                         //}
                         //else
                         //{
-                        CreateParameters(CurrentLoopProduct, ProductQty, M_MoveConfirm_ID, _currentPlanQlty_ID, CurrentLoopQty, MoveConfirmLine_ID, ctx, move.Get_TrxName());
+                        CreateParameters(CurrentLoopProduct, ProductQty, M_MoveConfirm_ID, _currentPlanQlty_ID, CurrentLoopQty, MoveConfirmLine_ID, OrgID, ctx, move.Get_TrxName());
                         CurrentLoopProduct.Clear();
                         ProductQty.Clear();
                         _currentPlanQlty_ID = 0;
@@ -234,7 +235,7 @@ namespace VAdvantage.Model
         }
         //  // Change By Arpit to Create Parameters24th of August,2017
         //On the Basis of User defined % for each quantity of Product to verify
-        public static void CreateParameters(List<int> _ProductList, List<int> _ProductQty, int M_MoveConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_MoveConfirmLine_ID, Ctx ctx, Trx Trx_Name)
+        public static void CreateParameters(List<int> _ProductList, List<int> _ProductQty, int M_MoveConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_MoveConfirmLine_ID,int OrgID, Ctx ctx, Trx Trx_Name)
         {
             StringBuilder _sql = new StringBuilder();
             DataSet _ds = null;
@@ -312,7 +313,7 @@ namespace VAdvantage.Model
                                 pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
                                 pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
                                 pos.Set_ValueNoCheck("AD_Client_ID", ctx.GetAD_Client_ID());
-                                pos.Set_ValueNoCheck("AD_Org_ID", ctx.GetAD_Org_ID());
+                                pos.Set_ValueNoCheck("AD_Org_ID", OrgID);  // VIS336 : set org from header on Quality control tab.
 
                                 if (pos.Save(Trx_Name))
                                 {
