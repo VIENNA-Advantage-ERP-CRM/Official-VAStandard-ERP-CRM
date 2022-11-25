@@ -5236,17 +5236,12 @@ namespace VAdvantage.Model
         /// <returns>bool</returns>
         public bool UpdateMetalConsumption(int c_order_ID)
         {
-            string qry = @"UPDATE C_Order
-                                 SET (VA076_ALAlAlloyTotConMT, VA076_CUTotConMT, VA076_LeadTotConMT) =
-                                    (
-                                        SELECT ALMetal, CUMetal, LeadMetal FROM (
-                                        SELECT OL.C_Order_ID, Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_ALMetalWeight") + ",0)*QtyEntered)/1000000 AS ALMetal,"
-                                        + "Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_CUMetalWeight") + ",0)*QtyEntered)/1000000 AS CUMetal,"
-                                        + "Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_LeadMetalWeight") + @",0)*QtyEntered)/1000000 AS LeadMetal 
-                                        FROM C_OrderLine OL
-                                        INNER JOIN VA076_Attributes Atr ON Atr.M_Product_ID = OL.M_Product_ID
-                                        WHERE OL.C_Order_ID = " + c_order_ID + @" group by OL.C_Order_ID) T
-                                    ) WHERE C_Order_ID = " + c_order_ID;
+            string qry = @"UPDATE C_Order SET (VA076_ALAlAlloyTotConMT, VA076_CUTotConMT, VA076_LeadTotConMT) = 
+                            (SELECT ALMetal, CUMetal, LeadMetal FROM (SELECT OL.C_Order_ID, Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_ALMetalWeight") + ",0)*QtyEntered)/1000000 AS ALMetal,"
+                            + "Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_CUMetalWeight") + ",0)*QtyEntered)/1000000 AS CUMetal,"
+                            + "Sum(NVL(" + DBFunctionCollection.TypecastColumnAsDecimal("Atr.VA076_LeadMetalWeight") + @",0)*QtyEntered)/1000000 AS LeadMetal 
+                            FROM C_OrderLine OL INNER JOIN VA076_Attributes Atr ON Atr.M_Product_ID = OL.M_Product_ID
+                            WHERE OL.C_Order_ID = " + c_order_ID + @" GROUP BY OL.C_Order_ID) T) WHERE C_Order_ID = " + c_order_ID;
 
             int no = DB.ExecuteQuery(qry, null, Get_TrxName());
             if (no <= 0)
