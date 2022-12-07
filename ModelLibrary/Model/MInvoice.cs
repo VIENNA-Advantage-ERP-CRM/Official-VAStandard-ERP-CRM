@@ -4294,6 +4294,13 @@ namespace VAdvantage.Model
                                         else
                                         {
                                             query.Clear();
+                                            // DevOps Task-1851
+                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) FROM C_InvoiceLine il
+                                            INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                            decimal grnQty = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString(), null, Get_Trx()));
+
+                                            query.Clear();
                                             query.Append(@" UPDATE C_InvoiceLine SET IsCostImmediate = 'Y'");
                                             if (line.Get_ColumnIndex("PostCurrentCostPrice") >= 0)
                                             {
@@ -4304,6 +4311,18 @@ namespace VAdvantage.Model
                                                 query.Append(@" , PostCurrentCostPrice = " + currentCostPrice);
                                             }
                                             line.SetIsCostImmediate(true);
+                                            // DevOps Task-1851
+                                            if (line.Get_ColumnIndex("Ref_InvoiceLineOrg_ID") >= 0 && costingCheck.currentQtyonQueue != null)
+                                            {
+                                                query.Append($@" , TotalInventoryAdjustment = {Math.Sign(line.GetQtyInvoiced()) * Decimal.Round(
+                                                 (costingCheck.currentQtyonQueue.Value < Math.Abs(line.GetQtyInvoiced()) ?
+                                                 costingCheck.currentQtyonQueue.Value : line.GetQtyInvoiced())
+                                                 * ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                query.Append($@" , TotalCogsAdjustment = {Math.Sign(line.GetQtyInvoiced()) * Decimal.Round
+                                                    ((costingCheck.currentQtyonQueue.Value < Math.Abs(line.GetQtyInvoiced()) ?
+                                                    (Math.Abs(line.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
+                                                    ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                            }
                                             query.Append(@" WHERE C_Invoiceline_ID = " + line.GetC_InvoiceLine_ID());
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                         }

@@ -1552,6 +1552,43 @@
         return "";
     };
 
+    /**
+ * This function is used to get the detail of Invoice line
+ * @param {any} ctx
+ * @param {any} windowNo
+ * @param {any} mTab
+ * @param {any} mField
+ * @param {any} value
+ * @param {any} oldValue
+ */
+    CalloutInvoice.prototype.GetInvoiceLineDetail = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        try {
+            this.setCalloutActive(true);
+
+            var paramString = value.toString();
+            var invoiceRecord = VIS.dataContext.getJSONRecord("MInvoice/GetInvoiceLineDetail", paramString);
+
+            if (invoiceRecord != null) {
+                mTab.setValue("M_Product_ID", invoiceRecord["M_Product_ID"]);
+                mTab.setValue("M_AttributeSetInstance_ID", invoiceRecord["M_AttributeSetInstance_ID"]);
+                mTab.setValue("C_UOM_ID", invoiceRecord["C_UOM_ID"]);
+                mTab.setValue("QtyEntered", invoiceRecord["QtyEntered"]);
+                mTab.setValue("QtyInvoiced", invoiceRecord["QtyInvoiced"]);
+            }
+            ctx = windowNo = mTab = mField = value = oldValue = null;
+            this.setCalloutActive(false);
+        }
+        catch (err) {
+            this.setCalloutActive(false);
+            return err;
+        }
+        return "";
+    };
+
+
     VIS.Model.CalloutInvoice = CalloutInvoice;
 
 

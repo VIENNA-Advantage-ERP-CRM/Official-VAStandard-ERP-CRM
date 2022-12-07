@@ -242,6 +242,7 @@ namespace VAdvantage.Model
             int costElementId = 0;
             MClient client = MClient.Get(GetCtx(), cd.GetAD_Client_ID());
             int M_Warehouse_ID = 0; // is used to calculate cost with warehouse level or not
+            costingCheck.IsCostCalculationfromProcess = optionalStrCd == "process" ? true : false;
 
             if (product != null)
             {
@@ -449,6 +450,7 @@ namespace VAdvantage.Model
             MMovementLine movementline = null;
             MCost costFrom = null;
             decimal amtWithSurcharge = 0;
+            int QueueOrganizationID = cd.GetAD_Org_ID() == 0 ? MWarehouse.Get(GetCtx(), cd.GetM_Warehouse_ID()).GetAD_Org_ID() : cd.GetAD_Org_ID();
 
             if (A_Asset_ID == 0)
             {
@@ -739,28 +741,10 @@ namespace VAdvantage.Model
                 }
                 else if (ce.IsLifo() || ce.IsFifo())
                 {
-                    //if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
-                    //{
-                    //    cost.SetCurrentQty(0);
-                    //}
-                    //else
-                    //{
-                    //    cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                    //}
-                    //cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
-
-                    decimal totalPrice = 0;
-                    decimal totalQty = 0;
-                    MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                        mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                    MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                     if (cQueue != null && cQueue.Length > 0)
                     {
-                        //for (int j = 0; j < cQueue.Length; j++)
-                        //{
-                        //    totalPrice += Decimal.Multiply(cQueue[j].GetCurrentCostPrice(), cQueue[j].GetCurrentQty());
-                        //    totalQty += cQueue[j].GetCurrentQty();
-                        //}
-                        //cost.SetCurrentCostPrice(Decimal.Round((totalPrice / totalQty), precision));
                         cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
                     }
                     else if (cQueue.Length == 0)
@@ -905,8 +889,8 @@ namespace VAdvantage.Model
                         if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
                             cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
                     }
-                    MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                        mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                    MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                     if (cQueue != null && cQueue.Length > 0)
                     {
                         cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
@@ -1172,8 +1156,8 @@ namespace VAdvantage.Model
                 {
                     if (ce.IsFifo() || ce.IsLifo())
                     {
-                        MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                        mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                        MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                         if (cQueue != null && cQueue.Length > 0)
                         {
                             cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
@@ -1229,18 +1213,118 @@ namespace VAdvantage.Model
 
                 if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_LandedCostAllocation_ID) FROM C_LandedCostAllocation WHERE  C_InvoiceLine_ID = " + GetC_InvoiceLine_ID(), null, Get_Trx())) <= 0)
                 {
-                    if (GetC_OrderLine_ID() == 0) // if invoice created without orderline  then no impact on cost
+                    if (GetC_OrderLine_ID() == 0) // if invoice created without orderline  then no impact on cost (Treat as Discount)
                     {
                         // 20-4-2016
                         if (windowName == "Invoice(APC)")
                         {
+                            Decimal adjustedAmt = 0;
+                            if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate())
+                            {
+                                // we have to reduce price
+                                if (amt < 0 && price > 0)
+                                {
+                                    price = decimal.Negate(price);
+                                }
+
+                                //DevOps Task-1851
+                                List<MCostElement> lstCostElement = new List<MCostElement>();
+                                if (!costingCheck.IsCostCalculationfromProcess)
+                                {
+                                    lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Lifo_ID));
+                                    lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Fifo_ID));
+                                }
+                                else if (ce.IsFifo() || ce.IsLifo())
+                                {
+                                    lstCostElement.Add(ce);
+                                }
+
+                                for (int cel = 0; cel < lstCostElement.Count; cel++)
+                                {
+                                    // get Cost Queue List Detail
+                                    MCostQueue[] cQueue = MCostQueue.GetQueueforDiscount(product, cd.GetM_AttributeSetInstance_ID(),
+                                                          mas, cd.GetAD_Org_ID(), lstCostElement[cel], Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                                    if (cQueue != null && cQueue.Length > 0)
+                                    {
+                                        decimal remainningQty = cd.GetQty();
+                                        decimal queueAmt = 0;
+                                        for (int cq = 0; cq < cQueue.Length; cq++)
+                                        {
+                                            if (cQueue[cq].GetCurrentQty() > Math.Abs(remainningQty) && cQueue[cq].GetCurrentQty() != 0)
+                                            {
+                                                queueAmt = Decimal.Round(((cQueue[cq].GetCurrentCostPrice() * cQueue[cq].GetCurrentQty()) +
+                                                            (price * Math.Abs(remainningQty))) / cQueue[cq].GetCurrentQty(), precision);
+                                                if (costingCheck.MMPolicy.Equals(lstCostElement[cel].GetCostingMethod()))
+                                                {
+                                                    adjustedAmt = price * Math.Abs(remainningQty);
+                                                }
+                                                remainningQty = 0;
+                                            }
+                                            else if (cQueue[cq].GetCurrentQty() != 0)
+                                            {
+                                                queueAmt = Decimal.Round(((cQueue[cq].GetCurrentCostPrice() * cQueue[cq].GetCurrentQty()) +
+                                                            (price * cQueue[cq].GetCurrentQty())) / cQueue[cq].GetCurrentQty(), precision);
+                                                remainningQty += cQueue[cq].GetCurrentQty();
+                                                if (costingCheck.MMPolicy.Equals(lstCostElement[cel].GetCostingMethod()))
+                                                {
+                                                    adjustedAmt = price * cQueue[cq].GetCurrentQty();
+                                                }
+                                            }
+                                            if (costingCheck.MMPolicy.Equals(lstCostElement[cel].GetCostingMethod()))
+                                            {
+                                                costingCheck.currentQtyonQueue = cQueue[cq].GetCurrentQty();
+                                            }
+
+                                            // Create Cost Queue Transactional Record
+                                            if (!MCostQueueTransaction.CreateCostQueueTransaction(GetCtx(), cd.GetAD_Client_ID(), cd.GetAD_Org_ID(),
+                                                cQueue[cq].GetM_CostQueue_ID(), cd, cd.GetQty(), costingCheck))
+                                            {
+                                                return false;
+                                            }
+
+                                            if (cQueue[cq].GetCurrentQty() != 0)
+                                            {
+                                                DB.ExecuteQuery("Update M_CostQueue SET CurrentCostPrice = " + (queueAmt) +
+                                                                @" WHERE M_CostQueue_ID = " + cQueue[cq].GetM_CostQueue_ID(), null, Get_Trx());
+                                            }
+                                            if (remainningQty == 0)
+                                            {
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (costingCheck.currentQtyonQueue == null)
+                                    {
+                                        costingCheck.currentQtyonQueue = 0;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (costingCheck != null && costingCheck.invoiceline != null)
+                                {
+                                    if (amt < 0)
+                                    {
+                                        adjustedAmt = Decimal.Negate(Math.Abs(Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment"))));
+                                    }
+                                    else
+                                    {
+                                        adjustedAmt = Math.Abs(Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")));
+                                    }
+                                    if (adjustedAmt == 0)
+                                    {
+                                        adjustedAmt = amt;
+                                    }
+                                }
+                            }
+
                             if (ce.IsAverageInvoice() || ce.IsAveragePO())
                             {
-                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
+                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
                                 if (Env.Signum(cost.GetCumulatedQty()) != 0)
                                 {
-                                    price = Decimal.Round(Decimal.Divide(cost.GetCumulatedAmt(), cost.GetCumulatedQty()), precision, MidpointRounding.AwayFromZero);
-                                    cost.SetCurrentCostPrice(price);
+                                    cost.SetCurrentCostPrice(Decimal.Round(Decimal.Divide(cost.GetCumulatedAmt(), cost.GetCumulatedQty()), precision, MidpointRounding.AwayFromZero));
                                 }
                                 else
                                 {
@@ -1249,36 +1333,26 @@ namespace VAdvantage.Model
                             }
                             else if (ce.IsWeightedAverageCost() || ce.IsWeightedAveragePO())
                             {
-                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
-                                price = Decimal.Round(Decimal.Divide(
-                                        Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt), cost.GetCurrentQty()), precision);
-                                cost.SetCurrentCostPrice(price);
+                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
+                                cost.SetCurrentCostPrice(Decimal.Round(Decimal.Divide(
+                                        Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), adjustedAmt), cost.GetCurrentQty()), precision));
                             }
                             else if (ce.IsStandardCosting() || ce.IsLastInvoice() || ce.IsLastPOPrice())
                             {
-                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
+                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
                             }
                             else if (ce.IsFifo() || ce.IsLifo())
                             {
-                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
-
-                                // we have to reduce price
-                                if (amt < 0 && price > 0)
-                                {
-                                    price = decimal.Negate(price);
-                                }
-
-                                // get Cost Queue List Detail
-                                MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                                                      mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                                cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
+                                MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                                                     mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                                 if (cQueue != null && cQueue.Length > 0)
                                 {
-                                    cost.SetCurrentCostPrice(Decimal.Round((cQueue[0].GetCurrentCostPrice() + price), precision));
-
-                                    DB.ExecuteQuery("Update M_CostQueue SET CurrentCostPrice = " + (cQueue[0].GetCurrentCostPrice() + price) +
-                                                    @" WHERE M_CostQueue_ID = " + cQueue[0].GetM_CostQueue_ID(), null, Get_Trx());
+                                    cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
                                 }
                             }
+
+
                             //change 3-5-2016
                             MCostElementDetail.CreateCostElementDetail(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product, M_ASI_ID,
                                                             mas, ce.GetM_CostElement_ID(), "Invoice(APC)", cd, cost.GetCurrentCostPrice() * qty, qty, costingCheck);
@@ -1421,8 +1495,8 @@ namespace VAdvantage.Model
                 {
                     #region Lifo / Fifo
                     //	Get Costs - costing level Org/ASI
-                    MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                        mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                    MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                     if (cQueue != null && cQueue.Length > 0)
                     {
                         cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
@@ -3195,13 +3269,15 @@ namespace VAdvantage.Model
                     MCostQueue[] cQueue;
                     if (windowName == "Inventory Move")
                     {
-                        cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                            mas, cq_AD_Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                        cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                        //M_ASI_ID,  mas, cq_AD_Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
                     }
                     else
                     {
-                        cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                            mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                        cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
+                        // M_ASI_ID,  mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
                     }
                     if (cQueue != null && cQueue.Length > 0)
                     {
@@ -4039,8 +4115,8 @@ namespace VAdvantage.Model
                     else if ((ce.IsFifo() || ce.IsLifo()) && windowName != "Invoice(Customer)")
                     {
                         #region Lifo / Fifo
-                        MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID,
-                            mas, Org_ID, ce, Get_TrxName(), cost.GetM_Warehouse_ID());
+                        MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
+                        mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                         if (cQueue != null && cQueue.Length > 0)
                         {
                             cost.SetCurrentCostPrice(Decimal.Round(cQueue[0].GetCurrentCostPrice(), precision));
