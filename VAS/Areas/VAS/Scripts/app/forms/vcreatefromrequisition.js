@@ -69,18 +69,13 @@
 		// load dynamic vienna controls
 		function LoadControls() {
 			// Requisition Control
-			var SqlWhere = "M_Requisition.DOcStatus IN ('CO') AND M_Requisition.IsActive='Y' AND M_Requisition.AD_Client_ID=@AD_Client_ID@ AND M_Requisition.AD_Org_ID IN (0,@AD_Org_ID@)"
-				+ " AND (M_Requisition_ID IN (SELECT Distinct M_requisition_ID FROM M_requisitionline WHERE C_Orderline_ID IS NULL"
-				+ " ) OR M_Requisition_ID IN (SELECT Distinct M_requisition_ID FROM M_requisitionline WHERE C_Orderline_ID IS NOT NULL AND M_RequisitionLine_ID IN"
-				+ " (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_OrderLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)"
-				+ " WHERE req.C_Orderline_ID IS NOT NULL AND req.Qty - req.DTD001_DeliveredQty > (SELECT SUM(cl.QtyEntered) FROM  M_RequisitionLine rl INNER JOIN C_OrderLine cl ON rl.M_RequisitionLine_ID = cl.M_RequisitionLine_ID"
-				+ " WHERE rl.M_RequisitionLine_ID = req.M_RequisitionLine_ID) AND oline.C_Order_ID IN (SELECT C_Order_ID FROM C_Order WHERE C_Order_ID IN (oline.C_Order_ID) AND DocStatus NOT IN ('RE','VO'))))"
-				+ " ) AND M_Requisition_ID IN (SELECT Distinct M_requisition_ID FROM M_requisitionline WHERE M_RequisitionLine_ID IN"
-				+ " (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)"
-				+ " WHERE req.Qty - req.DTD001_DeliveredQty > (SELECT SUM(rl.Qty) FROM C_RfqLineQty rl INNER JOIN C_RfqLine cl ON rl.C_RfqLine_ID = cl.C_RfqLine_ID"
+			var SqlWhere = "M_Requisition.DOcStatus IN ('CO') AND M_Requisition.IsActive='Y' AND M_Requisition.AD_Client_ID=@AD_Client_ID@"
+				+ " AND M_Requisition_ID IN (SELECT Distinct M_requisition_ID FROM M_requisitionline WHERE M_RequisitionLine_ID IN"
+				+ " (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req LEFT JOIN C_RfqLine oline ON (req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)"
+				+ " WHERE oline.M_RequisitionLine_ID IS NULL OR req.Qty - req.DTD001_DeliveredQty > (SELECT SUM(rl.Qty) FROM C_RfqLineQty rl INNER JOIN C_RfqLine cl ON rl.C_RfqLine_ID = cl.C_RfqLine_ID"
 				+ " WHERE cl.M_RequisitionLine_ID = req.M_RequisitionLine_ID) AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID) AND DocStatus NOT IN ('RE','VO')))) ";
 
-			lookupRequisition = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 702, VIS.DisplayType.MultiKey, "M_Requisition_ID", 0, false, SqlWhere);
+			lookupRequisition = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.MultiKey, "M_Requisition_ID", 0, false, SqlWhere);
 			$RequisitionControl = new VIS.Controls.VTextBoxButton("M_Requisition_ID", true, false, true, VIS.DisplayType.MultiKey, lookupRequisition);
 
 			var _RequisitionCtrlWrap = $('<div class="vis-control-wrap">');
