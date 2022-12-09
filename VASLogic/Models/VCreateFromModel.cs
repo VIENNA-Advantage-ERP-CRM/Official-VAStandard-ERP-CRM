@@ -4,9 +4,10 @@ using System.Data;
 using System.Linq;
 using System.Text;
 using System.Web;
+using VAdvantage.DataBase;
+using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
-using VIS.DBase;
 
 namespace VIS.Models
 {
@@ -788,6 +789,171 @@ namespace VIS.Models
             return whereCondition;
         }
 
+        /// <summary>
+        /// Get Requisiiton Lines data
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="M_Requisition_ID">Requisition ID</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Requisition Lines Data</returns>
+        public List<ReqLineData> GetReqLineData(Ctx ctx, string Requisition_ID, int M_Product_ID)
+        {
+
+            List<ReqLineData> result = new List<ReqLineData>();
+            DataSet _ds = null;
+            StringBuilder sql = new StringBuilder(@"SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName, 
+                        reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, 0 AS OrdQty
+                        FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID 
+                        LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
+                        LEFT JOIN M_Product pro ON (reqln.M_Product_ID=pro.M_Product_ID) LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID=uom.C_UOM_ID)
+                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
+                        UNION
+                        SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
+                        reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, SUM(rl.Qty) AS OrdQty
+                        FROM M_RequisitionLine reqln INNER JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID = cl.M_RequisitionLine_ID
+                        INNER JOIN C_RfqLineQty rl ON (rl.C_RfqLine_ID=cl.C_RfqLine_ID) LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
+                        LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
+                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' AND reqln.C_OrderLine_ID IS NOT NULL
+                        AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
+                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @") AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
+                        AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
+                        reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");
+            if (M_Product_ID > 0)
+            {
+                sql.Append(" AND reqln.M_Product_ID=" + M_Product_ID);
+            }
+            try
+            {
+                _ds = DB.ExecuteDataset(sql.ToString());
+                if (_ds != null && _ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < _ds.Tables[0].Rows.Count; i++)
+                    {
+                        decimal DelQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["DelQty"]);
+                        decimal OrdQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["OrdQty"]);
+
+                        // Check if Requisition and Product UOM are different then convert Delivered Qty into Requisition UOM.
+                        if (Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]) > 0 && DelQty > 0
+                            && Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_UOM_ID"]) != Util.GetValueOfInt(_ds.Tables[0].Rows[i]["ProdUOM"]))
+                        {
+                            DelQty = Util.GetValueOfDecimal(MUOMConversion.ConvertProductTo(ctx, Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]),
+                                Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_UOM_ID"]), DelQty));
+                        }
+
+                        // Check if Requisition Qty are already delivered or ordered than skip that line.
+                        if (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= OrdQty)
+                        {
+                            continue;
+                        }
+
+                        ReqLineData res = new ReqLineData();
+                        res.M_Product_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]);
+                        res.Product = Util.GetValueOfString(_ds.Tables[0].Rows[i]["ProdName"]);
+                        res.C_UOM_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_UOM_ID"]);
+                        res.UOM = Util.GetValueOfString(_ds.Tables[0].Rows[i]["UOM"]);
+                        res.C_Charge_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_Charge_ID"]);
+                        res.ASI_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
+                        res.ReqQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]);
+                        res.Price = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["PriceActual"]);
+                        res.EnteredQty = res.ReqQty - DelQty - OrdQty;
+                        res.PendingQty = res.EnteredQty;
+                        res.M_ReqLine_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_RequisitionLine_ID"]);
+                        res.M_Requisition_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Requisition_ID"]);
+                        //res.C_OrderLine_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_OrderLine_ID"]);
+                        result.Add(res);
+                    }
+                }
+            }
+            catch
+            {
+                if (_ds != null)
+                {
+                    _ds.Dispose();
+                    _ds = null;
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Creatd RFQ Lines and RFQ Line Qty
+        /// </summary>
+        /// <param name="C_Rfq_ID">RFQ ID</param>
+        /// <param name="ReqLines">Requisitions Line data</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>Message as String</returns>
+        public string CreateRfqLine(int C_Rfq_ID, List<ReqLineData> ReqLines, Ctx ctx)
+        {
+            string _msg = "";
+            int TotalCount = 0, SavedCount = 0;
+            Trx trx = Trx.Get("VCreateFromRequisition" + DateTime.Now.Ticks);
+
+            int LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_RfQLine WHERE C_RfQ_ID=" + C_Rfq_ID, null, trx));
+            MRfQ rfq = new MRfQ(ctx, C_Rfq_ID, null);
+            TotalCount = ReqLines.Count;
+            for (int i = 0; i < ReqLines.Count; i++)
+            {
+                LineNo = LineNo + 10;
+                // Create RfQ line
+                MRfQLine RfqLine = new MRfQLine(rfq);
+                RfqLine.SetLine(LineNo);
+                RfqLine.SetM_RequisitionLine_ID(ReqLines[i].M_ReqLine_ID);
+                RfqLine.SetM_Product_ID(ReqLines[i].M_Product_ID);
+
+                if (ReqLines[i].ASI_ID > 0)
+                {
+                    RfqLine.SetM_AttributeSetInstance_ID(ReqLines[i].ASI_ID);
+                }
+                //RfqLine.SetDescription("");
+                if (RfqLine.Save())
+                {
+                    // Create RfQ Qty
+                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
+                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);
+                    RfQLineQty.SetQty(ReqLines[i].EnteredQty);
+                    RfQLineQty.SetBenchmarkPrice(ReqLines[i].Price);
+                    RfQLineQty.SetIsPurchaseQty(true);
+                    RfQLineQty.SetIsRfQQty(true);
+                    if (!RfQLineQty.Save())
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        if (vp != null)
+                        {
+                            trx.Rollback();
+                            return Msg.GetMsg(ctx, "RfQLineQtyNotSaved") + "- " + vp.Name;
+                        }
+                        else
+                        {
+                            trx.Rollback();
+                            return Msg.GetMsg(ctx, "RfQLineQtyNotSaved");
+                        }
+                    }
+                }
+                else
+                {
+                    ValueNamePair vp = VLogger.RetrieveError();
+                    if (vp != null)
+                    {
+                        trx.Rollback();
+                        return Msg.GetMsg(ctx, "RfQLineNotSaved") + "- " + vp.Name;
+                    }
+                    else
+                    {
+                        trx.Rollback();
+                        return Msg.GetMsg(ctx, "RfQLineNotSaved");
+                    }
+                }
+                if (i == ReqLines.Count - 1)
+                {
+                    int no = DB.ExecuteQuery("UPDATE C_Rfq SET M_Requisition_ID='" + ReqLines[i].M_Requisition_ID + "' WHERE C_RfQ_ID= " + C_Rfq_ID, null, trx);
+                }
+            }
+            trx.Commit();
+            return _msg;
+        }
     }
 
 
@@ -843,5 +1009,36 @@ namespace VIS.Models
         public string Matched { get; set; }
     }
 
+    public class ReqLineData
+    {
+        public int M_Product_ID
+        { get; set; }
 
+        public string Product
+        { get; set; }
+
+        public int C_Charge_ID
+        { get; set; }
+        public int C_UOM_ID
+        { get; set; }
+        public string UOM
+        { get; set; }
+        public int ASI_ID
+        { get; set; }
+        public decimal ReqQty
+        { get; set; }
+
+        public decimal PendingQty
+        { get; set; }
+
+        public decimal EnteredQty
+        { get; set; }
+        public decimal Price
+        { get; set; }
+
+        public int M_ReqLine_ID
+        { get; set; }
+        public int M_Requisition_ID 
+        { get; set; }
+    }
 }
