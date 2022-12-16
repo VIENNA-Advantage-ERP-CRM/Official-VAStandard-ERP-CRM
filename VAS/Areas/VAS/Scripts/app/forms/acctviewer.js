@@ -1185,7 +1185,7 @@
                                 link.click();
                             }
                             else {
-                                VIS.ADialog.info(VIS.Msg.getMsg('ERRORGettingPostingServer'));
+                                VIS.ADialog.info(VIS.Msg.getMsg('ExcelError'));
                             }
                         }
                     });
