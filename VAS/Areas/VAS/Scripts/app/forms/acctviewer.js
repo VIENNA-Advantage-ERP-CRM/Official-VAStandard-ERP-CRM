@@ -708,7 +708,7 @@
         var btnRefresh = $("<button id='" + "btnRefresh_" + windowNo + "'style='margin-top: 0;' class='VIS_Pref_btn-2'><i class='vis vis-refresh'></i></button>");
         var btnPrint = $("<button class='VIS_Pref_btn-2' id='" + "btnPrint_" + windowNo + "' style='margin-top: 0px; margin-left: 10px;'><i class='vis vis-print'></button>");
         var btnRePost = $("<button class='VIS_Pref_btn-2' id='" + "btnRePost_" + windowNo + "' style='margin-top: 10px;'><img src='" + src + "'/></button>");
-        var btnExportExcel = $("<button class='VIS_Pref_btn-2' id='" + "btnExportExcel_" + windowNo + "' style='margin-top: 2px;margin-left: 34%;padding-left:8px;'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData")+"</span></button>");
+        var btnExportExcel = $("<button class='VIS_Pref_btn-2' id='" + "btnExportExcel_" + windowNo + "' style='margin-top: 2px;margin-left: 34%;padding-left:8px;'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData") + "</span></button>");
 
         var btnSelctDoc = $("<button class='input-group-text' Name='btnSelctDoc' id='" + "btnSelctDoc_" + windowNo + "'><i class='vis vis-find'></i></button>");
         var btnAccount = $("<button class='input-group-text' Name='btnAccount' id='" + "btnAccount_" + windowNo + "'><i class='vis vis-find'></i></button>");
@@ -851,16 +851,13 @@
             // South
             lblstatusLine.getControl().css("color", "rgba(var(--v-c-primary), 1)");//css("font-size", "28px").
             btnRePost.text(VIS.Msg.getMsg("RePost"));
-            /*btnExportExcel.text(VIS.Msg.getMsg("ImportExcel"));*/
             if (notShowPosted) {
                 btnRePost.hide();
-                btnExportExcel.hide();
                 chkforcePost.find("label").text(VIS.Msg.getMsg("Force"));
                 chkforcePost.hide();
             }
             else {
                 btnRePost.show();
-                btnExportExcel.show();
                 chkforcePost.find("label").text(VIS.Msg.getMsg("Force"));
                 chkforcePost.show();
             }
@@ -875,7 +872,6 @@
             divPaging.css("display", "none");
             resultDiv.css("display", "none");
             btnRePost.hide();
-            btnExportExcel.hide();
             chkforcePost.hide();
             btnRefresh.show();
             lblstatusLine.getControl().show();
@@ -898,18 +894,15 @@
             DrAndCr.show();
             btnRefresh.hide();
             lblstatusLine.getControl().hide();
-            //divPaging.append(btnExportExcel).append(ulPaging);
             divPaging.append(ulPaging);
             bottumDiv.append(divPaging);
             resultDiv.css("display", "block");
             if (notShowPosted) {
                 btnRePost.hide();
-                btnExportExcel.hide();
                 chkforcePost.hide();
             }
             else {
                 btnRePost.show();
-                btnExportExcel.show();
                 chkforcePost.show();
             }
             lblAccSchemaFilter.getControl().show();
@@ -1169,6 +1162,7 @@
                     }, 5);
 
                 });
+                //This function is used to Export file in Excel
                 btnExportExcel.on("click", function () {
                     $.ajax({
                         url: VIS.Application.contextUrl + "Posting/DownloadExcel",
@@ -1182,12 +1176,14 @@
                             VIS.ADialog.info(VIS.Msg.getMsg('ERRORGettingPostingServer'));
                         },
                         success: function (response) {
-                            var bytes = new Uint8Array(response.FileContents);
-                            var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                            var link = document.createElement('a');
-                            link.href = window.URL.createObjectURL(blob);
-                            link.download = response.FileDownloadName;
-                            link.click();
+                            if (response != null && response.FileContents.length > 0) {
+                                var bytes = new Uint8Array(response.FileContents);
+                                var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                                var link = document.createElement('a');
+                                link.href = window.URL.createObjectURL(blob);
+                                link.download = response.FileDownloadName;
+                                link.click();
+                            }
                         }
                     });
                 });
@@ -2335,7 +2331,6 @@
 
 
             btnRePost.hide();
-            btnExportExcel.hide()
             chkforcePost.hide();
             btnPrint.hide();
 
