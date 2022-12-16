@@ -1,9 +1,9 @@
 ﻿/********************************************************
- * Module Name    : VIS
+ * Module Name    : VASLogic
  * Purpose        : Model class for Posting viewer
  * Class Used     : 
  * Chronological Development
- * Meghraj S    25 Nov 2022
+ * VIS323  :  25 Nov 2022
  ******************************************************/
 
 using ClosedXML.Excel;
@@ -59,7 +59,9 @@ namespace VIS.Models
         /// Create excel file
         /// </summary>
         /// <param name="ctx">Context</param>
-        /// <param name="ds">Distributed Data</param>
+        /// <param name="ds">DataSet</param>
+        /// <param name="Ad_Table_Id">Ad_Table_Id</param>
+        /// <param name="Record_Id">Record_Id</param>
         /// <returns>memory stream</returns>
         public MemoryStream CreateExcel(Ctx ctx, DataSet dsFact, int Ad_Table_Id, int Record_Id)
         {
@@ -69,11 +71,11 @@ namespace VIS.Models
 
             //Get Data For Excel
             using (XLWorkbook wb = new XLWorkbook())
-            //using (var package = new ExcelPackage())
             {
                 for (int j = 1; j <= dsFact.Tables[0].Rows.Count; j++)
                 {
                     sql.Clear();
+                    //special check for get Element List once based on AccountSchemaId
                     if (j == 1)
                         elementList = GetElementType(Util.GetValueOfInt(dsFact.Tables[0].Rows[j-1]["C_ACCTSCHEMA_ID"]));
                     sql.Append(GetDataName(elementList, Ad_Table_Id, Record_Id, Util.GetValueOfInt(dsFact.Tables[0].Rows[j-1]["C_ACCTSCHEMA_ID"])));
@@ -86,8 +88,8 @@ namespace VIS.Models
                         //Add Columns  
                         dt.Columns.Add("ad_org_id", typeof(string));
                         dt.Columns.Add("account_id", typeof(string));
-                        dt.Columns.Add("AMTACCTDR", typeof(decimal));
-                        dt.Columns.Add("AMTACCTCR", typeof(decimal));
+                        dt.Columns.Add("AMTACCTDR", typeof(string));
+                        dt.Columns.Add("AMTACCTCR", typeof(string));
                         dt.Columns.Add("m_product_id", typeof(string));
                         dt.Columns.Add("C_BPARTNER_ID", typeof(string));
                         dt.Columns.Add("userelement8_id", typeof(string));
@@ -97,12 +99,12 @@ namespace VIS.Models
                         dt.Columns.Add("c_activity_id", typeof(string));
                         dt.Columns.Add("ad_orgtrx_id", typeof(string));
                         dt.Columns.Add("c_project_id", typeof(string));
-                        dt.Columns.Add("c_campaign_id", typeof(decimal));
+                        dt.Columns.Add("c_campaign_id", typeof(string));
                         dt.Columns.Add("userelement9_id", typeof(string));
-                        dt.Columns.Add("userelement3_id", typeof(int));
-                        dt.Columns.Add("userelement5_id", typeof(decimal));
-                        dt.Columns.Add("userelement6_id", typeof(decimal));
-                        dt.Columns.Add("userelement7_id", typeof(int));
+                        dt.Columns.Add("userelement3_id", typeof(string));
+                        dt.Columns.Add("userelement5_id", typeof(string));
+                        dt.Columns.Add("userelement6_id", typeof(string));
+                        dt.Columns.Add("userelement7_id", typeof(string));
 
                         //add data
                         for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -133,17 +135,12 @@ namespace VIS.Models
                         #endregion
 
                         #region CreateExcel
-
                         var ws = wb.Worksheets.Add("Sheet" + j + "");
-                        //var ws=package.Workbook.Worksheets.Add(item[0].date);
                         //Set excel header
                         ws.Cell("A1").Value = Util.GetValueOfString(dsFact.Tables[0].Rows[j-1]["Name"]);
                         var range = ws.Range("A1:L1");
                         range.Merge().Style.Font.SetBold().Font.FontSize = 12;
                         ws.Cell("A1").Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
-
-                        //get amount format
-                        //string format = AmountFormat(Util.GetValueOfInt(ds.Tables[0].Rows[0]["CostingPrecision"]));
 
                         if (dt.Rows.Count > 0)
                         {
@@ -233,19 +230,6 @@ namespace VIS.Models
             #endregion
         }
 
-        /// <summary>
-        /// Get Amount format
-        /// </summary>
-        /// <param name="precision">Precision, upto decimal to be handle</param>
-        /// <returns>Amount format</returns>
-        private string AmountFormat(int precision)
-        {
-            precision = precision == 0 ? 2 : precision;
-            //get zero according to precision
-            string trailingZeros = new String('0', precision);
-            string formatString = "0." + trailingZeros;
-            return formatString;
-        }
         #endregion
 
         /// <summary>
