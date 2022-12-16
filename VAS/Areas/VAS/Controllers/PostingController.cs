@@ -14,6 +14,13 @@ using VISLogic.Filters;
 
 namespace VIS.Controllers
 {
+ /********************************************************
+ * Module Name    : VAS
+ * Purpose        : Model class for Posting viewer
+ * Class Used     : 
+ * Chronological Development
+ * VIS323  :  25 Nov 2022
+ ******************************************************/
     public class PostingController : Controller
     {
         //

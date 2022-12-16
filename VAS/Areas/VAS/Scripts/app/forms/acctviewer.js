@@ -1184,6 +1184,9 @@
                                 link.download = response.FileDownloadName;
                                 link.click();
                             }
+                            else {
+                                VIS.ADialog.info(VIS.Msg.getMsg('ERRORGettingPostingServer'));
+                            }
                         }
                     });
                 });
