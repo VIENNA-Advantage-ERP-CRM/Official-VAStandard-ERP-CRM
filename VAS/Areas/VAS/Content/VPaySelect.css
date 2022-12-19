@@ -19,6 +19,18 @@
     /*margin-bottom: 5px;*/
     padding: 0 7px;
 }
+.vis-btnExcelExport {
+    padding: 10px 12px;
+    background: rgba(var(--v-c-primary), 1);
+    color: rgba(var(--v-c-on-primary), 1) !important;
+    font-size: 14px;
+    border: 0px;
+    border-radius: .25rem;
+    font-weight: 200;
+    cursor: pointer;
+
+
+}
 .vis-paymentselect-field {
     width: 100%;
 }
