@@ -9,10 +9,18 @@ using VAdvantage.Acct;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VIS.Models;
 using VISLogic.Filters;
 
 namespace VIS.Controllers
 {
+ /********************************************************
+ * Module Name    : VAS
+ * Purpose        : Model class for Posting viewer
+ * Class Used     : 
+ * Chronological Development
+ * VIS323  :  25 Nov 2022
+ ******************************************************/
     public class PostingController : Controller
     {
         //
@@ -66,6 +74,32 @@ namespace VIS.Controllers
             }
 
             return Json(new { result = res }, JsonRequestBehavior.AllowGet);
+        }
+
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        /// <summary>
+        ///This function used to Download Excel of Accounting Schema report
+        /// </summary>
+        /// <param name="AD_Table_ID">AD_Table_ID</param>
+        /// <param name="Record_ID">Record_ID</param>
+        /// <returns></returns>
+        public ActionResult DownloadExcel(int AD_Table_ID, int Record_ID)
+        {
+            FileContentResult robj = null;
+            Ctx ctx = Session["ctx"] as Ctx;
+            try
+            {
+                PostingModel obj = new PostingModel(ctx);
+                MemoryStream stream = obj.DownloadExcel(AD_Table_ID, Record_ID, out string reportname);
+                robj = File(stream.ToArray(), System.Net.Mime.MediaTypeNames.Application.Octet, reportname);
+
+            }
+            catch (Exception ex)
+            {
+                //res += ex.Message;
+            }
+            return Json(robj, JsonRequestBehavior.AllowGet);
         }
     }
 }

@@ -708,7 +708,7 @@
         var btnRefresh = $("<button id='" + "btnRefresh_" + windowNo + "'style='margin-top: 0;' class='VIS_Pref_btn-2'><i class='vis vis-refresh'></i></button>");
         var btnPrint = $("<button class='VIS_Pref_btn-2' id='" + "btnPrint_" + windowNo + "' style='margin-top: 0px; margin-left: 10px;'><i class='vis vis-print'></button>");
         var btnRePost = $("<button class='VIS_Pref_btn-2' id='" + "btnRePost_" + windowNo + "' style='margin-top: 10px;'><img src='" + src + "'/></button>");
-
+        var btnExportExcel = $("<button class='VIS_Pref_btn-2' id='" + "btnExportExcel_" + windowNo + "' style='margin-top: 2px;margin-left: 34%;padding-left:8px;'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData") + "</span></button>");
 
         var btnSelctDoc = $("<button class='input-group-text' Name='btnSelctDoc' id='" + "btnSelctDoc_" + windowNo + "'><i class='vis vis-find'></i></button>");
         var btnAccount = $("<button class='input-group-text' Name='btnAccount' id='" + "btnAccount_" + windowNo + "'><i class='vis vis-find'></i></button>");
@@ -912,6 +912,7 @@
         //bottumDiv.append(ulPaging);
         //Paging UI
         function createPageSettings() {
+            //divPaging = $('<div class="vis-info-pagingwrp" style="display:flex;align-items:center;justify-content:flex-end;">');
             divPaging = $('<div class="vis-info-pagingwrp" style="text-align: right; flex: 1;">');
             ulPaging = $('<ul class="vis-statusbar-ul">');
 
@@ -1075,6 +1076,7 @@
                 });
             }
 
+
             if (cmbAccSchemaFilter != null) {
                 cmbAccSchemaFilter.getControl().change(function () {
                     setBusy(true);
@@ -1160,6 +1162,34 @@
                     }, 5);
 
                 });
+                //This function is used to Export file in Excel
+                btnExportExcel.on("click", function () {
+                    $.ajax({
+                        url: VIS.Application.contextUrl + "Posting/DownloadExcel",
+                        dataType: "json",
+                        data: {
+                            AD_Table_ID: AD_Table_ID,
+                            Record_ID: Record_ID
+                        },
+                        error: function (e) {
+                            setBusy(false);
+                            VIS.ADialog.info(VIS.Msg.getMsg('ERRORGettingPostingServer'));
+                        },
+                        success: function (response) {
+                            if (response != null && response.FileContents.length > 0) {
+                                var bytes = new Uint8Array(response.FileContents);
+                                var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                                var link = document.createElement('a');
+                                link.href = window.URL.createObjectURL(blob);
+                                link.download = response.FileDownloadName;
+                                link.click();
+                            }
+                            else {
+                                VIS.ADialog.info(VIS.Msg.getMsg('ExcelError'));
+                            }
+                        }
+                    });
+                });
             }
 
             if (btnSelctDoc != null) {
@@ -1167,7 +1197,6 @@
                     actionButton(btnSelctDoc);
                 });
             }
-
             if (btnAccount != null) {
                 btnAccount.on("click", function () {
                     actionButton(btnAccount);
@@ -1627,7 +1656,7 @@
             /** dont show repost butoon if form is opened from menu. **/
             if (!$self.getIsMenu()) {
                 bottumDiv.append(btnRePost);
-                bottumDiv.append(chkforcePost).append(DrAndCr);
+                bottumDiv.append(chkforcePost).append(DrAndCr).append(btnExportExcel);
             }
 
             bottumDiv.append(lblstatusLine.getControl().addClass("VIS_Pref_Label_Font"));
@@ -2396,6 +2425,7 @@
             btnRefresh = null;
             btnPrint = null;
             btnRePost = null;
+            btnExportExcel = null;
             btnSelctDoc = null;
             btnAccount = null;
             btnProduct = null;
