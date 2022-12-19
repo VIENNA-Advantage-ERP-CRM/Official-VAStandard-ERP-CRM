@@ -708,7 +708,6 @@
         var btnRefresh = $("<button id='" + "btnRefresh_" + windowNo + "'style='margin-top: 0;' class='VIS_Pref_btn-2'><i class='vis vis-refresh'></i></button>");
         var btnPrint = $("<button class='VIS_Pref_btn-2' id='" + "btnPrint_" + windowNo + "' style='margin-top: 0px; margin-left: 10px;'><i class='vis vis-print'></button>");
         var btnRePost = $("<button class='VIS_Pref_btn-2' id='" + "btnRePost_" + windowNo + "' style='margin-top: 10px;'><img src='" + src + "'/></button>");
-        var btnExportExcel = $("<button class='VIS_Pref_btn-2' id='" + "btnExportExcel_" + windowNo + "' style='margin-top: 2px;margin-left: 34%;padding-left:8px;'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData") + "</span></button>");
 
         var btnSelctDoc = $("<button class='input-group-text' Name='btnSelctDoc' id='" + "btnSelctDoc_" + windowNo + "'><i class='vis vis-find'></i></button>");
         var btnAccount = $("<button class='input-group-text' Name='btnAccount' id='" + "btnAccount_" + windowNo + "'><i class='vis vis-find'></i></button>");
@@ -912,8 +911,7 @@
         //bottumDiv.append(ulPaging);
         //Paging UI
         function createPageSettings() {
-            //divPaging = $('<div class="vis-info-pagingwrp" style="display:flex;align-items:center;justify-content:flex-end;">');
-            divPaging = $('<div class="vis-info-pagingwrp" style="text-align: right; flex: 1;">');
+            divPaging = $("<div class='d-flex align-items-center ml-auto'><button id='btnExportExcel_" + $self.windowNo + "' class='vis-btnExcelExport mr-2'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData") + "</span></button><div class='vis-info-pagingwrp' style='text-align: right; flex: 1;''></div>");
             ulPaging = $('<ul class="vis-statusbar-ul">');
 
             liFirstPage = $('<li style="opacity: 1;"><div><i class="vis vis-shiftleft" title="' + VIS.Msg.getMsg("FirstPage") + '" style="opacity: 0.6;"></i></div></li>');
@@ -932,6 +930,8 @@
             ulPaging.append(liFirstPage).append(liPrevPage).append(liCurrPage).append(liNextPage).append(liLastPage);
             pageEvents();
         }
+        btnExportExcel = divPaging.find("#btnExportExcel_" + $self.windowNo + "");
+
         //Paging events
         function pageEvents() {
             liFirstPage.on("click", function () {
@@ -1162,6 +1162,7 @@
                     }, 5);
 
                 });
+
                 //This function is used to Export file in Excel
                 btnExportExcel.on("click", function () {
                     $.ajax({
@@ -1656,7 +1657,7 @@
             /** dont show repost butoon if form is opened from menu. **/
             if (!$self.getIsMenu()) {
                 bottumDiv.append(btnRePost);
-                bottumDiv.append(chkforcePost).append(DrAndCr).append(btnExportExcel);
+                bottumDiv.append(chkforcePost).append(DrAndCr);
             }
 
             bottumDiv.append(lblstatusLine.getControl().addClass("VIS_Pref_Label_Font"));
