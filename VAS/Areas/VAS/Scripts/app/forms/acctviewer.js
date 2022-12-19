@@ -1657,7 +1657,7 @@
             /** dont show repost butoon if form is opened from menu. **/
             if (!$self.getIsMenu()) {
                 bottumDiv.append(btnRePost);
-                bottumDiv.append(chkforcePost).append(DrAndCr);//.append(btnExportExcel);
+                bottumDiv.append(chkforcePost).append(DrAndCr);
             }
 
             bottumDiv.append(lblstatusLine.getControl().addClass("VIS_Pref_Label_Font"));
