@@ -135,7 +135,8 @@ namespace VIS.Models
                         #endregion
 
                         #region CreateExcel
-                        var ws = wb.Worksheets.Add("Sheet" + j + "");
+                        // Set AccountSchema Name as Sheet Name 
+                        var ws = wb.Worksheets.Add(Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]).Replace("/", "-"));
                         //Set excel header
                         ws.Cell("A1").Value = Util.GetValueOfString(dsFact.Tables[0].Rows[j-1]["Name"]);
                         var range = ws.Range("A1:L1");
