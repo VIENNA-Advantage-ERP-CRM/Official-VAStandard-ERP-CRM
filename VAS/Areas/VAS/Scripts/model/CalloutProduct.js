@@ -151,6 +151,7 @@
             // End Change Amortization
             var countDTD001 = false;
             var countVA005 = false;
+            var countVA075 = false;
             //if (countVA005 > 0) {
             //    Sql += " , producttype ";
             //}
@@ -167,6 +168,7 @@
                 countVA038 = dr["VA038_"];
                 countDTD001 = dr["DTD001_"];
                 countVA005 = dr["VA005_"];
+                countVA075 = dr["VA075_"];
                 var ds = null;
                 paramString = value.toString();
                 ds = VIS.dataContext.getJSONRecord("MProductCategory/GetCategoryData", paramString);
@@ -208,6 +210,14 @@
                         }
                         else {
                             mTab.setValue("VA038_AmortizationTemplate_ID", 0);
+                        }
+                    }
+                    if (countVA075 > 0) {
+                        if (ds["VA075_EquipmentCategory_ID"] != null || ds["VA075_EquipmentCategory_ID"] != "") {
+                            mTab.setValue("VA075_EquipmentCategory_ID", Util.getValueOfInt(ds["VA075_EquipmentCategory_ID"]));
+                        }
+                        else {
+                            mTab.setValue("VA075_EquipmentCategory_ID", 0);
                         }
                     }
        }
