@@ -161,7 +161,7 @@
             //Sql += " FROM M_Product_Category WHERE m_product_category_id=" + Util.getValueOfInt(value);
             //var result = CalloutDB.executeCalloutDataSet(Sql);
             // Added by Bharat on 11/May/2017
-            var paramString = "VA038_,DTD001_,VA005_";
+            var paramString = "VA038_,DTD001_,VA005_,VA075_";
             var dr = null;
             dr = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", paramString);
             if (dr != null) {
@@ -212,6 +212,9 @@
                             mTab.setValue("VA038_AmortizationTemplate_ID", 0);
                         }
                     }
+
+                    //VIS345 : Setting VA075_EquipmentCategory_ID from Product Category Window if Module VA075 is installed.
+
                     if (countVA075 > 0) {
                         if (ds["VA075_EquipmentCategory_ID"] != null || ds["VA075_EquipmentCategory_ID"] != "") {
                             mTab.setValue("VA075_EquipmentCategory_ID", Util.getValueOfInt(ds["VA075_EquipmentCategory_ID"]));
@@ -220,7 +223,7 @@
                             mTab.setValue("VA075_EquipmentCategory_ID", 0);
                         }
                     }
-       }
+                }
             }
             //if (result != null) {
             //    if (result.tables[0].rows.length > 0) {
