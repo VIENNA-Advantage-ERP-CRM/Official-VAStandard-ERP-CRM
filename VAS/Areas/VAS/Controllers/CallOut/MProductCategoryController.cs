@@ -1,4 +1,12 @@
-﻿using System;
+﻿/*******************************************************
+    * Module Name    : Standard module
+    * Purpose        : Product Category Controller
+    * Chronological Development
+    * VIS345  :     26th Dec 2021
+    ******************************************************/
+
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
@@ -10,6 +18,7 @@ using VIS.Models;
 
 namespace VIS.Controllers
 {
+
     public class MProductCategoryController : Controller
     {
         public ActionResult Index()
@@ -17,6 +26,11 @@ namespace VIS.Controllers
             return View();
         }
 
+        /// <summary>
+        /// GetProductCategory
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public JsonResult GetProductCategory(string fields)
         {
 
@@ -30,6 +44,11 @@ namespace VIS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
         // Added by Bharat on 11/May/2017
+        /// <summary>
+        /// GetCategoryData
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
         public JsonResult GetCategoryData(string fields)
         {
 
