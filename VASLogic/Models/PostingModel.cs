@@ -13,6 +13,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web;
 using VAdvantage.Acct;
 using VAdvantage.DataBase;
@@ -134,8 +135,10 @@ namespace VIS.Models
                         #endregion
 
                         #region CreateExcel
-                        var ws = wb.Worksheets.Add("Sheet" + j + "");
-                        //Set excel header
+                        // Set AccountSchema Name as Sheet Name 
+                        Regex pattern = new Regex("[/*?:\r]|[-]");//Added Special Characters which will be Replaced from string if exists
+                        var ws = wb.Worksheets.Add(pattern.Replace(Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]),"-"));
+                        //Set Excel file header
                         ws.Cell("A1").Value = Util.GetValueOfString(dsFact.Tables[0].Rows[j-1]["Name"]);
                         var range = ws.Range("A1:L1");
                         range.Merge().Style.Font.SetBold().Font.FontSize = 12;
