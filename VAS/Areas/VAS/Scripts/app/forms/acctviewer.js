@@ -871,6 +871,7 @@
             divPaging.css("display", "none");
             resultDiv.css("display", "none");
             btnRePost.hide();
+            btnExportExcel.hide();
             chkforcePost.hide();
             btnRefresh.show();
             lblstatusLine.getControl().show();
@@ -903,6 +904,7 @@
             else {
                 btnRePost.show();
                 chkforcePost.show();
+                btnExportExcel.show();
             }
             lblAccSchemaFilter.getControl().show();
             cmbAccSchemaFilter.getControl().show();
