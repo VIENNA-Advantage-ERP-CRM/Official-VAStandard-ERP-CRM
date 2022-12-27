@@ -137,7 +137,7 @@ namespace VIS.Models
 
                         #region CreateExcel
                         // Set AccountSchema Name as Sheet Name 
-                        Regex pattern = new Regex("[/*?:\r]|[-]");
+                        Regex pattern = new Regex("[/*?:\r]|[-]");//Added Special Characters which will be Replaced from string if exists
                         var ws = wb.Worksheets.Add(pattern.Replace(Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]),"-"));
                         //Set Excel file header
                         ws.Cell("A1").Value = Util.GetValueOfString(dsFact.Tables[0].Rows[j-1]["Name"]);
