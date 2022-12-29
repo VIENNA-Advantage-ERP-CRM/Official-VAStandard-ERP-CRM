@@ -1762,7 +1762,7 @@ namespace VAdvantage.Model
                     //Arpit
                     // not checking if cashamt is less than zero
                     // Done by Vivek on 12/07/2017 as per discussion with Mandeep sir 
-                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when amount is 0 when  amount is 0
+                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when amount is 0 
                     {
                         //JID_0821: If Cashbook currency conversion is not found. On completion of cash journal System give error "IN".
                         MConversionType conv = MConversionType.Get(GetCtx(), line.GetC_ConversionType_ID());
