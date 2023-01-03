@@ -284,6 +284,7 @@
 						ASI_ID: RequisitionGrd.records[selection[i] - 1].ASI_ID,
 						C_UOM_ID: RequisitionGrd.records[selection[i] - 1].C_UOM_ID,
 						M_ReqLine_ID: RequisitionGrd.records[selection[i] - 1].M_ReqLine_ID,
+						M_Requisition_ID: RequisitionGrd.records[selection[i] - 1].M_Requisition_ID,
 						EnteredQty: RequisitionGrd.records[selection[i] - 1].EnteredQty,
 						Price: RequisitionGrd.records[selection[i] - 1].Price
 					});
@@ -360,6 +361,7 @@
 
 				success: function (data) {
 					if (JSON.parse(data) != "") {
+						$RequisitionControl.setValue(null, false, true);
 						prdCtrl.setValue(null, false, true);
 						RequisitionGrd.clear();
 						VIS.ADialog.info("", true, JSON.parse(data), "");

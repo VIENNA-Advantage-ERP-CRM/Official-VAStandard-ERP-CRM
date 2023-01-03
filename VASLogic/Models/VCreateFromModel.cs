@@ -807,7 +807,8 @@ namespace VIS.Models
                         FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID 
                         LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
                         LEFT JOIN M_Product pro ON (reqln.M_Product_ID=pro.M_Product_ID) LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID=uom.C_UOM_ID)
-                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
+                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @")"+ (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "") 
+                        + @" AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
                         UNION
                         SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
@@ -817,14 +818,11 @@ namespace VIS.Models
                         LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
                         WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' AND reqln.C_OrderLine_ID IS NOT NULL
                         AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
-                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @") AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
+                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "") 
+                        + @" AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
                         AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
-                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");
-            if (M_Product_ID > 0)
-            {
-                sql.Append(" AND reqln.M_Product_ID=" + M_Product_ID);
-            }
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");            
             try
             {
                 _ds = DB.ExecuteDataset(sql.ToString());
@@ -887,13 +885,12 @@ namespace VIS.Models
         /// <returns>Message as String</returns>
         public string CreateRfqLine(int C_Rfq_ID, List<ReqLineData> ReqLines, Ctx ctx)
         {
-            string _msg = "";
-            int TotalCount = 0, SavedCount = 0;
+            string _msg = Msg.GetMsg(ctx, "RFQLinesSaved");
             Trx trx = Trx.Get("VCreateFromRequisition" + DateTime.Now.Ticks);
 
             int LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_RfQLine WHERE C_RfQ_ID=" + C_Rfq_ID, null, trx));
             MRfQ rfq = new MRfQ(ctx, C_Rfq_ID, null);
-            TotalCount = ReqLines.Count;
+
             for (int i = 0; i < ReqLines.Count; i++)
             {
                 LineNo = LineNo + 10;
