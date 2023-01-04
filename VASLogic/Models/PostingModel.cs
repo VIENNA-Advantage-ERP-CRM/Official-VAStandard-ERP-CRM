@@ -85,7 +85,8 @@ namespace VIS.Models
                     {
                         // Set AccountSchema Name as Sheet Name 
                         Regex pattern = new Regex("[/*?:\r]|[-]");//Added Special Characters which will be Replaced from string if exists
-                        var ws = wb.Worksheets.Add(pattern.Replace(Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]), "-"));
+                        //Added special case for worksheet name should be less than 31 character
+                        var ws = wb.Worksheets.Add(pattern.Replace(Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]).Length > 31 ? Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]).Substring(0, 31) : Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]), "-"));
                         //Set Excel file header
                         ws.Cell("A1").Value = Util.GetValueOfString(dsFact.Tables[0].Rows[j - 1]["Name"]);
                         var range = ws.Range("A1:L1");
