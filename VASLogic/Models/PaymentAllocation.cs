@@ -143,7 +143,7 @@ namespace VIS.Models
                 alloca.SetDateAcct(DateAcct);// to set Account date on allocation header because posting and conversion are calculating on the basis of Date Account
                 alloca.Set_Value("C_ConversionType_ID", _CurrencyType_ID); // to set Conversion Type on allocation header because posting and conversion are calculating on the basis of Conversion Type
                 alloca.SetDateTrx(DateTrx);
-                alloca.Set_Value("C_BPartner_ID", C_BPartner_ID);
+                //alloca.Set_Value("C_BPartner_ID", C_BPartner_ID);
                 if (alloca.Save())
                 {
                     //create allocation line if cash row selected and Payment is selected
@@ -1030,7 +1030,7 @@ namespace VIS.Models
                                 aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
                                 aLine.SetRef_Invoiceschedule_ID(positiveAmtInvSchdle_ID);
 
-                                aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
+                                //aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
                                 aLine.Set_ValueNoCheck("Description", string.Empty);
                                
 
@@ -1269,13 +1269,13 @@ namespace VIS.Models
                                 int positiveAmtInvSchdle_ID;
                                 if (mpay2 != null)
                                 {
-                                    aLine.SetC_InvoicePaySchedule_ID(mpay2.GetC_InvoicePaySchedule_ID());
+                                    //aLine.SetC_InvoicePaySchedule_ID(mpay2.GetC_InvoicePaySchedule_ID());
                                     aLine.Set_ValueNoCheck("Description", string.Empty);
                                     positiveAmtInvSchdle_ID = mpay2.GetC_InvoicePaySchedule_ID();
                                 }
                                 else
                                 {
-                                    aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
+                                    //aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
                                     positiveAmtInvSchdle_ID = Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]);
                                 }
                                 //set the trx Date and InvoicePayschedule_ID
