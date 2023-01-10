@@ -1050,6 +1050,7 @@
 
         function cleardata(button) {
             var keyColumn = button.attr('name');
+            button.find('span').text(" ");
             //used to clear controls based on id attribute
             $('#txt' + button.attr('id').substring(3)).val("");
             if (_data.whereInfo.length > 0) {
