@@ -309,13 +309,17 @@ namespace VIS.Models
         /// <param name="language"></param>
         /// <param name="columnName"></param>
         /// <returns></returns>
-        public string AcctViewerGetButtonText(Ctx ctx, string lookupDirEmbeded, string tName, string wheres, string selectSQLs,Language language,string columnName) 
+        public string AcctViewerGetButtonText(Ctx ctx, string lookupDirEmbeded, string tName, string wheres, string selectSQLs, Language language, string columnName)
         {
             //VIS323 DevOpsId 1901 to get lookup data for info window
+            if(language==null)
+            {
+                language = Language.GetLoginLanguage(ctx);
+            }
             lookupDirEmbeded = VLookUpFactory.GetLookup_TableDirEmbed(language, columnName, "avd", columnName);
             string sqlQry = "SELECT (" + lookupDirEmbeded + ") FROM " + tName + " avd WHERE avd." + selectSQLs;
 
-            try 
+            try
             {
                 string dex = DB.ExecuteScalar(sqlQry).ToString();
                 if (dex != null)
