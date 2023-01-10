@@ -85,6 +85,8 @@ namespace VIS.Controllers
         /// <param name="tName"></param>
         /// <param name="wheres"></param>
         /// <param name="selectSQLs"></param>
+        /// <param name="language"></param>
+        /// <param name="columnName"></param>
         /// <returns></returns>
         public JsonResult AcctViewerGetButtonText(string lookupDirEmbeded, string tName, string wheres, string selectSQLs,Language language,string ColumnName)
         {
