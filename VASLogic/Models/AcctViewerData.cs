@@ -7,6 +7,8 @@ using VAdvantage.DataBase;
 using VAdvantage.Utility;
 using VIS.Classes;
 using VAdvantage.Model;
+using VAdvantage.Classes;
+using VAdvantage.Login;
 
 namespace VIS.Models
 {
@@ -304,12 +306,16 @@ namespace VIS.Models
         /// <param name="tName"></param>
         /// <param name="wheres"></param>
         /// <param name="selectSQLs"></param>
+        /// <param name="language"></param>
+        /// <param name="columnName"></param>
         /// <returns></returns>
-        public string AcctViewerGetButtonText(Ctx ctx, string lookupDirEmbeded, string tName, string wheres, string selectSQLs)
+        public string AcctViewerGetButtonText(Ctx ctx, string lookupDirEmbeded, string tName, string wheres, string selectSQLs,Language language,string columnName) 
         {
+            //VIS323 DevOpsId 1901 to get lookup data for info window
+            lookupDirEmbeded = VLookUpFactory.GetLookup_TableDirEmbed(language, columnName, "avd", columnName);
             string sqlQry = "SELECT (" + lookupDirEmbeded + ") FROM " + tName + " avd WHERE avd." + selectSQLs;
 
-            try
+            try 
             {
                 string dex = DB.ExecuteScalar(sqlQry).ToString();
                 if (dex != null)
