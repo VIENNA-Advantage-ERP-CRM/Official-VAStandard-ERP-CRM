@@ -39,17 +39,18 @@
             if (dr != null) {
                 StdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
                 PriceListPrecision = Util.getValueOfInt(dr["PriceListPrecision"]);
-            }
-            dr = null;
+            }            
         }
 
-        //	get values
-        var id = Util.getValueOfInt(mTab.getValue("C_ProjectTask_ID"));        
+        //	VIS0060: Handled internal server error and Call controller method to get limit price.
+        var taskID = Util.getValueOfInt(mTab.getValue("C_ProjectTask_ID"));
+        var projID = Util.getValueOfInt(mTab.getValue("C_Project_ID"));
+        var productID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
 
-        var dr = VIS.dataContext.getJSONRecord("MProject/GetProjectDetail", id.toString())
-        if (dr != null) {
-            PriceLimit = Util.getValueOfDecimal(dr["PriceLimit"]);
-        }
+        var paramString = taskID.toString() + "," + projID.toString() + "," + productID.toString();
+
+        var PriceLimit = VIS.dataContext.getJSONRecord("MProject/GetProjectPriceLimit", paramString);
+
         PlannedQty = Util.getValueOfDecimal(mTab.getValue("PlannedQty"));
         if (PlannedQty == null) {
             PlannedQty = Envs.ONE;
