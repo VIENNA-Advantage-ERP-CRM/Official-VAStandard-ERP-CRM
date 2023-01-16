@@ -115,8 +115,8 @@ namespace VIS.Models
                             {
                                 ws.Cell(i + 3, 1).Value = ds.Tables[0].Rows[i]["AD_Org_ID"];
                                 ws.Cell(i + 3, 2).Value = ds.Tables[0].Rows[i]["ACCOUNT_ID"];
-                                ws.Cell(i + 3, 3).Value = ds.Tables[0].Rows[i]["ACCCREDIT"];
-                                ws.Cell(i + 3, 4).Value = ds.Tables[0].Rows[i]["ACCDEBIT"];
+                                ws.Cell(i + 3, 3).Value = ds.Tables[0].Rows[i]["ACCDEBIT"]; 
+                                ws.Cell(i + 3, 4).Value = ds.Tables[0].Rows[i]["ACCCREDIT"];
                                 for (int k = 0; k < elementList.Count; k++)
                                 {
                                     if (elementList[k]["ElementType"].StartsWith("X"))
