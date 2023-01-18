@@ -4508,7 +4508,8 @@
 
                             if ((record.changes != undefined) && (record.changes.SelectRow != undefined) && (record.changes.SelectRow == true && record.changes.AppliedAmt == undefined)) {
                                 record.changes.AppliedAmt = checkcommaordot(event, record.OpenAmt, record.OpenAmt);
-                                val = record.changes.AppliedAmt;
+                               // val = record.changes.AppliedAmt;
+                                val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
 
 
 
@@ -4516,12 +4517,9 @@
                             }
                             else {
                                 record.changes.AppliedAmt = checkcommaordot(event, record.changes.AppliedAmt, record.OpenAmt);
+                                //val = record.changes.AppliedAmt;
+                                val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
 
-
-
-
-
-                                val = record.changes.AppliedAmt;
 
                             }
                         }
@@ -7036,7 +7034,7 @@
                 saveCashData(rowsPayment,rowsCash, rowsInvoice, DateTrx, DateAcct);
             }
             else {
-                savePaymentData(rowsPayment, rowsInvoice, DateTrx, DateAcct);
+                savePaymentData(rowsPayment, rowsCash, rowsInvoice, DateTrx, DateAcct);
             }
         };
 
@@ -7221,7 +7219,7 @@
                         var C_CurrencyType_ID = 0;
 
                         var paymentData = [];
-                        //var cashData = [];
+                        var cashData = [];
                         var invoiceData = [];
 
                         var chk = $vchkMultiCurrency.is(':checked');
@@ -7329,7 +7327,7 @@
                             url: VIS.Application.contextUrl + "PaymentAllocation/SavePaymentData",
                             type: 'POST',
                             data: ({
-                                paymentData: JSON.stringify(paymentData), cashData: JSON.stringify(cashData), invoiceData: JSON.stringify(invoiceData), currency: $cmbCurrency.val(),
+                                paymentData: JSON.stringify(paymentData), cashData: JSON.stringify(cashData), invoiceData: JSON.stringify(invoiceData), currency: $cmbCurrency.val(),isCash:true,
                                 _C_BPartner_ID: _C_BPartner_ID, _windowNo: self.windowNo, payment: payment, DateTrx: $date.val(), appliedamt: applied
                                 , discount: discount, writeOff: writeOff, open: open, DateAcct: DateAcct, _CurrencyType_ID: C_CurrencyType_ID, isInterBPartner: false, conversionDate: conversionDate, chk: chk
                             }),
