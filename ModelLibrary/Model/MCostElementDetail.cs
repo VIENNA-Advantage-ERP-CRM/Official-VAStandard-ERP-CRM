@@ -83,7 +83,7 @@ namespace VAdvantage.Model
                         ced.SetAD_Org_ID(costingCheck.AD_OrgTo_ID);
                         ced.SetM_Warehouse_ID(costingCheck.M_WarehouseTo_ID);
                     }
-                    else if ((!(bool)costingCheck.isReversal && qty < 0) || (bool)costingCheck.isReversal && qty < 0)
+                    else if ((!(bool)costingCheck.isReversal && qty < 0) || (bool)costingCheck.isReversal && qty > 0)
                     {
                         // when not reversed record and dec qty OR when reversed record and inc qty 
                         ced.SetAD_Org_ID(costingCheck.AD_Org_ID);

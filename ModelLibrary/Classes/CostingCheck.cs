@@ -35,10 +35,11 @@ namespace ModelLibrary.Classes
         public MMovementLine movementline = null;
         public MInvoice invoice = null;
         public MInvoiceLine invoiceline = null;
+        public MProvisionalInvoice provisionalInvoice = null;
         public MOrder order = null;
         public MOrderLine orderline = null;
         public PO po = null;
-        private Decimal Price = 0, Qty = 0;
+        public Decimal Price = 0, Qty = 0;
         public String costingMethod = String.Empty;
         public int costingElement = 0, M_CostType_ID = 0;
         public int definedCostingElement = 0; /* Costing Element ID against selected Costing Method on Product Category or Accounting Schema*/
@@ -55,6 +56,8 @@ namespace ModelLibrary.Classes
         public decimal? onHandQty = null;
         public bool IsCostCalculationfromProcess = false;
         public decimal? currentQtyonQueue = null;
+        public bool? IsPOCostingethodBindedonProduct = null;
+        public DataSet dsCostElement = null;
 
         /// <summary>
         /// Constructor
@@ -121,6 +124,10 @@ namespace ModelLibrary.Classes
 
         public DataSet GetAccountingSchema(int AD_Client_ID)
         {
+            // Get Cost Element 
+            GetCostElement(AD_Client_ID);
+
+            // Get Accounting Schema
             query.Clear();
             query.Append(@"Select C_Acctschema_Id From C_Acctschema
                                 WHERE Isactive = 'Y' AND C_Acctschema_Id = (SELECT C_Acctschema1_Id FROM Ad_Clientinfo 
@@ -129,6 +136,13 @@ namespace ModelLibrary.Classes
                                 Select C_Acctschema_Id From C_Acctschema Where Isactive = 'Y' And Ad_Client_Id = " + AD_Client_ID + @"
                                 AND C_Acctschema_Id != (SELECT C_Acctschema1_Id FROM Ad_Clientinfo WHERE Ad_Client_Id = " + AD_Client_ID + " )");
             return DB.ExecuteDataset(query.ToString(), null, null);
+        }
+
+        public void GetCostElement(int AD_Client_ID)
+        {
+            query.Clear();
+            query.Append($@"SELECT DISTINCT M_CostElement_ID, CostingMethod, AD_Client_ID FROM M_CostElement WHERE IsActive = 'Y' AND AD_Client_ID = {AD_Client_ID}");
+            dsCostElement = DB.ExecuteDataset(query.ToString(), null, null);
         }
 
         public void ResetProperty()
@@ -160,6 +174,10 @@ namespace ModelLibrary.Classes
             query.Clear();
             M_Transaction_ID = 0; M_TransactionTo_ID = 0;
             errorMessage = String.Empty;
+            onHandQty = null;
+            IsPOCostingethodBindedonProduct = null;
+            IsCostCalculationfromProcess = false;
+            currentQtyonQueue = null;
         }
 
     }

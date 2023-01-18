@@ -215,17 +215,24 @@ namespace VAdvantage.Model
             // when Product Type = Item, and having reference of OrderLine and InOutLine
             if (product1.GetProductType().Equals(MProduct.PRODUCTTYPE_Item) && line.GetM_InOutLine_ID() > 0 && line.GetC_OrderLine_ID() > 0)
             {
-                // Is used to check costing method belongs to PO costing method  like (Average PO, Weighted Average PO or Last PO) or not
-                bool isPOCostingMethod = MCostElement.IsPOCostingmethod(GetCtx(), line.GetAD_Client_ID(), product1.GetM_Product_ID(), product1.Get_Trx());
+                ModelLibrary.Classes.CostingCheck costingCheck = new ModelLibrary.Classes.CostingCheck(GetCtx());
+                costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
+                costingCheck.provisionalInvoice = this;
+                costingCheck.AD_Org_ID = GetAD_Org_ID();
+                costingCheck.movementDate = GetDateAcct();
+                if (IsReversal())
+                {
+                    costingCheck.isReversal = true;
+                }
 
                 // Get Product Cost
-                Decimal ProductLineCost = line.GetProductLineCost(line, isPOCostingMethod);
+                Decimal ProductLineCost = line.GetProductLineCost(line, true);
 
                 // VIS_0045: 16-Dec-2022 -- DevOps ID - 1885
                 // calculate invoice line costing after calculating costing of linked MR line 
                 if (ProductLineCost != 0 && !MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, line.GetM_AttributeSetInstance_ID(),
                       "ProvisionalInvoice", null, null, null, null, line, ProductLineCost, line.GetQtyInvoiced(),
-                    Get_Trx(), out conversionNotFoundInvoice, optionalstr: (callingbyProcess ? "process" : "window")))
+                    Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: (callingbyProcess ? "process" : "window")))
                 {
                     SetProcessMsg(Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated"));
                     if ((client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory()) || callingbyProcess)

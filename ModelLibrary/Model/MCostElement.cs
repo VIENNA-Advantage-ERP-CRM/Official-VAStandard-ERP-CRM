@@ -647,8 +647,7 @@ namespace VAdvantage.Model
 
                 if (costingMethod.Equals(COSTINGMETHOD_WeightedAveragePO) ||
                     costingMethod.Equals(COSTINGMETHOD_AveragePO) ||
-                    costingMethod.Equals(COSTINGMETHOD_LastPOPrice) ||
-                    costingMethod.Equals(COSTINGMETHOD_ProvisionalWeightedAverage))
+                    costingMethod.Equals(COSTINGMETHOD_LastPOPrice))
                 {
                     isPOcostingMethod = true;
                 }

@@ -374,6 +374,99 @@ namespace VAdvantage.Model
             return Cost;
         }
 
+        /// <summary>
+        /// This Method is used to check costing before save constraints
+        /// Is Quantity available on Cost Queue with selected parameter on transaction line?
+        /// Is Conversion available -- Document/Base Curency to Accounting Schema's Currency ?
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="AD_Client_ID">Clinet ID</param>
+        /// <param name="AD_Org_ID">Organization ID</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <param name="M_ASI_ID">Attribute Set Instance ID</param>
+        /// <param name="M_Warehouse_ID">Warehouse ID</param>
+        /// <param name="Qty">Movemnt Qunatity</param>
+        /// <param name="IsConversionCheck">Is check currency rate</param>
+        /// <param name="AccountDate">Account Date</param>
+        /// <param name="C_Currency_ID">Currency</param>
+        /// <param name="C_Conversiontype_ID">Conversion Type</param>
+        /// <param name="trxName">TrxName</param>
+        /// <returns>null, if all ok</returns>
+        public static string CheckCostingCodition(Ctx ctx, int AD_Client_ID, int AD_Org_ID, int M_Product_ID,
+            int M_ASI_ID, int M_Warehouse_ID, decimal Qty, bool IsConversionCheck, DateTime? AccountDate, int C_Currency_ID, int C_Conversiontype_ID, Trx trxName)
+        {
+            string output = "";
+            string sql = "";
+            DataSet ds = null;
+
+            // Check Qty available in Cost Queue
+            if (Qty != 0)
+            {
+                sql = $@"select SUM(cq.CurrentQty) AS total , actsh.C_AcctSchema_ID, actsh.Name  from m_costQueue cq
+                        INNER JOIN C_AcctSchema actsh ON (actsh.C_AcctSchema_ID = cq.C_AcctSchema_ID and actsh.M_CostType_ID = cq.M_CostType_ID)
+                        where cq.CurrentQty > 0 
+                        AND cq.M_Product_ID = {M_Product_ID}
+                        AND NVL(cq.M_AttributeSetInstance_ID, 0) = {M_ASI_ID}
+                        AND cq.AD_Org_ID = {AD_Org_ID}
+                        AND cq.M_Warehouse_ID = {M_Warehouse_ID}
+                        AND cq.M_CostElement_ID = (SELECT M_CostElement_ID FROM M_CostElement 
+                               WHERE IsActive = 'Y' AND CostingMethod = 'F' AND AD_Client_ID = {AD_Client_ID})
+                        group by  actsh.C_AcctSchema_ID,  actsh.Name  
+                        having SUM(cq.CurrentQty) < {Math.Abs(Qty)}";
+                ds = DB.ExecuteDataset(sql, null, trxName);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        if (i == 0)
+                        {
+                            output = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total"]) + " quantity available for " + Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                        }
+                        else
+                        {
+                            output += (", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total"]) + " quantity available for " + Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]));
+                        }
+                    }
+                    return output;
+                }
+            }
+
+            // check Conversion rate available or not
+            // Document/Base Curency to Accounting Schema Currency
+            if (IsConversionCheck)
+            {
+                sql = $@"SELECT C_AcctSchema_ID , C_Currency_ID FROM C_AcctSchema WHERE IsActive = 'Y' AND AD_Client_ID = {AD_Client_ID}";
+                ds = DB.ExecuteDataset(sql, null, trxName);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    decimal rate = 0;
+                    C_Currency_ID = C_Currency_ID == 0 ? ctx.GetContextAsInt("$C_Currency_ID") : C_Currency_ID;
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        rate = MConversionRate.GetRate(C_Currency_ID, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Currency_ID"]), AccountDate, C_Conversiontype_ID, AD_Client_ID, AD_Org_ID);
+                        if (rate == 0)
+                        {
+                            if (string.IsNullOrEmpty(output))
+                            {
+                                output = "Conversion rate not define for: " + " From Currency " + C_Currency_ID
+                                        + " to " + Util.GetValueOfString(ds.Tables[0].Rows[i]["C_Currency_ID"]);
+                            }
+                            else
+                            {
+                                output += (", " + " From Currency " + C_Currency_ID
+                                            + " to " + Util.GetValueOfString(ds.Tables[0].Rows[i]["C_Currency_ID"]));
+                            }
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        return output;
+                    }
+                }
+            }
+            return output;
+        }
+
 
         /* 	Retrieve/Calculate Current Cost Price
         *	@param product product

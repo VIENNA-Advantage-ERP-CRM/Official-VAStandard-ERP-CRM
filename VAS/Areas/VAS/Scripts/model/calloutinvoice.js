@@ -3,6 +3,7 @@
     var Level = VIS.Logging.Level;
     var Util = VIS.Utility.Util;
     var countEd011 = 0;
+    var steps = false;
 
     function CalloutInvoice() {
         VIS.CalloutEngine.call(this, "VIS.CalloutInvoice"); //must call
@@ -1706,7 +1707,7 @@
                 return "";
             }
 
-            this.isCalloutActive(true);
+            this.setCalloutActive(true);
 
             var isSOTrx = ctx.isSOTrx(windowNo);
 
@@ -1787,6 +1788,7 @@
             this.log.severe(err.toString());
         }
         this.setCalloutActive(false);
+        return this.PriceList(ctx, windowNo, mTab, mField, mTab.getValue("M_PriceList_ID"));
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };

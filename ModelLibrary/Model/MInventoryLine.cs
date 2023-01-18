@@ -168,6 +168,20 @@ namespace VAdvantage.Model
             //    && _isManualEntry && GetM_AttributeSetInstance_ID() == 0)
             //    CreateMA(true);
 
+            //VIS_0046: check qty available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord
+                || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID") || Is_ValueChanged("QtyInternalUse")
+                || Is_ValueChanged("DifferenceQty")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), GetM_Product_ID(), GetM_AttributeSetInstance_ID(),
+                    GetParent().GetM_Warehouse_ID(), IsInternalUse() ? GetQtyInternalUse() : GetDifferenceQty(), false, GetParent().GetMovementDate(),
+                    0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
+
             if (!IsInternalUse())
             {
                 int no = DB.ExecuteQuery("UPDATE M_Inventory SET IsAdjusted = 'N' WHERE M_Inventory_ID = " + GetM_Inventory_ID(), null, Get_Trx());
