@@ -7072,10 +7072,14 @@
                         for (var i = 0; i < rowsPayment.length; i++) {
                             var row = $gridPayment.get(rowsPayment[i].recid);
                             C_CurrencyType_ID = parseInt(row.C_ConversionType_ID);
-                            paymentData.push({
-                                AppliedAmt: rowsPayment[i].AppliedAmt, Date: row.Date1, Converted: row.ConvertedAmount, CpaymentID: row.CpaymentID, Documentno: row.Documentno, Isocode: row.Isocode,
-                                Multiplierap: row.Multiplierap, OpenAmt: row.OpenAmt, Payment: row.Payment, Org: parseInt($cmbOrg.val()), IsPaid: false, paidAmt: 0
-                            });
+                            if (rowsPayment[i].AppliedAmt != 0 && rowsPayment[i].AppliedAmt != undefined) {
+                                var appliedAmt = rowsPayment[i].AppliedAmt;
+                                appliedAmt = convertAppliedAmtculture(appliedAmt, dotFormatter);
+                                paymentData.push({
+                                    AppliedAmt: appliedAmt, Date: row.Date1, Converted: row.ConvertedAmount, CpaymentID: row.CpaymentID, Documentno: row.Documentno, Isocode: row.Isocode,
+                                    Multiplierap: row.Multiplierap, OpenAmt: row.OpenAmt, Payment: row.Payment, Org: parseInt($cmbOrg.val()), IsPaid: false, paidAmt: 0
+                                });
+                            }
                         }
                         var chk = $vchkMultiCurrency.is(':checked');// isMultiCurrency
                         if (chk) {

@@ -244,33 +244,38 @@ namespace VIS.Models
                     #region Set Payment Allocated
                     if (paymentData.Count > 0)
                     {
-                        for (int i = 0; i < paymentData.Count; i++)
+                        DataSet ds = DB.ExecuteDataset("SELECT * FROM C_Payment WHERE C_Payment_ID IN(" + String.Join(",", paymentData.SelectMany(m => m).Where(k => k.Key.Equals("CpaymentID")).Select(x => x.Value)) + ")");
+                        if (!(ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0))
                         {
-                            int C_Payment_ID = Util.GetValueOfInt(paymentData[i]["CpaymentID"]);
-                            MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
-                            if (pay.TestAllocation())
+                            //for (int i = 0; i < paymentData.Count; i++)
+                            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
-                                if (!pay.Save())
+                                int C_Payment_ID = Util.GetValueOfInt(paymentData[i]["CpaymentID"]);
+                                //MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
+                                MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
+                                if (pay.TestAllocation())
                                 {
-                                    trx.Rollback();
-                                    trx.Close();
-                                    _log.SaveError("Error: ", "Payment not allocated");
-                                    ValueNamePair pp = VLogger.RetrieveError();
-                                    if (pp != null)
+                                    if (!pay.Save())
                                     {
-                                        msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
+                                        trx.Rollback();
+                                        trx.Close();
+                                        _log.SaveError("Error: ", "Payment not allocated");
+                                        ValueNamePair pp = VLogger.RetrieveError();
+                                        if (pp != null)
+                                        {
+                                            msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
+                                        }
+                                        else
+                                        {
+                                            msg = Msg.GetMsg(ctx, "PaymentNotCreated");
+                                        }
+                                        return msg;
                                     }
-                                    else
-                                    {
-                                        msg = Msg.GetMsg(ctx, "PaymentNotCreated");
-                                    }
-                                    return msg;
+
                                 }
 
-                            }
-
-                            // string sqlGetOpenPayments = "SELECT  NVL(currencyConvert(ALLOCPAYMENTAVAILABLE(C_Payment_ID) ,p.C_Currency_ID ," + C_Currency_ID + ",p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID),0) as amt FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
-                            string sqlGetOpenPayments = @"SELECT 
+                                // string sqlGetOpenPayments = "SELECT  NVL(currencyConvert(ALLOCPAYMENTAVAILABLE(C_Payment_ID) ,p.C_Currency_ID ," + C_Currency_ID + ",p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID),0) as amt FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
+                                string sqlGetOpenPayments = @"SELECT 
                              (SUM(NVL(currencyConvert(al.Amount, ah.C_Currency_ID, " + C_Currency_ID + @", ah.DateTrx, " + _CurrencyType_ID + @", ah.AD_Client_ID, ah.AD_Org_ID),0)) -
                               SUM(NVL(currencyConvert(p.payamt, p.C_Currency_ID, " + C_Currency_ID + @", p.DateTrx, " + _CurrencyType_ID + @", p.AD_Client_ID, p.AD_Org_ID),0))) as OpenAmt
                             FROM c_allocationline al
@@ -280,14 +285,15 @@ namespace VIS.Models
                             ON al.C_Payment_ID=p.c_payment_id
                             WHERE al.C_Payment_ID = " + C_Payment_ID + @" AND al.IsActive       ='Y'
                             group by al.C_Payment_ID,al.IsActive ";
-                            Decimal? result = Util.GetValueOfDecimal(DB.ExecuteScalar(sqlGetOpenPayments, null, trx));
-                            if (result == 0)
-                            {
-                                DB.ExecuteQuery("UPDATE C_Payment SET IsAllocated='Y' WHERE C_Payment_ID= " + pay.GetC_Payment_ID(), null, trx);
-                            }
-                            else
-                            {
-                                DB.ExecuteQuery("UPDATE C_Payment SET IsAllocated='N' WHERE C_Payment_ID= " + pay.GetC_Payment_ID(), null, trx);
+                                Decimal? result = Util.GetValueOfDecimal(DB.ExecuteScalar(sqlGetOpenPayments, null, trx));
+                                if (result == 0)
+                                {
+                                    DB.ExecuteQuery("UPDATE C_Payment SET IsAllocated='Y' WHERE C_Payment_ID= " + pay.GetC_Payment_ID(), null, trx);
+                                }
+                                else
+                                {
+                                    DB.ExecuteQuery("UPDATE C_Payment SET IsAllocated='N' WHERE C_Payment_ID= " + pay.GetC_Payment_ID(), null, trx);
+                                }
                             }
                         }
                     }
@@ -297,46 +303,51 @@ namespace VIS.Models
                     #region Set CashLine Allocated
                     if (rowsCash.Count > 0)
                     {
-                        for (int i = 0; i < rowsCash.Count; i++)
+                        DataSet ds = DB.ExecuteDataset("SELECT * FROM C_Cash WHERE C_Cash_ID IN(" + String.Join(",", rowsCash.SelectMany(m => m).Where(k => k.Key.Equals("ccashlineid")).Select(x => x.Value)) + ")");
+                        if (!(ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0))
                         {
-                            int _cashine_ID = Util.GetValueOfInt(rowsCash[i]["ccashlineid"]);
-                            MCashLine cash = new MCashLine(ctx, _cashine_ID, trx);
+                            //for (int i = 0; i < rowsCash.Count; i++)
+                            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                            {
+                                int _cashine_ID = Util.GetValueOfInt(rowsCash[i]["ccashlineid"]);
+                                MCashLine cash = new MCashLine(ctx, _cashine_ID, trx);
 
-                            string sqlGetOpenPayments = "SELECT  ALLOCCASHAVAILABLE(cl.C_CashLine_ID)  FROM C_CashLine cl Where C_CashLine_ID = " + _cashine_ID;
-                            object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);
-                            Decimal? amtPayment = 0;
-                            if (result == null || result == DBNull.Value)
-                            {
-                                amtPayment = -1;
-                            }
-                            else
-                            {
-                                amtPayment = Util.GetValueOfDecimal(result);
-                            }
-
-                            if (amtPayment == 0)
-                            {
-                                cash.SetIsAllocated(true);
-                            }
-                            else
-                            {
-                                cash.SetIsAllocated(false);
-                            }
-                            if (!cash.Save())
-                            {
-                                trx.Rollback();
-                                trx.Close();
-                                _log.SaveError("Error: ", "Cash Line not allocated");
-                                ValueNamePair pp = VLogger.RetrieveError();
-                                if (pp != null)
+                                string sqlGetOpenPayments = "SELECT  ALLOCCASHAVAILABLE(cl.C_CashLine_ID)  FROM C_CashLine cl Where C_CashLine_ID = " + _cashine_ID;
+                                object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);
+                                Decimal? amtPayment = 0;
+                                if (result == null || result == DBNull.Value)
                                 {
-                                    msg = Msg.GetMsg(ctx, "VIS_CashLineNotUpdate") + ":- " + pp.GetName();
+                                    amtPayment = -1;
                                 }
                                 else
                                 {
-                                    msg = Msg.GetMsg(ctx, "VIS_CashLineNotUpdate");
+                                    amtPayment = Util.GetValueOfDecimal(result);
                                 }
-                                return msg;
+
+                                if (amtPayment == 0)
+                                {
+                                    cash.SetIsAllocated(true);
+                                }
+                                else
+                                {
+                                    cash.SetIsAllocated(false);
+                                }
+                                if (!cash.Save())
+                                {
+                                    trx.Rollback();
+                                    trx.Close();
+                                    _log.SaveError("Error: ", "Cash Line not allocated");
+                                    ValueNamePair pp = VLogger.RetrieveError();
+                                    if (pp != null)
+                                    {
+                                        msg = Msg.GetMsg(ctx, "VIS_CashLineNotUpdate") + ":- " + pp.GetName();
+                                    }
+                                    else
+                                    {
+                                        msg = Msg.GetMsg(ctx, "VIS_CashLineNotUpdate");
+                                    }
+                                    return msg;
+                                }
                             }
                         }
                     }
@@ -1032,7 +1043,7 @@ namespace VIS.Models
 
                                 //aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
                                 aLine.Set_ValueNoCheck("Description", string.Empty);
-                               
+
 
                                 //get the C_InvoicePaySchedule_ID and Initialize to negtiveAmtInvSchdle_ID
                                 int negtiveAmtInvSchdle_ID;
@@ -1899,7 +1910,7 @@ namespace VIS.Models
         /// <param name="conversionDate"> conversion Date </param>
         /// <param name="chkMultiCurrency"> is MultiCurrency </param>
         /// <returns>string either error or empty string</returns>
-        public string SavePaymentData( List<Dictionary<string, string>> rowsPayment, List<Dictionary<string, string>> rowsCash, List<Dictionary<string, string>> rowsInvoice, string currency,
+        public string SavePaymentData(List<Dictionary<string, string>> rowsPayment, List<Dictionary<string, string>> rowsCash, List<Dictionary<string, string>> rowsInvoice, string currency,
              bool isCash, int _C_BPartner_ID, int _windowNo, string payment, DateTime DateTrx, string applied, string discount, string writeOff, string open, DateTime DateAcct, int _CurrencyType_ID, bool isInterBPartner, DateTime conversionDate, bool chkMultiCurrency)
         {
             #region ValidateRecords
@@ -2895,7 +2906,7 @@ namespace VIS.Models
                                     }
                                     else
                                     {
-                                        positiveAmtInvSchdle_ID = Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]); 
+                                        positiveAmtInvSchdle_ID = Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]);
                                         aLine.Set_ValueNoCheck("Description", string.Empty);
                                     }
 
@@ -3043,7 +3054,7 @@ namespace VIS.Models
                                     //Updating +ve Invoice allocationLine to set Ref_InvoicePaySchedule_ID
                                     aLine = new MAllocationLine(ctx, aLine_ID, trx);
                                     aLine.SetRef_Invoiceschedule_ID(negtiveAmtInvSchdle_ID);
-                                    
+
                                     if (!aLine.Save())
                                     {
                                         _log.SaveError("Error: ", "Allocation line Ref_InvoicePaySchedule_ID not updated!");
