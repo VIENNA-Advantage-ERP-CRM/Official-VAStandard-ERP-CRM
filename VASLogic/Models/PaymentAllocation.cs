@@ -710,17 +710,18 @@ namespace VIS.Models
                                 DiscountAmt, WriteOffAmt, OverUnderAmt);
                             aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                             aLine.SetPaymentInfo(0, C_CashLine_ID); //payment for payment allocation is zero
+                            aLine.Set_ValueNoCheck("Description", GetDescription("C_CashLine", C_CashLine_ID));
                             if (Env.IsModuleInstalled("VA009_"))
                             {
                                 if (mpay2 == null)
                                 {
                                     aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
-                                    aLine.Set_ValueNoCheck("Description", string.Empty);
+                                    // aLine.Set_ValueNoCheck("Description", string.Empty);
                                 }
                                 else if (mpay2 != null)
                                 {
                                     aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(mpay2.GetC_InvoicePaySchedule_ID()));
-                                    aLine.Set_ValueNoCheck("Description", string.Empty);
+                                    //  aLine.Set_ValueNoCheck("Description", string.Empty);
                                 }
                             }
                             aLine.SetDateTrx(DateTrx);
@@ -914,6 +915,7 @@ namespace VIS.Models
                                 aLine = new MAllocationLine(alloc, amount, DiscountAmt, WriteOffAmt, OverUnderAmt);
                                 aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                                 aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
+                                aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
 
                                 //get InvoiceSchedule_ID and Initalize to positiveAmtInvSchdle_ID
                                 int positiveAmtInvSchdle_ID;
@@ -1042,7 +1044,8 @@ namespace VIS.Models
                                 aLine.SetRef_Invoiceschedule_ID(positiveAmtInvSchdle_ID);
 
                                 //aLine.SetC_InvoicePaySchedule_ID(Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]));
-                                aLine.Set_ValueNoCheck("Description", string.Empty);
+                                //aLine.Set_ValueNoCheck("Description", string.Empty);
+                                aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
 
 
                                 //get the C_InvoicePaySchedule_ID and Initialize to negtiveAmtInvSchdle_ID
@@ -1275,13 +1278,14 @@ namespace VIS.Models
 
                                 aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                                 aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
+                                aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
 
                                 //get InvoiceSchedule_ID and Initalize to positiveAmtInvSchdle_ID
                                 int positiveAmtInvSchdle_ID;
                                 if (mpay2 != null)
                                 {
                                     //aLine.SetC_InvoicePaySchedule_ID(mpay2.GetC_InvoicePaySchedule_ID());
-                                    aLine.Set_ValueNoCheck("Description", string.Empty);
+                                    //aLine.Set_ValueNoCheck("Description", string.Empty);
                                     positiveAmtInvSchdle_ID = mpay2.GetC_InvoicePaySchedule_ID();
                                 }
                                 else
@@ -1407,6 +1411,7 @@ namespace VIS.Models
                                 aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                                 aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
                                 aLine.SetRef_Invoiceschedule_ID(positiveAmtInvSchdle_ID);
+                                aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
 
                                 //get the C_InvoicePaySchedule_ID and Initialize to negtiveAmtInvSchdle_ID
                                 int negtiveAmtInvSchdle_ID;
@@ -1553,6 +1558,8 @@ namespace VIS.Models
                             aLine.SetDocInfo(C_BPartner_ID, 0, 0);
                             aLine.SetPaymentInfo(0, C_CashLine_ID);
                             aLine.SetRef_CashLine_ID(Ref_CashLine_ID);
+                            aLine.Set_ValueNoCheck("Description", GetDescription("C_CashLine", C_CashLine_ID));
+
                             msg = InvAlloc(0, null, aLine, DateTrx, trx);
                             if (msg != string.Empty)
                             {
@@ -2542,6 +2549,7 @@ namespace VIS.Models
                                     aLine = new MAllocationLine(alloc, amount, DiscountAmt, WriteOffAmt, OverUnderAmt);
                                     aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                                     aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
+                                    aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
                                     //aLine.SetRef_Invoiceschedule_ID(Util.GetValueOfInt(negInvList[c]["c_invoicepayschedule_id"]));
                                     int positiveAmtInvSchdle_ID = 0;
                                     if (mpay2 != null)
@@ -2665,6 +2673,7 @@ namespace VIS.Models
                                     aLine.SetDocInfo(C_BPartner_ID, C_Order_ID, C_Invoice_ID);
                                     aLine.SetRef_C_Invoice_ID(Ref_Invoice_ID);
                                     aLine.SetRef_Invoiceschedule_ID(positiveAmtInvSchdle_ID);
+                                    aLine.Set_ValueNoCheck("Description", GetDescription("C_Invoice", C_Invoice_ID));
 
                                     //get the InvoicePaySchedule_ID and initilaze to negtiveAmtInvSchdle_ID
                                     int negtiveAmtInvSchdle_ID = 0;
