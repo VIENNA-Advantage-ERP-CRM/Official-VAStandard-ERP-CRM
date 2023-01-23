@@ -252,7 +252,7 @@ namespace VIS.Models
                             {
                                 int C_Payment_ID = Util.GetValueOfInt(paymentData[i]["CpaymentID"]);
                                 //MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
-                                MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
+                                MPayment pay = new MPayment(ctx, ds.Tables[0].Rows[i], trx);
                                 if (pay.TestAllocation())
                                 {
                                     if (!pay.Save())
@@ -310,7 +310,7 @@ namespace VIS.Models
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
                                 int _cashine_ID = Util.GetValueOfInt(rowsCash[i]["ccashlineid"]);
-                                MCashLine cash = new MCashLine(ctx, _cashine_ID, trx);
+                                MCashLine cash = new MCashLine(ctx, ds.Tables[0].Rows[i], trx);
 
                                 string sqlGetOpenPayments = "SELECT  ALLOCCASHAVAILABLE(cl.C_CashLine_ID)  FROM C_CashLine cl Where C_CashLine_ID = " + _cashine_ID;
                                 object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);
