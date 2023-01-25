@@ -533,7 +533,9 @@
                     else if ($vConversionType.getValue() == null) {
                         VIS.ADialog.warn("VIS_SlctcnvrsnType");
                     }
-                   // blankAllGrids();
+
+                    // blankAllGrids();
+
                     clearRightPanelFilters(); //clear right side  filters and selected records
                     return;
                 }
@@ -547,7 +549,7 @@
                     VIS.ADialog.info("", true, VIS.Msg.getMsg("SelectBusinessPartnerFirst"), "");
                     $vSearchBPartner.getControl().addClass('vis-ev-col-mandatory'); //highlight the field
                     clearRightPanelFilters(); //clear right side  filters and selected records
-                  //  blankAllGrids(); // clear the records from selected grids
+                    //  blankAllGrids(); // clear the records from selected grids
                 }
             });
 
@@ -1655,7 +1657,8 @@
 
                 }
                 else {
-                    $vchkMultiCurrency.prop('disabled', false);}
+                    $vchkMultiCurrency.prop('disabled', false);
+                }
 
                 var allocfrm = $allocationFrom.val();
                 var allocto = $allocationTo.val();
@@ -4157,7 +4160,7 @@
                     var val = record["DATEACCT"];
                     return new Date(val).toLocaleString();
                 },
-                hidden:true
+                hidden: true
             });
             columns.push({ field: "AD_Org_ID", caption: VIS.translatedTexts.AD_Org_ID, size: '85px', hidden: true });
             columns.push({ field: "OrgName", caption: VIS.translatedTexts.AD_Org_ID, size: '85px', hidden: true });
@@ -4508,7 +4511,7 @@
 
                             if ((record.changes != undefined) && (record.changes.SelectRow != undefined) && (record.changes.SelectRow == true && record.changes.AppliedAmt == undefined)) {
                                 record.changes.AppliedAmt = checkcommaordot(event, record.OpenAmt, record.OpenAmt);
-                               // val = record.changes.AppliedAmt;
+                                // val = record.changes.AppliedAmt;
                                 val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
 
 
@@ -6898,7 +6901,7 @@
             //$('.vis-allocation-leftControls').prop('style', ' margin-bottom: 5px');
             $('#cashMaindiv').css('display', 'none');
             $('#glMaindiv').css('display', 'none');
-            
+
             displayConvertionType();
         };
         function displayConvertionType() {
@@ -6920,7 +6923,8 @@
                 //VIS_0045: Hide Conversion Type when either allocaton From/To is Invoice
                 $innerRow.find('.vis-conversionType').css('display', 'none');
                 $vConversionType.getControl().val('');
-            }};
+            }
+        };
         function vchkapplocationChange() {
             var rowsPayment;
             var rowsCash;
@@ -7031,14 +7035,14 @@
                 glData(rowsPayment, rowsInvoice, rowsCash, rowsGLVoucher, DateTrx, DateAcct);
             }
             else if ($allocationFrom.val() == "C" || $allocationTo.val() == "C") {
-                saveCashData(rowsPayment,rowsCash, rowsInvoice, DateTrx, DateAcct);
+                saveCashData(rowsPayment, rowsCash, rowsInvoice, DateTrx, DateAcct);
             }
             else {
                 savePaymentData(rowsPayment, rowsCash, rowsInvoice, DateTrx, DateAcct);
             }
         };
 
-        function saveCashData(rowsPayment,rowsCash, rowsInvoice, DateTrx, DateAcct) {
+        function saveCashData(rowsPayment, rowsCash, rowsInvoice, DateTrx, DateAcct) {
 
             if (_noInvoices + _noCashLines == 0)
                 return "";
@@ -7072,10 +7076,14 @@
                         for (var i = 0; i < rowsPayment.length; i++) {
                             var row = $gridPayment.get(rowsPayment[i].recid);
                             C_CurrencyType_ID = parseInt(row.C_ConversionType_ID);
-                            paymentData.push({
-                                AppliedAmt: rowsPayment[i].AppliedAmt, Date: row.Date1, Converted: row.ConvertedAmount, CpaymentID: row.CpaymentID, Documentno: row.Documentno, Isocode: row.Isocode,
-                                Multiplierap: row.Multiplierap, OpenAmt: row.OpenAmt, Payment: row.Payment, Org: parseInt($cmbOrg.val()), IsPaid: false, paidAmt: 0
-                            });
+                            if (rowsPayment[i].AppliedAmt != 0 && rowsPayment[i].AppliedAmt != undefined) {
+                                var appliedAmt = rowsPayment[i].AppliedAmt;
+                                appliedAmt = convertAppliedAmtculture(appliedAmt, dotFormatter);
+                                paymentData.push({
+                                    AppliedAmt: appliedAmt, Date: row.Date1, Converted: row.ConvertedAmount, CpaymentID: row.CpaymentID, Documentno: row.Documentno, Isocode: row.Isocode,
+                                    Multiplierap: row.Multiplierap, OpenAmt: row.OpenAmt, Payment: row.Payment, Org: parseInt($cmbOrg.val()), IsPaid: false, paidAmt: 0
+                                });
+                            }
                         }
                         var chk = $vchkMultiCurrency.is(':checked');// isMultiCurrency
                         if (chk) {
@@ -7327,7 +7335,7 @@
                             url: VIS.Application.contextUrl + "PaymentAllocation/SavePaymentData",
                             type: 'POST',
                             data: ({
-                                paymentData: JSON.stringify(paymentData), cashData: JSON.stringify(cashData), invoiceData: JSON.stringify(invoiceData), currency: $cmbCurrency.val(),isCash:true,
+                                paymentData: JSON.stringify(paymentData), cashData: JSON.stringify(cashData), invoiceData: JSON.stringify(invoiceData), currency: $cmbCurrency.val(), isCash: true,
                                 _C_BPartner_ID: _C_BPartner_ID, _windowNo: self.windowNo, payment: payment, DateTrx: $date.val(), appliedamt: applied
                                 , discount: discount, writeOff: writeOff, open: open, DateAcct: DateAcct, _CurrencyType_ID: C_CurrencyType_ID, isInterBPartner: false, conversionDate: conversionDate, chk: chk
                             }),

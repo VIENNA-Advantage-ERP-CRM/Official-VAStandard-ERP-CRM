@@ -91,7 +91,7 @@ namespace VIS.Controllers
         /// <param name="chk"> for MultiCurrency Check </param>
         /// <returns></returns>
         [HttpPost]
-        public string SavePaymentData(string paymentData,string cashData, string invoiceData, string currency, bool isCash, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
+        public string SavePaymentData(string paymentData, string cashData, string invoiceData, string currency, bool isCash, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
         string appliedamt, string discount, string writeOff, string open, string DateAcct, int _CurrencyType_ID, bool isInterBPartner, string conversionDate, bool chk)
         {
             List<Dictionary<string, string>> pData = null;
@@ -115,7 +115,7 @@ namespace VIS.Controllers
             }
 
             PaymentAllocation payments = new PaymentAllocation(ct);
-            msg = payments.SavePaymentData(pData,cData, iData, currency,isCash, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
+            msg = payments.SavePaymentData(pData, cData, iData, currency, isCash, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
 
             return msg;
         }
