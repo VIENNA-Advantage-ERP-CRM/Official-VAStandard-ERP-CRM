@@ -2944,6 +2944,7 @@ namespace VIS.Models
                                     else
                                     {
                                         positiveAmtInvSchdle_ID = Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]);
+
                                         aLine.Set_ValueNoCheck("Description", string.Empty);
                                     }
 
@@ -3221,6 +3222,7 @@ namespace VIS.Models
                                 aLine.SetRef_Payment_ID(Ref_Payment_ID);
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_Payment", C_Payment_ID));
                                 aLine.Set_ValueNoCheck("Description", DsPayment.Tables[0].Select("C_Payment_ID=" + C_Payment_ID)[0]["Description"]);
+
                                 PaymentAmt -= Math.Abs(postAppliedAmt);
                                 msg = InvAlloc(0, null, aLine, DateTrx, trx);
                                 if (msg != string.Empty)
@@ -3242,6 +3244,7 @@ namespace VIS.Models
                                 aLine.SetRef_Payment_ID(Ref_Payment_ID);
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_Payment", C_Payment_ID));
                                 aLine.Set_ValueNoCheck("Description", DsPayment.Tables[0].Select("C_Payment_ID=" + C_Payment_ID)[0]["Description"]);
+
                                 msg = InvAlloc(0, null, aLine, DateTrx, trx);
                                 if (msg != string.Empty)
                                 {

@@ -285,7 +285,7 @@
 
         //initialize();
 
-        this.Initialize = function () {
+        this.Initialize=function() {
             _C_Currency_ID = ctx.getContextAsInt("$C_Currency_ID");//  default
             countVA009 = executeScalar("VIS_131");
             fillLookups();
@@ -533,7 +533,9 @@
                     else if ($vConversionType.getValue() == null) {
                         VIS.ADialog.warn("VIS_SlctcnvrsnType");
                     }
+
                     // blankAllGrids();
+
                     clearRightPanelFilters(); //clear right side  filters and selected records
                     return;
                 }
@@ -2207,7 +2209,7 @@
                     }
                     else {
                         $invDocbaseType.append("<option value= '0'></option>");
-                    }
+                     }
                     $invDocbaseType.prop('selectedIndex', 0);
                 },
                 error: function (er) {

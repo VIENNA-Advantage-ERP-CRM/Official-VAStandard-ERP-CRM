@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
+using VAdvantage.Login;
 using VAdvantage.Utility;
 using VIS.Models;
 
@@ -84,12 +85,14 @@ namespace VIS.Controllers
         /// <param name="tName"></param>
         /// <param name="wheres"></param>
         /// <param name="selectSQLs"></param>
+        /// <param name="language"></param>
+        /// <param name="columnName"></param>
         /// <returns></returns>
-        public JsonResult AcctViewerGetButtonText(string lookupDirEmbeded, string tName, string wheres, string selectSQLs)
+        public JsonResult AcctViewerGetButtonText(string lookupDirEmbeded, string tName, string wheres, string selectSQLs,Language language,string ColumnName)
         {
             var ctx = Session["ctx"] as Ctx;
             AcctViewerData obj = new AcctViewerData();
-            var value = obj.AcctViewerGetButtonText(ctx, lookupDirEmbeded, tName, wheres, selectSQLs);
+            var value = obj.AcctViewerGetButtonText(ctx, lookupDirEmbeded, tName, wheres, selectSQLs, language, ColumnName);
             return Json(new { result = value }, JsonRequestBehavior.AllowGet);
         }
 

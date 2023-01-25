@@ -488,17 +488,18 @@
     AcctViewerData.prototype.getButtonText = function (tableName, columnName, selectSQL) {
 
         var language = VIS.Env.getAD_Language(VIS.Env.getCtx());
-        var lookupDirEmbed = VIS.MLookupFactory.getLookup_TableDirEmbed(language, columnName, "avd", columnName);
         var retValue = "<" + selectSQL + ">";
         $.ajax({
             url: VIS.Application.contextUrl + "AcctViewerData/AcctViewerGetButtonText",
             type: 'POST',
             async: false,
             data: {
-                lookupDirEmbeded: lookupDirEmbed,
+                lookupDirEmbeded: null,
                 tName: tableName,
                 wheres: " avd WHERE avd.",
-                selectSQLs: selectSQL
+                selectSQLs: selectSQL,
+                language: language,
+                ColumnName: columnName
             },
             success: function (data) {
                 var res = data.result;
@@ -709,7 +710,6 @@
         var btnPrint = $("<button class='VIS_Pref_btn-2' id='" + "btnPrint_" + windowNo + "' style='margin-top: 0px; margin-left: 10px;'><i class='vis vis-print'></button>");
         var btnRePost = $("<button class='VIS_Pref_btn-2' id='" + "btnRePost_" + windowNo + "' style='margin-top: 10px;'><img src='" + src + "'/></button>");
 
-
         var btnSelctDoc = $("<button class='input-group-text' Name='btnSelctDoc' id='" + "btnSelctDoc_" + windowNo + "'><i class='vis vis-find'></i></button>");
         var btnAccount = $("<button class='input-group-text' Name='btnAccount' id='" + "btnAccount_" + windowNo + "'><i class='vis vis-find'></i></button>");
         var btnProduct = $("<button class='input-group-text' Name='btnProduct' id='" + "btnProduct_" + windowNo + "'><i class='vis vis-find'></i></button>");
@@ -818,7 +818,7 @@
         var rightSideDivWidth = $(window).width() / 2;
         var selectDivHeight = $(window).height() - 200;
         var _data = null;
-        //var _data = _data = new AcctViewerData(windowNo, AD_Client_ID, AD_Table_ID);;
+        //_data = new AcctViewerData(windowNo, AD_Client_ID, AD_Table_ID);;
 
 
         function jbInit() {
@@ -872,6 +872,7 @@
             divPaging.css("display", "none");
             resultDiv.css("display", "none");
             btnRePost.hide();
+            btnExportExcel.hide();
             chkforcePost.hide();
             btnRefresh.show();
             lblstatusLine.getControl().show();
@@ -904,6 +905,7 @@
             else {
                 btnRePost.show();
                 chkforcePost.show();
+                btnExportExcel.show();
             }
             lblAccSchemaFilter.getControl().show();
             cmbAccSchemaFilter.getControl().show();
@@ -912,7 +914,7 @@
         //bottumDiv.append(ulPaging);
         //Paging UI
         function createPageSettings() {
-            divPaging = $('<div class="vis-info-pagingwrp" style="text-align: right; flex: 1;">');
+            divPaging = $("<div class='d-flex align-items-center ml-auto'><button id='btnExportExcel_" + $self.windowNo + "' class='vis-btnExcelExport mr-2'><span class='vis vis-doc-excel'> " + VIS.Msg.getMsg("ExcelExportData") + "</span></button><div class='vis-info-pagingwrp' style='text-align: right; flex: 1;''></div>");
             ulPaging = $('<ul class="vis-statusbar-ul">');
 
             liFirstPage = $('<li style="opacity: 1;"><div><i class="vis vis-shiftleft" title="' + VIS.Msg.getMsg("FirstPage") + '" style="opacity: 0.6;"></i></div></li>');
@@ -931,6 +933,8 @@
             ulPaging.append(liFirstPage).append(liPrevPage).append(liCurrPage).append(liNextPage).append(liLastPage);
             pageEvents();
         }
+        btnExportExcel = divPaging.find("#btnExportExcel_" + $self.windowNo + "");
+
         //Paging events
         function pageEvents() {
             liFirstPage.on("click", function () {
@@ -1047,6 +1051,8 @@
         function cleardata(button) {
             var keyColumn = button.attr('name');
             button.find('span').text(" ");
+            //used to clear controls based on id attribute
+            $('#txt' + button.attr('id').substring(3)).val("");
             if (_data.whereInfo.length > 0) {
                 var index = _data.whereInfo.map(function (item) { return item.Key == keyColumn; }).indexOf(true);
                 _data.whereInfo.splice(index, 1);
@@ -1074,6 +1080,7 @@
                     actionAcctSchema();
                 });
             }
+
 
             if (cmbAccSchemaFilter != null) {
                 cmbAccSchemaFilter.getControl().change(function () {
@@ -1160,6 +1167,35 @@
                     }, 5);
 
                 });
+
+                //This function is used to Export file in Excel
+                btnExportExcel.on("click", function () {
+                    $.ajax({
+                        url: VIS.Application.contextUrl + "Posting/DownloadExcel",
+                        dataType: "json",
+                        data: {
+                            AD_Table_ID: AD_Table_ID,
+                            Record_ID: Record_ID
+                        },
+                        error: function (e) {
+                            setBusy(false);
+                            VIS.ADialog.info(VIS.Msg.getMsg('ERRORGettingPostingServer'));
+                        },
+                        success: function (response) {
+                            if (response != null && response.FileContents.length > 0) {
+                                var bytes = new Uint8Array(response.FileContents);
+                                var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                                var link = document.createElement('a');
+                                link.href = window.URL.createObjectURL(blob);
+                                link.download = response.FileDownloadName;
+                                link.click();
+                            }
+                            else {
+                                VIS.ADialog.info(VIS.Msg.getMsg('ExcelError'));
+                            }
+                        }
+                    });
+                });
             }
 
             if (btnSelctDoc != null) {
@@ -1167,7 +1203,6 @@
                     actionButton(btnSelctDoc);
                 });
             }
-
             if (btnAccount != null) {
                 btnAccount.on("click", function () {
                     actionButton(btnAccount);
@@ -1432,7 +1467,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtAccount_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblAcc.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1454,7 +1489,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtOrgUnit_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblOrgUnit.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1476,7 +1511,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProduct_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProduct.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1499,7 +1534,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtBPartner_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblBP.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1521,7 +1556,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProject_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProject.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -2146,7 +2181,22 @@
                     _data.whereInfo.push({ 'Key': keyColumn, 'Value': keyColumn + "=" + key });
 
                 }
-
+                //VIS323 DevOpsID:1901 bind selected data on input controls
+                if (button.attr('id') == "btnAccount_" + windowNo) {
+                    $('#txtAccount_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnOrgUnit_" + windowNo) {
+                    $('#txtOrgUnit_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnProduct_" + windowNo) {
+                    $('#txtProduct_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnBPartner_" + windowNo) {
+                    $('#txtBPartner_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnProject_" + windowNo) {
+                    $('#txtProject_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
                 //  Display Selection and resize
                 button.find('span').text(_data.getButtonText(tableName, lookupColumn, selectSQL));
 
@@ -2396,6 +2446,7 @@
             btnRefresh = null;
             btnPrint = null;
             btnRePost = null;
+            btnExportExcel = null;
             btnSelctDoc = null;
             btnAccount = null;
             btnProduct = null;

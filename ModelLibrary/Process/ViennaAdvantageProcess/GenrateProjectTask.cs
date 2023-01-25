@@ -19,14 +19,14 @@ namespace ViennaAdvantage.Process
     public class GenrateProjectTask : SvrProcess
     {
         /**	Project directly from Project	*/
-      //  private int C_Project_ID = 0;
+        //  private int C_Project_ID = 0;
         /** Project Type Parameter			*/
-       // private int C_ProjectType_ID = 0;
+        // private int C_ProjectType_ID = 0;
         private int _C_Campaign_ID = 0;
         //private int C_Phase_ID = 0;
         //private int C_ProjectPhase_ID = 0;
         //private int C_Task_ID = 0;
-       // private int C_ProjectTask_ID = 0;
+        // private int C_ProjectTask_ID = 0;
         private int C_CampaignType_ID = 0;
 
 
@@ -75,6 +75,9 @@ namespace ViennaAdvantage.Process
             }
             int[] allids = VAdvantage.Model.X_C_CampaignPhase.GetAllIDs("C_CampaignPhase", "C_CampaignType_ID=" + C_CampaignType_ID + " and AD_Client_ID = " + GetAD_Client_ID() + " Order By SEQNO ", Get_TrxName());
             //int[] allids = X_C_Phase.GetAllIDs("C_Phase", "C_ProjectType_ID=" + C_ProjectType_ID, Get_TrxName());
+            // VIS0060: Get Sequence no to set on Compaign Phase.
+            string SQL = "SELECT COALESCE(MAX(SeqNo),0) AS DefaultValue FROM C_ProjectPhase WHERE C_Project_ID=" + Project.GetC_Project_ID();
+            int SeqNo = Util.GetValueOfInt(DB.ExecuteScalar(SQL, null, Get_TrxName()));
             for (int i = 0; i < allids.Length; i++)
             {
                 VAdvantage.Model.X_C_CampaignPhase CampPhase = new VAdvantage.Model.X_C_CampaignPhase(GetCtx(), allids[i], Get_TrxName());
@@ -89,6 +92,7 @@ namespace ViennaAdvantage.Process
                     //ProjectPhase.SetAD_Org_ID(Phase1.GetAD_Org_ID());
                     ProjectPhase.SetAD_Org_ID(CampPhase.GetAD_Org_ID());
                     ProjectPhase.SetC_Project_ID(Project.GetC_Project_ID());
+                    ProjectPhase.SetSeqNo(SeqNo + 10);
                     //ProjectPhase.SetName(Phase1.GetName());
                     ProjectPhase.SetName(CampPhase.GetName());
                     // ProjectPhase.SetM_Product_ID(Phase1.GetM_Product_ID());
@@ -97,15 +101,17 @@ namespace ViennaAdvantage.Process
                     //ProjectPhase.SetQty(CampPhase.GetStandardQty());
                     //ProjectPhase.SetC_Phase_ID(Phase1.GetC_Phase_ID());
                     //ProjectPhase.SetC_Phase_ID(CampPhase.GetC_CampaignPhase_ID());
-                    ProjectPhase.SetC_Project_ID(Project.GetC_Project_ID());
+                    //ProjectPhase.SetC_Project_ID(Project.GetC_Project_ID());                    
                     if (!ProjectPhase.Save(Get_TrxName()))
                     {
                         return GetRetrievedError(ProjectPhase, "CampaignPhasetNotSaved");
                         //log.SaveError("CampaignPhasetNotSaved", "");
                         //return Msg.GetMsg(GetCtx(), "CampaignPhasetNotSaved");
                     }
-                    int[] allids1 = VAdvantage.Model.X_C_CampaignTask.GetAllIDs("C_CampaignTask", "C_CampaignPhase_ID=" + C_CampaignPhase_ID + " and AD_Client_ID = " + GetAD_Client_ID() + " Order By SEQNO ", Get_TrxName());
+                    int[] allids1 = VAdvantage.Model.X_C_CampaignTask.GetAllIDs("C_CampaignTask", "C_CampaignPhase_ID=" + C_CampaignPhase_ID + " AND AD_Client_ID = " + GetAD_Client_ID() + " Order By SEQNO ", Get_TrxName());
                     //int[] allids1 = X_C_Task.GetAllIDs("C_Task", "C_Phase_ID=" + C_Phase_ID, Get_TrxName());
+                    SQL = "SELECT COALESCE(MAX(SeqNo),0) AS DefaultValue FROM C_ProjectTask WHERE C_ProjectPhase_ID=" + ProjectPhase.GetC_ProjectPhase_ID();
+                    SeqNo = Util.GetValueOfInt(DB.ExecuteScalar(SQL, null, Get_TrxName()));
                     for (int j = 0; j < allids1.Length; j++)
                     {
                         VAdvantage.Model.X_C_CampaignTask CampaignTask = new VAdvantage.Model.X_C_CampaignTask(GetCtx(), allids1[j], Get_TrxName());
@@ -116,9 +122,9 @@ namespace ViennaAdvantage.Process
                         {
                             VAdvantage.Model.MProjectTask ProjectTask = new VAdvantage.Model.MProjectTask(GetCtx(), 0, Get_TrxName());
                             //ProjectTask.SetAD_Client_ID(task1.GetAD_Client_ID());
-                          //  ProjectTask.SetAD_Client_ID(CampaignTask.GetAD_Client_ID());
+                            //  ProjectTask.SetAD_Client_ID(CampaignTask.GetAD_Client_ID());
                             // ProjectTask.SetAD_Client_ID(task1.GetAD_Client_ID());
-                          //  ProjectTask.SetAD_Org_ID(CampaignTask.GetAD_Client_ID());
+                            //  ProjectTask.SetAD_Org_ID(CampaignTask.GetAD_Client_ID());
                             ProjectTask.SetC_ProjectPhase_ID(ProjectPhase.GetC_ProjectPhase_ID());
                             //ProjectTask.SetName(task1.GetName());
                             ProjectTask.SetName(CampaignTask.GetName());
@@ -129,10 +135,8 @@ namespace ViennaAdvantage.Process
                             //ProjectTask.SetC_Task_ID(task1.GetC_Task_ID());
                             ProjectTask.SetC_ProjectTask_ID(ProjectPhase.GetC_ProjectPhase_ID());
                             //ProjectTask.SetC_Task_ID(ProjectPhase.GetC_ProjectPhase_ID());
-                            // ProjectTask.SetC_Task_ID(CampaignTask.GetC_CampaignTask_ID());
-                            string SQL = "SELECT COALESCE(MAX(SeqNo),0)+10 AS DefaultValue FROM C_ProjectTask WHERE C_ProjectPhase_ID=" + ProjectPhase.GetC_ProjectPhase_ID();
-                            object SeqNo = DB.ExecuteScalar(SQL, null, Get_TrxName());
-                            ProjectTask.SetSeqNo(Util.GetValueOfInt(SeqNo));
+                            // ProjectTask.SetC_Task_ID(CampaignTask.GetC_CampaignTask_ID());                            
+                            ProjectTask.SetSeqNo(SeqNo + 10);
                             if (!ProjectTask.Save(Get_TrxName()))
                             {
                                 return GetRetrievedError(ProjectTask, "CampaignTasktNotSaved");
@@ -140,11 +144,8 @@ namespace ViennaAdvantage.Process
                                 //log.SaveError("CampaignTasktNotSaved", "");
                                 //return Msg.GetMsg(GetCtx(), "CampaignTasktNotSaved");
                             }
-
                         }
                     }
-
-
                 }
             }
             Campaign.SetGenerateProject("Y");

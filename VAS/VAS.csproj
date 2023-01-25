@@ -50,10 +50,19 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BaseLibrary">
-      <HintPath>..\..\BreakageDLL\BaseLibrary.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\BaseLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="ClosedXML, Version=0.95.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\ClosedXML.0.95.4\lib\net46\ClosedXML.dll</HintPath>
     </Reference>
     <Reference Include="CoreLibrary">
-      <HintPath>..\..\BreakageDLL\CoreLibrary.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml, Version=2.7.2.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>..\packages\DocumentFormat.OpenXml.2.7.2\lib\net46\DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="ExcelNumberFormat, Version=1.0.10.0, Culture=neutral, PublicKeyToken=23c6f5d73be07eca, processorArchitecture=MSIL">
+      <HintPath>..\packages\ExcelNumberFormat.1.0.10\lib\net20\ExcelNumberFormat.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -63,6 +72,14 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.FileSystem.Primitives, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.FileSystem.Primitives.4.0.1\lib\net46\System.IO.FileSystem.Primitives.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.IO.Packaging, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.Packaging.4.0.0\lib\net46\System.IO.Packaging.dll</HintPath>
+    </Reference>
     <Reference Include="System.Web.DynamicData" />
     <Reference Include="System.Web.Entity" />
     <Reference Include="System.Web.ApplicationServices" />
@@ -106,19 +123,19 @@
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="VAModelAD">
-      <HintPath>..\..\BreakageDLL\VAModelAD.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
     </Reference>
     <Reference Include="VAPrintLib">
-      <HintPath>..\..\BreakageDLL\VAPrintLib.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VAPrintLib.dll</HintPath>
     </Reference>
     <Reference Include="ViennaBase">
-      <HintPath>..\..\BreakageDLL\ViennaBase.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\ViennaBase.dll</HintPath>
     </Reference>
     <Reference Include="VIS">
-      <HintPath>..\..\BreakageDLL\VIS.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VIS.dll</HintPath>
     </Reference>
     <Reference Include="VISLogic">
-      <HintPath>..\..\BreakageDLL\VISLogic.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\VISLogic.dll</HintPath>
     </Reference>
     <Reference Include="WebGrease">
       <Private>True</Private>
@@ -128,8 +145,9 @@
       <Private>True</Private>
       <HintPath>..\packages\Antlr.3.5.0.2\lib\Antlr3.Runtime.dll</HintPath>
     </Reference>
+    <Reference Include="WindowsBase" />
     <Reference Include="XModel">
-      <HintPath>..\..\BreakageDLL\XModel.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -212,6 +230,7 @@
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />

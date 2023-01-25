@@ -67,8 +67,8 @@ namespace VAdvantage.Model
                 + " AND IsDefault='Y' "
                 + "ORDER BY SeqNo";
             //PreparedStatement pstmt = null;
-            DataTable dt=null;
-            IDataReader idr=null;
+            DataTable dt = null;
+            IDataReader idr = null;
             try
             {
                 //	pstmt = DataBase.prepareStatement (sql, null);
@@ -84,7 +84,7 @@ namespace VAdvantage.Model
                 {
                     retValue = new MStatus(ctx, dr, null);
                 }
-                
+
             }
             catch (Exception ex)
             {
@@ -100,7 +100,7 @@ namespace VAdvantage.Model
                 {
                     idr.Close();
                 }
-                dt = null; 
+                dt = null;
             }
             if (retValue != null)
                 _cacheDefault.Add(key, retValue);
@@ -120,7 +120,7 @@ namespace VAdvantage.Model
                 + "ORDER BY Value";
             List<MStatus> list = new List<MStatus>();
             IDataReader idr = null;
-            DataTable dt = null ;
+            DataTable dt = null;
             try
             {
                 idr = DataBase.DB.ExecuteReader(sql, null, null);
@@ -141,7 +141,8 @@ namespace VAdvantage.Model
                 }
                 _log.Severe(ex.ToString());
             }
-            finally {
+            finally
+            {
                 if (idr != null)
                 {
                     idr.Close();
@@ -206,6 +207,35 @@ namespace VAdvantage.Model
             if (GetTimeoutDays() == 0 && GetNext_Status_ID() != 0)
                 SetNext_Status_ID(0);
             //
+
+            //VIS0336:changes done for not allowing multiple open checbox true.
+            if (IsOpen())
+            {
+                string Sql = "SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND IsOpen='Y' AND IsActive='Y' ";
+                int COUNT = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, null));
+
+                if (COUNT >= 1)
+                {
+                    log.SaveError("Error", Msg.GetMsg(GetCtx(), "RStatusOpenExist"));
+                    return false;
+                }
+
+            }
+
+            //VIS0336:changes done for not allowing multiple open IsFinalClose true.
+            if (IsFinalClose())
+            {
+                string Sql = "SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND IsFinalClose='Y' AND IsActive='Y' ";
+                int COUNT = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, null));
+
+                if (COUNT >= 1)
+                {
+                    log.SaveError("Error", Msg.GetMsg(GetCtx(), "RStatusFinalCloseExist"));
+                    return false;
+                }
+
+            }
+
             return true;
         }
 

@@ -1,14 +1,4 @@
 ﻿/*Version 1.0.0.1*/
-/* Minification failed. Returning unminified contents.
-(46,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(47,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-primary'
-(69,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-secondary'
-(117,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(118,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(147,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-secondary'
-(201,27): run-time error CSS1039: Token not allowed after unary operator: '-v-c-primary'
-(202,22): run-time error CSS1039: Token not allowed after unary operator: '-v-c-on-primary'
- */
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -97,6 +87,17 @@
     float: left;
     /*margin-bottom: 5px;*/
     padding: 0 7px;
+}
+
+.vis-btnExcelExport {
+    padding: 10px 12px;
+    background: rgba(var(--v-c-primary), 1);
+    color: rgba(var(--v-c-on-primary), 1) !important;
+    font-size: 14px;
+    border: 0px;
+    border-radius: .25rem;
+    font-weight: 200;
+    cursor: pointer;
 }
 
 .vis-paymentselect-field {

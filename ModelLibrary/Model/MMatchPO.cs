@@ -676,29 +676,29 @@ namespace VAdvantage.Model
                 }
             }
 
-            if (GetC_OrderLine_ID() != 0)
-            {
-                MOrderLine obj = GetOrderLine();
-                //VIS_0319: OnOrderQty + Qtydelivered is not greater than QtyOrdered then return false
-                if (_isInOutLineChange)
-                {
-                    if ((obj.GetQtyOrdered() + obj.GetQtyDelivered()) > obj.GetQtyOrdered())
-                    {
-                        log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
-                        return false;
-                    }
-                }
+            //if (GetC_OrderLine_ID() != 0)
+            //{
+            //    MOrderLine obj = GetOrderLine();
+            //    //VIS_0319: OnOrderQty + Qtydelivered is not greater than QtyOrdered then return false
+            //    if (_isInOutLineChange)
+            //    {
+            //        if ((obj.GetQtyOrdered() + obj.GetQtyDelivered()) > obj.GetQtyOrdered())
+            //        {
+            //            log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
+            //            return false;
+            //        }
+            //    }
 
-                //VIS_0319: Qty + QtyInvoiced is not greater than QtyOrdered then return false
-                if (_isInvoiceLineChange)
-                {
-                    if ((GetQty() + obj.GetQtyInvoiced()) > obj.GetQtyOrdered())
-                    {
-                        log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
-                        return false;
-                    }
-                }
-            }
+            //    //VIS_0319: Qty + QtyInvoiced is not greater than QtyOrdered then return false
+            //    if (_isInvoiceLineChange)
+            //    {
+            //        if ((GetQty() + obj.GetQtyInvoiced()) > obj.GetQtyOrdered())
+            //        {
+            //            log.SaveError("Error", Msg.Translate(GetCtx(), "QtyCanNotbeGreater"));
+            //            return false;
+            //        }
+            //    }
+            //}
             return true;
         }
 

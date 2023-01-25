@@ -21,15 +21,20 @@ using VAdvantage.SqlExec;
 using VAdvantage.Utility;
 using System.Data;
 using System.Data.SqlClient;
-
+using System.IO;
+using VAdvantage.Logging;
+using VAdvantage.Print;
 
 namespace VAdvantage.Model
 {
-    public class MRfQ : X_C_RfQ
+    public class MRfQ : X_C_RfQ, DocAction
     {
 
         //Cache	
         private static CCache<int, MRfQ> s_cache = new CCache<int, MRfQ>("C_RfQ", 10);
+        private String _processMsg = null;
+        private bool _justPrepared = false;
+        private MRfQLine[] _lines = null;
 
         /// <summary>
         /// Get MRfQ from Cache
@@ -111,7 +116,7 @@ namespace VAdvantage.Model
             {
                 param = new SqlParameter[1];
                 param[0] = new SqlParameter("@param1", GetC_RfQ_ID());
-                idr = DataBase.DB.ExecuteReader(sql, param, Get_TrxName());
+                idr = DB.ExecuteReader(sql, param, Get_TrxName());
                 dt = new DataTable();
                 dt.Load(idr);
                 idr.Close();
@@ -295,6 +300,306 @@ namespace VAdvantage.Model
             int noQty = DataBase.DB.ExecuteQuery(setQty, null, Get_Trx());
 
             log.Fine(processed + " - Lines=" + noLine + ", Qty=" + noQty);
+        }
+        
+        /// <summary>
+        /// Process document
+        /// </summary>
+        /// <param name="processAction">document action</param>
+        /// <returns>true if performed</returns>
+        public bool ProcessIt(String processAction)
+        {
+            _processMsg = null;
+            DocumentEngine engine = new DocumentEngine(this, GetDocStatus());
+            return engine.ProcessIt(processAction, GetDocAction());
+        }
+
+        /// <summary>
+        /// Unlock Document.
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool UnlockIt()
+        {
+            log.Info("unlockIt - " + ToString());
+            SetProcessing(false);
+            return true;
+        }
+
+        /// <summary>
+        /// Invalidate Document
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool InvalidateIt()
+        {
+            log.Info(ToString());
+            SetDocAction(DOCACTION_Prepare);
+            return true;
+        }
+
+        /// <summary>
+        /// Prepare Document
+        /// </summary>
+        /// <returns>new status (In Progress or Invalid)</returns>
+        public string PrepareIt()
+        {
+            log.Info(ToString());
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+            if (_processMsg != null)
+                return DocActionVariables.STATUS_INVALID;
+
+            MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
+            //	Std Period open?
+            if (!MPeriod.IsOpen(GetCtx(), GetDateResponse(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            {
+                _processMsg = "@PeriodClosed@";
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+            // is Non Business Day?            
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateResponse(), GetAD_Org_ID()))
+            {
+                _processMsg = Common.Common.NONBUSINESSDAY;
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+            //	Lines
+            MRfQLine[] lines = GetLines();
+            if (lines.Length == 0)
+            {
+                _processMsg = "@NoLines@";
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+            _justPrepared = true;            
+            return DocActionVariables.STATUS_INPROGRESS;
+        }
+
+
+        /// <summary>
+        /// Approve Document
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool ApproveIt()
+        {
+            log.Info("approveIt - " + ToString());
+            //SetIsApproved(true);
+            return true;
+        }
+
+        /// <summary>
+        /// Reject Approval
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool RejectIt()
+        {
+            log.Info("rejectIt - " + ToString());
+            //SetIsApproved(false);
+            return true;
+        }
+
+        /// <summary>
+        /// Complete Document
+        /// </summary>
+        /// <returns>new status (Complete, In Progress, Invalid, Waiting ..)</returns>
+        /****************************************************************************************************/
+        public string CompleteIt()
+        {
+            log.Info(ToString());
+            StringBuilder Info = new StringBuilder();            
+            SetProcessed(true);
+
+            //User Validation
+            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+            if (valid != null)
+            {
+                if (Info.Length > 0)
+                    Info.Append(" - ");
+                Info.Append(valid);
+                _processMsg = Info.ToString();
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+            _processMsg = Info.ToString();            
+            SetDocAction(DOCACTION_Close);
+            return DocActionVariables.STATUS_COMPLETED;
+        }
+
+        /// <summary>
+        /// Void Document.
+        ///	Set Qtys to 0 - Sales: reverse all documents
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool VoidIt()
+        {
+            log.Info(ToString());
+            SetProcessed(true);
+            SetDocAction(DOCACTION_None);
+            return true;
+        }
+
+        /// <summary>
+        /// Close Document. Cancel not delivered Quantities
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool CloseIt()
+        {
+            log.Info(ToString());
+            SetProcessed(true);
+            SetDocAction(DOCACTION_None);
+            return true;
+        }
+
+        /// <summary>
+        /// Reverse Correction - same void
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool ReverseCorrectIt()
+        {
+            log.Info(ToString());
+            return VoidIt();
+        }
+
+        /// <summary>
+        /// Reverse Accrual - none
+        /// </summary>
+        /// <returns>false</returns>
+        public bool ReverseAccrualIt()
+        {
+            log.Info(ToString());
+            return false;
+        }
+
+        /// <summary>
+        /// Re-activate.
+        /// </summary>
+        /// <returns>true if success</returns>
+        public bool ReActivateIt()
+        {
+            log.Info(ToString());
+            SetDocAction(DOCACTION_Complete);
+            SetProcessed(false);
+            return true;
+        }
+
+        /// <summary>
+        /// Get Summary
+        /// </summary>
+        /// <returns>Summary of Document</returns>
+        public String GetSummary()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(GetDocumentNo());           
+            sb.Append(": ").
+                Append(Msg.Translate(GetCtx(), "Total Amount")).Append("=").Append(GetTotalAmt());            
+            //	 - Description
+            if (GetDescription() != null && GetDescription().Length > 0)
+                sb.Append(" - ").Append(GetDescription());
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Get Process Message
+        /// </summary>
+        /// <returns>clear text error message</returns>
+        public String GetProcessMsg()
+        {
+            return _processMsg;
+        }
+        /// <summary>
+        /// Get Document Owner (Responsible)
+        /// </summary>
+        /// <returns>AD_User_ID</returns>
+        public int GetDoc_User_ID()
+        {
+            return GetSalesRep_ID();
+        }
+
+        /// <summary>
+        /// Get Document Approval Amount
+        /// </summary>
+        /// <returns>amount</returns>
+        public Decimal GetApprovalAmt()
+        {
+            return GetTotalAmt();
+        }
+
+        /// <summary>
+        /// Get Document Info
+        /// </summary>
+        /// <returns>document Info (untranslated)</returns>
+        public String GetDocumentInfo()
+        {
+            MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
+            return dt.GetName() + " " + GetDocumentNo();
+        }
+
+        /// <summary>
+        /// Create PDF
+        /// </summary>
+        /// <returns>File or null</returns>
+        public FileInfo CreatePDF()
+        {
+            try
+            {
+                String fileName = Get_TableName() + Get_ID() + "_" + CommonFunctions.GenerateRandomNo() + ".pdf";
+                string filePath = Path.Combine(GlobalVariable.PhysicalPath, "TempDownload", fileName);
+
+
+                ReportEngine_N re = ReportEngine_N.Get(GetCtx(), ReportEngine_N.ORDER, GetC_Order_ID());
+                if (re == null)
+                    return null;
+
+                re.GetView();
+                bool b = re.CreatePDF(filePath);
+
+                FileInfo temp = new FileInfo(filePath);
+                if (!temp.Exists)
+                {
+                    b = re.CreatePDF(filePath);
+                    if (b)
+                    {
+                        return new FileInfo(filePath);
+                    }
+                    return null;
+                }
+                else
+                    return temp;
+            }
+            catch (Exception e)
+            {
+                log.Severe("Could not create PDF - " + e.Message);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public FileInfo CreatePDF(FileInfo file)
+        {
+            return null;
+        }
+
+        public Env.QueryParams GetLineOrgsQueryInfo()
+        {
+            return null;
+        }
+
+        public DateTime? GetDocumentDate()
+        {
+            return null;
+        }
+
+        public string GetDocBaseType()
+        {
+            return null;
+        }
+
+        public void SetProcessMsg(string processMsg)
+        {
+            _processMsg = processMsg;
         }
     }
 }
