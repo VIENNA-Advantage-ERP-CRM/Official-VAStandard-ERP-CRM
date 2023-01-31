@@ -1231,6 +1231,7 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
             BudgetControl budgetControl = null;
             String groupBy = " Account_ID, C_AcctSchema_ID ";
             String whereDimension = "";
+            bool isBudgetExist = false;
 
             String Where = " Account_ID = " + Util.GetValueOfInt(drDataRecord["Account_ID"])
                    + " AND C_AcctSchema_ID = " + Util.GetValueOfInt(drBUdgetControl["C_AcctSchema_ID"]);
@@ -1255,7 +1256,7 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
                 for (int i = 0; i < drBudgetComtrolDimension.Length; i++)
                 {
                     groupBy += ", " + Util.GetValueOfString(drBudgetComtrolDimension[i]["ElementName"]);
-                    whereDimension += " AND " + Util.GetValueOfString(drBudgetComtrolDimension[i]["ElementName"]) + "="
+                    whereDimension += " AND NVL(" + Util.GetValueOfString(drBudgetComtrolDimension[i]["ElementName"]) + ", 0)="
                                      + Util.GetValueOfInt(drDataRecord[Util.GetValueOfString(drBudgetComtrolDimension[i]["ElementName"])]);
                     //selectedDimension.Add(Util.GetValueOfString(drBudgetComtrolDimension[i]["ElementType"]));
                 }
@@ -1267,12 +1268,13 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
                                                (x.GL_BudgetControl_ID == Util.GetValueOfInt(drBUdgetControl["GL_BudgetControl_ID"])) &&
                                                (x.Account_ID == Util.GetValueOfInt(drDataRecord["Account_ID"]))))
             {
-                return _listBudgetControl;
+                isBudgetExist = true;
+                //return _listBudgetControl;
             }
 
             sql += groupBy + " FROM Fact_Acct WHERE GL_Budget_ID = " + Util.GetValueOfInt(drBUdgetControl["GL_Budget_ID"]) + " AND " + Where + " GROUP BY " + groupBy;
             DataSet dsBudgetControlAmount = DB.ExecuteDataset(sql, null, null);
-            if (dsBudgetControlAmount != null && dsBudgetControlAmount.Tables.Count > 0)
+            if (!isBudgetExist && dsBudgetControlAmount != null && dsBudgetControlAmount.Tables.Count > 0)
             {
                 for (int i = 0; i < dsBudgetControlAmount.Tables[0].Rows.Count; i++)
                 {
@@ -1303,6 +1305,9 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
                     budgetControl.UserElement8_ID = dsBudgetControlAmount.Tables[0].Columns.Contains("UserElement8_ID") ? Util.GetValueOfInt(dsBudgetControlAmount.Tables[0].Rows[i]["UserElement8_ID"]) : 0;
                     budgetControl.UserElement9_ID = dsBudgetControlAmount.Tables[0].Columns.Contains("UserElement9_ID") ? Util.GetValueOfInt(dsBudgetControlAmount.Tables[0].Rows[i]["UserElement9_ID"]) : 0;
                     budgetControl.ControlledAmount = dsBudgetControlAmount.Tables[0].Columns.Contains("ControlledAmount") ? Util.GetValueOfDecimal(dsBudgetControlAmount.Tables[0].Rows[i]["ControlledAmount"]) : 0;
+                    // VIS0060: Work done to get available Budget amount.
+                    budgetControl.AvailableBudget = dsBudgetControlAmount.Tables[0].Columns.Contains("ControlledAmount") ? Util.GetValueOfDecimal(dsBudgetControlAmount.Tables[0].Rows[i]["ControlledAmount"]) : 0;
+
                     // Control budget breach by percentage (if percentage defined get amount of percentage defined)
                     // implemented by rakesh kumar 18/Feb/2020
                     if (Util.GetValueOfDecimal(drBUdgetControl["BudgetBreachPercent"]) > 0)
@@ -1430,6 +1435,8 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
                                               (x.UserElement8_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement8) ? Util.GetValueOfInt(drDataRecord["UserElement8_ID"]) : 0)) &&
                                               (x.UserElement9_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement9) ? Util.GetValueOfInt(drDataRecord["UserElement9_ID"]) : 0))
                                              );
+
+                _budgetControl.AvailableBudget = Decimal.Subtract(_budgetControl.AvailableBudget, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : 0);
                 _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : Util.GetValueOfDecimal(drDataRecord["Debit"]));
             }
             return _listBudgetControl;
