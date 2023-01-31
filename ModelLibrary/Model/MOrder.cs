@@ -6781,6 +6781,7 @@ namespace VAdvantage.Model
         public int UserList2_ID { get; set; }
         public Decimal ControlledAmount { get; set; }
         public String WhereClause { get; set; }
+        public Decimal AvailableBudget { get; set; }
     }
 
 }
