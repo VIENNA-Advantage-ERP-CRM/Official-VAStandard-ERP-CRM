@@ -1951,7 +1951,8 @@ namespace VAdvantage.Model
                 {
                     quantity = Qty;
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, costingCheck.M_ASI_ID,
-                   "Physical Inventory", line, null, null, null, null, 0, quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                   "Physical Inventory", line, null, null, null, null, Util.GetValueOfDecimal(line.Get_Value("PriceCost")),
+                   quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                         {
@@ -2003,7 +2004,9 @@ namespace VAdvantage.Model
                 {
                     quantity = Qty;// Decimal.Negate(line.GetQtyInternalUse());
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, costingCheck.M_ASI_ID,
-                   "Internal Use Inventory", line, null, null, null, null, 0, quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                   "Internal Use Inventory", line, null, null, null, null,
+                   ((quantity < 0 && !IsReversal()) || (quantity > 0 && IsReversal())) ? Util.GetValueOfDecimal(line.Get_Value("PriceCost")): 0 ,
+                   quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                         {

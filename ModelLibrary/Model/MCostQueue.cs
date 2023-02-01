@@ -783,6 +783,7 @@ namespace VAdvantage.Model
                         Qty = receivedQty;
                         AD_Org_ID = AD_Org_ID2;
                         acctSchema = MAcctSchema.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]), trxName);
+                        costingCheck.precision = acctSchema.GetCostingPrecision();
                         if (product != null)
                         {
                             #region Costing Level
@@ -1024,7 +1025,7 @@ namespace VAdvantage.Model
                                 cmPrice = Price;
                                 if (Price == 0)
                                 {
-                                    Price = GetPrice(inout, inoutline, acctSchema.GetC_Currency_ID());
+                                    Price = GetPrice(inout, inoutline, acctSchema.GetC_Currency_ID(), costingCheck);
                                 }
                                 if (Price == 0)
                                 {
@@ -2696,12 +2697,20 @@ namespace VAdvantage.Model
                         if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory" || windowName == "Inventory Move" || windowName == "AssetDisposal")
                         {
                             #region Get Price
+                            int C_Currency_ID = 0;
+
                             //Get Price from MCost
                             if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                             {
                                 M_Warehouse_Id = costingCheck.M_Warehouse_ID != 0 ? costingCheck.M_Warehouse_ID : inventoryLine.GetParent().GetM_Warehouse_ID();
                                 costingCheck.movementDate = costingCheck.inventory != null ? costingCheck.inventory.GetMovementDate() : inventoryLine.GetParent().GetMovementDate();
                                 costingCheck.isReversal = costingCheck.isReversal != null ? costingCheck.isReversal : inventoryLine.GetParent().IsReversal();
+                                if (Price != 0)
+                                {
+                                    C_Currency_ID = Util.GetValueOfInt(ctx.GetContext("$C_Currency_ID"));
+                                    price = Price;
+                                    isPriceFromProductPrice = true;
+                                }
                             }
                             else if (windowName == "Inventory Move")
                             {
@@ -2720,12 +2729,15 @@ namespace VAdvantage.Model
                             }
 
                             // pick current cost price from product Costs 
-                            price = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
-                                        M_ASI_ID, trxName, M_Warehouse_Id);
+                            // when physical inventory anor Internal use inventory and price define on transaction then not to get price from product costs
+                            if (!(price != 0 && (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")))
+                            {
+                                price = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
+                                            M_ASI_ID, trxName, M_Warehouse_Id);
+                            }
                             cmPrice = price;
 
                             // Pick Price from Product price list when physical inventory
-                            int C_Currency_ID = 0;
                             if (price == 0 && windowName == "Physical Inventory")
                             {
                                 isPriceFromProductPrice = true;
@@ -2733,64 +2745,19 @@ namespace VAdvantage.Model
                                 query.Append(@"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
                                            FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
                                             inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inventoryLine.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + product.GetM_Product_ID() +
+                                           WHERE pl.AD_Org_ID IN (0, " + inventoryLine.GetAD_Org_ID() + @") AND pp.pricestd > 0 
+                                            AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' 
+                                            AND pp.m_product_id = " + product.GetM_Product_ID() +
                                           " AND NVL(pp.m_attributesetinstance_id, 0) = " + M_ASI_ID +
-                                          " AND pp.c_uom_id = " + product.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc");
+                                          " AND pp.c_uom_id = " + product.GetC_UOM_ID() + @" AND pl.issopricelist = 'N')
+                                            ORDER BY plv.m_pricelist_version_id DESC, pl.AD_Org_ID DESC, pl.m_pricelist_id DESC");
                                 DataSet dsStdPrice = DB.ExecuteDataset(query.ToString(), null, null);
                                 if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
                                 {
                                     price = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
                                     C_Currency_ID = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
                                 }
-                                else
-                                {
-                                    query.Clear();
-                                    query.Append(@"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + product.GetM_Product_ID() +
-                                           " AND NVL(pp.m_attributesetinstance_id, 0) = " + M_ASI_ID +
-                                           " AND pp.c_uom_id = " + product.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc");
-                                    dsStdPrice = DB.ExecuteDataset(query.ToString(), null, null);
-                                    if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                    {
-                                        price = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                        C_Currency_ID = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                    }
-                                }
-                                if (price == 0)
-                                {
-                                    query.Clear();
-                                    query.Append(@"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inventoryLine.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + product.GetM_Product_ID() +
-                                          " AND pp.c_uom_id = " + product.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc");
-                                    dsStdPrice = DB.ExecuteDataset(query.ToString(), null, null);
-                                    if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                    {
-                                        price = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                        C_Currency_ID = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                    }
-                                    else
-                                    {
-                                        query.Clear();
-                                        query.Append(@"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + product.GetM_Product_ID() +
-                                               " AND pp.c_uom_id = " + product.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc");
-                                        dsStdPrice = DB.ExecuteDataset(query.ToString(), null, null);
-                                        if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                        {
-                                            price = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                            C_Currency_ID = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                        }
-                                    }
-                                    dsStdPrice.Dispose();
-                                    if (price == 0)
-                                        price = 0;
-                                }
+                                dsStdPrice.Dispose();
                             }
 
                             Price = price * Qty;
@@ -3316,8 +3283,10 @@ namespace VAdvantage.Model
                                 query.Clear();
                                 query.Append(@"SELECT MIN(M_CostDetail_ID) FROM M_CostDetail WHERE NVL(M_CostElement_ID , 0) = 0 
                                                 AND IsActive = 'Y' AND C_AcctSchema_ID = " + acctSchema.GetC_AcctSchema_ID());
-                                if (windowName == "Invoice(Vendor)" || windowName == "Invoice(Customer)" || windowName == "Invoice(Vendor)-Return")
+                                if (windowName == "Invoice(Vendor)" || windowName == "Invoice(Customer)" ||
+                                    windowName == "Invoice(Vendor)-Return")
                                 {
+                                    costingCheck.IsCostImmediate = invoiceline.IsCostImmediate();
                                     // get cost detail object where cost element is null 
                                     query.Append("  AND NVL(M_CostElement_ID , 0) = 0 ");
                                     if (invoiceline.GetC_InvoiceLine_ID() > 0)
@@ -3350,6 +3319,7 @@ namespace VAdvantage.Model
                                 else if (windowName == "Material Receipt" || windowName == "Shipment" ||
                                          windowName == "Customer Return" || windowName == "Return To Vendor")
                                 {
+                                    costingCheck.IsCostImmediate = inoutline.IsCostImmediate();
                                     if (inoutline.GetM_InOutLine_ID() > 0)
                                     {
                                         query.Append(" AND M_InoutLine_ID = " + inoutline.GetM_InOutLine_ID());
@@ -3362,6 +3332,7 @@ namespace VAdvantage.Model
                                 }
                                 else if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                                 {
+                                    costingCheck.IsCostImmediate = inventoryLine.IsCostImmediate();
                                     query.Append(" AND M_InventoryLine_ID = " + inventoryLine.GetM_InventoryLine_ID());
                                 }
                                 else if (windowName == "AssetDisposal")
@@ -3374,10 +3345,12 @@ namespace VAdvantage.Model
                                 }
                                 else if (windowName == "Production Execution" || windowName.Equals("PE-FinishGood"))
                                 {
+                                    costingCheck.IsCostImmediate = Util.GetValueOfBool(po.Get_Value("IsCostImmediate"));
                                     query.Append(" AND VAMFG_M_WrkOdrTrnsctionLine_ID = " + Util.GetValueOfInt(po.Get_Value("VAMFG_M_WrkOdrTrnsctionLine_ID")));
                                 }
                                 else if (windowName == "Inventory Move")
                                 {
+                                    costingCheck.IsCostImmediate = movementline.IsCostImmediate();
                                     query.Append(" AND M_MovementLine_ID = " + movementline.GetM_MovementLine_ID() +
                                     @" AND AD_Org_ID = " + AD_Org_ID);
                                     if (costLevel == MProductCategory.COSTINGLEVEL_Warehouse || costLevel == MProductCategory.COSTINGLEVEL_WarehousePlusBatch)
@@ -3385,8 +3358,11 @@ namespace VAdvantage.Model
                                         query.Append(" AND M_Warehouse_ID = " + M_Warehouse_Id);
                                     }
                                 }
-                                int cdId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
-                                cd = new MCostDetail(ctx, cdId, trxName);
+                                if (costingCheck.IsCostImmediate)
+                                {
+                                    int cdId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
+                                    cd = new MCostDetail(ctx, cdId, trxName);
+                                }
                             }
 
                             if (cd == null || cd.GetM_CostDetail_ID() <= 0)
@@ -4170,6 +4146,16 @@ namespace VAdvantage.Model
                                 }
                                 #endregion
                             }
+
+                            else if (windowName.Equals("Invoice(Vendor)-Return") && invoiceline.GetM_InOutLine_ID() > 0 && invoiceline.GetC_OrderLine_ID() > 0)
+                            {
+                                // For APC, which linked with RMA and return --> Update difference price on Cost Queue
+                                if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetCostingPrecision()))
+                                {
+                                    _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
+                                    return false;
+                                }
+                            }
                         }
                         #endregion
 
@@ -4267,7 +4253,10 @@ namespace VAdvantage.Model
                                 {
                                     AD_Org_ID = 0;
                                 }
-                                if (AD_Org_ID != 0 && costingCheck.AD_Org_ID != costingCheck.AD_OrgTo_ID)
+                                if (AD_Org_ID != 0 && (costingCheck.AD_Org_ID != costingCheck.AD_OrgTo_ID ||
+                                    ((costingCheck.costinglevel.Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                                    costingCheck.costinglevel.Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch)) &&
+                                    costingCheck.M_Warehouse_ID != costingCheck.M_WarehouseTo_ID)))
                                 {
                                     result = cd.UpdateProductCost(windowName, cd, acctSchema, product, M_ASI_ID, AD_Org_ID, costingCheck, optionalStrCd: optionalstr); // for destination warehouse
                                     if (!result)
@@ -4308,8 +4297,9 @@ namespace VAdvantage.Model
                             {
                                 if ((windowName != "Invoice(Vendor)-Return" && invoiceline.GetC_OrderLine_ID() > 0) || (windowName == "Invoice(Vendor)-Return" && invoiceline.GetM_InOutLine_ID() > 0))
                                 {
-                                    // Reduce Cumulative Amount and Current Cost if provisional invoice not linked
-                                    if (invoiceline.Get_ValueAsInt("C_ProvisionalInvoiceLine_ID") <= 0)
+                                    // Reduce Cumulative Amount and Current Cost if provisional invoice not linked AND not for Invoice(Vendor)-Return linked with Return to Vendor
+                                    if (invoiceline.Get_ValueAsInt("C_ProvisionalInvoiceLine_ID") <= 0 &&
+                                       !(windowName == "Invoice(Vendor)-Return" && invoiceline.GetM_InOutLine_ID() > 0 && invoiceline.GetC_OrderLine_ID() > 0))
                                     {
                                         result = cd.UpdateProductCost("Match IV", cd, acctSchema, product, M_ASI_ID, invoiceline.GetAD_Org_ID(), costingCheck, optionalStrCd: optionalstr);
                                         if (!result)
@@ -6367,7 +6357,7 @@ namespace VAdvantage.Model
         /// <returns>amount</returns>
         public static Decimal GetPrice(MInOutLine inoutline, int CurrencyTo)
         {
-            return GetPrice(null, inoutline, CurrencyTo);
+            return GetPrice(null, inoutline, CurrencyTo, null);
         }
 
         /// <summary>
@@ -6377,7 +6367,7 @@ namespace VAdvantage.Model
         /// <param name="inoutline">InoutLine reference</param>
         /// <param name="CurrencyTo">converted currency</param>
         /// <returns>amount</returns>
-        public static Decimal GetPrice(MInOut inout, MInOutLine inoutline, int CurrencyTo)
+        public static Decimal GetPrice(MInOut inout, MInOutLine inoutline, int CurrencyTo, CostingCheck costingcheck)
         {
             decimal amount = 0;
             int c_currency_id = 0;
@@ -6398,9 +6388,11 @@ namespace VAdvantage.Model
                 if (bpartner.GetPO_PriceList_ID() > 0)
                 {
                     #region when price list available at Customer/Vendor
-                    sql = @"SELECT pricestd FROM m_productprice WHERE isactive = 'Y' AND m_product_id = " + inoutline.GetM_Product_ID() + " AND NVL(m_attributesetinstance_id, 0) = " + inoutline.GetM_AttributeSetInstance_ID() +
-                        " AND c_uom_id = " + inoutline.GetC_UOM_ID() + " AND m_pricelist_version_id =   (SELECT MAX(plv.m_pricelist_version_id)   FROM m_pricelist pl   INNER JOIN m_pricelist_version plv " +
-                                " ON pl.m_pricelist_id    = plv.m_pricelist_id   WHERE plv.IsActive = 'Y' AND  pl.m_pricelist_id = " + bpartner.GetPO_PriceList_ID() + ")";
+                    sql = @"SELECT pricestd FROM m_productprice WHERE isactive = 'Y' AND m_product_id = " + inoutline.GetM_Product_ID() +
+                        " AND NVL(m_attributesetinstance_id, 0) = " + (costingcheck != null ? costingcheck.M_ASI_ID : inoutline.GetM_AttributeSetInstance_ID()) +
+                        " AND c_uom_id = " + inoutline.GetC_UOM_ID() +
+                        " AND m_pricelist_version_id = (SELECT MAX(plv.m_pricelist_version_id) FROM m_pricelist pl   INNER JOIN m_pricelist_version plv " +
+                        " ON pl.m_pricelist_id = plv.m_pricelist_id   WHERE plv.IsActive = 'Y' AND  pl.m_pricelist_id = " + bpartner.GetPO_PriceList_ID() + ")";
                     dsStdPrice = DB.ExecuteDataset(sql, null, null);
                     if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
                     {
@@ -6409,63 +6401,19 @@ namespace VAdvantage.Model
                     if (amount == 0)
                     {
                         sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inoutline.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                            " AND NVL(pp.m_attributesetinstance_id, 0) = " + inoutline.GetM_AttributeSetInstance_ID() +
-                            " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc";
+                               FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
+                               inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
+                               WHERE pl.AD_Org_ID IN (0, " + inoutline.GetAD_Org_ID() + @") 
+                              AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' 
+                              AND pp.m_product_id = " + inoutline.GetM_Product_ID() +
+                            " AND NVL(pp.m_attributesetinstance_id, 0) = " + (costingcheck != null ? costingcheck.M_ASI_ID : inoutline.GetM_AttributeSetInstance_ID()) +
+                            " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') " +
+                            " ORDER BY plv.m_pricelist_version_id DESC, pl.AD_Org_ID DESC, pl.m_pricelist_id DESC";
                         dsStdPrice = DB.ExecuteDataset(sql, null, null);
                         if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
                         {
                             amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
                             c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                        }
-                        else
-                        {
-                            sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                                   " AND NVL(pp.m_attributesetinstance_id, 0) = " + inoutline.GetM_AttributeSetInstance_ID() +
-                                   " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc , pl.AD_Org_ID desc";
-                            dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                            if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                            {
-                                amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                            }
-                            else
-                            {
-                                sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inoutline.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                               " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc";
-                                dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                                if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                {
-                                    amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                    c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                }
-                                else
-                                {
-                                    sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                                           " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc , pl.AD_Org_ID desc";
-                                    dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                                    if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                    {
-                                        amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                        c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                    }
-                                    else
-                                    {
-                                        amount = 0;
-                                    }
-                                }
-                            }
                         }
                     }
                     #endregion
@@ -6476,9 +6424,11 @@ namespace VAdvantage.Model
                     sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
                                            FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
                                             inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inoutline.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                           " AND NVL(pp.m_attributesetinstance_id, 0) = " + inoutline.GetM_AttributeSetInstance_ID() +
-                           " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc";
+                                           WHERE pl.AD_Org_ID IN (0, " + inoutline.GetAD_Org_ID() + @") AND pp.pricestd > 0 AND pl.isactive = 'Y' 
+                             AND plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
+                           " AND NVL(pp.m_attributesetinstance_id, 0) = " + (costingcheck != null ? costingcheck.M_ASI_ID : inoutline.GetM_AttributeSetInstance_ID()) +
+                           " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + @" AND pl.issopricelist = 'N') 
+                             ORDER BY plv.m_pricelist_version_id DESC, pl.AD_Org_ID DESC, pl.m_pricelist_id DESC";
                     dsStdPrice = DB.ExecuteDataset(sql, null, null);
                     if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
                     {
@@ -6487,50 +6437,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                               " AND NVL(pp.m_attributesetinstance_id, 0) = " + inoutline.GetM_AttributeSetInstance_ID() +
-                               " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc , pl.AD_Org_ID desc";
-                        dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                        if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                        {
-                            amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                            c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                        }
-                        else
-                        {
-                            sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = " + inoutline.GetAD_Org_ID() + " AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                           " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc";
-                            dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                            if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                            {
-                                amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                            }
-                            else
-                            {
-                                sql = @"(SELECT pl.AD_Org_ID , pl.name , pl.m_pricelist_id  , plv.m_pricelist_version_id , pp.pricestd , pl.c_currency_id
-                                           FROM m_pricelist pl  INNER JOIN m_pricelist_version plv   ON pl.m_pricelist_id    = plv.m_pricelist_id
-                                            inner join m_productprice pp   on pp.m_pricelist_version_id = plv.m_pricelist_version_id
-                                           WHERE pl.AD_Org_ID = 0 AND pp.pricestd > 0 AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' and pp.m_product_id = " + inoutline.GetM_Product_ID() +
-                                       " AND pp.c_uom_id = " + inoutline.GetC_UOM_ID() + " AND pl.issopricelist = 'N') ORDER BY pl.m_pricelist_id asc , pl.AD_Org_ID desc";
-                                dsStdPrice = DB.ExecuteDataset(sql, null, null);
-                                if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
-                                {
-                                    amount = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
-                                    c_currency_id = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
-                                }
-                                else
-                                {
-                                    amount = 0;
-                                }
-                            }
-                        }
+                        amount = 0;
                     }
                     #endregion
                 }
@@ -6549,8 +6456,7 @@ namespace VAdvantage.Model
                 {
                     dsStdPrice.Dispose();
                 }
-                ValueNamePair pp = VLogger.RetrieveError();
-                _log.Info("Error occured during GetPrice Method. Error Value :  " + pp.GetValue() + " AND Error Name : " + pp.GetName() +
+                _log.Info("Error occured during GetPrice Method for GRN = " + inoutline.GetM_InOut_ID() +
                            " And Exception message : " + ex.Message.ToString());
             }
             finally
@@ -7454,7 +7360,8 @@ namespace VAdvantage.Model
         {
             String sql = "";
             backwardCompatabilitySupport = false;
-            sql = @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty, M_CostQueue.AD_Org_ID
+            sql = @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
+                            M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost, M_CostQueue.CurrentQty  
                             FROM M_CostQueue INNER JOIN M_CostQueueTransaction
                             ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
                             INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID
@@ -7516,8 +7423,17 @@ namespace VAdvantage.Model
                     // when qty on Queue Transaction is greaterthan or Equal to 
                     if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) >= Qty)
                     {
-                        DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentQty = CurrentQty + " + Qty +
-                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), null, cd.Get_Trx());
+                        sql = "UPDATE M_CostQueue SET ";
+                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
+                        {
+                            // Currenct Cost price on Cost Queue will be affected when return against RMA
+                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
+                                       Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) + Qty),
+                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                        }
+                        sql += " CurrentQty = CurrentQty + " + Qty +
+                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                        int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
 
                         // Create Cost Queue Transactional Record
                         if (!MCostQueueTransaction.CreateCostQueueTransaction(cd.GetCtx(), cd.GetAD_Client_ID(),
@@ -7531,8 +7447,19 @@ namespace VAdvantage.Model
                     // when qty on Queue Transaction is less than 
                     else if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) < Qty)
                     {
-                        DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentQty = CurrentQty + " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
-                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), null, cd.Get_Trx());
+                        sql = "UPDATE M_CostQueue SET ";
+                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
+                        {
+                            // Currenct Cost price on Cost Queue will be affected when return against RMA
+                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
+                                        ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"]))))
+                                        / (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
+                                        Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"])),
+                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                        }
+                        sql += " CurrentQty = CurrentQty + " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
+                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                        int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
                         Qty -= Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"]));
 
                         // Create Cost Queue Transactional Record
@@ -7571,7 +7498,7 @@ namespace VAdvantage.Model
             String sql = "";
             backwardCompatabilitySupport = false;
             String selectStatement = @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
-                            M_CostQueue.CurrentQty, M_CostQueue.AD_Org_ID ";
+                            M_CostQueue.CurrentQty, M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost ";
 
             sql = @" FROM M_CostQueue INNER JOIN M_CostQueueTransaction 
                             ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
@@ -7628,11 +7555,20 @@ namespace VAdvantage.Model
             {
                 for (int i = 0; i < dsCostQueue.Tables[0].Rows.Count; i++)
                 {
-                    // when qty on Queue Transaction is greaterthan or Equal to 
+                    // when qty on Queue Transaction is greater than or Equal to 
                     if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) >= Qty)
                     {
-                        int no = DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentQty = CurrentQty - " + Qty +
-                             @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), null, cd.Get_Trx());
+                        sql = "UPDATE M_CostQueue SET ";
+                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
+                        {
+                            // Currenct Cost price on Cost Queue will be affected when return against RMA
+                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
+                                       Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) - Qty),
+                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                        }
+                        sql += " CurrentQty = CurrentQty - " + Qty +
+                             @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                        int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
 
                         // Create Cost Queue Transactional Record
                         if (!MCostQueueTransaction.CreateCostQueueTransaction(cd.GetCtx(), cd.GetAD_Client_ID(),
@@ -7647,8 +7583,19 @@ namespace VAdvantage.Model
                     // when qty on Queue Transaction is less than 
                     else if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) < Qty)
                     {
-                        int no = DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentQty = CurrentQty - " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
-                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), null, cd.Get_Trx());
+                        sql = "UPDATE M_CostQueue SET ";
+                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
+                        {
+                            // Currenct Cost price on Cost Queue will be affected when return against RMA
+                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
+                                        ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))
+                                        / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) -
+                                            Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))),
+                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                        }
+                        sql += " CurrentQty = CurrentQty - " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
+                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                        int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
                         Qty -= Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"]));
 
                         // Create Cost Queue Transactional Record
@@ -7670,6 +7617,6 @@ namespace VAdvantage.Model
             }
             return true;
         }
-        //end
+
     }
 }

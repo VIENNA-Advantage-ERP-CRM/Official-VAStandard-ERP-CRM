@@ -58,6 +58,8 @@ namespace ModelLibrary.Classes
         public decimal? currentQtyonQueue = null;
         public bool? IsPOCostingethodBindedonProduct = null;
         public DataSet dsCostElement = null;
+        public bool IsCostImmediate = false;
+        public int precision = 2;
 
         /// <summary>
         /// Constructor
@@ -178,6 +180,7 @@ namespace ModelLibrary.Classes
             IsPOCostingethodBindedonProduct = null;
             IsCostCalculationfromProcess = false;
             currentQtyonQueue = null;
+            IsCostImmediate = false;
         }
 
     }

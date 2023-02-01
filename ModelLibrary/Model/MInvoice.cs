@@ -3959,7 +3959,7 @@ namespace VAdvantage.Model
                                             {
                                                 // for reverse record -- pick qty from M_MatchInvCostTrack 
                                                 decimal matchInvQty = 0;
-                                                if (GetDescription() != null && GetDescription().Contains("{->"))
+                                                if (GetReversalDoc_ID() > 0)
                                                 {
                                                     matchInvQty = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT SUM(QTY) FROM M_MatchInvCostTrack WHERE Rev_C_InvoiceLine_ID = " + line.GetC_InvoiceLine_ID(), null, Get_Trx()));
                                                 }
@@ -3968,10 +3968,11 @@ namespace VAdvantage.Model
                                                   "Invoice(Vendor)-Return", null, sLine, null, line, null,
                                                   count > 0 && isCostAdjustableOnLost &&
                                                   ((inv != null && inv.GetM_InOutLine_ID() > 0) ? inv.GetQty() : matchInvQty) <
-                                                  (GetDescription() != null && GetDescription().Contains("{->") ? Decimal.Negate(line.GetQtyInvoiced()) : line.GetQtyInvoiced())
+                                                  (GetReversalDoc_ID() > 0 ? Decimal.Negate(line.GetQtyInvoiced()) : line.GetQtyInvoiced())
                                                   ? Decimal.Negate(ProductLineCost)
-                                                  : Decimal.Negate(Decimal.Multiply(Decimal.Divide(ProductLineCost, line.GetQtyInvoiced()), (inv != null && inv.GetM_InOutLine_ID() > 0) ? inv.GetQty() : Decimal.Negate(matchInvQty))),
-                                                  GetDescription() != null && GetDescription().Contains("{->") ? (matchInvQty) : Decimal.Negate(inv.GetQty()),
+                                                  : Decimal.Negate(Decimal.Multiply(Decimal.Divide(ProductLineCost, line.GetQtyInvoiced()),
+                                                  (inv != null && inv.GetM_InOutLine_ID() > 0) ? inv.GetQty() : Decimal.Negate(matchInvQty))),
+                                                  GetReversalDoc_ID() > 0 ? (matchInvQty) : Decimal.Negate(inv.GetQty()),
                                                    Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                 {
                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
