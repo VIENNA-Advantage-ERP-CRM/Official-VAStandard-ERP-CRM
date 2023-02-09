@@ -1273,5 +1273,41 @@ namespace VIS.Controllers
             var value = obj.GetConversionWhere(columns, forInvoices, recordID, Table);
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get Requisiiton Lines data
+        /// </summary>
+        /// <param name="M_Requisition_ID">Requisition ID</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <returns>Requisition Lines Data</returns>
+        public JsonResult GetRequisitionLines(string M_Requisition_ID, int M_Product_ID)
+        {
+            List<ReqLineData> stValue = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                VCreateFromModel obj = new VCreateFromModel();
+                stValue = obj.GetReqLineData(ctx, M_Requisition_ID, M_Product_ID);
+            }
+            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Save RFQ Lines and RFQ Line Qty
+        /// </summary>
+        /// <param name="C_RFQ_ID">RFQ ID</param>
+        /// <param name="Data">Requisition Lines Data</param>
+        /// <returns>Message as String</returns>
+        public JsonResult SaveRfqLines(int C_RFQ_ID, List<ReqLineData> Data)
+        {
+            string result = "";
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                VCreateFromModel obj = new VCreateFromModel();
+                result = obj.CreateRfqLine(C_RFQ_ID, Data, ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }

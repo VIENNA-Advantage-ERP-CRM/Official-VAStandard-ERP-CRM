@@ -40,20 +40,20 @@ namespace VIS.Controllers
         /// <param name="chk"> for MultiCurrency Check </param>
         /// <returns></returns>
         [HttpPost]
-        public string SaveCashData(string cashData, string invoiceData, string currency, bool isCash, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
+        public string SaveCashData(string paymentData, string cashData, string invoiceData, string currency, bool isCash, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
             string appliedamt, string discount, string writeOff, string open, string DateAcct, int _CurrencyType_ID, bool isInterBPartner, string conversionDate, bool chk)
         {
 
-            //List<Dictionary<string, string>> pData = null;
+            List<Dictionary<string, string>> pData = null;
             List<Dictionary<string, string>> cData = null;
             List<Dictionary<string, string>> iData = null;
             Ctx ct = Session["ctx"] as Ctx;
             string msg = string.Empty;
             DateTime date = Convert.ToDateTime(DateTrx);
-            //if (paymentData != null)
-            //{
-            //    pData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(paymentData);
-            //}
+            if (paymentData != null)
+            {
+                pData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(paymentData);
+            }
             if (cashData != null)
             {
                 cData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(cashData);
@@ -65,7 +65,7 @@ namespace VIS.Controllers
 
 
             PaymentAllocation payments = new PaymentAllocation(ct);
-            msg = payments.SaveCashData(cData, iData, currency, isCash, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
+            msg = payments.SaveCashData(pData, cData, iData, currency, isCash, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
 
             return msg;
         }
@@ -91,11 +91,11 @@ namespace VIS.Controllers
         /// <param name="chk"> for MultiCurrency Check </param>
         /// <returns></returns>
         [HttpPost]
-        public string SavePaymentData(string paymentData, string invoiceData, string currency, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
+        public string SavePaymentData(string paymentData, string cashData, string invoiceData, string currency, bool isCash, int _C_BPartner_ID, int _windowNo, string payment, string DateTrx,
         string appliedamt, string discount, string writeOff, string open, string DateAcct, int _CurrencyType_ID, bool isInterBPartner, string conversionDate, bool chk)
         {
             List<Dictionary<string, string>> pData = null;
-            //List<Dictionary<string, string>> cData = null;
+            List<Dictionary<string, string>> cData = null;
             List<Dictionary<string, string>> iData = null;
             Ctx ct = Session["ctx"] as Ctx;
             string msg = string.Empty;
@@ -105,17 +105,17 @@ namespace VIS.Controllers
                 pData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(paymentData);
             }
             //not handling Cash grid in this Case
-            //if (cashData != null)
-            //{
-            //    cData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(cashData);
-            //}
+            if (cashData != null)
+            {
+                cData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(cashData);
+            }
             if (invoiceData != null)
             {
                 iData = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(invoiceData);
             }
 
             PaymentAllocation payments = new PaymentAllocation(ct);
-            msg = payments.SavePaymentData(pData, iData, currency, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
+            msg = payments.SavePaymentData(pData, cData, iData, currency, isCash, _C_BPartner_ID, _windowNo, payment, date, appliedamt, discount, writeOff, open, Convert.ToDateTime(DateAcct), _CurrencyType_ID, isInterBPartner, Convert.ToDateTime(conversionDate), chk);
 
             return msg;
         }

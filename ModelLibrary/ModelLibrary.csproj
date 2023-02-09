@@ -49,6 +49,9 @@
     <Reference Include="CoreLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
     </Reference>
+    <Reference Include="FRPTSvc">
+      <HintPath>..\ViennaAdvantageWeb\Dll\FRPTSvc.dll</HintPath>
+    </Reference>
     <Reference Include="IKVM.OpenJDK.ClassLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\IKVM.OpenJDK.ClassLibrary.dll</HintPath>
     </Reference>
@@ -537,6 +540,7 @@
     <Compile Include="Model\Storage.cs" />
     <Compile Include="Model\Tax.cs" />
     <Compile Include="Model\UserPricingVO.cs" />
+    <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\DocumentEngine.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />

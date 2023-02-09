@@ -429,63 +429,75 @@ namespace VAdvantage.Model
                 SetRef_BPartner_ID(_bp.GetC_BPartner_ID());
             }
 
-            String error = CreateBPContact();
+            string error = CreateBPContact();
             if (error != null && error.Length > 0)
                 return error;
             CreateBPLocation();
-
-            IDataReader dr = null;
+            
             try
             {
                 int id = _bp.GetC_BPartner_ID();
-                string qry = "Update c_bpartner set Description='' where c_bpartner_id=" + id;
-                int check = DB.ExecuteQuery(qry, null, Get_TrxName());
-                string val = _bp.GetValue();
-                qry = "Update c_bpartner set Value='" + val + GetBPName() + "' where c_bpartner_id=" + id;
-                check = DB.ExecuteQuery(qry, null, Get_TrxName());
+                string qry = "UPDATE C_BPartner SET Description='', Value='" + _bp.GetValue() + GetBPName() + "' WHERE C_BPartner_ID=" + id;
+                int check = DB.ExecuteQuery(qry, null, Get_TrxName());                
 
                 if (GetR_InterestArea_ID() != 0)
                 {
-                    string sql = "Select R_InterestArea_ID from vss_lead_interestarea where C_Lead_ID=" + GetC_Lead_ID();
-                    dr = DB.ExecuteReader(sql, null, Get_TrxName());
-                    while (dr.Read())
+                    StringBuilder sql = new StringBuilder("SELECT R_InterestArea_ID FROM vss_lead_interestarea WHERE C_Lead_ID=" + GetC_Lead_ID());
+                    DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_TrxName());
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {
-                        X_R_ContactInterest Prospect = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
-                        Prospect.SetR_InterestArea_ID(Util.GetValueOfInt(dr[0]));
-                        Prospect.SetC_BPartner_ID(GetRef_BPartner_ID());
-                        String query = "Select ad_user_id from ad_user where c_bpartner_id= " + GetRef_BPartner_ID();
-                        int UserId = Util.GetValueOfInt(DB.ExecuteScalar(query, null, Get_TrxName()));
-                        Prospect.SetAD_User_ID(UserId);
-                        query = "Select C_BPartner_Location_id from C_BPartner_Location where c_bpartner_id= " + GetRef_BPartner_ID();
+                        int UserId = 0, jobID = 0, locID = 0;
+                        string mail = "", phone = "", fax = "";
 
-                        int Id = Util.GetValueOfInt(DB.ExecuteScalar(query, null, Get_TrxName()));
-                        X_C_BPartner_Location loc = new X_C_BPartner_Location(GetCtx(), Id, Get_TrxName());
-                        Prospect.SetC_BPartner_Location_ID(Id);
-                        Prospect.SetPhone(loc.GetPhone());
-                        Prospect.SetFax(loc.GetFax());
-
-                        X_AD_User us = new X_AD_User(GetCtx(), UserId, Get_TrxName());
-                        Prospect.SetC_Job_ID(us.GetC_Job_ID());
-                        Prospect.SetSubscribeDate(DateTime.Today);
-                        query = "Select Email from ad_user where ad_user_id= " + UserId;
-                        String mail = Util.GetValueOfString(DB.ExecuteScalar(query, null, Get_TrxName()));
-                        Prospect.SetEMail(mail);
-                        if (Prospect.Save())
+                        sql.Clear();
+                        sql.Append("SELECT AD_User_ID, C_Job_ID, Email FROM AD_User WHERE C_BPartner_ID = " + GetRef_BPartner_ID());
+                        DataSet ds1 = DB.ExecuteDataset(sql.ToString(), null, Get_TrxName());
+                        if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
                         {
+                            UserId = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["AD_User_ID"]);
+                            jobID = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_Job_ID"]);
+                            mail = Util.GetValueOfString(ds1.Tables[0].Rows[0]["Email"]);
+                        }
 
+                        sql.Clear();
+                        sql.Append("SELECT C_BPartner_Location_ID, Phone, Fax FROM C_BPartner_Location WHERE C_BPartner_ID = " + GetRef_BPartner_ID());
+                        ds1 = DB.ExecuteDataset(sql.ToString(), null, Get_TrxName());
+                        if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+                        {
+                            locID = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
+                            phone = Util.GetValueOfString(ds1.Tables[0].Rows[0]["Phone"]);
+                            fax = Util.GetValueOfString(ds1.Tables[0].Rows[0]["Fax"]);
+                        }                        
+                        
+                        foreach (DataRow dr in ds.Tables[0].Rows)
+                        {
+                            X_R_ContactInterest Prospect = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
+                            Prospect.SetR_InterestArea_ID(Util.GetValueOfInt(dr[0]));
+                            Prospect.SetC_BPartner_ID(GetRef_BPartner_ID());                            
+                            Prospect.SetC_BPartner_Location_ID(locID);
+                            Prospect.SetPhone(phone);
+                            Prospect.SetFax(fax);
+                            Prospect.SetAD_User_ID(UserId);                            
+                            Prospect.SetC_Job_ID(jobID);
+                            Prospect.SetSubscribeDate(DateTime.Today);                            
+                            Prospect.SetEMail(mail);
+                            if (Prospect.Save())
+                            {
+
+                            }
                         }
                     }
-                    dr.Close();
+                    //dr.Close();
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 log.Log(Level.SEVERE, "MLead" + ex.Message, ex);
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr = null;
-                }
+                //if (dr != null)
+                //{
+                //    dr.Close();
+                //    dr = null;
+                //}
             }
 
             return null;

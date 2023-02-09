@@ -51,8 +51,9 @@ namespace VAdvantage.Process
                         reqline.M_AttributeSetInstance_ID,
                         reqline.Description,
                         reqline.C_Uom_ID,
-                        (reqline.Qty - reqline.DTD001_DeliveredQty) as Qty ,
-                        req.DateRequired
+                        (reqline.Qty - reqline.DTD001_DeliveredQty) as Qty,
+                        reqline.PriceActual,
+                        req.DateRequired                        
                         FROM M_RequisitionLine ReqLine
                         INNER JOIN M_requisition req
                         ON (reqline.M_requisition_ID  =req.M_requisition_ID)
@@ -338,6 +339,7 @@ namespace VAdvantage.Process
                     MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
                     RfQLineQty.SetC_UOM_ID(Util.GetValueOfInt(_ds.Tables[0].Rows[i]["C_UOM_ID"]));
                     RfQLineQty.SetQty(Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["Qty"]));
+                    RfQLineQty.SetBenchmarkPrice(Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["PriceActual"]));
                     RfQLineQty.SetIsPurchaseQty(true);
                     RfQLineQty.SetIsRfQQty(true);
                     if (!RfQLineQty.Save())

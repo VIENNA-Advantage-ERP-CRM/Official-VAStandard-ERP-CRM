@@ -71,7 +71,7 @@ namespace VAdvantage.Model
             if (m_recipients != null && !reload)
                 return m_recipients;
             String sql = "SELECT * FROM AD_AlertRecipient "
-                + "WHERE AD_Alert_ID=" + GetAD_Alert_ID();
+                + "WHERE IsActive='Y' AND AD_Alert_ID=" + GetAD_Alert_ID();
             List<MAlertRecipient> list = new List<MAlertRecipient>();
             try
             {

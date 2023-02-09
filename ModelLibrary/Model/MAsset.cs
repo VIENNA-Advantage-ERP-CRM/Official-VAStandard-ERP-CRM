@@ -785,6 +785,13 @@ namespace VAdvantage.Model
         {
             GetQty();		//	set to 1
             string name = "";
+
+            if (GetM_Product_ID() == 0 && Util.GetValueOfInt(Get_Value("C_Charge_ID")) == 0) //VIS0336:check placed to restrict select one from product and charge
+            {
+                log.SaveError("VIS_NOProductOrCharge", "");
+                return false;
+            }
+
             // VIS0060: Get Current next from Serial no Control of Equipment Category selected on Asset.
             if (newRecord && Env.IsModuleInstalled("VA075_") && Get_ColumnIndex("VA075_EquipmentCategory_ID") >= 0
                 && Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) > 0)

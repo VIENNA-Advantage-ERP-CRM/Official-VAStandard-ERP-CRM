@@ -488,17 +488,18 @@
     AcctViewerData.prototype.getButtonText = function (tableName, columnName, selectSQL) {
 
         var language = VIS.Env.getAD_Language(VIS.Env.getCtx());
-        var lookupDirEmbed = VIS.MLookupFactory.getLookup_TableDirEmbed(language, columnName, "avd", columnName);
         var retValue = "<" + selectSQL + ">";
         $.ajax({
             url: VIS.Application.contextUrl + "AcctViewerData/AcctViewerGetButtonText",
             type: 'POST',
             async: false,
             data: {
-                lookupDirEmbeded: lookupDirEmbed,
+                lookupDirEmbeded: null,
                 tName: tableName,
                 wheres: " avd WHERE avd.",
-                selectSQLs: selectSQL
+                selectSQLs: selectSQL,
+                language: language,
+                ColumnName: columnName
             },
             success: function (data) {
                 var res = data.result;
@@ -817,7 +818,7 @@
         var rightSideDivWidth = $(window).width() / 2;
         var selectDivHeight = $(window).height() - 200;
         var _data = null;
-        //var _data = _data = new AcctViewerData(windowNo, AD_Client_ID, AD_Table_ID);;
+        //_data = new AcctViewerData(windowNo, AD_Client_ID, AD_Table_ID);;
 
 
         function jbInit() {
@@ -1050,6 +1051,8 @@
         function cleardata(button) {
             var keyColumn = button.attr('name');
             button.find('span').text(" ");
+            //used to clear controls based on id attribute
+            $('#txt' + button.attr('id').substring(3)).val("");
             if (_data.whereInfo.length > 0) {
                 var index = _data.whereInfo.map(function (item) { return item.Key == keyColumn; }).indexOf(true);
                 _data.whereInfo.splice(index, 1);
@@ -1464,7 +1467,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtAccount_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblAcc.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1486,7 +1489,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtOrgUnit_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblOrgUnit.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1508,7 +1511,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProduct_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProduct.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1531,7 +1534,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtBPartner_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblBP.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1553,7 +1556,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProject_' + windowNo +'" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProject.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -2178,7 +2181,22 @@
                     _data.whereInfo.push({ 'Key': keyColumn, 'Value': keyColumn + "=" + key });
 
                 }
-
+                //VIS323 DevOpsID:1901 bind selected data on input controls
+                if (button.attr('id') == "btnAccount_" + windowNo) {
+                    $('#txtAccount_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnOrgUnit_" + windowNo) {
+                    $('#txtOrgUnit_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnProduct_" + windowNo) {
+                    $('#txtProduct_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnBPartner_" + windowNo) {
+                    $('#txtBPartner_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
+                if (button.attr('id') == "btnProject_" + windowNo) {
+                    $('#txtProject_' + windowNo).val(_data.getButtonText(tableName, lookupColumn, selectSQL));
+                }
                 //  Display Selection and resize
                 button.find('span').text(_data.getButtonText(tableName, lookupColumn, selectSQL));
 

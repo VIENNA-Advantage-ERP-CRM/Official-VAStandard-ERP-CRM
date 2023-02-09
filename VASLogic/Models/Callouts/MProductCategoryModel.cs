@@ -63,6 +63,12 @@ namespace VIS.Models
             {
                 retDic["DTD001_IsConsumable"] = Util.GetValueOfString(pc.Get_Value("DTD001_IsConsumable"));
             }
+            //VIS345 : 
+            if (pc.Get_ColumnIndex("VA075_EquipmentCategory_ID") >= 0)
+            {
+                retDic["VA075_EquipmentCategory_ID"] = Util.GetValueOfString(pc.Get_Value("VA075_EquipmentCategory_ID"));
+            }
+
             return retDic;
         }
     }
