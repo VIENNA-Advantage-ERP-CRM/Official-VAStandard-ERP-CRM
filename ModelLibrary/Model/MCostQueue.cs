@@ -1018,9 +1018,16 @@ namespace VAdvantage.Model
                                 //28-4-2016
                                 //get price from product costs based on costing method if not found 
                                 //then check price list based on trx org or (*) org 
-                                //price = MCostQueue.CalculateCost(ctx, acctSchema, product, M_ASI_ID, AD_Client_ID, AD_Org_ID, M_Warehouse_Id);
-                                price = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
-                                        M_ASI_ID, trxName, M_Warehouse_Id);
+                                if (windowName == "Return To Vendor")
+                                {
+                                    price = MCost.GetproductCostAndQtyMaterialonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
+                                           M_ASI_ID, trxName, M_Warehouse_Id, false);
+                                }
+                                else
+                                {
+                                    price = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
+                                            M_ASI_ID, trxName, M_Warehouse_Id);
+                                }
                                 Price = price * inoutline.GetMovementQty();
                                 cmPrice = Price;
                                 if (Price == 0)
@@ -2047,7 +2054,7 @@ namespace VAdvantage.Model
 
                             // Update Cost Queue Price
                             if (!UpdateCostQueuePrice(0, MRPriceAvPo, Qty, Price, inoutline.GetM_InOutLine_ID(),
-                                acctSchema.GetCostingPrecision()))
+                                acctSchema.GetCostingPrecision(), trxName))
                             {
                                 _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
                                 return false;
@@ -2749,13 +2756,25 @@ namespace VAdvantage.Model
                                             AND pl.isactive = 'Y' and plv.isactive = 'Y' and pp.isactive = 'Y' 
                                             AND pp.m_product_id = " + product.GetM_Product_ID() +
                                           " AND NVL(pp.m_attributesetinstance_id, 0) = " + M_ASI_ID +
-                                          " AND pp.c_uom_id = " + product.GetC_UOM_ID() + @" AND pl.issopricelist = 'N')
+                                          " AND pp.c_uom_id = " + inventoryLine.Get_ValueAsInt("C_UOM_ID") + @" AND pl.issopricelist = 'N')
                                             ORDER BY plv.m_pricelist_version_id DESC, pl.AD_Org_ID DESC, pl.m_pricelist_id DESC");
                                 DataSet dsStdPrice = DB.ExecuteDataset(query.ToString(), null, null);
                                 if (dsStdPrice != null && dsStdPrice.Tables.Count > 0 && dsStdPrice.Tables[0].Rows.Count > 0)
                                 {
                                     price = Util.GetValueOfDecimal(dsStdPrice.Tables[0].Rows[0]["pricestd"]);
                                     C_Currency_ID = Util.GetValueOfInt(dsStdPrice.Tables[0].Rows[0]["c_currency_id"]);
+                                    if (product.GetC_UOM_ID() != inventoryLine.Get_ValueAsInt("C_UOM_ID"))
+                                    {
+                                        decimal? rate = MUOMConversion.GetProductRateTo(ctx, product.GetM_Product_ID(), inventoryLine.Get_ValueAsInt("C_UOM_ID"));
+                                        if (rate == null)
+                                        {
+                                            price = 0;
+                                        }
+                                        else
+                                        {
+                                            price = price * rate.Value;
+                                        }
+                                    }
                                 }
                                 dsStdPrice.Dispose();
                             }
@@ -4147,10 +4166,10 @@ namespace VAdvantage.Model
                                 #endregion
                             }
 
-                            else if (windowName.Equals("Invoice(Vendor)-Return") && invoiceline.GetM_InOutLine_ID() > 0 && invoiceline.GetC_OrderLine_ID() > 0)
+                            else if (windowName.Equals("Invoice(Vendor)-Return") && invoiceline.GetM_InOutLine_ID() > 0)
                             {
                                 // For APC, which linked with RMA and return --> Update difference price on Cost Queue
-                                if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetCostingPrecision()))
+                                if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetCostingPrecision(), trxName))
                                 {
                                     _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
                                     return false;
@@ -6335,13 +6354,13 @@ namespace VAdvantage.Model
         /// <param name="InOutLine_ID">GRN Lline</param>
         /// <param name="precision">Precision</param>
         /// <returns>true, when updated</returns>
-        public static bool UpdateCostQueuePrice(int CostQueue_ID, Decimal oldPrice, Decimal qty, Decimal newPrice, int InOutLine_ID, int precision)
+        public static bool UpdateCostQueuePrice(int CostQueue_ID, Decimal oldPrice, Decimal qty, Decimal newPrice, int InOutLine_ID, int precision, Trx trxName)
         {
             Decimal price = Decimal.Subtract(Decimal.Multiply(newPrice, qty), Decimal.Multiply(oldPrice, qty));
             int no = DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentCostPrice =ROUND(((CurrentCostPrice * CurrentQty) + " + price +
                             @")/ (CASE WHEN CurrentQty = 0 THEN 1 ELSE CurrentQty END) ," + precision + @" )
                             WHERE M_CostQueue_ID IN (SELECT M_CostQueue_ID FROM M_CostQueueTransaction WHERE M_InOutLine_ID
-                            = " + InOutLine_ID + ")");
+                            = " + InOutLine_ID + ")", null, trxName);
             if (no < 0)
             {
                 return false;
@@ -7559,7 +7578,8 @@ namespace VAdvantage.Model
                     if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) >= Qty)
                     {
                         sql = "UPDATE M_CostQueue SET ";
-                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
+                        if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0
+                            && Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) - Qty != 0)
                         {
                             // Currenct Cost price on Cost Queue will be affected when return against RMA
                             sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -

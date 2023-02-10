@@ -325,16 +325,18 @@ namespace VAdvantage.Model
             // 25-Jan-2023 --> Get product cost when recird save with -ve qty
             if (IsInternalUse() && Get_ColumnIndex("ReversalDoc_ID") > 0 && GetReversalDoc_ID() == 0 && GetQtyInternalUse() < 0)
             {
-                if (Util.GetValueOfDecimal(Get_Value("PriceCost")) != 0)
-                {
-                    Set_Value("PriceCost", MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(), GetM_Product_ID(),
-                         GetM_AttributeSetInstance_ID(), Get_Trx(), inventory.GetM_Warehouse_ID()));
-                }
-                if (Util.GetValueOfDecimal(Get_Value("PriceCost")) == 0)
-                {
-                    log.SaveError("VIS_PriceMandatoryQtyIn","");
-                    return false;
-                }
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_CantbeNegative"));
+                return false;
+                //if (Util.GetValueOfDecimal(Get_Value("PriceCost")) != 0)
+                //{
+                //    Set_Value("PriceCost", MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(), GetM_Product_ID(),
+                //         GetM_AttributeSetInstance_ID(), Get_Trx(), inventory.GetM_Warehouse_ID()));
+                //}
+                //if (Util.GetValueOfDecimal(Get_Value("PriceCost")) == 0)
+                //{
+                //    log.SaveError("VIS_PriceMandatoryQtyIn","");
+                //    return false;
+                //}
             }
 
             //	Set Line No

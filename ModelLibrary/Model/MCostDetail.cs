@@ -1229,17 +1229,24 @@ namespace VAdvantage.Model
                         if (windowName == "Invoice(APC)")
                         {
                             Decimal adjustedAmt = 0;
-                            if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate())
+                            if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate() &&
+                                Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")) == 0)
                             {
                                 // we have to reduce price
                                 if (amt < 0 && price > 0)
                                 {
                                     price = decimal.Negate(price);
                                 }
+                                else
+                                {
+                                    // when price -ve means increase cost
+                                    price = Math.Abs(price);
+                                }
 
                                 //DevOps Task-1851
                                 List<MCostElement> lstCostElement = new List<MCostElement>();
-                                if (!costingCheck.IsCostCalculationfromProcess)
+                                if (!costingCheck.IsCostCalculationfromProcess ||
+                                    Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")) == 0)
                                 {
                                     lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Lifo_ID));
                                     lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Fifo_ID));
@@ -1283,6 +1290,10 @@ namespace VAdvantage.Model
                                             if (costingCheck.MMPolicy.Equals(lstCostElement[cel].GetCostingMethod()))
                                             {
                                                 costingCheck.currentQtyonQueue = cQueue[cq].GetCurrentQty();
+                                            }
+                                            if (adjustedAmt != 0)
+                                            {
+                                                costingCheck.invoiceline.Set_Value("TotalInventoryAdjustment", adjustedAmt);
                                             }
 
                                             // Create Cost Queue Transactional Record
@@ -1845,17 +1856,18 @@ namespace VAdvantage.Model
                     //VIS_0045: 28-June-2022 -> amount will be the cost detail amount included surcharge
                     amt = amt;
                 }
-                else if (!windowName.Equals("PE-FinishGood") && cost.GetCurrentCostPrice() != 0)
+                else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("Physical Inventory"))
                 {
-                    amt = cost.GetCurrentCostPrice() * qty;
-                }
-                if (windowName.Equals("Internal Use Inventory") || windowName.Equals("Physical Inventory"))
-                {
-                    if (Util.GetValueOfDecimal(costingCheck.inventoryLine.Get_Value("PriceCost")) == 0)
+                    if (Util.GetValueOfDecimal(costingCheck.inventoryLine.Get_Value("PriceCost")) == 0 && cost.GetCurrentCostPrice() != 0)
                     {
                         amt = cost.GetCurrentCostPrice() * qty;
                     }
                 }
+                else if (!windowName.Equals("PE-FinishGood") && cost.GetCurrentCostPrice() != 0)
+                {
+                    amt = cost.GetCurrentCostPrice() * qty;
+                }
+                
 
                 //
                 if (ce.IsAverageInvoice())
@@ -2160,7 +2172,8 @@ namespace VAdvantage.Model
 
                         // Amount will be affected from "Return to vendor" and "Invoice(Vendor)-Return" (diiference amount between PO and APC)
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
-                        if (Env.Signum(cost.GetCurrentQty()) != 0)
+                        if ((windowName.Equals("Invoice(Vendor)-Return") && Env.Signum(cost.GetCurrentQty()) != 0) || 
+                            (windowName.Equals("Return To Vendor") && Decimal.Add(cost.GetCurrentQty() , qty) != 0))
                         {
                             cost.SetCurrentCostPrice(Decimal.Round(
                                 Decimal.Divide(
@@ -3026,16 +3039,19 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Return To Vendor") || windowName.Equals("Invoice(Vendor)-Return"))
                     {
-                        // when we reverse Invoice which is against Return To Vendor then we have to increase ( Accumulation Qty & Accumulation Amt)
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (windowName.Equals("Return To Vendor"))
                         {
-                            costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
-                            return false;
-                        }
-                        if (Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
-                        {
-                            costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
-                            return false;
+                            // when we reverse Invoice which is against Return To Vendor then we have to increase ( Accumulation Qty & Accumulation Amt)
+                            if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                            {
+                                costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
+                                return false;
+                            }
+                            if (Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
+                            {
+                                costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
+                                return false;
+                            }
                         }
 
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
@@ -4480,7 +4496,7 @@ namespace VAdvantage.Model
                     if ((cd.GetQty() < 0 ||
                         windowName.Equals("Internal Use Inventory") ||
                         windowName.Equals("AssetDisposal") ||
-                        windowName.Equals("Physical Inventory") ||
+                       // windowName.Equals("Physical Inventory") ||
                         windowName.Equals("Return To Vendor") ||
                         windowName.Equals("Shipment") ||
                         windowName.Equals("Production Execution") ||
@@ -4490,6 +4506,7 @@ namespace VAdvantage.Model
                         && !(windowName.Equals("Material Receipt") ||
                              windowName.Equals("Customer Return") ||
                              windowName.Equals("PE-FinishGood") ||
+                             windowName.Equals("Physical Inventory") || 
                              windowName.Equals("Invoice(Vendor)") ||
                              (windowName.Equals("Inventory Move") && ((cd.GetQty() > 0 && !isReversed) || (cd.GetQty() < 0 && isReversed)))
                              ))

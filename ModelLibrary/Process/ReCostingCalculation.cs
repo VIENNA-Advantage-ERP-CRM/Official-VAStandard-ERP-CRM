@@ -2459,6 +2459,11 @@ namespace VAdvantage.Process
                                                          ( SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 }
 
+                // Update Transaction
+                DB.ExecuteQuery($@" UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null 
+                                    WHERE M_Product_ID IN (SELECT DISTINCT M_Product_ID FROM M_Product 
+                                    WHERE M_Product_Category_ID IN ({ productCategoryID } ) )", null, Get_Trx());
+
                 // Delete Query 
                 DB.ExecuteQuery(@"delete from m_cost where m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
@@ -2572,6 +2577,10 @@ namespace VAdvantage.Process
                                                         WHERE  M_Product_ID IN  (" + productID + " )", null, Get_Trx());
                 }
 
+                // Update Transaction
+                DB.ExecuteQuery($@" UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null 
+                                    WHERE M_Product_ID IN ({ productID } )", null, Get_Trx());
+
                 // Delete Query 
                 DB.ExecuteQuery(@"delete from m_cost where m_product_id IN  (" + productID + " )", null, Get_Trx());
                 DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN  (" + productID + " ) ", null, Get_Trx());
@@ -2632,6 +2641,10 @@ namespace VAdvantage.Process
                     DB.ExecuteQuery(@"UPDATE VAMFG_M_WrkOdrTrnsctionLine SET  iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N', CurrentCostPrice = 0 WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
                     DB.ExecuteQuery(@"UPDATE VAMFG_M_WrkOdrTransaction  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' , CurrentCostPrice = 0 WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
                 }
+
+                // Update Transaction
+                DB.ExecuteQuery($@" UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null 
+                                    WHERE AD_client_ID = ({ GetAD_Client_ID() } )", null, Get_Trx());
 
                 // Delete Query 
                 DB.ExecuteQuery(@"delete from m_cost WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
@@ -4298,7 +4311,7 @@ namespace VAdvantage.Process
             inventory = new MInventory(GetCtx(), M_Inventory_ID, Get_Trx());
             sql.Clear();
             sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
-                              FROM M_InventoryLine il INNER JOIN M_InventoryLineMA ilma (il.M_InventoryLine_ID = ilma.M_InventoryLine_ID) 
+                              FROM M_InventoryLine il INNER JOIN M_InventoryLineMA ilma ON (il.M_InventoryLine_ID = ilma.M_InventoryLine_ID) 
                             WHERE il.IsActive = 'Y' AND il.M_Inventory_ID = " + inventory.GetM_Inventory_ID());
             if (inventory.IsReversal())
             {
@@ -4445,7 +4458,15 @@ namespace VAdvantage.Process
                         {
                             #region for Physical Inventory
 
-                            quantity = Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]);
+                            if (Decimal.Subtract(inventoryLine.GetQtyCount(), inventoryLine.GetQtyBook()) > 0)
+                            {
+                                quantity = Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]);
+                            }
+                            else
+                            {
+                                quantity = Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]));
+                            }
+
 
                             #region get price from m_cost (Current Cost Price)
                             if (!client.IsCostImmediate() || inventoryLine.GetCurrentCostPrice() == 0)
@@ -4674,7 +4695,7 @@ namespace VAdvantage.Process
             sql.Clear();
             sql.Append(@"SELECT il.* , ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA , ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA,  
                             M_TransactionTo_ID 
-                            FROM M_MovementLine il INNER JOIN M_MovementLineMA ilma ON (il.M_InoutLine_ID = ilma.M_InoutLine_ID) 
+                            FROM M_MovementLine il INNER JOIN M_MovementLineMA ilma ON (il.M_MovementLine_ID = ilma.M_MovementLine_ID) 
                          WHERE il.IsActive = 'Y' AND il.M_Movement_ID = " + movement.GetM_Movement_ID());
             if (movement.IsReversal())
             {
@@ -4746,7 +4767,7 @@ namespace VAdvantage.Process
                     {
                         costingCheck.AD_Org_ID = movementLine.GetAD_Org_ID();
                         costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
-                        costingCheck.M_Warehouse_ID = movement.GetM_Warehouse_ID();
+                        costingCheck.M_Warehouse_ID = movement.GetDTD001_MWarehouseSource_ID();
                         costingCheck.M_Transaction_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"]);
                         costingCheck.AD_OrgTo_ID = locatorTo.GetAD_Org_ID();
                         costingCheck.M_WarehouseTo_ID = locatorTo.GetM_Warehouse_ID();
@@ -4828,7 +4849,7 @@ namespace VAdvantage.Process
                                 {
                                     query.Append(" ProductApproxCost = " + currentCostPrice);
                                 }
-                                if (queryTo.ToString().Contains("ProductApproxCost"))
+                                if (!queryTo.ToString().Contains("ProductApproxCost"))
                                 {
                                     queryTo.Append(" ProductApproxCost = " + toCurrentCostPrice);
                                 }
@@ -4839,7 +4860,7 @@ namespace VAdvantage.Process
                                 query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                 queryTo.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                 query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
-                                query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_TransactionTo_ID);
+                                queryTo.Append(" WHERE M_Transaction_ID = " + costingCheck.M_TransactionTo_ID);
                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 DB.ExecuteQuery(queryTo.ToString(), null, Get_Trx());
 
