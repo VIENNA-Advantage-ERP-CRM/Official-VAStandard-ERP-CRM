@@ -65,7 +65,7 @@ namespace VAdvantage.Model
                 sql = @"SELECT ROUND(AVG(CST.CURRENTCOSTPRICE), 10)   FROM M_PRODUCT P   INNER JOIN M_COST CST   ON P.M_PRODUCT_ID=CST.M_PRODUCT_ID
                                LEFT JOIN M_PRODUCT_CATEGORY PC   ON P.M_PRODUCT_CATEGORY_ID=PC.M_PRODUCT_CATEGORY_ID
                                INNER JOIN C_ACCTSCHEMA ACC   ON CST.C_ACCTSCHEMA_ID=ACC.C_ACCTSCHEMA_ID
-                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID
+                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID 
                                INNER JOIN M_COSTELEMENT CE  ON CST.M_COSTELEMENT_ID=CE.M_COSTELEMENT_ID
                               WHERE (( CASE WHEN PC.COSTINGMETHOD IS NOT NULL  THEN PC.COSTINGMETHOD
                                             ELSE ACC.COSTINGMETHOD  END) = CE.COSTINGMETHOD )
@@ -112,6 +112,24 @@ namespace VAdvantage.Model
         /// <returns>cost</returns>
         public static Decimal GetproductCostAndQtyMaterial(int client_Id, int org_Id, int product_id, int M_ASI_Id, Trx trxName, int M_Warehouse_ID, bool IsRequiredQty)
         {
+            return GetproductCostAndQtyMaterialonAcctSchema(client_Id, org_Id, 0, product_id, M_ASI_Id, trxName, M_Warehouse_ID, IsRequiredQty);
+        }
+
+        /// /// <summary>
+        /// This function is used to get cost against costing method (material type) which is to be define on Cost Combination
+        /// </summary>
+        /// <param name="client_Id">clinet</param>
+        /// <param name="org_Id">org</param>
+        /// <param name="C_AcctSchema_ID"></param>
+        /// <param name="product_id">product</param>
+        /// <param name="M_ASI_Id">attributesetinstance</param>
+        /// <param name="trxName">trx</param>
+        /// <param name="M_Warehouse_ID"> warehouse id -- when to get cost against costing level - "Warehouse + Batch, Warehouse"</param>
+        /// <param name="IsRequiredQty">when true, give current qty else current cost"</param>
+        /// <returns>cost</returns>
+        public static Decimal GetproductCostAndQtyMaterialonAcctSchema(int client_Id, int org_Id, int C_AcctSchema_ID, int product_id, int M_ASI_Id,
+            Trx trxName, int M_Warehouse_ID, bool IsRequiredQty)
+        {
             Decimal cost = 0;
             string sql = "";
             try
@@ -119,7 +137,7 @@ namespace VAdvantage.Model
                 sql = @"SELECT ROUND(" + (IsRequiredQty ? "AVG(CST.CURRENTQTY)" : "AVG(CST.CURRENTCOSTPRICE)") + @", 10)   FROM M_PRODUCT P   INNER JOIN M_COST CST   ON P.M_PRODUCT_ID=CST.M_PRODUCT_ID
                                LEFT JOIN M_PRODUCT_CATEGORY PC   ON P.M_PRODUCT_CATEGORY_ID=PC.M_PRODUCT_CATEGORY_ID
                                INNER JOIN C_ACCTSCHEMA ACC   ON CST.C_ACCTSCHEMA_ID=ACC.C_ACCTSCHEMA_ID
-                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID
+                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID 
                                INNER JOIN M_COSTELEMENT CE  ON CST.M_COSTELEMENT_ID=CE.M_COSTELEMENT_ID
                               WHERE ((   CASE WHEN PC.COSTINGMETHOD IS NOT NULL  AND PC.COSTINGMETHOD   = 'C'  THEN (SELECT CAST( Cel.M_Ref_Costelement AS INTEGER)
                                                   FROM M_CostElement ced  INNER JOIN M_Costelementline Cel ON Ced.M_Costelement_Id = CAST( Cel.M_Ref_Costelement AS INTEGER)
@@ -146,8 +164,16 @@ namespace VAdvantage.Model
                                              WHEN PC.COSTINGLEVEL IS NOT NULL  AND PC.COSTINGLEVEL   IN ('A' ,'B' , 'C' ,'O')  THEN 0 
                                              WHEN ACC.COSTINGLEVEL IS NOT NULL AND ACC.COSTINGLEVEL   IN ('W' ,'D') THEN " + M_Warehouse_ID + @"
                                             ELSE 0   END) = NVL(CST.M_Warehouse_ID , 0))
-                            AND P.M_PRODUCT_ID      =" + product_id + @"
-                            AND CST.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + client_Id + " )";
+                            AND P.M_PRODUCT_ID      =" + product_id;
+                if (C_AcctSchema_ID == 0)
+                {
+                    sql += " AND CST.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + client_Id + ")";
+                }
+                else
+                {
+                    sql += " AND CST.C_ACCTSCHEMA_ID = " + C_AcctSchema_ID;
+                }
+
                 cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
             }
             catch
@@ -193,7 +219,7 @@ namespace VAdvantage.Model
                 sql = @"SELECT ROUND(AVG(CST.CURRENTCOSTPRICE), 10)   FROM M_PRODUCT P   INNER JOIN M_COST CST   ON P.M_PRODUCT_ID=CST.M_PRODUCT_ID
                                LEFT JOIN M_PRODUCT_CATEGORY PC   ON P.M_PRODUCT_CATEGORY_ID=PC.M_PRODUCT_CATEGORY_ID
                                INNER JOIN C_ACCTSCHEMA ACC   ON CST.C_ACCTSCHEMA_ID=ACC.C_ACCTSCHEMA_ID
-                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID
+                               INNER JOIN M_CostType ct ON ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID 
                                INNER JOIN M_COSTELEMENT CE  ON CST.M_COSTELEMENT_ID=CE.M_COSTELEMENT_ID
                               WHERE (( CASE WHEN PC.COSTINGMETHOD IS NOT NULL  THEN PC.COSTINGMETHOD
                                             ELSE ACC.COSTINGMETHOD  END) = CE.COSTINGMETHOD )
@@ -372,6 +398,103 @@ namespace VAdvantage.Model
                 throw new ArgumentException("Costing Engine : Exception in getting Freight cost from GetFreightCostAgainstCostCombination " + ex.Message);
             }
             return Cost;
+        }
+
+        /// <summary>
+        /// This Method is used to check costing before save constraints
+        /// Is Quantity available on Cost Queue with selected parameter on transaction line?
+        /// Is Conversion available -- Document/Base Curency to Accounting Schema's Currency ?
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="AD_Client_ID">Clinet ID</param>
+        /// <param name="AD_Org_ID">Organization ID</param>
+        /// <param name="M_Product_ID">Product ID</param>
+        /// <param name="M_ASI_ID">Attribute Set Instance ID</param>
+        /// <param name="M_Warehouse_ID">Warehouse ID</param>
+        /// <param name="Qty">Movemnt Qunatity</param>
+        /// <param name="IsConversionCheck">Is check currency rate</param>
+        /// <param name="AccountDate">Account Date</param>
+        /// <param name="C_Currency_ID">Currency</param>
+        /// <param name="C_Conversiontype_ID">Conversion Type</param>
+        /// <param name="trxName">TrxName</param>
+        /// <returns>null, if all ok</returns>
+        public static string CheckCostingCodition(Ctx ctx, int AD_Client_ID, int AD_Org_ID, int M_Product_ID,
+            int M_ASI_ID, int M_Warehouse_ID, decimal Qty, bool IsConversionCheck, DateTime? AccountDate, int C_Currency_ID, int C_Conversiontype_ID, Trx trxName)
+        {
+            string output = "";
+            string sql = "";
+            DataSet ds = null;
+
+            // Check Qty available in Cost Queue
+            if (Qty != 0)
+            {
+                sql = $@"SELECT SUM(cq.CurrentQty) AS total , actsh.C_AcctSchema_ID, actsh.Name  FROM M_CostQueue cq
+                        INNER JOIN C_AcctSchema actsh ON (actsh.C_AcctSchema_ID = cq.C_AcctSchema_ID AND actsh.M_CostType_ID = cq.M_CostType_ID)
+                        WHERE cq.CurrentQty > 0 
+                        AND cq.M_Product_ID = {M_Product_ID}
+                        AND NVL(cq.M_AttributeSetInstance_ID, 0) = {M_ASI_ID}
+                        AND cq.AD_Org_ID = {AD_Org_ID}
+                        AND cq.M_Warehouse_ID = {M_Warehouse_ID}
+                        AND cq.M_CostElement_ID = (SELECT M_CostElement_ID FROM M_CostElement 
+                               WHERE IsActive = 'Y' AND CostingMethod = 'F' AND AD_Client_ID = {AD_Client_ID})
+                        GROUP BY  actsh.C_AcctSchema_ID,  actsh.Name  
+                        HAVING SUM(cq.CurrentQty) < {Math.Abs(Qty)}";
+                ds = DB.ExecuteDataset(sql, null, trxName);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        if (i == 0)
+                        {
+                            output = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total"]) + " quantity available for " + Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                        }
+                        else
+                        {
+                            output += (", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total"]) + " quantity available for " + Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]));
+                        }
+                    }
+                    return output;
+                }
+            }
+
+            // check Conversion rate available or not
+            // Document/Base Curency to Accounting Schema Currency
+            if (IsConversionCheck)
+            {
+                C_Currency_ID = C_Currency_ID == 0 ? ctx.GetContextAsInt("$C_Currency_ID") : C_Currency_ID;
+                sql = $@"SELECT actSch.C_AcctSchema_ID , actSch.C_Currency_ID, cur.ISO_Code as baseCurrencyCode, 
+                            curTrx.ISO_Code as TrxCurrencyCode FROM C_AcctSchema actSch
+                            INNER JOIN C_Currency cur ON (cur.C_Currency_ID = actSch.C_Currency_ID)
+                            LEFT JOIN C_Currency curTrx ON (curtrx.C_Currency_ID = {C_Currency_ID})
+                            WHERE actSch.IsActive = 'Y' AND actSch.AD_Client_ID =  {AD_Client_ID}";
+                ds = DB.ExecuteDataset(sql, null, trxName);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    decimal rate = 0;
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        rate = MConversionRate.GetRate(C_Currency_ID, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Currency_ID"]), AccountDate, C_Conversiontype_ID, AD_Client_ID, AD_Org_ID);
+                        if (rate == 0)
+                        {
+                            if (string.IsNullOrEmpty(output))
+                            {
+                                output = "Conversion rate not define between " + "  Currency " + Util.GetValueOfString(ds.Tables[0].Rows[i]["TrxCurrencyCode"])
+                                        + " and " + Util.GetValueOfString(ds.Tables[0].Rows[i]["baseCurrencyCode"]);
+                            }
+                            else
+                            {
+                                output += (", " + " Currency " + Util.GetValueOfString(ds.Tables[0].Rows[i]["TrxCurrencyCode"])
+                                            + " and " + Util.GetValueOfString(ds.Tables[0].Rows[i]["baseCurrencyCode"]));
+                            }
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        return output;
+                    }
+                }
+            }
+            return output;
         }
 
 

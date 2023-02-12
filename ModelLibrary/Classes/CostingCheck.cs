@@ -35,10 +35,11 @@ namespace ModelLibrary.Classes
         public MMovementLine movementline = null;
         public MInvoice invoice = null;
         public MInvoiceLine invoiceline = null;
+        public MProvisionalInvoice provisionalInvoice = null;
         public MOrder order = null;
         public MOrderLine orderline = null;
         public PO po = null;
-        private Decimal Price = 0, Qty = 0;
+        public Decimal Price = 0, Qty = 0;
         public String costingMethod = String.Empty;
         public int costingElement = 0, M_CostType_ID = 0;
         public int definedCostingElement = 0; /* Costing Element ID against selected Costing Method on Product Category or Accounting Schema*/
@@ -52,6 +53,13 @@ namespace ModelLibrary.Classes
         private StringBuilder query = new StringBuilder();
         public int M_Transaction_ID = 0, M_TransactionTo_ID = 0;
         public string errorMessage = String.Empty;
+        public decimal? onHandQty = null;
+        public bool IsCostCalculationfromProcess = false;
+        public decimal? currentQtyonQueue = null;
+        public bool? IsPOCostingethodBindedonProduct = null;
+        public DataSet dsCostElement = null;
+        public bool IsCostImmediate = false;
+        public int precision = 2;
 
         /// <summary>
         /// Constructor
@@ -93,6 +101,10 @@ namespace ModelLibrary.Classes
             return;
         }
 
+        /// <summary>
+        /// Get LIFO and FIFO Costing Method ID
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
         public void GetLifoAndFIFoID(int AD_Client_ID)
         {
             query.Clear();
@@ -116,8 +128,17 @@ namespace ModelLibrary.Classes
             }
         }
 
+        /// <summary>
+        /// Get Accounting Schemas
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <returns>Accounting Schemas</returns>
         public DataSet GetAccountingSchema(int AD_Client_ID)
         {
+            // Get Cost Element 
+            GetCostElement(AD_Client_ID);
+
+            // Get Accounting Schema
             query.Clear();
             query.Append(@"Select C_Acctschema_Id From C_Acctschema
                                 WHERE Isactive = 'Y' AND C_Acctschema_Id = (SELECT C_Acctschema1_Id FROM Ad_Clientinfo 
@@ -128,6 +149,20 @@ namespace ModelLibrary.Classes
             return DB.ExecuteDataset(query.ToString(), null, null);
         }
 
+        /// <summary>
+        /// Get Product Cost Element 
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
+        public void GetCostElement(int AD_Client_ID)
+        {
+            query.Clear();
+            query.Append($@"SELECT DISTINCT M_CostElement_ID, CostingMethod, AD_Client_ID FROM M_CostElement WHERE IsActive = 'Y' AND AD_Client_ID = {AD_Client_ID}");
+            dsCostElement = DB.ExecuteDataset(query.ToString(), null, null);
+        }
+
+        /// <summary>
+        /// Reset Property
+        /// </summary>
         public void ResetProperty()
         {
             AD_Client_ID = 0;
@@ -152,12 +187,16 @@ namespace ModelLibrary.Classes
             Fifo_ID = 0;
             costinglevel = String.Empty;
             MMPolicy = String.Empty;
-            isReversal = null;
             isMatchFromForm = "N";
             movementDate = null;
             query.Clear();
             M_Transaction_ID = 0; M_TransactionTo_ID = 0;
             errorMessage = String.Empty;
+            onHandQty = null;
+            IsPOCostingethodBindedonProduct = null;
+            IsCostCalculationfromProcess = false;
+            currentQtyonQueue = null;
+            IsCostImmediate = false;
         }
 
     }

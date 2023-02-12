@@ -261,6 +261,31 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// After Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">true when saved</param>
+        /// <returns>true if success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+                return success;
+
+            //VIS_0046: check conversion available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord || Is_ValueChanged("MovementDate")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), 0, 0,
+                    GetM_Warehouse_ID(), 0, true, GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Set Processed.
         ///	Propergate to Lines/Taxes
         /// </summary>
