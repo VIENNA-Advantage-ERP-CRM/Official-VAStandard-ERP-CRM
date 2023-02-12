@@ -101,6 +101,10 @@ namespace ModelLibrary.Classes
             return;
         }
 
+        /// <summary>
+        /// Get LIFO and FIFO Costing Method ID
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
         public void GetLifoAndFIFoID(int AD_Client_ID)
         {
             query.Clear();
@@ -124,6 +128,11 @@ namespace ModelLibrary.Classes
             }
         }
 
+        /// <summary>
+        /// Get Accounting Schemas
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <returns>Accounting Schemas</returns>
         public DataSet GetAccountingSchema(int AD_Client_ID)
         {
             // Get Cost Element 
@@ -140,6 +149,10 @@ namespace ModelLibrary.Classes
             return DB.ExecuteDataset(query.ToString(), null, null);
         }
 
+        /// <summary>
+        /// Get Product Cost Element 
+        /// </summary>
+        /// <param name="AD_Client_ID">Client ID</param>
         public void GetCostElement(int AD_Client_ID)
         {
             query.Clear();
@@ -147,6 +160,9 @@ namespace ModelLibrary.Classes
             dsCostElement = DB.ExecuteDataset(query.ToString(), null, null);
         }
 
+        /// <summary>
+        /// Reset Property
+        /// </summary>
         public void ResetProperty()
         {
             AD_Client_ID = 0;

@@ -428,17 +428,17 @@ namespace VAdvantage.Model
             // Check Qty available in Cost Queue
             if (Qty != 0)
             {
-                sql = $@"select SUM(cq.CurrentQty) AS total , actsh.C_AcctSchema_ID, actsh.Name  from m_costQueue cq
-                        INNER JOIN C_AcctSchema actsh ON (actsh.C_AcctSchema_ID = cq.C_AcctSchema_ID and actsh.M_CostType_ID = cq.M_CostType_ID)
-                        where cq.CurrentQty > 0 
+                sql = $@"SELECT SUM(cq.CurrentQty) AS total , actsh.C_AcctSchema_ID, actsh.Name  FROM M_CostQueue cq
+                        INNER JOIN C_AcctSchema actsh ON (actsh.C_AcctSchema_ID = cq.C_AcctSchema_ID AND actsh.M_CostType_ID = cq.M_CostType_ID)
+                        WHERE cq.CurrentQty > 0 
                         AND cq.M_Product_ID = {M_Product_ID}
                         AND NVL(cq.M_AttributeSetInstance_ID, 0) = {M_ASI_ID}
                         AND cq.AD_Org_ID = {AD_Org_ID}
                         AND cq.M_Warehouse_ID = {M_Warehouse_ID}
                         AND cq.M_CostElement_ID = (SELECT M_CostElement_ID FROM M_CostElement 
                                WHERE IsActive = 'Y' AND CostingMethod = 'F' AND AD_Client_ID = {AD_Client_ID})
-                        group by  actsh.C_AcctSchema_ID,  actsh.Name  
-                        having SUM(cq.CurrentQty) < {Math.Abs(Qty)}";
+                        GROUP BY  actsh.C_AcctSchema_ID,  actsh.Name  
+                        HAVING SUM(cq.CurrentQty) < {Math.Abs(Qty)}";
                 ds = DB.ExecuteDataset(sql, null, trxName);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
