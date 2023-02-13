@@ -52,7 +52,7 @@ namespace VAdvantage.Model
                         return true;
                     }
                     sql.Clear();
-                    sql.Append(@"SELECT COUNT(*) FROM M_CostElementLine WHERE M_Ref_CostElement =  " + GetM_Ref_CostElement()
+                    sql.Append(@"SELECT COUNT(*) FROM M_CostElementLine WHERE CAST(M_Ref_CostElement AS INTEGER) =  " + GetM_Ref_CostElement()
                                  + " AND AD_Client_ID = " + GetAD_Client_ID() + " AND M_CostElement_ID = " + GetM_CostElement_ID() + " AND M_CostElementLine_ID != " + GetM_CostElementLine_ID());
                     countRecord = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
                     if (countRecord > 0)
