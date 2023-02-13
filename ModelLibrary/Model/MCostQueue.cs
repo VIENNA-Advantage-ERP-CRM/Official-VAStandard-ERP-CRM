@@ -2053,7 +2053,7 @@ namespace VAdvantage.Model
                             }
 
                             // Update Cost Queue Price
-                            if (!UpdateCostQueuePrice(0, MRPriceAvPo, Qty, Price, inoutline.GetM_InOutLine_ID(),
+                            if (!UpdateCostQueuePrice(0, MRPriceAvPo, Qty, Price, inoutline.GetM_InOutLine_ID(), acctSchema.GetC_AcctSchema_ID(),
                                 acctSchema.GetCostingPrecision(), trxName))
                             {
                                 _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
@@ -4169,7 +4169,8 @@ namespace VAdvantage.Model
                             else if (windowName.Equals("Invoice(Vendor)-Return") && invoiceline.GetM_InOutLine_ID() > 0)
                             {
                                 // For APC, which linked with RMA and return --> Update difference price on Cost Queue
-                                if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetCostingPrecision(), trxName))
+                                if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetC_AcctSchema_ID(),
+                                    acctSchema.GetCostingPrecision(), trxName))
                                 {
                                     _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
                                     return false;
@@ -6354,12 +6355,12 @@ namespace VAdvantage.Model
         /// <param name="InOutLine_ID">GRN Lline</param>
         /// <param name="precision">Precision</param>
         /// <returns>true, when updated</returns>
-        public static bool UpdateCostQueuePrice(int CostQueue_ID, Decimal oldPrice, Decimal qty, Decimal newPrice, int InOutLine_ID, int precision, Trx trxName)
+        public static bool UpdateCostQueuePrice(int CostQueue_ID, Decimal oldPrice, Decimal qty, Decimal newPrice, int InOutLine_ID, int C_AcctSchema_ID, int precision, Trx trxName)
         {
             Decimal price = Decimal.Subtract(Decimal.Multiply(newPrice, qty), Decimal.Multiply(oldPrice, qty));
             int no = DB.ExecuteQuery("UPDATE M_CostQueue SET CurrentCostPrice =ROUND(((CurrentCostPrice * CurrentQty) + " + price +
-                            @")/ (CASE WHEN CurrentQty = 0 THEN 1 ELSE CurrentQty END) ," + precision + @" )
-                            WHERE M_CostQueue_ID IN (SELECT M_CostQueue_ID FROM M_CostQueueTransaction WHERE M_InOutLine_ID
+                            @")/ (CASE WHEN CurrentQty = 0 THEN 1 ELSE CurrentQty END) ," + precision + $@" )
+                            WHERE C_AcctSchema_ID = {C_AcctSchema_ID} AND M_CostQueue_ID IN (SELECT M_CostQueue_ID FROM M_CostQueueTransaction WHERE M_InOutLine_ID
                             = " + InOutLine_ID + ")", null, trxName);
             if (no < 0)
             {
