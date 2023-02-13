@@ -52,6 +52,10 @@ namespace VAdvantage.Model
         /// <returns>true if inserted</returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+            {
+                return success;
+            }
             //Update sum of all lines on Contract Master Header.
             int count = DB.ExecuteQuery(@" UPDATE VAS_ContractMaster SET VAS_ContractAmount = 
                             (SELECT SUM(AMOUNT) FROM VAS_ContractLine WHERE 
