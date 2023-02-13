@@ -7380,12 +7380,28 @@ namespace VAdvantage.Model
         {
             String sql = "";
             backwardCompatabilitySupport = false;
-            sql = @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
+
+            if (windowName.Equals("Customer Return") ||
+                (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument))
+            {
+                sql = $@" WITH Returntrx AS 
+                        (SELECT NVL(C_OrderLine.Orig_InOutLine_ID, 0) AS M_InoutLine_ID FROM M_InoutLine 
+                         INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
+                         WHERE  M_InoutLine.M_InoutLine_ID = {cd.GetM_InOutLine_ID()}) ";
+            }
+            sql += @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
                             M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost, M_CostQueue.CurrentQty  
                             FROM M_CostQueue INNER JOIN M_CostQueueTransaction
                             ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
-                            INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID
-                            WHERE  M_CostQueueTransaction.MovementQty <> 0 AND M_CostQueue.M_CostElement_ID = " + costElement.GetM_CostElement_ID() + @"
+                            INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID";
+
+            if (windowName.Equals("Customer Return") ||
+               (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument))
+            {
+                sql += @" INNER JOIN Returntrx rt ON (rt.M_InoutLine_ID = M_CostQueueTransaction.M_InoutLine_ID) ";
+            }
+
+            sql += " WHERE  M_CostQueueTransaction.MovementQty <> 0 AND M_CostQueue.M_CostElement_ID = " + costElement.GetM_CostElement_ID() + @"
                             AND M_CostQueue.C_ACCTSCHEMA_ID = " + cd.GetC_AcctSchema_ID();
 
             // VIS_0045: 24-June-2022 -> Include Attributeset instance (because we are calculating cost against Attribute / Material Policy Tab)
@@ -7395,9 +7411,9 @@ namespace VAdvantage.Model
                 (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument))
             {
                 // get reference of Orignal Document
-                sql += @" AND M_InoutLine_ID = (SELECT NVL(C_OrderLine.Orig_InOutLine_ID, 0) FROM M_InoutLine 
-                                INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
-                        WHERE  M_InoutLine.M_InoutLine_ID = " + cd.GetM_InOutLine_ID() + ")";
+                //sql += @" AND M_InoutLine_ID = (SELECT NVL(C_OrderLine.Orig_InOutLine_ID, 0) FROM M_InoutLine 
+                //                INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
+                //        WHERE  M_InoutLine.M_InoutLine_ID = " + cd.GetM_InOutLine_ID() + ")";
             }
             else if (windowName.Equals("Return To Vendor") && (cd.GetC_OrderLine_ID() == 0 || IsReversedDocument))
             {
@@ -7517,13 +7533,29 @@ namespace VAdvantage.Model
         {
             String sql = "";
             backwardCompatabilitySupport = false;
-            String selectStatement = @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
+            String selectStatement = "";
+            string withClause = "";
+            if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument)
+            {
+                selectStatement = $@"WITH linkedReturnVendor AS (
+	                                SELECT NVL(C_OrderLine.Orig_InOutLine_ID,0) AS M_InoutLine_ID
+	                                FROM M_InoutLine
+	                                INNER JOIN C_OrderLine ON (M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID)
+	                                WHERE M_InoutLine.M_InoutLine_ID = {cd.GetM_InOutLine_ID() }) ";
+                withClause = selectStatement;
+            }
+            selectStatement += @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
                             M_CostQueue.CurrentQty, M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost ";
 
             sql = @" FROM M_CostQueue INNER JOIN M_CostQueueTransaction 
                             ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
-                            INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID
-                            WHERE  M_CostQueueTransaction.MovementQty <> 0 AND M_CostQueue.M_CostElement_ID = " + costElement.GetM_CostElement_ID() + @"
+                            INNER JOIN M_CostElement ON (M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID)";
+            if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument)
+            {
+                sql += " INNER JOIN linkedReturnVendor lrv ON (lrv.M_InoutLine_ID = M_CostQueueTransaction.M_InoutLine_ID) ";
+            }
+
+            sql += @" WHERE  M_CostQueueTransaction.MovementQty <> 0 AND M_CostQueue.M_CostElement_ID = " + costElement.GetM_CostElement_ID() + @"
                             AND M_CostQueue.C_ACCTSCHEMA_ID = " + cd.GetC_AcctSchema_ID();
 
             // VIS_0045: 24-June-2022 -> Include Attributeset instance (because we are calculating cost against Attribute / Material Policy Tab)
@@ -7540,9 +7572,9 @@ namespace VAdvantage.Model
             else if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0 && !IsReversedDocument)
             {
                 // get reference of Orignal Document
-                sql += @" AND M_InoutLine_ID = (SELECT NVL(C_OrderLine.Orig_InOutLine_ID, 0) FROM M_InoutLine 
-                                INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
-                        WHERE  M_InoutLine.M_InoutLine_ID = " + cd.GetM_InOutLine_ID() + ")";
+                //sql += @" AND M_InoutLine_ID = (SELECT NVL(C_OrderLine.Orig_InOutLine_ID, 0) FROM M_InoutLine 
+                //                INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
+                //        WHERE  M_InoutLine.M_InoutLine_ID = " + cd.GetM_InOutLine_ID() + ")";
             }
             else if (windowName.Equals("Inventory Move"))
             {
@@ -7556,11 +7588,11 @@ namespace VAdvantage.Model
                           WHERE VAMFG_M_WrkOdrTrnsctionLine.VAMFG_M_WrkOdrTrnsctionLine_ID = " + cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID() + ")";
             }
 
-            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_CostQueue.M_CostQueue_ID) " + sql +
+            if (Util.GetValueOfInt(DB.ExecuteScalar(withClause + "SELECT COUNT(M_CostQueue.M_CostQueue_ID) " + sql +
                 @" AND  M_CostQueue.CurrentQty < CASE WHEN " + Math.Abs(Qty) + " <  M_CostQueueTransaction.MovementQty THEN " + Math.Abs(Qty) +
                 " ELSE M_CostQueueTransaction.MovementQty END")) > 0)
             {
-                _log.Info("SELECT COUNT(M_CostQueue.M_CostQueue_ID) " + sql + " AND  M_CostQueue.CurrentQty < CASE WHEN " + Math.Abs(Qty) + " <  M_CostQueueTransaction.MovementQty THEN " + Math.Abs(Qty) +
+                _log.Info(withClause + "SELECT COUNT(M_CostQueue.M_CostQueue_ID) " + sql + " AND  M_CostQueue.CurrentQty < CASE WHEN " + Math.Abs(Qty) + " <  M_CostQueueTransaction.MovementQty THEN " + Math.Abs(Qty) +
                 " ELSE M_CostQueueTransaction.MovementQty END");
                 _log.Info("Costing Engine : Current Qty is less than Movement Qty on cost Queue Transaction. window Name  = " + windowName);
                 costingCheck.errorMessage += "ReturnStockReduceFromCostQueue: Current Qty is less than Movement Qty on cost Queue Transaction";
