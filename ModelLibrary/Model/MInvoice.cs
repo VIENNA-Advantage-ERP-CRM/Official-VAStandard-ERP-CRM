@@ -2824,6 +2824,14 @@ namespace VAdvantage.Model
                 log.Info(ToString());
                 StringBuilder Info = new StringBuilder();
                 MDocType dt = MDocType.Get(GetCtx(), GetC_DocTypeTarget_ID());
+
+                //to check the contract amount, when order is selected
+                //with the invoice or without invoice.
+                if (!CheckContractData(dt))
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_Can'tComplete");
+                    return DocActionVariables.STATUS_INVALID;
+                }
                 //	Create Cash when the invoice againt order and payment method cash and  order is of POS type
                 if ((PAYMENTRULE_Cash.Equals(GetPaymentRule()) || PAYMENTRULE_CashAndCredit.Equals(GetPaymentRule())) && GetC_Order_ID() > 0)
                 {
@@ -5093,6 +5101,118 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// this function is to check the contract details based  on overlimit 
+        /// checkbox if that is true or flase the perform accordingly
+        /// </summary>
+        /// <returns>True/False to complete record or not</returns>
+        private bool CheckContractData(MDocType dt)
+        {
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
+            {
+                int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
+                if (ContractID > 0)
+                {
+                    MVASContractMaster _vasCont = new
+                        MVASContractMaster(GetCtx(), ContractID, Get_Trx());
+                    decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
+                                            _vasCont.GetVAS_ContractUtilizedAmount();
+                    decimal OrdAmt = 0;
+                    if ((GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("API"))) ||
+                            (GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("ARI"))))
+                    {
+                        OrdAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@" SELECT GrandTotal 
+                                    FROM C_Order WHERE C_Order_ID = " + GetC_Order_ID(),
+                               null, Get_Trx()));
+                        if (!_vasCont.IsVAS_OverLimit())
+                        {
+
+                            //(Invoice total-purchase order grandtotal)-contractRemainingAmount
+                            //if contracremainingamount is 100 and purchase order was 50, now
+                            // contractavalible amount becomes 50, Invoice created 70 then 20 will be added 
+                            // in utilized amount 1500-1000 > 0
+                            if ((GetGrandTotal() - OrdAmt) > ContractRemainingAmt)
+                            {
+                                SetProcessed(false);
+                                log.Warning("GrandTotal is greater than " +
+                                    "contract amount " + ((GetGrandTotal() - OrdAmt) -
+                                    (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                                _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                                return false;
+                            }
+                            else if ((GetGrandTotal() - OrdAmt) <= ContractRemainingAmt)
+                            {
+                                if ((GetGrandTotal() - OrdAmt) > 0)
+                                {
+                                    _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                                   + (GetGrandTotal() - OrdAmt));
+                                    if (!_vasCont.Save())
+                                    {
+                                        log.Warning("ContractUtilizedAmount Not Updated");
+                                    }
+                                }
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            if ((GetGrandTotal() - OrdAmt) > 0)
+                            {
+                                _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                                   + (GetGrandTotal() - OrdAmt));
+                                if (!_vasCont.Save())
+                                {
+                                    log.Warning("ContractUtilizedAmount Not Updated");
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    else if ((GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("API"))) ||
+                        (GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("ARI"))))
+                    {
+                        if (!_vasCont.IsVAS_OverLimit())
+                        {
+                            if (GetGrandTotal() > ContractRemainingAmt)
+                            {
+                                SetProcessed(false);
+                                log.Warning("GrandTotal is greater than " +
+                                    "contract amount " + (GetGrandTotal() -
+                                    (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                                _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                                return false;
+                            }
+                            else if (GetGrandTotal() <= ContractRemainingAmt)
+                            {
+                                _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                               + GetGrandTotal());
+                                if (!_vasCont.Save())
+                                {
+                                    log.Warning("ContractUtilizedAmount Not Updated");
+                                }
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                                   + GetGrandTotal());
+                            if (!_vasCont.Save())
+                            {
+                                log.Warning("ContractUtilizedAmount Not Updated");
+                            }
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Get or Create Cash Journal from CashBook selected on Organization Unit Info
         /// </summary>
         /// <param name="dateAcct">Account Date</param>
@@ -6151,7 +6271,7 @@ namespace VAdvantage.Model
             {
                 MInvoiceLine counterLine = counterLines[i];
                 counterLine.SetClientOrg(counter);
-                counterLine.SetInvoice(counter);	//	copies header values (BP, etc.)
+                counterLine.SetInvoice(counter);    //	copies header values (BP, etc.)
                 counterLine.SetPrice();
                 counterLine.SetTax();
                 //
@@ -6390,7 +6510,7 @@ namespace VAdvantage.Model
             }
 
             //
-            Load(Get_TrxName());	//	reload allocation reversal Info
+            Load(Get_TrxName());    //	reload allocation reversal Info
 
             //	Deep Copy
             MInvoice reversal = CopyFrom(this, GetDateInvoiced(),
