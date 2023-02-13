@@ -2223,7 +2223,7 @@ namespace VAdvantage.Model
                     list.Add(new MInOutLine(GetCtx(), dr, Get_TrxName()));
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
 
                 log.Log(Level.SEVERE, "MOrder" + sql, e);
@@ -2664,7 +2664,7 @@ namespace VAdvantage.Model
                 }
 
 
-             
+
 
 
 
@@ -3710,6 +3710,13 @@ namespace VAdvantage.Model
                 MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
                 DocSubTypeSO = dt.GetDocSubTypeSO();
 
+                //to check contract details and logic
+                if (!CheckContractData())
+                {
+                    SetProcessed(false);
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
                 //to check document type if it is pos then we need to check the document type on selected document types
                 if (MDocType.DOCSUBTYPESO_POSOrder.Equals(DocSubTypeSO))
                 {
@@ -4126,7 +4133,7 @@ namespace VAdvantage.Model
                         //Info.Append(" - @C_Invoice_ID@: ").Append(invoice.GetDocumentNo());
                         //Info.Append(" & @C_Invoice_ID@ No: ").Append(invoice.GetDocumentNo()).Append(" generated successfully");
                         //(1052)correct process message
-                       Info.Append(Msg.GetMsg(GetCtx(), "InvNo")).Append(invoice.GetDocumentNo());
+                        Info.Append(Msg.GetMsg(GetCtx(), "InvNo")).Append(invoice.GetDocumentNo());
                         _processMsg += Info.ToString();
 
                         String msg = invoice.GetProcessMsg();
@@ -4332,6 +4339,59 @@ namespace VAdvantage.Model
             SetCompletedDocumentNo();
 
             return DocActionVariables.STATUS_COMPLETED;
+        }
+
+        /// <summary>
+        /// this function is to check the contract details based  on overlimit 
+        /// checkbox if that is true or flase the perform accordingly
+        /// </summary>
+        /// <returns>True/False to complete record or not</returns>
+        private bool CheckContractData()
+        {
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
+            {
+                int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
+                if (ContractID > 0)
+                {
+                    MVASContractMaster _vasCont = new
+                        MVASContractMaster(GetCtx(), ContractID, Get_Trx());
+                    decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
+                                             _vasCont.GetVAS_ContractUtilizedAmount();
+                    if (!_vasCont.IsVAS_OverLimit())
+                    {
+                        if (GetGrandTotal() > ContractRemainingAmt)
+                        {
+                            SetProcessed(false);
+                            log.Warning("GrandTotal is greater than " +
+                                "contract amount " + (GetGrandTotal() -
+                                (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                            _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                            return false;
+                        }
+                        else if (GetGrandTotal() <= ContractRemainingAmt)
+                        {
+                            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                                + ContractRemainingAmt);
+                            if (!_vasCont.Save())
+                            {
+                                log.Warning("ContractUtilizedAmount Not Updated");
+                            }
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                               + GetGrandTotal());
+                        if (!_vasCont.Save())
+                        {
+                            log.Warning("ContractUtilizedAmount Not Updated");
+                        }
+                        return true;
+                    }
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -5239,121 +5299,93 @@ namespace VAdvantage.Model
                     //}
                     //else
                     //{
-                        // when order line created with charge OR with Product which is not of "item type" then not to create shipment line against this.
-                        MProduct oproduct = oLine.GetProduct();
-                        string allowNonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem"));
+                    // when order line created with charge OR with Product which is not of "item type" then not to create shipment line against this.
+                    MProduct oproduct = oLine.GetProduct();
+                    string allowNonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem"));
 
-                        if (String.IsNullOrEmpty(allowNonItem))
+                    if (String.IsNullOrEmpty(allowNonItem))
+                    {
+                        allowNonItem = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID = " + GetAD_Client_ID(), null, Get_Trx()));
+                    }
+
+                    //Create Lines for Charge / (Resource - Service - Expense) type product based on setting on Tenant to "Allow Non Item type".
+                    if ((oproduct == null || !(oproduct != null && oproduct.GetProductType() == MProduct.PRODUCTTYPE_Item))
+                        && (allowNonItem.Equals("N")))
+                        continue;
+
+                    //
+                    int M_Warehouse_ID = oLine.GetM_Warehouse_ID();
+                    wh = MWarehouse.Get(GetCtx(), M_Warehouse_ID);
+
+                    MInOutLine ioLine = new MInOutLine(shipment);
+
+                    //	Qty = Ordered - Delivered
+                    Decimal MovementQty = Decimal.Subtract(oLine.GetQtyOrdered(), oLine.GetQtyDelivered());
+
+                    //	Location
+                    int M_Locator_ID = MStorage.GetM_Locator_ID(oLine.GetM_Warehouse_ID(),
+                            oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(),
+                            MovementQty, Get_TrxName());
+                    if (M_Locator_ID == 0)      //	Get default Location
+                    {
+                        MProduct product = ioLine.GetProduct();
+                        M_Locator_ID = MProductLocator.GetFirstM_Locator_ID(product, M_Warehouse_ID);
+                        if (M_Locator_ID == 0)
                         {
-                            allowNonItem = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsAllowNonItem FROM AD_Client WHERE AD_Client_ID = " + GetAD_Client_ID(), null, Get_Trx()));
+                            //wh = MWarehouse.Get(GetCtx(), M_Warehouse_ID);
+                            M_Locator_ID = wh.GetDefaultM_Locator_ID();
                         }
+                    }
 
-                        //Create Lines for Charge / (Resource - Service - Expense) type product based on setting on Tenant to "Allow Non Item type".
-                        if ((oproduct == null || !(oproduct != null && oproduct.GetProductType() == MProduct.PRODUCTTYPE_Item))
-                            && (allowNonItem.Equals("N")))
-                            continue;
+                    Decimal? QtyAvail = MStorage.GetQtyAvailable(M_Warehouse_ID, oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(), Get_Trx());
+                    if (MovementQty > 0)
+                        QtyAvail += MovementQty;
 
-                        //
-                        int M_Warehouse_ID = oLine.GetM_Warehouse_ID();
-                        wh = MWarehouse.Get(GetCtx(), M_Warehouse_ID);
-
-                        MInOutLine ioLine = new MInOutLine(shipment);
-
-                        //	Qty = Ordered - Delivered
-                        Decimal MovementQty = Decimal.Subtract(oLine.GetQtyOrdered(), oLine.GetQtyDelivered());
-
-                        //	Location
-                        int M_Locator_ID = MStorage.GetM_Locator_ID(oLine.GetM_Warehouse_ID(),
-                                oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(),
-                                MovementQty, Get_TrxName());
-                        if (M_Locator_ID == 0)      //	Get default Location
+                    String sql = "SELECT SUM(QtyOnHand) FROM M_Storage s INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) WHERE s.M_Product_ID=" + oLine.GetM_Product_ID() + " AND l.M_Warehouse_ID=" + M_Warehouse_ID;
+                    if (oLine.GetM_AttributeSetInstance_ID() != 0)
+                    {
+                        sql += " AND M_AttributeSetInstance_ID=" + oLine.GetM_AttributeSetInstance_ID();
+                    }
+                    // check onhand qty on specified locator
+                    if (M_Locator_ID > 0)
+                    {
+                        sql += " AND l.M_Locator_ID = " + M_Locator_ID;
+                    }
+                    OnHandQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+                    if (wh.IsDisallowNegativeInv())
+                    {
+                        if (oLine.GetQtyOrdered() > QtyAvail && (DocSubTypeSO == "WR" || DocSubTypeSO == "WP"))
                         {
-                            MProduct product = ioLine.GetProduct();
-                            M_Locator_ID = MProductLocator.GetFirstM_Locator_ID(product, M_Warehouse_ID);
-                            if (M_Locator_ID == 0)
+                            #region In Case of -- WR (WareHouse Order) / WP (POS Order)
+                            // when qty avialble on warehouse is less than qty ordered, at that time we can create shipment in Drafetd stage, to be completed mnually
+                            _processMsg = CreateShipmentLineContainer(shipment, ioLine, oLine, M_Locator_ID, MovementQty, wh.IsDisallowNegativeInv(), oproduct);
+
+                            // when OnHand qty is less than qtyOrdered then not to create shipment (need to be rollback)
+                            if (!String.IsNullOrEmpty(_processMsg) && OnHandQty < oLine.GetQtyOrdered())
                             {
-                                //wh = MWarehouse.Get(GetCtx(), M_Warehouse_ID);
-                                M_Locator_ID = wh.GetDefaultM_Locator_ID();
+                                return null;
                             }
-                        }
 
-                        Decimal? QtyAvail = MStorage.GetQtyAvailable(M_Warehouse_ID, oLine.GetM_Product_ID(), oLine.GetM_AttributeSetInstance_ID(), Get_Trx());
-                        if (MovementQty > 0)
-                            QtyAvail += MovementQty;
-
-                        String sql = "SELECT SUM(QtyOnHand) FROM M_Storage s INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) WHERE s.M_Product_ID=" + oLine.GetM_Product_ID() + " AND l.M_Warehouse_ID=" + M_Warehouse_ID;
-                        if (oLine.GetM_AttributeSetInstance_ID() != 0)
-                        {
-                            sql += " AND M_AttributeSetInstance_ID=" + oLine.GetM_AttributeSetInstance_ID();
-                        }
-                        // check onhand qty on specified locator
-                        if (M_Locator_ID > 0)
-                        {
-                            sql += " AND l.M_Locator_ID = " + M_Locator_ID;
-                        }
-                        OnHandQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
-                        if (wh.IsDisallowNegativeInv())
-                        {
-                            if (oLine.GetQtyOrdered() > QtyAvail && (DocSubTypeSO == "WR" || DocSubTypeSO == "WP"))
-                            {
-                                #region In Case of -- WR (WareHouse Order) / WP (POS Order)
-                                // when qty avialble on warehouse is less than qty ordered, at that time we can create shipment in Drafetd stage, to be completed mnually
-                                _processMsg = CreateShipmentLineContainer(shipment, ioLine, oLine, M_Locator_ID, MovementQty, wh.IsDisallowNegativeInv(), oproduct);
-
-                                // when OnHand qty is less than qtyOrdered then not to create shipment (need to be rollback)
-                                if (!String.IsNullOrEmpty(_processMsg) && OnHandQty < oLine.GetQtyOrdered())
-                                {
-                                    return null;
-                                }
-
-                                //ioLine.SetOrderLine(oLine, M_Locator_ID, MovementQty);
-                                //ioLine.SetQty(MovementQty);
-                                //if (oLine.GetQtyEntered().CompareTo(oLine.GetQtyOrdered()) != 0)
-                                //{
-                                //    //ioLine.SetQtyEntered(Decimal.Multiply(MovementQty,(oLine.getQtyEntered()).divide(oLine.getQtyOrdered(), 6, Decimal.ROUND_HALF_UP));
-                                //    ioLine.SetQtyEntered(Decimal.Multiply(MovementQty, (Decimal.Divide(oLine.GetQtyEntered(), (oLine.GetQtyOrdered())))));
-                                //}
-                                //if (!ioLine.Save(Get_TrxName()))
-                                //{
-                                //    //_processMsg = "Could not create Shipment Line";
-                                //    //return null;
-                                //}
-                                //	Manually Process Shipment
-                                IsDrafted = true;
-                                #endregion
-                            }
-                            else
-                            {
-                                #region In Case of -- Credit Order / PePay Order / WareHouse Order / POS Order
-
-                                _processMsg = CreateShipmentLineContainer(shipment, ioLine, oLine, M_Locator_ID, MovementQty, wh.IsDisallowNegativeInv(), oproduct);
-                                if (!String.IsNullOrEmpty(_processMsg))
-                                {
-                                    return null;
-                                }
-
-                                //ioLine.SetOrderLine(oLine, M_Locator_ID, MovementQty);
-                                //ioLine.SetQty(MovementQty);
-                                //if (oLine.GetQtyEntered().CompareTo(oLine.GetQtyOrdered()) != 0)
-                                //{
-                                //    //ioLine.SetQtyEntered(Decimal.Multiply(MovementQty,(oLine.getQtyEntered()).divide(oLine.getQtyOrdered(), 6, Decimal.ROUND_HALF_UP));
-                                //    ioLine.SetQtyEntered(Decimal.Multiply(MovementQty, (Decimal.Divide(oLine.GetQtyEntered(), (oLine.GetQtyOrdered())))));
-                                //}
-                                //if (!ioLine.Save(Get_TrxName()))
-                                //{
-                                //    ValueNamePair pp = VLogger.RetrieveError();
-                                //    if (pp != null && !string.IsNullOrEmpty(pp.GetName()))
-                                //        _processMsg = "Could not create Shipment Line. " + pp.GetName();
-                                //    else
-                                //        _processMsg = "Could not create Shipment Line";
-                                //    return null;
-                                //}
-                                #endregion
-                            }
+                            //ioLine.SetOrderLine(oLine, M_Locator_ID, MovementQty);
+                            //ioLine.SetQty(MovementQty);
+                            //if (oLine.GetQtyEntered().CompareTo(oLine.GetQtyOrdered()) != 0)
+                            //{
+                            //    //ioLine.SetQtyEntered(Decimal.Multiply(MovementQty,(oLine.getQtyEntered()).divide(oLine.getQtyOrdered(), 6, Decimal.ROUND_HALF_UP));
+                            //    ioLine.SetQtyEntered(Decimal.Multiply(MovementQty, (Decimal.Divide(oLine.GetQtyEntered(), (oLine.GetQtyOrdered())))));
+                            //}
+                            //if (!ioLine.Save(Get_TrxName()))
+                            //{
+                            //    //_processMsg = "Could not create Shipment Line";
+                            //    //return null;
+                            //}
+                            //	Manually Process Shipment
+                            IsDrafted = true;
+                            #endregion
                         }
                         else
                         {
-                            #region when disallow is FALSE
+                            #region In Case of -- Credit Order / PePay Order / WareHouse Order / POS Order
+
                             _processMsg = CreateShipmentLineContainer(shipment, ioLine, oLine, M_Locator_ID, MovementQty, wh.IsDisallowNegativeInv(), oproduct);
                             if (!String.IsNullOrEmpty(_processMsg))
                             {
@@ -5378,6 +5410,34 @@ namespace VAdvantage.Model
                             //}
                             #endregion
                         }
+                    }
+                    else
+                    {
+                        #region when disallow is FALSE
+                        _processMsg = CreateShipmentLineContainer(shipment, ioLine, oLine, M_Locator_ID, MovementQty, wh.IsDisallowNegativeInv(), oproduct);
+                        if (!String.IsNullOrEmpty(_processMsg))
+                        {
+                            return null;
+                        }
+
+                        //ioLine.SetOrderLine(oLine, M_Locator_ID, MovementQty);
+                        //ioLine.SetQty(MovementQty);
+                        //if (oLine.GetQtyEntered().CompareTo(oLine.GetQtyOrdered()) != 0)
+                        //{
+                        //    //ioLine.SetQtyEntered(Decimal.Multiply(MovementQty,(oLine.getQtyEntered()).divide(oLine.getQtyOrdered(), 6, Decimal.ROUND_HALF_UP));
+                        //    ioLine.SetQtyEntered(Decimal.Multiply(MovementQty, (Decimal.Divide(oLine.GetQtyEntered(), (oLine.GetQtyOrdered())))));
+                        //}
+                        //if (!ioLine.Save(Get_TrxName()))
+                        //{
+                        //    ValueNamePair pp = VLogger.RetrieveError();
+                        //    if (pp != null && !string.IsNullOrEmpty(pp.GetName()))
+                        //        _processMsg = "Could not create Shipment Line. " + pp.GetName();
+                        //    else
+                        //        _processMsg = "Could not create Shipment Line";
+                        //    return null;
+                        //}
+                        #endregion
+                    }
                     //}
                 }
 
@@ -5773,7 +5833,7 @@ namespace VAdvantage.Model
                                 iLine.SetQtyEntered(iLine.GetQtyInvoiced());
                             else
                                 iLine.SetQtyEntered(Decimal.Multiply(iLine.GetQtyInvoiced(), (Decimal.Divide(oLine.GetQtyEntered(), oLine.GetQtyOrdered()))));
-                            
+
                             //190 - Get Print description and set
                             if (iLine.Get_ColumnIndex("PrintDescription") >= 0 && oLine.Get_ColumnIndex("PrintDescription") >= 0)
                                 iLine.Set_Value("PrintDescription", oLine.Get_Value("PrintDescription"));
@@ -6297,13 +6357,13 @@ namespace VAdvantage.Model
                 //Updated By VIS_317
                 if (MDocType.DOCSUBTYPESO_PrepayOrder.Equals(DocSubTypeSO))
                 {
-                    if(MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))                      
+                    if (MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))
                     {
-                        _processMsg= Msg.GetMsg(GetCtx(), "VIS_NotReactivateOrder");
+                        _processMsg = Msg.GetMsg(GetCtx(), "VIS_NotReactivateOrder");
                         return false;
                     }
                 }
-             // Added by Vivek on 08/11/2017 assigned by Mukesh sirf
+                // Added by Vivek on 08/11/2017 assigned by Mukesh sirf
                 // return false if linked document is in completed or closed stage
                 if (MDocType.DOCSUBTYPESO_OnCreditOrder.Equals(DocSubTypeSO)    //	(W)illCall(I)nvoice
                     || MDocType.DOCSUBTYPESO_WarehouseOrder.Equals(DocSubTypeSO)    //	(W)illCall(P)ickup	
