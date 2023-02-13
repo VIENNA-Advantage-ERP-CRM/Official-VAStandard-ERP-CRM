@@ -681,6 +681,19 @@ namespace VAdvantage.Model
                     }
                 }
             }
+
+            //VIS_0046: check qty available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord
+                || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID") || Is_ValueChanged("MovementQty")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), GetM_Product_ID(), GetM_AttributeSetInstance_ID(),
+                   GetMovementQty() < 0 ? MLocator.Get(GetCtx(), GetM_LocatorTo_ID()).GetM_Warehouse_ID() : GetParent().GetDTD001_MWarehouseSource_ID(),
+                   GetMovementQty(), false, GetParent().GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
             return true;
         }
 

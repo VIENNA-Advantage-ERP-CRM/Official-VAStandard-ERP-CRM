@@ -2974,6 +2974,42 @@ namespace VAdvantage.Model
                     isProvisionalInvoiceRecordFound = true;
                 }
             }
+            else if (!invoiceline.GetParent().IsSOTrx() && invoiceline.GetParent().IsReturnTrx() &&
+                invoiceline.GetM_InOutLine_ID() > 0 && invoiceline.GetM_Product_ID() > 0)
+            {
+                // For AP Credit memo, get difference amount between vendor RMA and APC when order linked
+                MDocType docType = MDocType.Get(GetCtx(), invoiceline.GetParent().GetC_DocTypeTarget_ID());
+                if (docType.GetDocBaseType().Equals(MDocBaseType.DOCBASETYPE_APCREDITMEMO))
+                {
+                    if (invoiceline.GetC_OrderLine_ID() > 0)
+                    {
+                        ds = DB.ExecuteDataset(@"SELECT ROUND((TaxableAmt/QtyOrdered) * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS TaxableAmt  
+                                                    , ROUND((TaxAmt/QtyOrdered) * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS TaxAmt 
+                                                    , ROUND((SurchargeAmt/QtyOrdered) * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS SurchargeAmt 
+                                            FROM C_OrderLine 
+                                            WHERE C_OrderLine_ID = " + invoiceline.GetC_OrderLine_ID(), null, Get_Trx());
+                    }
+                    else
+                    {
+                        // when order not linked then get difference between current Cost Price on Vendor Return and APC
+                        ds = DB.ExecuteDataset($@"SELECT ROUND(CurrencyConvert( CurrentCostPrice , {GetCtx().GetContextAsInt("$C_Currency_ID")},
+                                                    {invoiceline.GetParent().GetC_Currency_ID()},
+                                                    {GlobalVariable.TO_DATE( invoiceline.GetParent().GetDateAcct() , true)},
+                                                    {invoiceline.GetParent().GetC_ConversionType_ID()},
+                                                    {GetAD_Client_ID()} , {GetAD_Org_ID()})
+                                                    * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS TaxableAmt  
+                                                    , 0 AS TaxAmt, 0 AS SurchargeAmt 
+                                            FROM M_InOutLine  
+                                            WHERE M_InOutLine_ID = " + invoiceline.GetM_InOutLine_ID(), null, Get_Trx());
+                    }
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        isProvisionalInvoiceRecordFound = true;
+                    }
+                }
+            }
+
+
             if (invoiceline.Get_ColumnIndex("ReversalDoc_ID") >= 0 && invoiceline.Get_ValueAsInt("ReversalDoc_ID") > 0)
             {
                 multiplier = -1;

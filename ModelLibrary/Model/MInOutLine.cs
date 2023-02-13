@@ -41,6 +41,7 @@ namespace VAdvantage.Model
         private static VLogger _log = VLogger.GetVLogger(typeof(MInOutLine).FullName);
         public Decimal? OnHandQty = 0;
         private Decimal? containerQty = 0;
+        public bool checkQtyonProductCosts = true;
         #endregion
 
         /* 	Get Ship lines Of Order Line
@@ -1409,6 +1410,19 @@ namespace VAdvantage.Model
                 {
                     log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_NotUpdated"));
                     return false;
+                }
+            }
+
+            //VIS_0046: check qty available (Shipment / Vendor Return)
+            if (checkQtyonProductCosts && MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord
+                || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID") || Is_ValueChanged("MovementQty"))
+                && ((!GetParent().IsSOTrx() && !GetParent().IsReturnTrx()) || (GetParent().IsSOTrx() && !GetParent().IsReturnTrx())))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), GetM_Product_ID(), GetM_AttributeSetInstance_ID(),
+                    GetParent().GetM_Warehouse_ID(), GetMovementQty(), false, GetParent().GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
                 }
             }
 

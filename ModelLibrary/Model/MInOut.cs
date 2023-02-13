@@ -1661,6 +1661,17 @@ namespace VAdvantage.Model
                 //if (!success || newRecord)
                 return success;
 
+            //VIS_0046: check conversion available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && !IsSOTrx() && (newRecord || Is_ValueChanged("MovementDate")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), 0, 0,
+                    GetM_Warehouse_ID(), 0, true, GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
+
             if (!newRecord)
             {
                 if (Is_ValueChanged("AD_Org_ID"))
@@ -3276,6 +3287,7 @@ namespace VAdvantage.Model
                         {
                             bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
                                                                         productCQ.GetM_Product_ID(), Get_Trx());
+                            costingCheck.IsPOCostingethodBindedonProduct = isUpdatePostCurrentcostPriceFromMR;
 
                             if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)  // MR without PO
                             {
