@@ -274,7 +274,8 @@ namespace VAdvantage.Model
             int costElementId = 0;
             MClient client = MClient.Get(GetCtx(), cd.GetAD_Client_ID());
             int M_Warehouse_ID = 0; // is used to calculate cost with warehouse level or not
-            costingCheck.IsCostCalculationfromProcess = optionalStrCd == "process" ? true : false;
+            costingCheck.IsCostCalculationfromProcess = false;
+            costingCheck.AdjustAmountAfterDiscount = 0;
 
             if (costingCheck != null)
             {
@@ -1229,8 +1230,8 @@ namespace VAdvantage.Model
                         if (windowName == "Invoice(APC)")
                         {
                             Decimal adjustedAmt = 0;
-                            if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate() &&
-                                Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")) == 0)
+                            if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate()
+                              && !costingCheck.IsCostCalculationfromProcess)
                             {
                                 // we have to reduce price
                                 if (amt < 0 && price > 0)
@@ -1245,8 +1246,7 @@ namespace VAdvantage.Model
 
                                 //DevOps Task-1851
                                 List<MCostElement> lstCostElement = new List<MCostElement>();
-                                if (!costingCheck.IsCostCalculationfromProcess ||
-                                    Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")) == 0)
+                                if (!costingCheck.IsCostCalculationfromProcess)
                                 {
                                     lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Lifo_ID));
                                     lstCostElement.Add(MCostElement.Get(GetCtx(), costingCheck.Fifo_ID));
@@ -1255,6 +1255,7 @@ namespace VAdvantage.Model
                                 {
                                     lstCostElement.Add(ce);
                                 }
+                                costingCheck.IsCostCalculationfromProcess = true;
 
                                 for (int cel = 0; cel < lstCostElement.Count; cel++)
                                 {
@@ -1293,7 +1294,8 @@ namespace VAdvantage.Model
                                             }
                                             if (adjustedAmt != 0)
                                             {
-                                                costingCheck.invoiceline.Set_Value("TotalInventoryAdjustment", adjustedAmt);
+                                                costingCheck.AdjustAmountAfterDiscount = adjustedAmt;
+                                                // costingCheck.invoiceline.Set_Value("TotalInventoryAdjustment", adjustedAmt);
                                             }
 
                                             // Create Cost Queue Transactional Record
@@ -1328,14 +1330,30 @@ namespace VAdvantage.Model
                                     if (amt < 0)
                                     {
                                         adjustedAmt = Decimal.Negate(Math.Abs(Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment"))));
+                                        if (mas.GetC_Currency_ID() != costingCheck.invoice.GetC_Currency_ID())
+                                        {
+                                            adjustedAmt = MConversionRate.Convert(GetCtx(), adjustedAmt, costingCheck.invoice.GetC_Currency_ID(), mas.GetC_Currency_ID(),
+                                                costingCheck.invoice.GetDateInvoiced(), costingCheck.invoice.GetC_ConversionType_ID(),
+                                                costingCheck.invoice.GetAD_Client_ID(), costingCheck.invoice.GetAD_Org_ID());
+                                        }
                                     }
                                     else
                                     {
                                         adjustedAmt = Math.Abs(Util.GetValueOfDecimal(costingCheck.invoiceline.Get_Value("TotalInventoryAdjustment")));
+                                        adjustedAmt = MConversionRate.Convert(GetCtx(), adjustedAmt, costingCheck.invoice.GetC_Currency_ID(), mas.GetC_Currency_ID(),
+                                                costingCheck.invoice.GetDateInvoiced(), costingCheck.invoice.GetC_ConversionType_ID(),
+                                                costingCheck.invoice.GetAD_Client_ID(), costingCheck.invoice.GetAD_Org_ID());
                                     }
                                     if (adjustedAmt == 0)
                                     {
-                                        adjustedAmt = amt;
+                                        if (costingCheck.AdjustAmountAfterDiscount != 0)
+                                        {
+                                            adjustedAmt = costingCheck.AdjustAmountAfterDiscount;
+                                        }
+                                        else
+                                        {
+                                            adjustedAmt = amt;
+                                        }
                                     }
                                 }
                             }
@@ -1867,7 +1885,7 @@ namespace VAdvantage.Model
                 {
                     amt = cost.GetCurrentCostPrice() * qty;
                 }
-                
+
 
                 //
                 if (ce.IsAverageInvoice())
@@ -2172,8 +2190,8 @@ namespace VAdvantage.Model
 
                         // Amount will be affected from "Return to vendor" and "Invoice(Vendor)-Return" (diiference amount between PO and APC)
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
-                        if ((windowName.Equals("Invoice(Vendor)-Return") && Env.Signum(cost.GetCurrentQty()) != 0) || 
-                            (windowName.Equals("Return To Vendor") && Decimal.Add(cost.GetCurrentQty() , qty) != 0))
+                        if ((windowName.Equals("Invoice(Vendor)-Return") && Env.Signum(cost.GetCurrentQty()) != 0) ||
+                            (windowName.Equals("Return To Vendor") && Decimal.Add(cost.GetCurrentQty(), qty) != 0))
                         {
                             cost.SetCurrentCostPrice(Decimal.Round(
                                 Decimal.Divide(
@@ -4496,7 +4514,7 @@ namespace VAdvantage.Model
                     if ((cd.GetQty() < 0 ||
                         windowName.Equals("Internal Use Inventory") ||
                         windowName.Equals("AssetDisposal") ||
-                       // windowName.Equals("Physical Inventory") ||
+                        // windowName.Equals("Physical Inventory") ||
                         windowName.Equals("Return To Vendor") ||
                         windowName.Equals("Shipment") ||
                         windowName.Equals("Production Execution") ||
@@ -4506,7 +4524,7 @@ namespace VAdvantage.Model
                         && !(windowName.Equals("Material Receipt") ||
                              windowName.Equals("Customer Return") ||
                              windowName.Equals("PE-FinishGood") ||
-                             windowName.Equals("Physical Inventory") || 
+                             windowName.Equals("Physical Inventory") ||
                              windowName.Equals("Invoice(Vendor)") ||
                              (windowName.Equals("Inventory Move") && ((cd.GetQty() > 0 && !isReversed) || (cd.GetQty() < 0 && isReversed)))
                              ))

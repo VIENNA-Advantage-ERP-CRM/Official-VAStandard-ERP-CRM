@@ -2773,6 +2773,7 @@ namespace VAdvantage.Model
                                         else
                                         {
                                             price = price * rate.Value;
+                                            cmPrice = price;
                                         }
                                     }
                                 }
@@ -2817,6 +2818,7 @@ namespace VAdvantage.Model
                                 {
                                     Price = MConversionRate.Convert(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
                                                                             inventory.GetMovementDate(), 0, AD_Client_ID, AD_Org_ID2);
+                                    cmPrice = Price;
                                     if (Price == 0)
                                     {
                                         if (optionalstr != "window")
