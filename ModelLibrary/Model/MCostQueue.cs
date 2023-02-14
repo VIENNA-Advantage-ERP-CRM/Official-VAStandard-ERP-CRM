@@ -2737,7 +2737,8 @@ namespace VAdvantage.Model
 
                             // pick current cost price from product Costs 
                             // when physical inventory anor Internal use inventory and price define on transaction then not to get price from product costs
-                            if (!(price != 0 && (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")))
+                            if (!(Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) != 0 &&
+                                (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")))
                             {
                                 price = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(),
                                             M_ASI_ID, trxName, M_Warehouse_Id);

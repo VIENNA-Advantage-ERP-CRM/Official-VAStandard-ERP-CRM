@@ -1234,13 +1234,12 @@ namespace VAdvantage.Model
                               && !costingCheck.IsCostCalculationfromProcess)
                             {
                                 // we have to reduce price
-                                if (amt < 0 && price > 0)
+                                if (amt < 0 && price > 0 && cd.GetQty() < 0)
                                 {
                                     price = decimal.Negate(price);
                                 }
-                                else
+                                else if (amt > 0 && price < 0 && cd.GetQty() < 0)
                                 {
-                                    // when price -ve means increase cost
                                     price = Math.Abs(price);
                                 }
 
