@@ -55,6 +55,7 @@ namespace ModelLibrary.Classes
         public string errorMessage = String.Empty;
         public decimal? onHandQty = null;
         public bool IsCostCalculationfromProcess = false;
+        public decimal AdjustAmountAfterDiscount = 0;
         public decimal? currentQtyonQueue = null;
         public bool? IsPOCostingethodBindedonProduct = null;
         public DataSet dsCostElement = null;

@@ -2353,8 +2353,8 @@ namespace VAdvantage.Process
 
                 // for C_Invoice / C_InvoiceLine
                 countRecord = 0;
-                countRecord = DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N' , PostCurrentCostPrice = 0 
-                                                 WHERE M_Product_ID IN 
+                countRecord = DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N' , PostCurrentCostPrice = 0 , 
+                TotalInventoryAdjustment = 0, TotalCogsAdjustment = 0 WHERE M_Product_ID IN 
                                                  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 if (countRecord > 0)
                     DB.ExecuteQuery(@"UPDATE C_Invoice  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N'
@@ -2490,8 +2490,8 @@ namespace VAdvantage.Process
 
                 // for C_Invoice / C_InvoiceLine
                 countRecord = 0;
-                countRecord = DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N' , PostCurrentCostPrice = 0 
-                                                 WHERE M_Product_ID IN  (" + productID + " ) ", null, Get_Trx());
+                countRecord = DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N' , PostCurrentCostPrice = 0 , 
+                TotalInventoryAdjustment = 0, TotalCogsAdjustment = 0 WHERE M_Product_ID IN  (" + productID + " ) ", null, Get_Trx());
                 if (countRecord > 0)
                     DB.ExecuteQuery(@"UPDATE C_Invoice  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N'
                                        WHERE C_Invoice_ID IN ( 
@@ -2597,7 +2597,8 @@ namespace VAdvantage.Process
                 DB.ExecuteQuery(@"UPDATE M_Inout  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
 
                 // for C_Invoice / C_InvoiceLine
-                DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N', PostCurrentCostPrice = 0   WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
+                DB.ExecuteQuery(@"UPDATE c_invoiceline SET iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N', PostCurrentCostPrice = 0, 
+                TotalInventoryAdjustment = 0, TotalCogsAdjustment = 0 WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
                 DB.ExecuteQuery(@"UPDATE C_Invoice  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
 
                 // for C_ProvisionalInvoice / C_ProvisionalInvoiceLine
