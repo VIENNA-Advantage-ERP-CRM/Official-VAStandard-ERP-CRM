@@ -41,7 +41,7 @@ namespace VIS.Models
                         VAS_CONTRACTSUMMARY,  VAS_CONTRACTUTILIZEDAMOUNT,
                         VAS_JURISDICTION, VAS_OVERLIMIT, VAS_RENEWCONTRACT,
                         VAS_RENEWALDATE, VAS_RENEWALTERM, VAS_TERMINATE,
-                        VAS_TERMINATIONDATE
+                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID
                         FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID , null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -55,6 +55,7 @@ namespace VIS.Models
                     retDic["C_PaymentTerm_ID"] = ds.Tables[0].Rows[i]["C_PaymentTerm_ID"].ToString();
                     retDic["C_Project_ID"] = ds.Tables[0].Rows[i]["C_Project_ID"].ToString();
                     retDic["M_PriceList_ID"] = ds.Tables[0].Rows[i]["M_PriceList_ID"].ToString();
+                    retDic["VA009_PaymentMethod_ID"] = ds.Tables[0].Rows[i]["VA009_PaymentMethod_ID"].ToString();
                     retDic["VAS_ContractCategory_ID"] = ds.Tables[0].Rows[i]["VAS_ContractCategory_ID"].ToString();
                 }
             }

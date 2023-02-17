@@ -37,7 +37,7 @@ namespace VAdvantage.Model
             {
                 if (GetM_Product_ID() == 0 && GetC_Charge_ID() == 0)
                 {
-                    log.SaveError("", "VAS_MsutSelectProdChrg");
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_MsutSelectProdChrg"));
                     return false;
                 }
             }
