@@ -35,11 +35,12 @@ namespace VAdvantage.Process
 
             StringBuilder sql = new StringBuilder();
             sql.Append(@" UPDATE VAS_ContractMaster SET IsExpiredContracts = 
-                CASE WHEN (EndDate = Sysdate) THEN 'Y' ELSE 'N' END ");
+                CASE WHEN (EndDate = Sysdate) THEN 'Y' 
+                WHEN (EndDate < SYSDATE) THEN 'Y' ELSE 'N' END ");
             if (Util.GetValueOfInt(DB.ExecuteQuery
                 (sql.ToString(), null, Get_Trx())) < 0)
             {
-                log.SaveInfo("Error:", Msg.GetMsg(GetCtx(), "VAS_ExpiredNotUpdated"));
+                log.SaveInfo("", Msg.GetMsg(GetCtx(), "VAS_ExpiredNotUpdated"));
                 Get_TrxName().Rollback();
                 return Msg.GetMsg(GetCtx(), "VAS_ExpiredNotUpdated");
             }

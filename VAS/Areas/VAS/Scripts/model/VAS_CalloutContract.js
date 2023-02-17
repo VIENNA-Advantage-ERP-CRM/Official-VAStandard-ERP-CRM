@@ -22,8 +22,8 @@
             Edate.getMonth() - SDate.getMonth();
         var totalYears = (Edate.getFullYear() - SDate.getFullYear());
         //var difference = (Edate.getDate() - SDate.getDate()) / 30 +
-            //Edate.getMonth() - SDate.getMonth() +
-            //(12 * (Edate.getFullYear() - SDate.getFullYear()));
+        //Edate.getMonth() - SDate.getMonth() +
+        //(12 * (Edate.getFullYear() - SDate.getFullYear()));
         //var count = difference.toFixed(2);
         mTab.setValue("VAS_ContractMonths", totalMonths.toFixed(2));
         mTab.setValue("VAS_ContractDuration", totalYears.toFixed(2));
@@ -48,7 +48,7 @@
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
-    };    
+    };
     VAS_CalloutContract.prototype.StartDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
@@ -59,13 +59,15 @@
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-        if (endDate < startDate) {
-            VIS.ADialog.info("VAS_EndDateMustGreater", null, null, "");
+        if (mTab.getValue("EndDate") != null) {
+            if (endDate < startDate) {
+                VIS.ADialog.info("VAS_EndDateMustGreater", null, null, "");
+            }
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
-    };   
+    };
     VAS_CalloutContract.prototype.ContractRef = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
@@ -82,12 +84,14 @@
             mTab.setValue("C_PaymentTerm_ID", result["C_PaymentTerm_ID"]);
             mTab.setValue("C_Project_ID", result["C_Project_ID"]);
             mTab.setValue("M_PriceList_ID", result["M_PriceList_ID"]);
+            mTab.setValue("VA009_PaymentMethod_ID", result["VA009_PaymentMethod_ID"]);
+            mTab.setValue("C_BPartner_Location_ID", result["Bill_Location_ID"]);
             mTab.setValue("VAS_ContractCategory_ID", result["VAS_ContractCategory_ID"]);
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
-    }; 
+    };
     VAS_CalloutContract.prototype.PriceList = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         var dr = null;
