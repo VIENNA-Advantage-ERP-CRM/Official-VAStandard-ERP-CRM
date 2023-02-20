@@ -1901,13 +1901,17 @@ namespace VAdvantage.Model
                     _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
                     if (!string.IsNullOrEmpty(costingCheck.errorMessage))
                     {
-                        DB.ExecuteQuery("UPDATE M_MovementLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                            + GlobalVariable.TO_STRING(costingCheck.errorMessage) + " WHERE M_MovementLine_ID = " + line.GetM_MovementLine_ID(), null, Get_Trx());
                         _processMsg += ", " + costingCheck.errorMessage;
                     }
                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                     {
+                        Get_Trx().Rollback();
+                        costingCheck.UpdateCostError("M_MovementLine", line.GetM_MovementLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                         return false;
+                    }
+                    else
+                    {
+                        costingCheck.UpdateCostError("M_MovementLine", line.GetM_MovementLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                     }
                 }
                 else
