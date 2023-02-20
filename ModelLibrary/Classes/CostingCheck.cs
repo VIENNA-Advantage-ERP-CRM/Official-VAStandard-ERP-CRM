@@ -200,5 +200,24 @@ namespace ModelLibrary.Classes
             IsCostImmediate = false;
         }
 
+        /// <summary>
+        /// Update Cost Error on transaction line
+        /// </summary>
+        /// <param name="Tablename">TableName</param>
+        /// <param name="Record_id">Record ID</param>
+        /// <param name="ErrorMessage">Error Message</param>
+        /// <param name="trxname">Trx</param>
+        /// <param name="IsCommit">Is Commit record after update or not</param>
+        public void UpdateCostError(string Tablename, int Record_id, string ErrorMessage, Trx trxname, bool IsCommit)
+        {
+            DB.ExecuteQuery($@"UPDATE {Tablename} SET IsCostError = 'Y', CostErrorDetails = COALESCE(CostErrorDetails, '') || ', ' || 
+                               { GlobalVariable.TO_STRING(ErrorMessage)}
+             WHERE {Tablename}_ID = " + Record_id, null, trxname);
+            if (IsCommit)
+            {
+                trxname.Commit();
+            }
+        }
+
     }
 }
