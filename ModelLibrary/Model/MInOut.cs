@@ -3304,13 +3304,17 @@ namespace VAdvantage.Model
                                     {
                                         _processMsg += costingCheck.errorMessage;
                                     }
+
                                     // Update Error message on Line
-                                    DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                            + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                            + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                     {
+                                        Get_Trx().Rollback();
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                                         return DocActionVariables.STATUS_INVALID;
+                                    }
+                                    else
+                                    {
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                                     }
                                 }
                                 else
@@ -3390,13 +3394,17 @@ namespace VAdvantage.Model
                                     {
                                         _processMsg += costingCheck.errorMessage;
                                     }
+
                                     // Update Error message on Line
-                                    DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                            + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                            + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                     {
+                                        Get_Trx().Rollback();
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                                         return DocActionVariables.STATUS_INVALID;
+                                    }
+                                    else
+                                    {
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                                     }
                                 }
                                 else
@@ -3466,13 +3474,17 @@ namespace VAdvantage.Model
                                                 {
                                                     _processMsg += costingCheck.errorMessage;
                                                 }
+
                                                 // Update Error message on Line
-                                                DB.ExecuteQuery("UPDATE C_InvoiceLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                                        + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                                        + " WHERE C_InvoiceLine_ID = " + invoiceLine.GetC_InvoiceLine_ID(), null, Get_Trx());
                                                 if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                                 {
+                                                    Get_Trx().Rollback();
+                                                    costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                                                     return DocActionVariables.STATUS_INVALID;
+                                                }
+                                                else
+                                                {
+                                                    costingCheck.UpdateCostError("C_InvoiceLine", invoiceLine.GetC_InvoiceLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                                                 }
                                             }
                                             else
@@ -3524,13 +3536,17 @@ namespace VAdvantage.Model
                                     {
                                         _processMsg += costingCheck.errorMessage;
                                     }
+
                                     // Update Error message on Line
-                                    DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                            + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                            + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                     {
+                                        Get_Trx().Rollback();
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                                         return DocActionVariables.STATUS_INVALID;
+                                    }
+                                    else
+                                    {
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                                     }
                                 }
                                 else
@@ -3602,13 +3618,17 @@ namespace VAdvantage.Model
                                     {
                                         _processMsg += costingCheck.errorMessage;
                                     }
+
                                     // Update Error message on Line
-                                    DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                            + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                            + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                     {
+                                        Get_Trx().Rollback();
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                                         return DocActionVariables.STATUS_INVALID;
+                                    }
+                                    else
+                                    {
+                                        costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                                     }
                                 }
                                 else
@@ -4104,13 +4124,17 @@ namespace VAdvantage.Model
                         {
                             _processMsg += costingCheck.errorMessage;
                         }
+
                         // Update Error message on Line
-                        DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                         if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                         {
+                            Get_Trx().Rollback();
+                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                             return false;
+                        }
+                        else
+                        {
+                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                         }
                     }
                     else
@@ -4172,13 +4196,17 @@ namespace VAdvantage.Model
                         {
                             _processMsg += costingCheck.errorMessage;
                         }
+
                         // Update Error message on Line
-                        DB.ExecuteQuery("UPDATE M_InOutLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                + " WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                         if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                         {
+                            Get_Trx().Rollback();
+                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                             return false;
+                        }
+                        else
+                        {
+                            costingCheck.UpdateCostError("M_InOutLine", sLine.GetM_InOutLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                         }
                     }
                     else
