@@ -2456,6 +2456,14 @@ namespace VAdvantage.Model
                                         conversionNotFound = invoice.GetDocumentNo();
                                         _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                        if (ProductLineCost == 0)
+                                        {
+                                            costingCheck.errorMessage += "Price not available";
+                                        }
+                                        else
+                                        {
+                                            costingCheck.errorMessage += "Conversion not available";
+                                        }
                                         return false;
                                     }
                                 }
@@ -2527,6 +2535,10 @@ namespace VAdvantage.Model
                                                         trxName.Rollback();
                                                     }
                                                     conversionNotFound = invoice.GetDocumentNo();
+                                                    if (costingCheck != null && string.IsNullOrEmpty(costingCheck.errorMessage))
+                                                    {
+                                                        costingCheck.errorMessage += "Price not available";
+                                                    }
                                                     return false;
                                                 }
                                                 query.Clear();
@@ -4244,7 +4256,7 @@ namespace VAdvantage.Model
                                             DB.ExecuteQuery("DELETE FROM M_CostQueue WHERE M_CostQueue_ID IN ( " + costQueuseIds + " )", null, trxName);
                                         }
                                     }
-                                    _log.Severe("Error occured during UpdateProductCost for M_InventoryLine_ID = " + inventoryLine.GetM_InventoryLine_ID());
+                                    _log.Severe("Error occured during UpdateProductCost for VAMFG_M_WrkOdrTrnsctionLine_ID = " + cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
                                     return false;
                                 }
                             }
@@ -6235,6 +6247,7 @@ namespace VAdvantage.Model
                                                   Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_conversiontype_id"]), AD_Client_ID, invoiceLine.GetAD_Org_ID());
                             if (PriceActual > 0 && surchargeAmount == 0)
                             {
+                                costingCheck.errorMessage += "Conversion not available";
                                 return 0;
                             }
                             PriceLifoOrFifo += Decimal.Round(Decimal.Add(surchargeAmount, Decimal.Divide(Decimal.Multiply(surchargeAmount, ce.GetSurchargePercentage()), 100)), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
@@ -6322,6 +6335,7 @@ namespace VAdvantage.Model
                                                                      invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, invoice.GetAD_Org_ID());
                             if (ProductLineCost > 0 && surchargeAmount == 0)
                             {
+                                costingCheck.errorMessage += "Conversion not available";
                                 return 0;
                             }
                             PriceLifoOrFifo += Decimal.Round(Decimal.Add(surchargeAmount, Decimal.Divide(Decimal.Multiply(surchargeAmount, ce.GetSurchargePercentage()), 100)), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
