@@ -123,6 +123,12 @@ namespace VAdvantage.Model
                 Set_Value("VA068_RegisteredLocation_ID", subscriber.Get_ValueAsInt("VA068_RegisteredLocation_ID"));
                 Set_Value("VA068_RegisteredUser_ID", subscriber.Get_ValueAsInt("VA068_RegisteredUser_ID"));
             }
+            else if (Env.IsModuleInstalled("VA068_"))
+            {
+                Set_Value("C_BPartner_ID", C_BPartner_ID);
+                Set_Value("C_BPartner_Location_ID", C_BPartner_Location_ID);
+                Set_Value("AD_User_ID", AD_User_ID);
+            }
             else
             {
                 SetC_BPartner_ID(C_BPartner_ID);
