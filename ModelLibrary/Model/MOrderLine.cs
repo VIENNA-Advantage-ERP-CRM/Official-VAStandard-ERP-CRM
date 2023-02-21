@@ -4171,7 +4171,7 @@ namespace VAdvantage.Model
                             log.SaveError(Msg.Translate(GetCtx(), "VIS_OrderQtyMoreThnEstimation"), "");
                             return false;
                         }
-                    }                    
+                    }
 
                     // JID_0969: System should not allow to set Qty Order more than blanket order qty.
                     if (docType.IsReleaseDocument() && (docType.GetDocBaseType() == "SOO" || docType.GetDocBaseType() == "POO"))
@@ -4193,14 +4193,13 @@ namespace VAdvantage.Model
                         //To get value of controlType                        
                         if (Ord.Get_ColumnIndex("VAS_ControlType") >= 0)
                         {
-                            string Cttype = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT VAS_ControlType FROM C_Order 
+                            _ControlType = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT VAS_ControlType FROM C_Order 
                             WHERE C_Order_ID = " + Ord.GetC_Order_Blanket(), null, Get_Trx()));
-                            _ControlType = Cttype;
                         }
 
                         //check for control type empty for old scenario
                         //and control type QTY for new OR Qty + Price
-                        if (_ControlType.Equals(string.Empty) || _ControlType.Equals("QTY") 
+                        if (_ControlType.Equals(string.Empty) || _ControlType.Equals("QTY")
                             || _ControlType.Equals("PAQ"))
                         {
                             QtyBlanketPending = GetQtyBlanket();
@@ -4222,20 +4221,15 @@ namespace VAdvantage.Model
                                 SetPriceActual(prcAct);
                                 SetPriceList(prcList);
                             }
-                            else if (!newRecord && (Is_ValueChanged("PriceEntered") || Is_ValueChanged("PriceActual")
-                                || Is_ValueChanged("PriceList")))
+                            if (!newRecord && (Is_ValueChanged("PriceEntered") || Is_ValueChanged("PriceActual")
+                            || Is_ValueChanged("PriceList")))
                             {
-                                SetPriceEntered(prcEnt);
-                                SetPriceActual(prcAct);
-                                SetPriceList(prcList);
                                 log.SaveError("Error", Msg.GetMsg(GetCtx(), "PriceCantChange"));
                                 return false;
                             }
 
                         }
                     }
-
-
 
                     //	Set Price if Actual = 0
                     if (Env.IsModuleInstalled("ED011_"))
