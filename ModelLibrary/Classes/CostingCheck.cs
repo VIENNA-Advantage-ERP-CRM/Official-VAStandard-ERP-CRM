@@ -210,8 +210,7 @@ namespace ModelLibrary.Classes
         /// <param name="IsCommit">Is Commit record after update or not</param>
         public void UpdateCostError(string Tablename, int Record_id, string ErrorMessage, Trx trxname, bool IsCommit)
         {
-            DB.ExecuteQuery($@"UPDATE {Tablename} SET IsCostError = 'Y', CostErrorDetails = COALESCE(CostErrorDetails, '') || ', ' || 
-                               { GlobalVariable.TO_STRING(ErrorMessage)}
+            DB.ExecuteQuery($@"UPDATE {Tablename} SET IsCostError = 'Y', CostErrorDetails = { GlobalVariable.TO_STRING(ErrorMessage)}
              WHERE {Tablename}_ID = " + Record_id, null, trxname);
             if (IsCommit)
             {
