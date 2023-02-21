@@ -993,7 +993,14 @@ namespace VAdvantage.Model
                                         conversionNotFound = inout.GetDocumentNo();
                                         _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                     " - Document No  = " + conversionNotFound);
-                                        costingCheck.errorMessage += "Price not available";
+                                        if (receivedPrice != 0 && Price == 0)
+                                        {
+                                            costingCheck.errorMessage += "Conversion not available";
+                                        }
+                                        else if (receivedPrice == 0)
+                                        {
+                                            costingCheck.errorMessage += "Price not available";
+                                        }
                                         return false;
                                     }
                                 }
@@ -1087,7 +1094,10 @@ namespace VAdvantage.Model
                                     conversionNotFound = inout.GetDocumentNo();
                                     _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
-                                    costingCheck.errorMessage += "Price not available";
+                                    if (string.IsNullOrEmpty(costingCheck.errorMessage))
+                                    {
+                                        costingCheck.errorMessage += "Price not available either on Product Costs or on Purchase Price list";
+                                    }
                                     return false;
                                 }
                             }
@@ -1382,6 +1392,15 @@ namespace VAdvantage.Model
                                     }
                                     conversionNotFound = order.GetDocumentNo();
                                     _log.Severe("Currency Conversion not found-> MatchPO. Order No is " + order.GetDocumentNo());
+
+                                    if (ProductOrderLineCost != 0 && Price == 0)
+                                    {
+                                        costingCheck.errorMessage += "Conversion not available";
+                                    }
+                                    else if (ProductOrderLineCost == 0)
+                                    {
+                                        costingCheck.errorMessage += "Price not available";
+                                    }
                                     return false;
                                 }
                             }
@@ -2289,6 +2308,10 @@ namespace VAdvantage.Model
                                                 conversionNotFound = invoice.GetDocumentNo();
                                                 _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                                if (costingCheck != null && string.IsNullOrEmpty(costingCheck.errorMessage))
+                                                {
+                                                    costingCheck.errorMessage += "Price not available";
+                                                }
                                                 return false;
                                             }
                                             query.Clear();
@@ -2355,6 +2378,14 @@ namespace VAdvantage.Model
                                                     conversionNotFound = inv.GetDocumentNo();
                                                     _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                                    if (PriceActualIncludedTax == 0)
+                                                    {
+                                                        costingCheck.errorMessage += "Price not available";
+                                                    }
+                                                    else
+                                                    {
+                                                        costingCheck.errorMessage += "Conversion not available";
+                                                    }
                                                     return false;
                                                 }
                                             }
@@ -2604,6 +2635,14 @@ namespace VAdvantage.Model
                                                         conversionNotFound = inv.GetDocumentNo();
                                                         _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                                        if (PriceActualIncludedTax == 0)
+                                                        {
+                                                            costingCheck.errorMessage += "Price not available";
+                                                        }
+                                                        else
+                                                        {
+                                                            costingCheck.errorMessage += "Conversion not available";
+                                                        }
                                                         return false;
                                                     }
                                                 }
@@ -2841,7 +2880,7 @@ namespace VAdvantage.Model
                                         conversionNotFound = inventory.GetDocumentNo();
                                         _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
-                                        costingCheck.errorMessage += "Price not available";
+                                        costingCheck.errorMessage += "Conversion not available";
                                         return false;
                                     }
                                 }
@@ -2890,7 +2929,14 @@ namespace VAdvantage.Model
                                     conversionNotFound = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocumentNo from VAMFG_M_WrkOdrTransaction where VAMFG_M_WrkOdrTransaction_ID = " + Util.GetValueOfInt(po.Get_Value("VAMFG_M_WrkOdrTransaction_ID"))));
                                     _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
-                                    costingCheck.errorMessage += "Price not available";
+                                    if (Price == 0)
+                                    {
+                                        costingCheck.errorMessage += "Price not available";
+                                    }
+                                    else
+                                    {
+                                        costingCheck.errorMessage += "Conversion not available";
+                                    }
                                     return false;
                                 }
                             }
@@ -6481,10 +6527,18 @@ namespace VAdvantage.Model
 
                 amount = amount * inoutline.GetQtyEntered();
                 // conversion of amount
-                if (c_currency_id != 0 && c_currency_id != CurrencyTo)
+                if (c_currency_id != 0 && c_currency_id != CurrencyTo && amount != 0)
                 {
                     amount = MConversionRate.Convert(inout.GetCtx(), amount, c_currency_id, CurrencyTo,
                                                                             inout.GetDateAcct(), 0, inout.GetAD_Client_ID(), inout.GetAD_Org_ID());
+                    if (amount == 0)
+                    {
+                        costingcheck.errorMessage += "Conversion not available";
+                    }
+                }
+                else
+                {
+                    costingcheck.errorMessage += "Price not available";
                 }
             }
             catch (Exception ex)
