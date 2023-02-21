@@ -4176,18 +4176,60 @@ namespace VAdvantage.Model
                     // JID_0969: System should not allow to set Qty Order more than blanket order qty.
                     if (docType.IsReleaseDocument() && (docType.GetDocBaseType() == "SOO" || docType.GetDocBaseType() == "POO"))
                     {
-                        QtyBlanketPending = GetQtyBlanket();
-                        QtyOrdered = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(QtyOrdered) FROM C_Order o INNER JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID
-                            WHERE ol.C_OrderLine_Blanket_ID = " + GetC_OrderLine_Blanket_ID() + @" AND ol.IsActive = 'Y' AND o.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO') AND ol.C_OrderLine_ID <> "
-                                                                + Get_ID(), null, Get_Trx()));
-                        if (Decimal.Add(Convert.ToDecimal(QtyOrdered), GetQtyOrdered()) > QtyBlanketPending)
+                        //Get Control Type and Prices against selected 
+                        // blanket order
+                        string _ControlType = string.Empty;
+                        Decimal? prcEnt = 0;
+                        Decimal? prcAct = 0;
+                        Decimal? prcList = 0;
+                        DataSet PrcDS = DB.ExecuteDataset(@" SELECT PriceEntered, PriceList, PriceActual, 
+                             QtyEntered, QtyEstimation FROM C_OrderLine WHERE  C_OrderLine_ID = " + GetC_OrderLine_Blanket_ID(), null, Get_Trx());
+                        if (PrcDS != null && PrcDS.Tables.Count > 0 && PrcDS.Tables[0].Rows.Count > 0)
                         {
-                            log.SaveError("VIS_OrderQtyMoreThnBlanketPending", "");
-                            return false;
+                            prcAct = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceActual"]);
+                            prcEnt = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceEntered"]);
+                            prcList = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceList"]);
+                        }
+                        //To get value of controlType                        
+                        if (Ord.Get_ColumnIndex("VAS_ControlType") >= 0)
+                        {
+                            _ControlType = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT VAS_ControlType FROM C_Order 
+                            WHERE C_Order_ID = " + Ord.GetC_Order_Blanket(), null, Get_Trx()));
+                        }
+
+                        //check for control type empty for old scenario
+                        //and control type QTY for new OR Qty + Price
+                        if (_ControlType.Equals(string.Empty) || _ControlType.Equals("QTY")
+                            || _ControlType.Equals("PAQ"))
+                        {
+                            QtyBlanketPending = GetQtyBlanket();
+                            QtyOrdered = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(QtyOrdered) FROM C_Order o INNER JOIN C_OrderLine ol ON ol.C_Order_ID = o.C_Order_ID
+                            WHERE ol.C_OrderLine_Blanket_ID = " + GetC_OrderLine_Blanket_ID() + @" AND ol.IsActive = 'Y' AND o.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO') AND ol.C_OrderLine_ID <> "
+                                                                    + Get_ID(), null, Get_Trx()));
+                            if (Decimal.Add(Convert.ToDecimal(QtyOrdered), GetQtyOrdered()) > QtyBlanketPending)
+                            {
+                                log.SaveError("VIS_OrderQtyMoreThnBlanketPending", "");
+                                return false;
+                            }
+                        }
+                        //Check for control type Price or Qty+Price
+                        if (_ControlType.Equals("PRC") || _ControlType.Equals("PAQ"))
+                        {
+                            if (newRecord)
+                            {
+                                SetPriceEntered(prcEnt);
+                                SetPriceActual(prcAct);
+                                SetPriceList(prcList);
+                            }
+                            if (!newRecord && (Is_ValueChanged("PriceEntered") || Is_ValueChanged("PriceActual")
+                            || Is_ValueChanged("PriceList")))
+                            {
+                                log.SaveError("Error", Msg.GetMsg(GetCtx(), "PriceCantChange"));
+                                return false;
+                            }
+
                         }
                     }
-
-
 
                     //	Set Price if Actual = 0
                     if (Env.IsModuleInstalled("ED011_"))
