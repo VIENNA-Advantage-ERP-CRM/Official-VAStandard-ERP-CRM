@@ -4171,25 +4171,25 @@ namespace VAdvantage.Model
                             log.SaveError(Msg.Translate(GetCtx(), "VIS_OrderQtyMoreThnEstimation"), "");
                             return false;
                         }
-                    }
-                    //Get Control Type and Prices against selected 
-                    // blanket order
-                    string _ControlType = string.Empty;
-                    Decimal? prcEnt = Util.GetValueOfDecimal(Get_ValueOld("PriceEntered"));
-                    Decimal? prcAct = Util.GetValueOfDecimal(Get_ValueOld("PriceActual"));
-                    Decimal? prcList = Util.GetValueOfDecimal(Get_ValueOld("PriceList"));
-                    DataSet PrcDS = DB.ExecuteDataset(@" SELECT PriceEntered, PriceList, PriceActual, 
-                             QtyEntered, QtyEstimation FROM C_OrderLine WHERE  C_OrderLine_ID = " + GetC_OrderLine_Blanket_ID(), null, Get_Trx());
-                    if (PrcDS != null && PrcDS.Tables.Count > 0 && PrcDS.Tables[0].Rows.Count > 0)
-                    {
-                        prcAct = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceActual"]);
-                        prcEnt = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceEntered"]);
-                        prcList = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceList"]);
-                    }
+                    }                    
 
                     // JID_0969: System should not allow to set Qty Order more than blanket order qty.
                     if (docType.IsReleaseDocument() && (docType.GetDocBaseType() == "SOO" || docType.GetDocBaseType() == "POO"))
                     {
+                        //Get Control Type and Prices against selected 
+                        // blanket order
+                        string _ControlType = string.Empty;
+                        Decimal? prcEnt = 0;
+                        Decimal? prcAct = 0;
+                        Decimal? prcList = 0;
+                        DataSet PrcDS = DB.ExecuteDataset(@" SELECT PriceEntered, PriceList, PriceActual, 
+                             QtyEntered, QtyEstimation FROM C_OrderLine WHERE  C_OrderLine_ID = " + GetC_OrderLine_Blanket_ID(), null, Get_Trx());
+                        if (PrcDS != null && PrcDS.Tables.Count > 0 && PrcDS.Tables[0].Rows.Count > 0)
+                        {
+                            prcAct = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceActual"]);
+                            prcEnt = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceEntered"]);
+                            prcList = Util.GetValueOfDecimal(PrcDS.Tables[0].Rows[0]["PriceList"]);
+                        }
                         //To get value of controlType                        
                         if (Ord.Get_ColumnIndex("VAS_ControlType") >= 0)
                         {
