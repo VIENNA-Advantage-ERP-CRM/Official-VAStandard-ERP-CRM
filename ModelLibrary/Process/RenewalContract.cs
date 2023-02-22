@@ -32,13 +32,13 @@ namespace VAdvantage.Process
     {
         # region    private varriables 
         private ValueNamePair pp = null;
-        private string errorMsg = "";
+        private string rMsg = "";
         static VLogger log = VLogger.GetVLogger("RenewalContract");
         DateTime? StartDate;
         DateTime? EndDate;
         #endregion
         protected override string DoIt()
-        {
+        {            
             int C_OldContract_ID = GetRecord_ID();
             MVASContractMaster _oldCont = new MVASContractMaster(GetCtx(),
                                 C_OldContract_ID, Get_Trx());
@@ -51,6 +51,8 @@ namespace VAdvantage.Process
             _newCont.SetBill_Location_ID(_oldCont.GetBill_Location_ID());
             _newCont.SetStartDate(StartDate);
             _newCont.SetEndDate(EndDate);
+            _newCont.SetDocumentNo(string.Empty);
+            _newCont.SetIsExpiredContracts("N");
             _newCont.SetVAS_ContractDuration(Util.GetValueOfString(EndDate.Value.Year - StartDate.Value.Year));
             _newCont.SetVAS_ContractMonths(Util.GetValueOfString(
                 decimal.Negate(EndDate.Value.Month - StartDate.Value.Month)));
@@ -59,24 +61,24 @@ namespace VAdvantage.Process
                 pp = VLogger.RetrieveError();
                 if (pp != null)
                 {
-                    errorMsg = pp.GetName();
-                    if (errorMsg == "")
+                    rMsg = pp.GetName();
+                    if (rMsg == "")
                     {
-                        errorMsg = pp.GetValue();
+                        rMsg = pp.GetValue();
                     }
                 }
-                if (errorMsg == "")
+                if (rMsg == "")
                 {
-                    errorMsg = Msg.GetMsg(GetCtx(), "VAS_ContNotCopied");
+                    rMsg = Msg.GetMsg(GetCtx(), "VAS_ContNotCopied");
                 }
                 Get_TrxName().Rollback();
-                return errorMsg;
+                return rMsg;
             }
 
             int[] _oldlinesIds = MVASContractLine.GetAllIDs(
                                           X_VAS_ContractLine.Table_Name, " VAS_ContractMaster_ID = " +
                                           GetRecord_ID(), Get_Trx());
-            if (_oldlinesIds.Length > 0)
+            if (_oldlinesIds != null && _oldlinesIds.Length > 0)
             {
                 MVASContractLine _newLine = null;
                 MVASContractLine _oldLine = null;
@@ -95,18 +97,18 @@ namespace VAdvantage.Process
                         pp = VLogger.RetrieveError();
                         if (pp != null)
                         {
-                            errorMsg = pp.GetName();
-                            if (errorMsg == "")
+                            rMsg = pp.GetName();
+                            if (rMsg == "")
                             {
-                                errorMsg = pp.GetValue();
+                                rMsg = pp.GetValue();
                             }
                         }
-                        if (errorMsg == "")
+                        if (rMsg == "")
                         {
-                            errorMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
+                            rMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
                         }
                         Get_TrxName().Rollback();
-                        return errorMsg;
+                        return rMsg;
                     }
                 }
             }
@@ -114,7 +116,7 @@ namespace VAdvantage.Process
             _oldlinesIds = MVASContractOwner.GetAllIDs(
                                           X_VAS_ContractOwner.Table_Name, " VAS_ContractMaster_ID = " +
                                           GetRecord_ID(), Get_Trx());
-            if (_oldlinesIds.Length > 0)
+            if (_oldlinesIds != null && _oldlinesIds.Length > 0)
             {
                 MVASContractOwner _newCLine = null;
                 MVASContractOwner _oldCLine = null;
@@ -133,18 +135,18 @@ namespace VAdvantage.Process
                         pp = VLogger.RetrieveError();
                         if (pp != null)
                         {
-                            errorMsg = pp.GetName();
-                            if (errorMsg == "")
+                            rMsg = pp.GetName();
+                            if (rMsg == "")
                             {
-                                errorMsg = pp.GetValue();
+                                rMsg = pp.GetValue();
                             }
                         }
-                        if (errorMsg == "")
+                        if (rMsg == "")
                         {
-                            errorMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
+                            rMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
                         }
                         Get_TrxName().Rollback();
-                        return errorMsg;
+                        return rMsg;
                     }
                 }
             }
@@ -152,7 +154,7 @@ namespace VAdvantage.Process
             _oldlinesIds = MVASContractTerms.GetAllIDs(
                                           X_VAS_ContractTerms.Table_Name, " VAS_ContractMaster_ID = " +
                                           GetRecord_ID(), Get_Trx());
-            if (_oldlinesIds.Length > 0)
+            if (_oldlinesIds != null && _oldlinesIds.Length > 0)
             {
                 MVASContractTerms _newTLine = null;
                 MVASContractTerms _oldTLine = null;
@@ -171,23 +173,28 @@ namespace VAdvantage.Process
                         pp = VLogger.RetrieveError();
                         if (pp != null)
                         {
-                            errorMsg = pp.GetName();
-                            if (errorMsg == "")
+                            rMsg = pp.GetName();
+                            if (rMsg == "")
                             {
-                                errorMsg = pp.GetValue();
+                                rMsg = pp.GetValue();
                             }
                         }
-                        if (errorMsg == "")
+                        if (rMsg == "")
                         {
-                            errorMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
+                            rMsg = Msg.GetMsg(GetCtx(), "VAS_LineNotCopied");
                         }
                         Get_TrxName().Rollback();
-                        return errorMsg;
+                        return rMsg;
                     }
                 }
             }
 
-            return errorMsg;
+            if(string.IsNullOrEmpty(rMsg))
+            {
+                rMsg = Msg.GetMsg(GetCtx(), "VAS_ContractRenewed") + _newCont.GetDocumentNo();
+            }
+
+            return rMsg;
         }
 
         protected override void Prepare()
