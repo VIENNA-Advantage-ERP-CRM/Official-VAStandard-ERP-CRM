@@ -4371,7 +4371,7 @@ namespace VAdvantage.Model
                         else if (GetGrandTotal() <= ContractRemainingAmt)
                         {
                             _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                + ContractRemainingAmt);
+                                + GetGrandTotal());
                             if (!_vasCont.Save())
                             {
                                 log.Warning("ContractUtilizedAmount Not Updated");
