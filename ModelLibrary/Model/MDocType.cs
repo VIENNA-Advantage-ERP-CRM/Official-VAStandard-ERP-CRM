@@ -265,7 +265,7 @@ namespace VAdvantage.Model
         /// </summary>
         public void SetGL_Category_ID()
         {
-            String sql = "SELECT * FROM GL_Category WHERE AD_Client_ID=" + GetAD_Client_ID() + "AND IsDefault='Y'";
+            String sql = "SELECT * FROM GL_Category WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND IsDefault='Y'";
 
             int GL_Category_ID = DataBase.DB.GetSQLValue(Get_TrxName(), sql);
             if (GL_Category_ID == 0)
