@@ -261,6 +261,31 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// After Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">true when saved</param>
+        /// <returns>true if success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+                return success;
+
+            //VIS_0046: check conversion available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord || Is_ValueChanged("MovementDate")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), 0, 0,
+                    GetM_Warehouse_ID(), 0, true, GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Set Processed.
         ///	Propergate to Lines/Taxes
         /// </summary>
@@ -1876,13 +1901,17 @@ namespace VAdvantage.Model
                     _processMsg = Msg.GetMsg(GetCtx(), "VIS_CostNotCalculated");
                     if (!string.IsNullOrEmpty(costingCheck.errorMessage))
                     {
-                        DB.ExecuteQuery("UPDATE M_MovementLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                            + GlobalVariable.TO_STRING(costingCheck.errorMessage) + " WHERE M_MovementLine_ID = " + line.GetM_MovementLine_ID(), null, Get_Trx());
                         _processMsg += ", " + costingCheck.errorMessage;
                     }
                     if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                     {
+                        Get_Trx().Rollback();
+                        costingCheck.UpdateCostError("M_MovementLine", line.GetM_MovementLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                         return false;
+                    }
+                    else
+                    {
+                        costingCheck.UpdateCostError("M_MovementLine", line.GetM_MovementLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                     }
                 }
                 else

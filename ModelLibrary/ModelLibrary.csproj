@@ -245,6 +245,11 @@
     <Compile Include="Model\MRegion.cs" />
     <Compile Include="Model\MSalesRegion.cs" />
     <Compile Include="ModelAD\MSetup.cs" />
+    <Compile Include="Model\MVASContractLine.cs" />
+    <Compile Include="Model\MVASContractTerms.cs" />
+    <Compile Include="Model\MVASContractOwner.cs" />
+    <Compile Include="Model\MVASContractCategory.cs" />
+    <Compile Include="Model\MVASContractMaster.cs" />
     <Compile Include="Model\MWarehouse.cs" />
     <Compile Include="Model\UserPricingInterface.cs" />
     <Compile Include="Model\AcctViewerData.cs" />
@@ -545,6 +550,8 @@
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\DocumentEngine.cs" />
+    <Compile Include="Process\MarkExpireContract.cs" />
+    <Compile Include="Process\RenewalContract.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />
     <Compile Include="Process\AcctSchemaDefaultCopy.cs" />

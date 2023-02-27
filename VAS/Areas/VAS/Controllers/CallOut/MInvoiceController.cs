@@ -152,5 +152,23 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// DevOps Task-1851 - Get Invoice Details
+        /// </summary>
+        /// <param name="fields">Invoice Line ID</param>
+        /// <returns>InvoiceLineDetail</returns>
+        /// <writer>VIS_0045</writer>
+        public JsonResult GetInvoiceLineDetail(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel objInvoice = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(objInvoice.GetInvoiceLineDetail(fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

@@ -16,7 +16,7 @@ using VAdvantage.Logging;
 
 namespace VAdvantage.Model
 {
-    public class MStatus : X_R_Status
+    public class MStatus: X_R_Status
     {
         // Static Logger					
         private static VLogger _log = VLogger.GetVLogger(typeof(MStatus).FullName);
@@ -209,10 +209,12 @@ namespace VAdvantage.Model
             //
 
             //VIS0336:changes done for not allowing multiple open checbox true.
+            int COUNT = 0;
+            StringBuilder query = new StringBuilder();
             if (IsOpen())
             {
-                string Sql = "SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND IsOpen='Y' AND IsActive='Y' ";
-                int COUNT = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, null));
+                query.Append("SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND R_Status_ID !=" + GetR_Status_ID() + " AND IsOpen='Y' AND IsActive='Y'");
+                COUNT = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
 
                 if (COUNT >= 1)
                 {
@@ -225,8 +227,9 @@ namespace VAdvantage.Model
             //VIS0336:changes done for not allowing multiple open IsFinalClose true.
             if (IsFinalClose())
             {
-                string Sql = "SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND IsFinalClose='Y' AND IsActive='Y' ";
-                int COUNT = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, null));
+                query.Clear();
+                query.Append("SELECT COUNT(R_Status_ID) FROM  R_Status WHERE R_StatusCategory_ID=" + GetR_StatusCategory_ID() + " AND R_Status_ID !="+GetR_Status_ID()+" AND IsFinalClose='Y' AND IsActive='Y'");
+                COUNT = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
 
                 if (COUNT >= 1)
                 {

@@ -124,6 +124,7 @@
     <Compile Include="Models\Callouts\MTeamForcastModel.cs" />
     <Compile Include="Models\Callouts\MUOMConversionModel.cs" />
     <Compile Include="Models\Callouts\MUOMModel.cs" />
+    <Compile Include="Models\Callouts\MVASContractModel.cs" />
     <Compile Include="Models\Callouts\MWarehouseModel.cs" />
     <Compile Include="Models\ForecastFormModel.cs" />
     <Compile Include="Models\MChart.cs" />

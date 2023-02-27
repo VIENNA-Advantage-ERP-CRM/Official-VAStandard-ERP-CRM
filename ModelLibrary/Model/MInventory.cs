@@ -315,6 +315,32 @@ namespace VAdvantage.Model
             return true;
         }
 
+        /// <summary>
+        /// Implement After Save Logic
+        /// </summary>
+        /// <param name="newRecord">Is New Record</param>
+        /// <param name="success">Is Success</param>
+        /// <returns>True, when saved</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+            {
+                return success;
+            }
+
+            //VIS_0046: check conversion available 
+            if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord || Is_ValueChanged("MovementDate")))
+            {
+                string condition = MCost.CheckCostingCodition(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), 0, 0,
+                    GetM_Warehouse_ID(), 0, true, GetMovementDate(), 0, 0, Get_Trx());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    log.SaveWarning("", condition);
+                }
+            }
+            return true;
+        }
+
 
         /**
          * 	Set Processed.
@@ -2001,7 +2027,8 @@ namespace VAdvantage.Model
                 {
                     quantity = Qty;
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, costingCheck.M_ASI_ID,
-                   "Physical Inventory", line, null, null, null, null, 0, quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                   "Physical Inventory", line, null, null, null, null, Util.GetValueOfDecimal(line.Get_Value("PriceCost")),
+                   quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                         {
@@ -2012,13 +2039,17 @@ namespace VAdvantage.Model
                         {
                             _processMsg += costingCheck.errorMessage;
                         }
+
                         // Update Error message on Line
-                        DB.ExecuteQuery("UPDATE M_InventoryLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                                + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                                + " WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
                         if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                         {
+                            Get_Trx().Rollback();
+                            costingCheck.UpdateCostError("M_InventoryLine", line.GetM_InventoryLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                             return false;
+                        }
+                        else
+                        {
+                            costingCheck.UpdateCostError("M_InventoryLine", line.GetM_InventoryLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                         }
                     }
                     else
@@ -2053,7 +2084,9 @@ namespace VAdvantage.Model
                 {
                     quantity = Qty;// Decimal.Negate(line.GetQtyInternalUse());
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, costingCheck.M_ASI_ID,
-                   "Internal Use Inventory", line, null, null, null, null, 0, quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
+                   "Internal Use Inventory", line, null, null, null, null,
+                   ((quantity < 0 && !IsReversal()) || (quantity > 0 && IsReversal())) ? Util.GetValueOfDecimal(line.Get_Value("PriceCost")) : 0,
+                   quantity, Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                         {
@@ -2064,13 +2097,17 @@ namespace VAdvantage.Model
                         {
                             _processMsg += costingCheck.errorMessage;
                         }
+
                         // Update Error message on Line
-                        DB.ExecuteQuery("UPDATE M_InventoryLine SET IsCostError = 'Y', CostErrorDetails = CostErrorDetails || ', ' || "
-                            + GlobalVariable.TO_STRING(costingCheck.errorMessage)
-                            + " WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
                         if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                         {
+                            Get_Trx().Rollback();
+                            costingCheck.UpdateCostError("M_InventoryLine", line.GetM_InventoryLine_ID(), costingCheck.errorMessage, Get_Trx(), true);
                             return false;
+                        }
+                        else
+                        {
+                            costingCheck.UpdateCostError("M_InventoryLine", line.GetM_InventoryLine_ID(), costingCheck.errorMessage, Get_Trx(), false);
                         }
                     }
                     else
