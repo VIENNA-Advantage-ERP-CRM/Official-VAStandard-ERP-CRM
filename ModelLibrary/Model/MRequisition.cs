@@ -957,6 +957,8 @@ namespace VAdvantage.Model
 
                 MRequisitionLine[] lines = GetLines();
                 Decimal totalLines = Env.ZERO;
+
+
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MRequisitionLine line = lines[i];
@@ -1045,6 +1047,23 @@ namespace VAdvantage.Model
                 SetDocAction(DOCACTION_None);
                 log.Info("voidIt - " + ToString());
                 return true;
+            }
+            //VIS0336_changes for setting amount 0.
+            if (DOCACTION_Void.Equals(GetDocAction()))
+
+            {
+                MRequisitionLine[] lines = GetLines();
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    MRequisitionLine line = lines[i];
+                    line.SetLineNetAmt(Env.ZERO);
+                    if (!line.Save())
+                    {
+                        _processMsg = Msg.GetMsg(GetCtx(), "ReqLineNotSaved");
+                        return false;
+                    }
+                }
+                SetTotalLines(Env.ZERO);
             }
             if (!CloseIt())
             {
