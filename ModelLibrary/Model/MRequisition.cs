@@ -1049,13 +1049,26 @@ namespace VAdvantage.Model
                 return true;
             }
             //VIS0336_changes for setting amount 0.
-            if (DOCACTION_Void.Equals(GetDocAction()))
+            else if (DOCSTATUS_Drafted.Equals(GetDocStatus()))
 
             {
                 MRequisitionLine[] lines = GetLines();
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MRequisitionLine line = lines[i];
+
+                    String description = line.GetDescription();
+                    if (description == null)
+                        description = "";
+                    description += Msg.GetMsg(Env.GetContext(), "Voided", true) + " (" + line.GetQty() + ")";
+                    line.SetDescription(description);
+                    line.SetQty(0);
+                    line.SetQtyEntered(0);
+                    if (line.Get_ColumnIndex("QtyReserved") > 0)
+                    {
+                        line.SetQtyReserved(Env.ZERO);
+                    }
+                    line.Set_Value("Ref_OrderLine_ID", null);
                     line.SetLineNetAmt(Env.ZERO);
                     if (!line.Save())
                     {

@@ -517,13 +517,9 @@ namespace VAdvantage.Model
                 }
 
                 // Set Line Net Amount if not calculated
-                MRequisition requisition = new MRequisition(GetCtx(), GetM_Requisition_ID(), Get_Trx());
-
-                if (GetLineNetAmt().CompareTo(Env.ZERO) == 0 && requisition.GetDocAction() != "VO")
+                if (GetLineNetAmt().CompareTo(Env.ZERO) == 0)
                 {
-                   
-                     SetLineNetAmt();
-                 
+                    SetLineNetAmt();
                 }
 
             }
