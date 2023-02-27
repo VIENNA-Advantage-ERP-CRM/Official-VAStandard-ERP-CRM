@@ -957,6 +957,8 @@ namespace VAdvantage.Model
 
                 MRequisitionLine[] lines = GetLines();
                 Decimal totalLines = Env.ZERO;
+
+
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MRequisitionLine line = lines[i];
@@ -1045,6 +1047,36 @@ namespace VAdvantage.Model
                 SetDocAction(DOCACTION_None);
                 log.Info("voidIt - " + ToString());
                 return true;
+            }
+            //VIS0336_changes for setting amount 0.
+            else if (DOCSTATUS_Drafted.Equals(GetDocStatus()))
+
+            {
+                MRequisitionLine[] lines = GetLines();
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    MRequisitionLine line = lines[i];
+
+                    String description = line.GetDescription();
+                    if (description == null)
+                        description = "";
+                    description += Msg.GetMsg(Env.GetContext(), "Voided", true) + " (" + line.GetQty() + ")";
+                    line.SetDescription(description);
+                    line.SetQty(0);
+                    line.SetQtyEntered(0);
+                    if (line.Get_ColumnIndex("QtyReserved") > 0)
+                    {
+                        line.SetQtyReserved(Env.ZERO);
+                    }
+                    line.Set_Value("Ref_OrderLine_ID", null);
+                    line.SetLineNetAmt(Env.ZERO);
+                    if (!line.Save())
+                    {
+                        _processMsg = Msg.GetMsg(GetCtx(), "ReqLineNotSaved");
+                        return false;
+                    }
+                }
+                SetTotalLines(Env.ZERO);
             }
             if (!CloseIt())
             {
