@@ -518,10 +518,10 @@ namespace VAdvantage.Model
             {
                 // checking are we moving product from one warehouse to other warehouse
                 if (Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT CASE WHEN ((SELECT CASE WHEN o.IsLegalEntity = 'Y' THEN w.AD_Org_ID
-                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = o.LegalEntityOrg ) END
+                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = CAST(o.LegalEntityOrg AS INTEGER)) END
                  FROM m_warehouse w INNER JOIN ad_org o ON o.AD_Org_ID = w.AD_Org_ID WHERE w.m_warehouse_id = m.DTD001_MWarehouseSource_ID)) =
                  (SELECT  CASE WHEN o2.IsLegalEntity = 'Y' THEN w2.AD_Org_ID 
-                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = o2.LegalEntityOrg) END
+                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = CAST(o2.LegalEntityOrg AS INTEGER)) END
                  FROM m_warehouse w2 INNER JOIN ad_org o2 ON o2.AD_Org_ID = w2.AD_Org_ID WHERE M_Warehouse_ID = m.M_Warehouse_ID )
                  THEN 0 ELSE (SELECT ad_org_id FROM m_warehouse WHERE M_Warehouse_ID = m.M_Warehouse_ID ) END AS result FROM m_movement m WHERE m_movement_id = " + GetM_Movement_ID(), null, Get_Trx())) > 0)
                 {
@@ -728,10 +728,10 @@ namespace VAdvantage.Model
             {
                 // checking are we moving product from one warehouse to other warehouse
                 if (Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT CASE WHEN ((SELECT CASE WHEN o.IsLegalEntity = 'Y' THEN w.AD_Org_ID
-                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = o.LegalEntityOrg ) END
+                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = CAST(o.LegalEntityOrg AS INTEGER)) END
                  FROM m_warehouse w INNER JOIN ad_org o ON o.AD_Org_ID = w.AD_Org_ID WHERE w.m_warehouse_id = m.DTD001_MWarehouseSource_ID)) =
                  (SELECT  CASE WHEN o2.IsLegalEntity = 'Y' THEN w2.AD_Org_ID 
-                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = o2.LegalEntityOrg) END
+                 ELSE (SELECT AD_Org_ID FROM AD_Org WHERE Ad_Org_id = CAST(o2.LegalEntityOrg AS INTEGER)) END
                  FROM m_warehouse w2 INNER JOIN ad_org o2 ON o2.AD_Org_ID = w2.AD_Org_ID WHERE M_Warehouse_ID = m.M_Warehouse_ID )
                  THEN 0 ELSE (SELECT ad_org_id FROM m_warehouse WHERE M_Warehouse_ID = m.M_Warehouse_ID ) END AS result FROM m_movement m WHERE m_movement_id = " + GetM_Movement_ID(), null, Get_Trx())) > 0)
                 {
