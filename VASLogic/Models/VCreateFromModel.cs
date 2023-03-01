@@ -807,7 +807,7 @@ namespace VIS.Models
                         FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID 
                         LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
                         LEFT JOIN M_Product pro ON (reqln.M_Product_ID=pro.M_Product_ID) LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID=uom.C_UOM_ID)
-                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @")"+ (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "") 
+                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
                         + @" AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
                         UNION
                         SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
@@ -818,11 +818,11 @@ namespace VIS.Models
                         LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
                         WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' AND reqln.C_OrderLine_ID IS NOT NULL
                         AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
-                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "") 
+                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
                         + @" AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
                         AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
-                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");            
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");
             try
             {
                 _ds = DB.ExecuteDataset(sql.ToString());
@@ -905,8 +905,57 @@ namespace VIS.Models
                     RfqLine.SetM_AttributeSetInstance_ID(ReqLines[i].ASI_ID);
                 }
                 //RfqLine.SetDescription("");
-                if (RfqLine.Save())
+                if (RfqLine.Save() && Env.IsModuleInstalled("VA068_"))
                 {
+                    //VIS0336_Changes done for inserting record in vendor recomment tab.
+                    MTable tbl = new MTable(ctx, MTable.Get_Table_ID("VA068_VendorRecomend"), trx);
+                    PO VendorRecommend = null;
+                    string sql = "SELECT * FROM VA068_VendorRecomend v  INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID WHERE l.M_Requisition_ID=" + ReqLines[i].M_Requisition_ID;
+                    DataSet ds = DB.ExecuteDataset(sql, null, null);
+
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        for (int j = 0; j < ds.Tables[0].Rows.Count; j++)
+                        {
+
+                            VendorRecommend = tbl.GetPO(ctx, 0, trx);
+                            VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
+                            VendorRecommend.Set_Value("AD_Org_ID", ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                            VendorRecommend.Set_Value("AD_Client_ID", ds.Tables[0].Rows[i]["AD_Client_ID"]);
+                            VendorRecommend.Set_Value("LineNo", ds.Tables[0].Rows[i]["LineNo"]);
+                            VendorRecommend.Set_Value("Name", ds.Tables[0].Rows[i]["Name"]);
+                            VendorRecommend.Set_Value("EMail", ds.Tables[0].Rows[i]["EMail"]);
+                            VendorRecommend.Set_Value("C_BPartner_Location_ID", ds.Tables[0].Rows[i]["C_BPartner_Location_ID"]);
+                            VendorRecommend.Set_Value("VA068_ContactName", ds.Tables[0].Rows[i]["VA068_ContactName"]);
+                            VendorRecommend.Set_Value("VA068_Phone", ds.Tables[0].Rows[i]["VA068_Phone"]);
+                            VendorRecommend.Set_Value("VA068_Email", ds.Tables[0].Rows[i]["VA068_Email"]);
+                            VendorRecommend.Set_Value("VA068_Location_ID", ds.Tables[0].Rows[i]["VA068_Location_ID"]);
+                            VendorRecommend.Set_Value("VA068_Country_ID", ds.Tables[0].Rows[i]["VA068_Country_ID"]);
+                            VendorRecommend.Set_Value("VA068_Status", ds.Tables[0].Rows[i]["VA068_Status"]);
+                            VendorRecommend.Set_Value("VA068_Status", ds.Tables[0].Rows[i]["VA068_Status"]);
+                            VendorRecommend.Set_Value("IsApproved", ds.Tables[0].Rows[i]["IsApproved"]);
+                            VendorRecommend.Set_Value("VA068_VendorType", ds.Tables[0].Rows[i]["VA068_VendorType"]);
+                            VendorRecommend.Set_Value("C_BPartner_ID", ds.Tables[0].Rows[i]["C_BPartner_ID"]);
+                            VendorRecommend.Set_Value("VA068_VendorRegistration_ID", ds.Tables[0].Rows[i]["VA068_VendorRegistration_ID"]);
+
+                            if (!VendorRecommend.Save())
+                            {
+                                ValueNamePair vp = VLogger.RetrieveError();
+                                if (vp != null)
+                                {
+                                    trx.Rollback();
+                                    return Msg.GetMsg(ctx, "RfQLineNotSaved") + "- " + vp.Name;
+                                }
+                                else
+                                {
+                                    trx.Rollback();
+                                    return Msg.GetMsg(ctx, "RfQLineNotSaved");
+                                }
+                            }
+                        }
+
+                    }
+
                     // Create RfQ Qty
                     MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
                     RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);
@@ -1035,7 +1084,7 @@ namespace VIS.Models
 
         public int M_ReqLine_ID
         { get; set; }
-        public int M_Requisition_ID 
+        public int M_Requisition_ID
         { get; set; }
     }
 }
