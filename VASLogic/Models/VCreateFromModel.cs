@@ -885,14 +885,23 @@ namespace VIS.Models
         /// <returns>Message as String</returns>
         public string CreateRfqLine(int C_Rfq_ID, List<ReqLineData> ReqLines, Ctx ctx)
         {
+            DataRow[] selectedTable = null;
+            string RequisitionID = string.Empty;
             string _msg = Msg.GetMsg(ctx, "RFQLinesSaved");
             Trx trx = Trx.Get("VCreateFromRequisition" + DateTime.Now.Ticks);
 
             int LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(Line) FROM C_RfQLine WHERE C_RfQ_ID=" + C_Rfq_ID, null, trx));
             MRfQ rfq = new MRfQ(ctx, C_Rfq_ID, null);
 
+            RequisitionID= string.Join(",", ReqLines.Select(p => p.M_Requisition_ID.ToString()));
+            string sql = "SELECT * FROM VA068_VendorRecomend v  INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID " +
+                           "WHERE l.M_Requisition_ID in (" + RequisitionID + ")";
+            DataSet dt = DB.ExecuteDataset(sql, null, trx);
+
+
             for (int i = 0; i < ReqLines.Count; i++)
             {
+
                 LineNo = LineNo + 10;
                 // Create RfQ line
                 MRfQLine RfqLine = new MRfQLine(rfq);
@@ -905,38 +914,36 @@ namespace VIS.Models
                     RfqLine.SetM_AttributeSetInstance_ID(ReqLines[i].ASI_ID);
                 }
                 //RfqLine.SetDescription("");
-                if (RfqLine.Save() && Env.IsModuleInstalled("VA068_"))
+                if (RfqLine.Save())
                 {
                     //VIS0336_Changes done for inserting record in vendor recomment tab.
                     MTable tbl = new MTable(ctx, MTable.Get_Table_ID("VA068_VendorRecomend"), trx);
                     PO VendorRecommend = null;
-                    string sql = "SELECT * FROM VA068_VendorRecomend v  INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID WHERE l.M_Requisition_ID=" + ReqLines[i].M_Requisition_ID;
-                    DataSet ds = DB.ExecuteDataset(sql, null, null);
 
-                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    if (dt != null && dt.Tables[0].Rows.Count > 0)
                     {
-                        for (int j = 0; j < ds.Tables[0].Rows.Count; j++)
-                        {
+                        selectedTable = dt.Tables[0].Select(" M_RequisitionLine_ID=" + Util.GetValueOfInt(ReqLines[i].M_ReqLine_ID));
 
+                        foreach (DataRow rows in selectedTable)
+                        {
                             VendorRecommend = tbl.GetPO(ctx, 0, trx);
                             VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
-                            VendorRecommend.Set_Value("AD_Org_ID", ds.Tables[0].Rows[i]["AD_Org_ID"]);
-                            VendorRecommend.Set_Value("AD_Client_ID", ds.Tables[0].Rows[i]["AD_Client_ID"]);
-                            VendorRecommend.Set_Value("LineNo", ds.Tables[0].Rows[i]["LineNo"]);
-                            VendorRecommend.Set_Value("Name", ds.Tables[0].Rows[i]["Name"]);
-                            VendorRecommend.Set_Value("EMail", ds.Tables[0].Rows[i]["EMail"]);
-                            VendorRecommend.Set_Value("C_BPartner_Location_ID", ds.Tables[0].Rows[i]["C_BPartner_Location_ID"]);
-                            VendorRecommend.Set_Value("VA068_ContactName", ds.Tables[0].Rows[i]["VA068_ContactName"]);
-                            VendorRecommend.Set_Value("VA068_Phone", ds.Tables[0].Rows[i]["VA068_Phone"]);
-                            VendorRecommend.Set_Value("VA068_Email", ds.Tables[0].Rows[i]["VA068_Email"]);
-                            VendorRecommend.Set_Value("VA068_Location_ID", ds.Tables[0].Rows[i]["VA068_Location_ID"]);
-                            VendorRecommend.Set_Value("VA068_Country_ID", ds.Tables[0].Rows[i]["VA068_Country_ID"]);
-                            VendorRecommend.Set_Value("VA068_Status", ds.Tables[0].Rows[i]["VA068_Status"]);
-                            VendorRecommend.Set_Value("VA068_Status", ds.Tables[0].Rows[i]["VA068_Status"]);
-                            VendorRecommend.Set_Value("IsApproved", ds.Tables[0].Rows[i]["IsApproved"]);
-                            VendorRecommend.Set_Value("VA068_VendorType", ds.Tables[0].Rows[i]["VA068_VendorType"]);
-                            VendorRecommend.Set_Value("C_BPartner_ID", ds.Tables[0].Rows[i]["C_BPartner_ID"]);
-                            VendorRecommend.Set_Value("VA068_VendorRegistration_ID", ds.Tables[0].Rows[i]["VA068_VendorRegistration_ID"]);
+                            VendorRecommend.Set_Value("AD_Org_ID",Util.GetValueOfInt(rows["AD_Org_ID"]));
+                            VendorRecommend.Set_Value("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
+                            VendorRecommend.Set_Value("Lineno", Util.GetValueOfInt(rows["Lineno"]));
+                            VendorRecommend.Set_Value("Name", Util.GetValueOfString(rows["Name"]));
+                            VendorRecommend.Set_Value("Email", Util.GetValueOfString(rows["Email"]));
+                            VendorRecommend.Set_Value("C_BPartner_Location_ID", Util.GetValueOfInt(rows["C_BPartner_Location_ID"]));
+                            VendorRecommend.Set_Value("VA068_ContactName", Util.GetValueOfString(rows["VA068_ContactName"]));
+                            VendorRecommend.Set_Value("VA068_Phone", Util.GetValueOfString(rows["VA068_Phone"]));
+                            VendorRecommend.Set_Value("VA068_Email", Util.GetValueOfString( rows["VA068_Email"]));
+                            VendorRecommend.Set_Value("VA068_Location_ID", Util.GetValueOfInt(rows["VA068_Location_ID"]));
+                            VendorRecommend.Set_Value("VA068_Country_ID", Util.GetValueOfInt(rows["VA068_Country_ID"].ToString()));
+                            VendorRecommend.Set_Value("VA068_Status", Util.GetValueOfString(rows["VA068_Status"].ToString()));
+                            VendorRecommend.Set_Value("IsApproved", Util.GetValueOfString(rows["IsApproved"].ToString()));
+                            VendorRecommend.Set_Value("VA068_VendorType", Util.GetValueOfString(rows["VA068_VendorType"]));
+                            VendorRecommend.Set_Value("C_BPartner_ID", Util.GetValueOfInt(rows["C_BPartner_ID"]));
+                            VendorRecommend.Set_Value("VA068_VendorRegistration_ID", Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"]));
 
                             if (!VendorRecommend.Save())
                             {
@@ -944,17 +951,18 @@ namespace VIS.Models
                                 if (vp != null)
                                 {
                                     trx.Rollback();
-                                    return Msg.GetMsg(ctx, "RfQLineNotSaved") + "- " + vp.Name;
+                                    return Msg.GetMsg(ctx, "VA068_VendorRecomendNotSaved") + "- " + vp.Name;
                                 }
                                 else
                                 {
                                     trx.Rollback();
-                                    return Msg.GetMsg(ctx, "RfQLineNotSaved");
+                                    return Msg.GetMsg(ctx, "VA068_VendorRecomendNotSaved");
                                 }
                             }
                         }
 
                     }
+
 
                     // Create RfQ Qty
                     MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
