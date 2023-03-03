@@ -216,7 +216,7 @@ namespace VAdvantage.Process
             string result = string.Join(",", RequisitionID);
 
             string sql = "SELECT * FROM VA068_VendorRecomend v  INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID " +
-                           "WHERE l.M_Requisition_ID in (" + result + ")";
+                           "WHERE l.M_Requisition_ID IN (" + result + ")";
             DataSet dt = DB.ExecuteDataset(sql, null, Get_Trx());
 
             for (int i = 0; i < _ds.Tables[0].Rows.Count; i++)
@@ -358,7 +358,7 @@ namespace VAdvantage.Process
                             VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
                             VendorRecommend.Set_Value("AD_Org_ID", Util.GetValueOfInt(rows["AD_Org_ID"]));
                             VendorRecommend.Set_Value("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
-                            VendorRecommend.Set_Value("Lineno", Util.GetValueOfInt(rows["Lineno"]));
+                            VendorRecommend.Set_Value("LineNo", Util.GetValueOfInt(rows["LineNo"]));
                             VendorRecommend.Set_Value("Name", Util.GetValueOfString(rows["Name"]));
                             VendorRecommend.Set_Value("Email", Util.GetValueOfString(rows["Email"]));
                             VendorRecommend.Set_Value("C_BPartner_Location_ID", Util.GetValueOfInt(rows["C_BPartner_Location_ID"]));
@@ -368,7 +368,7 @@ namespace VAdvantage.Process
                             VendorRecommend.Set_Value("VA068_Location_ID", Util.GetValueOfInt(rows["VA068_Location_ID"]));
                             VendorRecommend.Set_Value("VA068_Country_ID", Util.GetValueOfInt(rows["VA068_Country_ID"].ToString()));
                             VendorRecommend.Set_Value("VA068_Status", Util.GetValueOfString(rows["VA068_Status"].ToString()));
-                            VendorRecommend.Set_Value("IsApproved", Util.GetValueOfString(rows["IsApproved"].ToString()));
+                           // VendorRecommend.Set_Value("IsApproved", Util.GetValueOfString(rows["IsApproved"].ToString()));
                             VendorRecommend.Set_Value("VA068_VendorType", Util.GetValueOfString(rows["VA068_VendorType"]));
                             VendorRecommend.Set_Value("C_BPartner_ID", Util.GetValueOfInt(rows["C_BPartner_ID"]));
                             VendorRecommend.Set_Value("VA068_VendorRegistration_ID", Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"]));
