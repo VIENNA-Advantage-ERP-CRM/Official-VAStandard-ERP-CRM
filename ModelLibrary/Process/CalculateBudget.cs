@@ -54,7 +54,7 @@ namespace VAdvantage.Process
                   GL_BudgetControl.C_AcctSchema_ID, GL_BudgetControl.CommitmentType, GL_BudgetControl.BudgetControlScope,  GL_BudgetControl.GL_BudgetControl_ID, GL_BudgetControl.Name AS ControlName,GL_BudgetControl.BudgetBreachPercent
                 FROM GL_Budget INNER JOIN GL_BudgetControl ON GL_Budget.GL_Budget_ID = GL_BudgetControl.GL_Budget_ID
                 INNER JOIN Ad_ClientInfo ON Ad_ClientInfo.AD_Client_ID = GL_Budget.AD_Client_ID
-                WHERE GL_BudgetControl.IsActive = 'Y' AND GL_Budget.IsActive = 'Y' AND GL_BudgetControl.AD_Org_ID IN (0 , " + GetAD_Org_ID() + @")  
+                WHERE GL_BudgetControl.IsActive = 'Y' AND GL_Budget.IsActive = 'Y' AND GL_BudgetControl.AD_Org_ID IN (0 , " + requisition.GetAD_Org_ID() + @")  
                    AND GL_BudgetControl.CommitmentType IN ('B' ) AND 
                   (( GL_Budget.BudgetControlBasis = 'P' AND GL_Budget.C_Period_ID =
                   (SELECT C_Period.C_Period_ID FROM C_Period INNER JOIN c_year ON c_year.c_year_ID = C_Period.c_year_ID
@@ -135,11 +135,11 @@ namespace VAdvantage.Process
                     if (parameters.Length == 8)
                     {
                         object[] parametersArray = new object[] { GetCtx(),
-                                                                Util.GetValueOfInt(GetAD_Client_ID()),
-                                                                Util.GetValueOfInt(X_M_Requisition.Table_ID),//MTable.Get(GetCtx() , "M_Requisition").GetAD_Table_ID()
+                                                                Util.GetValueOfInt(req.GetAD_Client_ID()),
+                                                                Util.GetValueOfInt(X_M_Requisition.Table_ID),
                                                                 Util.GetValueOfInt(req.GetM_Requisition_ID()),
                                                                 true,
-                                                                Util.GetValueOfInt(GetAD_Org_ID()),
+                                                                Util.GetValueOfInt(req.GetAD_Org_ID()),
                                                                 ad_window_id,
                                                                 Util.GetValueOfInt(req.GetC_DocType_ID()) };
                         result = (DataSet)methodInfo.Invoke(null, parametersArray);
