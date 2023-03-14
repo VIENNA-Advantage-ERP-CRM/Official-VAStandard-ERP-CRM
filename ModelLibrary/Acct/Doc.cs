@@ -279,7 +279,7 @@ namespace VAdvantage.Acct
                 {
                     //for posting set Window_ID at doc
                     doc.SetAD_Window_ID(AD_Window_ID);
-                    if (doc.GetAD_Window_ID() < 0)
+                    if (doc.GetAD_Window_ID() <= 0)
                     {
                         doc.SetAD_Window_ID(GetWindowID(AD_Table_ID, Record_ID, TableName, trxName));
                     }
