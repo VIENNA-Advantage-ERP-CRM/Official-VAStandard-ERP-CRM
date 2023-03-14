@@ -569,8 +569,26 @@ namespace VAdvantage.Acct
                 }
 
                 //  Create entry for non-zero element
-                //Iterator keys = map.keySet().iterator();
                 IEnumerator keys = map.Keys.GetEnumerator();
+
+                // VIS_0045: 14-March-2023 -> DevOps FEATURE 1996
+                // Get All Organization from Key
+                List<int> lstAD_Org_ID = new List<int>();
+                bool isInterCompanySettingFound = false;
+                while (keys.MoveNext())
+                {
+                    lstAD_Org_ID.Add(Util.GetValueOfInt(keys.Current));
+                }
+
+                // Get List of Intercomany account linked
+                DataSet dsInterCompany = GetInterCompanySetting(_doc.GetAD_Org_ID(), lstAD_Org_ID);
+                if (dsInterCompany != null && dsInterCompany.Tables.Count > 0 && dsInterCompany.Tables[0].Rows.Count > 0)
+                {
+                    // when record found on Intercomany setting, then make the setting true
+                    isInterCompanySettingFound = true;
+                }
+
+                keys = map.Keys.GetEnumerator();
                 while (keys.MoveNext())
                 {
                     int key = Utility.Util.GetValueOfInt(keys.Current);
@@ -580,45 +598,182 @@ namespace VAdvantage.Acct
                     if (!difference.IsZeroBalance())
                     {
                         //  Create Balancing Entry
-                        FactLine line = new FactLine(_doc.GetCtx(), _doc.Get_Table_ID(), _doc.Get_ID(), 0, _trx);
-                        line.SetDocumentInfo(_doc, null);
-                        line.SetPostingType(_postingType);
-                        //  Amount & Account
-                        if (Env.Signum(difference.GetBalance()) < 0)
+                        if (_doc.GetAD_Org_ID() != key)
                         {
-                            if (difference.IsReversal())
+                            for (int i = 0; i < 2; i++)
                             {
-                                line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
-                                line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
-                            }
-                            else
-                            {
-                                line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
-                                line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
+                                FactLine line = CreateInterCompany(i, difference, key, elementType, isInterCompanySettingFound, dsInterCompany);
+                                //
+                                _lines.Add(line);
+                                log.Fine("(" + elementType + ") - " + line);
                             }
                         }
-                        else
-                        {
-                            if (difference.IsReversal())
-                            {
-                                line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
-                                line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
-                            }
-                            else
-                            {
-                                line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
-                                line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
-                            }
-                        }
-                        line.Convert();
-                        line.SetAD_Org_ID(Utility.Util.GetValueOfInt(key));
-                        //
-                        _lines.Add(line);
-                        log.Fine("(" + elementType + ") - " + line);
                     }
                 }
                 map.Clear();
             }
+        }
+
+        /// <summary>
+        /// Create InterCompany Fact Line
+        /// </summary>
+        /// <param name="iteration">Iteration No</param>
+        /// <param name="difference">Balance Class Object</param>
+        /// <param name="key">Organization ID - which to be balanced</param>
+        /// <param name="elementType">Element Type</param>
+        /// <param name="isInterCompanySettingFound">Is Intercompant setting found</param>
+        /// <param name="dsInterCompany">Dataset of Intercompany setting</param>
+        /// <writer> VIS_0045: 14-March-2023 -> DevOps FEATURE 1996</writer>
+        /// <returns>factline object</returns>
+        private FactLine CreateInterCompany(int iteration, Balance difference, int key, string elementType, bool isInterCompanySettingFound, DataSet dsInterCompany)
+        {
+            DataRow[] drInterCompany = null;
+            if (isInterCompanySettingFound)
+            {
+                drInterCompany = dsInterCompany.Tables[0].Select($@"FRPT_From_Org_ID = {_doc.GetAD_Org_ID()} AND FRPT_To_Org_ID = {key}");
+            }
+            if (iteration == 1)
+            {
+                key = _doc.GetAD_Org_ID();
+            }
+
+            //  Create Balancing Entry
+            FactLine line = new FactLine(_doc.GetCtx(), _doc.Get_Table_ID(), _doc.Get_ID(), 0, _doc.GetAD_Window_ID(), _trx);
+            line.SetDocumentInfo(_doc, null);
+            line.SetPostingType(_postingType);
+            //  Amount & Account
+            if (Env.Signum(difference.GetBalance()) < 0)
+            {
+                if (difference.IsReversal())
+                {
+                    if (iteration == 0)
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueTo_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
+                        }
+                    }
+                    else
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueFrom_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
+                        }
+                    }
+                }
+                else
+                {
+                    if (iteration == 0)
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueFrom_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
+                        }
+                    }
+                    else
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueTo_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (difference.IsReversal())
+                {
+                    if (iteration == 0)
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueFrom_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
+                        }
+                    }
+                    else
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueTo_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
+                        }
+                    }
+                }
+                else
+                {
+                    if (iteration == 0)
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), Env.ZERO, difference.GetPostBalance());
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueTo_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueTo_Acct(elementType));
+                        }
+                    }
+                    else
+                    {
+                        line.SetAmtSource(_doc.GetC_Currency_ID(), difference.GetPostBalance(), Env.ZERO);
+                        if (drInterCompany != null && drInterCompany.Length > 0)
+                        {
+                            line.SetAccount(_acctSchema, MAccount.Get(line.GetCtx(), Util.GetValueOfInt(drInterCompany[0]["InterCompanyDueFrom_Acct"])));
+                        }
+                        else
+                        {
+                            line.SetAccount(_acctSchema, _acctSchema.GetDueFrom_Acct(elementType));
+                        }
+                    }
+                }
+            }
+            line.Convert();
+            line.SetAD_Org_ID(Util.GetValueOfInt(key));
+            return line;
+        }
+
+        /// <summary>
+        /// Get Intercompany setting records
+        /// </summary>
+        /// <param name="From_Org_ID">From Organization</param>
+        /// <param name="FRPT_To_Org_ID">List of To Organization</param>
+        /// <writer> VIS_0045: 14-March-2023 -> DevOps FEATURE 1996</writer>
+        /// <returns>Dataset of Intercompany setting records</returns>
+        private DataSet GetInterCompanySetting(int From_Org_ID, List<int> FRPT_To_Org_ID)
+        {
+            return DB.ExecuteDataset($@"SELECT ics.FRPT_From_Org_ID, ics.FRPT_To_Org_ID, ics.InterCompanyDueFrom_Acct, ics.InterCompanyDueTo_Acct 
+                                       FROM FRPT_IntercompanySetup ics 
+                                       WHERE ics.IsActive = 'Y' AND ics.C_AcctSchema_ID = {_acctSchema.GetC_AcctSchema_ID()}  
+                                       AND ics.FRPT_From_Org_ID = {From_Org_ID} AND ics.FRPT_To_Org_ID IN ({string.Join(",", FRPT_To_Org_ID)})");
         }
 
 
