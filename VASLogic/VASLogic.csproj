@@ -102,6 +102,7 @@
     <Compile Include="Models\Callouts\MInventoryModel.cs" />
     <Compile Include="Models\Callouts\MInvoiceBatchLineModel.cs" />
     <Compile Include="Models\Callouts\MInvoiceModel.cs" />
+    <Compile Include="Models\Callouts\MInvRevaluationModel.cs" />
     <Compile Include="Models\Callouts\MLocatorModel.cs" />
     <Compile Include="Models\Callouts\ModulePrefixModel.cs" />
     <Compile Include="Models\Callouts\MOrderLineModel.cs" />

@@ -171,6 +171,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MInventoryLineController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MInvoiceBatchLineController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MInvoiceController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MInvRevaluationController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MLocatorContoller.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\ModulePrefixController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MOrderController.cs" />
@@ -244,6 +245,7 @@
     <Content Include="Areas\VAS\Scripts\model\calloutinventory.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutinvoice.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutinvoicebatch.js" />
+    <Content Include="Areas\VAS\Scripts\model\calloutInvRevaluation.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutmasterforecast.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutmovement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutoffer.js" />
