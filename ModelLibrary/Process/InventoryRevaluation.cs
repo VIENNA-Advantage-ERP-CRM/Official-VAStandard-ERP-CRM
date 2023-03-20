@@ -350,7 +350,7 @@ namespace VAdvantage.Process
                     sql.Append(@" WHEN st.movementtype IN ('W-', 'W+') AND 
                                   (wot.VAMFG_WorkOrderTxnType NOT IN ('CI' , 'CR') OR wot.VAMFG_WorkOrderTxnType IS NULL) THEN 0 ");
                 }
-                sql.Append($@" ELSE (st.MovementQty * CASE WHEN st.ProductCost <> 0 THEN st.ProductCost ELSE st.ProductApproxCost END ) END ) AS Currentcostprice "); 
+                sql.Append($@" ELSE (st.MovementQty * CASE WHEN st.ProductCost <> 0 THEN st.ProductCost ELSE st.ProductApproxCost END ) END ) AS Currentcostprice ");
                 sql.Append($@" FROM M_Transaction st 
                                INNER JOIN M_Locator loc ON (loc.M_Locator_ID = st.M_Locator_ID)
                                INNER JOIN M_Product p ON (p.M_Product_ID = st.M_Product_ID)
@@ -538,9 +538,19 @@ namespace VAdvantage.Process
             sql.Append($@" FROM M_Product P  
                            INNER JOIN M_Cost CST ON (P.M_Product_ID = CST.M_Product_ID)
                            INNER JOIN M_Product_Category PC ON (P.M_Product_Category_ID = PC.M_Product_Category_ID)
-                           INNER JOIN C_AcctSchema ACC ON (CST.C_AcctSchema_ID = ACC.C_AcctSchema_ID)
-                           INNER JOIN M_CostType ct ON (ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID)
-                           INNER JOIN CostElement CE ON (CST.M_CostElement_ID = CE.M_CostElement_ID AND CE.M_Product_Category_ID = PC.M_Product_Category_ID)");
+                           INNER JOIN C_AcctSchema ACC ON (CST.C_AcctSchema_ID = ACC.C_AcctSchema_ID)");
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MAcctSchema.COSTINGMETHOD_StandardCosting) &&
+                objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity) &&
+                objInventoryRevaluation.Get_ValueAsInt("M_CostType_ID") > 0)
+            {
+                sql.Append($@" INNER JOIN M_CostType ct ON (ct.M_CostType_ID = {objInventoryRevaluation.Get_ValueAsInt("M_CostType_ID")}
+                                                            AND ct.M_CostType_ID = cst.M_CostType_ID)");
+            }
+            else
+            {
+                sql.Append($@" INNER JOIN M_CostType ct ON (ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID)");
+            }
+            sql.Append($@" INNER JOIN CostElement CE ON (CST.M_CostElement_ID = CE.M_CostElement_ID AND CE.M_Product_Category_ID = PC.M_Product_Category_ID)");
             if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo) ||
                 objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo))
             {
