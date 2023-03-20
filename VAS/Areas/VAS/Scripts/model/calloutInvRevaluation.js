@@ -1,11 +1,9 @@
-﻿VIS = window.VIS || {};
-
-(function (VIS, $) {
+﻿; (function (VIS, $) {
 
     var Util = VIS.Utility.Util;
 
     function calloutInvRevaluation() {
-        VIS.CalloutEngine.call(this, "calloutInvRevaluation"); //must call
+        VIS.CalloutEngine.call(this, "VIS.calloutInvRevaluation"); //must call
     };
 
     VIS.Utility.inheritPrototype(calloutInvRevaluation, VIS.CalloutEngine);
