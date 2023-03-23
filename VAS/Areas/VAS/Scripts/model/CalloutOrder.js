@@ -148,6 +148,7 @@
                     DocSubTypeSO = "--";
                 ctx.setContext(windowNo, "OrderType", DocSubTypeSO);
                 ctx.setContext(windowNo, "DocTypeValue", DocTypeValue);
+               
 
                 if (DocSubTypeSO == 'BO') {
                     ctx.setContext(windowNo, "BlanketOrderType", DocSubTypeSO);
@@ -155,6 +156,7 @@
                 }
                 else if (Util.getValueOfString(idr["IsReleaseDocument"]).equals("Y")) {
                     mTab.setValue("BlanketOrderType", "BO");
+                    mTab.setValue("OrderType", "BO");  //VIS0336_Changes for Blanket order field on Purchase order window.
                 }
                 else {
                     ctx.setContext(windowNo, "BlanketOrderType", "OO");
