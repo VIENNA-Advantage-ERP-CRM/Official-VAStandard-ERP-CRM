@@ -209,7 +209,8 @@ namespace VAdvantage.Process
 
                 // Warehouse
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                  objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                    objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append(@" , loc.M_Warehouse_ID ");
                 }
@@ -258,8 +259,8 @@ namespace VAdvantage.Process
 
                 // when Costing Level is Warehouse or Warehouse+Batch then add warehouse id
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch)
-                   && objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                    objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append($@" AND loc.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}");
                 }
@@ -284,7 +285,8 @@ namespace VAdvantage.Process
 
                 // when Costing Level is Warehouse or Warehouse+Batch then add warehouse id
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                   objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                   objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                   objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append($@" , loc.M_Warehouse_ID ");
                 }
@@ -309,7 +311,8 @@ namespace VAdvantage.Process
 
                 // Warehouse
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                  objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                    objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append(@" , st.M_Warehouse_ID ");
                 }
@@ -385,8 +388,8 @@ namespace VAdvantage.Process
 
                 // when Costing Level is Warehouse or Warehouse+Batch then add warehouse id
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch)
-                   && objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                    objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append($@" AND st.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}");
                 }
@@ -411,7 +414,8 @@ namespace VAdvantage.Process
 
                 // when Costing Level is Warehouse or Warehouse+Batch then add warehouse id
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                   objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                    objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append($@" , st.M_Warehouse_ID ");
                 }
@@ -464,11 +468,11 @@ namespace VAdvantage.Process
 
             #region Cost Element
             sql.Append($@" , CostElement AS 
-                             (SELECT CASE WHEN t.CostingMethod = 'C' THEN comb.M_Costelement_Id ELSE t.M_CostElement_ID END AS M_CostElement_ID, 
+                             (SELECT MMPolicy, CASE WHEN t.CostingMethod = 'C' THEN comb.M_Costelement_Id ELSE t.M_CostElement_ID END AS M_CostElement_ID, 
                              t.M_Product_Category_ID , t.C_AcctSchema_ID, 
                              CASE WHEN t.CostingMethod = 'C' THEN comb.CostingMethod ELSE t.CostingMethod END AS costingMethod
                            FROM                                        
-                            (SELECT DISTINCT 
+                            (SELECT DISTINCT pc.MMPolicy, 
                             CASE WHEN (pc.costingmethod IS NOT NULL AND pc.costingmethod = 'C') THEN pc.M_CostElement_ID
                                  WHEN (pc.costingmethod IS NOT NULL AND pc.costingmethod  <> 'C') THEN 
                                  (SELECT M_CostElement_ID FROM M_CostElement WHERE CostingMethod = pc.CostingMethod AND AD_Client_ID = {GetAD_Client_ID()})
@@ -497,8 +501,7 @@ namespace VAdvantage.Process
                                  P.C_UOM_ID,
                                  pl.PriceStd,
                                  stk.TotalQty");
-            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo) ||
-                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo))
+            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
             {
                 sql.Append(" ,CASE WHEN SUM(cq.CurrentQty) = 0 THEN 0 ELSE ROUND(SUM(cq.CurrentQty * cq.currentcostprice) / SUM(cq.CurrentQty) , 10) END AS CurrentCostPrice");
             }
@@ -526,7 +529,8 @@ namespace VAdvantage.Process
 
             //Warehose
             if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                objInventoryRevaluation.GetM_Warehouse_ID() > 0)
             {
                 sql.Append(@" ,cst.M_Warehouse_ID ");
             }
@@ -551,14 +555,23 @@ namespace VAdvantage.Process
                 sql.Append($@" INNER JOIN M_CostType ct ON (ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID)");
             }
             sql.Append($@" INNER JOIN CostElement CE ON (CST.M_CostElement_ID = CE.M_CostElement_ID AND CE.M_Product_Category_ID = PC.M_Product_Category_ID)");
-            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo) ||
-                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo))
+            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
             {
+                sql.Append(@"  LEFT JOIN M_CostElement ceMethod ON (ceMethod.CostingMethod = ce.MMPolicy and ceMethod.AD_Client_ID = cst.AD_Client_ID) ");
                 sql.Append($@" INNER JOIN M_CostQueue cq ON (cq.M_Product_ID = CST.M_Product_ID 
-                                AND cq.M_CostElement_ID = CE.M_CostElement_ID AND cq.C_AcctSchema_ID = {objInventoryRevaluation.GetC_AcctSchema_ID()}");
+                                AND cq.C_AcctSchema_ID = {objInventoryRevaluation.GetC_AcctSchema_ID()}");
+                if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                    objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
+                {
+                    sql.Append(@" AND cq.M_CostElement_ID = CE.M_CostElement_ID ");
+                }
+                else
+                {
+                    sql.Append(@" AND cq.M_CostElement_ID = ceMethod.M_CostElement_ID ");
+                }
                 if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
-                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
-                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse)))
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse)))
                 {
                     sql.Append(" AND cq.M_AttributeSetInstance_ID = CST.M_AttributeSetInstance_ID ");
                 }
@@ -566,6 +579,10 @@ namespace VAdvantage.Process
                     objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
                 {
                     sql.Append(@" AND cq.M_Warehouse_ID = CST.M_Warehouse_ID ");
+                }
+                else if (objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+                {
+                    sql.Append($@" AND cq.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()} ");
                 }
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
                     objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_OrgPlusBatch) ||
@@ -577,13 +594,29 @@ namespace VAdvantage.Process
                 sql.Append(" ) ");
             }
             sql.Append($@" LEFT JOIN PriceList pl ON (pl.M_Product_ID = cst.M_Product_ID AND pl.M_AttributeSetInstance_ID = cst.M_AttributeSetInstance_ID)
-                           INNER JOIN Stock stk ON (stk.M_Product_ID = cst.M_Product_ID AND stk.M_AttributeSetInstance_ID = cst.M_AttributeSetInstance_ID
-                                                    AND stk.M_Warehouse_ID = cst.M_Warehouse_ID)");
+                           INNER JOIN Stock stk ON (stk.M_Product_ID = cst.M_Product_ID AND stk.M_AttributeSetInstance_ID = cst.M_AttributeSetInstance_ID");
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+            {
+                sql.Append(@" AND stk.M_Warehouse_ID = cst.M_Warehouse_ID) ");
+            }
+            else if (objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append($@" AND stk.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}) ");
+            }
 
             if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
             {
-                sql.Append(@" INNER JOIN Sales s ON (s.M_Product_ID = cst.M_Product_ID AND s.M_AttributeSetInstance_ID = cst.M_AttributeSetInstance_ID
-                                                    AND s.M_Warehouse_ID = cst.M_Warehouse_ID)");
+                sql.Append(@" INNER JOIN Sales s ON (s.M_Product_ID = cst.M_Product_ID AND s.M_AttributeSetInstance_ID = cst.M_AttributeSetInstance_ID");
+                if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                {
+                    sql.Append(@" AND s.M_Warehouse_ID = cst.M_Warehouse_ID) ");
+                }
+                else if (objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+                {
+                    sql.Append($@" AND s.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}) ");
+                }
             }
 
             sql.Append($@" WHERE acc.C_AcctSchema_ID = {objInventoryRevaluation.GetC_AcctSchema_ID()} 
@@ -592,7 +625,9 @@ namespace VAdvantage.Process
                            AND ((CASE WHEN {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())} IN ('A' , 'O' , 'W' , 'D') 
                                       THEN {objInventoryRevaluation.GetAD_Org_ID()}
                                       ELSE 0 END) = CST.AD_Org_ID)");
-            if (objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            if ((objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                 objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch)) &&
+                 objInventoryRevaluation.GetM_Warehouse_ID() > 0)
             {
                 sql.Append($@" AND ((CASE WHEN { GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())} IN ('W', 'D')
                                           THEN { objInventoryRevaluation.GetM_Warehouse_ID()}
@@ -606,8 +641,7 @@ namespace VAdvantage.Process
             {
                 sql.Append($@" AND P.M_Product_ID = {objInventoryRevaluation.GetM_Product_ID()}");
             }
-            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo) ||
-                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo))
+            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
             {
                 sql.Append(@" GROUP BY P.M_Product_Category_ID, 
                                  P.M_Product_ID,
@@ -625,7 +659,8 @@ namespace VAdvantage.Process
                     sql.Append(@" ,cst.M_AttributeSetInstance_ID ");
                 }
                 if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
-                   objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+                   objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                   objInventoryRevaluation.GetM_Warehouse_ID() > 0)
                 {
                     sql.Append(@" ,cst.M_Warehouse_ID ");
                 }
