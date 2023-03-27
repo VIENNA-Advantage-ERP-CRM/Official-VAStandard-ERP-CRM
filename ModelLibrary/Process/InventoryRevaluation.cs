@@ -361,9 +361,12 @@ namespace VAdvantage.Process
                                LEFT JOIN M_Inventoryline il ON (st.M_Inventoryline_ID = il.M_Inventoryline_ID and il.IsInternalUse = 'Y')
                                LEFT JOIN M_inventory inv ON (il.M_inventory_ID = inv.M_inventory_ID and inv.isinternaluse = 'Y')
                                LEFT JOIN M_ProductionLine pl ON (pl.M_ProductionLine_ID = st.M_ProductionLine_ID AND pl.MaterialType = 'C')");
-                sql.Append(@" LEFT JOIN VAMFG_M_WrkOdrTrnsctionLine wotl ON (wotl.VAMFG_M_WrkOdrTrnsctionLine_ID = st.VAMFG_M_WrkOdrTrnsctionLine_ID)
+                if (Env.IsModuleInstalled("VAMFG_"))
+                {
+                    sql.Append(@" LEFT JOIN VAMFG_M_WrkOdrTrnsctionLine wotl ON (wotl.VAMFG_M_WrkOdrTrnsctionLine_ID = st.VAMFG_M_WrkOdrTrnsctionLine_ID)
                               LEFT JOIN VAMFG_M_WrkOdrTransaction wot ON (wot.VAMFG_M_WrkOdrTransaction_ID = wotl.VAMFG_M_WrkOdrTransaction_ID
                                                                           AND wot.VAMFG_WorkOrderTxnType IN ('CI' , 'CR'))");
+                }
                 sql.Append($@" WHERE st.MovementType IN ('C-' , 'C+' , 'I+', 'I-', 'P-', 'P+' , 'W-', 'W+') 
                                      AND st.MovementDate BETWEEN prd.StartDate AND prd.EndDate ");
                 sql.Append(@" GROUP BY st.AD_Client_ID, loc.AD_Org_ID, p.M_Product_Category_ID, st.M_Product_ID, 
