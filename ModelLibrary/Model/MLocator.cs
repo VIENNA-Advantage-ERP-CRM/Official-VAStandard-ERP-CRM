@@ -484,6 +484,20 @@ namespace VAdvantage.Model
             }
             return false;
         }
+
+        protected override bool BeforeDelete()
+        {
+            string sql = @"SELECT Count(M_Product_ID) FROM M_Storage
+                     WHERE M_Locator_ID=" + GetM_Locator_ID()+ "AND QtyOnHand > 0";
+
+            int count =Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
+            if (count != 0)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_LocatorError"));
+                return false;
+            }
+            return true;
+        }
         //END
     }
 }
