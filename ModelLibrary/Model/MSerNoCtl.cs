@@ -123,7 +123,7 @@ namespace VAdvantage.Model
                 if (isUseOrgLevel)
                 {
                     selectSQL = selectSQL.Replace("@param1", docOrg_ID.ToString());
-                    rs = DB.ExecuteDataset(selectSQL, null, null);
+                    rs = DB.ExecuteDataset(selectSQL, null, Get_TrxName());
 
                     // Check organization level document sequence settings and if exist then override general settings.
                     if (rs != null && rs.Tables[0].Rows.Count > 0)
@@ -141,7 +141,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    rs = DB.ExecuteDataset(selectSQL, null, null);
+                    rs = DB.ExecuteDataset(selectSQL, null, Get_TrxName());
                 }
 
                 if (rs != null && rs.Tables.Count > 0 && rs.Tables[0].Rows.Count > 0)
@@ -157,7 +157,7 @@ namespace VAdvantage.Model
 
                     next = int.Parse(rs.Tables[0].Rows[0]["CurrentNext"].ToString());
 
-                    if (DB.ExecuteQuery(updateSQL, null, null) < 0)
+                    if (DB.ExecuteQuery(updateSQL, null, Get_TrxName()) < 0)
                     {
                         next = -2;
                     }
@@ -168,7 +168,7 @@ namespace VAdvantage.Model
                     {   // create Serial no (CurrentNo = StartNo + IncrementNo) for this Organization and return first number (=StartNo)
                         next = startNo;
 
-                        X_M_SerNoCtl_No seqno = new X_M_SerNoCtl_No(po.GetCtx(), 0, null);
+                        X_M_SerNoCtl_No seqno = new X_M_SerNoCtl_No(po.GetCtx(), 0, Get_TrxName());
                         seqno.SetM_SerNoCtl_ID(GetM_SerNoCtl_ID());
                         seqno.SetAD_Org_ID(docOrg_ID);
                         seqno.SetCurrentNext(startNo + incrementNo);
