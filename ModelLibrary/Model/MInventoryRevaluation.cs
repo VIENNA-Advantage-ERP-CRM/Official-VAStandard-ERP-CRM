@@ -138,7 +138,8 @@ namespace VAdvantage.Model
             }
 
             // Document Date / Account Date should be equal to current date
-            if ((newRecord || Is_ValueChanged("DateDoc") || Is_ValueChanged("DateAcct")) && GetRevaluationType().Equals(REVALUATIONTYPE_OnAvailableQuantity))
+            if ((newRecord || Is_ValueChanged("DateDoc") || Is_ValueChanged("DateAcct") || Is_ValueChanged("RevaluationType"))
+                && GetRevaluationType().Equals(REVALUATIONTYPE_OnAvailableQuantity))
             {
                 if (GetDateDoc().Value.Date != GetDateAcct().Value.Date)
                 {
