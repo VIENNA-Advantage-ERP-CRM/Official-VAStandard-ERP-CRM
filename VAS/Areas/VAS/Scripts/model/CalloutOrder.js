@@ -2239,16 +2239,16 @@
                             "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                             "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
                             "," + C_BPartner_ID1.toString() +
-                            "," + (mTab.getValue("QtyEntered")).toString() + "," + 1 + "," + 1);
+                            "," + (mTab.getValue("QtyEntered")).toString() +"," + 1 + "," + 1);
                         var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
                         DiscountSchema = Util.getValueOfString(prices["DiscountSchema"]);
 
                         // VIS0060: Handle zero price issue on quantity change.
-                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfDecimal(prices["PriceList"]) != 0 && mTab.getValue("PriceList") == 0)) {
+                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfString(prices["DiscountCalculate"])=="Y")||(Util.getValueOfDecimal(prices["PriceList"]) != 0 && mTab.getValue("PriceList") == 0)) {
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
                             PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"]);
-                        }
+                      }
                     }
                     //if (PriceEntered == null)
                     //    PriceEntered = stdPrice;

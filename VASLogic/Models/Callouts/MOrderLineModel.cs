@@ -1246,7 +1246,6 @@ namespace VIS.Models
             //decimal _flatDiscount = Util.GetValueOfInt(paramValue[6].ToString());
             int _c_BPartner_Id = Util.GetValueOfInt(paramValue[5].ToString());
             decimal _qtyEntered = Util.GetValueOfInt(paramValue[6].ToString());
-
             /** Price List - ValidFrom date validation ** Dt:11/03/2021 ** Modified By: Kumar **/
             string _transactionDate = string.Empty;
             if (paramValue.Length > 9)
@@ -1265,6 +1264,7 @@ namespace VIS.Models
             int _m_DiscountSchema_ID = 0;
             decimal _flatDiscount = 0;
             int uomPrecision = 2;
+            decimal ActualPrice = 0;
 
             MOrderModel objOrder = new MOrderModel();
             /** Price List - ValidFrom date validation ** Dt:11/03/2021 ** Modified By: Kumar **/
@@ -1309,6 +1309,7 @@ namespace VIS.Models
                 //End
                 PriceList = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceList"]);
                 PriceLimit = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceLimit"]);
+                ActualPrice= Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceStd"]); 
             }
             else
             {
@@ -1331,7 +1332,7 @@ namespace VIS.Models
                     //end
                     PriceList = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
                     PriceLimit = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceLimit"]);
-
+                    ActualPrice = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceStd"]);
 
                     sql.Clear();
                     sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y' " +
@@ -1361,8 +1362,9 @@ namespace VIS.Models
             retDic["PriceList"] = PriceList;
             retDic["PriceLimit"] = PriceLimit;
             retDic["DiscountSchema"] = _m_DiscountSchema_ID > 0 ? "Y" : "N";
+            retDic["DiscountCalculate"] = PriceEntered != ActualPrice ? "Y" : "N";    //VIS0336_changes done for adding the discount schema break discount also in price.
             retDic["UOMPrecision"] = uomPrecision;
-            retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id, 
+            retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id,
                 decimal.Round( _qtyEntered, uomPrecision, MidpointRounding.AwayFromZero));
 
             return retDic;
