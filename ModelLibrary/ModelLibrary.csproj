@@ -217,6 +217,8 @@
     <Compile Include="ModelAD\MCloudSetup.cs" />
     <Compile Include="Model\MConversionRate.cs" />
     <Compile Include="Model\MConversionType.cs" />
+    <Compile Include="Model\MInventoryRevaluation.cs" />
+    <Compile Include="Model\MRevaluationLine.cs" />
     <Compile Include="Model\MSysConfig.cs" />
     <Compile Include="Model\MAccountGroupBatch.cs" />
     <Compile Include="Model\MAssignAcctSchema.cs" />
@@ -542,6 +544,7 @@
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\DocumentEngine.cs" />
+    <Compile Include="Process\InventoryRevaluation.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />
     <Compile Include="Process\AcctSchemaDefaultCopy.cs" />
