@@ -1246,7 +1246,7 @@ namespace VIS.Models
             //decimal _flatDiscount = Util.GetValueOfInt(paramValue[6].ToString());
             int _c_BPartner_Id = Util.GetValueOfInt(paramValue[5].ToString());
             decimal _qtyEntered = Util.GetValueOfInt(paramValue[6].ToString());
-
+            decimal ActualPrice = Util.GetValueOfInt(paramValue[7].ToString());
             /** Price List - ValidFrom date validation ** Dt:11/03/2021 ** Modified By: Kumar **/
             string _transactionDate = string.Empty;
             if (paramValue.Length > 9)
@@ -1361,8 +1361,9 @@ namespace VIS.Models
             retDic["PriceList"] = PriceList;
             retDic["PriceLimit"] = PriceLimit;
             retDic["DiscountSchema"] = _m_DiscountSchema_ID > 0 ? "Y" : "N";
+            retDic["DiscountCalculate"] = PriceEntered == ActualPrice ? "Y" : "N";    //VIS0336_changes done for adding the discount schema break discount also in price.
             retDic["UOMPrecision"] = uomPrecision;
-            retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id, 
+            retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id,
                 decimal.Round( _qtyEntered, uomPrecision, MidpointRounding.AwayFromZero));
 
             return retDic;
