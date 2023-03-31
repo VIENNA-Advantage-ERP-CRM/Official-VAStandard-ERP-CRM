@@ -434,15 +434,19 @@ namespace VAdvantage.Model
             }
 
             // Order BY
-            sql.Append(@" ORDER BY cq.QueueDate ");
-            if (!isMMPolicyFIFO)
+            if (GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo) ||
+                GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo))
             {
-                sql.Append("DESC ");
-            }
-            sql.Append(@" , cq.M_AttributeSetInstance_ID ");
-            if (!isMMPolicyFIFO)
-            {
-                sql.Append("DESC ");
+                sql.Append(@" ORDER BY cq.QueueDate ");
+                if (!isMMPolicyFIFO)
+                {
+                    sql.Append("DESC ");
+                }
+                sql.Append(@" , cq.M_AttributeSetInstance_ID ");
+                if (!isMMPolicyFIFO)
+                {
+                    sql.Append("DESC ");
+                }
             }
 
             cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
