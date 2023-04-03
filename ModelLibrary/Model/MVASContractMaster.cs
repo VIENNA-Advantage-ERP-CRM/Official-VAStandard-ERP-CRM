@@ -25,5 +25,17 @@ namespace VAdvantage.Model
             : base(ctx, dr, trx)
         {
         }
+        protected override bool BeforeSave(bool newRecord)
+        {
+            if (!newRecord || newRecord)
+            {
+                if (Util.GetValueOfDateTime(GetStartDate()) > Util.GetValueOfDateTime(GetEndDate()))
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_EndDateMustGreater"));
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }
