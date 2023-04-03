@@ -32,8 +32,16 @@
         return "";
 
     };
+    /**
+      * *************************Callout check End date must be greater than Start date****************************
+      * @param {any} ctx
+      * @param {any} windowNo
+      * @param {any} mTab
+      * @param {any} mField
+      * @param {any} value
+      * @param {any} oldValue
+      */
     VAS_CalloutContract.prototype.EndDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
         }
@@ -43,14 +51,22 @@
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
         if (endDate < startDate) {
-            VIS.ADialog.info("VAS_EndDateMustGreater", null, null, "");
+            return "VAS_EndDateMustGreater";
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
+    /**
+     * *****************Callout check Start Date must be less than End Date********************
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
     VAS_CalloutContract.prototype.StartDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
         }
@@ -61,13 +77,14 @@
         startDate = startDate.toISOString();
         if (mTab.getValue("EndDate") != null) {
             if (endDate < startDate) {
-                VIS.ADialog.info("VAS_EndDateMustGreater", null, null, "");
+                return "VAS_EndDateMustGreater";
             }
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
+
     VAS_CalloutContract.prototype.ContractRef = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
