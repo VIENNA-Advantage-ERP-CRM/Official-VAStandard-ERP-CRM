@@ -25,16 +25,16 @@ namespace VAdvantage.Model
             : base(ctx, dr, trx)
         {
         }
+
+        //VIS 404 check for End date not greater than startdate date on Contract Master window
+    
         protected override bool BeforeSave(bool newRecord)
         {
-            if (!newRecord || newRecord)
-            {
                 if (Util.GetValueOfDateTime(GetStartDate()) > Util.GetValueOfDateTime(GetEndDate()))
                 {
                     log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_EndDateMustGreater"));
                     return false;
-                }
-            }
+                }       
             return true;
         }
     }
