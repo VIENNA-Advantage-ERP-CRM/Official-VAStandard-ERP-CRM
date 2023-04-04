@@ -50,9 +50,13 @@
         var endDate = new Date(value);
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-        if (endDate < startDate) {
-            return "VAS_EndDateMustGreater";
-        }
+            if (mTab.getValue("StartDate") != null) {
+                if (endDate < startDate) {
+                    mTab.setValue("EndDate", null);
+                    this.setCalloutActive(false);
+                    return "VAS_EndDateMustGreater";
+                }
+            }        
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
@@ -75,11 +79,13 @@
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-        if (mTab.getValue("EndDate") != null) {
-            if (endDate < startDate) {
-                return "VAS_EndDateMustGreater";
+            if (mTab.getValue("EndDate") != null) {
+                if (endDate < startDate) {
+                    mTab.setValue("StartDate", null);
+                    this.setCalloutActive(false);
+                    return "VAS_EndDateMustGreater";
+                }
             }
-        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
