@@ -2658,7 +2658,7 @@
 
             // Check for RMA
             var isReturnTrx = "Y" == (ctx.getContext("IsReturnTrx"));
-
+            var isSOTrx = (ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y");
             var isBlanketOrderLine = Util.getValueOfInt(mTab.getValue("C_OrderLine_Blanket_ID")) > 0 ? true : false;
             var isQuotationOrderLine = Util.getValueOfInt(mTab.getValue("C_Quotation_Line_ID")) > 0 ? true : false;
             // if order line having sales quotation ID then set isBlanketOrderLine AS TRUE
@@ -2689,7 +2689,8 @@
                 var params = M_Product_ID.toString().concat(",", (mTab.getValue("C_Order_ID")).toString() +
                     "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
-                    "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() + "," + 1 + "," + 1);
+                    "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() +
+                    "," + isSOTrx +"," + 1 + "," + 1);
                 var productPrices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
 
                 if (!isBlanketOrderLine) {
