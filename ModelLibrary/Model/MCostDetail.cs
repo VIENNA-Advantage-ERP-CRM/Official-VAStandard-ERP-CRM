@@ -1797,7 +1797,7 @@ namespace VAdvantage.Model
                         // when expected cost already calculated, then not to add qty 
                         //cost.Add(amt, GetExpectedCostCalculated() ? 0 : qty);
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
-                        //cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), GetExpectedCostCalculated() ? 0 : qty));
+                        cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), GetExpectedCostCalculated() ? 0 : qty));
                         log.Finer("Inv - none - " + cost);
                     }
                 }
