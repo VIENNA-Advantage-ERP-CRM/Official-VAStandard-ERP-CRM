@@ -709,6 +709,8 @@ namespace VAdvantage.Model
             String costLevel = null; // is used to check costing level binded for calculation of costing
             bool backwardCompatabilitySupport = false;
             DataSet dsInOut = null;
+            // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
+            bool isFreeProduct = product != null && product.Get_ColumnIndex("IsFOCItem") >= 0 ?  Util.GetValueOfBool(product.Get_Value("IsFOCItem")) : false;
             //bool IsPOCostingMethod = false;
 
             // Check when costing calculate for the below window - for calculation on landed cost
@@ -984,30 +986,36 @@ namespace VAdvantage.Model
 
                                     // VIS_0045: 16-Dec-2022 -- DevOps ID - 1885
                                     // System should allow calculating the cost even if the price is ZERO on a sales order because during consumption cost will not be affected
-                                    if (Price == 0 && !(windowName == "Customer Return" || windowName == "Shipment"))
+                                    if (!(windowName == "Customer Return" || windowName == "Shipment"))
                                     {
-                                        if (optionalstr != "window")
+                                        // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037
+                                        // When Free Item Marked on product, Received Price not ZERO, but converted price ZERO then restrict to calcualte product cost 
+                                        if (IsFreeProductNotVerified(isFreeProduct, receivedPrice, Price, costingCheck))
                                         {
-                                            trxName.Rollback();
+                                            if (optionalstr != "window")
+                                            {
+                                                trxName.Rollback();
+                                            }
+                                            conversionNotFound = inout.GetDocumentNo();
+                                            _log.Info("CostingEngine: Price not available for window = " + windowName +
+                                                        " - Document No  = " + conversionNotFound);
+                                            if (receivedPrice != 0 && Price == 0)
+                                            {
+                                                costingCheck.errorMessage += "Conversion not available";
+                                            }
+                                            else if (receivedPrice == 0)
+                                            {
+                                                costingCheck.errorMessage += "Price not available";
+                                            }
+                                            return false;
                                         }
-                                        conversionNotFound = inout.GetDocumentNo();
-                                        _log.Info("CostingEngine: Price not available for window = " + windowName +
-                                                    " - Document No  = " + conversionNotFound);
-                                        if (receivedPrice != 0 && Price == 0)
-                                        {
-                                            costingCheck.errorMessage += "Conversion not available";
-                                        }
-                                        else if (receivedPrice == 0)
-                                        {
-                                            costingCheck.errorMessage += "Price not available";
-                                        }
-                                        return false;
                                     }
                                 }
 
-                                // VIS_0045: 16-Dec-2022 -- DevOps ID - 1885
-                                //when purchase order created with ZERO price then not to calculate cost 
-                                else if (Price == 0 && !(windowName == "Customer Return" || windowName == "Shipment"))
+                                // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037
+                                // When Free Item Marked on product, Received Price not ZERO, but converted price ZERO then restrict to calcualte product cost 
+                                else if (!(windowName == "Customer Return" || windowName == "Shipment") &&
+                                         IsFreeProductNotVerified(isFreeProduct, Price, Price, costingCheck))
                                 {
                                     if (optionalstr != "window")
                                     {
@@ -1070,9 +1078,18 @@ namespace VAdvantage.Model
                                         Price = Price * inoutline.GetMovementQty();
                                         if (Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]) != acctSchema.GetC_Currency_ID())
                                         {
+                                            if (Price == 0)
+                                            {
+                                                costingCheck.errorMessage += "Price not available";
+                                            }
                                             // convert amount on account date of M_Inout (discussed with Ashish, Suya, Mukesh sir)
                                             Price = MConversionRate.Convert(ctx, Price, Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]), acctSchema.GetC_Currency_ID(),
                                                     inout.GetDateAcct(), Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_ConversionType_ID"]), AD_Client_ID, AD_Org_ID2);
+
+                                            if (Price == 0)
+                                            {
+                                                costingCheck.errorMessage += "Conversion not available";
+                                            }
                                         }
                                         invoiceline = null;
                                     }
@@ -1085,7 +1102,8 @@ namespace VAdvantage.Model
                                     cmPrice = Price;
                                 }
 
-                                if (Price == 0)
+                                // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
+                                if (IsFreeProductNotVerified(isFreeProduct, Price, Price, costingCheck))
                                 {
                                     if (optionalstr != "window")
                                     {
@@ -1151,6 +1169,7 @@ namespace VAdvantage.Model
                                 costingCheck.M_Warehouse_ID = M_Warehouse_Id;
                                 costingCheck.movementDate = invoice.GetDateAcct();
                             }
+
                             if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID() && Price != 0)
                             {
                                 Price = MConversionRate.Convert(ctx, Price, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
@@ -2835,7 +2854,8 @@ namespace VAdvantage.Model
                             Price = price * Qty;
                             cmPrice = cmPrice * Qty;
 
-                            if (Price == 0)
+                            // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
+                            if (IsFreeProductNotVerified(isFreeProduct, Price, Price, costingCheck))
                             {
                                 if (optionalstr != "window")
                                 {
@@ -2866,7 +2886,7 @@ namespace VAdvantage.Model
                             {
                                 inventory = costingCheck.inventory != null ? costingCheck.inventory : new MInventory(ctx, inventoryLine.GetM_Inventory_ID(), trxName);
 
-                                if (C_Currency_ID != 0 && C_Currency_ID != acctSchema.GetC_Currency_ID())
+                                if (C_Currency_ID != 0 && C_Currency_ID != acctSchema.GetC_Currency_ID() && Price != 0)
                                 {
                                     Price = MConversionRate.Convert(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
                                                                             inventory.GetMovementDate(), 0, AD_Client_ID, AD_Org_ID2);
@@ -2920,7 +2940,9 @@ namespace VAdvantage.Model
                                     price = MConversionRate.Convert(ctx, price, Util.GetValueOfInt(ctx.GetContext("$C_Currency_ID")), acctSchema.GetC_Currency_ID(),
                                                                         VAMFG_DateAcct, 0, AD_Client_ID, AD_Org_ID2);
                                 }
-                                if (price == 0)
+
+                                // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
+                                if (IsFreeProductNotVerified(isFreeProduct, Price, price, costingCheck))
                                 {
                                     if (optionalstr == "process")
                                     {
@@ -2951,7 +2973,8 @@ namespace VAdvantage.Model
                             Price = price * Qty;
                             cmPrice = cmPrice * Qty;
 
-                            if (Price == 0)
+                            // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
+                            if (IsFreeProductNotVerified(isFreeProduct, Price, Price, costingCheck))
                             {
                                 if (optionalstr == "process")
                                 {
@@ -6083,6 +6106,50 @@ namespace VAdvantage.Model
                 return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// This function is used to check Product is free or not
+        /// When Free Item - Price found but conversion not found then return true
+        /// When not Free Item - Price ZERO then return true
+        /// When Free Item - Price ZERO then return false
+        /// </summary>
+        /// <param name="IsFreeProduct">Is Free Item</param>
+        /// <param name="ReceivedPrice">Product Price</param>
+        /// <param name="CostingPrice">Product Converted price</param>
+        /// <param name="costingCheck">Costing Check Class</param>
+        /// <writer>VIS_0045: 04-Apr-2023 -- DevOps ID - 2037</writer>
+        /// <returns>True, when system will not calvulate the cost and give message</returns>
+        public static bool IsFreeProductNotVerified(bool IsFreeProduct, decimal ReceivedPrice, Decimal CostingPrice, CostingCheck costingCheck)
+        {
+            // when product is not marked as free, then check receieved adn costing price is ZERO- system will not complete the transaction 
+            if (!IsFreeProduct && (ReceivedPrice == 0 || CostingPrice == 0))
+            {
+                return true;
+            }
+            else if (IsFreeProduct && ReceivedPrice != 0 && CostingPrice == 0)
+            {
+                return true;
+            }
+            else if (IsFreeProduct && costingCheck != null && costingCheck.errorMessage != null && costingCheck.errorMessage.Contains("Price not available"))
+            {
+                // system will complete the transaction, when price not found and free product
+                return false;
+            }
+            else if (!IsFreeProduct && costingCheck != null && costingCheck.errorMessage != null && costingCheck.errorMessage.Contains("Price not available"))
+            {
+                // system will not complete the transaction, when price not found and not free product
+                return true;
+            }
+            else if (costingCheck != null && costingCheck.errorMessage != null && costingCheck.errorMessage.Contains("Conversion not available"))
+            {
+                return true;
+            }
+            else if (IsFreeProduct && ReceivedPrice == 0 && CostingPrice == 0)
+            {
+                return false;
+            }
+            return false;
         }
 
         /// <summary>
