@@ -1246,6 +1246,7 @@ namespace VIS.Models
             //decimal _flatDiscount = Util.GetValueOfInt(paramValue[6].ToString());
             int _c_BPartner_Id = Util.GetValueOfInt(paramValue[5].ToString());
             decimal _qtyEntered = Util.GetValueOfInt(paramValue[6].ToString());
+            bool isSOTrx = Convert.ToBoolean(paramValue[7]);
             /** Price List - ValidFrom date validation ** Dt:11/03/2021 ** Modified By: Kumar **/
             string _transactionDate = string.Empty;
             if (paramValue.Length > 9)
@@ -1291,7 +1292,15 @@ namespace VIS.Models
 
             MBPartnerModel objBPartner = new MBPartnerModel();
             Dictionary<String, String> bpartner1 = objBPartner.GetBPartner(ctx, _c_BPartner_Id.ToString());
-            _m_DiscountSchema_ID = Util.GetValueOfInt(bpartner1["M_DiscountSchema_ID"]);
+            if (isSOTrx) //VIS_0336_changes for setting discount in case of SO and PO
+            {
+                _m_DiscountSchema_ID = Util.GetValueOfInt(bpartner1["M_DiscountSchema_ID"]);
+            }
+            else
+            {
+                _m_DiscountSchema_ID=Util.GetValueOfInt(bpartner1["M_DiscountSchema_ID"]);
+            }
+           
             _flatDiscount = Util.GetValueOfInt(bpartner1["FlatDiscount"]);
             uomPrecision = MUOM.GetPrecision(ctx, _c_Uom_Id);
             sql.Clear();
@@ -1309,7 +1318,7 @@ namespace VIS.Models
                 //End
                 PriceList = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceList"]);
                 PriceLimit = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceLimit"]);
-                ActualPrice= Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceStd"]); 
+                ActualPrice= Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceStd"]);
             }
             else
             {
