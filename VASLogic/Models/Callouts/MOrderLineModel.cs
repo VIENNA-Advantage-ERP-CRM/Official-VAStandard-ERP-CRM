@@ -1298,7 +1298,7 @@ namespace VIS.Models
             }
             else
             {
-                _m_DiscountSchema_ID=Util.GetValueOfInt(bpartner1["M_DiscountSchema_ID"]);
+                _m_DiscountSchema_ID=Util.GetValueOfInt(bpartner1["PO_DiscountSchema_ID"]);
             }
            
             _flatDiscount = Util.GetValueOfInt(bpartner1["FlatDiscount"]);
@@ -1374,7 +1374,7 @@ namespace VIS.Models
             retDic["DiscountCalculate"] = PriceEntered != ActualPrice ? "Y" : "N";    //VIS0336_changes done for adding the discount schema break discount also in price.
             retDic["UOMPrecision"] = uomPrecision;
             retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id,
-                decimal.Round( _qtyEntered, uomPrecision, MidpointRounding.AwayFromZero));
+                decimal.Round(_qtyEntered, uomPrecision, MidpointRounding.AwayFromZero));
 
             return retDic;
         }
