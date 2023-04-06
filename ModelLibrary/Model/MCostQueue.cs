@@ -6752,6 +6752,7 @@ namespace VAdvantage.Model
             MCostElement ce = null;
             decimal amtWithSurcharge = 0;
             int M_SourceWarehouse_ID = 0;
+            bool isFreeProduct = product != null && product.Get_ColumnIndex("IsFOCItem") >= 0 ? Util.GetValueOfBool(product.Get_Value("IsFOCItem")) : false;
             // change 2-5-2016
             try
             {
@@ -6773,7 +6774,7 @@ namespace VAdvantage.Model
                         M_SourceWarehouse_ID = costingCheck.M_Warehouse_ID != 0 ? costingCheck.M_Warehouse_ID : movementline.GetParent().GetDTD001_MWarehouseSource_ID();
                     }
 
-                    if (Price == 0)
+                    if (Price == 0 && !isFreeProduct)
                     {
                         #region fifo cost
                         if (cl == MProductCategory.COSTINGLEVEL_BatchLot)
