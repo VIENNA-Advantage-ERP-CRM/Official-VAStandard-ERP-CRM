@@ -660,9 +660,11 @@
                 pageNo: pNo
             },
             success: function (data) {
-                obj.dataByData = data.result;
-                resetPageCtrls(data.result.pSetting);
-                callbackGetDataModel(data.result);
+                /**VIS_045: DevOps Task ID: 2075 -> Handle date in UTC */
+                data = JSON.parse(data);
+                obj.dataByData = data;
+                resetPageCtrls(data.pSetting);
+                callbackGetDataModel(data);
                 //return data.result;
             }
         });
@@ -1012,7 +1014,9 @@
                     else {
                         if (row[j] != null && dataObj.Columns[j].indexOf("Date") > 0) {
                             if (row[j] != "") {
-                                var date = new Date(parseInt(row[j].substr(6)));
+                                //var date = new Date(parseInt(row[j].substr(6)));
+                                /**VIS_045: DevOps Task ID: 2075 -> Handle date in UTC */
+                                var date = new Date((row[j]));
                                 if (data != null)
                                     line[dataObj.Columns[j]] = date.toLocaleDateString();
                             }
@@ -1467,7 +1471,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" id="txtAccount_' + windowNo +'" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtAccount_' + windowNo + '" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblAcc.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1489,7 +1493,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" id="txtOrgUnit_' + windowNo +'" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtOrgUnit_' + windowNo + '" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblOrgUnit.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1511,7 +1515,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" id="txtProduct_' + windowNo +'" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProduct_' + windowNo + '" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProduct.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1534,7 +1538,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" id="txtBPartner_' + windowNo +'" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtBPartner_' + windowNo + '" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblBP.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
@@ -1556,7 +1560,7 @@
             var $FrmInputWrap = $('<div class="input-group vis-input-wrap">');
             var $FrmControlWrap = $('<div class="vis-control-wrap">');
             var $FrmCtrlBtnWrap = $('<div class="input-group-append">');
-            var $FrmInputRO = $('<input type="text" id="txtProject_' + windowNo +'" readonly data-hasbtn=" ">');
+            var $FrmInputRO = $('<input type="text" id="txtProject_' + windowNo + '" readonly data-hasbtn=" ">');
             tble.append(tr);
             //tr.append(td);
             //td.append(lblProject.getControl().css("display", "inline-block").addClass("VIS_Pref_Label_Font"));
