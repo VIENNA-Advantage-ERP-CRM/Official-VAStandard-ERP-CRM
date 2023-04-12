@@ -710,7 +710,7 @@ namespace VAdvantage.Model
             bool backwardCompatabilitySupport = false;
             DataSet dsInOut = null;
             // VIS_0045: 04-Apr-2023 -- DevOps ID - 2037 -- Free item product Cost Calculation
-            bool isFreeProduct = product != null && product.Get_ColumnIndex("IsFOCItem") >= 0 ?  Util.GetValueOfBool(product.Get_Value("IsFOCItem")) : false;
+            bool isFreeProduct = product != null && product.Get_ColumnIndex("IsFOCItem") >= 0 ? Util.GetValueOfBool(product.Get_Value("IsFOCItem")) : false;
             //bool IsPOCostingMethod = false;
 
             // Check when costing calculate for the below window - for calculation on landed cost
@@ -6603,7 +6603,7 @@ namespace VAdvantage.Model
                         costingcheck.errorMessage += "Conversion not available";
                     }
                 }
-                else
+                else if (amount == 0)
                 {
                     costingcheck.errorMessage += "Price not available";
                 }
