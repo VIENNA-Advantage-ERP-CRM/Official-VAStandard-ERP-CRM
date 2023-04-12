@@ -222,7 +222,7 @@ namespace VIS.Controllers
                 var ctx = Session["ctx"] as Ctx;
                 CommonModel obj = new CommonModel();
                 var value = obj.GetDataQuery(ctx, AD_Client_ID, whereClause, orderClause, gr1, gr2, gr3, gr4, sort1, sort2, sort3, sort4, displayDocInfo, displaySrcAmt, displayqty, pageNo);
-                return Json(new { result = value }, JsonRequestBehavior.AllowGet);
+                return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
             }
             return Json(new { result = "ok" }, JsonRequestBehavior.AllowGet);
         }
