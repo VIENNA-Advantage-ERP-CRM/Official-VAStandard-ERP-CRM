@@ -3259,7 +3259,7 @@ namespace VAdvantage.Model
                             if (currentCostPrice != 0)
                             {
                                 // this column will be added when current cost available else to be added after cost calculation
-                                query.Append(" ProductApproxCost = " + currentCostPrice);
+                                // query.Append(" ProductApproxCost = " + currentCostPrice);
                             }
                         }
                         DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = " + currentCostPrice +
