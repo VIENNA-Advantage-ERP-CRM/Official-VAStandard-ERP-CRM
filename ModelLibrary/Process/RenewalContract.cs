@@ -44,12 +44,10 @@ namespace VAdvantage.Process
                                 C_OldContract_ID, Get_Trx());
             MVASContractMaster _newCont = new MVASContractMaster(GetCtx(),
                                         0, Get_Trx());
-           DateTime? renewDate = Util.GetValueOfDateTime(_oldCont.GetVAS_RenewalDate().Value);
-            if(StartDate < renewDate)
+            if(StartDate < _oldCont.GetVAS_RenewalDate())
             {
                 return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");             //Start date should not be less than Renewal date
             }
-            else
             _oldCont.CopyTo(_newCont);
             _newCont.SetAD_Client_ID(GetAD_Client_ID());
             _newCont.SetAD_Org_ID(GetAD_Org_ID());
@@ -61,9 +59,10 @@ namespace VAdvantage.Process
             _newCont.SetVAS_RenewalDate(null);
             _newCont.SetDocumentNo(string.Empty);
             _newCont.SetIsExpiredContracts("N");
-            _newCont.SetVAS_ContractDuration(Util.GetValueOfString(EndDate.Value.Year - StartDate.Value.Year));
-            _newCont.SetVAS_ContractMonths(Util.GetValueOfString(
-                Math.Round(decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month) + decimal.Subtract(EndDate.Value.Day, StartDate.Value.Day) /30,1)));
+            _newCont.SetVAS_ContractDuration(Util.GetValueOfString(
+                Math.Round((decimal.Subtract(EndDate.Value.Year,StartDate.Value.Year) * 12 + decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month))/12,1)));
+            var monthDiff = (EndDate - StartDate).Value.Days;
+            _newCont.SetVAS_ContractMonths(Util.GetValueOfString(Math.Round((decimal)monthDiff / 30, 1)));
             if (!_newCont.Save())
             {
                 pp = VLogger.RetrieveError();

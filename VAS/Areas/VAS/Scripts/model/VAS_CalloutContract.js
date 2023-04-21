@@ -16,15 +16,12 @@
         }
         this.setCalloutActive(true);
         var SDate = Util.getValueOfDate(mTab.getValue("StartDate"));
-        var Edate = Util.getValueOfDate(mTab.getValue("EndDate"));
-        //var totaldays = dateDiffInYears(SDate, Edate);
+        var Edate = Util.getValueOfDate(mTab.getValue("EndDate"));   
         var totalMonths = (Edate.getDate() - SDate.getDate()) / 30 +
-            Edate.getMonth() - SDate.getMonth();
-        var totalYears = (Edate.getFullYear() - SDate.getFullYear());
-        //var difference = (Edate.getDate() - SDate.getDate()) / 30 +
-        //Edate.getMonth() - SDate.getMonth() +
-        //(12 * (Edate.getFullYear() - SDate.getFullYear()));
-        //var count = difference.toFixed(2);
+            (Edate.getMonth() - SDate.getMonth() +
+            (12 * (Edate.getFullYear() - SDate.getFullYear())));       
+        var totalYears = (Edate.getMonth() - SDate.getMonth()) / 12 +
+                        (Edate.getFullYear() - SDate.getFullYear());       
         mTab.setValue("VAS_ContractMonths", totalMonths.toFixed(2));
         mTab.setValue("VAS_ContractDuration", totalYears.toFixed(2));
         this.setCalloutActive(false);
@@ -234,7 +231,7 @@
                     mTab.setValue("C_BPartner_Location_ID", null);
                 else {
                     mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
-                    if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	//	set the same
+                    if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	
                         mTab.setValue("Bill_Location_ID", shipTo_ID);
                 }
 
@@ -248,7 +245,7 @@
                         if (bpdtl != null) {
                             isvendor = Util.getValueOfString(bpdtl["IsVendor"]);
                             isCustomer = Util.getValueOfString(bpdtl["IsCustomer"]);
-                            if (!isSOTrx) {     //In case of Purchase Order
+                            if (!isSOTrx) {                   //In case of Purchase Order
                                 if (isvendor == "Y") {
                                     _PaymentMethod_ID = Util.getValueOfInt(bpdtl["VA009_PO_PaymentMethod_ID"]);
                                 }
