@@ -42,7 +42,7 @@ namespace VIS.Models
                         VAS_ContractSummary,  VAS_CONTRACTUTILIZEDAMOUNT,
                         VAS_JURISDICTION, VAS_OVERLIMIT, VAS_RENEWCONTRACT,
                         VAS_RENEWALDATE, VAS_RENEWALTERM, VAS_TERMINATE,
-                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID
+                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID,IsExpiredContracts
                         FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID , null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -60,7 +60,8 @@ namespace VIS.Models
                     retDic["VAS_ContractCategory_ID"] = ds.Tables[0].Rows[i]["VAS_ContractCategory_ID"].ToString();
                     retDic["ContractType"] = ds.Tables[0].Rows[i]["ContractType"].ToString();
                     retDic["VAS_Jurisdiction"] = ds.Tables[0].Rows[i]["VAS_Jurisdiction"].ToString();
-                    retDic["VAS_ContractSummary"] = ds.Tables[0].Rows[i]["VAS_ContractSummary"].ToString();
+                    retDic["VAS_ContractSummary"] = ds.Tables[0].Rows[i]["VAS_ContractSummary"].ToString();                  
+                    retDic["IsExpiredContracts"] = ds.Tables[0].Rows[i]["IsExpiredContracts"].ToString();
                 }
             }
                 
@@ -120,6 +121,17 @@ namespace VIS.Models
                 retDic["C_IncoTermPO_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
             }
             return retDic;
+        }
+        /// <summary>
+        /// Get Product UOM for Contract master window's contract line tab
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public int GetProductUOM(string fields)
+        {
+            string sql = @"SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(fields);
+            int UOM=Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            return UOM;
         }
     }
 }
