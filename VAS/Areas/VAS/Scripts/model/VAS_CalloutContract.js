@@ -96,6 +96,10 @@
         this.setCalloutActive(true);
         var result = VIS.dataContext.getJSONRecord("MVASContract/GetContractDetails", Util.getValueOfInt(value));
         if (result) {
+            if (result["IsExpiredContracts"] == 'Y') {          //Check Contract Expired or not
+                this.setCalloutActive(false);
+                return "VAS_ContractExpired";
+            }
             mTab.setValue("ContractType", result["ContractType"]);
             mTab.setValue("C_BPartner_ID", result["C_BPartner_ID"]);
             mTab.setValue("Bill_Location_ID", result["Bill_Location_ID"]);
@@ -331,7 +335,49 @@
         }
         return isAdvancePayTerm;
     }
+/**
+ * VIS404 Set UOM on product selection on contract line tab of Contract Master window
+ * @param {any} ctx
+ * @param {any} windowNo
+ * @param {any} mTab
+ * @param {any} mField
+ * @param {any} value
+ * @param {any} oldValue
+ */
+    VAS_CalloutContract.prototype.SetProductUOM = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null) {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var data = VIS.dataContext.getJSONRecord("MVASContract/GetProductUOM", value.toString());
+        if (data != null) {
+            mTab.setValue("C_UOM_ID", data);
+            this.setCalloutActive(false);
+            return "";
+        }
+    };
+    /**
+     * VIS404 Set fields blank on change of Contract Type
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    VAS_CalloutContract.prototype.UpdateIsSOTrx = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "" || value == false) {
+            return "";
+        }
+        this.setCalloutActive(true);
 
+        ctx.setIsSOTrx(windowNo, value == "ASR" ? true : false)      
+        if (value == "ASR") {
+            mTab.setValue("IsSOTrx", value == "ASR" ? true : false);
+            mTab.setValue("VAS_Jurisdiction", null);
+        }
+        this.setCalloutActive(false);
+    };
     function dateDiffInYears(dateold, datenew) {
         var ynew = datenew.getFullYear();
         var mnew = datenew.getMonth();
