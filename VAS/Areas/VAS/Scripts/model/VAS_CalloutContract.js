@@ -373,7 +373,7 @@
 
         ctx.setIsSOTrx(windowNo, value == "ASR" ? true : false)      
         if (value == "ASR") {
-            mTab.setValue("IsSOTrx", true);
+            mTab.setValue("IsSOTrx", value == "ASR" ? true : false);
             mTab.setValue("VAS_Jurisdiction", null);
         }
         this.setCalloutActive(false);
