@@ -44,5 +44,14 @@ namespace VIS.Controllers
             retJSON = JsonConvert.SerializeObject(objBPModel.GetBPartnerData(ctx, fields));
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        public JsonResult GetAwardRecommendationDeatils(string fields)
+        {
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            MVASContractModel objBPModel = new MVASContractModel();
+            retJSON = JsonConvert.SerializeObject(objBPModel.GetAwardRecommendationDeatils(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
