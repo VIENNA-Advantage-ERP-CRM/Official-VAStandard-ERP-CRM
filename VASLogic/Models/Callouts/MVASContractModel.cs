@@ -42,8 +42,9 @@ namespace VIS.Models
                         VAS_ContractSummary,  VAS_CONTRACTUTILIZEDAMOUNT,
                         VAS_JURISDICTION, VAS_OVERLIMIT, VAS_RENEWCONTRACT,
                         VAS_RENEWALDATE, VAS_RENEWALTERM, VAS_TERMINATE,
-                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID " + (Env.IsModuleInstalled("VA097_") ? " , VA097_VendorDetails_ID " : "") +
+                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID,IsExpiredContracts " + (Env.IsModuleInstalled("VA097_") ? " , VA097_VendorDetails_ID " : "") +
                         " FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID, null, null);
+
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -64,7 +65,8 @@ namespace VIS.Models
                     if (Env.IsModuleInstalled("VA097_"))//VIS0336_changes done for setting the vendor details id on purchase order window
                     {
                         retDic["VA097_VendorDetails_ID"] = ds.Tables[0].Rows[i]["VA097_VendorDetails_ID"].ToString();
-                    }
+                    }              
+                    retDic["IsExpiredContracts"] = ds.Tables[0].Rows[i]["IsExpiredContracts"].ToString();
                 }
             }
 
@@ -127,6 +129,16 @@ namespace VIS.Models
             return retDic;
         }
 
-
+        /// <summary>
+        /// Get Product UOM for Contract master window's contract line tab
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public int GetProductUOM(string fields)
+        {
+            string sql = @"SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(fields);
+            int UOM=Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            return UOM;
+        }
     }
 }
