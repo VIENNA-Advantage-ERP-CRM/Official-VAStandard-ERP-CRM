@@ -109,7 +109,10 @@
             mTab.setValue("VA009_PaymentMethod_ID", result["VA009_PaymentMethod_ID"]);
             mTab.setValue("C_BPartner_Location_ID", result["Bill_Location_ID"]);
             mTab.setValue("VAS_ContractCategory_ID", result["VAS_ContractCategory_ID"]);
-            mTab.setValue("VA097_VendorDetails_ID", result["VA097_VendorDetails_ID"]);
+
+            if (mTab.getField("VA097_VendorDetails_ID") != null) {  //VIS0336_changes done for setting the vendor details id on purchase order window
+                mTab.setValue("VA097_VendorDetails_ID", result["VA097_VendorDetails_ID"]);
+            }
 
         }
         this.setCalloutActive(false);
@@ -334,25 +337,6 @@
         }
         return isAdvancePayTerm;
     }
-
-    VAS_CalloutContract.prototype.AwardDetails = function (ctx, windowNo, mTab, mField, value, oldValue) {
-
-        if (this.isCalloutActive() || value == null || value.toString() == "") {
-            return "";
-        }
-        this.setCalloutActive(true);
-        var paramString = mTab.getValue("VA097_VendorDetails_ID");
-
-        var res = VIS.dataContext.getJSONRecord("MVASContract/GetAwardRecommendationDeatils", paramString);
-        if (res != null) {
-            mTab.setValue("C_BPartner_ID", Util.getValueOfInt(res["C_BPARtner_ID"]));
-            mTab.setValue("C_BPARTNER_LOCATION_ID", Util.getValueOfInt(res["C_BPARTNER_LOCATION_ID"]));
-            mTab.setValue("AD_USER_ID", Util.getValueOfInt(res["AD_USER_ID"]));
-        }
-        
-        this.setCalloutActive(false);
-        return;
-    };
 
     function dateDiffInYears(dateold, datenew) {
         var ynew = datenew.getFullYear();

@@ -42,8 +42,8 @@ namespace VIS.Models
                         VAS_ContractSummary,  VAS_CONTRACTUTILIZEDAMOUNT,
                         VAS_JURISDICTION, VAS_OVERLIMIT, VAS_RENEWCONTRACT,
                         VAS_RENEWALDATE, VAS_RENEWALTERM, VAS_TERMINATE,
-                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID,VA097_VendorDetails_ID
-                        FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID , null, null);
+                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID " + (Env.IsModuleInstalled("VA097_") ? " , VA097_VendorDetails_ID " : "") +
+                        " FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -61,10 +61,13 @@ namespace VIS.Models
                     retDic["ContractType"] = ds.Tables[0].Rows[i]["ContractType"].ToString();
                     retDic["VAS_Jurisdiction"] = ds.Tables[0].Rows[i]["VAS_Jurisdiction"].ToString();
                     retDic["VAS_ContractSummary"] = ds.Tables[0].Rows[i]["VAS_ContractSummary"].ToString();
-                    retDic["VA097_VendorDetails_ID"] = ds.Tables[0].Rows[i]["VA097_VendorDetails_ID"].ToString();
-
+                    if (Env.IsModuleInstalled("VA097_"))//VIS0336_changes done for setting the vendor details id on purchase order window
+                    {
+                        retDic["VA097_VendorDetails_ID"] = ds.Tables[0].Rows[i]["VA097_VendorDetails_ID"].ToString();
+                    }
                 }
             }
+
 
             return retDic;
 
@@ -120,23 +123,6 @@ namespace VIS.Models
                 retDic["Bill_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Bill_Location_ID"]);
                 retDic["C_IncoTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]);
                 retDic["C_IncoTermPO_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
-            }
-            return retDic;
-        }
-
-        public Dictionary<string, object> GetAwardRecommendationDeatils(Ctx ctx, string fields)
-        {
-            string sql = string.Empty;
-            Dictionary<string, object> retDic = null;
-            sql = "SELECT C_BPARtner_ID,C_BPARTNER_LOCATION_ID,AD_USER_ID FROM VA097_VendorDetails WHERE VA097_VendorDetails_ID=" +Util.GetValueOfInt(fields);
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
-            {
-                retDic = new Dictionary<string, object>();
-                retDic["C_BPARtner_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPARtner_ID"]);
-                retDic["C_BPARTNER_LOCATION_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPARTNER_LOCATION_ID"]);
-                retDic["AD_USER_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_USER_ID"]);
-
             }
             return retDic;
         }
