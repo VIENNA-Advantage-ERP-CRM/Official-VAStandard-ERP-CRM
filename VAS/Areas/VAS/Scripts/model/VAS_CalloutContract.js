@@ -16,12 +16,12 @@
         }
         this.setCalloutActive(true);
         var SDate = Util.getValueOfDate(mTab.getValue("StartDate"));
-        var Edate = Util.getValueOfDate(mTab.getValue("EndDate"));   
+        var Edate = Util.getValueOfDate(mTab.getValue("EndDate"));
         var totalMonths = (Edate.getDate() - SDate.getDate()) / 30 +
             (Edate.getMonth() - SDate.getMonth() +
-            (12 * (Edate.getFullYear() - SDate.getFullYear())));       
+                (12 * (Edate.getFullYear() - SDate.getFullYear())));
         var totalYears = (Edate.getMonth() - SDate.getMonth()) / 12 +
-                        (Edate.getFullYear() - SDate.getFullYear());       
+            (Edate.getFullYear() - SDate.getFullYear());
         mTab.setValue("VAS_ContractMonths", totalMonths.toFixed(2));
         mTab.setValue("VAS_ContractDuration", totalYears.toFixed(2));
         this.setCalloutActive(false);
@@ -47,13 +47,13 @@
         var endDate = new Date(value);
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-            if (mTab.getValue("StartDate") != null) {
-                if (endDate < startDate) {
-                    mTab.setValue("EndDate", null);
-                    this.setCalloutActive(false);
-                    return "VAS_EndDateMustGreater";
-                }
-            }        
+        if (mTab.getValue("StartDate") != null) {
+            if (endDate < startDate) {
+                mTab.setValue("EndDate", null);
+                this.setCalloutActive(false);
+                return "VAS_EndDateMustGreater";
+            }
+        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
@@ -76,13 +76,13 @@
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-            if (mTab.getValue("EndDate") != null) {
-                if (endDate < startDate) {
-                    mTab.setValue("StartDate", null);
-                    this.setCalloutActive(false);
-                    return "VAS_EndDateMustGreater";
-                }
+        if (mTab.getValue("EndDate") != null) {
+            if (endDate < startDate) {
+                mTab.setValue("StartDate", null);
+                this.setCalloutActive(false);
+                return "VAS_EndDateMustGreater";
             }
+        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
@@ -103,7 +103,7 @@
             mTab.setValue("ContractType", result["ContractType"]);
             mTab.setValue("C_BPartner_ID", result["C_BPartner_ID"]);
             mTab.setValue("Bill_Location_ID", result["Bill_Location_ID"]);
-            mTab.setValue("Bill_User_ID", result["Bill_User_ID"]);  
+            mTab.setValue("Bill_User_ID", result["Bill_User_ID"]);
             mTab.setValue("VAS_Jurisdiction", result["VAS_Jurisdiction"]);
             mTab.setValue("C_Currency_ID", result["C_Currency_ID"]);
             mTab.setValue("C_IncoTerm_ID", result["C_IncoTerm_ID"]);
@@ -112,7 +112,13 @@
             mTab.setValue("M_PriceList_ID", result["M_PriceList_ID"]);
             mTab.setValue("VA009_PaymentMethod_ID", result["VA009_PaymentMethod_ID"]);
             mTab.setValue("C_BPartner_Location_ID", result["Bill_Location_ID"]);
-            mTab.setValue("VAS_ContractCategory_ID", result["VAS_ContractCategory_ID"]);        }
+            mTab.setValue("VAS_ContractCategory_ID", result["VAS_ContractCategory_ID"]);
+
+            if (mTab.getField("VA097_VendorDetails_ID") != null) {  //VIS0336_changes done for setting the vendor details id on purchase order window
+                mTab.setValue("VA097_VendorDetails_ID", result["VA097_VendorDetails_ID"]);
+            }
+
+        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
@@ -165,7 +171,7 @@
     VAS_CalloutContract.prototype.BPartner = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         var dr = null;
-       
+
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
         }
@@ -177,7 +183,7 @@
                 C_BPartner_ID = Util.getValueOfInt(value.toString());
             if (C_BPartner_ID == 0)
                 return "";
-          
+
             var isReturnTrx = Util.getValueOfBoolean(mTab.getValue("IsReturnTrx"));
             if (isReturnTrx)
                 return "";
@@ -200,15 +206,15 @@
                 var contractType = Util.getValueOfString(mTab.getValue("ContractType"));
                 if (contractType == "ASP")
                     mTab.setValue("VAS_Jurisdiction", dr["VA068_TaxJurisdiction"]);
-                    
+
                 // Price List
-               
-                    var PriceList = Util.getValueOfInt(contractType=="ASR" ? dr["M_PriceList_ID"] : dr["PO_PriceList_ID"]);
+
+                var PriceList = Util.getValueOfInt(contractType == "ASR" ? dr["M_PriceList_ID"] : dr["PO_PriceList_ID"]);
                 if (PriceList != 0) {
-                    mTab.setValue("M_PriceList_ID", PriceList);                  
+                    mTab.setValue("M_PriceList_ID", PriceList);
                 }
                 //Inco Term
-                var IncoTerm = Util.getValueOfInt(contractType=="ASR" ? dr["C_IncoTerm_ID"] : dr["C_IncoTermPO_ID"]);
+                var IncoTerm = Util.getValueOfInt(contractType == "ASR" ? dr["C_IncoTerm_ID"] : dr["C_IncoTermPO_ID"]);
                 if (IncoTerm > 0) {
                     mTab.setValue("C_IncoTerm_ID", IncoTerm);
                 }
@@ -235,14 +241,14 @@
                     mTab.setValue("C_BPartner_Location_ID", null);
                 else {
                     mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
-                    if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	
+                    if ("Y" == Util.getValueOfString(dr["IsShipTo"]))
                         mTab.setValue("Bill_Location_ID", shipTo_ID);
                 }
 
                 //Payment Method
                 if (_CountVA009) {
-                    var _PaymentMethod_ID = Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]);                  
-                    var _PO_PaymentMethod_ID = 0;                  
+                    var _PaymentMethod_ID = Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]);
+                    var _PO_PaymentMethod_ID = 0;
                     if (C_Order_Blanket <= 0) {
 
                         var bpdtl = VIS.dataContext.getJSONRecord("MBPartner/GetBPDetails", C_BPartner_ID);
@@ -278,9 +284,9 @@
 
                 if (_PaymentMethod_ID == 0)
                     mTab.setValue("VA009_PaymentMethod_ID", null);
-                else 
-                    mTab.setValue("VA009_PaymentMethod_ID", _PaymentMethod_ID);  
-                
+                else
+                    mTab.setValue("VA009_PaymentMethod_ID", _PaymentMethod_ID);
+
                 // Invoice Contact
                 var contID = Util.getValueOfInt(dr["AD_User_ID"]);
                 if (C_BPartner_ID.toString() == ctx.getContext("C_BPartner_ID")) {
@@ -294,25 +300,25 @@
                     mTab.setValue("AD_User_ID", contID);
                     mTab.setValue("Bill_User_ID", contID);
                 }
-               
-                    //	Payment Term
-                    var PaymentTermPresent = Util.getValueOfInt(mTab.getValue("C_PaymentTerm_ID")); // from BSO/BPO window
-                    var C_Order_Blanket = Util.getValueOfDecimal(mTab.getValue("C_Order_Blanket"));
-                    if (PaymentTermPresent > 0 && C_Order_Blanket > 0) {
+
+                //	Payment Term
+                var PaymentTermPresent = Util.getValueOfInt(mTab.getValue("C_PaymentTerm_ID")); // from BSO/BPO window
+                var C_Order_Blanket = Util.getValueOfDecimal(mTab.getValue("C_Order_Blanket"));
+                if (PaymentTermPresent > 0 && C_Order_Blanket > 0) {
+                }
+                else {
+                    ii = Util.getValueOfInt(contractType=="ASR" ? dr["C_PaymentTerm_ID"] : dr["PO_PaymentTerm_ID"]);
+                    var isPaymentTermUpdate = this.checkAdvancePaymentTerm(Util.getValueOfInt(mTab.getValue("C_DocTypeTarget_ID")), ii);
+                    if (isPaymentTermUpdate) {
+                        if (ii != 0)//ii=0 when dr return ""
+                        {
+                            mTab.setValue("C_PaymentTerm_ID", ii);
+                        }
                     }
                     else {
-                        ii = Util.getValueOfInt(contractType=="ASR" ? dr["C_PaymentTerm_ID"] : dr["PO_PaymentTerm_ID"]);                       
-                        var isPaymentTermUpdate = this.checkAdvancePaymentTerm(Util.getValueOfInt(mTab.getValue("C_DocTypeTarget_ID")), ii);
-                        if (isPaymentTermUpdate) {
-                            if (ii != 0)//ii=0 when dr return ""
-                            {
-                                mTab.setValue("C_PaymentTerm_ID", ii);
-                            }
-                        }
-                        else {
-                            mTab.setValue("C_PaymentTerm_ID", null);
-                        }
-                    }      
+                        mTab.setValue("C_PaymentTerm_ID", null);
+                    }
+                }
             }
         }
         catch (err) {
@@ -320,7 +326,7 @@
             return err;
         }
         this.setCalloutActive(false);
-        oldValue = null;       
+        oldValue = null;
     };
 
     VAS_CalloutContract.prototype.checkAdvancePaymentTerm = function (documnetType_Id, PaymentTerm_Id) {

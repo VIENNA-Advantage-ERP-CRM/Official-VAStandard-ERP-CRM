@@ -31,7 +31,7 @@ namespace VIS.Models
             //Assign parameter value
             VAS_Contract_ID = Util.GetValueOfInt(paramValue[0].ToString());
             //End Assign parameter value
-            
+
             DataSet ds = DB.ExecuteDataset(@" SELECT Bill_Location_ID, 
                         Bill_User_ID, C_BPartner_ID, VAS_TERMINATIONREASON,
                         C_Currency_ID , C_IncoTerm_ID, C_PaymentTerm_ID,
@@ -42,8 +42,9 @@ namespace VIS.Models
                         VAS_ContractSummary,  VAS_CONTRACTUTILIZEDAMOUNT,
                         VAS_JURISDICTION, VAS_OVERLIMIT, VAS_RENEWCONTRACT,
                         VAS_RENEWALDATE, VAS_RENEWALTERM, VAS_TERMINATE,
-                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID,IsExpiredContracts
-                        FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID , null, null);
+                        VAS_TERMINATIONDATE, VA009_PaymentMethod_ID,IsExpiredContracts " + (Env.IsModuleInstalled("VA097_") ? " , VA097_VendorDetails_ID " : "") +
+                        " FROM VAS_ContractMaster WHERE VAS_ContractMaster_ID = " + VAS_Contract_ID, null, null);
+
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -60,11 +61,16 @@ namespace VIS.Models
                     retDic["VAS_ContractCategory_ID"] = ds.Tables[0].Rows[i]["VAS_ContractCategory_ID"].ToString();
                     retDic["ContractType"] = ds.Tables[0].Rows[i]["ContractType"].ToString();
                     retDic["VAS_Jurisdiction"] = ds.Tables[0].Rows[i]["VAS_Jurisdiction"].ToString();
-                    retDic["VAS_ContractSummary"] = ds.Tables[0].Rows[i]["VAS_ContractSummary"].ToString();                  
+                    retDic["VAS_ContractSummary"] = ds.Tables[0].Rows[i]["VAS_ContractSummary"].ToString();
+                    if (Env.IsModuleInstalled("VA097_"))//VIS0336_changes done for setting the vendor details id on purchase order window
+                    {
+                        retDic["VA097_VendorDetails_ID"] = ds.Tables[0].Rows[i]["VA097_VendorDetails_ID"].ToString();
+                    }              
                     retDic["IsExpiredContracts"] = ds.Tables[0].Rows[i]["IsExpiredContracts"].ToString();
                 }
             }
-                
+
+
             return retDic;
 
         }
@@ -83,10 +89,10 @@ namespace VIS.Models
             string sql = "SELECT p.AD_Language, p.C_PaymentTerm_ID, COALESCE(p.M_PriceList_ID, g.M_PriceList_ID) AS M_PriceList_ID,"
                 + "p.PaymentRule,p.SO_Description,p.C_IncoTerm_ID,p.C_IncoTermPO_ID, ";
             if (countVA009)
-            {        
+            {
                 sql += " p.VA009_PaymentMethod_ID, p.VA009_PO_PaymentMethod_ID,";
             }
-            sql +=" lship.C_BPartner_Location_ID,c.AD_User_ID,"
+            sql += " lship.C_BPartner_Location_ID,c.AD_User_ID,"
                 + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
                 + " lbill.C_BPartner_Location_ID AS Bill_Location_ID,lbill.IsShipTo,p.VA068_TaxJurisdiction"
                 + " FROM C_BPartner p"
@@ -100,8 +106,8 @@ namespace VIS.Models
             {
                 retDic = new Dictionary<string, object>();
                 retDic["C_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_PaymentTerm_ID"]);
-                retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);             
-                retDic["VA068_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_TaxJurisdiction"]);             
+                retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                retDic["VA068_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_TaxJurisdiction"]);
                 if (countVA009)
                 {
                     retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
@@ -109,19 +115,20 @@ namespace VIS.Models
                         + Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]), null, null));
                     retDic["VA009_PO_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PO_PaymentMethod_ID"]);
                 }
-      
+
                 retDic["PO_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PO_PriceList_ID"]);
                 retDic["PaymentRulePO"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PaymentRulePO"]);
                 retDic["PO_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PO_PaymentTerm_ID"]);
                 retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
                 retDic["AD_User_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
                 retDic["Bill_BPartner_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_BPartnerRelation_ID FROM C_BP_Relation WHERE C_BPartner_ID = " + C_BPartner_ID, null, null));
-                retDic["Bill_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Bill_Location_ID"]);              
+                retDic["Bill_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Bill_Location_ID"]);
                 retDic["C_IncoTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]);
                 retDic["C_IncoTermPO_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTermPO_ID"]);
             }
             return retDic;
         }
+
         /// <summary>
         /// Get Product UOM for Contract master window's contract line tab
         /// </summary>

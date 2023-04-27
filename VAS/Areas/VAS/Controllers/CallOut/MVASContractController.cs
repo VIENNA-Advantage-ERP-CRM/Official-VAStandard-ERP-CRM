@@ -44,6 +44,7 @@ namespace VIS.Controllers
             retJSON = JsonConvert.SerializeObject(objBPModel.GetBPartnerData(ctx, fields));
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
         /// <summary>
         /// Set Product UOM on Contract master window's contract line tab
         /// </summary>
