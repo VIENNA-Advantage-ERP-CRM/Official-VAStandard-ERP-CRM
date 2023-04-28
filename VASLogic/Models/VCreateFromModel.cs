@@ -907,8 +907,14 @@ namespace VIS.Models
                 MRfQLine RfqLine = new MRfQLine(rfq);
                 RfqLine.SetLine(LineNo);
                 RfqLine.SetM_RequisitionLine_ID(ReqLines[i].M_ReqLine_ID);
-                RfqLine.SetM_Product_ID(ReqLines[i].M_Product_ID);
-
+                if (ReqLines[i].M_Product_ID > 0)
+                {
+                    RfqLine.SetM_Product_ID(ReqLines[i].M_Product_ID);
+                }
+                else
+                { 
+                    RfqLine.Set_Value("C_Charge_ID",Util.GetValueOfInt(ReqLines[i].C_Charge_ID));
+                }
                 if (ReqLines[i].ASI_ID > 0)
                 {
                     RfqLine.SetM_AttributeSetInstance_ID(ReqLines[i].ASI_ID);
