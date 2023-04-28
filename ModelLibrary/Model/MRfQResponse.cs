@@ -125,9 +125,9 @@ namespace VAdvantage.Model
             }
             else if (Env.IsModuleInstalled("VA068_"))
             {
-                Set_Value("C_BPartner_ID", C_BPartner_ID);
-                Set_Value("C_BPartner_Location_ID", C_BPartner_Location_ID);
-                Set_Value("AD_User_ID", AD_User_ID);
+                Set_ValueNoCheck("C_BPartner_ID", C_BPartner_ID);
+                Set_ValueNoCheck("C_BPartner_Location_ID", C_BPartner_Location_ID);
+                Set_ValueNoCheck("AD_User_ID", AD_User_ID);
             }
             else
             {
