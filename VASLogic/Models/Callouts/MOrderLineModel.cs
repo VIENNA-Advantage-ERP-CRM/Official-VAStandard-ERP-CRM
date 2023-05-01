@@ -1341,7 +1341,7 @@ namespace VIS.Models
                     //end
                     PriceList = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
                     PriceLimit = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceLimit"]);
-                    ActualPrice = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["PriceStd"]);
+                    ActualPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
 
                     sql.Clear();
                     sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y' " +
