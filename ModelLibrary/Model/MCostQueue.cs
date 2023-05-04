@@ -4223,8 +4223,13 @@ namespace VAdvantage.Model
                                 if (invoiceline.GetC_OrderLine_ID() > 0 && matchInoutLine != null && matchInoutLine.GetM_InOutLine_ID() > 0)
                                 {
                                     query.Clear();
-                                    query.Append(@"SELECT * FROM T_Temp_CostDetail WHERE C_OrderLine_ID = " + invoiceline.GetC_OrderLine_ID() +
-                                        " AND M_InOutLine_ID = " + matchInoutLine.GetM_InOutLine_ID() + " AND C_AcctSchema_ID = " + acctSchema.GetC_AcctSchema_ID());
+                                    query.Append($@"SELECT cd.M_CostQueue_ID, cd.Amt, cq.ActualQty, cq.CurrentQty, cq.M_CostElement_ID, ce.CostingMethod
+                                                    FROM T_Temp_CostDetail cd 
+                                                    INNER JOIN M_COstQueue cq ON (cd.M_CostQueue_ID = cq.M_CostQueue_ID)
+                                                    INNER JOIN M_CostElement ce ON (ce.M_CostElement_ID = cq.M_CostElement_ID)
+                                                    WHERE  cd.C_OrderLine_ID = { invoiceline.GetC_OrderLine_ID() }
+                                                    AND cd.M_InOutLine_ID = { matchInoutLine.GetM_InOutLine_ID() }
+                                                    AND cd.C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID()}");
                                     DataSet ds1 = DB.ExecuteDataset(query.ToString(), null, trxName);
                                     if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
                                     {
@@ -4232,13 +4237,44 @@ namespace VAdvantage.Model
                                         {
                                             // change 9-5-2016
                                             // handle partial payment
-                                            X_T_Temp_CostDetail tempCostDetail = new X_T_Temp_CostDetail(invoiceline.GetCtx(), ds1.Tables[0].Rows[k], trxName);
-                                            query.Clear();
-                                            query.Append("SELECT M_CostElement_ID FROM M_CostQueue WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostQueue_ID"]));
-                                            costingElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
-                                            costElement = MCostElement.Get(ctx, costingElementId);
+                                            //X_T_Temp_CostDetail tempCostDetail = new X_T_Temp_CostDetail(invoiceline.GetCtx(), ds1.Tables[0].Rows[k], trxName);
+                                            //query.Clear();
+                                            //query.Append("SELECT M_CostElement_ID FROM M_CostQueue WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostQueue_ID"]));
+                                            //costingElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
+                                            costElement = MCostElement.Get(ctx, Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostElement_ID"]));
 
-                                            price = MCostQueue.CalculateCostQueuePrice(invoice, invoiceline, tempCostDetail.GetAmt(), acctSchema, AD_Client_ID, AD_Org_ID, costElement, trxName, client.IsCostImmediate(), optionalstr, matchInoutLine, costingCheck);
+                                            price = MCostQueue.CalculateCostQueuePrice(invoice, invoiceline,
+                                                    Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["Amt"]),
+                                                    acctSchema, AD_Client_ID, AD_Org_ID, costElement, trxName,
+                                                    client.IsCostImmediate(), optionalstr, matchInoutLine, costingCheck);
+
+                                            if (costingCheck != null && costingCheck.MMPolicy != null &&
+                                                costingCheck.MMPolicy.Equals(Util.GetValueOfString(ds1.Tables[0].Rows[k]["CostingMethod"])))
+                                            {
+                                                costingCheck.currentQtyonQueue = Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"]);
+
+                                                // Update Cost Queue
+                                                if (Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"]) != Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["ActualQty"])
+                                                    && Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"]) != cd.GetQty())
+                                                {
+                                                    decimal sign = Math.Sign(cd.GetAmt());
+                                                    cd.SetAmt(Decimal.Round(Decimal.Multiply(Decimal.Divide(cd.GetAmt(), cd.GetQty()),
+                                                        Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"])),
+                                                        acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero));
+                                                    if (Math.Sign(cd.GetAmt()) != sign)
+                                                    {
+                                                        cd.SetAmt(decimal.Negate(cd.GetAmt()));
+                                                    }
+
+                                                    sign = Math.Sign(cd.GetQty());
+                                                    cd.SetQty(Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"]));
+                                                    if (Math.Sign(cd.GetQty()) != sign)
+                                                    {
+                                                        cd.SetQty(decimal.Negate(cd.GetQty()));
+                                                    }
+                                                    cd.Save();
+                                                }
+                                            }
 
                                             query.Clear();
                                             query.Append("UPDATE m_costqueue SET CurrentCostPrice = " + price + " WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostQueue_ID"]));

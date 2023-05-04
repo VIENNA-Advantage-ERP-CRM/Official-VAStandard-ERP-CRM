@@ -2643,6 +2643,13 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            /* VIS_0045: 04-May-2023 - DevOps Task ID: 2107*/
+            if (GetPayAmt().Equals(0) && GetWriteOffAmt().Equals(0) && GetDiscountAmt().Equals(0) && GetOverUnderAmt().Equals(0) && GetPaymentAmount().Equals(0))
+            {
+                _processMsg = Msg.GetMsg(GetCtx() , "PayAmountCantZERO");
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             //	Waiting Payment - Need to create Invoice & Shipment
             if (GetC_Order_ID() != 0 && GetC_Invoice_ID() == 0)
             {	//	see WebOrder.process
