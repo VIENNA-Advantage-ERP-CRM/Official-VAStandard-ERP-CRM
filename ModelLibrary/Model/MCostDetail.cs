@@ -200,6 +200,10 @@ namespace VAdvantage.Model
                     {
                         cd.SetAD_Org_ID(invoiceline.GetAD_Org_ID());
                     }
+                    if (cd.Get_ColumnIndex("InvoiceQty") >= 0)
+                    {
+                        cd.Set_Value("InvoiceQty", Qty);
+                    }
                 }
                 else if (WindowName == "Invoice(Customer)")
                 {
@@ -669,7 +673,7 @@ namespace VAdvantage.Model
                     cost.SetCumulatedAmt(Decimal.Subtract(cost.GetCumulatedAmt(), (MRPrice * GetQty())));
 
                     //VIS_0045: 18-July-2022 -> Reduce / Update Current Cost for Weighted Average Cost
-                    if (ce.IsWeightedAverageCost())
+                    if (ce.IsWeightedAverageCost() && cost.GetCurrentQty() != 0)
                     {
                         price = Decimal.Round(Decimal.Divide(
                                                   Decimal.Subtract(
@@ -769,12 +773,15 @@ namespace VAdvantage.Model
                     //}
                     //else
                     //{
-                    price = Decimal.Round(Decimal.Divide(
-                                           Decimal.Add(
-                                           Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amtWithSurcharge),
-                                           cost.GetCurrentQty())
-                                           , precision, MidpointRounding.AwayFromZero);
-                    cost.SetCurrentCostPrice(price);
+                    if (cost.GetCurrentQty() != 0)
+                    {
+                        price = Decimal.Round(Decimal.Divide(
+                                               Decimal.Add(
+                                               Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amtWithSurcharge),
+                                               cost.GetCurrentQty())
+                                               , precision, MidpointRounding.AwayFromZero);
+                        cost.SetCurrentCostPrice(price);
+                    }
                     //cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                     // }
                     //cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
@@ -805,7 +812,8 @@ namespace VAdvantage.Model
                     }
                     else if (cQueue.Length == 0)
                     {
-                        cost.SetCurrentCostPrice(0);
+                        // not to set CC as ZERO, bcz if user want to do physical inventory then then can enter stock with previous CC.
+                        //cost.SetCurrentCostPrice(0);
                     }
 
                 }
