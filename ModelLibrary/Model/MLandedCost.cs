@@ -194,11 +194,14 @@ namespace VAdvantage.Model
                     sql.Append(" AND C_LandedCost_ID <> " + GetC_LandedCost_ID());
                 }
             }
-            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-            if (count > 0)
+            if (sql.Length > 0)
             {
-                log.SaveError("VIS_DuplicateRecord", "");
-                return false;
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                if (count > 0)
+                {
+                    log.SaveError("VIS_DuplicateRecord", "");
+                    return false;
+                }
             }
 
             return true;

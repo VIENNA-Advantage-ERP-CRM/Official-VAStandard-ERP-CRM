@@ -3772,6 +3772,11 @@ namespace VAdvantage.Model
                                                         inv.SetPostCurrentCostPrice(currentCostPrice);
                                                     }
                                                     inv.SetIsCostImmediate(true);
+                                                    if (inv.Get_ColumnIndex("QueueQty") >= 0)
+                                                    {
+                                                        inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
+                                                        inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
+                                                    }
                                                     inv.Save(Get_Trx());
 
                                                     // update the Post current price after Invoice receving on inoutline
@@ -4416,6 +4421,11 @@ namespace VAdvantage.Model
                                                     inv.SetPostCurrentCostPrice(currentCostPrice);
                                                 }
                                                 inv.SetIsCostImmediate(true);
+                                                if (inv.Get_ColumnIndex("QueueQty") >= 0 && costingCheck != null && costingCheck.currentQtyonQueue != null)
+                                                {
+                                                    inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
+                                                    inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
+                                                }
                                                 inv.Save(Get_Trx());
 
                                                 // update the Post current price after Invoice receving on inoutline
