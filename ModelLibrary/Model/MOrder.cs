@@ -4328,7 +4328,7 @@ namespace VAdvantage.Model
             //}
 
             //VIS0336: update tender status po generated
-                if (!IsSOTrx() &&  Env.IsModuleInstalled("VA097_"))
+                if (!IsSOTrx() &&  Env.IsModuleInstalled("VA097_") && Util.GetValueOfInt(Get_Value("VA097_VendorDetails_ID")) > 0)
                 {
                     string sql = " UPDATE VA097_Tender SET VA097_TenderStatus='PO' WHERE VA097_Tender_ID=(SELECT VA097_Tender_ID FROM VA097_RFQ_TenderLine WHERE VA097_RFQ_TenderLine_ID=(SELECT VA097_RFQ_TenderLine_ID FROM VA097_VendorDetails WHERE VA097_VendorDetails_ID=" + Get_Value("VA097_VendorDetails_ID") + ")) ";
                     int Count = DB.ExecuteQuery(sql, null, Get_Trx());
