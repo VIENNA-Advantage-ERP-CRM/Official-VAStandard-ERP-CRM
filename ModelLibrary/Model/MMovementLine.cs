@@ -750,6 +750,11 @@ namespace VAdvantage.Model
                 log.SaveWarning("", Util.GetValueOfString(Get_Value("VAMFG_WarningReason")));
             }
 
+            // VIS0060: Show warning if raised by validation logic on before save.
+            if (Get_ColumnIndex("VAMFG_IsWarningRaised") >= 0 && Util.GetValueOfBool(Get_Value("VAMFG_IsWarningRaised")))
+            {
+                log.SaveWarning("", Util.GetValueOfString(Get_Value("VAMFG_WarningReason")));
+            }
             //VIS_0046: check qty available 
             if (MClient.Get(GetCtx(), GetAD_Client_ID()).IsCostImmediate() && (newRecord
                 || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID") || Is_ValueChanged("MovementQty")))

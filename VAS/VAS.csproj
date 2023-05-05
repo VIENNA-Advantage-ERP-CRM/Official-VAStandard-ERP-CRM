@@ -195,6 +195,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MTeamForcastController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMConversionController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MVASContractController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MWarehouseController.cs" />
     <Compile Include="Areas\VAS\Controllers\CommonController.cs" />
     <Compile Include="Areas\VAS\Controllers\ForecastFormController.cs" />
@@ -265,6 +266,7 @@
     <Content Include="Areas\VAS\Scripts\model\callouttax.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutteamforecast.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
+    <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
     <Content Include="Areas\VAS\Views\web.config" />
     <Content Include="Areas\VAS\Views\PaymentAllocation\Index.cshtml" />

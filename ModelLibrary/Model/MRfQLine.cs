@@ -206,6 +206,12 @@ namespace VAdvantage.Model
         /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
+            // VIS0060: if Product/Charge not selected the system will give error
+            if (GetM_Product_ID() == 0 && Get_ValueAsInt("C_Charge_ID") == 0)
+            {
+                log.SaveError("VIS_NOProductOrCharge", "");
+                return false;
+            }
             //	Calculate Complete Date (also used to verify)
             if (GetDateWorkStart() != null && GetDeliveryDays() != 0)
             {

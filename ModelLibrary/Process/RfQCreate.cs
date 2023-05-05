@@ -76,6 +76,29 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
             int sent = 0;
             int notSent = 0;
 
+            // VIS0060: Get Existing Rfq Response
+            int rfqResponse_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + _C_RfQ_ID, null, Get_Trx()));
+            if(rfqResponse_ID == 0)
+            {
+                MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VAS_Response"), Get_Trx());
+                PO rfqResponse = tbl.GetPO(GetCtx(), 0, Get_Trx());
+                rfqResponse.SetClientOrg(rfq);
+                rfqResponse.Set_ValueNoCheck("C_RfQ_ID", rfq.GetC_RfQ_ID());                
+                rfqResponse.Set_Value("Name", rfq.GetName());
+                if (!rfqResponse.Save())
+                {
+                    ValueNamePair pp = VLogger.RetrieveError();
+                    if (pp != null && !string.IsNullOrEmpty(pp.GetName()))
+                        return "Could not create Rfq Response. " + pp.GetName();
+                    else
+                        return "Could not create Rfq Response";
+                }
+                else
+                {
+                    rfqResponse_ID = rfqResponse.Get_ID();
+                }
+            }
+
             //	Get all existing responses
             MRfQResponse[] responses = rfq.GetResponses(false, false);
 
@@ -89,7 +112,15 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 //	existing response
                 for (int r = 0; r < responses.Length; r++)
                 {
-                    if (subscriber.GetC_BPartner_ID() == responses[r].GetC_BPartner_ID()
+                    if(Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0 
+                        && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") == Util.GetValueOfInt(responses[r].Get_Value("VA068_VendorRegistration_ID"))
+                            && subscriber.Get_ValueAsInt("VA068_RegisteredLocation_ID") == Util.GetValueOfInt(responses[r].Get_Value("VA068_RegisteredLocation_ID")))
+                    {
+                        skip = true;
+                        break;
+                    }
+
+                    if (subscriber.GetC_BPartner_ID() > 0 && subscriber.GetC_BPartner_ID() == responses[r].GetC_BPartner_ID()
                         && subscriber.GetC_BPartner_Location_ID() == responses[r].GetC_BPartner_Location_ID())
                     {
                         skip = true;
@@ -102,7 +133,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 }
 
                 //	Create Response
-                MRfQResponse response = new MRfQResponse(rfq, subscriber);
+                MRfQResponse response = new MRfQResponse(rfq, subscriber, rfqResponse_ID);
                 if (response.Get_ID() == 0)	//	no lines
                 {
                     continue;
@@ -111,7 +142,11 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 counter++;
                 if (_IsSendRfQ)//send mail check
                 {
-                    if (response.SendRfQ())
+                    if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0 && response.SendRfqToVendors())
+                    {
+                        sent++;
+                    }
+                    else if (subscriber.GetC_BPartner_ID() > 0 && response.SendRfQ())
                     {
                         sent++;
                     }

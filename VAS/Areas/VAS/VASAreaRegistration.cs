@@ -80,7 +80,8 @@ namespace VAS
             //       "~/Areas/VAS/Scripts/model/callouttax.js",
             //       "~/Areas/VAS/Scripts/model/calloutteamforecast.js",
             //       "~/Areas/VAS/Scripts/model/callouttimeexpense.js",
-            //       "~/Areas/VAS/Scripts/model/calloutInvRevaluation.js"
+            //       "~/Areas/VAS/Scripts/model/calloutInvRevaluation.js",
+            //       "~/Areas/VAS/Scripts/model/VAS_CalloutContract.js"
             //       );
 
 

@@ -838,7 +838,7 @@ namespace VAdvantage.DataBase
                             (SELECT DISTINCT Prod.Name AS Name FROM VA010_MoveConfParameters Shp 
                             INNER JOIN M_Product Prod ON prod.m_product_id = shp.m_product_id 
                             WHERE NVL(Shp.Va010_Actualvalue,0) = 0 AND Shp.Isactive = 'Y' 
-                            AND Shp.M_MovementLineConfirm_ID IN (" + mMovementLinesConfirm + "))s t");
+                            AND Shp.M_MovementLineConfirm_ID IN (" + mMovementLinesConfirm + ")) t");
             }
             return sql.ToString();
         }

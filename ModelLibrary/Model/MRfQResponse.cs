@@ -69,11 +69,12 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="rfq"></param>
         /// <param name="subscriber"></param>
-        public MRfQResponse(MRfQ rfq, MRfQTopicSubscriber subscriber)
+        /// <param name="VAS_Response_ID">RFQ Response Header</param>
+        public MRfQResponse(MRfQ rfq, MRfQTopicSubscriber subscriber, int VAS_Response_ID)
             : this(rfq, subscriber,
                 subscriber.GetC_BPartner_ID(),
                 subscriber.GetC_BPartner_Location_ID(),
-                subscriber.GetAD_User_ID())
+                subscriber.GetAD_User_ID(), VAS_Response_ID)
         {
 
         }
@@ -87,7 +88,7 @@ namespace VAdvantage.Model
             : this(rfq, null,
                 partner.GetC_BPartner_ID(),
                 partner.GetPrimaryC_BPartner_Location_ID(),
-                partner.GetPrimaryAD_User_ID())
+                partner.GetPrimaryAD_User_ID(), 0)
         {
 
         }
@@ -103,20 +104,37 @@ namespace VAdvantage.Model
         /// <param name="C_BPartner_ID">bpartner</param>
         /// <param name="C_BPartner_Location_ID">bpartner location</param>
         /// <param name="AD_User_ID">bpartner user</param>
+        /// <param name="VAS_Response_ID">RFQ Response Header</param>
         public MRfQResponse(MRfQ rfq, MRfQTopicSubscriber subscriber,
-            int C_BPartner_ID, int C_BPartner_Location_ID, int AD_User_ID)
+            int C_BPartner_ID, int C_BPartner_Location_ID, int AD_User_ID, int VAS_Response_ID)
             : this(rfq.GetCtx(), 0, rfq.Get_TrxName())
         {
-
             SetClientOrg(rfq);
+            // VIS0060: Set Rfq Response header ID on Rfq Response
+            Set_ValueNoCheck("VAS_Response_ID", VAS_Response_ID);
             SetC_RfQ_ID(rfq.GetC_RfQ_ID());
             SetC_Currency_ID(rfq.GetC_Currency_ID());
             SetName(rfq.GetName());
             _rfq = rfq;
             //	Subscriber info
-            SetC_BPartner_ID(C_BPartner_ID);
-            SetC_BPartner_Location_ID(C_BPartner_Location_ID);
-            SetAD_User_ID(AD_User_ID);
+            if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0)
+            {
+                Set_Value("VA068_VendorRegistration_ID", subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID"));
+                Set_Value("VA068_RegisteredLocation_ID", subscriber.Get_ValueAsInt("VA068_RegisteredLocation_ID"));
+                Set_Value("VA068_RegisteredUser_ID", subscriber.Get_ValueAsInt("VA068_RegisteredUser_ID"));
+            }
+            else if (Env.IsModuleInstalled("VA068_"))
+            {
+                Set_ValueNoCheck("C_BPartner_ID", C_BPartner_ID);
+                Set_ValueNoCheck("C_BPartner_Location_ID", C_BPartner_Location_ID);
+                Set_ValueNoCheck("AD_User_ID", AD_User_ID);
+            }
+            else
+            {
+                SetC_BPartner_ID(C_BPartner_ID);
+                SetC_BPartner_Location_ID(C_BPartner_Location_ID);
+                SetAD_User_ID(AD_User_ID);
+            }
 
             //	Create Lines
             MRfQLine[] lines = rfq.GetLines();
@@ -285,6 +303,69 @@ namespace VAdvantage.Model
             return false;
         }
 
+        /// <summary>
+        /// 	Send RfQ, mail subject and body from mail template 
+        /// </summary>
+        /// <returns>true if RfQ is sent per email.</returns>
+        public bool SendRfqToVendors()
+        {
+            string mail = "", name = "";
+            try
+            {
+                DataSet ds = DB.ExecuteDataset("SELECT VA068_Email, VA068_FirstName FROM VA068_RegisteredUser WHERE VA068_RegisteredUser_ID = "
+                    + Get_ValueAsInt("VA068_RegisteredUser_ID"), null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
+                    name = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                }
+                MClient client = MClient.Get(GetCtx());
+                MMailText mtext = new MMailText(GetCtx(), GetRfQ().GetR_MailText_ID(), Get_TrxName());
+
+                if (Get_ValueAsInt("VA068_RegisteredUser_ID") == 0 || string.IsNullOrEmpty(mail))
+                {
+                    log.Log(Level.SEVERE, "No User or no EMail - " + GetName());
+                    return false;
+                }
+
+                // Check if mail template is set for RfQ window, if not then get from RfQ Topic window.
+                if (mtext.GetR_MailText_ID() == 0)
+                {
+                    MRfQTopic mRfQTopic = new MRfQTopic(GetCtx(), GetRfQ().GetC_RfQ_Topic_ID(), Get_TrxName());
+                    if (mRfQTopic.GetC_RfQ_Topic_ID() > 0)
+                    {
+                        mtext = new MMailText(GetCtx(), mRfQTopic.GetR_MailText_ID(), Get_TrxName());
+                    }
+                }
+
+                //Replace the email template constants with tables values.
+                StringBuilder message = new StringBuilder();
+                mtext.SetPO(GetRfQ(), true);
+                message.Append(mtext.GetMailText(true).Equals(string.Empty) ? "** No Email Body" : mtext.GetMailText(true));
+
+                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader(); ;
+
+                EMail email = client.CreateEMail(mail, name, subject, message.ToString());
+                if (email == null)
+                {
+                    return false;
+                }
+                email.AddAttachment(CreatePDF());
+                if (EMail.SENT_OK.Equals(email.Send()))
+                {
+                    //SetDateInvited(new Timestamp(System.currentTimeMillis()));
+                    SetDateInvited(DateTime.Now);
+                    Save();
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Severe(ex.ToString());
+                //MessageBox.Show("error--" + ex.ToString());
+            }
+            return false;
+        }
         /// <summary>
         /// Create PDF file
         /// </summary>
