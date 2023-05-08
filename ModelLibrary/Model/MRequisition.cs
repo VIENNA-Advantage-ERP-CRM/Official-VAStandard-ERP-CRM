@@ -1289,39 +1289,41 @@ namespace VAdvantage.Model
 
 
             //VIS0336_check tender line against theis reqisiition exist or not
-            if (Env.IsModuleInstalled("VA097_"))
+            sql.Clear();
+            sql.Append("SELECT r.DocStatus,r.DocumentNo from C_RfQ r  WHERE  r.M_Requisition_ID=" + GetM_Requisition_ID() +
+                       " AND (r.DocStatus in ('CO','DR'))");
+            ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+
+            if ((ds == null || ds.Tables[0].Rows.Count == 0) && Env.IsModuleInstalled("VA097_"))
             {
                 sql.Clear();
                 sql.Append(" SELECT t.DocStatus,t.DocumentNo FROM VA097_RequisitionLines r INNER JOIN VA097_TenderLine tl ON tl.VA097_TenderLine_ID=r.VA097_TenderLine_ID " +
-                           " INNER JOIN VA097_Tender  t ON t.VA097_Tender_ID=tl.VA097_Tender_ID WHERE r.M_Requisition_ID="+GetM_Requisition_ID()+"  AND (t.DocStatus in ('CO','DR'))");
+                           " INNER JOIN VA097_Tender  t ON t.VA097_Tender_ID=tl.VA097_Tender_ID WHERE r.M_Requisition_ID=" + GetM_Requisition_ID() + "  AND (t.DocStatus in ('CO','DR'))");
                 ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-
-                if (ds != null && ds.Tables[0].Rows.Count > 0)
-                {
-
-
-                    DataRow[] selectedTable = null;
-                    selectedTable = ds.Tables[0].Select("DocStatus='CO'");
-                    var SelectedValues = selectedTable.AsEnumerable().Select(s => s.Field<string>("DocumentNo")).ToArray();
-                    string TenderID = string.Join(",", SelectedValues);
-                    if (selectedTable.Length == 0)
-                    {
-                        _processMsg = Msg.GetMsg(GetCtx(), "VA097_DeleteReqLine");
-                        return false;
-                    }
-                    else
-                    {
-                        _processMsg = Msg.GetMsg(GetCtx(), "VA097_Reactivate" + " = "+ TenderID);
-                        return false;
-                    }
-                    
-                }
             }
-            
-                SetDocAction(DOCACTION_Complete);
-                SetProcessed(false);
-                return true;
-            
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                DataRow[] selectedTable = ds.Tables[0].Select("DocStatus='CO'");
+                if (selectedTable.Length > 0)
+                {
+                    string[] SelectedValues = selectedTable.AsEnumerable().Select(s => s.Field<string>("DocumentNo")).ToArray();
+                    _processMsg = Msg.GetMsg(GetCtx(), "VA097_Reactivate" + " : " + string.Join(",", SelectedValues));
+                    return false;
+                }
+
+                else
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VA097_DeleteReqLine");
+                    return false;
+                }
+
+
+            }
+
+            SetDocAction(DOCACTION_Complete);
+            SetProcessed(false);
+            return true;
+
         }
 
         /*
