@@ -292,10 +292,11 @@
                     }
                     //	Location
                     var locID = Util.getValueOfInt(dr["C_BPartner_Location_ID"]);
+                    /*VIS_0045: 04-May-2023 - DevOps Task ID: 2110*/
                     //	overwritten by InfoBP selection - works only if InfoWindow
                     //	was used otherwise creates error (uses last value, may bevar  to differnt BP)
-                    if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                        var loc = ctx.getContext("C_BPartner_Location_ID");
+                    if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                        var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
                         if (loc && loc.toString().length > 0) {
                             locID = parseInt(loc);
                         }
@@ -307,10 +308,11 @@
                         mTab.setValue("C_BPartner_Location_ID", locID);
                     }
 
+                    /*VIS_0045: 04-May-2023 - DevOps Task ID: 2110*/
                     //	Contact - overwritten by InfoBP selection
                     var contID = Util.getValueOfInt(dr["AD_User_ID"]);
-                    if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                        var cont = ctx.getContext("AD_User_ID");
+                    if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                        var cont = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "AD_USER_ID");
                         if (cont && cont.toString().length > 0) {
                             contID = parseInt(cont);
                         }
@@ -1752,10 +1754,11 @@
 
                 //	Location
                 var locID = Util.getValueOfInt(dr["C_BPartner_Location_ID"]);
+                /*VIS_0045: 04-May-2023 - DevOps Task ID: 2110*/
                 //	overwritten by InfoBP selection - works only if InfoWindow
                 //	was used otherwise creates error (uses last value, may bevar to differnt BP)
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var loc = ctx.getContext("C_BPartner_Location_ID");
+                if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                    var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
                     if (loc && loc.toString().length > 0) {
                         locID = parseInt(loc);
                     }
@@ -1767,10 +1770,11 @@
                     mTab.setValue("C_BPartner_Location_ID", locID);
                 }
 
+                /*VIS_0045: 04-May-2023 - DevOps Task ID: 2110*/
                 //	Contact - overwritten by InfoBP selection
                 var contID = Util.getValueOfInt(dr["AD_User_ID"]);
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var cont = ctx.getContext("AD_User_ID");
+                if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                    var cont = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "AD_USER_ID");
                     if (cont && cont.toString().length > 0) {
                         contID = parseInt(cont);
                     }
