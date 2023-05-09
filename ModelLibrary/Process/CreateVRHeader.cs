@@ -1,4 +1,12 @@
-﻿using System;
+﻿/********************************************************
+ * Project Name   : VAdvantage
+ * Class Name     : CreateVRHeader
+ * Purpose        : Create Vendor response header for older data
+ * Class Used     : ProcessEngine.SvrProcess
+ * Chronological    Development
+ * Lakhwinder     09-May-2023
+  ******************************************************/
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -14,9 +22,10 @@ namespace VAdvantage.Process
 {
     class CreateVRHeader : SvrProcess
     {
+        //Create Header for Retro data which was entered with older version
         protected override string DoIt()
         {
-            string res = "Done";
+            string res = Msg.GetMsg(GetCtx(), "Done");
 
             StringBuilder sb = new StringBuilder(@"SELECT rr.C_RFQ_ID,
                                                      rr.AD_Client_ID,
@@ -82,7 +91,7 @@ namespace VAdvantage.Process
                     trx.Rollback();
                     trx.Close();
                     ValueNamePair pp = VLogger.RetrieveError();
-                    res = pp != null ? pp.GetValue() : "VAS_ResponseNotSaved";
+                    res = pp != null ? pp.GetValue() : Msg.GetMsg(GetCtx(), "VAS_ResponseNotSaved");
                     return res;
                 }
 
@@ -93,11 +102,12 @@ namespace VAdvantage.Process
                     trx.Rollback();
                     trx.Close();
                     ValueNamePair pp = VLogger.RetrieveError();
-                    res = pp != null ? pp.GetValue() : "VAS_RFQResponseNotSaved";
+                    res = pp != null ? pp.GetValue() : Msg.GetMsg(GetCtx(), "VAS_RFQResponseNotSaved");
                     return res;
                 }
+                trx.Commit();
             }
-            trx.Commit();
+            
             trx.Close();
             return res;
         }
