@@ -41,7 +41,7 @@ namespace VAdvantage.Process
             DataSet ds = DB.ExecuteDataset(sb.ToString());
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
             {
-                return "VIS_NoRecord";
+                return Msg.GetMsg(GetCtx(), "VIS_NoVRRecord");
             }
             List<int> processedRfqs = new List<int>();
             int rfqid = 0;
