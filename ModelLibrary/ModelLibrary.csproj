@@ -551,6 +551,7 @@
     <Compile Include="Model\Tax.cs" />
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
+    <Compile Include="Process\CreateVRHeader.cs" />
     <Compile Include="Process\DocumentEngine.cs" />
     <Compile Include="Process\InventoryRevaluation.cs" />
     <Compile Include="Process\MarkExpireContract.cs" />
