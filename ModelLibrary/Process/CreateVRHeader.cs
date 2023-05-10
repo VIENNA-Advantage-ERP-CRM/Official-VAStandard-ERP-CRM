@@ -61,9 +61,7 @@ namespace VAdvantage.Process
                                 C_RFQ_ID        ,
                                 Created         ,
                                 CreatedBy       ,
-                                Description     ,
                                 DocumentNo      ,
-                                Help            ,
                                 IsActive,
                                 Name,
                                 Updated,
@@ -76,9 +74,7 @@ namespace VAdvantage.Process
                 sb.Append(rfqid + ",");
                 sb.Append(GlobalVariable.TO_DATE(DateTime.Now, false) + ",");
                 sb.Append(ds.Tables[0].Rows[i]["CreatedBy"] + ",");
-                sb.Append("'" + ds.Tables[0].Rows[i]["Name"] + "',");
                 sb.Append("'" + ds.Tables[0].Rows[i]["DocumentNo"] + "',");
-                sb.Append("'" + ds.Tables[0].Rows[i]["Name"] + "',");
                 sb.Append("'Y',");
                 sb.Append("'" + ds.Tables[0].Rows[i]["Name"] + "',");
                 sb.Append(GlobalVariable.TO_DATE(DateTime.Now, false) + ",");
