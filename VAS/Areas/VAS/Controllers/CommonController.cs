@@ -1766,6 +1766,8 @@ namespace VIS.Controllers
                     if (inoutLine != null)
                     {
                         invoiceLine.SetM_AttributeSetInstance_ID(inoutLine.GetM_AttributeSetInstance_ID());
+                        // VIS0060: Handle case of UOM, was overwritten by Order Line UOM
+                        invoiceLine.SetC_UOM_ID(inoutLine.GetC_UOM_ID());
                     }
 
                     /* nnayak - Bug 1567690. The organization from the Orderline can be different from the organization 
