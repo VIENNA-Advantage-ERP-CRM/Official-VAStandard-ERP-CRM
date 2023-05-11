@@ -190,7 +190,6 @@
 
             this.setCalloutActive(true);
 
-            var _CountVA068 = false;
             var _CountVA009 = false;
             var paramString = "VA009_";
             var isSOTrx = ctx.isSOTrx(windowNo);
@@ -199,21 +198,14 @@
                 _CountVA009 = dr["VA009_"];
             }
 
-            //Get prefix
-            paramString = "VA068_";
-            dr = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", paramString);
-            if (dr != null) {
-                _CountVA068 = dr["VA068_"];
-            }
-
-            paramString = _CountVA009.toString() + "," + _CountVA068.toString() + "," + C_BPartner_ID;
+            paramString = _CountVA009.toString() + "," + C_BPartner_ID;
             dr = VIS.dataContext.getJSONRecord("MVASContract/GetBPartnerData", paramString);
             if (dr != null) {
 
                 // jurisdiction Tax
                 var contractType = Util.getValueOfString(mTab.getValue("ContractType"));
                 if (contractType == "ASP")
-                    mTab.setValue("VAS_Jurisdiction", dr["VA068_TaxJurisdiction"]);
+                    mTab.setValue("VAS_Jurisdiction", dr["VAS_TaxJurisdiction"]);
 
                 // Price List
 

@@ -84,8 +84,7 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             bool countVA009 = Util.GetValueOfBool(paramValue[0]);
-            bool countVA068 = Util.GetValueOfBool(paramValue[1]);
-            int C_BPartner_ID = Util.GetValueOfInt(paramValue[2]);
+            int C_BPartner_ID = Util.GetValueOfInt(paramValue[1]);
             Dictionary<string, object> retDic = null;
             string sql = "SELECT p.AD_Language, p.C_PaymentTerm_ID, COALESCE(p.M_PriceList_ID, g.M_PriceList_ID) AS M_PriceList_ID,"
                 + "p.PaymentRule,p.SO_Description,p.C_IncoTerm_ID,p.C_IncoTermPO_ID, ";
@@ -97,10 +96,10 @@ namespace VIS.Models
                 + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
                 + " lbill.C_BPartner_Location_ID AS Bill_Location_ID,lbill.IsShipTo ";
             
-            if (countVA068)
-                sql += " , p.VA068_TaxJurisdiction ";
+            if (Env.IsModuleInstalled("VA068_"))
+                sql += " , p.VA068_TaxJurisdiction as VAS_TaxJurisdiction ";
             else
-                sql += " , '' as VA068_TaxJurisdiction ";
+                sql += " , '' as VAS_TaxJurisdiction ";
 
             sql += " FROM C_BPartner p"
               + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
@@ -114,7 +113,7 @@ namespace VIS.Models
                 retDic = new Dictionary<string, object>();
                 retDic["C_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_PaymentTerm_ID"]);
                 retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
-                retDic["VA068_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_TaxJurisdiction"]);
+                retDic["VAS_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_TaxJurisdiction"]);
                 if (countVA009)
                 {
                     retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
