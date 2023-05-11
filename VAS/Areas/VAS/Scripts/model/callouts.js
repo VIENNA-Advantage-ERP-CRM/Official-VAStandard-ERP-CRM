@@ -394,6 +394,33 @@
         this.setCalloutActive(false);
         return "";
     }
+    /**
+     * Set total amount on Quantity tab of RFQ Window
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutRFQ.prototype.TotalLineAmt = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var qty = Util.getValueOfDecimal(mTab.getValue("Qty"));
+        var benchPrice = Util.getValueOfDecimal(mTab.getValue("BenchmarkPrice"));
+        if (mField.getColumnName() == "Qty") {
+            var TotalAmt = qty * benchPrice;
+        }
+        if (mField.getColumnName() == "BenchmarkPrice") {
+            var TotalAmt = qty * benchPrice;
+        }
+        mTab.setValue("LineNetAmt", TotalAmt);
+        this.setCalloutActive(false);
+        return "";
+    };
+
     VIS.Model.CalloutRFQ = CalloutRFQ;
 
     //** clearing WeekDay value when FixDueDate checkbox is true ** Dt: 02/04/2021 ** Modified By: Kumar ** //
