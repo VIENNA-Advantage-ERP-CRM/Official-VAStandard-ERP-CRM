@@ -205,7 +205,7 @@
                 // jurisdiction Tax
                 var contractType = Util.getValueOfString(mTab.getValue("ContractType"));
                 if (contractType == "ASP")
-                    mTab.setValue("VAS_Jurisdiction", dr["VA068_TaxJurisdiction"]);
+                    mTab.setValue("VAS_Jurisdiction", dr["VAS_TaxJurisdiction"]);
 
                 // Price List
 

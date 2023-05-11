@@ -65,7 +65,7 @@ namespace VIS.Models
                     if (Env.IsModuleInstalled("VA097_"))//VIS0336_changes done for setting the vendor details id on purchase order window
                     {
                         retDic["VA097_VendorDetails_ID"] = ds.Tables[0].Rows[i]["VA097_VendorDetails_ID"].ToString();
-                    }              
+                    }
                     retDic["IsExpiredContracts"] = ds.Tables[0].Rows[i]["IsExpiredContracts"].ToString();
                 }
             }
@@ -94,9 +94,15 @@ namespace VIS.Models
             }
             sql += " lship.C_BPartner_Location_ID,c.AD_User_ID,"
                 + " COALESCE(p.PO_PriceList_ID,g.PO_PriceList_ID) AS PO_PriceList_ID, p.PaymentRulePO,p.PO_PaymentTerm_ID,"
-                + " lbill.C_BPartner_Location_ID AS Bill_Location_ID,lbill.IsShipTo,p.VA068_TaxJurisdiction"
-                + " FROM C_BPartner p"
-                + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
+                + " lbill.C_BPartner_Location_ID AS Bill_Location_ID,lbill.IsShipTo ";
+            
+            if (Env.IsModuleInstalled("VA068_"))
+                sql += " , p.VA068_TaxJurisdiction as VAS_TaxJurisdiction ";
+            else
+                sql += " , '' as VAS_TaxJurisdiction ";
+
+            sql += " FROM C_BPartner p"
+              + " INNER JOIN C_BP_Group g ON (p.C_BP_Group_ID=g.C_BP_Group_ID)"
                 + " LEFT OUTER JOIN C_BPartner_Location lbill ON (p.C_BPartner_ID=lbill.C_BPartner_ID AND lbill.IsBillTo='Y' AND lbill.IsActive='Y')"
                 + " LEFT OUTER JOIN C_BPartner_Location lship ON (p.C_BPartner_ID=lship.C_BPartner_ID AND lship.IsShipTo='Y' AND lship.IsActive='Y')"
                 + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
@@ -107,7 +113,7 @@ namespace VIS.Models
                 retDic = new Dictionary<string, object>();
                 retDic["C_PaymentTerm_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_PaymentTerm_ID"]);
                 retDic["M_PriceList_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
-                retDic["VA068_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_TaxJurisdiction"]);
+                retDic["VAS_TaxJurisdiction"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_TaxJurisdiction"]);
                 if (countVA009)
                 {
                     retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
@@ -137,7 +143,7 @@ namespace VIS.Models
         public int GetProductUOM(string fields)
         {
             string sql = @"SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(fields);
-            int UOM=Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            int UOM = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return UOM;
         }
     }
