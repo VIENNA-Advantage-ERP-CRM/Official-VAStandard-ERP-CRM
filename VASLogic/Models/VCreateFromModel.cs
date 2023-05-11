@@ -971,10 +971,11 @@ namespace VIS.Models
 
 
                     // Create RfQ Qty
-                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
-                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);
+                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);                   
+                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);                   
                     RfQLineQty.SetQty(ReqLines[i].EnteredQty);
                     RfQLineQty.SetBenchmarkPrice(ReqLines[i].Price);
+                    RfQLineQty.Set_Value("LineNetAmt", ReqLines[i].EnteredQty * ReqLines[i].Price);
                     RfQLineQty.SetIsPurchaseQty(true);
                     RfQLineQty.SetIsRfQQty(true);
                     if (!RfQLineQty.Save())
