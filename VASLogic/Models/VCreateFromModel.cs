@@ -907,6 +907,7 @@ namespace VIS.Models
                 MRfQLine RfqLine = new MRfQLine(rfq);
                 RfqLine.SetLine(LineNo);
                 RfqLine.SetM_RequisitionLine_ID(ReqLines[i].M_ReqLine_ID);
+                RfqLine.Set_Value("LineTotalAmt", ReqLines[i].EnteredQty * ReqLines[i].Price);
                 if (ReqLines[i].M_Product_ID > 0)
                 {
                     RfqLine.SetM_Product_ID(ReqLines[i].M_Product_ID);
@@ -971,10 +972,11 @@ namespace VIS.Models
 
 
                     // Create RfQ Qty
-                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
-                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);
+                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);                   
+                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);                   
                     RfQLineQty.SetQty(ReqLines[i].EnteredQty);
                     RfQLineQty.SetBenchmarkPrice(ReqLines[i].Price);
+                    RfQLineQty.Set_Value("LineNetAmt", ReqLines[i].EnteredQty * ReqLines[i].Price);
                     RfQLineQty.SetIsPurchaseQty(true);
                     RfQLineQty.SetIsRfQQty(true);
                     if (!RfQLineQty.Save())
