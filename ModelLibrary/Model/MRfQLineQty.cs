@@ -179,5 +179,28 @@ namespace VAdvantage.Model
                 .Append("]");
             return sb.ToString();
         }
+        /// <summary>
+        /// Set Total amount on RFQ line and RFQ header 
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <param name="success"></param>
+        /// <returns></returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if(!success)
+            {
+                return false;
+            }
+            string sql = @"UPDATE C_RfQLine SET LineTotalAmt=(SELECT SUM(LineNetAmt) FROM C_RfQLineQty 
+                    WHERE C_RfQLine_ID=" + GetC_RfQLine_ID() + " AND IsActive='Y') " +
+                    "WHERE C_RfQLine_ID=" + GetC_RfQLine_ID();
+            int count = DB.ExecuteQuery(sql, null, Get_Trx());
+            string sql1 = @"UPDATE C_RfQ SET TotalAmt=(SELECT SUM(LineTotalAmt) FROM C_RfQLine 
+                        WHERE C_RfQ_ID=(SELECT C_RFQ_ID FROM C_RfQLine WHERE C_RfQLine_ID="+ GetC_RfQLine_ID ()+ ") AND IsActive='Y')" +
+                        " WHERE C_RfQ_ID=(SELECT C_RFQ_ID FROM C_RfQLine WHERE C_RfQLine_ID=" + GetC_RfQLine_ID() + ")";
+            int count1 = DB.ExecuteQuery(sql1, null, null);
+
+            return true;        
+        }
     }
 }
