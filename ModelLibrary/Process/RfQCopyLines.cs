@@ -107,8 +107,8 @@ namespace VAdvantage.Process
                     MRfQLineQty newQty = new MRfQLineQty(newLine);
                     newQty.SetC_UOM_ID(qtys[j].GetC_UOM_ID());
                     newQty.SetQty(qtys[j].GetQty());
-                    newQty.SetBenchmarkPrice(qtys[j].GetBenchmarkPrice());
-                    newQty.Set_Value("LineNetAmt", qtys[j].GetQty() * qtys[j].GetBenchmarkPrice());
+                    //newQty.SetBenchmarkPrice(qtys[j].GetBenchmarkPrice());
+                    //newQty.Set_Value("LineNetAmt", qtys[j].GetQty() * qtys[j].GetBenchmarkPrice());
                     newQty.SetIsOfferQty(qtys[j].IsOfferQty());
                     newQty.SetIsPurchaseQty(qtys[j].IsPurchaseQty());
                     newQty.SetMargin(qtys[j].GetMargin());
