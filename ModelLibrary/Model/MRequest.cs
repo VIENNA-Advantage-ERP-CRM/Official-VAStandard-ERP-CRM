@@ -907,8 +907,9 @@ namespace VAdvantage.Model
                     if (IsInvoiced() != _requestType.IsInvoiced())
                         SetIsInvoiced(_requestType.IsInvoiced());
                     if (GetDateNextAction() == null && _requestType.GetAutoDueDateDays() > 0)
-                        SetDateNextAction(TimeUtil.AddDays(DateTime.Now,
-                            _requestType.GetAutoDueDateDays()));
+                        //VIS_427-Bug Id 2105: calculated the according the system time
+                        SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
+                    
                 }
                 //	Is Status Valid
                 if (GetR_Status_ID() != 0)
@@ -1016,6 +1017,8 @@ namespace VAdvantage.Model
                         MUser.GetNameOfUser(GetSalesRep_ID())
                         };
                     String msg = Msg.GetMsg(GetCtx(), "RequestActionTransfer");
+                    //VIS_427-Bug Id 2105: replacing  the value of placeholders in above message
+                    msg = String.Format(@msg, Util.GetValueOfString(args[0].ToString()), Util.GetValueOfString(args[1].ToString()), Util.GetValueOfString(args[2].ToString()), Util.GetValueOfString(args[3].ToString()));
                     AddToResult(msg);
                     sendInfo.Add("SalesRep_ID");
                 }
