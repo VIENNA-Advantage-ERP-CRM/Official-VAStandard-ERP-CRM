@@ -1224,7 +1224,7 @@
             return "";
         }
         //	No Invoice
-        var C_Invoice_ID = ctx.getContextAsInt(windowNo, "C_Invoice_ID");
+        var C_Invoice_ID = mTab.getValue("C_Invoice_ID");
         if (C_Invoice_ID == 0) {
             return "";
         }

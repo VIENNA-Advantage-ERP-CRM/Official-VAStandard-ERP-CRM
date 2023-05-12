@@ -80,10 +80,11 @@
                 }
                 //	Location
                 var locID = Util.getValueOfInt(idr["C_BPartner_Location_ID"]);
+                /*VIS_0045: 04-May-2023 - DevOps Task ID: 2110*/
                 //	overwritten by InfoBP selection - works only if InfoWindow
                 //	was used otherwise creates error (uses last value, may belong to differnt BP)
-                if (C_BPartner_ID.toString().equals(ctx.getContext("C_BPartner_ID"))) {
-                    var loc = ctx.getContext("C_BPartner_Location_ID");
+                if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                    var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
                     if (loc.toString().length > 0) {
                         locID = Util.getValueOfInt(loc);
                     }

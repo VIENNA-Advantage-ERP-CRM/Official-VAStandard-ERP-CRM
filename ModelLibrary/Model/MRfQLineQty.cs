@@ -96,15 +96,15 @@ namespace VAdvantage.Model
         public MRfQLineQty(MRfQLine line)
             : this(line.GetCtx(), 0, line.Get_TrxName())
         {
-            
+
             SetClientOrg(line);
             SetC_RfQLine_ID(line.GetC_RfQLine_ID());
         }
-       
-         /// <summary>
-         /// Get Uom Name
-         /// </summary>
-         /// <returns>UOM</returns>
+
+        /// <summary>
+        /// Get Uom Name
+        /// </summary>
+        /// <returns>UOM</returns>
         public String GetUomName()
         {
             if (_uom == null)
@@ -114,11 +114,11 @@ namespace VAdvantage.Model
             return _uom.GetName();
         }
 
-       /// <summary>
-       /// Get active Response Qtys of this RfQ Qty
-       /// </summary>
-       /// <param name="onlyValidAmounts">only valid amounts</param>
-       /// <returns>array of response line qtys</returns>
+        /// <summary>
+        /// Get active Response Qtys of this RfQ Qty
+        /// </summary>
+        /// <param name="onlyValidAmounts">only valid amounts</param>
+        /// <returns>array of response line qtys</returns>
         public MRfQResponseLineQty[] GetResponseQtys(bool onlyValidAmounts)
         {
             List<MRfQResponseLineQty> list = new List<MRfQResponseLineQty>();
@@ -178,6 +178,29 @@ namespace VAdvantage.Model
                 .Append(",Purchase=").Append(IsPurchaseQty())
                 .Append("]");
             return sb.ToString();
+        }
+        /// <summary>
+        /// Set Total amount on RFQ line and RFQ header 
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <param name="success"></param>
+        /// <returns></returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+            {
+                return false;
+            }
+            string sql = @"UPDATE C_RfQLine SET LineTotalAmt=(SELECT SUM(LineNetAmt) FROM C_RfQLineQty 
+                    WHERE C_RfQLine_ID=" + GetC_RfQLine_ID() + " AND IsActive='Y') " +
+                    "WHERE C_RfQLine_ID=" + GetC_RfQLine_ID();
+            int count = DB.ExecuteQuery(sql, null, Get_Trx());
+            string sql1 = @"UPDATE C_RfQ SET TotalAmt=(SELECT SUM(LineTotalAmt) FROM C_RfQLine 
+                        WHERE C_RfQ_ID=(SELECT C_RFQ_ID FROM C_RfQLine WHERE C_RfQLine_ID=" + GetC_RfQLine_ID() + ") AND IsActive='Y')" +
+                        " WHERE C_RfQ_ID=(SELECT C_RFQ_ID FROM C_RfQLine WHERE C_RfQLine_ID=" + GetC_RfQLine_ID() + ")";
+            int count1 = DB.ExecuteQuery(sql1, null, Get_Trx());
+
+            return true;
         }
     }
 }

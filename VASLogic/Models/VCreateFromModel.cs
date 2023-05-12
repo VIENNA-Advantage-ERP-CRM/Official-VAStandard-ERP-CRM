@@ -934,8 +934,8 @@ namespace VIS.Models
                         {
                             VendorRecommend = tbl.GetPO(ctx, 0, trx);
                             VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
-                            VendorRecommend.Set_Value("AD_Org_ID",Util.GetValueOfInt(rows["AD_Org_ID"]));
-                            VendorRecommend.Set_Value("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
+                            VendorRecommend.Set_ValueNoCheck("AD_Org_ID",Util.GetValueOfInt(rows["AD_Org_ID"]));
+                            VendorRecommend.Set_ValueNoCheck("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
                             VendorRecommend.Set_Value("LineNo", Util.GetValueOfInt(rows["LineNo"]));
                             VendorRecommend.Set_Value("Name", Util.GetValueOfString(rows["Name"]));
                             VendorRecommend.Set_Value("Email", Util.GetValueOfString(rows["Email"]));
@@ -971,10 +971,11 @@ namespace VIS.Models
 
 
                     // Create RfQ Qty
-                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);
-                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);
+                    MRfQLineQty RfQLineQty = new MRfQLineQty(RfqLine);                   
+                    RfQLineQty.SetC_UOM_ID(ReqLines[i].C_UOM_ID);                   
                     RfQLineQty.SetQty(ReqLines[i].EnteredQty);
                     RfQLineQty.SetBenchmarkPrice(ReqLines[i].Price);
+                    RfQLineQty.Set_Value("LineNetAmt", ReqLines[i].EnteredQty * ReqLines[i].Price);
                     RfQLineQty.SetIsPurchaseQty(true);
                     RfQLineQty.SetIsRfQQty(true);
                     if (!RfQLineQty.Save())
