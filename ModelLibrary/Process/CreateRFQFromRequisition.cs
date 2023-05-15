@@ -212,12 +212,16 @@ namespace VAdvantage.Process
             string message = "";
             DataRow[] selectedTable = null;
             //VIS0336:changes done for inserting the record in vendor recommend tab when process run.
+            DataSet dt = null;
             object[] RequisitionID = _ds.Tables[0].AsEnumerable().Select(r => r.Field<object>("M_requisition_ID")).ToArray();
             string result = string.Join(",", RequisitionID);
 
-            string sql = "SELECT * FROM VA068_VendorRecomend v  INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID " +
+            if (Env.IsModuleInstalled("VA068_"))
+            {
+                string sql = "SELECT * FROM VA068_VendorRecomend v INNER JOIN M_RequisitionLine l ON l.M_RequisitionLine_ID=v.M_RequisitionLine_ID " +
                            "WHERE l.M_Requisition_ID IN (" + result + ")";
-            DataSet dt = DB.ExecuteDataset(sql, null, Get_Trx());
+                dt = DB.ExecuteDataset(sql, null, Get_Trx());
+            }
 
             for (int i = 0; i < _ds.Tables[0].Rows.Count; i++)
             {
@@ -346,49 +350,50 @@ namespace VAdvantage.Process
                 if (RfqLine.Save())
                 {
                     //VIS0336:changes done for inserting the record in vendor recommend tab when process run.
-                    MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA068_VendorRecomend"), Get_Trx());
-                    PO VendorRecommend = null;
-                    if (dt != null && dt.Tables[0].Rows.Count > 0)
+                    if (Env.IsModuleInstalled("VA068_"))
                     {
-                        selectedTable = dt.Tables[0].Select(" M_RequisitionLine_ID=" + Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_requisitionLine_ID"]));
-
-                        foreach (DataRow rows in selectedTable)
+                        MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA068_VendorRecomend"), Get_Trx());
+                        PO VendorRecommend = null;
+                        if (dt != null && dt.Tables.Count > 0 && dt.Tables[0].Rows.Count > 0)
                         {
-                            VendorRecommend = tbl.GetPO(GetCtx(), 0, Get_Trx());
-                            VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
-                            VendorRecommend.Set_Value("AD_Org_ID", Util.GetValueOfInt(rows["AD_Org_ID"]));
-                            VendorRecommend.Set_Value("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
-                            VendorRecommend.Set_Value("LineNo", Util.GetValueOfInt(rows["LineNo"]));
-                            VendorRecommend.Set_Value("Name", Util.GetValueOfString(rows["Name"]));
-                            VendorRecommend.Set_Value("Email", Util.GetValueOfString(rows["Email"]));
-                            VendorRecommend.Set_Value("C_BPartner_Location_ID", Util.GetValueOfInt(rows["C_BPartner_Location_ID"]));
-                            VendorRecommend.Set_Value("VA068_ContactName", Util.GetValueOfString(rows["VA068_ContactName"]));
-                            VendorRecommend.Set_Value("VA068_Phone", Util.GetValueOfString(rows["VA068_Phone"]));
-                            VendorRecommend.Set_Value("VA068_Email", Util.GetValueOfString(rows["VA068_Email"]));
-                            VendorRecommend.Set_Value("VA068_Location_ID", Util.GetValueOfInt(rows["VA068_Location_ID"]));
-                            VendorRecommend.Set_Value("VA068_Country_ID", Util.GetValueOfInt(rows["VA068_Country_ID"].ToString()));
-                            VendorRecommend.Set_Value("VA068_Status", Util.GetValueOfString(rows["VA068_Status"].ToString()));
-                           // VendorRecommend.Set_Value("IsApproved", Util.GetValueOfString(rows["IsApproved"].ToString()));
-                            VendorRecommend.Set_Value("VA068_VendorType", Util.GetValueOfString(rows["VA068_VendorType"]));
-                            VendorRecommend.Set_Value("C_BPartner_ID", Util.GetValueOfInt(rows["C_BPartner_ID"]));
-                            VendorRecommend.Set_Value("VA068_VendorRegistration_ID", Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"]));
-
-                            if (!VendorRecommend.Save())
+                            selectedTable = dt.Tables[0].Select(" M_RequisitionLine_ID=" + Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_requisitionLine_ID"]));
+                            foreach (DataRow rows in selectedTable)
                             {
-                                ValueNamePair vp = VLogger.RetrieveError();
-                                if (vp != null)
+                                VendorRecommend = tbl.GetPO(GetCtx(), 0, Get_Trx());
+                                VendorRecommend.Set_Value("C_RfQLine_ID", RfqLine.GetC_RfQLine_ID());
+                                VendorRecommend.Set_Value("AD_Org_ID", Util.GetValueOfInt(rows["AD_Org_ID"]));
+                                VendorRecommend.Set_Value("AD_Client_ID", Util.GetValueOfInt(rows["AD_Client_ID"]));
+                                VendorRecommend.Set_Value("LineNo", Util.GetValueOfInt(rows["LineNo"]));
+                                VendorRecommend.Set_Value("Name", Util.GetValueOfString(rows["Name"]));
+                                VendorRecommend.Set_Value("Email", Util.GetValueOfString(rows["Email"]));
+                                VendorRecommend.Set_Value("C_BPartner_Location_ID", Util.GetValueOfInt(rows["C_BPartner_Location_ID"]));
+                                VendorRecommend.Set_Value("VA068_ContactName", Util.GetValueOfString(rows["VA068_ContactName"]));
+                                VendorRecommend.Set_Value("VA068_Phone", Util.GetValueOfString(rows["VA068_Phone"]));
+                                VendorRecommend.Set_Value("VA068_Email", Util.GetValueOfString(rows["VA068_Email"]));
+                                VendorRecommend.Set_Value("VA068_Location_ID", Util.GetValueOfInt(rows["VA068_Location_ID"]));
+                                VendorRecommend.Set_Value("VA068_Country_ID", Util.GetValueOfInt(rows["VA068_Country_ID"].ToString()));
+                                VendorRecommend.Set_Value("VA068_Status", Util.GetValueOfString(rows["VA068_Status"].ToString()));
+                                // VendorRecommend.Set_Value("IsApproved", Util.GetValueOfString(rows["IsApproved"].ToString()));
+                                VendorRecommend.Set_Value("VA068_VendorType", Util.GetValueOfString(rows["VA068_VendorType"]));
+                                VendorRecommend.Set_Value("C_BPartner_ID", Util.GetValueOfInt(rows["C_BPartner_ID"]));
+                                VendorRecommend.Set_Value("VA068_VendorRegistration_ID", Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"]));
+
+                                if (!VendorRecommend.Save())
                                 {
-                                    Get_Trx().Rollback();
-                                    return Msg.GetMsg(GetCtx(), "VA068_VendorRecomendNotSaved") + "- " + vp.Name;
-                                }
-                                else
-                                {
-                                    Get_Trx().Rollback();
-                                    return Msg.GetMsg(GetCtx(), "VA068_VendorRecomendNotSaved");
+                                    ValueNamePair vp = VLogger.RetrieveError();
+                                    if (vp != null)
+                                    {
+                                        Get_Trx().Rollback();
+                                        return Msg.GetMsg(GetCtx(), "VA068_VendorRecomendNotSaved") + "- " + vp.Name;
+                                    }
+                                    else
+                                    {
+                                        Get_Trx().Rollback();
+                                        return Msg.GetMsg(GetCtx(), "VA068_VendorRecomendNotSaved");
+                                    }
                                 }
                             }
                         }
-
                     }
 
                     // Create RfQ Qty
