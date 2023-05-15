@@ -158,8 +158,15 @@ namespace VAdvantage.Process
                         if (qty.GetRfQLineQty().IsActive() && qty.GetRfQLineQty().IsPurchaseQty())
                         {
                             MOrderLine ol = new MOrderLine(order);
-                            ol.SetM_Product_ID(line.GetRfQLine().GetM_Product_ID(),
-                                qty.GetRfQLineQty().GetC_UOM_ID());
+                            if (line.GetRfQLine().GetM_Product_ID() > 0)
+                            {
+                                ol.SetM_Product_ID(line.GetRfQLine().GetM_Product_ID(),
+                                    qty.GetRfQLineQty().GetC_UOM_ID());
+                            }
+                            else
+                            {
+                                ol.Set_Value("C_Charge_ID", line.GetRfQLine().Get_Value("C_Charge_ID"));
+                            }
                             ol.SetDescription(line.GetDescription());
                             ol.SetQty(qty.GetRfQLineQty().GetQty());
                             Decimal? price = qty.GetNetAmt();

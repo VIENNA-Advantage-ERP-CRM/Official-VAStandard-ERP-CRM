@@ -23,7 +23,8 @@ using System.Data;
 using System.Data.SqlClient;
 using VAdvantage.Logging;
 
-using VAdvantage.ProcessEngine;namespace VAdvantage.Process
+using VAdvantage.ProcessEngine;
+namespace VAdvantage.Process
 {
     public class RfQCreateSO : ProcessEngine.SvrProcess
     {
@@ -137,13 +138,20 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                     if (qty.IsActive() && qty.IsOfferQty())
                     {
                         MOrderLine ol = new MOrderLine(order);
-                        ol.SetM_Product_ID(line.GetM_Product_ID(),
-                            qty.GetC_UOM_ID());
+                        if (line.GetM_Product_ID() > 0)
+                        {
+                            ol.SetM_Product_ID(line.GetM_Product_ID(),
+                                qty.GetC_UOM_ID());
+                        }
+                        else
+                        {
+                            ol.Set_Value("C_Charge_ID", line.Get_Value("C_Charge_ID"));
+                        }
                         ol.SetDescription(line.GetDescription());
                         ol.SetQty(qty.GetQty());
                         //
                         Decimal price = qty.GetOfferAmt();
-                        if ( Env.Signum(price) == 0)
+                        if (Env.Signum(price) == 0)
                         {
                             price = qty.GetBestResponseAmt();
                             if (Env.Signum(price) == 0)
@@ -154,11 +162,11 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                             else
                             {
                                 Decimal margin = qty.GetMargin();
-                                if ( Env.Signum(margin) == 0)
+                                if (Env.Signum(margin) == 0)
                                 {
                                     margin = rfq.GetMargin();
                                 }
-                                if ( Env.Signum(margin) != 0)
+                                if (Env.Signum(margin) != 0)
                                 {
                                     margin = Decimal.Add(margin, ONEHUNDRED);
                                     price = Decimal.Round(Decimal.Divide(Decimal.Multiply(price, margin),
@@ -199,7 +207,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
         {
             PaymentBaseType = "";
             string _sql = "SELECT VA009_PAYMENTBASETYPE FROM VA009_PAYMENTMETHOD WHERE VA009_PaymentMethod_ID=" + VA009_PaymentMethod_ID;
-            PaymentBaseType= Util.GetValueOfString(DB.ExecuteScalar(_sql, null, Get_TrxName()));
+            PaymentBaseType = Util.GetValueOfString(DB.ExecuteScalar(_sql, null, Get_TrxName()));
             return PaymentBaseType;
         }
         //-------End------
