@@ -556,8 +556,12 @@ namespace VAdvantage.Model
                         else
                         {
                             /* By Pass for POS terminal Order */
+                            /*VIS_045: DevOps Task ID - 2121, 16 May-2023, 
+                             * System will allow to complete payment order linked with invoice having POS type */
                             if (invoice.GetC_Order_ID() > 0 && DB.GetSQLValue(null,
-                                            "SELECT VAPOS_POSTerminal_ID FROM C_Order WHERE C_Order_ID = " + invoice.GetC_Order_ID()) > 0)
+                                @"SELECT Count(o.C_Order_ID) FROM C_Order o 
+                                    INNER JOIN C_DocType d ON (d.C_DocType_ID = o.C_DocTypetarget_ID) WHERE (NVL(o.VAPOS_POSTerminal_ID, 0) > 0
+                                    OR d.DocSubTypeSO = 'WR') AND  o.C_Order_ID = " + invoice.GetC_Order_ID()) > 0)
                             {
                                 ; //Intentionlly left blank
                             }

@@ -347,7 +347,12 @@ namespace VAdvantage.Model
                 }
                 if (GetDueAmt() <= Decimal.Add(GetVA009_PaidAmntInvce(), GetVA009_Variance()))
                 {
-                    DB.ExecuteQuery("UPDATE C_InvoicePaySchedule SET VA009_IsPaid = 'Y' WHERE C_InvoicePaySchedule_ID = " + GetC_InvoicePaySchedule_ID(), null, Get_Trx());
+                     /* VIS_045: DevOps Task ID - 2121, 16 May-2023
+                      * System will not mark Schedule as paid when negative amount in case order is of POS type*/
+                    if (!CheckIsPOSOrderType(_parent))
+                    {
+                        DB.ExecuteQuery("UPDATE C_InvoicePaySchedule SET VA009_IsPaid = 'Y' WHERE C_InvoicePaySchedule_ID = " + GetC_InvoicePaySchedule_ID(), null, Get_Trx());
+                    }
                     // if payment is done against invioce for advanced schedules then update payment reference at order schedule tab
                     if (GetVA009_OrderPaySchedule_ID() > 0 && GetC_Payment_ID() > 0)
                     {
@@ -398,6 +403,26 @@ namespace VAdvantage.Model
                 }
             }
             return success;
+        }
+
+        /// <summary>
+        /// This function is used to check wheather the linked order belongs to POS type or not
+        /// </summary>
+        /// <param name="parent">Invoice Object</param>
+        /// <Task> VIS_045: DevOps Task ID - 2121, 16 May-2023</Task>
+        /// <returns>True, When POS type</returns>
+        public bool CheckIsPOSOrderType(MInvoice parent)
+        {
+            if (parent != null && parent.IsSOTrx() && !parent.IsReturnTrx() && parent.GetC_Order_ID() > 0)
+            {
+                if (GetDueAmt() < 0 && DB.GetSQLValue(null, $@"SELECT Count(o.C_Order_ID) FROM C_Order o 
+                                    INNER JOIN C_DocType d ON (d.C_DocType_ID = o.C_DocTypetarget_ID) 
+                                    WHERE d.DocSubTypeSO = 'WR' AND  o.C_Order_ID = {parent.GetC_Order_ID()}") > 0)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
