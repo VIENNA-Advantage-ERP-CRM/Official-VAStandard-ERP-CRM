@@ -253,17 +253,20 @@ namespace VAdvantage.Model
             {
                 // When Material Policy is FIFO, then user can not select costing metghod as "LIFO" and vice versa
                 string costingMethod = GetCostingMethod();
-                if (costingMethod.Equals(COSTINGMETHOD_CostCombination) && GetM_CostElement_ID() > 0)
+                if (!string.IsNullOrEmpty(costingMethod))
                 {
-                    costingMethod = Util.GetValueOfString(DB.ExecuteScalar($@"SELECT CostingMethod FROM M_CostElement WHERE M_CostElement_ID IN 
+                    if (costingMethod.Equals(COSTINGMETHOD_CostCombination) && GetM_CostElement_ID() > 0)
+                    {
+                        costingMethod = Util.GetValueOfString(DB.ExecuteScalar($@"SELECT CostingMethod FROM M_CostElement WHERE M_CostElement_ID IN 
                             (SELECT CAST(M_Ref_CostElement AS INTEGER) FROM M_CostElementLine WHERE M_CostElement_ID={GetM_CostElement_ID()} )
                             AND CostingMethod IS NOT NULL", null, Get_Trx()));
-                }
-                if ((GetMMPolicy().Equals(MMPOLICY_FiFo) && costingMethod.Equals(COSTINGMETHOD_Lifo)) ||
-                    (GetMMPolicy().Equals(MMPOLICY_LiFo) && costingMethod.Equals(COSTINGMETHOD_Fifo)))
-                {
-                    log.SaveError("MMPolicyAndMethodnotMatch", "");
-                    return false;
+                    }
+                    if ((GetMMPolicy().Equals(MMPOLICY_FiFo) && costingMethod.Equals(COSTINGMETHOD_Lifo)) ||
+                        (GetMMPolicy().Equals(MMPOLICY_LiFo) && costingMethod.Equals(COSTINGMETHOD_Fifo)))
+                    {
+                        log.SaveError("MMPolicyAndMethodnotMatch", "");
+                        return false;
+                    }
                 }
 
                 // Check Quantity available on Cost Queue or not
