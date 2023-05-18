@@ -166,7 +166,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                             //Array.Sort(respQtys, respQtys);
                         }
                         catch { }
-                        int lastRank = 1;		//	multiple rank #1
+                        int lastRank = 0;		//	multiple rank #1
                         Decimal? lastAmt = Env.ZERO;
                         for (int rank = 0; rank < respQtys.Length; rank++)
                         {
@@ -186,9 +186,9 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                             {
                                 if (lastAmt.Value.CompareTo(netAmt.Value) != 0)
                                 {
-                                    lastRank = rank + 1;
+                                    lastRank = lastRank + 1;
                                     lastAmt = qty.GetNetAmt();
-                                }
+                                }                               
                                 qty.SetRanking(lastRank);
                                 log.Fine("  - Rank " + lastRank + ": " + qty);
                             }

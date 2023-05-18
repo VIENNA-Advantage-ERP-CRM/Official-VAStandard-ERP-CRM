@@ -4265,67 +4265,80 @@ namespace VAdvantage.Model
                 _processMsg = Info.ToString();
                 //
                 SetDocAction(DOCACTION_Close);
-                //Changes by abhishek suggested by lokesh on 7/1/2016
-                //try
-                //{
-                //    int countVAPOS = Util.GetValueOfInt(DB.ExecuteScalar("Select count(*) from AD_ModuleInfo Where Prefix='VAPOS_'"));
-                //    if (countVAPOS > 0)
-                //    {
-                //        MPriceList priceLst = new MPriceList(GetCtx(), GetM_PriceList_ID(), null);
-                //        bool taxInclusive = priceLst.IsTaxIncluded();
-                //        int VAPOS_POSTertminal_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select VAPOS_POSTerminal_ID from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //        if (VAPOS_POSTertminal_ID > 0)
-                //        {
-                //            string cAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_CashPaid from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //            string pAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_PayAmt from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //            List<string> tax_IDLst = new List<string>();
-                //            List<string> OLTaxAmtLst = new List<string>();
-                //            List<string> DscLineLst = new List<string>();
+            //Changes by abhishek suggested by lokesh on 7/1/2016
+            //try
+            //{
+            //    int countVAPOS = Util.GetValueOfInt(DB.ExecuteScalar("Select count(*) from AD_ModuleInfo Where Prefix='VAPOS_'"));
+            //    if (countVAPOS > 0)
+            //    {
+            //        MPriceList priceLst = new MPriceList(GetCtx(), GetM_PriceList_ID(), null);
+            //        bool taxInclusive = priceLst.IsTaxIncluded();
+            //        int VAPOS_POSTertminal_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select VAPOS_POSTerminal_ID from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+            //        if (VAPOS_POSTertminal_ID > 0)
+            //        {
+            //            string cAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_CashPaid from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+            //            string pAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_PayAmt from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+            //            List<string> tax_IDLst = new List<string>();
+            //            List<string> OLTaxAmtLst = new List<string>();
+            //            List<string> DscLineLst = new List<string>();
 
-                //            DataSet dsDE = DB.ExecuteDataset("select ol.C_Tax_ID, ol.VAPOS_DiscountAmount, ol.LINENETAMT, tx.rate from C_OrderLine ol inner join C_Tax tx on(ol.C_Tax_ID=tx.C_Tax_ID)  where C_Order_ID=" + GetC_Order_ID());
-                //            try
-                //            {
-                //                if (dsDE != null)
-                //                {
-                //                    if (dsDE.Tables[0].Rows.Count > 0)
-                //                    {
-                //                        for (int i = 0; i < dsDE.Tables[0].Rows.Count; i++)
-                //                        {
-                //                            tax_IDLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["C_Tax_ID"]));
-                //                            DscLineLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["VAPOS_DiscountAmount"]));
-                //                            decimal taxRate = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["rate"]);
-                //                            decimal LINENETAMT = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["LINENETAMT"]);
-                //                            if (taxInclusive)
-                //                            {
-                //                                OLTaxAmtLst.Add(Convert.ToString(((LINENETAMT / (100 + taxRate)) * (taxRate / 100))));
-                //                            }
-                //                            else
-                //                            {
-                //                                OLTaxAmtLst.Add(Convert.ToString(taxRate * LINENETAMT / 100));
+            //            DataSet dsDE = DB.ExecuteDataset("select ol.C_Tax_ID, ol.VAPOS_DiscountAmount, ol.LINENETAMT, tx.rate from C_OrderLine ol inner join C_Tax tx on(ol.C_Tax_ID=tx.C_Tax_ID)  where C_Order_ID=" + GetC_Order_ID());
+            //            try
+            //            {
+            //                if (dsDE != null)
+            //                {
+            //                    if (dsDE.Tables[0].Rows.Count > 0)
+            //                    {
+            //                        for (int i = 0; i < dsDE.Tables[0].Rows.Count; i++)
+            //                        {
+            //                            tax_IDLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["C_Tax_ID"]));
+            //                            DscLineLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["VAPOS_DiscountAmount"]));
+            //                            decimal taxRate = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["rate"]);
+            //                            decimal LINENETAMT = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["LINENETAMT"]);
+            //                            if (taxInclusive)
+            //                            {
+            //                                OLTaxAmtLst.Add(Convert.ToString(((LINENETAMT / (100 + taxRate)) * (taxRate / 100))));
+            //                            }
+            //                            else
+            //                            {
+            //                                OLTaxAmtLst.Add(Convert.ToString(taxRate * LINENETAMT / 100));
 
-                //                            }
+            //                            }
 
-                //                        }
-                //                    }
-                //                    dsDE.Dispose();
-                //                }
-                //            }
-                //            catch
-                //            {
-                //                if (dsDE != null) { dsDE.Dispose(); }
-                //            }
-                //            string[] tax_ID = tax_IDLst.ToArray();
-                //            string[] OLTaxAmt = OLTaxAmtLst.ToArray();
-                //            string[] DscLine = DscLineLst.ToArray();
-                //            SaveDayEndRecord(GetCtx(), VAPOS_POSTertminal_ID, cAmount, pAmount, GetC_DocType_ID(), tax_ID, OLTaxAmt, GetGrandTotal().ToString(), DscLine);
-                //        }
-                //    }
-                //}
+            //                        }
+            //                    }
+            //                    dsDE.Dispose();
+            //                }
+            //            }
+            //            catch
+            //            {
+            //                if (dsDE != null) { dsDE.Dispose(); }
+            //            }
+            //            string[] tax_ID = tax_IDLst.ToArray();
+            //            string[] OLTaxAmt = OLTaxAmtLst.ToArray();
+            //            string[] DscLine = DscLineLst.ToArray();
+            //            SaveDayEndRecord(GetCtx(), VAPOS_POSTertminal_ID, cAmount, pAmount, GetC_DocType_ID(), tax_ID, OLTaxAmt, GetGrandTotal().ToString(), DscLine);
+            //        }
+            //    }
+            //}
 
-                //catch
-                //{
-                //    //ShowMessage.Error("MOrder",null,"CompleteIt");
-                //}
+            //catch
+            //{
+            //    //ShowMessage.Error("MOrder",null,"CompleteIt");
+            //}
+
+            //VIS0336: update tender status po generated
+                if (!IsSOTrx() &&  Env.IsModuleInstalled("VA097_") && Util.GetValueOfInt(Get_Value("VA097_VendorDetails_ID")) > 0)
+                {
+                    string sql = " UPDATE VA097_Tender SET VA097_TenderStatus='PO' WHERE VA097_Tender_ID=(SELECT VA097_Tender_ID FROM VA097_RFQ_TenderLine WHERE VA097_RFQ_TenderLine_ID=(SELECT VA097_RFQ_TenderLine_ID FROM VA097_VendorDetails WHERE VA097_VendorDetails_ID=" + Get_Value("VA097_VendorDetails_ID") + ")) ";
+                    int Count = DB.ExecuteQuery(sql, null, Get_Trx());
+                    if (Count < 0)
+                    {
+                        Get_Trx().Rollback();
+                        return Msg.GetMsg(GetCtx(), "VA097_AwardStatusNotUpdated");
+
+                    }
+                }
             }
 
             catch

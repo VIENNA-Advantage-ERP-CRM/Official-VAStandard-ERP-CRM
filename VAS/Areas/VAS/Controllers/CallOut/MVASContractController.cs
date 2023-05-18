@@ -31,6 +31,29 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// On Business Partner and ContractType according Field should be Updated
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public JsonResult GetBPartnerData(string fields)
+        {
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            MVASContractModel objBPModel = new MVASContractModel();
+            retJSON = JsonConvert.SerializeObject(objBPModel.GetBPartnerData(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
 
+        /// <summary>
+        /// Set Product UOM on Contract master window's contract line tab
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public JsonResult GetProductUOM(string fields)
+        {
+            MVASContractModel Obj = new MVASContractModel();
+            return Json(JsonConvert.SerializeObject(Obj.GetProductUOM(fields)), JsonRequestBehavior.AllowGet);
+        }
     }
 }

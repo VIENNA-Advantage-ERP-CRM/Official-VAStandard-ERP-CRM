@@ -148,7 +148,7 @@
                     DocSubTypeSO = "--";
                 ctx.setContext(windowNo, "OrderType", DocSubTypeSO);
                 ctx.setContext(windowNo, "DocTypeValue", DocTypeValue);
-               
+
 
                 if (DocSubTypeSO == 'BO') {
                     ctx.setContext(windowNo, "BlanketOrderType", DocSubTypeSO);
@@ -2239,16 +2239,20 @@
                             "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                             "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
                             "," + C_BPartner_ID1.toString() +
-                            "," + (mTab.getValue("QtyEntered")).toString() +"," + 1 + "," + 1);
+                            "," + (mTab.getValue("QtyEntered")).toString() +
+                            "," + isSOTrx + "," + 1 + "," + 1);
                         var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
                         DiscountSchema = Util.getValueOfString(prices["DiscountSchema"]);
 
                         // VIS0060: Handle zero price issue on quantity change.
-                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfString(prices["DiscountCalculate"])=="Y")||(Util.getValueOfDecimal(prices["PriceList"]) != 0 && mTab.getValue("PriceList") == 0)) {
+                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfString(prices["DiscountCalculate"]) == "Y" && Util.getValueOfDecimal(prices["PriceEntered"]) != 0) ||
+                            (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
                             PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"]);
-                      }
+                            mTab.setValue("PriceActual", PriceEntered);                            
+                            mTab.setValue("Discount", ((Util.getValueOfDecimal(mTab.getValue("PriceList")) - PriceEntered) / Util.getValueOfDecimal(mTab.getValue("PriceList"))) * 100);
+                        }
                     }
                     //if (PriceEntered == null)
                     //    PriceEntered = stdPrice;
@@ -2259,12 +2263,14 @@
 
                     // SI_0605: not to update price when blanket order line exist
                     // JID_1362: when qty delivered / invoiced > 0, then priace acual and entererd not change
-                    if (!isBlanketOrderLine && !isReactivation
-                        && (mField.getColumnName() == "M_Product_ID" || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0))) {
-                        mTab.setValue("PriceActual", PriceEntered);
-                        PriceActual = PriceEntered;
-                        mTab.setValue("Discount", ((Util.getValueOfDecimal(mTab.getValue("PriceList")) - PriceEntered) / Util.getValueOfDecimal(mTab.getValue("PriceList"))) * 100);
-                    }
+                    //if (!isBlanketOrderLine && !isReactivation
+                    //    && (mField.getColumnName() == "M_Product_ID" || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0)
+                    //    || (Util.getValueOfString(prices["DiscountCalculate"]) == "Y" && PriceEntered != 0))) {
+                    //    mTab.setValue("PriceActual", PriceEntered);
+                    //    PriceActual = PriceEntered;
+                    //    mTab.setValue("Discount", ((Util.getValueOfDecimal(mTab.getValue("PriceList")) - PriceEntered) / Util.getValueOfDecimal(mTab.getValue("PriceList"))) * 100);
+                    //}
+
                     mTab.setValue("PriceEntered", PriceEntered);
                     ctx.setContext(windowNo, "DiscountSchema", DiscountSchema);
                 }
@@ -2657,7 +2663,7 @@
 
             // Check for RMA
             var isReturnTrx = "Y" == (ctx.getContext("IsReturnTrx"));
-
+            var isSOTrx = (ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y");
             var isBlanketOrderLine = Util.getValueOfInt(mTab.getValue("C_OrderLine_Blanket_ID")) > 0 ? true : false;
             var isQuotationOrderLine = Util.getValueOfInt(mTab.getValue("C_Quotation_Line_ID")) > 0 ? true : false;
             // if order line having sales quotation ID then set isBlanketOrderLine AS TRUE
@@ -2688,7 +2694,8 @@
                 var params = M_Product_ID.toString().concat(",", (mTab.getValue("C_Order_ID")).toString() +
                     "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
-                    "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() + "," + 1 + "," + 1);
+                    "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() +
+                    "," + isSOTrx + "," + 1 + "," + 1);
                 var productPrices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
 
                 if (!isBlanketOrderLine) {

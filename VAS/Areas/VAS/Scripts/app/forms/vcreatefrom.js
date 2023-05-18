@@ -1011,7 +1011,7 @@
         sql += ") t GROUP BY C_Order_ID,C_OrderLine_ID,QtyOrdered "
             + " HAVING QtyOrdered > SUM(nvl(Qty,0)) AND QtyOrdered > SUM(NVL(QtyInvoiced,0)))";
 
-        var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), this.windowNo, 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
+        var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), VIS.Env.getWindowNo(), 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
         this.cmbOrder = new VIS.Controls.VTextBoxButton("C_Order_ID", true, false, true, VIS.DisplayType.Search, lookupOrder);
 
         //$.ajax({

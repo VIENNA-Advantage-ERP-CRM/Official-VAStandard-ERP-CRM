@@ -907,8 +907,9 @@ namespace VAdvantage.Model
                     if (IsInvoiced() != _requestType.IsInvoiced())
                         SetIsInvoiced(_requestType.IsInvoiced());
                     if (GetDateNextAction() == null && _requestType.GetAutoDueDateDays() > 0)
-                        SetDateNextAction(TimeUtil.AddDays(DateTime.Now,
-                            _requestType.GetAutoDueDateDays()));
+                        //VIS_427-Bug Id 2105: calculated the according the system time
+                        SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
+                    
                 }
                 //	Is Status Valid
                 if (GetR_Status_ID() != 0)
@@ -1016,11 +1017,48 @@ namespace VAdvantage.Model
                         MUser.GetNameOfUser(GetSalesRep_ID())
                         };
                     String msg = Msg.GetMsg(GetCtx(), "RequestActionTransfer");
+                    //VIS_427-Bug Id 2105: replacing  the value of placeholders in above message
+                    msg = String.Format(@msg, Util.GetValueOfString(args[0].ToString()), Util.GetValueOfString(args[1].ToString()), Util.GetValueOfString(args[2].ToString()), Util.GetValueOfString(args[3].ToString()));
                     AddToResult(msg);
                     sendInfo.Add("SalesRep_ID");
                 }
             }
-            CheckChange(ra, "AD_Role_ID");
+            //VIS_427-Bug Id 2105: check when role changes for request
+            if (CheckChange(ra, "AD_Role_ID"))
+            {
+                string oldname="null", newname="null";
+                int AD_User_ID = p_ctx.GetAD_User_ID();
+                if (AD_User_ID == 0)
+                AD_User_ID = GetUpdatedBy();
+                int oldAd_Role_ID = Util.GetValueOfInt(Get_ValueOld("AD_Role_ID"));
+                String sql = "SELECT NAME,AD_Role_ID FROM AD_Role where AD_Role_ID IN " + (oldAd_Role_ID, GetAD_Role_ID());
+               DataSet ds = DB.ExecuteDataset(sql);
+                if( ds !=null && ds.Tables[0].Rows.Count>0)
+                {
+                    foreach (DataRow dr in ds.Tables[0].Rows)
+                    {
+                        if (oldAd_Role_ID == Util.GetValueOfInt(dr["AD_Role_ID"]) && oldAd_Role_ID != 0)
+                        {
+                            oldname = Util.GetValueOfString(dr["Name"]);
+                        }
+                        if (GetAD_Role_ID() == Util.GetValueOfInt(dr["AD_Role_ID"]) && GetAD_Role_ID() != 0)
+                        {
+                            newname = Util.GetValueOfString(dr["Name"]);
+                        }
+                    }
+                    //  RequestActionTransfer - Request {0} was transfered by {1} from {2} to {3}
+                    Object[] args = new Object[] {GetDocumentNo(),
+                        MUser.GetNameOfUser(AD_User_ID),
+                         oldname,
+                          newname
+                        };
+                    String msg = Msg.GetMsg(GetCtx(), "RequestActionTransfer");
+                    //VIS_427-Bug Id 2105: replacing  the value of placeholders in above message
+                    msg = String.Format(@msg, args[0], args[1], args[2], args[3]);
+                    AddToResult(msg);
+                    sendInfo.Add("AD_Role_ID");
+                }
+            }
             //
             if (CheckChange(ra, "Priority"))
                 sendInfo.Add("Priority");

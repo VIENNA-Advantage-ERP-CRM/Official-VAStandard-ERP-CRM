@@ -23,7 +23,8 @@ using System.Data;
 using VAdvantage.Logging;
 
 
-using VAdvantage.ProcessEngine;namespace VAdvantage.Process
+using VAdvantage.ProcessEngine;
+namespace VAdvantage.Process
 {
     public class RfQCopyLines : ProcessEngine.SvrProcess
     {
@@ -86,7 +87,14 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 newLine.SetLine(lines[i].GetLine());
                 newLine.SetDescription(lines[i].GetDescription());
                 newLine.SetHelp(lines[i].GetHelp());
-                newLine.SetM_Product_ID(lines[i].GetM_Product_ID());
+                if (lines[i].GetM_Product_ID() > 0)
+                {
+                    newLine.SetM_Product_ID(lines[i].GetM_Product_ID());
+                }
+                else
+                {
+                    newLine.Set_Value("C_Charge_ID", lines[i].Get_Value("C_Charge_ID"));
+                }
                 newLine.SetM_AttributeSetInstance_ID(lines[i].GetM_AttributeSetInstance_ID());
                 //	newLine.setDateWorkStart();
                 //	newLine.setDateWorkComplete();
@@ -99,6 +107,8 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                     MRfQLineQty newQty = new MRfQLineQty(newLine);
                     newQty.SetC_UOM_ID(qtys[j].GetC_UOM_ID());
                     newQty.SetQty(qtys[j].GetQty());
+                    //newQty.SetBenchmarkPrice(qtys[j].GetBenchmarkPrice());
+                    //newQty.Set_Value("LineNetAmt", qtys[j].GetQty() * qtys[j].GetBenchmarkPrice());
                     newQty.SetIsOfferQty(qtys[j].IsOfferQty());
                     newQty.SetIsPurchaseQty(qtys[j].IsPurchaseQty());
                     newQty.SetMargin(qtys[j].GetMargin());
@@ -106,7 +116,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 }
                 counter++;
             }	//	copy all lines	
-            return "# " + counter;
+            return "Copied=" + counter;
         }
     }
 }
