@@ -1653,6 +1653,7 @@ namespace VIS.Controllers
                 int M_Product_ID = 0;
                 int C_OrderLine_ID = 0;
                 int M_InOutLine_ID = 0;
+                bool IsLineFromShipment = false;
                 MProduct product = null;
 
                 //Double d = Convert.ToDouble(model[i]["Quantity"]);                      //  1-Qty
@@ -1678,6 +1679,15 @@ namespace VIS.Controllers
                     C_OrderLine_ID = Convert.ToInt32((model[i]["C_Order_ID_K"]));       //  4-OrderLine
                 if (model[i]["M_InOut_ID_K"] != "")
                     M_InOutLine_ID = Convert.ToInt32((model[i]["M_InOut_ID_K"]));   //  5-Shipment
+
+                if (M_InOutLine_ID != 0)
+                {
+                    IsLineFromShipment = true;
+                }
+                else
+                {
+                    IsLineFromShipment = false;
+                }
 
                 //	Precision of Qty UOM
                 int precision = 2;
@@ -1769,29 +1779,32 @@ namespace VIS.Controllers
                     if (inoutLine != null)
                     {
                         invoiceLine.SetM_AttributeSetInstance_ID(inoutLine.GetM_AttributeSetInstance_ID());
-                        // VIS0060: Handle case of UOM, was overwritten by Order Line UOM
-                        invoiceLine.SetC_UOM_ID(inoutLine.GetC_UOM_ID());
-
-                        // Update Price
-                        if (inoutLine.GetC_UOM_ID() != orderLine.GetC_UOM_ID() && M_Product_ID != 0)
+                        if (IsLineFromShipment)
                         {
-                            if (product.GetC_UOM_ID() == orderLine.GetC_UOM_ID())
+                            // VIS0060: Handle case of UOM, was overwritten by Order Line UOM
+                            invoiceLine.SetC_UOM_ID(inoutLine.GetC_UOM_ID());
+
+                            // Update Price
+                            if (inoutLine.GetC_UOM_ID() != orderLine.GetC_UOM_ID() && M_Product_ID != 0)
                             {
-                                //VIS_0045: DevOps Task ID-2124, 18-May-2023,  when Product UOM and Order UOM are same
-                                decimal rate = (inoutLine.GetQtyEntered() != 0 ? (inoutLine.GetMovementQty() / inoutLine.GetQtyEntered()) : 1);
-                                invoiceLine.SetPriceEntered(Decimal.Round(orderLine.GetPriceEntered() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceActual(Decimal.Round(orderLine.GetPriceActual() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceLimit(Decimal.Round(orderLine.GetPriceLimit() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                            }
-                            else if (product.GetC_UOM_ID() != orderLine.GetC_UOM_ID())
-                            {
-                                //VIS_0045: DevOps Task ID-2124, 18-May-2023, when Product UOM and Order UOM are different
-                                decimal rate = (orderLine.GetQtyEntered() != 0 ? (orderLine.GetQtyOrdered() / orderLine.GetQtyEntered()) : 1);
-                                invoiceLine.SetPriceEntered(Decimal.Round(orderLine.GetPriceEntered() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceActual(Decimal.Round(orderLine.GetPriceActual() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceLimit(Decimal.Round(orderLine.GetPriceLimit() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                if (product.GetC_UOM_ID() == orderLine.GetC_UOM_ID())
+                                {
+                                    //VIS_0045: DevOps Task ID-2124, 18-May-2023,  when Product UOM and Order UOM are same
+                                    decimal rate = (inoutLine.GetQtyEntered() != 0 ? (inoutLine.GetMovementQty() / inoutLine.GetQtyEntered()) : 1);
+                                    invoiceLine.SetPriceEntered(Decimal.Round(orderLine.GetPriceEntered() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceActual(Decimal.Round(orderLine.GetPriceActual() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceLimit(Decimal.Round(orderLine.GetPriceLimit() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                }
+                                else if (product.GetC_UOM_ID() != orderLine.GetC_UOM_ID())
+                                {
+                                    //VIS_0045: DevOps Task ID-2124, 18-May-2023, when Product UOM and Order UOM are different
+                                    decimal rate = (orderLine.GetQtyEntered() != 0 ? (orderLine.GetQtyOrdered() / orderLine.GetQtyEntered()) : 1);
+                                    invoiceLine.SetPriceEntered(Decimal.Round(orderLine.GetPriceEntered() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceActual(Decimal.Round(orderLine.GetPriceActual() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceLimit(Decimal.Round(orderLine.GetPriceLimit() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                    invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                }
                             }
                         }
                     }
