@@ -584,6 +584,7 @@ namespace VAdvantage.Model
          */
         protected override bool BeforeSave(bool newRecord)
         {
+            StringBuilder _sql = new StringBuilder();
             // Set Search Key from Serial No defined on Product Category.
             MProductCategory pc = new MProductCategory(GetCtx(), GetM_Product_Category_ID(), Get_TrxName());
             if (newRecord && pc.Get_ColumnIndex("M_SerNoCtl_ID") >= 0 && pc.GetM_SerNoCtl_ID() > 0)
@@ -690,6 +691,20 @@ namespace VAdvantage.Model
                     }
                 }
             }
+            //VIS0336_for adding records on QA parm tab
+            if (Env.IsModuleInstalled("VA010_") && Is_ValueChanged("VA010_QualityPlan_ID"))
+            {
+                _sql.Clear();
+                _sql.Append("SELECT COUNT(VA010_QAParameter_ID) FROM VA010_QAParameter WHERE M_Product_ID=" + GetM_Product_ID());
+                int Recordcount = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
+                if (Recordcount > 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_RecordExist"));
+                    return false;
+                }
+            }
+
+
             return true;
         }
 
@@ -866,6 +881,65 @@ namespace VAdvantage.Model
                 {
                     CallNutritionApi(Convert.ToString(objNDBNo), GetM_Product_ID());
                 }
+            }
+
+            //VIS0336_for adding records on QA parm tab
+            if (Env.IsModuleInstalled("VA010_") && (Is_ValueChanged("VA010_QualityPlan_ID") || newRecord) && Util.GetValueOfInt(Get_Value("VA010_QualityPlan_ID")) > 0)
+            {
+                int Line = 10;
+                int ScoreLine = 10;
+
+                _sql.Clear();
+                _sql.Append("SELECT ap.VA010_TestParameter_ID,VA010_TestPrmtrList_ID,ap.VA010_Weightagepercentage,ap.Description as ADescription,s.VA010_AssgndParameters_ID,s.VA010_Score," +
+                             " s.Description from VA010_AssgndParameters ap INNER JOIN VA010_QAScore s ON ap.VA010_AssgndParameters_ID=s.VA010_AssgndParameters_ID" +
+                             "  WHERE ap.VA010_QualityPlan_ID=" + Get_Value("VA010_QualityPlan_ID") + " AND ap.AD_Org_ID="+ GetAD_Org_ID());
+                DataSet ds = DB.ExecuteDataset(_sql.ToString(), null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA010_QAParameter"), Get_Trx());
+                    PO QaParameter = null;
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        QaParameter = tbl.GetPO(GetCtx(), 0, Get_Trx());
+                        QaParameter.Set_ValueNoCheck("M_Product_ID", Util.GetValueOfInt(GetM_Product_ID()));
+                        QaParameter.Set_Value("AD_Org_ID", GetAD_Org_ID());
+                        QaParameter.Set_Value("AD_Client_ID", GetAD_Client_ID());
+                        QaParameter.Set_Value("VA010_TestParameter_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_TestParameter_ID"]));
+                        QaParameter.Set_Value("VA010_TestPrmtrList_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_TestPrmtrList_ID"]));
+                        QaParameter.Set_Value("VA010_Weightagepercentage", Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_Weightagepercentage"]));
+                        QaParameter.Set_Value("Description", Util.GetValueOfString(ds.Tables[0].Rows[i]["ADescription"]));
+                        QaParameter.Set_Value("LineNo", Line);
+
+                        if (QaParameter.Save())
+                        {
+                            MTable tbl1 = new MTable(GetCtx(), MTable.Get_Table_ID("VA010_QAScore"), Get_Trx());
+                            PO QAScore = null;
+                            QAScore = tbl1.GetPO(GetCtx(), 0, Get_Trx());
+                            QAScore.Set_ValueNoCheck("VA010_QAParameter_ID", QaParameter.Get_Value("VA010_QAParameter_ID"));
+                            QAScore.Set_Value("VA010_Score", Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_Score"]));
+                            QAScore.Set_Value("Description", Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]));
+                            QAScore.Set_Value("LineNo", ScoreLine);
+
+                            if (!QAScore.Save())
+                            {
+                                ValueNamePair pp = VLogger.RetrieveError();
+                                Get_Trx().Rollback();
+                                log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAScoreNotSaved") + (pp != null ? ": " + pp.GetName() : ""));
+                                return false;
+                            }
+                            Line = Line + 10;
+                        }
+                        else
+                        {
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            Get_Trx().Rollback();
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAParmNotSaved") + (pp != null ? ": " + pp.GetName() : ""));
+                            return false;
+                        }
+
+                    }
+                }
+
             }
             return success;
         }
