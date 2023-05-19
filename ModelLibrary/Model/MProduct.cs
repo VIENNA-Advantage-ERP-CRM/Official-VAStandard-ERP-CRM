@@ -696,7 +696,7 @@ namespace VAdvantage.Model
             {
                 _sql.Clear();
                 _sql.Append("SELECT COUNT(VA010_QAParameter_ID) FROM VA010_QAParameter WHERE M_Product_ID=" + GetM_Product_ID());
-                int Recordcount = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString(), null, null));
+                int Recordcount = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
                 if (Recordcount > 0)
                 {
                     log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_RecordExist"));
@@ -884,7 +884,7 @@ namespace VAdvantage.Model
             }
 
             //VIS0336_for adding records on QA parm tab
-            if (Env.IsModuleInstalled("VA010_") && Is_ValueChanged("VA010_QualityPlan_ID") || newRecord)
+            if (Env.IsModuleInstalled("VA010_") && Is_ValueChanged("VA010_QualityPlan_ID")  &&  Util.GetValueOfInt(Get_Value("VA010_QualityPlan_ID"))>0 || newRecord )
             {
                 int Line = 10;
                 int ScoreLine = 10;
@@ -894,10 +894,10 @@ namespace VAdvantage.Model
                              " s.Description from VA010_AssgndParameters ap INNER JOIN VA010_QAScore s ON ap.VA010_AssgndParameters_ID=s.VA010_AssgndParameters_ID" +
                              "  WHERE ap.VA010_QualityPlan_ID=" + Get_Value("VA010_QualityPlan_ID") + " AND ap.AD_Org_ID="+ GetAD_Org_ID());
                 DataSet ds = DB.ExecuteDataset(_sql.ToString(), null, Get_Trx());
-                MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA010_QAParameter"), Get_Trx());
-                PO QaParameter = null;
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
+                    MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA010_QAParameter"), Get_Trx());
+                    PO QaParameter = null;
                     for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
                         QaParameter = tbl.GetPO(GetCtx(), 0, Get_Trx());
@@ -922,37 +922,19 @@ namespace VAdvantage.Model
 
                             if (!QAScore.Save())
                             {
-                                ValueNamePair vp = VLogger.RetrieveError();
-                                if (vp != null)
-                                {
-                                    Get_Trx().Rollback();
-                                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAScoreNotSaved"));
-                                    return false;
-                                }
-                                else
-                                {
-                                    Get_Trx().Rollback();
-                                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAScoreNotSaved"));
-                                    return false;
-                                }
+                                ValueNamePair pp = VLogger.RetrieveError();
+                                Get_Trx().Rollback();
+                                log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAScoreNotSaved") + (pp != null ? ": " + pp.GetName() : ""));
+                                return false;
                             }
                             Line = Line + 10;
                         }
                         else
                         {
-                            ValueNamePair vp = VLogger.RetrieveError();
-                            if (vp != null)
-                            {
-                                Get_Trx().Rollback();
-                                log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAParmNotSaved"));
-                                return false;
-                            }
-                            else
-                            {
-                                Get_Trx().Rollback();
-                                log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAParmNotSaved"));
-                                return false;
-                            }
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            Get_Trx().Rollback();
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_QAParmNotSaved") + (pp != null ? ": " + pp.GetName() : ""));
+                            return false;
                         }
 
                     }
