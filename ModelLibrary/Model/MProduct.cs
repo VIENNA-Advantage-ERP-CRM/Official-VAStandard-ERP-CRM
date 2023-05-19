@@ -884,7 +884,7 @@ namespace VAdvantage.Model
             }
 
             //VIS0336_for adding records on QA parm tab
-            if (Env.IsModuleInstalled("VA010_") && Is_ValueChanged("VA010_QualityPlan_ID")  &&  Util.GetValueOfInt(Get_Value("VA010_QualityPlan_ID"))>0 || newRecord )
+            if (Env.IsModuleInstalled("VA010_") && (Is_ValueChanged("VA010_QualityPlan_ID") || newRecord) && Util.GetValueOfInt(Get_Value("VA010_QualityPlan_ID")) > 0)
             {
                 int Line = 10;
                 int ScoreLine = 10;
