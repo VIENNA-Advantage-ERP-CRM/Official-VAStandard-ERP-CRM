@@ -96,6 +96,13 @@ namespace VIS.Models
                 retDic["C_IncoTerm_ID"] = Util.GetValueOfString(order.GetC_IncoTerm_ID());
             }
 
+            // Added by Lakhwinder on 17 May 2023 to set Contract from Order
+
+            if (order.Get_ColumnIndex("VAS_ContractMaster_ID") > 0)
+            {
+                retDic["VAS_ContractMaster_ID"] = Util.GetValueOfString(order.Get_Value("VAS_ContractMaster_ID"));
+            }
+
             if (Env.IsModuleInstalled("VA077_"))
             {
                 retDic["VA077_HistoricContractDate"] = Util.GetValueOfString(order.Get_Value("VA077_HistoricContractDate"));
