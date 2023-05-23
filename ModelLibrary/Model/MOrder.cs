@@ -4401,9 +4401,10 @@ namespace VAdvantage.Model
                              WHERE t.VAS_ThresholdBasis='PPC'
                              AND r.IsActive='Y' AND t.IsActive='Y'
                              AND (ol.LineTotalAmt>=r.VAS_ThresholdRangeFrom AND ol.LineTotalAmt<=r.VAS_ThresholdRangeTo)
-                             AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
-                             AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
-                             AND r.M_Product_ID=" + lines[i].GetM_Product_ID() + @"
+                             AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")));
+                        //+ @"
+                        //   AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
+                        sql.Append(@"  AND r.M_Product_ID=" + lines[i].GetM_Product_ID() + @"
                              AND r.M_Product_Category_ID=(SELECT M_Product_Category_ID FROM M_Product WHERE M_Product_ID=" + lines[i].GetM_Product_ID() + @")
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
@@ -4509,11 +4510,11 @@ namespace VAdvantage.Model
                                       r.VAS_ThresholdRangeTo,
                                       r.VAS_PercentVariationAllowed
                              FROM VAS_ThresholdRange r
-                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)
-                            INNER JOIN C_Order o ON (r.Ref_C_Order_ID=o.C_Order_ID)                            
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)                                                    
                              WHERE t.VAS_ThresholdBasis='GNL'
                              AND r.IsActive='Y' AND t.IsActive='Y'
-                            AND (o.GrandTotal>=r.VAS_ThresholdRangeFrom AND o.GrandTotal<=r.VAS_ThresholdRangeTo)   
+                            AND ((SELECT GrandTotal FROM C_Order WHERE C_Order_ID="+Util.GetValueOfInt(Get_Value("Ref_C_Order_ID"))+ @")>=r.VAS_ThresholdRangeFrom 
+                                    AND (SELECT GrandTotal FROM C_Order WHERE C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @")<=r.VAS_ThresholdRangeTo)   
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
                         ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
@@ -4546,6 +4547,10 @@ namespace VAdvantage.Model
                     if (obj != null )
                     {
                         commomnConfig=voData.Find(x => x.UseForMultiplelines == true);
+                        if (commomnConfig == null) 
+                        {
+                            return "VAS_VoConfigNotFound";
+                        }
                     }
 
                     sql.Clear();
@@ -4574,15 +4579,15 @@ namespace VAdvantage.Model
                             if (voData[i].CheckLineAmt == true)
                             {
                                 
-                                amt = Convert.ToDecimal(ds.Tables[0].Compute("SUM(LineNetAmt)", "M_Product_ID =" + voData[i].M_Product_ID));
+                                amt = Convert.ToDecimal(ds.Tables[0].Compute("SUM(LineNetAmt)", "M_Product_ID =" + voData[i].ProductID));
                                 sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(LineNetAmt) FROM C_OrderLine ol
 INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
-    WHERE ol.IsActive='Y' AND o.IsActive='Y' AND ol.M_Product_ID=@" + voData[i].M_Product_ID + " AND o.Ref_C_Order_ID=" + Get_Value("Ref_C_Order_ID"), null, Get_Trx()));
+    WHERE ol.IsActive='Y' AND o.IsActive='Y' AND ol.M_Product_ID=" + voData[i].ProductID + " AND o.Ref_C_Order_ID=" + Util.GetValueOfInt( Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
                                 if (sumLineAmt >= (amt * voData[i].VariationAllowed / 100))
                                 {
                                     res.Clear();
                                     res.Append("@Line@:" + voData[i].LineNo);
-                                    res.Append( "@VAS_AllowedvariationExceed@");
+                                    res.Append(" @VAS_AllowedvariationExceed@");
                                     return res.ToString();
                                 }
                             }
@@ -4591,7 +4596,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                                 amt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]);
                                 //sumLineAmt = voData.Sum(x => x.LineAmt);
                                 sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(GrandTotal) FROM C_Order
-    WHERE IsActive='Y' AND Ref_C_Order_ID=" + Get_Value("Ref_C_Order_ID"), null, Get_Trx()));
+    WHERE IsActive='Y' AND Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
 
                                 if (sumLineAmt >= (amt * voData[i].VariationAllowed / 100))
                                 {
