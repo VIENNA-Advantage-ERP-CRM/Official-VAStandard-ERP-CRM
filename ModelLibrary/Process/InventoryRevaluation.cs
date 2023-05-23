@@ -849,9 +849,9 @@ namespace VAdvantage.Process
                         CASE WHEN ( pc.costingmethod IS NOT NULL AND pc.costingmethod = 'C' ) THEN pc.m_costelement_id
                              WHEN ( pc.costingmethod IS NOT NULL AND pc.costingmethod <> 'C' ) THEN (
                                     SELECT m_costelement_id FROM m_costelement
-                                    WHERE costingmethod = pc.costingmethod AND ad_client_id = 11)
+                                    WHERE costingmethod = pc.costingmethod AND ad_client_id = {objInventoryRevaluation.GetAD_Client_ID()})
                             WHEN ( acct.costingmethod IS NOT NULL AND acct.costingmethod = 'C' ) THEN acct.m_costelement_id
-                            ELSE ( SELECT m_costelement_id FROM m_costelement WHERE costingmethod = acct.costingmethod AND ad_client_id = 11 )
+                            ELSE ( SELECT m_costelement_id FROM m_costelement WHERE costingmethod = acct.costingmethod AND ad_client_id = {objInventoryRevaluation.GetAD_Client_ID()} )
                         END  AS m_costelement_id,
                         CASE WHEN ( pc.costingmethod IS NOT NULL ) THEN pc.costingmethod 
                              ELSE acct.costingmethod END AS costingmethod,
@@ -859,7 +859,7 @@ namespace VAdvantage.Process
                         acct.c_acctschema_id
                     FROM m_product_category pc
                         INNER JOIN c_acctschema acct ON ( acct.ad_client_id = pc.ad_client_id
-                                                          AND 101 = acct.c_acctschema_id )
+                                                          AND {objInventoryRevaluation.GetC_AcctSchema_ID()} = acct.c_acctschema_id )
                     WHERE pc.isactive = 'Y' 
                         AND pc.ad_client_id = {objInventoryRevaluation.GetAD_Client_ID()}
                 ) t
@@ -893,7 +893,7 @@ namespace VAdvantage.Process
                             t.M_InventoryLine_ID, 
                             m.M_Movement_ID,
                             t.M_MovementLine_ID,
-                            p.M_Production_ID,
+                            pd.M_Production_ID,
                             t.M_ProductionLine_ID,
                             t.movementqty,
                             t.currentqty,
@@ -978,7 +978,7 @@ namespace VAdvantage.Process
                             LEFT JOIN m_movement m ON (m.m_movement_id = ml.m_movement_id )
                             LEFT JOIN m_productionline pl ON (pl.m_productionline_id = t.m_productionline_id
                                                                AND pl.materialtype = 'C' ) 
-                            LEFT JOIN m_production p ON ( p.m_production_id = pl.m_production_id )");
+                            LEFT JOIN m_production pd ON ( pd.m_production_id = pl.m_production_id )");
             if (Env.IsModuleInstalled("VAMFG_"))
             {
                 sql.Append(@" LEFT JOIN VAMFG_M_WrkOdrTrnsctionLine wotl ON (wotl.VAMFG_M_WrkOdrTrnsctionLine_ID = t.VAMFG_M_WrkOdrTrnsctionLine_ID)
@@ -991,7 +991,7 @@ namespace VAdvantage.Process
                             AND NVL(t.VAFAM_AssetDisposal_ID, 0) = 0
                             AND ( ( t.MovementType IN ( 'I+', 'I-' ) AND i.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
                                   OR ( t.MovementType IN ( 'M+', 'M-' ) AND m.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
-                                  OR ( t.MovementType IN ( 'P+', 'P-' ) AND p.IsReversed NOT IN ( 'Y' ) AND pl.MaterialType = 'C' AND t.MovementQty < 0 )
+                                  OR ( t.MovementType IN ( 'P+', 'P-' ) AND pd.IsReversed NOT IN ( 'Y' ) AND pl.MaterialType = 'C' AND t.MovementQty < 0 )
                                    OR ( t.MovementType IN ( 'C+', 'C-' ) ) ");
             if (Env.IsModuleInstalled("VAMFG_"))
             {
