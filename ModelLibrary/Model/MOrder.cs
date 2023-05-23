@@ -28,6 +28,7 @@ using VAdvantage.Print;
 using System.Reflection;
 using ModelLibrary.Classes;
 using VAdvantage.ProcessEngine;
+using System.Dynamic;
 
 namespace VAdvantage.Model
 {
@@ -3710,6 +3711,16 @@ namespace VAdvantage.Model
                 MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
                 DocSubTypeSO = dt.GetDocSubTypeSO();
 
+                //Handle Variation Order
+                //15 May 2023
+                string result = EvaluateVariationOrder();
+                if (!String.IsNullOrEmpty(result))
+                {
+                    SetProcessMsg(result);
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+
                 //to check contract details and logic
                 if (!CheckContractData())
                 {
@@ -4265,70 +4276,70 @@ namespace VAdvantage.Model
                 _processMsg = Info.ToString();
                 //
                 SetDocAction(DOCACTION_Close);
-            //Changes by abhishek suggested by lokesh on 7/1/2016
-            //try
-            //{
-            //    int countVAPOS = Util.GetValueOfInt(DB.ExecuteScalar("Select count(*) from AD_ModuleInfo Where Prefix='VAPOS_'"));
-            //    if (countVAPOS > 0)
-            //    {
-            //        MPriceList priceLst = new MPriceList(GetCtx(), GetM_PriceList_ID(), null);
-            //        bool taxInclusive = priceLst.IsTaxIncluded();
-            //        int VAPOS_POSTertminal_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select VAPOS_POSTerminal_ID from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-            //        if (VAPOS_POSTertminal_ID > 0)
-            //        {
-            //            string cAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_CashPaid from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-            //            string pAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_PayAmt from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-            //            List<string> tax_IDLst = new List<string>();
-            //            List<string> OLTaxAmtLst = new List<string>();
-            //            List<string> DscLineLst = new List<string>();
+                //Changes by abhishek suggested by lokesh on 7/1/2016
+                //try
+                //{
+                //    int countVAPOS = Util.GetValueOfInt(DB.ExecuteScalar("Select count(*) from AD_ModuleInfo Where Prefix='VAPOS_'"));
+                //    if (countVAPOS > 0)
+                //    {
+                //        MPriceList priceLst = new MPriceList(GetCtx(), GetM_PriceList_ID(), null);
+                //        bool taxInclusive = priceLst.IsTaxIncluded();
+                //        int VAPOS_POSTertminal_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select VAPOS_POSTerminal_ID from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+                //        if (VAPOS_POSTertminal_ID > 0)
+                //        {
+                //            string cAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_CashPaid from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+                //            string pAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_PayAmt from c_Order Where C_Order_ID=" + GetC_Order_ID()));
+                //            List<string> tax_IDLst = new List<string>();
+                //            List<string> OLTaxAmtLst = new List<string>();
+                //            List<string> DscLineLst = new List<string>();
 
-            //            DataSet dsDE = DB.ExecuteDataset("select ol.C_Tax_ID, ol.VAPOS_DiscountAmount, ol.LINENETAMT, tx.rate from C_OrderLine ol inner join C_Tax tx on(ol.C_Tax_ID=tx.C_Tax_ID)  where C_Order_ID=" + GetC_Order_ID());
-            //            try
-            //            {
-            //                if (dsDE != null)
-            //                {
-            //                    if (dsDE.Tables[0].Rows.Count > 0)
-            //                    {
-            //                        for (int i = 0; i < dsDE.Tables[0].Rows.Count; i++)
-            //                        {
-            //                            tax_IDLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["C_Tax_ID"]));
-            //                            DscLineLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["VAPOS_DiscountAmount"]));
-            //                            decimal taxRate = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["rate"]);
-            //                            decimal LINENETAMT = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["LINENETAMT"]);
-            //                            if (taxInclusive)
-            //                            {
-            //                                OLTaxAmtLst.Add(Convert.ToString(((LINENETAMT / (100 + taxRate)) * (taxRate / 100))));
-            //                            }
-            //                            else
-            //                            {
-            //                                OLTaxAmtLst.Add(Convert.ToString(taxRate * LINENETAMT / 100));
+                //            DataSet dsDE = DB.ExecuteDataset("select ol.C_Tax_ID, ol.VAPOS_DiscountAmount, ol.LINENETAMT, tx.rate from C_OrderLine ol inner join C_Tax tx on(ol.C_Tax_ID=tx.C_Tax_ID)  where C_Order_ID=" + GetC_Order_ID());
+                //            try
+                //            {
+                //                if (dsDE != null)
+                //                {
+                //                    if (dsDE.Tables[0].Rows.Count > 0)
+                //                    {
+                //                        for (int i = 0; i < dsDE.Tables[0].Rows.Count; i++)
+                //                        {
+                //                            tax_IDLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["C_Tax_ID"]));
+                //                            DscLineLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["VAPOS_DiscountAmount"]));
+                //                            decimal taxRate = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["rate"]);
+                //                            decimal LINENETAMT = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["LINENETAMT"]);
+                //                            if (taxInclusive)
+                //                            {
+                //                                OLTaxAmtLst.Add(Convert.ToString(((LINENETAMT / (100 + taxRate)) * (taxRate / 100))));
+                //                            }
+                //                            else
+                //                            {
+                //                                OLTaxAmtLst.Add(Convert.ToString(taxRate * LINENETAMT / 100));
 
-            //                            }
+                //                            }
 
-            //                        }
-            //                    }
-            //                    dsDE.Dispose();
-            //                }
-            //            }
-            //            catch
-            //            {
-            //                if (dsDE != null) { dsDE.Dispose(); }
-            //            }
-            //            string[] tax_ID = tax_IDLst.ToArray();
-            //            string[] OLTaxAmt = OLTaxAmtLst.ToArray();
-            //            string[] DscLine = DscLineLst.ToArray();
-            //            SaveDayEndRecord(GetCtx(), VAPOS_POSTertminal_ID, cAmount, pAmount, GetC_DocType_ID(), tax_ID, OLTaxAmt, GetGrandTotal().ToString(), DscLine);
-            //        }
-            //    }
-            //}
+                //                        }
+                //                    }
+                //                    dsDE.Dispose();
+                //                }
+                //            }
+                //            catch
+                //            {
+                //                if (dsDE != null) { dsDE.Dispose(); }
+                //            }
+                //            string[] tax_ID = tax_IDLst.ToArray();
+                //            string[] OLTaxAmt = OLTaxAmtLst.ToArray();
+                //            string[] DscLine = DscLineLst.ToArray();
+                //            SaveDayEndRecord(GetCtx(), VAPOS_POSTertminal_ID, cAmount, pAmount, GetC_DocType_ID(), tax_ID, OLTaxAmt, GetGrandTotal().ToString(), DscLine);
+                //        }
+                //    }
+                //}
 
-            //catch
-            //{
-            //    //ShowMessage.Error("MOrder",null,"CompleteIt");
-            //}
+                //catch
+                //{
+                //    //ShowMessage.Error("MOrder",null,"CompleteIt");
+                //}
 
-            //VIS0336: update tender status po generated
-                if (!IsSOTrx() &&  Env.IsModuleInstalled("VA097_") && Util.GetValueOfInt(Get_Value("VA097_VendorDetails_ID")) > 0)
+                //VIS0336: update tender status po generated
+                if (!IsSOTrx() && Env.IsModuleInstalled("VA097_") && Util.GetValueOfInt(Get_Value("VA097_VendorDetails_ID")) > 0)
                 {
                     string sql = " UPDATE VA097_Tender SET VA097_TenderStatus='PO' WHERE VA097_Tender_ID=(SELECT VA097_Tender_ID FROM VA097_RFQ_TenderLine WHERE VA097_RFQ_TenderLine_ID=(SELECT VA097_RFQ_TenderLine_ID FROM VA097_VendorDetails WHERE VA097_VendorDetails_ID=" + Get_Value("VA097_VendorDetails_ID") + ")) ";
                     int Count = DB.ExecuteQuery(sql, null, Get_Trx());
@@ -4353,7 +4364,261 @@ namespace VAdvantage.Model
 
             return DocActionVariables.STATUS_COMPLETED;
         }
+        /// <summary>
+        /// If Order Type is Variation Order Process it accordingly
+        /// </summary>
+        /// <returns>empty if all Ok , Else Error Message</returns>
+        private string EvaluateVariationOrder()
+        {
+            StringBuilder res = new StringBuilder("");
+            if (!IsSOTrx() && !IsReturnTrx() && (Util.GetValueOfString(DB.ExecuteScalar("SELECT VAS_IsVariationOrder FROM C_DocType WHERE C_DocType_ID=" + GetC_DocTypeTarget_ID())) == "Y"))
+            {
+                StringBuilder sql = new StringBuilder();
 
+                List<MOrderLine> lines = GetLines().ToList();
+                if (lines.Count == 0)
+                { return "@NoLines@"; }
+                else
+                {
+                    List<dynamic> voData = new List<dynamic>();
+                    DataSet ds = null;
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        dynamic data = new ExpandoObject();
+                        data.OLineID = lines[i].GetC_OrderLine_ID();
+                        data.ProductID = lines[i].GetM_Product_ID();
+                        data.LineNo = lines[i].GetLine();
+                        data.LineAmt = lines[i].GetLineNetAmt();
+                        //1.If a combination of Product+Product Category+ Contract+ Original Purchase Order exists with data on these fields on the Variation Threshold Screen ,
+                        //then system will allow that percentage variation and validate the same ONLY.
+                        sql.Append(@"SELECT r.VAS_ThresholdRangeFrom,
+                                      r.VAS_ThresholdRangeTo,
+                                      r.VAS_PercentVariationAllowed
+                             FROM VAS_ThresholdRange r
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)
+                             INNER JOIN C_Order o ON (r.Ref_C_Order_ID=o.C_Order_ID)
+                             INNER JOIN C_OrderLine ol ON (o.C_Order_ID=ol.C_Order_ID AND ol.M_Product_ID=r.M_Product_ID)
+                             WHERE t.VAS_ThresholdBasis='PPC'
+                             AND r.IsActive='Y' AND t.IsActive='Y'
+                             AND (ol.LineTotalAmt>=r.VAS_ThresholdRangeFrom AND ol.LineTotalAmt<=r.VAS_ThresholdRangeTo)
+                             AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")));
+                        //+ @"
+                        //   AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
+                        sql.Append(@"  AND r.M_Product_ID=" + lines[i].GetM_Product_ID() + @"
+                             AND r.M_Product_Category_ID=(SELECT M_Product_Category_ID FROM M_Product WHERE M_Product_ID=" + lines[i].GetM_Product_ID() + @")
+                             AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
+                        ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            data.RangeFrom = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeFrom"]);
+                            data.RangeTo = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeTo"]);
+                            data.VariationAllowed = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PercentVariationAllowed"]);
+                            data.UseForMultiplelines = false;
+                            data.CheckLineAmt = true;
+                            voData.Add(data);
+                            continue;
+                        }
+
+                        //2.If a combination of Contract + Purchase Order exists with data on these fields on the Variation Threshold Screen,
+                        //then system will allow that percentage variation and validate the same ONLY.
+                        sql.Clear();
+                        sql.Append(@"SELECT r.VAS_ThresholdRangeFrom,
+                                      r.VAS_ThresholdRangeTo,
+                                      r.VAS_PercentVariationAllowed
+                             FROM VAS_ThresholdRange r
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)
+                             INNER JOIN C_Order o ON (r.Ref_C_Order_ID=o.C_Order_ID)                             
+                             WHERE t.VAS_ThresholdBasis='POC'
+                             AND r.IsActive='Y' AND t.IsActive='Y'
+                                AND (o.GrandTotal>=r.VAS_ThresholdRangeFrom AND o.GrandTotal<=r.VAS_ThresholdRangeTo)                             
+                             AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
+                             AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
+                             AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
+                        ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            data.RangeFrom = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeFrom"]);
+                            data.RangeTo = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeTo"]);
+                            data.VariationAllowed = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PercentVariationAllowed"]);
+                            data.UseForMultiplelines = false;
+                            data.CheckLineAmt = false;
+                            voData.Add(data);
+                            continue;
+                        }
+
+                        //3. If  a record with only Purchase Order exists with data on this field on the Variation Threshold Screen,
+                        //then system will allow that percentage variation specified in this record and validate the same ONLY
+                        sql.Clear();
+                        sql.Append(@"SELECT r.VAS_ThresholdRangeFrom,
+                                      r.VAS_ThresholdRangeTo,
+                                      r.VAS_PercentVariationAllowed
+                             FROM VAS_ThresholdRange r
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)
+                             INNER JOIN C_Order o ON (r.Ref_C_Order_ID=o.C_Order_ID)                            
+                             WHERE t.VAS_ThresholdBasis='POC'
+                             AND r.IsActive='Y' AND t.IsActive='Y'
+                              AND (o.GrandTotal>=r.VAS_ThresholdRangeFrom AND o.GrandTotal<=r.VAS_ThresholdRangeTo)   
+                             AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
+                             AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
+                        ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            data.RangeFrom = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeFrom"]);
+                            data.RangeTo = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeTo"]);
+                            data.VariationAllowed = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PercentVariationAllowed"]);
+                            data.UseForMultiplelines = false;
+                            data.CheckLineAmt = false;
+                            voData.Add(data);
+                            continue;
+                        }
+
+                        //4.If multiple products are available on variation order line and threshold configuration exist for less products then system should proceed validating the threshold
+                        //configuration existing for Original PO / Contract.
+                        sql.Clear();
+                        sql.Append(@"SELECT r.VAS_ThresholdRangeFrom,
+                                      r.VAS_ThresholdRangeTo,
+                                      r.VAS_PercentVariationAllowed
+                             FROM VAS_ThresholdRange r
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)
+                             INNER JOIN C_Order o ON (r.Ref_C_Order_ID=o.C_Order_ID)                            
+                             WHERE t.VAS_ThresholdBasis='POC'
+                             AND r.IsActive='Y' AND t.IsActive='Y'
+                            AND (o.GrandTotal>=r.VAS_ThresholdRangeFrom AND o.GrandTotal<=r.VAS_ThresholdRangeTo)   
+                             AND( r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
+                             OR r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @")
+                             AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
+                        ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            data.RangeFrom = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeFrom"]);
+                            data.RangeTo = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeTo"]);
+                            data.VariationAllowed = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PercentVariationAllowed"]);
+                            data.UseForMultiplelines = true;
+                            data.CheckLineAmt = false;
+                            voData.Add(data);
+                            continue;
+                        }
+
+                        //5.If none of the above stated combination is available then system will go for the record with threshold basis General and will allow the percentage
+                        //variation specified in this record and validate the same only
+                        sql.Clear();
+                        sql.Append(@"SELECT r.VAS_ThresholdRangeFrom,
+                                      r.VAS_ThresholdRangeTo,
+                                      r.VAS_PercentVariationAllowed
+                             FROM VAS_ThresholdRange r
+                             INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)                                                    
+                             WHERE t.VAS_ThresholdBasis='GNL'
+                             AND r.IsActive='Y' AND t.IsActive='Y'
+                            AND ((SELECT GrandTotal FROM C_Order WHERE C_Order_ID="+Util.GetValueOfInt(Get_Value("Ref_C_Order_ID"))+ @")>=r.VAS_ThresholdRangeFrom 
+                                    AND (SELECT GrandTotal FROM C_Order WHERE C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @")<=r.VAS_ThresholdRangeTo)   
+                             AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
+                        ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            data.RangeFrom = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeFrom"]);
+                            data.RangeTo = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_ThresholdRangeTo"]);
+                            data.VariationAllowed = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PercentVariationAllowed"]);
+                            data.UseForMultiplelines = false;
+                            data.CheckLineAmt = false;
+                            voData.Add(data);
+                            continue;
+                        }
+                        else
+                        {
+
+                            data.RangeFrom = -1;
+                            data.RangeTo = -1;
+                            data.VariationAllowed = -1;
+                            data.UseForMultiplelines = false;
+                            data.CheckLineAmt = false;
+                        }
+                        voData.Add(data);
+
+                    }
+                    //line which do not have variation config 
+                    //then try to find a commomn config
+                    dynamic obj = voData.Find(x => x.RangeFrom == -1);                        
+                    dynamic commomnConfig = null;
+                    if (obj != null )
+                    {
+                        commomnConfig=voData.Find(x => x.UseForMultiplelines == true);
+                        if (commomnConfig == null) 
+                        {
+                            return "VAS_VoConfigNotFound";
+                        }
+                    }
+
+                    sql.Clear();
+                    ds.Clear();
+                    ds = null;
+                    sql.Append(@"SELECT
+                            o.GrandTotal,
+                            ol.LineNetAmt,
+                            ol.M_Product_ID
+                            FROM C_Order o
+                            INNER JOIN C_OrderLine ol ON (o.C_Order_ID=ol.C_Order_ID)
+                            WHERE ol.IsActive='Y' AND o.IsActive='Y'
+                            AND  o.C_Order_ID=" +Util.GetValueOfInt( Get_Value("Ref_C_Order_ID")));
+                    ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                    if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    {
+                        return  "VAS_OrigPONotFound";
+                    }
+                    decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
+                    decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
+                    if (commomnConfig == null)
+                    {
+                        for (int i = 0; i < voData.Count; i++)
+                        {
+
+                            if (voData[i].CheckLineAmt == true)
+                            {
+                                
+                                amt = Convert.ToDecimal(ds.Tables[0].Compute("SUM(LineNetAmt)", "M_Product_ID =" + voData[i].ProductID));
+                                sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(LineNetAmt) FROM C_OrderLine ol
+INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
+    WHERE ol.IsActive='Y' AND o.IsActive='Y' AND ol.M_Product_ID=" + voData[i].ProductID + " AND o.Ref_C_Order_ID=" + Util.GetValueOfInt( Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
+                                if (sumLineAmt >= (amt * voData[i].VariationAllowed / 100))
+                                {
+                                    res.Clear();
+                                    res.Append("@Line@:" + voData[i].LineNo);
+                                    res.Append(" @VAS_AllowedvariationExceed@");
+                                    return res.ToString();
+                                }
+                            }
+                            else
+                            {
+                                amt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]);
+                                //sumLineAmt = voData.Sum(x => x.LineAmt);
+                                sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(GrandTotal) FROM C_Order
+    WHERE IsActive='Y' AND Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
+
+                                if (sumLineAmt >= (amt * voData[i].VariationAllowed / 100))
+                                {
+                                    return "@VAS_AllowedvariationExceed@";
+                                }
+                            }
+
+                        }
+                    }
+                    else
+                    {
+                        amt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]);
+                        if (GetGrandTotal() >= (amt * commomnConfig.VariationAllowed / 100))
+                        {
+                            return "VAS_AllowedvariationExceed";
+                        }
+                    }
+                }
+            }
+
+            return res.ToString();
+        }
         /// <summary>
         /// this function is to check the contract details based  on overlimit 
         /// checkbox if that is true or flase the perform accordingly
