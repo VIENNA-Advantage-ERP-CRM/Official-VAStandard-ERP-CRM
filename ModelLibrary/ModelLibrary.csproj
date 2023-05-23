@@ -218,6 +218,7 @@
     <Compile Include="Model\MConversionRate.cs" />
     <Compile Include="Model\MConversionType.cs" />
     <Compile Include="Model\MInventoryRevaluation.cs" />
+    <Compile Include="Model\MRevaluationAcctSchema.cs" />
     <Compile Include="Model\MRevaluationLine.cs" />
     <Compile Include="Model\MSysConfig.cs" />
     <Compile Include="Model\MAccountGroupBatch.cs" />
