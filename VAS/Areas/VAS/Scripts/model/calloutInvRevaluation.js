@@ -116,14 +116,10 @@
                 var CostingPrecision = Util.getValueOfInt(dr["CostingPrecision"]);
 
                 if (mField.getColumnName() == "NewCostPrice") {
-                    mTab.setValue("DifferenceCostPrice", (mTab.getValue("NewCostPrice") - mTab.getValue("CurrentCostPrice")).toFixed(CostingPrecision));
-                    mTab.setValue("TotalDifference", (mTab.getValue("DifferenceCostPrice") * mTab.getValue("QtyOnHand")).toFixed(CostingPrecision));
-
-                    // When REVALUATIONTYPE_OnSoldConsumedQuantity
-                    if (Util.getValueOfString(dr["RevaluationType"]) == "S") {
-                        mTab.setValue("NewValue", (mTab.getValue("SoldQty") * mTab.getValue("NewCostPrice")).toFixed(CostingPrecision));
-                        mTab.setValue("DifferenceValue", (mTab.getValue("NewValue") - mTab.getValue("SoldValue")).toFixed(CostingPrecision));
-                    }
+                    mTab.setValue("DifferenceValue", (mTab.getValue("NewCostPrice") - mTab.getValue("CurrentCostPrice")).toFixed(CostingPrecision));
+                    mTab.setValue("TotalDifference", (mTab.getValue("DifferenceValue") * mTab.getValue("QtyOnHand")).toFixed(CostingPrecision));
+                    mTab.setValue("CurrentTotalValue", (mTab.getValue("CurrentCostPrice") * mTab.getValue("QtyOnHand")).toFixed(CostingPrecision));
+                    mTab.setValue("RevaluedTotalValue", (mTab.getValue("NewCostPrice") * mTab.getValue("QtyOnHand")).toFixed(CostingPrecision));
                 }
             }
         }
