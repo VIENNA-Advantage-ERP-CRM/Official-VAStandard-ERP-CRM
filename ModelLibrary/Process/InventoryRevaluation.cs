@@ -155,7 +155,7 @@ namespace VAdvantage.Process
                     //Prices 
                     objRevaluationLine.SetSoldQty(Decimal.Negate(Util.GetValueOfDecimal(dsRevaluation.Tables[0].Rows[i]["MovementQty"])));
 
-                    sumConsumedQty = decimal.Negate(dsRevaluation.Tables[0].Select($@"M_AttributeSetInstance_ID = 
+                    sumConsumedQty = decimal.Negate(dsRevaluation.Tables[0].Select($@"M_Product_ID = {objRevaluationLine.GetM_Product_ID()} AND M_AttributeSetInstance_ID = 
                                      {Util.GetValueOfInt(dsRevaluation.Tables[0].Rows[i]["M_AttributeSetInstance_ID"])}  
                                      AND AD_Org_ID = {Util.GetValueOfInt(dsRevaluation.Tables[0].Rows[i]["AD_Org_ID"])} 
                                      AND M_Warehouse_ID = {Util.GetValueOfInt(dsRevaluation.Tables[0].Rows[i]["M_Warehouse_ID"])}")
