@@ -8,6 +8,7 @@
  * VIS_0045       : 10-March-2023
   ******************************************************/
 
+using ModelLibrary.Model;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -50,6 +51,8 @@ namespace VAdvantage.Model
         /* Product Cost**/
         decimal productCost = 0;
         decimal combCost = 0;
+        /* Dataset for Revaluated Accounting Schema*/
+        DataSet dsAcctSchema = null;
 
         /// <summary>
         /// Standard Constructor
@@ -108,6 +111,54 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Create Revalue Accounting Schema Record
+        /// </summary>
+        private void CreateAssignAccountingSchemaRecord()
+        {
+            // Get Accounting Schema Detail wuh Conversion rate
+            String sql = $@"SELECT DISTINCT CA.C_AcctSchema_ID , Ca.C_Currency_ID , { GetC_ConversionType_ID() } AS C_ConversionType_ID , 
+                            CURRENCYRATE({ GetC_Currency_ID() }, Ca.C_Currency_ID, 
+                            { GlobalVariable.TO_DATE(GetDateAcct(), true) },
+                            { GetC_ConversionType_ID() }, { GetAD_Client_ID() },
+                            { GetAD_Org_ID() }) AS Rate
+                            FROM C_AcctSchema CA 
+                            WHERE CA.ISACTIVE = 'Y' AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
+            sql = MRole.GetDefault(GetCtx()).AddAccessSQL(sql, "C_AcctSchema", true, true);
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+
+            MRevaluationAcctSchema assignAcctSchema = null;
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    // create new record 
+                    assignAcctSchema = new MRevaluationAcctSchema(GetCtx(), 0, Get_Trx());
+                    assignAcctSchema.SetAD_Client_ID(GetAD_Client_ID());
+                    assignAcctSchema.SetAD_Org_ID(GetAD_Org_ID());
+                    assignAcctSchema.SetM_InventoryRevaluation_ID(GetM_InventoryRevaluation_ID());
+                    assignAcctSchema.SetC_AcctSchema_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
+                    assignAcctSchema.SetC_Currency_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Currency_ID"]));
+                    assignAcctSchema.SetC_ConversionType_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ConversionType_ID"]));
+                    assignAcctSchema.SetRate(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Rate"]));
+                    if (!assignAcctSchema.Save())
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string val = "";
+                        if (vp != null)
+                        {
+                            val = vp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = vp.GetValue();
+                            }
+                        }
+                        log.Log(Level.SEVERE, "Inventory Revaluation not saved " + val);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Implement Before Save Functionality
         /// </summary>
         /// <param name="newRecord">Is New Record</param>
@@ -153,6 +204,27 @@ namespace VAdvantage.Model
                 }
             }
 
+            return true;
+        }
+
+        /// <summary>
+        /// Implement After Save Functionality
+        /// </summary>
+        /// <param name="newRecord">new Record</param>
+        /// <param name="success">Success</param>
+        /// <returns>True, when Success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+            {
+                return false;
+            }
+
+            if (newRecord)
+            {
+                // Create Revalue Accounting Schema Record
+                CreateAssignAccountingSchemaRecord();
+            }
             return true;
         }
 
@@ -205,10 +277,21 @@ namespace VAdvantage.Model
             }
 
             //when newcostprice is ZERO then returm message, please define revaluated cost
-            if (Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(M_RevaluationLine_ID) FROM M_RevaluationLine 
+            if (GetRevaluationType().Equals(REVALUATIONTYPE_OnAvailableQuantity) &&
+                Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(M_RevaluationLine_ID) FROM M_RevaluationLine 
                 WHERE M_InventoryRevaluation_ID = {GetM_InventoryRevaluation_ID()} AND NewCostPrice = 0 ")) > 0)
             {
                 _processMsg = Msg.GetMsg(GetCtx(), "EnterRevaluatedCost");
+                log.Info(_processMsg);
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+            // Check Conversion Rate available on the Revalue Accounting Schema
+            if (GetRevaluationType().Equals(REVALUATIONTYPE_OnAvailableQuantity) && 
+                Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(M_RevaluationAcctSchema_ID) FROM M_RevaluationAcctSchema 
+                WHERE M_InventoryRevaluation_ID = {GetM_InventoryRevaluation_ID()} AND Rate = 0 ")) > 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "EnterRateforRevaluation");
                 log.Info(_processMsg);
                 return DocActionVariables.STATUS_INVALID;
             }
@@ -235,28 +318,43 @@ namespace VAdvantage.Model
                     return status;
             }
 
-            // Get Accounting Schema Cost Type
-            acctSchema = MAcctSchema.Get(GetCtx(), GetC_AcctSchema_ID());
-            int M_CostType_ID = acctSchema.GetM_CostType_ID();
+            // Set Document Date based on setting on Document Type
+            SetCompletedDocumentDate();
 
-            // Get Product Cost Element based on selected Costing Method
-            M_CostElement_ID = MCostElement.GetMaterialCostElement(GetCtx(), GetCostingMethod()).GetM_CostElement_ID();
-
-            // Get Cost Element ID's binded on product Category
-            GetCostElements();
-
-            // Get Product Transaction Details
-            GetProductTransaction();
-
-            MRevaluationLine[] lines = GetLines(true);
-            for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+            if (GetRevaluationType().Equals(REVALUATIONTYPE_OnAvailableQuantity))
             {
-                RevaluateProductCost(lines[lineIndex], M_CostType_ID);
-                if (!string.IsNullOrEmpty(_processMsg))
+                // Get Accounting Schema Cost Type
+                acctSchema = MAcctSchema.Get(GetCtx(), GetC_AcctSchema_ID());
+                int M_CostType_ID = acctSchema.GetM_CostType_ID();
+
+                // Get Product Cost Element based on selected Costing Method
+                M_CostElement_ID = MCostElement.GetMaterialCostElement(GetCtx(), GetCostingMethod()).GetM_CostElement_ID();
+
+                // Get Cost Element ID's binded on product Category
+                GetCostElements();
+
+                // Get Product Transaction Details
+                GetProductTransaction();
+
+                // Get Accounting SChema Details
+                GetAccountingSchemaForRevaluation();
+
+                MRevaluationLine[] lines = GetLines(true);
+                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
                 {
-                    return DocActionVariables.STATUS_INVALID;
+                    for (int asc = 0; asc < dsAcctSchema.Tables[0].Rows.Count; asc++)
+                    {
+                        RevaluateProductCost(lines[lineIndex], M_CostType_ID, dsAcctSchema.Tables[0].Rows[asc]);
+                        if (!string.IsNullOrEmpty(_processMsg))
+                        {
+                            return DocActionVariables.STATUS_INVALID;
+                        }
+                    }
                 }
             }
+
+            // Set the document number from completed document sequence after completed (if needed)
+            SetCompletedDocumentNo();
 
             String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
             if (valid != null)
@@ -271,27 +369,79 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Set the document number from Completed Document Sequence after completed
+        /// </summary>
+        private void SetCompletedDocumentNo()
+        {
+            MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
+
+            // if Overwrite Sequence on Complete checkbox is true.
+            if (dt.IsOverwriteSeqOnComplete())
+            {
+                // Set Drafted Document No into Temp Document No.
+                if (Get_ColumnIndex("TempDocumentNo") >= 0)
+                {
+                    Set_Value("TempDocumentNo", GetDocumentNo());
+                }
+
+                // Get current next from Completed document sequence defined on Document type
+                String value = MSequence.GetDocumentNo(GetC_DocType_ID(), Get_TrxName(), GetCtx(), true, this);
+                if (value != null)
+                {
+                    SetDocumentNo(value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Overwrite the document date based on setting on Document Type
+        /// </summary>
+        private void SetCompletedDocumentDate()
+        {
+            MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
+
+            // if Overwrite Date on Complete checkbox is true.
+            if (dt.IsOverwriteDateOnComplete())
+            {
+                SetDateDoc(DateTime.Now.Date);
+                if (GetDateAcct().Value.Date < GetDateDoc().Value.Date)
+                {
+                    SetDateAcct(GetDateDoc());
+
+                    //	Std Period open?
+                    if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+                    {
+                        throw new Exception("@PeriodClosed@");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Update Revaluated Cost
         /// DevOps Task - FEATURE 1995
         /// </summary>
         /// <param name="objRevaluationLine">Revaluation Line Object</param>
         /// <param name="M_CostType_ID">Cost Type</param>
         /// <returns>true, when updated lines</returns>
-        private string RevaluateProductCost(MRevaluationLine objRevaluationLine, int M_CostType_ID)
+        private string RevaluateProductCost(MRevaluationLine objRevaluationLine, int M_CostType_ID, DataRow drAcctSchema)
         {
             combCost = 0;
             productCost = 0;
             // Update Cost Queue Cost
-            if (UpdateCostQueue(objRevaluationLine))
+            if (UpdateCostQueue(objRevaluationLine, drAcctSchema))
             {
                 // Update Product Costs - CurrentCostPrice and AccumulationCost
-                if (UpdateproductCost(objRevaluationLine, M_CostType_ID, out productCost))
+                if (UpdateproductCost(objRevaluationLine, M_CostType_ID, drAcctSchema, out productCost))
                 {
                     // Update Cost Combination
-                    if (UpdateCostCombination(objRevaluationLine, out combCost))
+                    if (UpdateCostCombination(objRevaluationLine, drAcctSchema, out combCost))
                     {
-                        // Create Transaction
-                        CreateRevaluationTransaction(objRevaluationLine, (combCost != 0 ? combCost : productCost));
+                        if (GetC_AcctSchema_ID() == Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"]))
+                        {
+                            // Create Transaction for Primary Accounting Schema Only
+                            CreateRevaluationTransaction(objRevaluationLine, (combCost != 0 ? combCost : productCost));
+                        }
                     }
                     else
                     {
@@ -316,16 +466,16 @@ namespace VAdvantage.Model
         /// <param name="objRevaluationLine">Revaluation Line Object</param>
         /// <param name="M_CostType_ID">Cost Type</param>
         /// <returns>true, when updated lines</returns>
-        private bool UpdateproductCost(MRevaluationLine objRevaluationLine, int M_CostType_ID, out decimal productCost)
+        private bool UpdateproductCost(MRevaluationLine objRevaluationLine, int M_CostType_ID, DataRow drAcctSchema, out decimal productCost)
         {
             sql.Clear();
-            productCost = Decimal.Round(GetProductCost(objRevaluationLine), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
+            productCost = Decimal.Round(GetProductCost(objRevaluationLine, drAcctSchema), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
             sql.Clear();
             sql.Append($@"UPDATE M_Cost SET CurrentCostPrice = {productCost}, 
-                            CumulatedAmt  = NVL(CumulatedAmt, 0) + {objRevaluationLine.GetTotalDifference()}, 
+                            CumulatedAmt  = NVL(CumulatedAmt, 0) + {objRevaluationLine.GetTotalDifference() * Util.GetValueOfDecimal(drAcctSchema["Rate"])}, 
                             Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)},
                             UpdatedBy = {GetCtx().GetAD_User_ID()}
-                           WHERE C_AcctSchema_ID = {GetC_AcctSchema_ID()} 
+                           WHERE C_AcctSchema_ID = {Util.GetValueOfDecimal(drAcctSchema["C_AcctSchema_ID"])} 
                             AND M_Product_ID = {objRevaluationLine.GetM_Product_ID()}
                             AND AD_Client_ID = {GetAD_Client_ID()}
                             AND M_CostType_ID = {M_CostType_ID}
@@ -354,7 +504,7 @@ namespace VAdvantage.Model
                 log.Log(Level.WARNING, $@"Product Costs not updated, 
                                           Inventory Revaluation ID = {GetM_InventoryRevaluation_ID()},  
                                           Revlaution Line ID = {objRevaluationLine.GetM_RevaluationLine_ID()},
-                                          C_AcctSchema_ID = {GetC_AcctSchema_ID()},  
+                                          C_AcctSchema_ID = {Util.GetValueOfDecimal(drAcctSchema["C_AcctSchema_ID"])},  
                                           M_Product_ID = {objRevaluationLine.GetM_Product_ID()}");
                 return false;
             }
@@ -366,7 +516,7 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="objRevaluationLine">Inventory Revaluation Line</param>
         /// <returns>Product Costs</returns>
-        private decimal GetProductCost(MRevaluationLine objRevaluationLine)
+        private decimal GetProductCost(MRevaluationLine objRevaluationLine, DataRow drAcctSchema)
         {
             decimal cost = 0;
 
@@ -408,7 +558,7 @@ namespace VAdvantage.Model
             sql.Append(" FROM M_CostQueue cq ");
 
             // Where Clause
-            sql.Append($@" WHERE cq.CurrentQty <> 0 AND cq.C_AcctSchema_ID = {GetC_AcctSchema_ID()} 
+            sql.Append($@" WHERE cq.CurrentQty <> 0 AND cq.C_AcctSchema_ID = { Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"]) } 
                             AND cq.M_Product_ID = {objRevaluationLine.GetM_Product_ID()}
                             AND cq.AD_Client_ID = {GetAD_Client_ID()}");
 
@@ -458,14 +608,14 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="objRevaluationLine">Revaluation Line Object</param>
         /// <returns>true, when updated lines</returns>
-        private bool UpdateCostQueue(MRevaluationLine objRevaluationLine)
+        private bool UpdateCostQueue(MRevaluationLine objRevaluationLine, DataRow drAcctSchema)
         {
             sql.Clear();
             #region Update Cost Queue
-            sql.Append($@" UPDATE M_CostQueue SET CurrentCostPrice= {objRevaluationLine.GetNewCostPrice()}, 
+            sql.Append($@" UPDATE M_CostQueue SET CurrentCostPrice= {objRevaluationLine.GetNewCostPrice() * Util.GetValueOfDecimal(drAcctSchema["Rate"])}, 
                             Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)},
                             UpdatedBy = {GetCtx().GetAD_User_ID()}
-                           WHERE C_AcctSchema_ID = {GetC_AcctSchema_ID()} 
+                           WHERE C_AcctSchema_ID = {Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"])} 
                             AND M_Product_ID = {objRevaluationLine.GetM_Product_ID()}
                             AND AD_Client_ID = {GetAD_Client_ID()}");
             sql.Append($@" AND CurrentQty <> 0 ");
@@ -495,7 +645,7 @@ namespace VAdvantage.Model
                 log.Log(Level.WARNING, $@"Cost Queue not updated, 
                                           Inventory Revaluation ID = {GetM_InventoryRevaluation_ID()},  
                                           Revlaution Line ID = {objRevaluationLine.GetM_RevaluationLine_ID()},
-                                          C_AcctSchema_ID = {GetC_AcctSchema_ID()},  
+                                          C_AcctSchema_ID = {Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"])},  
                                           M_Product_ID = {objRevaluationLine.GetM_Product_ID()}");
                 return false;
             }
@@ -512,7 +662,7 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="objRevaluationLine">Revaluation Line Object</param>
         /// <returns>true, when combination updated</returns>
-        private bool UpdateCostCombination(MRevaluationLine objRevaluationLine, out Decimal ProductCost)
+        private bool UpdateCostCombination(MRevaluationLine objRevaluationLine, DataRow drAcctSchema, out Decimal ProductCost)
         {
             ProductCost = 0;
             if (dsCostElement != null && dsCostElement.Tables.Count > 0 && dsCostElement.Tables[0].Rows.Count > 0)
@@ -544,7 +694,7 @@ namespace VAdvantage.Model
                             MCostElement ce = null;
                             MCost cost = null;
                             MProduct product = new MProduct(GetCtx(), objRevaluationLine.GetM_Product_ID(), Get_Trx());
-                            MAcctSchema acctSchema = MAcctSchema.Get(GetCtx(), GetC_AcctSchema_ID());
+                            MAcctSchema acctSchema = MAcctSchema.Get(GetCtx(), Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"]));
                             int costElementId = 0;
 
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -639,6 +789,16 @@ namespace VAdvantage.Model
             sql.Append(")");
             dsCostElement = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             return dsCostElement;
+        }
+
+        private DataSet GetAccountingSchemaForRevaluation()
+        {
+            sql.Clear();
+            sql.Append($@" SELECT C_AcctSchema_ID, Rate FROM M_RevaluationAcctSchema WHERE M_InventoryRevaluation_ID= {GetM_InventoryRevaluation_ID()}
+                           UNION 
+                           SELECT C_AcctSchema_ID, 1 AS Rate FROM M_InventoryRevaluation  WHERE M_InventoryRevaluation_ID= {GetM_InventoryRevaluation_ID()}");
+            dsAcctSchema = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+            return dsAcctSchema;
         }
 
         /// <summary>
