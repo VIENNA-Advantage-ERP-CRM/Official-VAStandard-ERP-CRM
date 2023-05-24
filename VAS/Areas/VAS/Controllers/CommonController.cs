@@ -1812,11 +1812,19 @@ namespace VIS.Controllers
                     /* nnayak - Bug 1567690. The organization from the Orderline can be different from the organization 
                     on the header */
                     invoiceLine.SetClientOrg(orderLine.GetAD_Client_ID(), orderLine.GetAD_Org_ID());
-                    if (orderLine.GetQtyEntered().CompareTo(orderLine.GetQtyOrdered()) != 0)
+                    if (!IsLineFromShipment && orderLine.GetQtyEntered().CompareTo(orderLine.GetQtyOrdered()) != 0)
                     {
                         invoiceLine.SetQtyInvoiced(Decimal.Round(Decimal.Divide(Decimal.Multiply(QtyEntered,
                         orderLine.GetQtyOrdered()),
                         orderLine.GetQtyEntered()), 12, MidpointRounding.AwayFromZero));
+                    }
+                    else if (IsLineFromShipment && inoutLine.GetQtyEntered().CompareTo(inoutLine.GetMovementQty()) != 0)
+                    {
+                        //VIS_0045: When Invoice create with Ship/Receipt reference then convert the qty based on movement qty and qty entered on Ship/Receipt itself
+                        // case came when order and inout having different UOM
+                        invoiceLine.SetQtyInvoiced(Decimal.Round(Decimal.Divide(Decimal.Multiply(QtyEntered,
+                        inoutLine.GetMovementQty()),
+                        inoutLine.GetQtyEntered()), 12, MidpointRounding.AwayFromZero));
                     }
 
                     //190 - Get the Print description from SO and Set to invoice line 
