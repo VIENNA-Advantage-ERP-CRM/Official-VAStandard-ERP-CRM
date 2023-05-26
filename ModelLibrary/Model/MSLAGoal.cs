@@ -43,7 +43,7 @@ namespace VAdvantage.Model
         /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            if (Env.IsModuleInstalled("VA068_") && (Is_ValueChanged("Percentage") || Is_ValueChanged("IsActive")))
+            if (Env.IsModuleInstalled("VA068_") && (Is_ValueChanged("VA068_WeightagePertage") || Is_ValueChanged("IsActive")))
             {
                 log.Fine("beforeSave");
                 Set_Value("IsValid", false);
@@ -64,7 +64,7 @@ namespace VAdvantage.Model
                 return success;
             }
 
-            if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("Percentage") || Is_ValueChanged("IsActive")))
+            if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("VA068_WeightagePertage") || Is_ValueChanged("IsActive")))
             {
                 log.Fine("afterSave");
                 Validate();
