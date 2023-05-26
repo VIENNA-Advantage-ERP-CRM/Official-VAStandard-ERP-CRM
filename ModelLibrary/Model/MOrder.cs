@@ -4401,6 +4401,7 @@ namespace VAdvantage.Model
                              WHERE t.VAS_ThresholdBasis='PPC'
                              AND r.IsActive='Y' AND t.IsActive='Y'
                              AND (ol.LineTotalAmt>=r.VAS_ThresholdRangeFrom AND ol.LineTotalAmt<=r.VAS_ThresholdRangeTo)
+                             AND ("+ GlobalVariable.TO_DATE( GetDateOrdered(),true)+@" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")));
                         //+ @"
                         //   AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
@@ -4435,6 +4436,7 @@ namespace VAdvantage.Model
                              AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
                              AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
                         ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -4462,6 +4464,7 @@ namespace VAdvantage.Model
                               AND (o.GrandTotal>=r.VAS_ThresholdRangeFrom AND o.GrandTotal<=r.VAS_ThresholdRangeTo)   
                              AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
                         ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -4490,6 +4493,7 @@ namespace VAdvantage.Model
                              AND( r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @"
                              OR r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @")
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
                         ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -4516,6 +4520,7 @@ namespace VAdvantage.Model
                             AND ((SELECT GrandTotal FROM C_Order WHERE C_Order_ID="+Util.GetValueOfInt(Get_Value("Ref_C_Order_ID"))+ @")>=r.VAS_ThresholdRangeFrom 
                                     AND (SELECT GrandTotal FROM C_Order WHERE C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @")<=r.VAS_ThresholdRangeTo)   
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
+                             AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND t.AD_Org_ID IN (0," + GetAD_Org_ID() + ")");
                         ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx()).AddAccessSQL(sql.ToString(), "VAS_ThresholdRange", true, true), null, Get_Trx());
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -4609,7 +4614,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     else
                     {
                         amt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]);
-                        if (GetGrandTotal() >= (amt * commomnConfig.VariationAllowed / 100))
+                        sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(GrandTotal) FROM C_Order
+    WHERE IsActive='Y' AND Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
+                        if (sumLineAmt >= (amt * commomnConfig.VariationAllowed / 100))
                         {
                             return "VAS_AllowedvariationExceed";
                         }

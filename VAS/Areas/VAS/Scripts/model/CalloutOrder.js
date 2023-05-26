@@ -227,6 +227,9 @@
                 if (idr["VAS_IsVariationOrder"] == "Y") {
                     mTab.setValue("VAS_OrderType", "VO");
                 }
+                else {
+                    mTab.setValue("VAS_OrderType", "");
+                }
             }
             //idr.close();
 
@@ -3413,11 +3416,18 @@
         }
         this.setCalloutActive(true);
         var dr = VIS.dataContext.getJSONRecord("MOrderLine/GetOrderLine", value.toString());
-
-        mTab.setValue("M_Product_ID", dr["M_Product_ID"]);
-        mTab.setValue("C_Charge_ID", dr["C_Charge_ID"]);
-        mTab.setValue("M_AttributeSetInstance_ID", dr["M_AttributeSetInstance_ID"]);
-        mTab.setValue("C_UOM_ID", dr["C_UOM_ID"]);
+        if (dr["M_Product_ID"] != "0") {
+            mTab.setValue("M_Product_ID", dr["M_Product_ID"]);
+        }
+        if (dr["C_Charge_ID"] != "0") {
+            mTab.setValue("C_Charge_ID", dr["C_Charge_ID"]);
+        }
+        if (dr["M_AttributeSetInstance_ID"] != "0") {
+            mTab.setValue("M_AttributeSetInstance_ID", dr["M_AttributeSetInstance_ID"]);
+        }
+        if (dr["C_UOM_ID"] != "0") {
+            mTab.setValue("C_UOM_ID", dr["C_UOM_ID"]);
+        }
         ctx = windowNo = mTab = mField = value = oldValue = null;
         this.setCalloutActive(false);
         return "";
