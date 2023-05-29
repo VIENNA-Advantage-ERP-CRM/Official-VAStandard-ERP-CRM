@@ -4606,6 +4606,9 @@ namespace VAdvantage.Model
                                                     (Math.Abs(line.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
                                             }
+
+                                            // VIS_045: 29-May-2023 -> DevOps Task ID: 2146
+                                            query.Append(@" , M_Transaction_ID = (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID) ");
                                             query.Append(@" WHERE C_Invoiceline_ID = " + line.GetC_InvoiceLine_ID());
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                         }
