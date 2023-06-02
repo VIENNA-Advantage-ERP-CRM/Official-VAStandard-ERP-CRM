@@ -222,6 +222,14 @@
                         else
                             mTab.setValue("DocumentNo", "<" + Util.getValueOfString(idr["CurrentNext"]) + ">");
                 }
+
+                //Variation Order                
+                if (idr["VAS_IsVariationOrder"] == "Y") {
+                    mTab.setValue("VAS_OrderType", "VO");
+                }
+                else {
+                    mTab.setValue("VAS_OrderType", "");
+                }
             }
             //idr.close();
 
@@ -2249,8 +2257,8 @@
                             (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
-                            PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"]);
-                            mTab.setValue("PriceActual", PriceEntered);                            
+                            PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
+                            mTab.setValue("PriceActual", PriceEntered);
                             mTab.setValue("Discount", ((Util.getValueOfDecimal(mTab.getValue("PriceList")) - PriceEntered) / Util.getValueOfDecimal(mTab.getValue("PriceList"))) * 100);
                         }
                     }
@@ -3394,6 +3402,37 @@
     };
 
     /// <summary>
+    /// Fetch and set  OrderLine Details
+    /// </summary>
+    /// <param name="ctx">context</param>
+    /// <param name="windowNo">current Window No</param>
+    /// <param name="mTab">Grid Tab</param>
+    /// <param name="mField">Grid Field</param>
+    /// <param name="value">New Value</param>
+    /// <returns>null or error message</returns>
+    CalloutOrder.prototype.RefPurchaseOrderLine = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var dr = VIS.dataContext.getJSONRecord("MOrderLine/GetOrderLine", value.toString());
+        if (dr["M_Product_ID"] != "0") {
+            mTab.setValue("M_Product_ID", dr["M_Product_ID"]);
+        }
+        if (dr["C_Charge_ID"] != "0") {
+            mTab.setValue("C_Charge_ID", dr["C_Charge_ID"]);
+        }
+        if (dr["M_AttributeSetInstance_ID"] != "0") {
+            mTab.setValue("M_AttributeSetInstance_ID", dr["M_AttributeSetInstance_ID"]);
+        }
+        if (dr["C_UOM_ID"] != "0") {
+            mTab.setValue("C_UOM_ID", dr["C_UOM_ID"]);
+        }
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        this.setCalloutActive(false);
+        return "";
+    };
+    /// <summary>
     /// Orig_InOutLine - Shipment Line Defaults.
     /// </summary>
     /// <param name="ctx">context</param>
@@ -3474,6 +3513,137 @@
         }
         return isAdvancePayTerm;
     }
+
+    /// <summary>
+    ///While Select Origional Purchase order in Case of Variation Order
+    /// </summary>
+    /// <param name="ctx">context</param>
+    /// <param name="windowNo">current Window No</param>
+    /// <param name="mTab">Grid Tab</param>
+    /// <param name="mField">Grid Field</param>
+    /// <param name="value">New Value</param>
+    /// <returns>Pick few Details from Origional Purchase Order And Copy to new One</returns>
+    CalloutOrder.prototype.RefPurchaseOrder = function (ctx, windowNo, mTab, mField, value, oldValue) {
+
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        try {
+            //var U=Util;
+            var Orig_Po_ID = Util.getValueOfInt(value);
+            if (Orig_Po_ID == null || Orig_Po_ID == 0)
+                return "";
+
+            this.setCalloutActive(true);
+            //	Get Details
+            var dr = VIS.dataContext.getJSONRecord("MOrder/GetOrder", Orig_Po_ID.toString());
+            if (dr != null) {
+                var C_BPartner_ID = Util.getValueOfDouble(dr["C_BPartner_ID"]);
+                var C_BPartner_Location_ID = Util.getValueOfDouble(dr["C_BPartner_Location_ID"]);
+                var AD_User_ID = Util.getValueOfDouble(dr["AD_User_ID"]);
+
+
+
+
+                var Bill_BPartner_ID = Util.getValueOfDouble(dr["Bill_BPartner_ID"]);
+                var Bill_User_ID = Util.getValueOfDouble(dr["Bill_User_ID"]);
+                var Bill_Location_ID = Util.getValueOfDouble(dr["Bill_Location_ID"]);
+                var VAS_ContractMaster_ID = Util.getValueOfDouble(dr["VAS_ContractMaster_ID"]);
+
+                var M_PriceList_ID = Util.getValueOfDouble(dr["M_PriceList_ID"]);
+                var M_Warehouse_ID = Util.getValueOfDouble(dr["M_Warehouse_ID"]);
+                var C_PaymentTerm_ID = Util.getValueOfDouble(dr["C_PaymentTerm_ID"]);
+                var PaymentRule = Util.getValueOfDouble(dr["PaymentRule"]);
+                var C_Payment_ID = Util.getValueOfDouble(dr["C_Payment_ID"]);
+                var VA009_PaymentMethod_ID = Util.getValueOfDouble(dr["VA009_PaymentMethod_ID"]);
+                var C_Currency_ID = Util.getValueOfDouble(dr["C_Currency_ID"]);
+
+                var C_Project_ID = Util.getValueOfDouble(dr["C_Project_ID"]);
+                var C_Campaign_ID = Util.getValueOfDouble(dr["C_Campaign_ID"]); C_ProjectRef_ID
+                var C_ProjectRef_ID = Util.getValueOfDouble(dr["C_ProjectRef_ID"]);
+                var SalesRep_ID = Util.getValueOfDouble(dr["SalesRep_ID"]);
+                var PriorityRule = Util.getValueOfDouble(dr["PriorityRule"]);
+
+                if (C_BPartner_ID != 0 && C_BPartner_ID != null) {
+                    mTab.setValue("C_BPartner_ID", C_BPartner_ID);
+                }
+                if (C_BPartner_Location_ID != 0 && C_BPartner_Location_ID != null) {
+                    mTab.setValue("C_BPartner_Location_ID", C_BPartner_Location_ID);
+                }
+                if (AD_User_ID != 0 && AD_User_ID != null) {
+                    mTab.setValue("AD_User_ID", AD_User_ID);
+                }
+                if (Bill_BPartner_ID != 0 && Bill_BPartner_ID != null) {
+                    mTab.setValue("Bill_BPartner_ID", Bill_BPartner_ID);
+                }
+                if (Bill_User_ID != 0 && Bill_User_ID != null) {
+                    mTab.setValue("Bill_User_ID", Bill_User_ID);
+                }
+                if (Bill_Location_ID != 0 && Bill_Location_ID != null) {
+                    mTab.setValue("Bill_Location_ID", Bill_Location_ID);
+                }
+                if (VAS_ContractMaster_ID != 0 && VAS_ContractMaster_ID != null) {
+                    mTab.setValue("VAS_ContractMaster_ID", VAS_ContractMaster_ID);
+                }
+
+                if (M_PriceList_ID != 0 && M_PriceList_ID != null) {
+                    mTab.setValue("M_PriceList_ID", M_PriceList_ID);
+                }
+
+                if (M_Warehouse_ID != 0 && M_Warehouse_ID != null) {
+                    mTab.setValue("M_Warehouse_ID", M_Warehouse_ID);
+                }
+
+                if (C_PaymentTerm_ID != 0 && C_PaymentTerm_ID != null) {
+                    mTab.setValue("C_PaymentTerm_ID", C_PaymentTerm_ID);
+                }
+                if (PaymentRule != 0 && PaymentRule != null) {
+                    mTab.setValue("PaymentRule", PaymentRule);
+                }
+
+
+                if (VA009_PaymentMethod_ID != 0 && VA009_PaymentMethod_ID != null) {
+                    mTab.setValue("VA009_PaymentMethod_ID", VA009_PaymentMethod_ID);
+                }
+
+                if (C_Currency_ID != 0 && C_Currency_ID != null) {
+                    mTab.setValue("C_Currency_ID", C_Currency_ID);
+                }
+
+                //if (C_Project_ID != 0 && C_Project_ID != null) {
+                //    mTab.setValue("C_Project_ID", C_Project_ID);
+                //}
+
+                //if (C_Campaign_ID != 0 && C_Campaign_ID != null) {
+                //    mTab.setValue("C_Campaign_ID", C_Campaign_ID);
+                //}
+
+                //if (C_ProjectRef_ID != 0 && C_ProjectRef_ID != null) {
+                //    mTab.setValue("C_ProjectRef_ID", C_ProjectRef_ID);
+                //}
+
+                if (SalesRep_ID != 0 && SalesRep_ID != null) {
+                    mTab.setValue("SalesRep_ID", SalesRep_ID);
+                }
+
+                if (PriorityRule != 0 && PriorityRule != null) {
+                    mTab.setValue("PriorityRule", PriorityRule);
+                }
+
+                if (mTab.getField("C_IncoTerm_ID") != null) {
+                    mTab.setValue("C_IncoTerm_ID", Util.getValueOfInt(dr["C_IncoTerm_ID"]));
+                }
+
+            }
+        }
+        catch (err) {
+            //MessageBox.Show("error in Orig_InOutLine");
+            this.setCalloutActive(false);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
 
     VIS.Model.CalloutOrder = CalloutOrder;
     //***CalloutOrder End
