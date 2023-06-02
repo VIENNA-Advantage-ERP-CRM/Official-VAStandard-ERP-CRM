@@ -274,15 +274,15 @@ namespace VAdvantage.Model
                 SetDateAcct(ts);
             }
 
-            // 
+            // VIS_045: 02-June-2023 -> DevOps Task ID: 2152 - Convert PO/Invoice/Provisional Price in Base UOM
             DataSet ds = DB.ExecuteDataset(@"SELECT  M_Storage.QtyOnHand,
-                            NVL(currencyConvert(C_OrderLine.PriceEntered, C_Order.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            NVL(currencyConvert((C_OrderLine.PriceEntered * (C_OrderLine.QtyEntered/C_OrderLine.QtyOrdered)), C_Order.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", M_InOut.DateAcct, C_Order.C_ConversionType_ID,
                             M_InOut.AD_Client_ID, M_InOut.AD_Org_ID), 0) as POPriceEntered,
-                            NVL(currencyConvert(C_InvoiceLine.PriceEntered, C_Invoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            NVL(currencyConvert((C_InvoiceLine.PriceEntered* (C_InvoiceLine.QtyEntered/C_InvoiceLine.QtyInvoiced)), C_Invoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", C_Invoice.DateAcct, C_Invoice.C_ConversionType_ID,
                             C_Invoice.AD_Client_ID, C_Invoice.AD_Org_ID), 0) as InvPriceEntered,
-                            NVL(currencyConvert(C_ProvisionalInvoiceLine.PriceEntered, C_ProvisionalInvoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            NVL(currencyConvert((C_ProvisionalInvoiceLine.PriceEntered * (C_ProvisionalInvoiceLine.QtyEntered/C_ProvisionalInvoiceLine.QtyInvoiced)), C_ProvisionalInvoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", C_ProvisionalInvoice.DateAcct, C_ProvisionalInvoice.C_ConversionType_ID,
                             C_ProvisionalInvoice.AD_Client_ID, C_ProvisionalInvoice.AD_Org_ID), 0) as ProvisionalPriceEntered,
                             M_InOut.IsSOTrx, M_InOut.IsReturnTrx,
@@ -302,10 +302,11 @@ namespace VAdvantage.Model
                             WHERE M_InOutLine.M_InOutLine_ID = " + GetM_InOutLine_ID(), null, Get_TrxName());
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
+                int precision = MCurrency.Get(GetCtx(), GetCtx().GetContextAsInt("$C_Currency_ID")).GetStdPrecision();
                 SetAvailableStock(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["QtyOnHand"]));
-                SetPricePO(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["POPriceEntered"]));
-                SetProvisionalInvPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["ProvisionalPriceEntered"]));
-                SetInvoicedAmt(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["InvPriceEntered"]));
+                SetPricePO(Decimal.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["POPriceEntered"]), precision, MidpointRounding.AwayFromZero));
+                SetProvisionalInvPrice(Decimal.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["ProvisionalPriceEntered"]), precision, MidpointRounding.AwayFromZero));
+                SetInvoicedAmt(Decimal.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["InvPriceEntered"]), precision, MidpointRounding.AwayFromZero));
                 SetIsSOTrx(Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]).Equals("Y"));
                 SetIsReturnTrx(Util.GetValueOfString(ds.Tables[0].Rows[0]["IsReturnTrx"]).Equals("Y"));
                 SetC_ProvisionalInvoiceLine_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ProvisionalInvoiceline_ID"]));
