@@ -1145,7 +1145,7 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append($@" AND i.MovementDate >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  (it.MovementDate + 1) ELSE it.MovementDate END) 
+                sql.Append($@" AND i.MovementDate >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
                                OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID,
                               it.m_attributesetinstance_id , loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC , it.MovementDate, M_Transaction_ID ASC) AS MovementDate
                             FROM M_Transaction it INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
@@ -1271,7 +1271,7 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    sql.Append($@" AND wot.VAMFG_DateAcct >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  (it.MovementDate + 1) ELSE it.MovementDate END) OVER 
+                    sql.Append($@" AND wot.VAMFG_DateAcct >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
                                                     (PARTITION BY l.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id, 0) , loc.M_Warehouse_ID
                                                       ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
                                                       INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
@@ -1296,7 +1296,7 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    sql.Append($@" WHERE pcpw.Created >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  (it.MovementDate + 1) ELSE it.MovementDate END) OVER 
+                    sql.Append($@" WHERE pcpw.Created >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
                                                     (PARTITION BY it.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id , 0)
                                                       ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
                                                       INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
@@ -1328,7 +1328,7 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append($@" AND p.MovementDate >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  (it.MovementDate + 1) ELSE it.MovementDate END) OVER 
+                sql.Append($@" AND p.MovementDate >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
                                                       (PARTITION BY loc.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id, 0) , loc.M_Warehouse_ID
                                                       ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
                                                       INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
