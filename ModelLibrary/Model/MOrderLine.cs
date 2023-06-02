@@ -55,6 +55,7 @@ namespace VAdvantage.Model
 
         private bool resetAmtDim = false;
         private bool resetTotalAmtDim = false;
+        public bool skipQtyConversion = false;
         #endregion
 
         /// <summary>
@@ -4125,24 +4126,28 @@ namespace VAdvantage.Model
                         QtyEntered = QtyEntered1;
                         SetQtyEntered(QtyEntered);
                     }
-                    Decimal? pc = MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), GetC_UOM_ID(), QtyEntered);
-                    QtyOrdered = pc;
-                    bool conversion = false;
-                    if (QtyOrdered != null)
-                    {
-                        conversion = QtyEntered != QtyOrdered;
-                    }
-                    if (QtyOrdered == null)
-                    {
-                        conversion = false;
-                        QtyOrdered = 1;
-                        SetQtyOrdered(QtyOrdered * QtyEntered1);
-                    }
-                    else
-                    {
-                        SetQtyOrdered(QtyOrdered);
-                    }
 
+                    // VIS0060: Skip Quantity Conversion based on requirement.
+                    if (!skipQtyConversion && (newRecord || Is_ValueChanged("QtyEntered")))
+                    {
+                        Decimal? pc = MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), GetC_UOM_ID(), QtyEntered);
+                        QtyOrdered = pc;
+                        bool conversion = false;
+                        if (QtyOrdered != null)
+                        {
+                            conversion = QtyEntered != QtyOrdered;
+                        }
+                        if (QtyOrdered == null)
+                        {
+                            conversion = false;
+                            QtyOrdered = 1;
+                            SetQtyOrdered(QtyOrdered * QtyEntered1);
+                        }
+                        else
+                        {
+                            SetQtyOrdered(QtyOrdered);
+                        }
+                    }
 
                     //if (conversion)
                     //{
