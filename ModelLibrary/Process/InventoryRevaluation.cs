@@ -1310,11 +1310,11 @@ namespace VAdvantage.Process
             }
             sql.Append($@" select pl.Amt AS CurrentCostPrice , pl.MovementQty AS QtyEntered 
                         , pl.M_Product_ID , pl.M_AttributeSetInstance_ID, pl.AD_Org_ID ,pl.M_Warehouse_ID , 
-                        NVL(pc.CostingLevel , asch.CostingLevel) AS CostingLevel, p.M_Product_Category_ID 
+                        NVL(pc.CostingLevel , asch.CostingLevel) AS CostingLevel, pr.M_Product_Category_ID 
                         from M_ProductionLine pl
                         INNER JOIN M_Production p ON (pl.M_Production_ID = p.M_Production_ID)
-                        INNER JOIN M_Product p ON (p.M_Product_ID = pl.M_Product_ID)
-                        INNER JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
+                        INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
+                        INNER JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = pr.M_Product_Category_ID)
                         INNER JOIN AD_ClientInfo cinfo ON (cinfo.AD_Client_ID = pl.AD_Client_ID)
                         INNER JOIN C_AcctSchema asch ON (asch.C_AcctSchema_ID = cinfo.C_AcctSchema1_ID)");
             if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
