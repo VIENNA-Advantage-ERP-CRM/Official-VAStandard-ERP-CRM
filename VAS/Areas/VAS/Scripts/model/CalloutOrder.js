@@ -2257,7 +2257,7 @@
                             (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
-                            PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"]);
+                            PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
                             mTab.setValue("PriceActual", PriceEntered);
                             mTab.setValue("Discount", ((Util.getValueOfDecimal(mTab.getValue("PriceList")) - PriceEntered) / Util.getValueOfDecimal(mTab.getValue("PriceList"))) * 100);
                         }
