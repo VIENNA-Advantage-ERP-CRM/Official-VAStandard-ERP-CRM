@@ -1136,7 +1136,7 @@ namespace VAdvantage.Process
                 sql.Append($@" INNER JOIN C_Period prd ON (prd.C_Period_ID = {objInventoryRevaluation.GetC_Period_ID()}) ");
             }
 
-            sql.Append($@" WHERE mi.ConsumedQty <> 0 
+            sql.Append($@" WHERE mi.ConsumedQty <> 0 AND mi.PriceDifferenceAPPO <> 0 
                   AND t.CostingLevel = {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())}");
 
             if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
