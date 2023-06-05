@@ -1266,6 +1266,7 @@ namespace VIS.Models
             decimal _flatDiscount = 0;
             int uomPrecision = 2;
             decimal ActualPrice = 0;
+            decimal pricelistprecision = 2;
 
             MOrderModel objOrder = new MOrderModel();
             /** Price List - ValidFrom date validation ** Dt:11/03/2021 ** Modified By: Kumar **/
@@ -1303,6 +1304,7 @@ namespace VIS.Models
            
             _flatDiscount = Util.GetValueOfInt(bpartner1["FlatDiscount"]);
             uomPrecision = MUOM.GetPrecision(ctx, _c_Uom_Id);
+            pricelistprecision = MPriceList.GetPricePrecision(ctx, _m_PriceList_ID);
             sql.Clear();
             sql.Append("SELECT PriceStd , PriceList, PriceLimit FROM M_ProductPrice WHERE IsActive='Y' AND M_Product_ID = " + _m_Product_Id
                             + " AND M_PriceList_Version_ID = " + _priceListVersion_Id
@@ -1373,6 +1375,7 @@ namespace VIS.Models
             retDic["DiscountSchema"] = _m_DiscountSchema_ID > 0 ? "Y" : "N";
             retDic["DiscountCalculate"] = PriceEntered != ActualPrice ? "Y" : "N";    //VIS0336_changes done for adding the discount schema break discount also in price.
             retDic["UOMPrecision"] = uomPrecision;
+            retDic["PriceListPrecision"] = pricelistprecision;
             retDic["QtyOrdered"] = MUOMConversion.ConvertProductFrom(ctx, _m_Product_Id, _c_Uom_Id,
                 decimal.Round(_qtyEntered, uomPrecision, MidpointRounding.AwayFromZero));
 

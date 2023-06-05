@@ -2668,6 +2668,7 @@
             var QtyEntered = VIS.Env.ZERO;
             var QtyEstimation = VIS.Env.ZERO;
             var PriceActual, PriceEntered;
+            var PriceListPrecision = 2;               
 
             // Check for RMA
             var isReturnTrx = "Y" == (ctx.getContext("IsReturnTrx"));
@@ -2707,10 +2708,11 @@
                 var productPrices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
 
                 if (!isBlanketOrderLine) {
-                    mTab.setValue("PriceList", Util.getValueOfDecimal(productPrices["PriceList"]));
-                    mTab.setValue("PriceLimit", Util.getValueOfDecimal(productPrices["PriceLimit"]));
-                    mTab.setValue("PriceActual", Util.getValueOfDecimal(productPrices["PriceEntered"]));
-                    mTab.setValue("PriceEntered", Util.getValueOfDecimal(productPrices["PriceEntered"]));
+                    PriceListPrecision = Util.getValueOfInt(productPrices["PriceListPrecision"]);
+                    mTab.setValue("PriceList", Util.getValueOfDecimal(productPrices["PriceList"].toFixed(PriceListPrecision)));
+                    mTab.setValue("PriceLimit", Util.getValueOfDecimal(productPrices["PriceLimit"].toFixed(PriceListPrecision)));
+                    mTab.setValue("PriceActual", Util.getValueOfDecimal(productPrices["PriceEntered"].toFixed(PriceListPrecision)));
+                    mTab.setValue("PriceEntered", Util.getValueOfDecimal(productPrices["PriceEntered"].toFixed(PriceListPrecision)));
                 }
 
                 var QtyEntered1 = QtyEntered.toFixed(Util.getValueOfInt(productPrices["UOMPrecision"]));
