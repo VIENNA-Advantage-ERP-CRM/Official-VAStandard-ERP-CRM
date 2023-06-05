@@ -1185,7 +1185,7 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
-            
+
             //** If schedule lines are present, system should not allow to save header with week day ** Dt: 02/04/2021 ** Modified By: Kumar ** //
             if (Util.GetValueOfInt(GetNetDay()) > 0 && count > 0)
             {
@@ -1308,8 +1308,9 @@ namespace VAdvantage.Model
                     schedule.SetDiscountDate(payDueDate);
                 }
 
-                //schedule.SetDiscountDate(invoice.GetDateInvoiced().Value.AddDays(Util.GetValueOfInt(payterm.GetDiscountDays())));                
-                schedule.SetDiscountAmt((Util.GetValueOfDecimal((invoice.GetGrandTotal() * payterm.GetDiscount()) / 100)));
+                /*VIS_0045: 05-June-2023, DevOps Task ID - 2149*/
+                schedule.SetDiscountAmt(Decimal.Round(Util.GetValueOfDecimal((invoice.GetGrandTotal() * payterm.GetDiscount()) / 100),
+                    MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID()).GetStdPrecision(), MidpointRounding.AwayFromZero));
 
                 if (payterm.IsNextBusinessDay())
                 {
@@ -1330,7 +1331,9 @@ namespace VAdvantage.Model
                 }
 
                 //schedule.SetDiscountDays2(invoice.GetDateInvoiced().Value.AddDays(Util.GetValueOfInt(payterm.GetDiscountDays2())));
-                schedule.SetDiscount2((Util.GetValueOfDecimal((invoice.GetGrandTotal() * payterm.GetDiscount2()) / 100)));
+                /*VIS_0045: 05-June-2023, DevOps Task ID - 2149*/
+                schedule.SetDiscount2(Decimal.Round(Util.GetValueOfDecimal((invoice.GetGrandTotal() * payterm.GetDiscount2()) / 100),
+                    MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID()).GetStdPrecision(), MidpointRounding.AwayFromZero));
             }
 
             MPaymentTerm paytrm = new MPaymentTerm(GetCtx(), invoice.GetC_PaymentTerm_ID(), Get_Trx());
@@ -1431,6 +1434,7 @@ namespace VAdvantage.Model
         /// <param name="_ds">datarow of orderschedule</param>
         private void copyorderschedules(MInvoicePaySchedule schedule, MInvoice invoice, DataRow _ds, Decimal LineTotalAmt, Decimal schedulePercentage)
         {
+            int precision = MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID()).GetStdPrecision();
             schedule.SetAD_Client_ID(Util.GetValueOfInt(_ds["AD_Client_ID"]));
             schedule.SetAD_Org_ID(Util.GetValueOfInt(_ds["AD_Org_ID"]));
             schedule.SetVA009_OrderPaySchedule_ID(Util.GetValueOfInt(_ds["VA009_OrderPaySchedule_ID"]));
@@ -1483,8 +1487,9 @@ namespace VAdvantage.Model
             {
                 schedule.SetVA009_GrandTotal(Decimal.Negate(Util.GetValueOfDecimal(_ds["VA009_GrandTotal"])));
                 schedule.SetDueAmt(Decimal.Negate(remainingDueAmount));
-                schedule.SetDiscountAmt(Decimal.Negate(Util.GetValueOfDecimal(_ds["DiscountAmt"])));
-                schedule.SetDiscount2(Decimal.Negate(Util.GetValueOfDecimal(_ds["Discount2"])));
+                /*VIS_0045: 05-June-2023, DevOps Task ID - 2149*/
+                schedule.SetDiscountAmt(Decimal.Negate(Decimal.Round(Util.GetValueOfDecimal(_ds["DiscountAmt"]), precision, MidpointRounding.AwayFromZero)));
+                schedule.SetDiscount2(Decimal.Negate(Decimal.Round(Util.GetValueOfDecimal(_ds["Discount2"]), precision, MidpointRounding.AwayFromZero)));
                 // set Open Amount (Invoice)
                 //schedule.SetVA009_OpnAmntInvce(Decimal.Negate(Util.GetValueOfDecimal(_ds["VA009_OpnAmntInvce"])));
                 schedule.SetVA009_OpnAmntInvce(Decimal.Negate(remainingDueAmount));
@@ -1504,8 +1509,9 @@ namespace VAdvantage.Model
             {
                 schedule.SetVA009_GrandTotal(Util.GetValueOfDecimal(_ds["VA009_GrandTotal"]));
                 schedule.SetDueAmt(remainingDueAmount);
-                schedule.SetDiscountAmt(Util.GetValueOfDecimal(_ds["DiscountAmt"]));
-                schedule.SetDiscount2(Util.GetValueOfDecimal(_ds["Discount2"]));
+                /*VIS_0045: 05-June-2023, DevOps Task ID - 2149*/
+                schedule.SetDiscountAmt(Decimal.Round(Util.GetValueOfDecimal(_ds["DiscountAmt"]), precision, MidpointRounding.AwayFromZero));
+                schedule.SetDiscount2(Decimal.Round(Util.GetValueOfDecimal(_ds["Discount2"]), precision, MidpointRounding.AwayFromZero));
                 // set Open Amount (Invoice)
                 schedule.SetVA009_OpnAmntInvce(remainingDueAmount);
                 // set Open Amount (Base)
