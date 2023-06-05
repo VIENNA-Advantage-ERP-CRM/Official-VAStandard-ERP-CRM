@@ -44,7 +44,7 @@ namespace VAdvantage.Model
             int count = Util.GetValueOfInt (DB.ExecuteScalar(sql,null,Get_Trx()));
             if (count == 0)
             { return true; }
-            log.SaveError("Error","VAS_InvalidVariationDate");
+            log.SaveError("","VAS_InvalidVariationDate");
 
             return false;
         }
