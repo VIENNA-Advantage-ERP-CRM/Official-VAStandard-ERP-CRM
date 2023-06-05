@@ -35,12 +35,17 @@ namespace VAdvantage.Model
         /// <returns></returns>
         protected override bool BeforeSave(bool newRecord)
         {
+            if (GetValidTo() < GetValidFrom())
+            {
+                log.SaveError("", "ToDateMustGreater");
+                return false;
+            }
             string sql = @"SELECT COUNT(VAS_VariationThreshold_ID)
                             FROM VAS_VariationThreshold
-                            WHERE IsActive='Y' AND AD_Client_ID="+GetAD_Client_ID() +@" AND AD_Org_ID="+GetAD_Org_ID()+@"
-                            AND( "+GlobalVariable.TO_DATE(GetValidFrom(),true)+ @" BETWEEN ValidFrom AND ValidTo)
-                            AND( " + GlobalVariable.TO_DATE(GetValidTo(), true) + @" BETWEEN ValidFrom AND ValidTo)
-                            AND VAS_VariationThreshold_ID<>"+GetVAS_VariationThreshold_ID();
+                            WHERE IsActive='Y' AND AD_Client_ID=" + GetAD_Client_ID() + @" AND AD_Org_ID=" + GetAD_Org_ID() + @"
+                            AND( " + GlobalVariable.TO_DATE(GetValidFrom(), true) + @" <= ValidTo)
+                            AND( " + GlobalVariable.TO_DATE(GetValidTo(), true) + @" >=ValidFrom)
+                            AND VAS_VariationThreshold_ID<>" + GetVAS_VariationThreshold_ID();
             int count = Util.GetValueOfInt (DB.ExecuteScalar(sql,null,Get_Trx()));
             if (count == 0)
             { return true; }
