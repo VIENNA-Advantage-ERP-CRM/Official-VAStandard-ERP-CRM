@@ -252,6 +252,7 @@
     <Compile Include="Model\MVASContractOwner.cs" />
     <Compile Include="Model\MVASContractCategory.cs" />
     <Compile Include="Model\MVASContractMaster.cs" />
+    <Compile Include="Model\MVASVariationThreshold.cs" />
     <Compile Include="Model\MWarehouse.cs" />
     <Compile Include="Model\UserPricingInterface.cs" />
     <Compile Include="Model\AcctViewerData.cs" />
