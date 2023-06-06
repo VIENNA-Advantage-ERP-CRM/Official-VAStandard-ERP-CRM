@@ -335,17 +335,17 @@
             if (dr != null) {
                 var M_Product_ID = Util.getValueOfInt(dr["M_Product_ID"]);
                 var C_Charge_ID = Util.getValueOfInt(dr["C_Charge_ID"]);
-                var Qty = Util.getValueOfInt(dr["Qty"]);
-                var QtyOrdered = Util.getValueOfInt(dr["QtyOrdered"]);
-                var QtyReleased = Util.getValueOfInt(dr["QtyReleased"]);
-                var PriceList = Util.getValueOfDouble(dr["PriceList"]);
-                var PriceActual = Util.getValueOfDouble(dr["PriceActual"]);
-                var C_UOM_ID = Util.getValueOfDouble(dr["C_UOM_ID"]);
-                var Discount = Util.getValueOfDouble(dr["Discount"]);
-                var PriceEntered = Util.getValueOfDouble(dr["PriceEntered"]);
+                var Qty = Util.getValueOfDecimal(dr["Qty"]);
+                var QtyOrdered = Util.getValueOfDecimal(dr["QtyOrdered"]);
+                var QtyReleased = Util.getValueOfDecimal(dr["QtyReleased"]);
+                var PriceList = Util.getValueOfDecimal(dr["PriceList"]);
+                var PriceActual = Util.getValueOfDecimal(dr["PriceActual"]);
+                var C_UOM_ID = Util.getValueOfInt(dr["C_UOM_ID"]);
+                var Discount = Util.getValueOfDecimal(dr["Discount"]);
+                var PriceEntered = Util.getValueOfDecimal(dr["PriceEntered"]);
                 var M_AttributeSetInstance_ID = Util.getValueOfInt(dr["M_AttributeSetInstance_ID"]);
-                var C_Tax_ID = Util.getValueOfDouble(dr["C_Tax_ID"]);
-
+                var C_Tax_ID = Util.getValueOfInt(dr["C_Tax_ID"]);
+                var AD_OrgTrx_ID = Util.getValueOfInt(dr["AD_OrgTrx_ID"]);
 
 
                 QtyEntered = Util.getValueOfDecimal(Qty);
@@ -429,6 +429,9 @@
                 if (C_Tax_ID != 0 && C_Tax_ID != null) {
                     mTab.setValue("C_Tax_ID", C_Tax_ID);
                 }
+
+                // VIS0060: Set Trx Organization from Blanket Order Line
+                mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);                
             }
         }
         catch (err) {
@@ -2668,7 +2671,7 @@
             var QtyEntered = VIS.Env.ZERO;
             var QtyEstimation = VIS.Env.ZERO;
             var PriceActual, PriceEntered;
-            var PriceListPrecision = 2;               
+            var PriceListPrecision = 2;
 
             // Check for RMA
             var isReturnTrx = "Y" == (ctx.getContext("IsReturnTrx"));
