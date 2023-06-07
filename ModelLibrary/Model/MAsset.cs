@@ -875,7 +875,7 @@ namespace VAdvantage.Model
             #endregion 
 
             //VIS0336:set checkbox true when record created .
-            if(Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) >0)
+            if(Env.IsModuleInstalled("VA075_") && Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) >0)
             {
                 Set_Value("VA075_IsEquipment","Y");
             }
