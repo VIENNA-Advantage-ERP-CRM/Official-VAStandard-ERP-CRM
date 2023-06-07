@@ -121,22 +121,16 @@ namespace VIS.Models
                 if (C_UOM_ID != 0)
                 {
                     if (C_UOM_ID != uom && uom != 0)
-                    {
-                        //retValue["multiplyrate"] = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND M_Product_ID= " + M_Product_ID + " AND IsActive='Y'"));
-                        //if (Util.GetValueOfDecimal(retValue["multiplyrate"]) <= 0)
-                        //{
-                        //    retValue["multiplyrate"] = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT trunc(multiplyrate,4) FROM C_UOM_Conversion WHERE C_UOM_ID = " + C_UOM_ID + " AND C_UOM_To_ID = " + uom + " AND IsActive='Y'"));
-                        //}
-
+                    {                        
                         retValue["qtyentered"] = MUOMConversion.ConvertProductFrom(ctx, M_Product_ID, uom, QtyEntered);
                         if (retValue["qtyentered"] == null)
                         {
                             retValue["qtyentered"] = QtyEntered;
                         }
-                        retValue["uom"] = uom;
                     }
                 }
                 retValue["C_UOM_ID"] = C_UOM_ID;
+                retValue["uom"] = uom;
             }
             catch (Exception e)
             {
