@@ -287,7 +287,8 @@ namespace VAdvantage.Model
                             C_ProvisionalInvoice.AD_Client_ID, C_ProvisionalInvoice.AD_Org_ID), 0) as ProvisionalPriceEntered,
                             M_InOut.IsSOTrx, M_InOut.IsReturnTrx,
                             C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID,
-                            M_InOutLine.M_AttributeSetInstance_ID
+                            M_InOutLine.M_AttributeSetInstance_ID, 
+                            M_PriceList.PricePrecision 
                             FROM M_InOutLine
                             INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
                             INNER JOIN M_Storage ON(M_InOutLine.M_Locator_ID = M_Storage.M_Locator_ID
@@ -295,6 +296,7 @@ namespace VAdvantage.Model
                             AND NVL(M_InOutLine.M_AttributeSetInstance_ID, 0) = NVL(M_Storage.M_AttributeSetInstance_ID, 0))
                             INNER JOIN C_InvoiceLine ON C_InvoiceLine.C_InvoiceLine_ID = " + GetC_InvoiceLine_ID() + @"
                             INNER JOIN C_Invoice ON C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID
+                            INNER JOIN M_PriceList ON M_PriceList.M_PriceList_ID = C_Invoice.M_PriceList_ID 
                             LEFT JOIN C_OrderLine ON M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID
                             LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
                             LEFT JOIN C_ProvisionalInvoiceline ON C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID = C_InvoiceLine.C_ProvisionalInvoiceline_ID
@@ -302,7 +304,7 @@ namespace VAdvantage.Model
                             WHERE M_InOutLine.M_InOutLine_ID = " + GetM_InOutLine_ID(), null, Get_TrxName());
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
-                int precision = MCurrency.Get(GetCtx(), GetCtx().GetContextAsInt("$C_Currency_ID")).GetStdPrecision();
+                int precision = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PricePrecision"]);
                 SetAvailableStock(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["QtyOnHand"]));
                 SetPricePO(Decimal.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["POPriceEntered"]), precision, MidpointRounding.AwayFromZero));
                 SetProvisionalInvPrice(Decimal.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["ProvisionalPriceEntered"]), precision, MidpointRounding.AwayFromZero));
