@@ -382,7 +382,7 @@ namespace VAdvantage.Model
                 }
                 
                 //	Send Note
-                if (ad_user_ID > 0 && (X_AD_User.NOTIFICATIONTYPE_EMail.Equals(notificationType)
+                if (ad_user_ID > 0 && (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(notificationType)
                     || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(notificationType)))
                 {
                     MNote note = new MNote(GetCtx(), "Response", ad_user_ID, GetAD_Client_ID(), 0, Get_TrxName());
