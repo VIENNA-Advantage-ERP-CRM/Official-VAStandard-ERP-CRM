@@ -298,38 +298,7 @@ namespace VAdvantage.Model
                 }
 
                 if (NotificationType == null)
-                    NotificationType = to.GetNotificationType();
-                //	Send Mail
-                if (X_AD_User.NOTIFICATIONTYPE_EMail.Equals(NotificationType)
-                    || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(NotificationType))
-                {
-                    MMailAttachment1 _mAttachment = new MMailAttachment1(GetCtx(), 0, null);
-                    _mAttachment.SetAD_Client_ID(GetCtx().GetAD_Client_ID());
-                    _mAttachment.SetAD_Org_ID(GetCtx().GetAD_Org_ID());
-                    _mAttachment.SetAD_Table_ID(GetRfQ().Get_Table_ID());
-                    _mAttachment.IsActive();
-                    _mAttachment.SetMailAddress("");
-                    _mAttachment.SetAttachmentType("M");
-                    _mAttachment.SetRecord_ID(GetC_RfQ_ID());
-                    _mAttachment.SetTextMsg(message.ToString());
-                    _mAttachment.SetTitle(subject);
-                    _mAttachment.SetMailAddress(to.GetEMail());
-                    _mAttachment.SetMailAddressFrom(client.GetRequestEMail());
-                    _mAttachment.NewRecord();
-
-                    //if (client.SendEMail(to.GetAD_User_ID(), subject, message.ToString(), GetRfQ().CreatePDF()))
-                    if (mailSent)
-                    {
-                        _mAttachment.SetIsMailSent(true);
-                    }
-                    else
-                    {
-                        log.Warning("Failed: " + to);
-                        NotificationType = X_AD_User.NOTIFICATIONTYPE_Notice;
-                        _mAttachment.SetIsMailSent(false);
-                    }
-                    _mAttachment.Save();
-                }
+                    NotificationType = to.GetNotificationType();                
 
                 //	Send Note
                 if (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(NotificationType)
@@ -411,33 +380,7 @@ namespace VAdvantage.Model
                     SetDateInvited(DateTime.Now);
                     Save();
                 }
-
-                MMailAttachment1 _mAttachment = new MMailAttachment1(GetCtx(), 0, Get_Trx());
-                _mAttachment.SetAD_Client_ID(GetAD_Client_ID());
-                _mAttachment.SetAD_Org_ID(GetAD_Org_ID());
-                _mAttachment.SetAD_Table_ID(GetRfQ().Get_Table_ID());
-                _mAttachment.IsActive();
-                _mAttachment.SetMailAddress("");
-                _mAttachment.SetAttachmentType("M");
-                _mAttachment.SetRecord_ID(GetC_RfQ_ID());
-                _mAttachment.SetTextMsg(message.ToString());
-                _mAttachment.SetTitle(subject);
-                _mAttachment.SetMailAddress(mail);
-                _mAttachment.SetMailAddressFrom(client.GetRequestEMail());
-                _mAttachment.NewRecord();
-
-                //if (client.SendEMail(to.GetAD_User_ID(), subject, message.ToString(), GetRfQ().CreatePDF()))
-                if (mailSent)
-                {
-                    _mAttachment.SetIsMailSent(true);
-                }
-                else
-                {
-                    log.Warning("Failed: " + name);
-                    _mAttachment.SetIsMailSent(false);
-                }
-                _mAttachment.Save();
-
+                
                 //	Send Note
                 if (ad_user_ID > 0 && (X_AD_User.NOTIFICATIONTYPE_EMail.Equals(notificationType)
                     || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(notificationType)))
