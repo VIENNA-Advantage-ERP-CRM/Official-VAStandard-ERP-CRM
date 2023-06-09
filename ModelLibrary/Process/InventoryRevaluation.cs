@@ -1141,11 +1141,11 @@ namespace VAdvantage.Process
 
             if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
             {
-                sql.Append($@" AND i.MovementDate BETWEEN prd.StartDate AND prd.EndDate  ");
+                sql.Append($@" AND mi.DateAcct BETWEEN prd.StartDate AND prd.EndDate  ");
             }
             else
             {
-                sql.Append($@" AND i.MovementDate >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
+                sql.Append($@" AND mi.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
                                OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID,
                               it.m_attributesetinstance_id , loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC , it.MovementDate, M_Transaction_ID ASC) AS MovementDate
                             FROM M_Transaction it INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
