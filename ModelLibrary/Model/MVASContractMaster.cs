@@ -27,14 +27,29 @@ namespace VAdvantage.Model
         }
 
         //VIS 404 check for End date not greater than startdate date on Contract Master window
-    
+
         protected override bool BeforeSave(bool newRecord)
         {
-                if (Util.GetValueOfDateTime(GetStartDate()) > Util.GetValueOfDateTime(GetEndDate()))
+            if (Util.GetValueOfDateTime(GetStartDate()) > Util.GetValueOfDateTime(GetEndDate()))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_EndDateMustGreater"));
+                return false;
+            }
+
+            // VIS0060: Check Vendor for Blacklisting and Suspension for the particuler period if Vendor Mgt module is installed.
+            if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("DateDoc") || Is_ValueChanged("C_BPartner_ID")))
+            {
+                int blkSpn = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(C_BPartner_ID)
+                            FROM VA068_VendorBlacklistingSuspen WHERE C_BPartner_ID = " + GetC_BPartner_ID() +
+                        " AND (VA068_FinalIndefiniteBlacklisting = 'Y' OR VA068_FinalEndingDate > "
+                        + GlobalVariable.TO_DATE(GetDateDoc(), true) + ")", null, Get_Trx()));
+
+                if (blkSpn > 0)
                 {
-                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_EndDateMustGreater"));
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
                     return false;
-                }       
+                }
+            }
             return true;
         }
     }
