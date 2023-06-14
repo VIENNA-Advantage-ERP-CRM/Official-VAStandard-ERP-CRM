@@ -1083,8 +1083,7 @@ namespace VAdvantage.Process
             }
             sql.Append($@" WHERE t.MovementDate BETWEEN prd.StartDate AND prd.EndDate 
                             AND t.CostingLevel = {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())}
-                            AND t.MovementType NOT IN ( 'V+', 'V-', 'IR' )
-                            AND NVL(t.VAFAM_AssetDisposal_ID, 0) = 0
+                            AND t.MovementType NOT IN ( 'V+', 'V-', 'IR' ) 
                             AND ( ( t.MovementType IN ( 'I+', 'I-' ) AND i.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
                                   OR ( t.MovementType IN ( 'M+', 'M-' ) AND m.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
                                   OR ( t.MovementType IN ( 'P+', 'P-' ) AND pd.IsReversed NOT IN ( 'Y' ) AND pl.MaterialType = 'C' AND t.MovementQty < 0 )
@@ -1095,6 +1094,10 @@ namespace VAdvantage.Process
                                        AND wot.docstatus NOT IN ( 'VO', 'RE' ) ) ");
             }
             sql.Append(")");
+            if (Env.IsModuleInstalled("VAFAM_"))
+            {
+                sql.Append(@" AND NVL(t.VAFAM_AssetDisposal_ID, 0) = 0 ");
+            }
             if (objInventoryRevaluation.GetM_Product_Category_ID() > 0)
             {
                 sql.Append($@" AND p.M_Product_Category_ID = {objInventoryRevaluation.GetM_Product_Category_ID()}");
