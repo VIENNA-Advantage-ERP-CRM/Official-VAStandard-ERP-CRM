@@ -252,8 +252,10 @@ namespace VAdvantage.Model
         /// <returns>true if RfQ is sent per email.</returns>
         public bool SendRfQ()
         {
+            bool mailSent = false;
             try
             {
+                string NotificationType = null;
                 MUser to = MUser.Get(GetCtx(), GetAD_User_ID());
                 MClient client = MClient.Get(GetCtx());
                 MMailText mtext = new MMailText(GetCtx(), GetRfQ().GetR_MailText_ID(), Get_TrxName());
@@ -289,10 +291,25 @@ namespace VAdvantage.Model
                 email.AddAttachment(CreatePDF());
                 if (EMail.SENT_OK.Equals(email.Send()))
                 {
+                    mailSent = true;
                     //SetDateInvited(new Timestamp(System.currentTimeMillis()));
                     SetDateInvited(DateTime.Now);
                     Save();
-                    return true;
+                }
+
+                if (NotificationType == null)
+                    NotificationType = to.GetNotificationType();                
+
+                //	Send Note
+                if (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(NotificationType)
+                    || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(NotificationType))
+                {
+                    MNote note = new MNote(GetCtx(), "Response", to.GetAD_User_ID(), GetAD_Client_ID(), 0, Get_TrxName());
+                    note.SetRecord(X_C_RfQ.Table_ID, GetC_RfQ_ID());
+                    note.SetReference(subject);
+                    note.SetTextMsg(message.ToString());
+                    note.SetAD_Org_ID(0);
+                    note.Save();
                 }
             }
             catch (Exception ex)
@@ -300,7 +317,7 @@ namespace VAdvantage.Model
                 log.Severe(ex.ToString());
                 //MessageBox.Show("error--" + ex.ToString());
             }
-            return false;
+            return mailSent;
         }
 
         /// <summary>
@@ -309,16 +326,22 @@ namespace VAdvantage.Model
         /// <returns>true if RfQ is sent per email.</returns>
         public bool SendRfqToVendors()
         {
-            string mail = "", name = "";
+            string mail = "", name = "", notificationType = "";
+            int ad_user_ID = 0;
+            bool mailSent = false;
             try
             {
-                DataSet ds = DB.ExecuteDataset("SELECT VA068_Email, VA068_FirstName FROM VA068_RegisteredUser WHERE VA068_RegisteredUser_ID = "
-                    + Get_ValueAsInt("VA068_RegisteredUser_ID"), null, Get_Trx());
+                DataSet ds = DB.ExecuteDataset(@"SELECT ru.VA068_Email, ru.VA068_FirstName, au.AD_User_ID, au.NotificationType
+                    FROM VA068_RegisteredUser ru LEFT JOIN AD_User au ON (ru.AD_User_ID = au.AD_User_ID) 
+                    WHERE ru.VA068_RegisteredUser_ID = " + Get_ValueAsInt("VA068_RegisteredUser_ID"), null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
                     name = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                    ad_user_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
+                    notificationType = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
                 }
+
                 MClient client = MClient.Get(GetCtx());
                 MMailText mtext = new MMailText(GetCtx(), GetRfQ().GetR_MailText_ID(), Get_TrxName());
 
@@ -353,18 +376,30 @@ namespace VAdvantage.Model
                 email.AddAttachment(CreatePDF());
                 if (EMail.SENT_OK.Equals(email.Send()))
                 {
-                    //SetDateInvited(new Timestamp(System.currentTimeMillis()));
+                    mailSent = true;
                     SetDateInvited(DateTime.Now);
                     Save();
-                    return true;
                 }
+                
+                //	Send Note
+                if (ad_user_ID > 0 && (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(notificationType)
+                    || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(notificationType)))
+                {
+                    MNote note = new MNote(GetCtx(), "Response", ad_user_ID, GetAD_Client_ID(), 0, Get_TrxName());
+                    note.SetRecord(X_C_RfQ.Table_ID, GetC_RfQ_ID());
+                    note.SetReference(subject);
+                    note.SetTextMsg(message.ToString());
+                    note.SetAD_Org_ID(0);
+                    note.Save();
+                }
+
             }
             catch (Exception ex)
             {
                 log.Severe(ex.ToString());
                 //MessageBox.Show("error--" + ex.ToString());
             }
-            return false;
+            return mailSent;
         }
         /// <summary>
         /// Create PDF file

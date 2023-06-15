@@ -603,6 +603,9 @@ namespace VAdvantage.Process
             sql.Append(", ");
             CreateConsumedqtyQuery();
 
+            sql.Append(", ");
+            TreatAsDiscountQuery();
+
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
                 sql.Append(", ");
@@ -637,7 +640,7 @@ namespace VAdvantage.Process
                                , CASE WHEN s.TotalQty = 0 THEN 0 ELSE ROUND(s.Currentcostprice/s.TotalQty, 12) END AS SoldCurrentcostprice ");
             }
 
-            sql.Append(" , conQty.NotAdjustmentAmt ");
+            sql.Append(" , (NVL(conQty.NotAdjustmentAmt, 0) + NVL(td.NotAdjustmentAmt , 0)) AS NotAdjustmentAmt ");
 
             //ASI
             if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
@@ -744,6 +747,7 @@ namespace VAdvantage.Process
                 }
             }
 
+            // Consumed Qty from Matcg Invoice
             sql.Append($@" {(Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("C") ? " INNER " : " LEFT ")} 
                             JOIN Consumedqty conQty ON (conQty.M_Product_ID = P.M_Product_ID  
                                                         AND CST.AD_Org_ID = conQty.AD_Org_ID 
@@ -758,6 +762,21 @@ namespace VAdvantage.Process
                 sql.Append($@" AND conQty.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}) ");
             }
 
+            // Treat as Discount (AP Invoice)
+            sql.Append($@" LEFT JOIN TreatDiscount td ON (td.M_Product_ID = P.M_Product_ID  
+                                                        AND CST.AD_Org_ID = td.AD_Org_ID 
+                                                        AND NVL(CST.M_AttributeSetInstance_ID, 0) = NVL(td.M_AttributeSetInstance_ID, 0)  ");
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                    objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch))
+            {
+                sql.Append(@" AND td.M_Warehouse_ID = cst.M_Warehouse_ID) ");
+            }
+            else if (objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append($@" AND td.M_Warehouse_ID = {objInventoryRevaluation.GetM_Warehouse_ID()}) ");
+            }
+
+            // Considered Manufacturing
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
                 sql.Append($@" INNER JOIN Manufactured manPrd ON (manPrd.M_Product_ID = P.M_Product_ID  
@@ -808,7 +827,7 @@ namespace VAdvantage.Process
                                  P.M_Product_ID,
                                  P.C_UOM_ID,
                                  pl.PriceStd,
-                                 stk.TotalQty, conQty.NotAdjustmentAmt ");
+                                 stk.TotalQty, conQty.NotAdjustmentAmt, td.NotAdjustmentAmt  ");
                 if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
                 {
                     sql.Append(@"  ,s.TotalQty , s.Currentcostprice ");
@@ -842,6 +861,9 @@ namespace VAdvantage.Process
             sql.Append($@"WITH ");
 
             CreateConsumedqtyQuery();
+
+            sql.Append(", ");
+            TreatAsDiscountQuery();
 
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
@@ -915,7 +937,7 @@ namespace VAdvantage.Process
                             t.productapproxcost,
                             t.productcost,
                             t.movementqty * t.productcost AS totalcost,
-                            cq.notadjustmentamt,
+                            (NVL(cq.notadjustmentamt, 0) + NVL(td.NotAdjustmentAmt, 0)) AS NotAdjustmentAmt,
                             cq.consumedqty");
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
@@ -992,6 +1014,31 @@ namespace VAdvantage.Process
             }
             sql.Append(")");
 
+            // Treat as Discount (AP Invoice)
+            sql.Append($@" LEFT JOIN TreatDiscount td ON (td.M_Product_ID = P.M_Product_ID");
+            // Organization
+            if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_BatchLot)))
+            {
+                sql.Append(@" AND l.AD_Org_ID = td.AD_Org_ID ");
+            }
+            // AtributeSetInstance
+            if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse)))
+            {
+                sql.Append(@" AND NVL(t.M_AttributeSetInstance_ID, 0) = NVL(td.M_AttributeSetInstance_ID, 0) ");
+            }
+            //Warehose
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append(@" AND NVL(l.M_Warehouse_ID, 0) = NVL(td.M_Warehouse_ID, 0) ");
+            }
+            sql.Append(")");
+
+            // Considere Manufacturing
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
                 sql.Append($@" INNER JOIN Manufactured manPrd ON (manPrd.M_Product_ID = P.M_Product_ID ");
@@ -1036,8 +1083,7 @@ namespace VAdvantage.Process
             }
             sql.Append($@" WHERE t.MovementDate BETWEEN prd.StartDate AND prd.EndDate 
                             AND t.CostingLevel = {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())}
-                            AND t.MovementType NOT IN ( 'V+', 'V-', 'IR' )
-                            AND NVL(t.VAFAM_AssetDisposal_ID, 0) = 0
+                            AND t.MovementType NOT IN ( 'V+', 'V-', 'IR' ) 
                             AND ( ( t.MovementType IN ( 'I+', 'I-' ) AND i.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
                                   OR ( t.MovementType IN ( 'M+', 'M-' ) AND m.DocStatus NOT IN ( 'VO', 'RE' ) AND t.MovementQty < 0 )
                                   OR ( t.MovementType IN ( 'P+', 'P-' ) AND pd.IsReversed NOT IN ( 'Y' ) AND pl.MaterialType = 'C' AND t.MovementQty < 0 )
@@ -1048,6 +1094,10 @@ namespace VAdvantage.Process
                                        AND wot.docstatus NOT IN ( 'VO', 'RE' ) ) ");
             }
             sql.Append(")");
+            if (Env.IsModuleInstalled("VAFAM_"))
+            {
+                sql.Append(@" AND NVL(t.VAFAM_AssetDisposal_ID, 0) = 0 ");
+            }
             if (objInventoryRevaluation.GetM_Product_Category_ID() > 0)
             {
                 sql.Append($@" AND p.M_Product_Category_ID = {objInventoryRevaluation.GetM_Product_Category_ID()}");
@@ -1382,6 +1432,130 @@ namespace VAdvantage.Process
                 //sql.Append(@" , 0 AS M_Warehouse_ID");
             }
             sql.Append(@" ) ");
+        }
+
+        /// <summary>
+        /// Create Query for getting detail on Not Adjusted Amount from Match Invoice
+        /// </summary>
+        /// <Author>VIS_045: 02-June-2023 -> DevOps Task ID - 2151</Author>
+        private void TreatAsDiscountQuery()
+        {
+            sql.Append($@" TreatDiscount AS (
+                SELECT
+                il.M_Product_ID,
+                SUM(currencyConvert(il.TotalCOGSAdjustment , i.C_Currency_ID , {objInventoryRevaluation.GetC_Currency_ID()} ,
+                i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, il.AD_Org_ID)) AS NotAdjustmentAmt");
+
+            // Organization
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+              objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_BatchLot))
+            {
+                sql.Append(@" , 0 AS AD_Org_ID ");
+            }
+            else
+            {
+                sql.Append(@" , l.AD_Org_ID ");
+            }
+
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse))
+            {
+                sql.Append(@" , 0 AS M_AttributeSetInstance_ID ");
+            }
+            else
+            {
+                sql.Append(@" , il.M_AttributeSetInstance_ID ");
+            }
+
+            //Warehose
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append(@" , io.M_Warehouse_ID ");
+            }
+            else
+            {
+                sql.Append(@" , 0 AS M_Warehouse_ID");
+            }
+
+            sql.Append($@" FROM
+                 C_InvoiceLine il
+                INNER JOIN C_Invoice i ON (i.C_Invoice_ID = il.C_Invoice_ID)
+                INNER JOIN C_InvoiceLine ril ON (il.Ref_InvoiceLineOrg_ID = ril.C_InvoiceLine_ID)
+                INNER JOIN M_Product p ON ( p.M_Product_ID = il.M_Product_ID )
+                INNER JOIN M_InOutLine iol ON (ril.M_InOutLine_ID = iol.M_InOutLine_ID )
+                INNER JOIN M_InOut io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                INNER JOIN M_Transaction t ON (t.M_InOutLine_ID = iol.M_InOutLine_ID)
+                INNER JOIN M_Locator l ON (l.M_Locator_ID = iol.M_Locator_ID)");
+            if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
+            {
+                sql.Append($@" INNER JOIN C_Period prd ON (prd.C_Period_ID = {objInventoryRevaluation.GetC_Period_ID()}) ");
+            }
+
+            sql.Append($@" WHERE il.TotalCOGSAdjustment <> 0 AND i.TreatAsDiscount = 'Y' 
+                  AND t.CostingLevel = {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())}");
+
+            if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
+            {
+                sql.Append($@" AND i.DateAcct BETWEEN prd.StartDate AND prd.EndDate  ");
+            }
+            else
+            {
+                sql.Append($@" AND i.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
+                               OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID,
+                              it.m_attributesetinstance_id , loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC , it.MovementDate, M_Transaction_ID ASC) AS MovementDate
+                            FROM M_Transaction it INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
+                            WHERE it.M_Product_ID = p.M_Product_ID AND l.AD_Org_ID = loc.AD_Org_ID AND io.M_Warehouse_ID = loc.M_Warehouse_ID 
+                            AND it.M_AttributeSetInstance_ID = il.M_AttributeSetInstance_ID  FETCH FIRST ROW ONLY )  ");
+            }
+
+            if (objInventoryRevaluation.GetM_Product_Category_ID() > 0)
+            {
+                sql.Append($@" AND p.M_Product_Category_ID = {objInventoryRevaluation.GetM_Product_Category_ID()}");
+            }
+            if (objInventoryRevaluation.GetM_Product_ID() > 0)
+            {
+                sql.Append($@" AND p.M_Product_ID = {objInventoryRevaluation.GetM_Product_ID()}");
+            }
+            // Organization
+            if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+              objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_BatchLot)))
+            {
+                sql.Append($@" AND l.AD_Org_ID = {objInventoryRevaluation.GetAD_Org_ID()}");
+            }
+
+            //Warehose
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append($@" AND io.M_Warehouse_ID  = {objInventoryRevaluation.GetM_Warehouse_ID()}");
+            }
+
+            sql.Append(@" GROUP BY il.M_Product_ID ");
+            // Organization
+            if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_BatchLot)))
+            {
+                sql.Append(@" , l.AD_Org_ID ");
+            }
+            // Attribute Set Instance
+            if (!(objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse)))
+            {
+                sql.Append(@" , il.M_AttributeSetInstance_ID ");
+            }
+            // Warehouse
+            if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Warehouse) ||
+                objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_WarehousePlusBatch) ||
+                objInventoryRevaluation.GetM_Warehouse_ID() > 0)
+            {
+                sql.Append(@" , io.M_Warehouse_ID ");
+            }
+            sql.Append(" ) ");
         }
 
     }

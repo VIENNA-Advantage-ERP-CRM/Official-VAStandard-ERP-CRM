@@ -220,6 +220,7 @@
     <Compile Include="Model\MInventoryRevaluation.cs" />
     <Compile Include="Model\MRevaluationAcctSchema.cs" />
     <Compile Include="Model\MRevaluationLine.cs" />
+    <Compile Include="Model\MSLAGoal.cs" />
     <Compile Include="Model\MSysConfig.cs" />
     <Compile Include="Model\MAccountGroupBatch.cs" />
     <Compile Include="Model\MAssignAcctSchema.cs" />
@@ -250,6 +251,7 @@
     <Compile Include="Model\MVASContractOwner.cs" />
     <Compile Include="Model\MVASContractCategory.cs" />
     <Compile Include="Model\MVASContractMaster.cs" />
+    <Compile Include="Model\MVASVariationThreshold.cs" />
     <Compile Include="Model\MWarehouse.cs" />
     <Compile Include="Model\UserPricingInterface.cs" />
     <Compile Include="Model\AcctViewerData.cs" />
