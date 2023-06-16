@@ -640,7 +640,7 @@ namespace VAdvantage.Process
                                , CASE WHEN s.TotalQty = 0 THEN 0 ELSE ROUND(s.Currentcostprice/s.TotalQty, 12) END AS SoldCurrentcostprice ");
             }
 
-            sql.Append(" , (NVL(conQty.NotAdjustmentAmt, 0) + NVL(td.NotAdjustmentAmt , 0)) AS NotAdjustmentAmt ");
+            sql.Append(" , (NVL(conQty.NotAdjustmentAmt, 0) - NVL(td.NotAdjustmentAmt , 0)) AS NotAdjustmentAmt ");
 
             //ASI
             if (objInventoryRevaluation.GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
@@ -937,7 +937,7 @@ namespace VAdvantage.Process
                             t.productapproxcost,
                             t.productcost,
                             t.movementqty * t.productcost AS totalcost,
-                            (NVL(cq.notadjustmentamt, 0) + NVL(td.NotAdjustmentAmt, 0)) AS NotAdjustmentAmt,
+                            (NVL(cq.notadjustmentamt, 0) - NVL(td.NotAdjustmentAmt, 0)) AS NotAdjustmentAmt,
                             cq.consumedqty");
             if (Util.GetValueOfString(objInventoryRevaluation.Get_Value("ProductConsideration")).Equals("M"))
             {
