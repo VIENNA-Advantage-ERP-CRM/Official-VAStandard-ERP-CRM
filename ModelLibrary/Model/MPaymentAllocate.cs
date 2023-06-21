@@ -26,6 +26,7 @@ namespace VAdvantage.Model
         private static VLogger _log = VLogger.GetVLogger(typeof(MPaymentAllocate).FullName);
         /**	The Invoice				*/
         private MInvoice _invoice = null;
+        private MJournalLine _journalLine = null; //VIS_427 DevopsTaskId :2156 variable for MJournalLine
 
         /// <summary>
         /// Standard Constructor
@@ -110,18 +111,36 @@ namespace VAdvantage.Model
                 _invoice = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_TrxName());
             return _invoice;
         }
+        //VIS_427 DevopsTaskId :2156 get Gl JournalLine
+        public MJournalLine GetJournaLine()
+        {
+            if (_journalLine == null && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
+                _journalLine = new MJournalLine(GetCtx(), Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")), Get_TrxName());
+            return _journalLine;
+        }
 
         /**
-         * 	Get BPartner of Invoice
+         * 	Get BPartner of Invoice or Gl journalline 
          *	@return bp
          */
         public int GetC_BPartner_ID()
         {
-            if (_invoice == null)
-                GetInvoice();
-            if (_invoice == null)
-                return 0;
-            return _invoice.GetC_BPartner_ID();
+            if (Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
+            {
+                if (_journalLine == null)
+                    GetJournaLine();
+                if (_journalLine == null)
+                    return 0;
+                return Util.GetValueOfInt(_journalLine.Get_Value("C_BPartner_ID"));
+            }
+            else
+            {
+                if (_invoice == null)
+                    GetInvoice();
+                if (_invoice == null)
+                    return 0;
+                return _invoice.GetC_BPartner_ID();
+            }
         }
 
         /**
@@ -416,7 +435,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
+            
             // Added bby Bharat on 31 July 2017 as Issue given by Ravikant
             //int _CountVA009 = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA009_'  AND IsActive = 'Y'"));
             if (Env.IsModuleInstalled("VA009_"))
