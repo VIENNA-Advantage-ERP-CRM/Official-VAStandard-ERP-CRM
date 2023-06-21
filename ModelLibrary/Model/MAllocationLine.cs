@@ -286,7 +286,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
+   
             //	Payment - Invoice
             if (C_Payment_ID != 0 && invoice != null)
             {
@@ -353,10 +353,18 @@ namespace VAdvantage.Model
                 }
             }
 
-            if (GetGL_JournalLine_ID() != 0 && reverse)
+            //VIS_427 DevopsTaskId :2156 update Gl_journalline
+            if (GetGL_JournalLine_ID() != 0)
             {
-                // set allocation as false on View Allocation reversal
-                DB.ExecuteQuery(@" UPDATE GL_JOURNALLINE SET isAllocated ='N' WHERE GL_JOURNALLINE_ID =" + GetGL_JournalLine_ID(), null, Get_TrxName());
+                if (reverse)
+                {
+                    // set allocation as false on View Allocation reversal
+                    DB.ExecuteQuery(@" UPDATE GL_JournalLine SET isAllocated ='N' WHERE GL_JournalLine_ID =" + GetGL_JournalLine_ID(), null, Get_TrxName());
+                }
+                else
+                {
+                    DB.ExecuteQuery(@" UPDATE GL_JournalLine SET isAllocated ='Y' WHERE GL_JournalLine_ID =" + GetGL_JournalLine_ID(), null, Get_TrxName());
+                }
             }
             // Added by Bharat- Update Discrepancy amount on Invoice.
 
