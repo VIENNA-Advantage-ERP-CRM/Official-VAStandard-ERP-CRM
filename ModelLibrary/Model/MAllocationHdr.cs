@@ -1010,10 +1010,10 @@ namespace VAdvantage.Model
                 line.SetWithholdingAmt(Env.ZERO);
                 line.SetBackupWithholdingAmount(Env.ZERO);
                 line.Save();
-
-
+                
+                
                 // Added by Amit for Payment Management 5-11-2015   
-                if (Env.IsModuleInstalled("VA009_"))
+                if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID()>0)
                 {
                     MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), line.GetC_InvoicePaySchedule_ID(), Get_Trx());
                     paySch.SetVA009_IsPaid(false);

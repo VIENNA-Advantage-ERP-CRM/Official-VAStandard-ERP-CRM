@@ -4628,7 +4628,11 @@ namespace VAdvantage.Model
                     return AllocateOrder();
                 }
             }
-
+            //VIS_427 DevopsTaskId :2156 Create Gl JournalLine 
+            if (Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
+            {
+                    return AllocateJournalLine();
+            }
             //	Invoices of a AP Payment Selection
             if (AllocatePaySelection())
                 return true;
@@ -4707,8 +4711,13 @@ namespace VAdvantage.Model
                         aLine.SetWithholdingAmt(Decimal.Negate(Util.GetValueOfDecimal(dr[0]["withholdingAmt"])));
                         aLine.SetBackupWithholdingAmount(Decimal.Negate(Util.GetValueOfDecimal(dr[0]["BackupwithholdingAmt"])));
                     }
-                }
+                }                
                 aLine.SetDocInfo(pa.GetC_BPartner_ID(), 0, pa.GetC_Invoice_ID());
+                //VIS_427 DevopsTaskId :2156 set  Gl JournalLine 
+                if (pa.Get_ColumnIndex("GL_JournalLine_ID")>=0 && Util.GetValueOfInt(pa.Get_Value("GL_JournalLine_ID")) != 0)
+                {
+                    aLine.SetGL_JournalLine_ID(Util.GetValueOfInt(pa.Get_Value("GL_JournalLine_ID")));
+                }
                 aLine.SetPaymentInfo(GetC_Payment_ID(), 0);
                 if (Env.IsModuleInstalled("VA009_"))
                 {
@@ -4916,6 +4925,94 @@ namespace VAdvantage.Model
             catch (Exception ex)
             {
                 log.Severe(ex.Message);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Generate Allocation for Payment incase of GL JournalLine
+        /// </summary>
+        /// <returns>if allocation generated it returns true</returns>
+        /// <writer>VIS_427</writer>
+
+        private bool AllocateJournalLine()
+        {
+            try
+            {
+                int journalline_id = Util.GetValueOfInt(Get_Value("GL_JournalLine_ID"));
+                //	calculate actual allocation
+                Decimal allocationAmt = GetPaymentAmount();			//	underpayment
+
+                MAllocationHdr alloc = new MAllocationHdr(GetCtx(), false,
+                    GetDateTrx(), GetC_Currency_ID(),
+                    Msg.Translate(GetCtx(), "C_Payment_ID") + ": " + GetDocumentNo() + " [1]", Get_TrxName());
+
+                alloc.SetAD_Org_ID(GetAD_Org_ID());
+                // Update conversion type from payment to view allocation (required for posting)
+                if (alloc.Get_ColumnIndex("C_ConversionType_ID") > 0)
+                {
+                    alloc.SetC_ConversionType_ID(GetC_ConversionType_ID());
+                }
+                /** when trx date not matched with account date, then we have to set dateacct from payment record*/
+                alloc.SetDateAcct(GetDateAcct());
+                if (!alloc.Save())
+                {
+                    log.Log(Level.SEVERE, "Could not create Allocation Hdr");
+                    return false;
+                }
+                MAllocationLine aLine = null;
+                if (IsReceipt())
+                {
+                    aLine = new MAllocationLine(alloc, allocationAmt,
+                        GetDiscountAmt(), GetWriteOffAmt(), GetOverUnderAmt());
+                    if (aLine.Get_ColumnIndex("WithholdingAmt") > 0)
+                    {
+                        aLine.SetBackupWithholdingAmount(GetBackupWithholdingAmount());
+                        aLine.SetWithholdingAmt(GetWithholdingAmt());
+                    }
+                }
+                else
+                {
+                    aLine = new MAllocationLine(alloc, Decimal.Negate(allocationAmt),
+                        Decimal.Negate(GetDiscountAmt()), Decimal.Negate(GetWriteOffAmt()), Decimal.Negate(GetOverUnderAmt()));
+                    if (aLine.Get_ColumnIndex("WithholdingAmt") > 0)
+                    {
+                        aLine.SetBackupWithholdingAmount(Decimal.Negate(GetBackupWithholdingAmount()));
+                        aLine.SetWithholdingAmt(Decimal.Negate(GetWithholdingAmt()));
+                    }
+                }
+                aLine.SetDocInfo(GetC_BPartner_ID(), 0, 0);
+                aLine.SetGL_JournalLine_ID(journalline_id);
+                aLine.SetC_Payment_ID(GetC_Payment_ID());
+                if (!aLine.Save(Get_TrxName()))
+                {
+                    log.Log(Level.SEVERE, "Could not create Allocation Line");
+                    return false;
+                }
+                //	Should start WF
+                alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
+                if (alloc.GetProcessMsg() != null)
+                {
+                    _AllocMsg = alloc.GetProcessMsg();
+                    return false;
+                }
+                alloc.Save(Get_Trx());
+                _processMsg = " View @C_AllocationHdr_ID@ created successfully with doc no: " + alloc.GetDocumentNo();
+                int C_Project_ID = DataBase.DB.GetSQLValue(Get_Trx(),
+                    "SELECT MAX(C_Project_ID) FROM GL_JournalLine WHERE GL_JournalLine_ID=@param1", journalline_id);
+                if (C_Project_ID > 0 && GetC_Project_ID() == 0)
+                {
+                    SetC_Project_ID(C_Project_ID);
+                }
+                else if (C_Project_ID > 0 && GetC_Project_ID() > 0 && C_Project_ID != GetC_Project_ID())
+                {
+                    log.Warning("GL_JournalLine C_Project_ID=" + C_Project_ID
+                        + " <> Payment C_Project_ID=" + GetC_Project_ID());
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Severe(ex.ToString());
             }
             return true;
         }
@@ -5305,6 +5402,7 @@ namespace VAdvantage.Model
             reversal.SetClientOrg(this);
             reversal.SetC_Order_ID(0);
             reversal.SetC_Invoice_ID(0);
+            reversal.Set_Value("GL_JournalLine_ID", 0); //VIS_427 DevopsTaskId :2156 Set Gl JournalLine to zero on reverse
             reversal.SetDateAcct(dateAcct);
             //
             reversal.SetDocumentNo(GetDocumentNo() + REVERSE_INDICATOR);	//	indicate reversals
