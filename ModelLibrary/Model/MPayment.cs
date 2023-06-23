@@ -5192,8 +5192,12 @@ namespace VAdvantage.Model
             if (Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
             {
                 Set_Value("GL_JournalLine_ID", null);
-            }         
-            //
+            }
+            //VIS_427 DevopsTaskId :2156 Set Batch to zero on reverse
+            if (Util.GetValueOfInt(Get_Value("VA009_Batch_ID")) != 0)
+            {
+                Set_Value("VA009_Batch_ID", null);
+            }
             SetC_Invoice_ID(0);
             SetIsAllocated(false);
         }
