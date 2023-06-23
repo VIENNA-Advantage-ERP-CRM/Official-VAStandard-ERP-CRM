@@ -5188,6 +5188,11 @@ namespace VAdvantage.Model
                     log.Fine("Unlink Order #" + no);
                 }
             }
+            //VIS_427 DevopsTaskId :2156 Set Gl JournalLine to zero on reverse
+            if (Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
+            {
+                Set_Value("GL_JournalLine_ID", null);
+            }         
             //
             SetC_Invoice_ID(0);
             SetIsAllocated(false);
@@ -5402,7 +5407,7 @@ namespace VAdvantage.Model
             reversal.SetClientOrg(this);
             reversal.SetC_Order_ID(0);
             reversal.SetC_Invoice_ID(0);
-            reversal.Set_Value("GL_JournalLine_ID", 0); //VIS_427 DevopsTaskId :2156 Set Gl JournalLine to zero on reverse
+            reversal.Set_Value("GL_JournalLine_ID", null); //VIS_427 DevopsTaskId :2156 Set Gl JournalLine to zero on reverse
             reversal.SetDateAcct(dateAcct);
             //
             reversal.SetDocumentNo(GetDocumentNo() + REVERSE_INDICATOR);	//	indicate reversals
@@ -5505,7 +5510,7 @@ namespace VAdvantage.Model
             int invoice_ID = 0;
             if (Env.IsModuleInstalled("VA009_"))
             {
-                string sql = "SELECT DISTINCT C_PaymentAllocate_ID FROM C_PaymentAllocate WHERE IsActive = 'Y' AND  NVL(C_Invoice_ID , 0) <> 0 AND C_Payment_ID =  " + GetC_Payment_ID();
+                string sql = "SELECT DISTINCT C_PaymentAllocate_ID FROM C_PaymentAllocate WHERE IsActive = 'Y' AND (NVL(C_Invoice_ID , 0) <> 0 OR NVL(GL_JournalLine_ID , 0) <> 0) AND C_Payment_ID =  " + GetC_Payment_ID();
                 DataSet ds = new DataSet();
                 ds = DB.ExecuteDataset(sql, null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -5517,8 +5522,16 @@ namespace VAdvantage.Model
                         reversalPaymentAllocate.SetAD_Client_ID(originalPaymentAllocate.GetAD_Client_ID());
                         reversalPaymentAllocate.SetAD_Org_ID(originalPaymentAllocate.GetAD_Org_ID());
                         reversalPaymentAllocate.SetC_Payment_ID(reversal.GetC_Payment_ID());
-                        reversalPaymentAllocate.SetC_Invoice_ID(originalPaymentAllocate.GetC_Invoice_ID());
-                        reversalPaymentAllocate.SetC_InvoicePaySchedule_ID(originalPaymentAllocate.GetC_InvoicePaySchedule_ID());
+                        if (originalPaymentAllocate.GetC_Invoice_ID() > 0)
+                        {
+                            reversalPaymentAllocate.SetC_Invoice_ID(originalPaymentAllocate.GetC_Invoice_ID());
+                            reversalPaymentAllocate.SetC_InvoicePaySchedule_ID(originalPaymentAllocate.GetC_InvoicePaySchedule_ID());
+                        }
+                        //VIS_427 DevopsTaskId :2156 Added For GL JournalLine
+                        else if (Util.GetValueOfInt(originalPaymentAllocate.Get_Value("GL_JournalLine_ID")) > 0)
+                        {
+                            reversalPaymentAllocate.Set_Value("GL_JournalLine_ID", Util.GetValueOfInt(originalPaymentAllocate.Get_Value("GL_JournalLine_ID")));
+                        }
                         reversalPaymentAllocate.SetInvoiceAmt(originalPaymentAllocate.GetInvoiceAmt());
                         reversalPaymentAllocate.SetAmount(Decimal.Negate(originalPaymentAllocate.GetAmount()));
                         reversalPaymentAllocate.SetDiscountAmt(Decimal.Negate(originalPaymentAllocate.GetDiscountAmt()));
@@ -5601,10 +5614,10 @@ namespace VAdvantage.Model
 
                 // VIS_0045: Payment Schedule Batch 
                 // Update Execution Status as "Assigned to Batch" on Invoice PaySchedule 
-                String sql = @"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus = '"
-                            + MInvoicePaySchedule.VA009_EXECUTIONSTATUS_AssignedToBatch +
-                            @"' WHERE C_InvoicePaySchedule_ID IN ( SELECT C_InvoicePaySchedule_ID FROM VA009_BatchLineDetails 
-                                    WHERE C_Payment_ID = " + GetC_Payment_ID() + ")";
+                    String sql = @"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus = '"
+                                + MInvoicePaySchedule.VA009_EXECUTIONSTATUS_AssignedToBatch +
+                                @"' WHERE C_InvoicePaySchedule_ID IN ( SELECT C_InvoicePaySchedule_ID FROM VA009_BatchLineDetails 
+                                    WHERE C_Payment_ID = " + GetC_Payment_ID() + ")";                
                 DB.ExecuteQuery(sql, null, Get_Trx());
 
                 //update Payment Batch line set payment = null during reverse of this payment
