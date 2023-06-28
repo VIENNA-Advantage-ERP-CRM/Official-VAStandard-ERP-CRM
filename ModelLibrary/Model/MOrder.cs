@@ -1150,7 +1150,7 @@ namespace VAdvantage.Model
             {
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' "
+                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1210,7 +1210,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' "
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1253,7 +1253,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "'"
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "' AND VAS_IsVariationOrder='N'"
                     + " ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
