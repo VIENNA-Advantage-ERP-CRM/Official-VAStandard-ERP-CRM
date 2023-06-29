@@ -4510,7 +4510,7 @@ namespace VAdvantage.Model
                         commomnConfig = voData.Find(x => x.UseForMultiplelines == true);
                         if (commomnConfig == null)
                         {
-                            return "VAS_VoConfigNotFound";
+                            return "@VAS_VoConfigNotFound@";
                         }
                     }
 
@@ -4528,7 +4528,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return "VAS_OrigPONotFound";
+                        return  "@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -4574,7 +4574,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
     WHERE IsActive='Y' AND Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
                         if (sumLineAmt >= (amt * commomnConfig.VariationAllowed / 100))
                         {
-                            return "VAS_AllowedvariationExceed";
+                            return "@VAS_AllowedvariationExceed@";
                         }
                     }
                 }
