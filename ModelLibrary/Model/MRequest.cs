@@ -952,6 +952,10 @@ namespace VAdvantage.Model
                     SetCloseDate(DateTime.Now);
                 if (status.IsFinalClose())
                     SetProcessed(true);
+                else if (status.IsClosed())
+                    Set_Value("VAS_IsResolved", "Y");        //VIS_427 BugId: 2190 If Status is Final Close then mark VAS_IsResovled Checkbox true
+                else
+                    Set_Value("VAS_IsResolved", "N");
             }
 
             //	Confidential Info
