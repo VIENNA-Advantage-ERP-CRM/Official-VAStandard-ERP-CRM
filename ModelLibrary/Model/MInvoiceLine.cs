@@ -355,12 +355,37 @@ namespace VAdvantage.Model
                         //}
                         //else
                         //{
-                        SetPriceEntered(oLine.GetPriceEntered());
-                        SetPriceActual(oLine.GetPriceActual());
-                        SetPriceLimit(oLine.GetPriceLimit());
-                        SetPriceList(oLine.GetPriceList());
-                        //}
-                    }
+                        //VIS_427 DevOps TaskID:2124 - worked for updating the price according to UOM
+                        if (oLine.GetC_UOM_ID() == sLine.GetC_UOM_ID())
+                        {
+                            SetPriceEntered(oLine.GetPriceEntered());
+                            SetPriceActual(oLine.GetPriceActual());
+                            SetPriceLimit(oLine.GetPriceLimit());
+                            SetPriceList(oLine.GetPriceList());
+                        }
+                        else
+                        {
+                            int priceListPrcision = MPriceList.Get(GetCtx(), _M_PriceList_ID, Get_Trx()).GetPricePrecision();
+                            MProduct prod = MProduct.Get(GetCtx(), oLine.GetM_Product_ID());
+                            if (prod.GetC_UOM_ID() == oLine.GetC_UOM_ID())
+                            {
+                                decimal rate = (sLine.GetMovementQty() / sLine.GetQtyEntered());
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() * rate,priceListPrcision,MidpointRounding.AwayFromZero));
+                                SetPriceActual(Decimal.Round(oLine.GetPriceActual() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceList(Decimal.Round(oLine.GetPriceList() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                            }
+                            else if (prod.GetC_UOM_ID() != oLine.GetC_UOM_ID())
+                            {
+                                decimal rate = (oLine.GetQtyOrdered() / oLine.GetQtyEntered());
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered()/rate, priceListPrcision,MidpointRounding.AwayFromZero));
+                                SetPriceActual(Decimal.Round(oLine.GetPriceActual()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceList(Decimal.Round(oLine.GetPriceList()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                            }
+                            //}
+                        }
+                     }
                     //
                     SetC_Tax_ID(oLine.GetC_Tax_ID());
                     SetLineNetAmt(oLine.GetLineNetAmt());

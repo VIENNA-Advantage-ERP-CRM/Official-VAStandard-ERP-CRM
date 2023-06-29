@@ -134,6 +134,9 @@ namespace VAdvantage.Process
                     + " AND IsActive='Y' AND IsTableID='Y' AND IsAutoSequence='Y' ";
                     DB.ExecuteQuery(updateSQL, null, Get_Trx());
 
+                    // VIS_045: DevOps Task ID - 1937,  15-May-2023, Update Native Sequence 
+                    UpdateNativeSequence(C_ProfitLossLines_ID);
+
                     // Update Profit Before tax on Header
                     ProfitBeforeTax = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT SUM(AccountDebit) - SUM(AccountCredit) FROM C_ProfitLossLines WHERE  C_ProfitAndLoss_ID > 0 AND  IsActive='Y' AND C_ProfitLoss_ID=" + GetRecord_ID(), null, Get_Trx()));
                     prof.SetProfitBeforeTax(ProfitBeforeTax);
@@ -163,6 +166,26 @@ namespace VAdvantage.Process
         protected override void Prepare()
         {
 
+        }
+
+        /// <summary>
+        /// Whene Native Sequence Applicable then update native sequence
+        /// </summary>
+        /// <param name="MaxRecord_ID">Record ID to be updated</param>
+        /// <Task>VIS_045: DevOps Task ID - 1937,  15-May-2023</Task>
+        private void UpdateNativeSequence(int MaxRecord_ID)
+        {
+            if (MSysConfig.IsNativeSequence(false))
+            {
+                if (DB.IsPostgreSQL())
+                {
+                    DB.ExecuteQuery($"ALTER SEQUENCE C_PROFITLOSSLINES_SEQ RESTART WITH {MaxRecord_ID}", null, Get_Trx());
+                }
+                else
+                {
+                    DB.ExecuteQuery($"ALTER SEQUENCE C_PROFITLOSSLINES_SEQ RESTART start WITH {MaxRecord_ID}", null, Get_Trx());
+                }
+            }
         }
 
         /// <summary>

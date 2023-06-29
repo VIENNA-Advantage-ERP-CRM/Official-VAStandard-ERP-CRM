@@ -179,7 +179,7 @@ namespace VAdvantage.Model
             if (!reload && locators != null)
                 return locators;
             //
-            String sql = "SELECT * FROM M_Locator WHERE M_Warehouse_ID=" + GetM_Warehouse_ID() + " ORDER BY X,Y,Z";
+            String sql = "SELECT * FROM M_Locator WHERE IsActive = 'Y' AND M_Warehouse_ID=" + GetM_Warehouse_ID() + " ORDER BY X,Y,Z";
             List<MLocator> list = new List<MLocator>();
             try
             {

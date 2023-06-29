@@ -126,16 +126,16 @@ namespace VAdvantage.Model
                 //	Product
                 if (restriction.GetM_Product_ID() == M_Product_ID)
                 {
-                    return true;
+                    return false;
                 }
                 //	Product Category
                 if (MProductCategory.IsCategory(restriction.GetM_Product_Category_ID(), M_Product_ID))
                 {
-                    return true;
+                    return false;
                 }
             }
             //	must be on "positive" list
-            return false;
+            return true;
         }
     }
 }

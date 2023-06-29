@@ -248,8 +248,55 @@ namespace VAdvantage.Model
                 }
             }
 
+            /*VIS_045: DevOps Task ID - 2113, 09-May-2022*/
+            if (newRecord || Is_ValueChanged("CostingMethod") || Is_ValueChanged("M_CostElement_ID") || Is_ValueChanged("MMPolicy"))
+            {
+                // When Material Policy is FIFO, then user can not select costing metghod as "LIFO" and vice versa
+                string costingMethod = GetCostingMethod();
+                if (!string.IsNullOrEmpty(costingMethod))
+                {
+                    if (costingMethod.Equals(COSTINGMETHOD_CostCombination) && GetM_CostElement_ID() > 0)
+                    {
+                        costingMethod = Util.GetValueOfString(DB.ExecuteScalar($@"SELECT CostingMethod FROM M_CostElement WHERE M_CostElement_ID IN 
+                            (SELECT CAST(M_Ref_CostElement AS INTEGER) FROM M_CostElementLine WHERE M_CostElement_ID={GetM_CostElement_ID()} )
+                            AND CostingMethod IS NOT NULL", null, Get_Trx()));
+                    }
+                    if ((GetMMPolicy().Equals(MMPOLICY_FiFo) && costingMethod.Equals(COSTINGMETHOD_Lifo)) ||
+                        (GetMMPolicy().Equals(MMPOLICY_LiFo) && costingMethod.Equals(COSTINGMETHOD_Fifo)))
+                    {
+                        log.SaveError("MMPolicyAndMethodnotMatch", "");
+                        return false;
+                    }
+                }
+
+                // Check Quantity available on Cost Queue or not
+                if (CheckProductTransactionCount())
+                {
+                    log.SaveError("QtyFoundPolicycantChange", "");
+                    return false;
+                }
+            }
+
             return true;
         }
+
+        /// <summary>
+        /// Check Quantity available on Cost Queue or not
+        /// </summary>
+        /// <writer>VIS_045, DevOps Task ID - 2113, 09-May-2022</writer>
+        /// <returns>False, when Qunatity on Cost Queue is ZERO</returns>
+        public bool CheckProductTransactionCount()
+        {
+            String sql = $@"SELECT COUNT(cq.M_CostQueue_ID) FROM M_CostQueue cq
+                            INNER JOIN M_Product p ON (p.M_Product_ID = cq.M_Product_ID)
+                            WHERE cq.CurrentQty <> 0 AND p.M_Product_Category_ID = {GetM_Product_Category_ID()}";
+            if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
         /**
          * 	Before Delete
          *	@return true

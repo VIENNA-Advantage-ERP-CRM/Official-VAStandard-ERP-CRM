@@ -3403,6 +3403,11 @@ namespace VAdvantage.Model
                         }
                     }
 
+                    // Set Transaction ID on Invoice Line 
+                    DB.ExecuteQuery($@"UPDATE C_InvoiceLine SET M_Transaction_ID = 
+                                        (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID)
+                                       WHERE C_Invoiceline_ID = {line.GetC_InvoiceLine_ID()} ", null, Get_Trx());
+
                     //Enhaced by amit 16-12-2015 for Cost Queue
                     if (client.IsCostImmediate())
                     {
@@ -4606,6 +4611,9 @@ namespace VAdvantage.Model
                                                     (Math.Abs(line.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
                                             }
+
+                                            // VIS_045: 29-May-2023 -> DevOps Task ID: 2146
+                                            query.Append(@" , M_Transaction_ID = (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID) ");
                                             query.Append(@" WHERE C_Invoiceline_ID = " + line.GetC_InvoiceLine_ID());
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                         }
@@ -4836,7 +4844,7 @@ namespace VAdvantage.Model
                 bp = new MBPartner(GetCtx(), GetC_BPartner_ID(), Get_TrxName());
                 //	Update total revenue and balance / credit limit (reversed on AllocationLine.processIt)
                 //Ned to get conversion based on selected conversion type on Invoice.
-                Decimal invAmt = MConversionRate.ConvertBase(GetCtx(), GetGrandTotal(true),	//	CM adjusted 
+                Decimal invAmt = MConversionRate.ConvertBase(GetCtx(), GetGrandTotal(true), //	CM adjusted 
                     GetC_Currency_ID(), GetDateAcct(), GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
 
                 //Added by Vivek for Credit Limit on 24/08/2016
@@ -5046,7 +5054,7 @@ namespace VAdvantage.Model
                         _processMsg = "Could not update Business Partner User";
                         return DocActionVariables.STATUS_INVALID;
                     }
-                }	//	user
+                }   //	user
 
                 //	Update Project
                 if (IsSOTrx() && GetC_Project_ID() != 0)
@@ -5076,7 +5084,7 @@ namespace VAdvantage.Model
                         _processMsg = "Could not update Project";
                         return DocActionVariables.STATUS_INVALID;
                     }
-                }	//	project
+                }   //	project
 
                 //	User Validation
                 String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
@@ -7552,7 +7560,7 @@ namespace VAdvantage.Model
             if (Env.IsModuleInstalled("VA009_"))
             {
                 int invPaySchId = DB.GetSQLValue
-                    (null, "SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE VA009_TransCurrency= " + C_Currency_ID
+                    (Get_Trx(), "SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE VA009_TransCurrency= " + C_Currency_ID
                       + " AND  C_Invoice_ID = " + GetC_Invoice_ID() + " AND  VA009_PaymentMethod_ID IN "
                       + " (SELECT p.VA009_PaymentMethod_ID FROM VA009_PaymentMethod p WHERE p.VA009_PaymentBaseType = "
                                      + " '" + X_C_Order.PAYMENTRULE_Cash + "' AND p.C_Currency_ID IS NULL AND p.IsActive = 'Y' AND p.AD_Client_ID = " + GetAD_Client_ID() + ") ");
