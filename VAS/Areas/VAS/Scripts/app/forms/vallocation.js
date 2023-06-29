@@ -2134,7 +2134,9 @@
                     $cmbCurrency.addClass('vis-ev-col-mandatory');
                 }
             }
-
+            //VIS_427 DevOps TaskID:2173 Filter Business Partner According to organization
+            //value = VIS.MLookupFactory.get(ctx, self.windowNo, 3499, VIS.DisplayType.Search, "C_BPartner_ID", 0, false,
+            //    "C_BPartner.IsActive = 'Y' AND C_BPartner.AD_Org_ID IN (0, @OrgID@)");
             value = VIS.MLookupFactory.getMLookUp(ctx, self.windowNo, 3499, VIS.DisplayType.Search);
             $vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, value);
 

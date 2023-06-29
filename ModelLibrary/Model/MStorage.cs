@@ -1442,7 +1442,7 @@ namespace VAdvantage.Model
                 + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                 + " AND s.M_Product_ID=" + M_Product_ID
                 + " AND (mas.IsInstanceAttribute IS NULL OR mas.IsInstanceAttribute='N' OR s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID + ")"
-                + " AND l.IsActive='Y' AND l.IsDefault='Y' AND s.QtyOrdered >= @param ";
+                + " AND l.IsActive='Y' AND l.IsDefault='Y' AND s.QtyOrdered >= @param ORDER BY s.QtyOrdered DESC";
             M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, param, trxName));
             if (M_Locator_ID == 0)
             {
@@ -1454,7 +1454,7 @@ namespace VAdvantage.Model
                 + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                 + " AND s.M_Product_ID=" + M_Product_ID
                 + " AND (mas.IsInstanceAttribute IS NULL OR mas.IsInstanceAttribute='N' OR s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID + ")"
-                + " AND l.IsActive='Y' AND l.IsDefault='N' AND s.QtyOrdered >= @param ";
+                + " AND l.IsActive='Y' AND l.IsDefault='N' AND s.QtyOrdered >= @param ORDER BY s.QtyOrdered DESC";
                 try
                 {
                     idr = DB.ExecuteReader(qry, param, trxName);
@@ -1516,7 +1516,7 @@ namespace VAdvantage.Model
                 + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                 + " AND s.M_Product_ID=" + M_Product_ID
                 + " AND (mas.IsInstanceAttribute IS NULL OR mas.IsInstanceAttribute='N' OR s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID + ")"
-                + " AND l.IsActive='Y' AND l.IsDefault='Y' AND CASE WHEN " + AbsoluteRequired + " = 1 THEN ABS(s.QtyReserved) ELSE s.QtyReserved END >= @param ";
+                + " AND l.IsActive='Y' AND l.IsDefault='Y' AND CASE WHEN " + AbsoluteRequired + " = 1 THEN ABS(s.QtyReserved) ELSE s.QtyReserved END >= @param ORDER BY s.QtyReserved DESC";
             M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, param, trxName));
             if (M_Locator_ID == 0)
             {
@@ -1528,7 +1528,7 @@ namespace VAdvantage.Model
                 + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                 + " AND s.M_Product_ID=" + M_Product_ID
                 + " AND (mas.IsInstanceAttribute IS NULL OR mas.IsInstanceAttribute='N' OR s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID + ")"
-                + " AND l.IsActive='Y' AND l.IsDefault='N' AND CASE WHEN " + AbsoluteRequired + " = 1 THEN  ABS(s.QtyReserved) ELSE s.QtyReserved END >= @param ";
+                + " AND l.IsActive='Y' AND l.IsDefault='N' AND CASE WHEN " + AbsoluteRequired + " = 1 THEN  ABS(s.QtyReserved) ELSE s.QtyReserved END >= @param ORDER BY s.QtyReserved DESC";
                 try
                 {
                     idr = DB.ExecuteReader(qry, param, trxName);

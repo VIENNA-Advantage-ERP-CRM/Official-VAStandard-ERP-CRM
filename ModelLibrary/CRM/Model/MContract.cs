@@ -1907,6 +1907,21 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            // VIS0060: Check Vendor for Blacklisting and Suspension for the particuler period if Vendor Mgt module is installed.
+            if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("StartDate") || Is_ValueChanged("C_BPartner_ID")))
+            {
+                int blkSpn = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(C_BPartner_ID)
+                            FROM VA068_VendorBlacklistingSuspen WHERE C_BPartner_ID = " + GetC_BPartner_ID() +
+                        " AND (VA068_FinalIndefiniteBlacklisting = 'Y' OR VA068_FinalEndingDate > "
+                        + GlobalVariable.TO_DATE(GetStartDate(), true) + ")", null, Get_Trx()));
+
+                if (blkSpn > 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
+                    return false;
+                }
+            }
+
             // calculate tax amount and surcharge amount 
             if (newRecord || Is_ValueChanged("C_Tax_ID") || Is_ValueChanged("M_PriceList_ID")
                 || Is_ValueChanged("QtyEntered") || Is_ValueChanged("PriceActual") || Is_ValueChanged("Discount"))

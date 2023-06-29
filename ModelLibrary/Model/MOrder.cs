@@ -1150,7 +1150,7 @@ namespace VAdvantage.Model
             {
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' "
+                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1210,7 +1210,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' "
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1253,7 +1253,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "'"
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "' AND VAS_IsVariationOrder='N'"
                     + " ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -2577,59 +2577,21 @@ namespace VAdvantage.Model
                 if (GetC_ConversionType_ID() == 0)
                     SetC_ConversionType_ID(MConversionType.GetDefault(GetAD_Client_ID()));
 
-                //Added by Bharat for Credit Limit on 24/08/2016
-                //if (IsSOTrx())
-                //{
-                //    MBPartner bp = MBPartner.Get(GetCtx(), GetC_BPartner_ID());
-                //    if (bp.GetCreditStatusSettingOn() == "CH")
-                //    {
-                //        decimal creditLimit = bp.GetSO_CreditLimit();
-                //        string creditVal = bp.GetCreditValidation();
-                //        if (creditLimit != 0)
-                //        {
-                //            decimal creditAvlb = creditLimit - bp.GetSO_CreditUsed();
-                //            if (creditAvlb <= 0)
-                //            {
-                //                //if (creditVal == "A" || creditVal == "D" || creditVal == "E")
-                //                //{
-                //                //    log.SaveError("Error", Msg.GetMsg(GetCtx(), "CreditUsedSalesOrder"));
-                //                //    return false;
-                //                //}
-                //                //else if (creditVal == "G" || creditVal == "J" || creditVal == "K")
-                //                //{
-                //                    log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "CreditOver"));
-                //                //}
-                //            }
-                //        }
-                //    }
-                //    // JID_0161 // change here now will check credit settings on field only on Business Partner Header // Lokesh Chauhan 15 July 2019
-                //    else if (bp.GetCreditStatusSettingOn() == X_C_BPartner.CREDITSTATUSSETTINGON_CustomerLocation)
-                //    {
-                //        MBPartnerLocation bpl = new MBPartnerLocation(GetCtx(), GetC_BPartner_Location_ID(), null);
-                //        //if (bpl.GetCreditStatusSettingOn() == "CL")
-                //        //{
-                //            decimal creditLimit = bpl.GetSO_CreditLimit();
-                //            string creditVal = bpl.GetCreditValidation();
-                //            if (creditLimit != 0)
-                //            {
-                //                decimal creditAvlb = creditLimit - bpl.GetSO_CreditUsed();
-                //                if (creditAvlb <= 0)
-                //                {
-                //                    //if (creditVal == "A" || creditVal == "D" || creditVal == "E")
-                //                    //{
-                //                    //    log.SaveError("Error", Msg.GetMsg(GetCtx(), "CreditUsedSalesOrder"));
-                //                    //    return false;
-                //                    //}
-                //                    //else if (creditVal == "G" || creditVal == "J" || creditVal == "K")
-                //                    //{
-                //                        //log.Warning(Msg.GetMsg(GetCtx(), "CreditOver"));
-                //                        log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "CreditOver"));
-                //                    //}
-                //                }
-                //            }
-                //        //}
-                //    }
-                //}
+                // VIS0060: Check Vendor for Blacklisting and Suspension for the particuler period if Vendor Mgt module is installed.
+                if (Env.IsModuleInstalled("VA068_") && !IsReturnTrx() && (dt.GetDocBaseType().Equals("POO") || dt.GetDocBaseType().Equals("SOO")
+                    || dt.GetDocBaseType().Equals("BOO")) && (newRecord || Is_ValueChanged("DateOrdered") || Is_ValueChanged("C_BPartner_ID")))
+                {
+                    int blkSpn = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(C_BPartner_ID)
+                            FROM VA068_VendorBlacklistingSuspen WHERE C_BPartner_ID = " + GetC_BPartner_ID() +
+                            " AND (VA068_FinalIndefiniteBlacklisting = 'Y' OR VA068_FinalEndingDate > "
+                            + GlobalVariable.TO_DATE(GetDateOrdered(), true) + ")", null, Get_Trx()));
+
+                    if (blkSpn > 0)
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
+                        return false;
+                    }                    
+                }
 
                 if (IsReturnTrx())
                 {
@@ -2663,12 +2625,6 @@ namespace VAdvantage.Model
                         }
                     }
                 }
-
-
-
-
-
-
             }
             catch
             {
@@ -4401,7 +4357,7 @@ namespace VAdvantage.Model
                              WHERE t.VAS_ThresholdBasis='PPC'
                              AND r.IsActive='Y' AND t.IsActive='Y'
                              AND (ol.LineTotalAmt>=r.VAS_ThresholdRangeFrom AND ol.LineTotalAmt<=r.VAS_ThresholdRangeTo)
-                             AND ("+ GlobalVariable.TO_DATE( GetDateOrdered(),true)+@" BETWEEN t.ValidFrom AND t.ValidTo)
+                             AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
                              AND r.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")));
                         //+ @"
                         //   AND r.VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) + @"
@@ -4517,7 +4473,7 @@ namespace VAdvantage.Model
                              INNER JOIN VAS_VariationThreshold t ON (t.VAS_VariationThreshold_ID=r.VAS_VariationThreshold_ID)                                                    
                              WHERE t.VAS_ThresholdBasis='GNL'
                              AND r.IsActive='Y' AND t.IsActive='Y'
-                            AND ((SELECT GrandTotal FROM C_Order WHERE C_Order_ID="+Util.GetValueOfInt(Get_Value("Ref_C_Order_ID"))+ @")>=r.VAS_ThresholdRangeFrom 
+                            AND ((SELECT GrandTotal FROM C_Order WHERE C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @")>=r.VAS_ThresholdRangeFrom 
                                     AND (SELECT GrandTotal FROM C_Order WHERE C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")) + @")<=r.VAS_ThresholdRangeTo)   
                              AND t.AD_Client_ID=" + GetAD_Client_ID() + @"
                              AND (" + GlobalVariable.TO_DATE(GetDateOrdered(), true) + @" BETWEEN t.ValidFrom AND t.ValidTo)
@@ -4547,12 +4503,12 @@ namespace VAdvantage.Model
                     }
                     //line which do not have variation config 
                     //then try to find a commomn config
-                    dynamic obj = voData.Find(x => x.RangeFrom == -1);                        
+                    dynamic obj = voData.Find(x => x.RangeFrom == -1);
                     dynamic commomnConfig = null;
-                    if (obj != null )
+                    if (obj != null)
                     {
-                        commomnConfig=voData.Find(x => x.UseForMultiplelines == true);
-                        if (commomnConfig == null) 
+                        commomnConfig = voData.Find(x => x.UseForMultiplelines == true);
+                        if (commomnConfig == null)
                         {
                             return "@VAS_VoConfigNotFound@";
                         }
@@ -4568,7 +4524,7 @@ namespace VAdvantage.Model
                             FROM C_Order o
                             INNER JOIN C_OrderLine ol ON (o.C_Order_ID=ol.C_Order_ID)
                             WHERE ol.IsActive='Y' AND o.IsActive='Y'
-                            AND  o.C_Order_ID=" +Util.GetValueOfInt( Get_Value("Ref_C_Order_ID")));
+                            AND  o.C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")));
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
@@ -4583,11 +4539,11 @@ namespace VAdvantage.Model
 
                             if (voData[i].CheckLineAmt == true)
                             {
-                                
+
                                 amt = Convert.ToDecimal(ds.Tables[0].Compute("SUM(LineNetAmt)", "M_Product_ID =" + voData[i].ProductID));
                                 sumLineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(LineNetAmt) FROM C_OrderLine ol
 INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
-    WHERE ol.IsActive='Y' AND o.IsActive='Y' AND ol.M_Product_ID=" + voData[i].ProductID + " AND o.Ref_C_Order_ID=" + Util.GetValueOfInt( Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
+    WHERE ol.IsActive='Y' AND o.IsActive='Y' AND ol.M_Product_ID=" + voData[i].ProductID + " AND o.Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
                                 if (sumLineAmt >= (amt * voData[i].VariationAllowed / 100))
                                 {
                                     res.Clear();

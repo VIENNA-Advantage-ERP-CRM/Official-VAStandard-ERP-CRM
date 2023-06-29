@@ -269,152 +269,106 @@ namespace VAdvantage.Model
             return retValue;
         }
 
-        // Added by Mohit VAWMS 20-8-2015
+        /// <summary>
+        ///	Before Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <returns>true if can be saved</returns>
         protected override Boolean BeforeSave(Boolean newRecord)
         {
-            if (Env.HasModulePrefix("VAWMS_", out mInfo))
+            //  Check Storage
+            if (Is_ValueChanged("IsActive") && IsActive())  // now not active 
             {
-                //  Check Storage
-                if (Is_ValueChanged("IsActive") && IsActive())  // now not active 
+                if (checkStock(GetCtx(), Get_ID(), Get_TrxName()))
                 {
-                    if (checkStock(GetCtx(), Get_ID(), Get_TrxName()))
-                    {
-                        log.SaveError("Error", Msg.GetMsg(GetCtx(), "LocatorHasStock"));
-                        return false;
-                    }
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "LocatorHasStock"));  
+                    return false;
+                }
 
-                } // storage
+            } // storage
 
-                // JID:1888 Checks for the duplicate Searchkey
-               
-                    int count = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(Value) FROM M_Locator WHERE Value= '" + GetValue() + "' AND M_Locator_ID !="+GetM_Locator_ID()));
-                    if (count > 0)
-                    {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "SearchKeyUnique"));
-                        return false;
-                    }
+            // JID:1888 Checks for the duplicate Searchkey
+
+            int count = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(Value) FROM M_Locator WHERE Value= '" + GetValue() + 
+                "' AND M_Locator_ID !=" + GetM_Locator_ID()));
+            if (count > 0)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "SearchKeyUnique"));
+                return false;
+            }
+
+            if (newRecord
+                    || Is_ValueChanged("X")
+                    || Is_ValueChanged("Y")
+                    || Is_ValueChanged("Z")
+                    || Is_ValueChanged("POSITION")
+                    || Is_ValueChanged("Bin"))
+            {
+                MWarehouse wh = new MWarehouse(GetCtx(), GetM_Warehouse_ID(), Get_TrxName());
                 
-                if (newRecord
-                        || Is_ValueChanged("X")
-                        || Is_ValueChanged("Y")
-                        || Is_ValueChanged("Z")
-                        || Is_ValueChanged("POSITION")
-                        || Is_ValueChanged("Bin"))
+                StringBuilder combination = new StringBuilder();
+                combination.Append(GetX()).Append(wh.GetSeparator());
+                combination.Append(GetY()).Append(wh.GetSeparator());
+                combination.Append(GetZ());
+                if (GetPOSITION() != null && GetPOSITION().Length != 0)
                 {
-                    MWarehouse wh = new MWarehouse(GetCtx(), GetM_Warehouse_ID(), Get_TrxName());
+                    combination.Append(wh.GetSeparator()).Append(GetPOSITION());
+                }
+                if (GetBin() != null && GetBin().Length != 0)
+                {
+                    combination.Append(wh.GetSeparator()).Append(GetBin());
+                }
+                log.Fine("Set Locator Combination :" + combination);
 
-                    //if (GetBin() != null && GetPOSITION() != null || GetPOSITION()==null)
-                    //{
-                    //    log.SaveError("Error", Msg.GetMsg(GetCtx(), "PositionMandatorySegment"));
-                    //    return false;
-                    //}
-
-
-
-                    //if (GetX() == null || GetX().Length == 0 || !Util.isAlphaNumeric(GetX()) ||
-                    //    GetY() == null || GetY().Length == 0 || !Util.isAlphaNumeric(GetY()) ||
-                    //    GetZ() == null || GetZ().Length == 0 || !Util.isAlphaNumeric(GetZ()) ||
-                    //    (GetBin() != null && GetBin().Length != 0 && !Util.isAlphaNumeric(GetBin())) ||
-                    //    (GetPOSITION() != null && GetPOSITION().Length != 0 && !Util.isAlphaNumeric(GetPOSITION())))
-                    //if (GetX() == null || GetX().Length == 0 ||
-                    //   GetY() == null || GetY().Length == 0 ||
-                    //   GetZ() == null || GetZ().Length == 0 ||
-                    //   (GetBin() != null && GetBin().Length != 0) ||
-                    //   (GetPOSITION() != null && GetPOSITION().Length != 0))
-                    //{
-                    //    log.SaveError("Error", Msg.GetMsg(GetCtx(), "SegmentNotAlphaNumeric"));
-                    //    return false;
-                    //}
-
-                    //String combination = GetX().concat(wh.GetSeparator());
-                    //combination = combination.(GetY()).concat(wh.GetSeparator());
-                    //combination = combination.concat(GetZ());
-
-                    //if (GetPOSITION() != null && GetPOSITION().Length != 0)
-                    //    combination = combination.concat(wh.GetSeparator()).concat(GetPOSITION());
-
-                    //if (GetBin() != null && GetBin().Length != 0)
-                    //    combination = combination.concat(wh.GetSeparator()).concat(GetBin());
-                    StringBuilder combination = new StringBuilder();
-                    combination.Append(GetX()).Append(wh.GetSeparator());
-                    combination = combination.Append(GetY()).Append(wh.GetSeparator());
-                    combination = combination.Append(GetZ());
-                    if (GetPOSITION() != null && GetPOSITION().Length != 0)
-                    {
-                        combination = combination.Append(wh.GetSeparator()).Append(GetPOSITION());
-                    }
-                    if (GetBin() != null && GetBin().Length != 0)
-                    {
-                        combination = combination.Append(wh.GetSeparator()).Append(GetBin());
-                    }
-                    log.Fine("Set Locator Combination :" + combination);
-
-                    //String sql = "SELECT count(*) FROM M_Locator WHERE M_Locator_ID<>?" +
-                    //                " AND M_Warehouse_ID = ?" +
-                    //                " AND UPPER(LocatorCombination) = UPPER(?)";
-                    String sql = "SELECT count(*) FROM M_Locator WHERE M_Locator_ID<>" + GetM_Locator_ID() +
-                                  " AND M_Warehouse_ID =" + GetM_Warehouse_ID() +
-                                  " AND UPPER(LocatorCombination) = UPPER('" + combination + "')";
-                    //int ii = QueryUtil.GetSQLValue(Get_TrxName(), sql, GetM_Locator_ID(), GetM_Warehouse_ID(), combination);
-                    int ii = Convert.ToInt32(DB.ExecuteScalar(sql, null, Get_TrxName()));
-                    if (ii != 0)
-                    {
-                        log.SaveError("Error", Msg.GetMsg(GetCtx(), "CombinationNotUnique"));
-                        return false;
-                    }
-
-                    SetLocatorCombination(combination.ToString());
+                string sql = "SELECT COUNT(M_Locator_ID) FROM M_Locator WHERE M_Locator_ID <> " + GetM_Locator_ID() +
+                              " AND M_Warehouse_ID =" + GetM_Warehouse_ID() +
+                              " AND UPPER(LocatorCombination) = UPPER('" + combination + "')";
+                int ii = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
+                if (ii != 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "CombinationNotUnique"));
+                    return false;
                 }
 
-                if (newRecord
-                        || Is_ValueChanged("IsAvailableToPromise")
-                        || Is_ValueChanged("IsAvailableForAllocation"))
+                SetLocatorCombination(combination.ToString());
+            }
+
+            if (newRecord
+                    || Is_ValueChanged("IsAvailableToPromise")
+                    || Is_ValueChanged("IsAvailableForAllocation"))
+            {
+                if (IsAvailableForAllocation() && !IsAvailableToPromise())
                 {
-                    if (IsAvailableForAllocation() && !IsAvailableToPromise())
-                    {
-                        log.SaveError("Error", Msg.GetMsg(GetCtx(), "InvalidCombination"));
-                        return false;
-                    }
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "InvalidCombination"));
+                    return false;
                 }
-                return true;
             }
             return true;
         }
-        public static Boolean checkStock(Ctx ctx, int M_Locator_ID, Trx trx)
-        {
-            //ArrayList<MStorage> list = new ArrayList<MStorage>();
-            String sql = "SELECT COALESCE(SUM(CASE WHEN QtyType LIKE 'H' THEN Qty ELSE 0 END), 0) QtyOnHand, " +
-                                "COALESCE(SUM(CASE WHEN QtyType LIKE 'O' THEN Qty ELSE 0 END), 0) QtyOrdered, " +
-                                "COALESCE(SUM(CASE WHEN QtyType LIKE 'R' THEN Qty ELSE 0 END), 0) QtyReserved " +
-                    "FROM M_StorageDetail WHERE M_Locator_ID=" + M_Locator_ID;
-            Decimal OnHand = Env.ZERO;
-            Decimal Ordered = Env.ZERO;
-            Decimal Reserved = Env.ZERO;
 
-            //PreparedStatement pstmt = null;
-            //ResultSet rs = null;
+        /// <summary>
+        /// Check if stock available under this Locator
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="M_Locator_ID">Locator ID</param>
+        /// <param name="trx">trx</param>
+        /// <returns></returns>
+        public static bool checkStock(Ctx ctx, int M_Locator_ID, Trx trx)
+        {
+            string sql = "SELECT QtyOnHand, QtyOrdered, QtyReserved FROM M_Storage WHERE M_Locator_ID=" + M_Locator_ID;
+            decimal OnHand = Env.ZERO;
+            decimal Ordered = Env.ZERO;
+            decimal Reserved = Env.ZERO;
+
             DataSet dstmt = new DataSet();
             try
             {
-
-                //pstmt = DB.prepareStatement(sql, trx);
-                //pstmt.setInt(1, M_Locator_ID);
-                //rs = pstmt.executeQuery();
-                //while (rs.next())
-                //{
-                //    OnHand = rs.getBigDecimal("QtyOnHand");
-                //    Ordered = rs.getBigDecimal("QtyOrdered");
-                //    Reserved = rs.getBigDecimal("QtyReserved");
-                //}
-                dstmt = DB.ExecuteDataset(sql, null);
+                dstmt = DB.ExecuteDataset(sql, null, trx);
                 if (dstmt != null && dstmt.Tables.Count > 0 && dstmt.Tables[0].Rows.Count > 0)
                 {
-                    for (int i = 0; i < dstmt.Tables[0].Rows.Count; i++)
-                    {
-                        OnHand = Convert.ToDecimal(dstmt.Tables[0].Rows[0]["QtyOnHand"]);
-                        Ordered = Convert.ToDecimal(dstmt.Tables[0].Rows[0]["QtyOrdered"]);
-                        Reserved = Convert.ToDecimal(dstmt.Tables[0].Rows[0]["QtyReserved"]);
-                    }
+                    OnHand = Util.GetValueOfDecimal(dstmt.Tables[0].Rows[0]["QtyOnHand"]);
+                    Ordered = Util.GetValueOfDecimal(dstmt.Tables[0].Rows[0]["QtyOrdered"]);
+                    Reserved = Util.GetValueOfDecimal(dstmt.Tables[0].Rows[0]["QtyReserved"]);
                 }
             }
             catch (Exception ex)
@@ -427,7 +381,6 @@ namespace VAdvantage.Model
                     dstmt.Dispose();
             }
 
-            //if ((OnHand.signum() != 0) || (Ordered.signum() != 0) || (Reserved.signum() != 0))
             if ((OnHand != 0) || (Ordered != 0) || (Reserved != 0))
                 return true;
             else
@@ -488,10 +441,10 @@ namespace VAdvantage.Model
         protected override bool BeforeDelete()
         {
             string sql = @"SELECT Count(M_Product_ID) FROM M_Storage
-                    WHERE M_Locator_ID=" + GetM_Locator_ID()+ "AND " +
+                    WHERE M_Locator_ID=" + GetM_Locator_ID() + "AND " +
                     "(QtyOnHand > 0 OR QtyOrdered > 0 OR QtyReserved > 0 OR DTD001_QtyReserved > 0 OR DTD001_SourceReserve > 0)";
 
-            int count =Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
+            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
             if (count != 0)
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_LocatorError"));

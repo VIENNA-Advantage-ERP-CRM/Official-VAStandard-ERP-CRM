@@ -876,48 +876,54 @@ namespace VAdvantage.Model
 
         public int GetLocation(int ware_ID)
         {
-            //string qry = @"SELECT sg.M_Locator_ID FROM M_Storage sg INNER JOIN M_Locator loc ON sg.M_Locator_ID=loc.M_Locator_ID INNER JOIN M_Warehouse wh ON loc.M_Warehouse_ID=wh.M_Warehouse_ID where wh.M_Warehouse_ID = " + ware_ID + " and sg.M_Product_ID = " + prod_ID + " and loc.IsActive = 'Y'";
-            //IDataReader idrloc =DB.ExecuteReader(qry);
-            int location = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator where M_Warehouse_ID = " + ware_ID + " and IsActive = 'Y' and IsDefault='Y'"));
-            if (location > 0)
-            {
-                return location;
-            }
-            else
-            {
-                //qry = @"SELECT sg.M_Locator_ID FROM M_Storage sg INNER JOIN M_Locator loc ON sg.M_Locator_ID=loc.M_Locator_ID INNER JOIN M_Warehouse wh ON loc.M_Warehouse_ID=wh.M_Warehouse_ID where wh.M_Warehouse_ID = " + ware_ID + " and loc.IsDefault='Y' and loc.IsActive = 'Y'";
-                location = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator where M_Warehouse_ID = " + ware_ID + " and IsActive = 'Y'"));
-                if (location > 0)
-                {
-                    return location;
-                }
-                else
-                {
-                    return 0;
-                }
-            }
+            // VIS0060: Reserve quantity in Locator based on X,Y,Z and Priority.
+            MWarehouse wh = MWarehouse.Get(GetCtx(), ware_ID);
+            return wh.GetDefaultM_Locator_ID();
+
+            //int location = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID = " + ware_ID + " AND IsActive = 'Y' and IsDefault='Y'"));
+            //if (location > 0)
+            //{
+            //    return location;
+            //}
+            //else
+            //{
+            //    qry = @"SELECT sg.M_Locator_ID FROM M_Storage sg INNER JOIN M_Locator loc ON sg.M_Locator_ID=loc.M_Locator_ID INNER JOIN M_Warehouse wh ON loc.M_Warehouse_ID=wh.M_Warehouse_ID where wh.M_Warehouse_ID = " + ware_ID + " and loc.IsDefault='Y' and loc.IsActive = 'Y'";
+            //    location = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID = " + ware_ID + " AND IsActive = 'Y' ORDER BY PriorityNo"));
+            //    if (location > 0)
+            //    {
+            //        return location;
+            //    }
+            //    else
+            //    {
+            //        return 0;
+            //    }
+            //}
         }
 
         // Get Locator_ID for SourceWarehouse  //new 6 jan 3 4
         public int GetSwhLocation(int Swh_ID)
         {
-            int Swhlocation = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator where M_Warehouse_ID = " + Swh_ID + " and IsActive = 'Y' and IsDefault='Y'"));
-            if (Swhlocation > 0)
-            {
-                return Swhlocation;
-            }
-            else
-            {
-                Swhlocation = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator where M_Warehouse_ID = " + Swh_ID + " and IsActive = 'Y'"));
-                if (Swhlocation > 0)
-                {
-                    return Swhlocation;
-                }
-                else
-                {
-                    return 0;
-                }
-            }
+            // VIS0060: Reserve quantity in Locator based on X,Y,Z and Priority.
+            MWarehouse wh = MWarehouse.Get(GetCtx(), Swh_ID);
+            return wh.GetDefaultM_Locator_ID();
+
+            //int Swhlocation = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID = " + Swh_ID + " AND IsActive = 'Y' and IsDefault='Y'"));
+            //if (Swhlocation > 0)
+            //{
+            //    return Swhlocation;
+            //}
+            //else
+            //{
+            //    Swhlocation = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID = " + Swh_ID + " AND IsActive = 'Y' ORDER BY PriorityNo"));
+            //    if (Swhlocation > 0)
+            //    {
+            //        return Swhlocation;
+            //    }
+            //    else
+            //    {
+            //        return 0;
+            //    }
+            //}
         }
         //End
 
