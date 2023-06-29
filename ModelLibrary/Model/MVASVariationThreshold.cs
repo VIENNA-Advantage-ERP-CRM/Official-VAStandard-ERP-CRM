@@ -37,7 +37,7 @@ namespace VAdvantage.Model
         {
             if (GetValidTo() < GetValidFrom())
             {
-                log.SaveError("", "ToDateMustGreater");
+                log.SaveError("", Msg.GetMsg(GetCtx(),"ToDateMustGreater"));
                 return false;
             }
             string sql = @"SELECT COUNT(VAS_VariationThreshold_ID)
@@ -49,7 +49,7 @@ namespace VAdvantage.Model
             int count = Util.GetValueOfInt (DB.ExecuteScalar(sql,null,Get_Trx()));
             if (count == 0)
             { return true; }
-            log.SaveError("","VAS_InvalidVariationDate");
+            log.SaveError("", Msg.GetMsg(GetCtx(),"VAS_InvalidVariationDate"));
 
             return false;
         }
