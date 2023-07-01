@@ -1136,11 +1136,14 @@ namespace VAdvantage.Model
                 _emailTo = new StringBuilder();
                 if (_requestType.IsR_AllowSaveNotify() && (update != null || sendInfo.Count > 0))
                 {
-                    DateTime date= DateTime.SpecifyKind(ra.GetCreated(), DateTimeKind.Utc);  //VIS_427 BugId: 2190 Corrected the time lapse on date last action field
                     prepareNotificMsg(sendInfo);
                     //	Update
                     if (ra != null)
+                    {
+                        //VIS_427 BugId: 2190 Corrected the time lapse on date last action field
+                        DateTime date = ra.GetCreated().ToLocalTime();
                         SetDateLastAction(date);
+                    }
                     SetLastResult(GetResult());
                     SetDueType();
                     //	ReSet
