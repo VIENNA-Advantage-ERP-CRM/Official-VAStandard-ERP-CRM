@@ -1139,7 +1139,11 @@ namespace VAdvantage.Model
                     prepareNotificMsg(sendInfo);
                     //	Update
                     if (ra != null)
-                        SetDateLastAction(ra.GetCreated());
+                    {
+                        //VIS_427 BugId: 2190 Corrected the time lapse on date last action field
+                        DateTime date = ra.GetCreated().ToLocalTime();
+                        SetDateLastAction(date);
+                    }
                     SetLastResult(GetResult());
                     SetDueType();
                     //	ReSet
