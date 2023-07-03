@@ -952,6 +952,10 @@ namespace VAdvantage.Model
                     SetCloseDate(DateTime.Now);
                 if (status.IsFinalClose())
                     SetProcessed(true);
+                else if (status.IsClosed())
+                    Set_Value("VAS_IsResolved", "Y");        //VIS_427 BugId: 2190 If Status is Final Close then mark VAS_IsResovled Checkbox true
+                else
+                    Set_Value("VAS_IsResolved", "N");
             }
 
             //	Confidential Info
@@ -1135,7 +1139,11 @@ namespace VAdvantage.Model
                     prepareNotificMsg(sendInfo);
                     //	Update
                     if (ra != null)
-                        SetDateLastAction(ra.GetCreated());
+                    {
+                        //VIS_427 BugId: 2190 Corrected the time lapse on date last action field
+                        DateTime date = ra.GetCreated().ToLocalTime();
+                        SetDateLastAction(date);
+                    }
                     SetLastResult(GetResult());
                     SetDueType();
                     //	ReSet

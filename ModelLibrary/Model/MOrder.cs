@@ -1150,7 +1150,7 @@ namespace VAdvantage.Model
             {
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' "
+                    + ") AND DocSubTypeSO='" + DocSubTypeSO_x + "' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1210,7 +1210,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' "
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND VAS_IsVariationOrder='N' "
                     + "ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -1253,7 +1253,7 @@ namespace VAdvantage.Model
                 //	PO
                 String sql = "SELECT C_DocType_ID FROM C_DocType "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID() + " AND AD_Org_ID IN (0," + GetAD_Org_ID()
-                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "'"
+                    + ") AND DocBaseType='POO' AND IsReturnTrx='N' AND IsReleaseDocument='" + Released + "' AND VAS_IsVariationOrder='N'"
                     + " ORDER BY AD_Org_ID DESC, IsDefault DESC";
                 int C_DocType_ID = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
                 if (C_DocType_ID <= 0)
@@ -4510,7 +4510,7 @@ namespace VAdvantage.Model
                         commomnConfig = voData.Find(x => x.UseForMultiplelines == true);
                         if (commomnConfig == null)
                         {
-                            return "VAS_VoConfigNotFound";
+                            return "@VAS_VoConfigNotFound@";
                         }
                     }
 
@@ -4528,7 +4528,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return "VAS_OrigPONotFound";
+                        return  "@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -4574,7 +4574,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
     WHERE IsActive='Y' AND Ref_C_Order_ID=" + Util.GetValueOfInt(Get_Value("Ref_C_Order_ID")), null, Get_Trx()));
                         if (sumLineAmt >= (amt * commomnConfig.VariationAllowed / 100))
                         {
-                            return "VAS_AllowedvariationExceed";
+                            return "@VAS_AllowedvariationExceed@";
                         }
                     }
                 }
