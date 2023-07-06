@@ -1957,19 +1957,12 @@ namespace VAdvantage.Model
                     && Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")) > 0)
                 {
                     //VIS0336:Set VA075_IsMaterialIssued checkbox true in case of inventory.
-
                     int no = 0;
 
-                    if (!IsReversal())
-                    {
-                        no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET Processed='Y', Quantity=" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered")) + " , VA075_IsMaterialIssued='Y'" +
-                            " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
-                    }
-                    else
-                    {
-                        no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET VA075_IsMaterialIssued='N'" +
-                                   " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
-                    }
+                    no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET " + (!IsReversal() ? " Processed = 'Y', Quantity=" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered")) + " , " +
+                        " VA075_IsMaterialIssued='Y'" : " VA075_IsMaterialIssued='N'") +
+                        " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
+
                     if (no < 0)
                     {
                         log.Info("Spare Part Not Updated For Work Order: " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrder_ID")));
