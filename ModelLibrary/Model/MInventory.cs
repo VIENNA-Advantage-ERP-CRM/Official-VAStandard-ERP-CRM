@@ -1916,7 +1916,7 @@ namespace VAdvantage.Model
                             if (!po.Save())
                             {
                                 log.Info("Asset Expense Not Saved For Asset ");
-                            }                            
+                            }
                             else
                             {
                                 // In Case of Capital Expense ..Asset Gross Value will be updated 
@@ -1956,13 +1956,19 @@ namespace VAdvantage.Model
                 if (IsInternalUse() && Env.IsModuleInstalled("VA075_") && line.Get_ColumnIndex("VA075_WorkOrderComponent_ID") >= 0
                     && Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")) > 0)
                 {
-                    int no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET Processed='Y', Quantity=" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered"))
-                        + " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
+                    //VIS0336:Set VA075_IsMaterialIssued checkbox true in case of inventory.
+                    int no = 0;
+
+                    no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET " + (!IsReversal() ? " Processed = 'Y', Quantity=" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered")) + " , " +
+                        " VA075_IsMaterialIssued='Y'" : " VA075_IsMaterialIssued='N'") +
+                        " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
+
                     if (no < 0)
                     {
                         log.Info("Spare Part Not Updated For Work Order: " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrder_ID")));
                     }
                 }
+
             }	//	for all lines
             log.Info("Lines Loop Ended");
             //	User Validation
@@ -3253,7 +3259,7 @@ namespace VAdvantage.Model
             for (int i = 0; i < oLines.Length; i++)
             {
                 MInventoryLine oLine = oLines[i];
-                MInventoryLine rLine = new MInventoryLine(GetCtx(), 0, Get_TrxName());               
+                MInventoryLine rLine = new MInventoryLine(GetCtx(), 0, Get_TrxName());
 
                 CopyValues(oLine, rLine, oLine.GetAD_Client_ID(), oLine.GetAD_Org_ID());
                 rLine.SetM_Inventory_ID(reversal.GetM_Inventory_ID());
@@ -3301,7 +3307,7 @@ namespace VAdvantage.Model
                             if (!po.Save())
                             {
                                 log.Info("Asset Expense Not Saved For Asset ");
-                            }                            
+                            }
                             else
                             {
                                 UpdateDescriptionInOldExpnse(oLine, rLine);
@@ -3379,15 +3385,15 @@ namespace VAdvantage.Model
             po.SetAD_Org_ID(GetAD_Org_ID());
             po.Set_Value("M_Inventory_ID", rLine.GetM_Inventory_ID());
             po.Set_Value("DateAcct", GetMovementDate());
-            po.Set_ValueNoCheck("A_Asset_ID", oldline.Get_Value("A_Asset_ID"));            
+            po.Set_ValueNoCheck("A_Asset_ID", oldline.Get_Value("A_Asset_ID"));
             po.Set_Value("C_Charge_ID", rLine.GetC_Charge_ID());
             po.Set_Value("M_AttributeSetInstance_ID", rLine.GetM_AttributeSetInstance_ID());
             po.Set_Value("M_Product_ID", rLine.GetM_Product_ID());
-            po.Set_Value("C_UOM_ID", rLine.Get_Value("C_UOM_ID"));            
+            po.Set_Value("C_UOM_ID", rLine.Get_Value("C_UOM_ID"));
             po.Set_Value("Price", rLine.GetCurrentCostPrice());
             po.Set_Value("Qty", Util.GetValueOfDecimal(rLine.Get_Value("QtyEntered")));
             po.Set_Value("VAFAM_CapitalExpense", rLine.Get_Value("VAFAM_CapitalExpense"));
-            po.Set_Value("Amount", decimal.Multiply(Util.GetValueOfDecimal(rLine.Get_Value("QtyEntered")), rLine.GetCurrentCostPrice()));                        
+            po.Set_Value("Amount", decimal.Multiply(Util.GetValueOfDecimal(rLine.Get_Value("QtyEntered")), rLine.GetCurrentCostPrice()));
             po.Set_Value("Description", "{->" + GetDocumentNo() + ")");
         }
 
@@ -3407,7 +3413,7 @@ namespace VAdvantage.Model
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
                     foreach (DataRow idr in ds.Tables[0].Rows)
-                    {                        
+                    {
                         Sql.Clear();
                         Sql.Append("UPDATE VAFAM_Expense SET Description = (" + this.GetDocumentNo() + " < -) WHERE VAFAM_Expense_ID = " + Util.GetValueOfInt(idr["VAFAM_Expense_ID"]));
                         int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
@@ -3415,7 +3421,7 @@ namespace VAdvantage.Model
                 }
             }
             catch (Exception e)
-            {               
+            {
                 log.Severe(Sql.ToString() + " - " + e.Message);
             }
         }
