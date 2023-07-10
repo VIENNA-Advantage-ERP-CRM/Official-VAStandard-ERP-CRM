@@ -60,5 +60,33 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VIS0336:for fetching the projectid
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>ProjectID</returns>
+        public JsonResult GetProjectID(string fields)
+        {
+            MProjectModel obj = new MProjectModel();
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            retJSON = JsonConvert.SerializeObject(obj.GetProjectID(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// VIS0336:for fetching the projectline details
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>linedetails</returns>
+        public JsonResult GetReqLinesProjectDetail(string fields)
+        {
+            MProjectModel obj = new MProjectModel();
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            retJSON = JsonConvert.SerializeObject(obj.GetReqLinesProjectDetail(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
     }
 }
