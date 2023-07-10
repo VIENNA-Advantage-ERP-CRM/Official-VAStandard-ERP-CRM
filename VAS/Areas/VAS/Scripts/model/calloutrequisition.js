@@ -458,29 +458,6 @@
     };
 
     /**
-*  //VIS0336:for setting the projectID
-* @param {any} ctx
-* @param {any} windowNo
-* @param {any} mTab
-* @param {any} mField
-* @param {any} value
-* @param {any} oldValue
-*/
-    CalloutRequisition.prototype.Project = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        if (this.isCalloutActive() || value == null) {
-            return "";
-        }
-        if (mTab.getValue("M_Requisition_Id") != null) {
-            var paramString = mTab.getValue("M_Requisition_Id");
-            var data = VIS.dataContext.getJSONRecord("MProject/GetProjectID", paramString);
-            if (data != null) {
-                mTab.setValue("C_Project_ID", data);
-            }
-        }
-        this.setCalloutActive(false);
-        return "";
-    };
-    /**
 *  //VIS0336:for setting the Projectline details on req line tab
 * @param {any} ctx
 * @param {any} windowNo
@@ -494,7 +471,7 @@
             return "";
         }
         if (mTab.getValue("C_ProjectLine_ID") != null) {
-            var paramString = mTab.getValue("C_Project_ID") + "," + mTab.getValue("C_ProjectLine_ID");
+            var paramString = mTab.getValue("C_ProjectLine_ID");
             var data = VIS.dataContext.getJSONRecord("MProject/GetReqLinesProjectDetail", paramString);
             if (data != null) {
                 mTab.setValue("M_Product_ID", data["ProductID"]);

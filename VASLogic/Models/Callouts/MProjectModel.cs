@@ -100,11 +100,9 @@ namespace VIS.Models
         /// <returns>Project line detail</returns>
         public Dictionary<string, object> GetReqLinesProjectDetail(Ctx ctx, string fields)
         {
-            string[] paramValue = fields.Split(',');
             Dictionary<string, object> retDic = null;
             StringBuilder str = new StringBuilder();
-            str.Append("SELECT M_Product_ID,M_AttributeSetInstance_ID,C_Charge_ID,C_UOM_ID,PlannedPrice,PlannedQty from C_ProjectLine WHERE C_ProjectLine_ID=" + paramValue[1]
-                       + " AND C_Project_ID=" + paramValue[0]);
+            str.Append("SELECT M_Product_ID,M_AttributeSetInstance_ID,C_Charge_ID,C_UOM_ID,PlannedPrice,PlannedQty from C_ProjectLine WHERE C_ProjectLine_ID=" + Util.GetValueOfInt(fields));
             DataSet ds = DB.ExecuteDataset(str.ToString(), null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -122,18 +120,6 @@ namespace VIS.Models
             }
             return retDic;
         }
-        /// <summary>
-        /// VIS0336:for setting the projectid on req line tab
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="fields"></param>
-        /// <returns>projectid</returns>
-        public int GetProjectID(Ctx ctx, string fields)
-        {
-            string sql = "SELECT C_Project_ID FROM M_Requisition   WHERE M_Requisition_ID=" + fields;
-            int ProjectID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
 
-            return ProjectID;
-        }
     }
 }
