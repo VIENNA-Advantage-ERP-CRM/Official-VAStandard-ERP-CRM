@@ -98,6 +98,32 @@
         return "";
     };
 
+    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        var DocDate = mTab.getValue("DateDoc");
+        var StartDate = mTab.getValue("StartDate");
+        if (DocDate != null && StartDate != null) {
+            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
+                mTab.setValue("DateDoc", null);
+                this.setCalloutActive(false);
+                return "VAS_ContractDateMustGreater";
+            }
+            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
+                mTab.setValue("StartDate", null);
+                this.setCalloutActive(false);
+                return "VAS_ContractDateMustGreater";
+            }
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+
     VAS_CalloutContract.prototype.ContractRef = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
         if (this.isCalloutActive() || value == null || value.toString() == "") {
