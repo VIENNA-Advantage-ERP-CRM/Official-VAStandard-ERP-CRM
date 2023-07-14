@@ -188,16 +188,10 @@
         var ts = mTab.getValue("DateTrx");
         var tsDate;
         if (ts == null) {
-            //ts = DateTime.Now.Date; //new DateTime(CommonFunctions.CurrentTimeMillis());
             ts = new Date();
-
-
         }
 
-        //tsDate = "TO_DATE( '" + ts.getMonth() + "-" + ts.getDate() + "-" + ts.getFullYear() + "', 'MM-DD-YYYY')";
-        //
         // Added by Bharat on 02 June 2017 to remove client side queries
-
         var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
         var dr = null;
         try {
@@ -243,66 +237,7 @@
             }
 
         }
-
-        //var sql = "SELECT C_BPartner_ID,C_Currency_ID,C_Bpartner_Location_Id,"		//	1..2
-        //    + " invoiceOpen(C_Invoice_ID, @param1) as invoiceOpen ,"					//	3		#1
-        //    + " invoiceDiscount(C_Invoice_ID,@param2,@param3) as invoiceDiscount, IsSOTrx, IsInDispute "	//	4..5	#2/3
-        //    + "FROM C_Invoice WHERE C_Invoice_ID=@param4";			//			#4
-        //var dr = null;
-        ////SqlParameter[] param = new SqlParameter[4];
-        //var param = [];
-        //try {
-        //    param[0] = new VIS.DB.SqlParam("@param1", C_InvoicePaySchedule_ID);
-        //    param[1] = new VIS.DB.SqlParam("@param2", ts);
-        //    param[1].setIsDate(true);
-        //    param[2] = new VIS.DB.SqlParam("@param3", C_InvoicePaySchedule_ID);
-        //    param[3] = new VIS.DB.SqlParam("@param4", C_Invoice_ID);
-        //    dr = VIS.DB.executeReader(sql, param, null);
-
-        //    if (dr.read()) {
-        //        mTab.setValue("C_BPartner_ID", Util.getValueOfInt(dr.get("c_bpartner_id")));//.getInt(1)));
-        //        mTab.setValue("C_Bpartner_Location_Id", Util.getValueOfInt(dr.get("c_bpartner_location_id")));
-        //        var C_Currency_ID = Util.getValueOfInt(dr.get("c_currency_id"));//dr.getInt(2);					//	Set Invoice Currency
-        //        mTab.setValue("C_Currency_ID", C_Currency_ID);
-        //        //
-        //        var invoiceOpen = Util.getValueOfDecimal(dr.get("invoiceopen"));//.getBigDecimal(3);		//	Set Invoice OPen Amount
-        //        if (invoiceOpen == null) {
-        //            invoiceOpen = VIS.Env.ZERO;
-        //        }
-        //        var discountAmt = Util.getValueOfDecimal(dr.get("invoicediscount"));//.getBigDecimal(4);		//	Set Discount Amt
-        //        if (discountAmt == null) {
-        //            discountAmt = VIS.Env.ZERO;
-        //        }
-        //        //mTab.setValue("PayAmt", Decimal.Subtract(invoiceOpen, discountAmt));                
-        //        if (_chk == 0)//Pratap
-        //        {
-        //            mTab.setValue("PayAmt", (invoiceOpen - discountAmt));
-        //        }
-        //        mTab.setValue("C_InvoicePaySchedule_ID", C_InvoicePaySchedule_ID);//Pratap
-        //        mTab.setValue("DiscountAmt", discountAmt);
-        //        //  reset as dependent fields get reset
-        //        ctx.setContext(windowNo, "C_Invoice_ID", C_Invoice_ID.toString());
-        //        // mTab.setValue("C_Invoice_ID", C_Invoice_ID);
-        //        //Added by Bharat to Set Discrepancy from Invoice
-        //        invoiceDiscrepancy = dr.getString("isindispute") == "Y";
-        //        if (payDiscrepancy) {
-        //            if (invoiceDiscrepancy) {
-        //                mTab.setValue("IsInDispute", true);
-        //                VIS.ADialog.info("DiscrepancyInvoice");
-        //            }
-        //            else {
-        //                mTab.setValue("IsInDispute", false);
-        //            }
-        //        }
-        //    }
-        //    dr.close();
-        //}
         catch (err) {
-            //if (dr != null) {
-            //    dr.close();
-            //    dr = null;
-            //}
-            //this.log.log(Level.SEVERE, sql, err);
             this.setCalloutActive(false);
             return err.message;
         }
@@ -1108,7 +1043,6 @@
         var _chk = 0;
 
         // Added by Bharat on 28 June 2017
-
         var drAmt = null;
         try {
             drAmt = VIS.dataContext.getJSONRecord("MInvoice/GetInvPaySchedDetail", C_Invoice_ID);
@@ -1129,18 +1063,14 @@
             this.log.log(Level.SEVERE, "PaymentAllocate.Invoice -" + C_Invoice_ID, err.message);
             return err.toString();
         }
+
         // Bharat
         //  Payment Date
         var ts = Util.getValueOfDate(ctx.getContextAsTime(windowNo, "DateTrx"));
         if (ts == null) {
-            //ts = DateTime.Now.Date; //new DateTime(CommonFunctions.CurrentTimeMillis());
             ts = new Date();
         }
 
-        //var sql = "SELECT C_BPartner_ID,C_Currency_ID,"		//	1..2
-        //    + " invoiceOpen(C_Invoice_ID, " + C_InvoicePaySchedule_ID + ") as invoiceOpen ,"					//	3		#1
-        //    + " invoiceDiscount(C_Invoice_ID," + VIS.DB.to_date(ts, true) + "," + C_InvoicePaySchedule_ID + ") as invoiceDiscount , IsSOTrx "	//	4..5	#2/3
-        //    + "FROM C_Invoice WHERE C_Invoice_ID=" + C_Invoice_ID;
         var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
         var dr = null;
         try {
@@ -1160,37 +1090,13 @@
                 }
                 mTab.setValue("DiscountAmt", discountAmt);
                 //  reset as dependent fields get reset
-                ctx.setContext(windowNo, "C_Invoice_ID", C_Invoice_ID.toString());
+                // VIS_045: commented due to read only logic not working because on new record this context not clear
+                // ctx.setContext(windowNo, "C_Invoice_ID", C_Invoice_ID.toString());
             }
-            //var idr = null;
-            //try {            
-            //    idr = VIS.DB.executeReader(sql, null, null);
-            //    if (idr.read()) {
-            //        var invoiceOpen = idr.get("invoiceopen");//.getBigDecimal(3);		//	Set Invoice OPen Amount
-            //        if (invoiceOpen == null) {
-            //            invoiceOpen = VIS.Env.ZERO;
-            //        }
-            //        var discountAmt = idr.get("invoicediscount");//.getBigDecimal(4);		//	Set Discount Amt
-            //        if (discountAmt == null) {
-            //            discountAmt = VIS.Env.ZERO;
-            //        }
-            //        mTab.setValue("InvoiceAmt", invoiceOpen);
-            //        mTab.setValue("Amount", invoiceOpen - discountAmt);
-            //        mTab.setValue("DiscountAmt", discountAmt);
-            //        //  reset as dependent fields get reset
-            //        ctx.setContext(windowNo, "C_Invoice_ID", C_Invoice_ID.toString());
-            //        mTab.setValue("C_Invoice_ID", C_Invoice_ID);
-            //    }
-            //    idr.close();
+
         }
         catch (err) {
-            //if (idr != null) {
-            //    idr.close();
-            //    idr = null;
-            //}
-            //this.log.log(Level.SEVERE, sql, err);
             this.setCalloutActive(false);
-            //return e.getLocalizedMessage();
             return err.message;
         }
         this.setCalloutActive(false);
