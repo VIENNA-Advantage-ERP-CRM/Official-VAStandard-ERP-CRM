@@ -23,7 +23,7 @@ namespace VAdvantage.Process
     public class ProfitLossReactivation : SvrProcess
     {
         private int no = 0;
-
+        string docStatus = null;
         /// <summary>
         /// Implement PrepareIt
         /// </summary>
@@ -38,6 +38,12 @@ namespace VAdvantage.Process
         /// <returns>Message</returns>
         protected override string DoIt()
         {
+            string msg = CheckDocStatus(GetRecord_ID());
+            if (!string.IsNullOrEmpty(msg))
+            {
+                Get_Trx().Rollback();
+                return msg;
+            }
             if (DeletePostingAffects(GetRecord_ID()) < 0)
             {
                 Get_Trx().Rollback();
@@ -61,10 +67,34 @@ namespace VAdvantage.Process
         public int ReActivatePL(int C_ProfitLoss_ID)
         {
             no = DB.ExecuteQuery(@"UPDATE C_ProfitLoss SET Processed = 'N' , DocAction = 'CO' , DocStatus = 'IP' , Posted = 'N' 
-                WHERE C_ProfitLoss_ID = " + C_ProfitLoss_ID , null  , Get_Trx());
+                WHERE C_ProfitLoss_ID = " + C_ProfitLoss_ID, null, Get_Trx());
             log.Info("C_ProfitLoss - Unprocessed record Count : " + no);
 
             return no;
+        }
+        /// <summary>
+        /// This function used to check the document status 
+        /// if the document status is close,void,reverse then return message
+        /// </summary>
+        /// <param name="C_ProfitLoss_ID">Profit Loss ID</param>
+        /// <returns>msg</returns>
+        public string CheckDocStatus(int C_ProfitLoss_ID)
+        {
+            MProfitLoss pl = new MProfitLoss(GetCtx(), C_ProfitLoss_ID, Get_Trx());
+            docStatus = pl.GetDocStatus();//Get document status
+            if (docStatus == "CL")//Check the docStatus equal to close
+            {
+                return Msg.GetMsg(GetCtx(), "DocStatusClose");
+            }
+            else if (docStatus == "VO")//Check the docStatus equal to Void
+            {
+                return Msg.GetMsg(GetCtx(), "DocStatusVoid");
+            }
+            else if (docStatus == "RE")//Check the docStatus equal to Reverse
+            {
+                return Msg.GetMsg(GetCtx(), "DocStatusReverse");
+            }
+            return "";
         }
 
         /// <summary>

@@ -17,18 +17,28 @@
         this.setCalloutActive(true);
         var SDate = Util.getValueOfDate(mTab.getValue("StartDate"));
         var Edate = Util.getValueOfDate(mTab.getValue("EndDate"));
-        var totalMonths = (Edate.getDate() - SDate.getDate()) / 30 +
-            (Edate.getMonth() - SDate.getMonth() +
-                (12 * (Edate.getFullYear() - SDate.getFullYear())));
-        var totalYears = (Edate.getMonth() - SDate.getMonth()) / 12 +
-            (Edate.getFullYear() - SDate.getFullYear());
-        mTab.setValue("VAS_ContractMonths", totalMonths.toFixed(2));
-        mTab.setValue("VAS_ContractDuration", totalYears.toFixed(2));
+
+
+        if (SDate != 0 && Edate != 0) {
+
+            var totalMonths = (Edate.getDate() - SDate.getDate()) / 30 +
+                (Edate.getMonth() - SDate.getMonth() +
+                    (12 * (Edate.getFullYear() - SDate.getFullYear())));
+
+            var totalYears = (Edate.getMonth() - SDate.getMonth()) / 12 +
+                (Edate.getFullYear() - SDate.getFullYear());
+            var Month = (totalMonths % 12);
+
+            mTab.setValue("VAS_ContractMonths", Math.round(Month));
+            mTab.setValue("VAS_ContractDuration", Math.round(totalYears));
+        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
 
     };
+
+
     /**
       * *************************Callout check End date must be greater than Start date****************************
       * @param {any} ctx
@@ -81,6 +91,40 @@
                 mTab.setValue("StartDate", null);
                 this.setCalloutActive(false);
                 return "VAS_EndDateMustGreater";
+            }
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+    /**
+* VIS0336:for checking contract and contract start date
+* @param {any} ctx
+* @param {any} windowNo
+* @param {any} mTab
+* @param {any} mField
+* @param {any} value
+* @param {any} oldValue
+*/
+    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        var DocDate = mTab.getValue("DateDoc");
+        var StartDate = mTab.getValue("StartDate");
+        if (DocDate != null && StartDate != null) {
+            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
+                mTab.setValue("DateDoc", null);
+                this.setCalloutActive(false);
+                return "VAS_ContractDateMustGreater";
+            }
+            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
+                mTab.setValue("StartDate", null);
+                this.setCalloutActive(false);
+                return "VAS_ContractDateMustGreater";
             }
         }
         this.setCalloutActive(false);
@@ -307,7 +351,7 @@
                 if (PaymentTermPresent > 0 && C_Order_Blanket > 0) {
                 }
                 else {
-                    ii = Util.getValueOfInt(contractType=="ASR" ? dr["C_PaymentTerm_ID"] : dr["PO_PaymentTerm_ID"]);
+                    ii = Util.getValueOfInt(contractType == "ASR" ? dr["C_PaymentTerm_ID"] : dr["PO_PaymentTerm_ID"]);
                     var isPaymentTermUpdate = this.checkAdvancePaymentTerm(Util.getValueOfInt(mTab.getValue("C_DocTypeTarget_ID")), ii);
                     if (isPaymentTermUpdate) {
                         if (ii != 0)//ii=0 when dr return ""
@@ -341,15 +385,15 @@
         }
         return isAdvancePayTerm;
     }
-/**
- * VIS404 Set UOM on product selection on contract line tab of Contract Master window
- * @param {any} ctx
- * @param {any} windowNo
- * @param {any} mTab
- * @param {any} mField
- * @param {any} value
- * @param {any} oldValue
- */
+    /**
+     * VIS404 Set UOM on product selection on contract line tab of Contract Master window
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
     VAS_CalloutContract.prototype.SetProductUOM = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (this.isCalloutActive() || value == null) {
             return "";
@@ -377,7 +421,7 @@
         }
         this.setCalloutActive(true);
 
-        ctx.setIsSOTrx(windowNo, value == "ASR" ? true : false)      
+        ctx.setIsSOTrx(windowNo, value == "ASR" ? true : false)
         if (value == "ASR") {
             mTab.setValue("IsSOTrx", value == "ASR" ? true : false);
             mTab.setValue("VAS_Jurisdiction", null);
