@@ -169,7 +169,8 @@ namespace ViennaAdvantage.Process
 
             // Check applied if the product is of item type recipee, then bom should validate from second tab of product i.e Bill Of Material else from BOM and BM Components.
             // Change by mohit to validate the BOM if created from recipee manaement form.- 28 June 2019.
-            if (Env.IsModuleInstalled("VA019_") && product.GetVA019_ItemType().Equals(VAdvantage.Model.X_M_Product.VA019_ITEMTYPE_Recipe))
+            if (Env.IsModuleInstalled("VA019_") && !string.IsNullOrEmpty(product.GetVA019_ItemType()) 
+                && product.GetVA019_ItemType().Equals(VAdvantage.Model.X_M_Product.VA019_ITEMTYPE_Recipe))
             {
                 if (!ValidateOldProduct(_product))
                 {
