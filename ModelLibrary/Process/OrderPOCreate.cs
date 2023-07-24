@@ -114,12 +114,20 @@ namespace VAdvantage.Process
             log.Info("DateOrdered=" + _DateOrdered_From + " - " + _DateOrdered_To
                 + " - C_BPartner_ID=" + _C_BPartner_ID + " - Current Vendor_ID=" + _Vendor_ID
                 + " - IsDropShip=" + _IsDropShip + " - C_Order_ID=" + _C_Order_ID + " - Vendor_ID=" + _C_RefVendor_ID);
+
             if (string.IsNullOrEmpty(_C_Order_ID) && _IsDropShip == null
                 && _DateOrdered_From == null && _DateOrdered_To == null
                 && _C_BPartner_ID == 0 && _Vendor_ID == 0 && _C_RefVendor_ID == 0)
             {
                 throw new Exception("You need to restrict selection");
             }
+
+            //VIS0336:for checking vendor or BPratner
+            if (string.IsNullOrEmpty(_C_Order_ID) && _C_RefVendor_ID == 0)
+            {
+                throw new Exception("VAS_UserMandatory");
+            }
+
             // Get Completed Order
             String sql = "SELECT * FROM C_Order o "
                 + "WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.IsSalesQuotation = 'N' AND O.DocStatus='" + X_C_Order.DOCACTION_Complete + "'"
