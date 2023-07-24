@@ -1518,12 +1518,18 @@ namespace VAdvantage.Model
             }
 
             //APInvoice Case: invoice Reference can't be same for same financial year and Business Partner and DoCTypeTarget and DateAcct      
+
+            if (checkFinancialYear() > 0)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "StartEndDateNotExist"));
+                return false;
+            }
             if ((Is_ValueChanged("DateAcct") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_DocTypeTarget_ID") || Is_ValueChanged("InvoiceReference")) && !IsSOTrx() && checkFinancialYear() > 0)
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
                 return false;
             }
-
+         
             //	Price List
             if (GetM_PriceList_ID() == 0)
             {
@@ -1852,15 +1858,19 @@ namespace VAdvantage.Model
                                     IsActive = 'Y' AND AD_Client_ID=" + GetAD_Client_ID(), null, null));
                 }
 
-                ds = DB.ExecuteDataset(@"SELECT startdate , enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
-                    "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
-                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate) " +
-                    "AND periodno IN (1, 12)", null, null);
+                ds = DB.ExecuteDataset(@"SELECT MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
+                "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
+                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate)", null, null);
 
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
                     startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
-                    endDate = Convert.ToDateTime(ds.Tables[0].Rows[1]["enddate"]);
+                    endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
+                }
+                else
+                {
+                    log.Info("Start Date and End Date not found");
+                    return 1;
                 }
                 string sql = "SELECT COUNT(C_Invoice_ID) FROM C_Invoice WHERE DocStatus NOT IN('RE','VO') AND IsExpenseInvoice='N' AND IsSoTrx='N'" +
                   " AND C_BPartner_ID = " + GetC_BPartner_ID() + " AND InvoiceReference = '" + Get_Value("InvoiceReference") + "'" +
