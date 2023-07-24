@@ -1862,9 +1862,9 @@ namespace VAdvantage.Model
                     startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
                     endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
                 }
-                else
+                else        //VIS404 if start date and end date not found
                 {
-                    log.Info("Start Date and End Date not found");   //VIS404 if start date and end date not found
+                    log.Info("Check Method checkFinancialYear() if Start Date and End Date not found"); 
                     return 1;
                 }
                 string sql = "SELECT COUNT(C_Invoice_ID) FROM C_Invoice WHERE DocStatus NOT IN('RE','VO') AND IsExpenseInvoice='N' AND IsSoTrx='N'" +
