@@ -1519,11 +1519,6 @@ namespace VAdvantage.Model
 
             //APInvoice Case: invoice Reference can't be same for same financial year and Business Partner and DoCTypeTarget and DateAcct      
 
-            if (checkFinancialYear() > 0)
-            {
-                log.SaveError("", Msg.GetMsg(GetCtx(), "StartEndDateNotExist"));
-                return false;
-            }
             if ((Is_ValueChanged("DateAcct") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_DocTypeTarget_ID") || Is_ValueChanged("InvoiceReference")) && !IsSOTrx() && checkFinancialYear() > 0)
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
@@ -1869,7 +1864,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    log.Info("Start Date and End Date not found");
+                    log.Info("Start Date and End Date not found");   //VIS404 if start date and end date not found
                     return 1;
                 }
                 string sql = "SELECT COUNT(C_Invoice_ID) FROM C_Invoice WHERE DocStatus NOT IN('RE','VO') AND IsExpenseInvoice='N' AND IsSoTrx='N'" +
