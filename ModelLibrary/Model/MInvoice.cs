@@ -1856,14 +1856,14 @@ namespace VAdvantage.Model
                 ds = DB.ExecuteDataset(@"SELECT MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
                 "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
                     " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate) " +
-                    "HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);   // VIS404 Check for null row
+                    "HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);      // TaskID 2258 Check for not selecting null row
 
                 if (ds != null && ds.Tables[0].Rows.Count > 0 )    
                 {
                     startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
                     endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
                 }
-                else        // VIS404 If start date and end date not found
+                else          // TaskID 2258 If start date and end date not found
                 {
                     log.Info("Check Method checkFinancialYear() if Start Date and End Date not found"); 
                     return 1;
