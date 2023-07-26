@@ -105,8 +105,22 @@ namespace VAS.Process
 
             if (!mRecurring.Save())
             {
-                log.Log(Level.SEVERE, Msg.GetMsg(GetCtx(), "Recurring_NotSaved"));
-                return Msg.GetMsg(GetCtx(), "Recurring_NotCreated");
+                string val = string.Empty;
+                ValueNamePair pp = VLogger.RetrieveError();
+                if (pp != null)
+                {
+                    val = pp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = pp.GetValue();
+                    }
+                }
+                if (string.IsNullOrEmpty(val))
+                {
+                    val = Msg.GetMsg(GetCtx(), "Recurring_NotCreated");
+                }
+                log.Log(Level.SEVERE, val);
+                return val;
             }
             return Msg.GetMsg(GetCtx(), "Recurring_Created") + mRecurring.GetName();
 
