@@ -18,6 +18,8 @@ using VAdvantage.Utility;
 
 
 using VAdvantage.ProcessEngine;
+using System.Collections.Generic;
+using System.Data;
 
 namespace VAS.Process
 {
@@ -37,6 +39,11 @@ namespace VAS.Process
         private int _RunsMax = 0;
         // Frequency 
         private int _Frequency = 0;
+
+        // These variables are use for Dictionary type to get and set value in Recurring window
+        private static readonly string RECURRING_NAME = "RECURRING_NAME";
+        private static readonly string ORGID = "ORGID";
+        private static readonly string CLIENTID = "CLIENTID";
 
         /// <summary>
         /// Get window Record ID
@@ -94,10 +101,16 @@ namespace VAS.Process
             if(existingRecurring!=null && existingRecurring.Length>0)
                 return Msg.GetMsg(GetCtx(), "Recurring_AlreadyCreated") + existingRecurring;
 
-            string recurringName = getDynamicRecurringName(recordId);
+           // string recurringName = getDynamicRecurringName(recordId);
+
+            Dictionary<string, object> keyValuePairs = GetDynamicRecurringName(recordId);
 
             MRecurring mRecurring = new MRecurring(GetCtx(), 0, Get_TrxName());
-            mRecurring.SetName(recurringName);
+
+            mRecurring.SetName(Util.GetValueOfString(keyValuePairs[RECURRING_NAME]));
+            mRecurring.SetAD_Client_ID(Util.GetValueOfInt(keyValuePairs[CLIENTID]));
+            mRecurring.SetAD_Org_ID(Util.GetValueOfInt(keyValuePairs[ORGID]));
+
             mRecurring.SetRunsMax(_RunsMax);
             mRecurring.SetRecurringType(MRecurring.RECURRINGTYPE_Invoice);
             mRecurring.SetDateNextRun(_DateNextRun);
@@ -135,18 +148,7 @@ namespace VAS.Process
         /// <returns>Name of existing Recurring Window</returns>
         private string getExistingRecurringRecord(int recordId)
         {
-            //string recurringName = null;
-
             string recurringName = Util.GetValueOfString(DB.ExecuteScalar("SELECT Name FROM C_Recurring WHERE C_Invoice_ID=" + recordId));
-           
-            /*else if (_RecurringType.Equals(MRecurring.RECURRINGTYPE_GLJournal))
-            {
-                recurringName = Util.GetValueOfString(DB.ExecuteScalar("SELECT Name FROM C_Recurring WHERE GL_Journal_ID=" + recordId));
-            }
-            else if (_RecurringType.Equals(MRecurring.RECURRINGTYPE_GLJournalBatch))
-            {
-                recurringName = Util.GetValueOfString(DB.ExecuteScalar("SELECT Name FROM C_Recurring WHERE GL_JournalBatch_ID=" + recordId));
-            }*/
             return recurringName;
         }
 
@@ -155,30 +157,40 @@ namespace VAS.Process
         /// Creating the combination of Name of Document Type and DocumentNo of GL Journal Batch window. 
         /// </summary>
         /// <param name="recordId">>Invoice Record ID</param>
-        /// <returns>Combination of DocType Name and Document No</returns>
-        private string getDynamicRecurringName(int recordId)
+        /// <returns>Combination of DocType Name and Document No, Org Id and Client ID in Dictionary Type</returns>
+        private Dictionary<string, object> GetDynamicRecurringName(int recordId)
         {
-            string sql = "SELECT dt.Name ||'/'|| inv.DocumentNo " +
+            string sql = "SELECT dt.Name ||'/'|| inv.DocumentNo AS RecurringName, inv.Ad_Org_Id AS OrgId , inv.Ad_Client_Id AS ClientID " +
                         " FROM C_Invoice inv " +
-                        " INNER JOIN C_DocType dt on (inv.C_DocType_ID = dt.C_DocType_ID) WHERE inv.C_Invoice_ID ="+ recordId;
-            string recurringName = Util.GetValueOfString(DB.ExecuteScalar(sql));
+                        " INNER JOIN C_DocType dt on (inv.C_DocType_ID = dt.C_DocType_ID) WHERE inv.C_Invoice_ID =" + recordId;
 
-            
-            /*else
-            if (recurringType.Equals(MRecurring.RECURRINGTYPE_GLJournal))
+            Dictionary<string, object> keyValuePairs = new Dictionary<string, object>();
+            IDataReader data = DB.ExecuteReader(sql);
+            try
             {
-                MJournal mJournal = new MJournal(GetCtx(), recordId, Get_TrxName());
-                MDocType mDocType = new MDocType(GetCtx(), mJournal.GetC_DocType_ID(), Get_TrxName());
-                recurringName = mDocType.GetName() + "/" + mJournal.GetDocumentNo();
+                if (data != null)
+                {
+                    if (data.Read())
+                    {
+                        keyValuePairs.Add(RECURRING_NAME, Util.GetValueOfString(data["RecurringName"]));
+                        keyValuePairs.Add(ORGID, Util.GetValueOfInt(data["OrgId"]));
+                        keyValuePairs.Add(CLIENTID, Util.GetValueOfInt(data["ClientID"]));
+                    }
+                    data.Close();
+                    data = null;
+                }
             }
-            else
-            if (recurringType.Equals(MRecurring.RECURRINGTYPE_GLJournalBatch))
+            catch (Exception ex)
             {
-                MJournalBatch mJournalBatch = new MJournalBatch(GetCtx(), recordId, Get_TrxName());
-                MDocType mDocType = new MDocType(GetCtx(), mJournalBatch.GetC_DocType_ID(), Get_TrxName());
-                recurringName = mDocType.GetName() + "/" + mJournalBatch.GetDocumentNo();
-            }*/
-            return recurringName;
+                if (data != null)
+                {
+                    data = null;
+                    data.Close();
+                }
+                log.Log(Level.SEVERE, sql, ex);
+            }
+
+            return keyValuePairs;
         }
     }	//	Recurring
 }
