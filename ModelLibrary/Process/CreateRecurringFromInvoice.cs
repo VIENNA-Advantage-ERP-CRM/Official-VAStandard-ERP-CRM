@@ -165,31 +165,15 @@ namespace VAS.Process
                         " INNER JOIN C_DocType dt on (inv.C_DocType_ID = dt.C_DocType_ID) WHERE inv.C_Invoice_ID =" + recordId;
 
             Dictionary<string, object> keyValuePairs = new Dictionary<string, object>();
-            IDataReader data = DB.ExecuteReader(sql);
-            try
+            DataSet ds = DB.ExecuteDataset(sql);
+            
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                if (data != null)
-                {
-                    if (data.Read())
-                    {
-                        keyValuePairs.Add(RECURRING_NAME, Util.GetValueOfString(data["RecurringName"]));
-                        keyValuePairs.Add(ORGID, Util.GetValueOfInt(data["OrgId"]));
-                        keyValuePairs.Add(CLIENTID, Util.GetValueOfInt(data["ClientID"]));
-                    }
-                    data.Close();
-                    data = null;
-                }
+                keyValuePairs.Add(RECURRING_NAME, Util.GetValueOfString(ds.Tables[0].Rows[0]["RecurringName"]));
+                keyValuePairs.Add(ORGID, Util.GetValueOfInt(ds.Tables[0].Rows[0]["OrgId"]));
+                keyValuePairs.Add(CLIENTID, Util.GetValueOfInt(ds.Tables[0].Rows[0]["ClientID"]));
+                ds.Clear();
             }
-            catch (Exception ex)
-            {
-                if (data != null)
-                {
-                    data = null;
-                    data.Close();
-                }
-                log.Log(Level.SEVERE, sql, ex);
-            }
-
             return keyValuePairs;
         }
     }	//	Recurring
