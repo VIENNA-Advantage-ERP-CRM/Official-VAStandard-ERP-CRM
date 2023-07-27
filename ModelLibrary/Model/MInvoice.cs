@@ -2917,7 +2917,7 @@ namespace VAdvantage.Model
                                     for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
                                     {
                                         cl = new MCashLine(cash);
-                                        if (Util.GetValueOfString(ds.Tables[0].Rows[k]["VA009_IsPaid"]) == "Y")     //TaskID: 4672 Issue resolved Cash Journal completed with Zero Amount
+                                        if (Util.GetValueOfString(ds.Tables[0].Rows[k]["VA009_IsPaid"]) == "Y")     //TaskID: 2248 Issue resolved Cash Journal completed with Zero Amount
                                         {
                                             continue;
                                         }
