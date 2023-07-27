@@ -3680,7 +3680,9 @@ namespace VAdvantage.Model
                                 SetPrice();
                             }
                         }
-                        //Handle issue on AR Invoice set Zero Amount in invoce line tab
+                        /*TRN100098 Devops TaskID:1985 On Selecting the Product on the Sales Order window set price automatically
+                        in case Product Price is changed to zero then it set price zero in Invoice line tab
+                        from the reference of the sales order window*/
                         if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
                         {
                             SetPrice();
