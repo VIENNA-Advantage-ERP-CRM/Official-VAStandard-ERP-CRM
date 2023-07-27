@@ -3680,11 +3680,13 @@ namespace VAdvantage.Model
                                 SetPrice();
                             }
                         }
-                        else
+                        //Handle issue on AR Invoice set Zero Amount in invoce line tab
+                        if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
+                        {
                             SetPrice();
+                        }
                     }
                 }
-
                 //	Set Tax
 
                 if (GetC_Tax_ID() == 0)
