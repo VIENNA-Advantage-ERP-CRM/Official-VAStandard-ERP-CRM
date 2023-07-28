@@ -3680,9 +3680,8 @@ namespace VAdvantage.Model
                                 SetPrice();
                             }
                         }
-                        /*TRN100098 Devops TaskID:1985 On Selecting the Product on the Sales Order window set price automatically
-                        in case Product Price is changed to zero then it set price zero in Invoice line tab
-                        from the reference of the sales order window*/
+                        /* Devops TaskID:1985 This method will not be called when invoice is creating 
+                          with Order reference .Because price will be the defined on Order only.*/                        
                         if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
                         {
                             SetPrice();
