@@ -1524,7 +1524,7 @@ namespace VAdvantage.Model
                 log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
                 return false;
             }
-         
+
             //	Price List
             if (GetM_PriceList_ID() == 0)
             {
@@ -1858,14 +1858,14 @@ namespace VAdvantage.Model
                     " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate) " +
                     "HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);      // TaskID 2258 Check for not selecting null row
 
-                if (ds != null && ds.Tables[0].Rows.Count > 0 )    
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
                     startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
                     endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
                 }
                 else          // TaskID 2258 If start date and end date not found
                 {
-                    log.Info("Check Method checkFinancialYear() if Start Date and End Date not found"); 
+                    log.Info("Check Method checkFinancialYear() if Start Date and End Date not found");
                     return 1;
                 }
                 string sql = "SELECT COUNT(C_Invoice_ID) FROM C_Invoice WHERE DocStatus NOT IN('RE','VO') AND IsExpenseInvoice='N' AND IsSoTrx='N'" +
@@ -2917,7 +2917,14 @@ namespace VAdvantage.Model
                                     for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
                                     {
                                         cl = new MCashLine(cash);
-                                        cl.CreateCashLine(this, Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_InvoicePaySchedule_ID"]), Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["DueAmt"]));
+                                        if (Util.GetValueOfString(ds.Tables[0].Rows[k]["VA009_IsPaid"]) == "Y")     //VIS404 TaskID: 2248 Issue resolved Cash Journal completed with Zero Amount
+                                        {
+                                            continue;
+                                        }
+                                        else
+                                        {
+                                            cl.CreateCashLine(this, Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_InvoicePaySchedule_ID"]), Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["DueAmt"]));
+                                        }
                                         if (!cl.Save(Get_TrxName()))
                                         {
                                             _processMsg = "Could not Save Cash Journal Line";
