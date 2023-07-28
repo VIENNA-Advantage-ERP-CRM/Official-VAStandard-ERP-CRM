@@ -133,7 +133,7 @@ namespace VAS.Process
                 log.Log(Level.SEVERE, val);
                 return val;
             }
-            return Msg.GetMsg(GetCtx(), "Recurring_Created") + mRecurring.GetName();
+            return Msg.GetMsg(GetCtx(), "Recurring_Created") + " '"+mRecurring.GetName()+"'";
 
         }   //	doIt
 
