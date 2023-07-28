@@ -3680,11 +3680,14 @@ namespace VAdvantage.Model
                                 SetPrice();
                             }
                         }
-                        else
+                        /* Devops TaskID:1985 This method will not be called when invoice is creating 
+                          with Order reference .Because price will be the defined on Order only.*/                        
+                        if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
+                        {
                             SetPrice();
+                        }
                     }
                 }
-
                 //	Set Tax
 
                 if (GetC_Tax_ID() == 0)
