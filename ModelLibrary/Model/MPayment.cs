@@ -655,11 +655,11 @@ namespace VAdvantage.Model
                 // set prepayment as TRUE, when payment created with order/order schedule reference
                 if (newRecord
                     || Is_ValueChanged("C_Charge_ID") || Is_ValueChanged("C_Invoice_ID")
-                    || Is_ValueChanged("C_Order_ID") || Is_ValueChanged("C_Project_ID"))
+                    || Is_ValueChanged("C_Order_ID") || Is_ValueChanged("C_Project_ID") || Is_ValueChanged("GL_JournalLine_ID"))
                     SetIsPrepayment(GetC_Charge_ID() == 0
                         && GetC_BPartner_ID() != 0
                         && (GetC_Order_ID() != 0
-                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0)));
+                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0 && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) ==0)));
 
                 // In Case of Advance Charge, set Prepayment as True
                 if (GetC_Charge_ID() != 0)
