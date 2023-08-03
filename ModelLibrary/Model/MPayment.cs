@@ -2752,7 +2752,7 @@ namespace VAdvantage.Model
             {
                 // TaskID 1381 When Payment Method ID(Payment window) equals to Payment Method ID on Bank Account Document tab with No checkno
                 //if check number is not in Bank Account Document tab  than message will be returned 
-                string sql = "Select VA009_PaymentMethod_ID from C_BankAccountDoc where C_BankAccount_ID=" + GetC_BankAccount_ID() +
+                string sql = "SELECT VA009_PaymentMethod_ID FROM C_BankAccountDoc WHERE C_BankAccount_ID=" + GetC_BankAccount_ID() +
                     " AND IsActive='Y'AND VA009_PaymentMethod_ID= " + GetVA009_PaymentMethod_ID();
                 int Payment_Method_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
                 if (Payment_Method_ID > 0)
