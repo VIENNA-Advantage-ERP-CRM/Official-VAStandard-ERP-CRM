@@ -2745,6 +2745,37 @@ namespace VAdvantage.Model
                 }
             }
 
+            MBankAccount bnkAct = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
+            MDocType dt1 = MDocType.Get(GetCtx(), GetC_DocType_ID());
+
+            if (bnkAct.IsChkNoAutoControl() && string.IsNullOrEmpty(GetCheckNo()))
+            {
+                // TaskID 1381 When Payment Method ID(Payment window) equals to Payment Method ID on Bank Account Document tab with No checkno
+                //if check number is not in Bank Account Document tab  than message will be returned 
+                string sql = "SELECT VA009_PaymentMethod_ID FROM C_BankAccountDoc WHERE C_BankAccount_ID=" + GetC_BankAccount_ID() +
+                    " AND IsActive='Y'AND VA009_PaymentMethod_ID= " + GetVA009_PaymentMethod_ID();
+                int Payment_Method_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+                if (Payment_Method_ID > 0)
+                {
+                    // when DocBaseType equals to APP and PayAmt greater and equals to zero  
+                    //when DocBaseType equals to ARR and PayAmt less than zero
+                    if ((dt1.GetDocBaseType().Equals(MDocBaseType.DOCBASETYPE_APPAYMENT) && GetPayAmt() >= 0)
+                        || (dt1.GetDocBaseType().Equals(MDocBaseType.DOCBASETYPE_ARRECEIPT) && GetPayAmt() < 0))
+                    {
+                        // get Check number from Bank Account Document tab
+                        string checkNo = GetChecknumber(GetVA009_PaymentMethod_ID(), GetC_BankAccount_ID(), Get_Trx());
+                        //Check check number exists in Bank Account Document tab  if the check number is not exists than return the message
+                        if (checkNo == "0")
+                        {
+                            _processMsg = Msg.GetMsg(GetCtx(), "NoCheckNum");
+                            log.Info("" + _processMsg + ": Payment Document No " + GetDocumentNo());
+                            return DocActionVariables.STATUS_INVALID;
+                        }
+                    }
+                }
+            }
+
+
             /* set withholding tax amount
              * While calculating the withholding amount, the system has to check whether the withholding amount 
              * is zero or not equal to zero. If it's not equal to zero then the system will not calculate the withholding amount.
@@ -3200,7 +3231,7 @@ namespace VAdvantage.Model
                 }
             }
             //Credit Limit
-
+            
             if (GetC_InvoicePaySchedule_ID() != 0)
             {
                 if (Env.IsModuleInstalled("VA009_"))
