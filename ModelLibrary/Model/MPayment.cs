@@ -1170,8 +1170,9 @@ namespace VAdvantage.Model
         /// <param name="PayMethod_ID">Payment Mehtod ID</param>
         /// <param name="BankAccount_ID"> Bank Account ID</param>
         /// <param name="trx">transaction object</param>
-        /// <returns></returns>
-        public string GetChecknumbr(int PayMethod_ID, int BankAccount_ID, Trx trx)
+        /// <returns>currentnext</returns>
+        /// <task>TaskID 1381</task>
+        public string GetAutoCheckNumber(int PayMethod_ID, int BankAccount_ID, Trx trx)
         {
             string sql = @"SELECT currentnext FROM (SELECT currentnext,DENSE_RANK() OVER(ORDER BY priority ASC) AS rnk  " +
                          " FROM C_BANKACCOUNTDOC WHERE VA009_PaymentMethod_ID =" + PayMethod_ID + " And C_BankAccount_ID  =" + BankAccount_ID + " " +
@@ -2778,7 +2779,7 @@ namespace VAdvantage.Model
                         || (dt1.GetDocBaseType().Equals(MDocBaseType.DOCBASETYPE_ARRECEIPT) && GetPayAmt() < 0))
                     {
                         // get Check number from Bank Account Document tab
-                        string checkNo = GetChecknumbr(GetVA009_PaymentMethod_ID(), GetC_BankAccount_ID(), Get_Trx());
+                        string checkNo = GetAutoCheckNumber(GetVA009_PaymentMethod_ID(), GetC_BankAccount_ID(), Get_Trx());
                         //Check check number exists in Bank Account Document tab  if the check number is not exists than return the message
                         if (checkNo == "")
                         {
