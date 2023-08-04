@@ -175,7 +175,10 @@
                 if (ds != null) {
                     if (countDTD001) {
                         mTab.setValue("ProductType", ds["ProductType"]);
-                        mTab.setValue("DTD001_IsConsumable", ds["DTD001_IsConsumable"]);
+                        if (ds["DTD001_IsConsumable"] == 'True') {  //VIS0336:change done for setting the true value
+                            mTab.setValue("DTD001_IsConsumable", true);
+
+                        }
                     }
                     else {
                         mTab.setValue("ProductType", "");
