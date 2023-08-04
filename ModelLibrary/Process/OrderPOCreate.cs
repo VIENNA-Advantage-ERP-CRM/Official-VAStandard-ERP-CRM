@@ -125,7 +125,8 @@ namespace VAdvantage.Process
             //VIS0336:for checking vendor or BPratner
             if (string.IsNullOrEmpty(_C_Order_ID) && _C_RefVendor_ID == 0)
             {
-                throw new Exception("VAS_UserMandatory");
+                return Msg.GetMsg(GetCtx(), "VAS_UserMandatory");
+                
             }
 
             // Get Completed Order
@@ -368,7 +369,7 @@ namespace VAdvantage.Process
                             listConsolidatePO.Add(consolidatePO);
                         }
                     }
-                    
+
                     _Dropship = Utility.Util.GetValueOfString(dr["ISDROPSHIP"]);
                     // int M_Product_ID = Utility.Util.GetValueOfInt(dr["M_PRODUCT_ID"]);
                     //	Create PO Line
@@ -608,7 +609,7 @@ namespace VAdvantage.Process
             po.SetC_Campaign_ID(so.GetC_Campaign_ID());
             po.SetC_Project_ID(so.GetC_Project_ID());
             po.SetUser1_ID(so.GetUser1_ID());
-            po.SetUser2_ID(so.GetUser2_ID());            
+            po.SetUser2_ID(so.GetUser2_ID());
 
             //Set VA077 values on header level
             if (Env.IsModuleInstalled("VA077_"))
