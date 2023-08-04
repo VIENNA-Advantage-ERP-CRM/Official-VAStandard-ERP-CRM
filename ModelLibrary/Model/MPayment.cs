@@ -1164,6 +1164,21 @@ namespace VAdvantage.Model
             }
             return string.Empty;
         }
+        /// <summary>
+        /// Get checknumber for selected bank account and payment method.
+        /// </summary>
+        /// <param name="PayMethod_ID">Payment Mehtod ID</param>
+        /// <param name="BankAccount_ID"> Bank Account ID</param>
+        /// <param name="trx">transaction object</param>
+        /// <returns></returns>
+        public string GetChecknumbr(int PayMethod_ID, int BankAccount_ID, Trx trx)
+        {
+            string sql = @"SELECT currentnext FROM (SELECT currentnext,DENSE_RANK() OVER(ORDER BY priority ASC) AS rnk  " +
+                         " FROM C_BANKACCOUNTDOC WHERE VA009_PaymentMethod_ID =" + PayMethod_ID + " And C_BankAccount_ID  =" + BankAccount_ID + " " +
+                         "AND  currentnext BETWEEN startchknumber AND endchknumber AND ISACTIVE = 'Y'  AND Priority IS NOT NULL )" +
+                         "WHERE rnk = 1";
+            return Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()));
+        }
 
         /**
          * 	Get Allocated Amt in Payment Currency
@@ -2650,7 +2665,7 @@ namespace VAdvantage.Model
             /* VIS_0045: 04-May-2023 - DevOps Task ID: 2107*/
             if (GetPayAmt().Equals(0) && GetWriteOffAmt().Equals(0) && GetDiscountAmt().Equals(0) && GetOverUnderAmt().Equals(0) && GetPaymentAmount().Equals(0))
             {
-                _processMsg = Msg.GetMsg(GetCtx() , "PayAmountCantZERO");
+                _processMsg = Msg.GetMsg(GetCtx(), "PayAmountCantZERO");
                 return DocActionVariables.STATUS_INVALID;
             }
 
@@ -2763,9 +2778,9 @@ namespace VAdvantage.Model
                         || (dt1.GetDocBaseType().Equals(MDocBaseType.DOCBASETYPE_ARRECEIPT) && GetPayAmt() < 0))
                     {
                         // get Check number from Bank Account Document tab
-                        string checkNo = GetChecknumber(GetVA009_PaymentMethod_ID(), GetC_BankAccount_ID(), Get_Trx());
+                        string checkNo = GetChecknumbr(GetVA009_PaymentMethod_ID(), GetC_BankAccount_ID(), Get_Trx());
                         //Check check number exists in Bank Account Document tab  if the check number is not exists than return the message
-                        if (checkNo == "0")
+                        if (checkNo == "")
                         {
                             _processMsg = Msg.GetMsg(GetCtx(), "NoCheckNum");
                             log.Info("" + _processMsg + ": Payment Document No " + GetDocumentNo());
@@ -3231,7 +3246,7 @@ namespace VAdvantage.Model
                 }
             }
             //Credit Limit
-            
+
             if (GetC_InvoicePaySchedule_ID() != 0)
             {
                 if (Env.IsModuleInstalled("VA009_"))
@@ -3346,7 +3361,7 @@ namespace VAdvantage.Model
             {
                 //VIS_317 When Payment Method ID (Payment window) not equals to Payment Method ID on (Bank Account Document ''Bank Window'') with Check No.
                 //if user pass the check number manually than payment status would be completed. 
-                string PayCount = "SELECT COUNT(VA009_PaymentMethod_ID) FROM C_BankAccountDoc WHERE C_BankAccount_ID=" + GetC_BankAccount_ID() 
+                string PayCount = "SELECT COUNT(VA009_PaymentMethod_ID) FROM C_BankAccountDoc WHERE C_BankAccount_ID=" + GetC_BankAccount_ID()
                                    + " AND EndChkNumber >= CurrentNext AND IsActive='Y' AND VA009_PaymentMethod_ID= " + GetVA009_PaymentMethod_ID();
                 int Count = Util.GetValueOfInt(DB.ExecuteScalar(PayCount, null, Get_Trx()));
                 if (Count == 0 && !string.IsNullOrEmpty(GetCheckNo()) && GetCheckNo() != "0")
@@ -4662,7 +4677,7 @@ namespace VAdvantage.Model
             //VIS_427 DevopsTaskId :2156 Create Gl JournalLine 
             if (Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) != 0)
             {
-                    return AllocateJournalLine();
+                return AllocateJournalLine();
             }
             //	Invoices of a AP Payment Selection
             if (AllocatePaySelection())
@@ -4742,10 +4757,10 @@ namespace VAdvantage.Model
                         aLine.SetWithholdingAmt(Decimal.Negate(Util.GetValueOfDecimal(dr[0]["withholdingAmt"])));
                         aLine.SetBackupWithholdingAmount(Decimal.Negate(Util.GetValueOfDecimal(dr[0]["BackupwithholdingAmt"])));
                     }
-                }                
+                }
                 aLine.SetDocInfo(pa.GetC_BPartner_ID(), 0, pa.GetC_Invoice_ID());
                 //VIS_427 DevopsTaskId :2156 set  Gl JournalLine 
-                if (pa.Get_ColumnIndex("GL_JournalLine_ID")>=0 && Util.GetValueOfInt(pa.Get_Value("GL_JournalLine_ID")) != 0)
+                if (pa.Get_ColumnIndex("GL_JournalLine_ID") >= 0 && Util.GetValueOfInt(pa.Get_Value("GL_JournalLine_ID")) != 0)
                 {
                     aLine.SetGL_JournalLine_ID(Util.GetValueOfInt(pa.Get_Value("GL_JournalLine_ID")));
                 }
@@ -5649,10 +5664,10 @@ namespace VAdvantage.Model
 
                 // VIS_0045: Payment Schedule Batch 
                 // Update Execution Status as "Assigned to Batch" on Invoice PaySchedule 
-                    String sql = @"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus = '"
-                                + MInvoicePaySchedule.VA009_EXECUTIONSTATUS_AssignedToBatch +
-                                @"' WHERE C_InvoicePaySchedule_ID IN ( SELECT C_InvoicePaySchedule_ID FROM VA009_BatchLineDetails 
-                                    WHERE C_Payment_ID = " + GetC_Payment_ID() + ")";                
+                String sql = @"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus = '"
+                            + MInvoicePaySchedule.VA009_EXECUTIONSTATUS_AssignedToBatch +
+                            @"' WHERE C_InvoicePaySchedule_ID IN ( SELECT C_InvoicePaySchedule_ID FROM VA009_BatchLineDetails 
+                                    WHERE C_Payment_ID = " + GetC_Payment_ID() + ")";
                 DB.ExecuteQuery(sql, null, Get_Trx());
 
                 //update Payment Batch line set payment = null during reverse of this payment
