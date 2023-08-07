@@ -114,12 +114,21 @@ namespace VAdvantage.Process
             log.Info("DateOrdered=" + _DateOrdered_From + " - " + _DateOrdered_To
                 + " - C_BPartner_ID=" + _C_BPartner_ID + " - Current Vendor_ID=" + _Vendor_ID
                 + " - IsDropShip=" + _IsDropShip + " - C_Order_ID=" + _C_Order_ID + " - Vendor_ID=" + _C_RefVendor_ID);
+
             if (string.IsNullOrEmpty(_C_Order_ID) && _IsDropShip == null
                 && _DateOrdered_From == null && _DateOrdered_To == null
                 && _C_BPartner_ID == 0 && _Vendor_ID == 0 && _C_RefVendor_ID == 0)
             {
                 throw new Exception("You need to restrict selection");
             }
+
+            //VIS0336:for checking vendor or BPratner
+            if (string.IsNullOrEmpty(_C_Order_ID) && _C_RefVendor_ID == 0)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_UserMandatory");
+                
+            }
+
             // Get Completed Order
             String sql = "SELECT * FROM C_Order o "
                 + "WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.IsSalesQuotation = 'N' AND O.DocStatus='" + X_C_Order.DOCACTION_Complete + "'"
@@ -360,7 +369,7 @@ namespace VAdvantage.Process
                             listConsolidatePO.Add(consolidatePO);
                         }
                     }
-                    
+
                     _Dropship = Utility.Util.GetValueOfString(dr["ISDROPSHIP"]);
                     // int M_Product_ID = Utility.Util.GetValueOfInt(dr["M_PRODUCT_ID"]);
                     //	Create PO Line
@@ -600,7 +609,7 @@ namespace VAdvantage.Process
             po.SetC_Campaign_ID(so.GetC_Campaign_ID());
             po.SetC_Project_ID(so.GetC_Project_ID());
             po.SetUser1_ID(so.GetUser1_ID());
-            po.SetUser2_ID(so.GetUser2_ID());            
+            po.SetUser2_ID(so.GetUser2_ID());
 
             //Set VA077 values on header level
             if (Env.IsModuleInstalled("VA077_"))

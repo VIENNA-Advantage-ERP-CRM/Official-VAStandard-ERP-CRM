@@ -700,20 +700,24 @@
                 else
                     mTab.setValue("Bill_Location_ID", bill_Location_ID);
 
-                // Ship-To Location
+               // VIS0336_Set location acc to selected record in Info window
                 var shipTo_ID = Util.getValueOfInt(dr["C_BPartner_Location_ID"]);
-                if (C_BPartner_ID.toString() == ctx.getContext("C_BPartner_ID")) {
-                    var loc = ctx.getContext("C_BPartner_Location_ID");
-                    if (loc.length > 0)
-                        shipTo_ID = Util.getValueOfInt(loc);
+                if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                    var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
+                    if (loc && loc.toString().length > 0) {
+                        shipTo_ID = parseInt(loc);
+                    }
                 }
-                if (shipTo_ID == 0)
+                if (shipTo_ID == 0) {
                     mTab.setValue("C_BPartner_Location_ID", null);
+                }
                 else {
                     mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
                     if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	//	set the same
-                        mTab.setValue("Bill_Location_ID", shipTo_ID);
+                    mTab.setValue("Bill_Location_ID", shipTo_ID);
                 }
+
+
 
                 var _salerep_ID = Util.getValueOfInt(dr["SalesRep_ID"])
                 if (_salerep_ID > 0)
@@ -809,18 +813,22 @@
                     }
                 }
 
+                // VIS0336_Set UserID acc to selected record in Info window
                 var contID = Util.getValueOfInt(dr["AD_User_ID"]);
-                if (C_BPartner_ID.toString() == ctx.getContext("C_BPartner_ID")) {
-                    var cont = ctx.getContext("AD_User_ID");
-                    if (cont.length > 0)
-                        contID = Util.getValueOfInt(cont);
+                if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
+                    var cont = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "AD_USER_ID");
+                    if (cont && cont.toString().length > 0) {
+                        contID = parseInt(cont);
+                    }
                 }
-                if (contID == 0)
+                if (contID == 0) {
                     mTab.setValue("AD_User_ID", null);
+                }
                 else {
                     mTab.setValue("AD_User_ID", contID);
                     mTab.setValue("Bill_User_ID", contID);
                 }
+
 
                 //	CreditAvailable 
                 if (isSOTrx) {
