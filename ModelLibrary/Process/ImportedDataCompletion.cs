@@ -37,6 +37,7 @@ namespace VAdvantage.Process
 
         DateTime? currentDate;
         DateTime? minDateRecord;
+        string C_DocType_ID;
 
         /// <summary>
         /// Prepare Parameters
@@ -50,6 +51,10 @@ namespace VAdvantage.Process
                 if (para[i].GetParameter() == null)
                 {
 
+                }
+                else if (name.Equals("C_DocType_ID"))
+                {
+                    C_DocType_ID = Util.GetValueOfString(para[i].GetParameter());
                 }
                 else if (name.Equals("ToDate"))
                 {
@@ -89,32 +94,32 @@ namespace VAdvantage.Process
                     sql.Append(@"SELECT * FROM ( 
                          SELECT AD_Client_ID, AD_Org_ID, IsActive, to_char(Created, 'DD-MON-YY HH24:MI:SS') AS Created, CreatedBy, to_char(Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, UpdatedBy,  
                            DocumentNo, C_Order_ID AS Record_Id, IsSOTrx,  IsReturnTrx, '' AS IsInternalUse, 'C_Order' AS TableName,
-                           DocStatus, DateOrdered AS DateAcct
+                           DocStatus, DateOrdered AS DateAcct, C_DocTypeTarget_ID AS C_DocType_ID
                          FROM C_Order WHERE DateAcct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND IsActive = 'Y' AND DocStatus NOT IN ('CO', 'CL', 'RE', 'VO')
                          UNION
                          SELECT AD_Client_ID, AD_Org_ID, IsActive, to_char(Created, 'DD-MON-YY HH24:MI:SS') AS Created, CreatedBy, to_char(Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, UpdatedBy,  
                            DocumentNo, M_InOut_ID AS Record_Id, IsSOTrx,  IsReturnTrx, '' AS IsInternalUse, 'M_InOut' AS TableName,
-                           DocStatus, MovementDate AS DateAcct
+                           DocStatus, MovementDate AS DateAcct, C_DocType_ID
                          FROM M_InOut WHERE DateAcct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND IsActive = 'Y' AND DocStatus NOT IN ('CO', 'CL', 'RE', 'VO')
                          UNION
                          SELECT AD_Client_ID, AD_Org_ID, IsActive, to_char(Created, 'DD-MON-YY HH24:MI:SS') AS Created, CreatedBy, to_char(Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, UpdatedBy,
                                 DocumentNo, C_Invoice_ID AS Record_Id, IsSOTrx, IsReturnTrx, '' AS IsInternalUse, 'C_Invoice' AS TableName,
-                                DocStatus, DateAcct AS DateAcct
+                                DocStatus, DateAcct AS DateAcct, C_DocTypeTarget_ID AS C_DocType_ID
                          FROM C_Invoice WHERE DateAcct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND IsActive = 'Y' AND DocStatus NOT IN ('CO', 'CL', 'RE', 'VO')
                          UNION 
                          SELECT AD_Client_ID, AD_Org_ID, IsActive, to_char(Created, 'DD-MON-YY HH24:MI:SS') AS Created, CreatedBy, to_char(Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, UpdatedBy,
                                 DocumentNo, M_Inventory_ID AS Record_Id, '' AS IsSOTrx, '' AS IsReturnTrx, IsInternalUse, 'M_Inventory' AS TableName,
-                                DocStatus, MovementDate AS DateAcct
+                                DocStatus, MovementDate AS DateAcct, C_DocType_ID
                          FROM M_Inventory WHERE MovementDate = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND IsActive = 'Y' AND DocStatus NOT IN ('CO', 'CL', 'RE', 'VO')
                          UNION
                          SELECT AD_Client_ID, AD_Org_ID, IsActive, to_char(Created, 'DD-MON-YY HH24:MI:SS') AS Created, CreatedBy, to_char(Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, UpdatedBy, 
                                 DocumentNo,  M_Movement_ID AS Record_Id, '' AS IsSOTrx, '' AS IsReturnTrx, '' AS IsInternalUse, 'M_Movement' AS TableName,
-                                DocStatus, MovementDate AS DateAcct
+                                DocStatus, MovementDate AS DateAcct, C_DocType_ID
                          FROM M_Movement WHERE MovementDate = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND IsActive = 'Y' AND DocStatus NOT IN ('CO', 'CL', 'RE', 'VO')
                          UNION
                          SELECT p.AD_Client_ID, p.AD_Org_ID, p.IsActive, to_char(p.Created, 'DD-MON-YY HH24:MI:SS') AS Created, p.CreatedBy, to_char(p.Updated, 'DD-MON-YY HH24:MI:SS') AS Updated, p.UpdatedBy, 
                                 p.name AS DocumentNo, ap.AD_PInstance_ID AS Record_Id, p.IsReversed AS IsSOTrx, '' AS IsReturnTrx, '' AS IsInternalUse, 'M_Production' AS TableName,
-                                '' AS DocStatus, p.MovementDate AS DateAcct
+                                '' AS DocStatus, p.MovementDate AS DateAcct, 0 AS C_DocType_ID
                          FROM M_Production p INNER JOIN AD_PInstance ap ON (ap.Record_ID = p.M_Production_ID AND ap.AD_Process_ID = 
                          (SELECT AD_Process_ID FROM AD_Process WHERE Value='M_Production_WithoutFRPT')) WHERE p.MovementDate = " + GlobalVariable.TO_DATE(minDateRecord, true)
                          + @" AND p.IsActive = 'Y' AND p.IsCreated = 'Y' AND p.Processed = 'N'");
@@ -122,9 +127,23 @@ namespace VAdvantage.Process
                     sql.Append(@" ) t ");
                     if (GetAD_Client_ID() > 0)
                     {
-                        sql.Append(" WHERE AD_Client_ID = " + GetAD_Client_ID());
+                        sql.Append(" WHERE t.AD_Client_ID = " + GetAD_Client_ID());
+                        // VIS0060: if Document Type is selected then process will complete the records of selected document types only.
+                        if (!string.IsNullOrEmpty(C_DocType_ID))
+                        {
+                            sql.Append(" AND t.C_DocType_ID IN (" + C_DocType_ID + ")");
+                        }
                     }
-                    sql.Append(" ORDER BY DateAcct, Created");
+                    else
+                    {
+                        // VIS0060: if Document Type is selected then process will complete the records of selected document types only.
+                        if (!string.IsNullOrEmpty(C_DocType_ID))
+                        {
+                            sql.Append(" WHERE t.C_DocType_ID IN (" + C_DocType_ID + ")");
+                        }
+                    }
+
+                    sql.Append(" ORDER BY t.DateAcct, t.Created");
                     dsRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
 
                     // Complete Record
