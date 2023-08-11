@@ -48,6 +48,12 @@ namespace VAdvantage.Model
                 log.Fine("beforeSave");
                 Set_Value("IsValid", false);
             }
+            //warning message on Maximum Permissible Score field if value is not in between 1 to 10 
+             if (Env.IsModuleInstalled("VA068_") && Util.GetValueOfString(Get_Value("VA068_GoalType"))== "MNL" && (GetMeasureTarget() > 10 || GetMeasureTarget() < 1))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_MaxScoreValidation"));
+                return false;
+            }
             return true;
         }
 
@@ -101,7 +107,7 @@ namespace VAdvantage.Model
                 Validate();
             }
             return true;
-        }        
+        }
 
         /// <summary>
         /// Validate SLA Criteria & Goal
