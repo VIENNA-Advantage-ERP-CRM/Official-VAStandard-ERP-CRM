@@ -4115,15 +4115,19 @@ namespace VAdvantage.Model
                                 if (!X_C_Invoice.PAYMENTRULE_Cash.Equals(invoice.GetPaymentRule()) && !X_C_Invoice.PAYMENTRULE_CashAndCredit.Equals(invoice.GetPaymentRule()))
                                 {
                                     MPayment _pay = null;
-                                    _pay = CreatePaymentAgainstPOSDocType(Info, invoice);
-                                    if (_pay == null)
+                                    //When Invoice amount is zero then Payment will not be created and
+                                    //When Invoice Amount is not equals to zero then Payment will be created
+                                    if (invoice.GetGrandTotal() != 0)
                                     {
-                                        if (_processMsg != null && _processMsg.Length > 0)
-                                            Info.Append(" (").Append(_processMsg).Append(")");
-                                        Get_Trx().Rollback();
-                                        return DocActionVariables.STATUS_INVALID;
+                                        _pay = CreatePaymentAgainstPOSDocType(Info, invoice);
+                                        if (_pay == null)
+                                        {
+                                            if (_processMsg != null && _processMsg.Length > 0)
+                                                Info.Append(" (").Append(_processMsg).Append(")");
+                                            Get_Trx().Rollback();
+                                            return DocActionVariables.STATUS_INVALID;
+                                        }
                                     }
-
                                 }
                             }
                         }
