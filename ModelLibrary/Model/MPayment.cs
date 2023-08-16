@@ -1174,10 +1174,10 @@ namespace VAdvantage.Model
         /// <task>TaskID 1381</task>
         public string GetAutoCheckNumber(int PayMethod_ID, int BankAccount_ID, Trx trx)
         {
-            string sql = @"SELECT currentnext FROM (SELECT currentnext,DENSE_RANK() OVER(ORDER BY priority ASC) AS rnk  " +
-                         " FROM C_BANKACCOUNTDOC WHERE VA009_PaymentMethod_ID =" + PayMethod_ID + " And C_BankAccount_ID  =" + BankAccount_ID + " " +
-                         "AND  currentnext BETWEEN startchknumber AND endchknumber AND ISACTIVE = 'Y'  AND Priority IS NOT NULL )" +
-                         "WHERE rnk = 1";
+            string sql = @"SELECT CurrentNext FROM (SELECT currentnext,DENSE_RANK() OVER(ORDER BY priority ASC) AS rnk  " +
+                         " FROM C_BankAccountDoc WHERE VA009_PaymentMethod_ID =" + PayMethod_ID + " And C_BankAccount_ID  =" + BankAccount_ID + " " +
+                         " AND CurrentNext BETWEEN startchknumber AND endchknumber AND ISACTIVE = 'Y'  AND Priority IS NOT NULL )t " +
+                         " WHERE rnk = 1";
             return Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()));
         }
 
