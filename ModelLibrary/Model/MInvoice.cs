@@ -2276,6 +2276,20 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            /*Task ID:1102 Filter the records with the reference of sales order when invoicerule is After full order delivery
+             * and QtyOrdered not equals to OtyDelivered then return message on Ar Invoice window*/
+            int C_InvoiceLine_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(inv.C_InvoiceLine_ID) FROM C_Invoice i
+                         INNER JOIN C_InvoiceLine inv ON (i.C_Invoice_ID = inv.C_Invoice_ID)
+                         INNER JOIN C_Orderline ol ON (ol.C_Orderline_ID = inv.C_Orderline_ID) 
+                         INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID) 
+                         WHERE o.InvoiceRule = {GlobalVariable.TO_STRING(MOrder.INVOICERULE_AfterOrderDelivered)}  
+                         AND ol.QtyOrdered != ol.QtyDelivered AND inv.C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_TrxName()));
+            if (C_InvoiceLine_ID > 0)
+            {               
+                _processMsg = Msg.GetMsg(GetCtx(), "InvoicingRuleMissMatch");
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             //	Lines
             MInvoiceLine[] lines = GetLines(true);
             if (lines.Length == 0)
