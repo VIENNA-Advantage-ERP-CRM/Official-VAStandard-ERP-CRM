@@ -128,8 +128,9 @@ namespace VAdvantage.Process
                         objRevaluationLine.SetDifferenceCostPrice(Decimal.Round(Decimal.Divide(
                                                        Util.GetValueOfDecimal(dsRevaluation.Tables[0].Rows[i]["NotAdjustmentAmt"]),
                                                        objRevaluationLine.GetQtyOnHand()),
-                                                       precision, MidpointRounding.AwayFromZero));
-                        objRevaluationLine.SetNewCostPrice(decimal.Add(objRevaluationLine.GetCurrentCostPrice(), objRevaluationLine.GetDifferenceCostPrice()));
+                                                       12, MidpointRounding.AwayFromZero));
+                        objRevaluationLine.SetNewCostPrice(Decimal.Round(decimal.Add(objRevaluationLine.GetCurrentCostPrice(), objRevaluationLine.GetDifferenceCostPrice()),
+                                                            precision, MidpointRounding.AwayFromZero));
                         objRevaluationLine.Set_Value("RevaluedTotalValue",
                            decimal.Multiply(Util.GetValueOfDecimal(objRevaluationLine.GetNewCostPrice()), objRevaluationLine.GetQtyOnHand()));
                         objRevaluationLine.Set_Value("CurrentTotalValue",
@@ -213,13 +214,13 @@ namespace VAdvantage.Process
                         {
                             objRevaluationLine.SetDifferenceCostPrice(Decimal.Round(Decimal.Divide(
                                                         Util.GetValueOfDecimal(dsRevaluation.Tables[0].Rows[i]["NotAdjustmentAmt"]), sumConsumedQty),
-                                                        precision, MidpointRounding.AwayFromZero));
-                            objRevaluationLine.Set_Value("CostAfterRevaluation", Decimal.Add(Util.GetValueOfDecimal(dsRevaluation.Tables[0].Rows[i]["ProductCost"]),
-                                                                         objRevaluationLine.GetDifferenceCostPrice()));
+                                                        12, MidpointRounding.AwayFromZero));
+                            objRevaluationLine.Set_Value("CostAfterRevaluation", Decimal.Round(Decimal.Add(Util.GetValueOfDecimal(dsRevaluation.Tables[0].Rows[i]["ProductCost"]),
+                                                                         objRevaluationLine.GetDifferenceCostPrice()), 12, MidpointRounding.AwayFromZero));
                         }
                     }
-                    objRevaluationLine.Set_Value("ValueAfterRevaluation", Decimal.Multiply(
-                                                  Util.GetValueOfDecimal(objRevaluationLine.Get_Value("CostAfterRevaluation")), objRevaluationLine.GetSoldQty()));
+                    objRevaluationLine.Set_Value("ValueAfterRevaluation", Decimal.Round(Decimal.Multiply(
+                                                  Util.GetValueOfDecimal(objRevaluationLine.Get_Value("CostAfterRevaluation")), objRevaluationLine.GetSoldQty()), 12, MidpointRounding.AwayFromZero));
                 }
                 if (!objRevaluationLine.Save())
                 {
