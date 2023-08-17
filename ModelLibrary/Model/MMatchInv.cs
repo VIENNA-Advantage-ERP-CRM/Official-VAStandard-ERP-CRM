@@ -276,15 +276,15 @@ namespace VAdvantage.Model
 
             // VIS_045: 02-June-2023 -> DevOps Task ID: 2152 - Convert PO/Invoice/Provisional Price in Base UOM
             DataSet ds = DB.ExecuteDataset(@"SELECT  M_Storage.QtyOnHand,
-                            NVL(currencyConvert((C_OrderLine.PriceEntered * (C_OrderLine.QtyEntered/C_OrderLine.QtyOrdered)), C_Order.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            ROUND(NVL(currencyConvert((C_OrderLine.PriceEntered * (C_OrderLine.QtyEntered/C_OrderLine.QtyOrdered)), C_Order.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", M_InOut.DateAcct, C_Order.C_ConversionType_ID,
-                            M_InOut.AD_Client_ID, M_InOut.AD_Org_ID), 0) as POPriceEntered,
-                            NVL(currencyConvert((C_InvoiceLine.PriceEntered* (C_InvoiceLine.QtyEntered/C_InvoiceLine.QtyInvoiced)), C_Invoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            M_InOut.AD_Client_ID, M_InOut.AD_Org_ID), 0), 12) as POPriceEntered,
+                            ROUND(NVL(currencyConvert((C_InvoiceLine.PriceEntered* (C_InvoiceLine.QtyEntered/C_InvoiceLine.QtyInvoiced)), C_Invoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", C_Invoice.DateAcct, C_Invoice.C_ConversionType_ID,
-                            C_Invoice.AD_Client_ID, C_Invoice.AD_Org_ID), 0) as InvPriceEntered,
-                            NVL(currencyConvert((C_ProvisionalInvoiceLine.PriceEntered * (C_ProvisionalInvoiceLine.QtyEntered/C_ProvisionalInvoiceLine.QtyInvoiced)), C_ProvisionalInvoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
+                            C_Invoice.AD_Client_ID, C_Invoice.AD_Org_ID), 0), 12) as InvPriceEntered,
+                            ROUND(NVL(currencyConvert((C_ProvisionalInvoiceLine.PriceEntered * (C_ProvisionalInvoiceLine.QtyEntered/C_ProvisionalInvoiceLine.QtyInvoiced)), C_ProvisionalInvoice.C_Currency_ID, " + GetCtx().GetContextAsInt("$C_Currency_ID") +
                             @", C_ProvisionalInvoice.DateAcct, C_ProvisionalInvoice.C_ConversionType_ID,
-                            C_ProvisionalInvoice.AD_Client_ID, C_ProvisionalInvoice.AD_Org_ID), 0) as ProvisionalPriceEntered,
+                            C_ProvisionalInvoice.AD_Client_ID, C_ProvisionalInvoice.AD_Org_ID), 0), 12) as ProvisionalPriceEntered,
                             M_InOut.IsSOTrx, M_InOut.IsReturnTrx,
                             C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID,
                             M_InOutLine.M_AttributeSetInstance_ID, 
