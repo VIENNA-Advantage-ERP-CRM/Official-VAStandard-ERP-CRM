@@ -1688,11 +1688,12 @@ namespace VAdvantage.Model
 
             if (((IsSOTrx() && !IsReturnTrx()) || GetMovementType() == "V-") && !IsReversal())
             {
-                MOrder ord = new MOrder(GetCtx(), GetC_Order_ID(), Get_TrxName());
-                Decimal grandTotal = MConversionRate.ConvertBase(GetCtx(),
-                        ord.GetGrandTotal(), GetC_Currency_ID(), GetDateOrdered(),
-                        ord.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                //MOrder ord = new MOrder(GetCtx(), GetC_Order_ID(), Get_TrxName());
+                //Decimal grandTotal = MConversionRate.ConvertBase(GetCtx(),
+                //        ord.GetGrandTotal(), ord.GetC_Currency_ID(), GetDateOrdered(),
+                //        ord.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
 
+                decimal grandTotal = GetShipmentAmt();
                 MBPartner bp = new MBPartner(GetCtx(), GetC_BPartner_ID(), Get_Trx());
                 string retMsg = "";
                 bool crdAll = bp.IsCreditAllowed(GetC_BPartner_Location_ID(), grandTotal, out retMsg);
@@ -1752,6 +1753,23 @@ namespace VAdvantage.Model
             log.Info(ToString());
             SetDocAction(DOCACTION_Prepare);
             return true;
+        }
+
+        /// <summary>
+        /// Get Shipment Value
+        /// </summary>        
+        /// <returns>value in accounting currency</returns>
+        public decimal GetShipmentAmt()
+        {
+            decimal retValue;
+            string sql = "SELECT SUM(COALESCE("
+                + "CURRENCYBASEWITHCONVERSIONTYPE((ol.LineTotalAmt/ol.QtyOrdered)*il.MovementQty,o.C_Currency_ID,o.DateOrdered, o.AD_Client_ID,o.AD_Org_ID, o.C_CONVERSIONTYPE_ID) ,0)) "
+                + " FROM M_InOutLine il INNER JOIN C_OrderLine ol ON (il.C_OrderLine_ID=ol.C_OrderLine_ID)"
+                + " INNER JOIN C_Order o ON (ol.C_Order_ID=o.C_Order_ID) "
+                + " WHERE il.M_InOut_ID=" + Get_ID();
+
+            retValue = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return retValue;
         }
 
         /// <summary>
@@ -1838,7 +1856,7 @@ namespace VAdvantage.Model
 
                     // check for Credit limit and Credit validation on Customer Master or Location
                     string retMsg = "";
-                    bool crdAll = bp.IsCreditAllowed(GetC_BPartner_Location_ID(), 0, out retMsg);
+                    bool crdAll = bp.IsCreditAllowed(GetC_BPartner_Location_ID(), GetShipmentAmt(), out retMsg);
                     if (!crdAll)
                     {
                         if (bp.ValidateCreditValidation("B,D,E,F", GetC_BPartner_Location_ID()))
