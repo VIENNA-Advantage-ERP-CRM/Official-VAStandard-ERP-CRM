@@ -43,6 +43,7 @@ namespace VAdvantage.Model
         //GL Info				
         private MAcctSchemaGL _gl = null;
         private MAccount _SuspenseError_Acct = null;
+        private MAccount _RoundingOff_Acct = null;
         private MAccount _DueTo_Acct = null;
         private MAccount _DueFrom_Acct = null;
         private MAccount _CurrencyBalancing_Acct = null;
@@ -365,7 +366,7 @@ namespace VAdvantage.Model
                 if (info.GetC_AcctSchema1_ID() == GetC_AcctSchema_ID())
                     SetAD_OrgOnly_ID(0);
             }
-         
+
             return true;
         }
 
@@ -510,6 +511,91 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Get Rounding Off Account
+        /// </summary>
+        /// <Writer>VIS_045</Writer>
+        /// <Task ID>DevOps 2349 - 29 Aug, 2023</Task>
+        /// <returns>Rounding Off account</returns>
+        public MAccount GetRoundingOff_Acct()
+        {
+            if (_RoundingOff_Acct != null)
+            {
+                return _RoundingOff_Acct;
+            }
+            if (_gl == null)
+            {
+                GetAcctSchemaGL();
+            }
+            int C_ValidCombination_ID = _gl.Get_ColumnIndex("FRPT_RoundingOff_Acct") >= 0 ? _gl.Get_ValueAsInt("FRPT_RoundingOff_Acct") : 0;
+            _RoundingOff_Acct = MAccount.Get(GetCtx(), C_ValidCombination_ID);
+            return _RoundingOff_Acct;
+        }
+
+        /// <summary>
+        /// Is Rounding Off active
+        /// </summary>
+        /// <Writer>VIS_045</Writer>
+        /// <Task ID>DevOps 2349 - 29 Aug, 2023</Task>
+        /// <returns>Rounding Off balancing</returns>
+        public bool IsRoundingOff_Balancing()
+        {
+            if (_gl == null)
+            {
+                GetAcctSchemaGL();
+            }
+            return _gl.Get_ColumnIndex("FRPT_IsRoundingOff") >= 0 && Util.GetValueOfBool(_gl.Get_Value("FRPT_IsRoundingOff")) && _gl.Get_ValueAsInt("FRPT_RoundingOff_Acct") != 0;
+        }
+
+        /// <summary>
+        /// Get Tolerance Range from
+        /// </summary>
+        /// <Writer>VIS_045</Writer>
+        /// <Task ID>DevOps 2349 - 29 Aug, 2023</Task>
+        /// <returns>Tolerance Range from</returns>
+        public decimal GetToleranceRangeFrom_Rounding()
+        {
+            if (_gl == null)
+            {
+                GetAcctSchemaGL();
+            }
+            return _gl.Get_ColumnIndex("FRPT_ToleranceRangeFrom") >= 0 ? Util.GetValueOfDecimal(_gl.Get_Value("FRPT_ToleranceRangeFrom")) : 0;
+        }
+
+        /// <summary>
+        /// Get Tolerance Range To
+        /// </summary>
+        /// <Writer>VIS_045</Writer>
+        /// <Task ID>DevOps 2349 - 29 Aug, 2023</Task>
+        /// <returns>Tolerance Range To</returns>
+        public decimal GetToleranceRangeTo_Rounding()
+        {
+            if (_gl == null)
+            {
+                GetAcctSchemaGL();
+            }
+            return _gl.Get_ColumnIndex("FRPT_ToleranceRangeTo") >= 0 ? Util.GetValueOfDecimal(_gl.Get_Value("FRPT_ToleranceRangeTo")) : 0;
+        }
+
+        /// <summary>
+        /// This Function is used to check Is Rounding appliable or not
+        /// </summary>
+        /// <param name="value">Amount</param>
+        /// <Writer>VIS_045</Writer>
+        /// <Task ID>DevOps 2349 - 29 Aug, 2023</Task>
+        /// <returns>True, When Rounding Account Applicable</returns>
+        public bool IsRoundingOff_Applicable(decimal value)
+        {
+            if (_gl == null)
+            {
+                GetAcctSchemaGL();
+            }
+            return _gl.Get_ColumnIndex("FRPT_IsRoundingOff") >= 0 &&
+                   value >= Util.GetValueOfDecimal(_gl.Get_Value("FRPT_ToleranceRangeFrom")) &&
+                   value <= Util.GetValueOfDecimal(_gl.Get_Value("FRPT_ToleranceRangeTo"));
+        }
+
+
+        /// <summary>
         /// Get Due To Account for Segment
         /// </summary>
         /// <param name="segment">ignored</param>
@@ -530,11 +616,11 @@ namespace VAdvantage.Model
 
         }
 
-      /// <summary>
-      /// gain
-      /// </summary>
-      /// <param name="segment"></param>
-      /// <returns></returns>
+        /// <summary>
+        /// gain
+        /// </summary>
+        /// <param name="segment"></param>
+        /// <returns></returns>
         public MAccount GetDueFrom_Acct(String segment)
         {
             if (_DueFrom_Acct != null)
@@ -572,11 +658,11 @@ namespace VAdvantage.Model
             return _realizedGain_Acct;
         }
 
-       /// <summary>
-       /// loass
-       /// </summary>
-       /// <param name="segment"></param>
-       /// <returns></returns>
+        /// <summary>
+        /// loass
+        /// </summary>
+        /// <param name="segment"></param>
+        /// <returns></returns>
         public MAccount GetFRPT_RealizedLoss_Acct()
         {
             if (_realizedLoss_Acct != null)
