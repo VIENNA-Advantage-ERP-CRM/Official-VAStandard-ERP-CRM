@@ -366,7 +366,8 @@ namespace VAdvantage.Acct
         /// <returns>FactLine</returns>
         public FactLine BalanceSource()
         {
-            if (!_acctSchema.IsSuspenseBalancing() || _doc.IsMultiCurrency())
+            //VIS_045: DevOps Task ID: 2349 - 29 Aug, 2023 --> Check Is Rounding or Suspense Account to be post or not.
+            if ((!_acctSchema.IsRoundingOff_Balancing() && !_acctSchema.IsSuspenseBalancing()) || _doc.IsMultiCurrency())
             {
                 return null;
             }
@@ -390,7 +391,8 @@ namespace VAdvantage.Acct
             }
 
             //	Account
-            line.SetAccount(_acctSchema, _acctSchema.GetSuspenseBalancing_Acct());
+            // VIS_045: DevOps Task ID: 2349 - 29 Aug, 2023 --> Check Is Rounding Applicable then Rounding Account else Suspense Account
+            line.SetAccount(_acctSchema, _acctSchema.IsRoundingOff_Applicable(diff) ? _acctSchema.GetRoundingOff_Acct() : _acctSchema.GetSuspenseBalancing_Acct());
 
             // Conversion rate
             if (_lines != null && _lines.Count > 0 && _lines[0].GetConversionRate() > 0)
