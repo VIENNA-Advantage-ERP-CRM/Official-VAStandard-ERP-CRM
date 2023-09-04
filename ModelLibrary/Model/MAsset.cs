@@ -875,9 +875,9 @@ namespace VAdvantage.Model
             #endregion 
 
             //VIS0336:set checkbox true when record created .
-            if(Env.IsModuleInstalled("VA075_") && Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) >0)
+            if (Env.IsModuleInstalled("VA075_") && Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) > 0)
             {
-                Set_Value("VA075_IsEquipment","Y");
+                Set_Value("VA075_IsEquipment", "Y");
             }
             return true;
         }
@@ -889,6 +889,9 @@ namespace VAdvantage.Model
         /// <returns></returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+                return success;
+
             //Cost Code Commented - As not required on Asset Save
             //if (newRecord)
             //{
