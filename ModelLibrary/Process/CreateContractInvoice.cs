@@ -60,6 +60,13 @@ namespace ViennaAdvantageServer.Process
         /// <returns></returns>
         protected override string DoIt()
         {
+            /* TaskID:2346 When One Organization Matches with another organization of different role  
+             * then only allow to generate Invoice with that organization other wise it will display message.*/
+            if (!CheckOrgAccess())
+            {
+                return Msg.GetMsg(GetCtx(), "OrgAccess");
+            }
+
             int C_Contract_ID = Util.GetValueOfInt(GetRecord_ID());
             // Get Invoice TableId and DocAction ProcessId to execute workflow
             sql.Append("SELECT T.AD_TABLE_ID,C.AD_PROCESS_ID from AD_TABLE T INNER JOIN AD_COLUMN C ON C.AD_TABLE_ID=T.AD_TABLE_ID WHERE UPPER(C.ColumnName)='DOCACTION' AND UPPER(T.TableName)='C_INVOICE'");
@@ -447,6 +454,25 @@ namespace ViennaAdvantageServer.Process
             }
             return _C_DocType_ID;
         }
+
+        /// <summary>
+        /// TaskID:2346 Check Organization Access for User
+        /// </summary>
+        /// <returns>true, when having Organization access</returns>
+        private bool CheckOrgAccess()
+        {
+            MRole.OrgAccess[] accesss = MRole.GetDefault(GetCtx()).GetOrgAccess();//Get Organizations
+            for (int i = 0; i < accesss.Length; i++)
+            {
+                if (accesss[i].AD_Org_ID.Equals(GetAD_Org_ID()))
+                {
+                    return true;                   
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Created By: Rakesh Kumar (VA228)
         /// Created Date: 07/June/2021
