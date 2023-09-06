@@ -60,8 +60,8 @@ namespace ViennaAdvantageServer.Process
         /// <returns></returns>
         protected override string DoIt()
         {
-            /* TaskID:2346 When One Organization Matches with another organization of different role  
-             * then only allow to generate Invoice with that organization other wise it will display message.*/
+            /* TaskID:2346 System will check the Organization access to user. If user not having access of selected organization on record then
+             * system will not generate invoice.*/
             if (!CheckOrgAccess())
             {
                 return Msg.GetMsg(GetCtx(), "OrgAccess");
