@@ -407,12 +407,7 @@ namespace VAdvantage.Model
         /// </summary>
         /// <returns>true if success</returns>
         public bool ReverseCorrectIt()
-        {
-            //TaskID:1135 Payment is generated for this Provisional invoice then not reverse the provional invoice 
-            if (Util.GetValueOfBool(Get_Value("IsPaid")))
-            {
-                _processMsg = Msg.GetMsg(GetCtx(), "NotReverse");               
-            }
+        {            
             _log.Info(ToString());
 
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), GetDocBaseType(), GetAD_Org_ID()))

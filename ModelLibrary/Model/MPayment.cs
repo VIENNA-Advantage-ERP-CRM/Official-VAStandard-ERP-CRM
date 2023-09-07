@@ -2955,10 +2955,10 @@ namespace VAdvantage.Model
                 //	MProject project = new MProject(GetCtx(), GetC_Project_ID());
             }
             // Update Paid on Provisional Invoice
-            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")) > 0)
+            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID"))  > 0 && GetReversalDoc_ID()==0)            
             {
                //TaskID:1135 When Payment is created with Provisional Invoice reference then  checked isPaid checkbox on Provisional Invoice window
-                UpdatePaymentStatus();
+                UpdatePaymentStatus(Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")));
             }
 
             //	Counter Doc
@@ -3415,11 +3415,11 @@ namespace VAdvantage.Model
         /// <summary>
         /// TaskID:1135 Update Payment Status when reverse and  payment the provisional invoice.
         /// </summary>
-        private void UpdatePaymentStatus()
+        private void UpdatePaymentStatus( int C_ProvisionalInvoice_ID)
         {
 
             DB.ExecuteQuery("UPDATE C_ProvisionalInvoice SET IsPaid = " + (GetReversalDoc_ID() == 0 ? "'Y'" : "'N'") +
-                   @" WHERE C_ProvisionalInvoice_ID = " + Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")), null, Get_Trx());                   
+                   @" WHERE C_ProvisionalInvoice_ID = " + C_ProvisionalInvoice_ID, null, Get_Trx());                   
         }
 
         /// <summary>
@@ -5417,8 +5417,7 @@ namespace VAdvantage.Model
                 _processMsg = Msg.GetMsg(GetCtx(), "PaymentAlreadyReconciled");
                 return false;
             }
-            //TaskID:1135 When user reverse the Payment then Uncheck isPaid checkbox on Provisional Invoice window.
-            UpdatePaymentStatus();
+            
 
             // JID_1276
             if (GetC_Order_ID() > 0 && GetVA009_OrderPaySchedule_ID() > 0)
@@ -5552,6 +5551,11 @@ namespace VAdvantage.Model
             if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0)
             {
                 reversal.Set_Value("C_ProvisionalInvoice_ID", Get_Value("C_ProvisionalInvoice_ID"));
+                //TaskID:1135 When user reverse the Payment then Uncheck isPaid checkbox on Provisional Invoice window.
+                if (Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")) > 0)
+                {
+                    reversal.UpdatePaymentStatus(Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")));
+                }
             }
 
             if (!reversal.Save(Get_Trx()))
