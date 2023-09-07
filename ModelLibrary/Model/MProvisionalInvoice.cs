@@ -411,8 +411,7 @@ namespace VAdvantage.Model
             //TaskID:1135 Payment is generated for this Provisional invoice then not reverse the provional invoice 
             if (Util.GetValueOfBool(Get_Value("IsPaid")))
             {
-                _processMsg = Msg.GetMsg(GetCtx(), "NotReverse");
-                return true;
+                _processMsg = Msg.GetMsg(GetCtx(), "NotReverse");               
             }
             _log.Info(ToString());
 
