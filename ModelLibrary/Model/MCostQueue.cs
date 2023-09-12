@@ -3539,7 +3539,7 @@ namespace VAdvantage.Model
                                 costingElementId = costingCheck.Lifo_ID;
                             }
                             costElement = MCostElement.Get(ctx, costingElementId);
-                        backwardInOut:
+                            backwardInOut:
                             if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                             {
                                 #region Phy. Inventory / Internal Use Inventory
@@ -3792,7 +3792,7 @@ namespace VAdvantage.Model
                                 }
                                 else
                                 {
-                                backwardSupportPE:
+                                    backwardSupportPE:
                                     //1st entry either of FIFO of LIFO 
                                     if (po.Get_ValueAsInt("ReversalDoc_ID") > 0 && !backwardCompatabilitySupport)
                                     {
@@ -7556,9 +7556,10 @@ namespace VAdvantage.Model
                          INNER JOIN C_OrderLine ON M_InoutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID 
                          WHERE  M_InoutLine.M_InoutLine_ID = {cd.GetM_InOutLine_ID()}) ";
             }
-            sql += @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
-                            M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost, M_CostQueue.CurrentQty  
-                            FROM M_CostQueue INNER JOIN M_CostQueueTransaction
+            sql += @"SELECT  M_CostQueueTransaction.M_CostQueueTransaction_ID,M_CostQueue.ActualQty, M_CostQueue.M_CostQueue_ID, M_CostQueueTransaction.MovementQty,
+                            M_CostQueue.AD_Org_ID, M_CostQueue.CurrentCostPrice * M_CostQueue.CurrentQty AS TotalCost,
+                             M_CostQueue.CurrentQty                           
+                            FROM M_CostQueue INNER JOIN M_CostQueueTransaction 
                             ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
                             INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID";
 
@@ -7621,6 +7622,7 @@ namespace VAdvantage.Model
             DataSet dsCostQueue = DB.ExecuteDataset(sql, null, cd.Get_Trx());
             if (dsCostQueue != null && dsCostQueue.Tables.Count > 0 && dsCostQueue.Tables[0].Rows.Count > 0)
             {
+                decimal diffActualandCurrentQty;
                 for (int i = 0; i < dsCostQueue.Tables[0].Rows.Count; i++)
                 {
                     // when qty on Queue Transaction is greaterthan or Equal to 
@@ -7633,19 +7635,52 @@ namespace VAdvantage.Model
                             sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
                                        Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) + Qty),
                                         costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
-                        }
-                        sql += " CurrentQty = CurrentQty + " + Qty +
-                            @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
-                        int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
 
-                        // Create Cost Queue Transactional Record
-                        if (!MCostQueueTransaction.CreateCostQueueTransaction(cd.GetCtx(), cd.GetAD_Client_ID(),
-                            Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["AD_Org_ID"]),
-                            Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), cd, Qty, costingCheck))
-                        {
-                            return false;
                         }
-                        break;
+                        //TaskID:2144 When ActualQty is greater than or equal to the sum of  CurrentQty and return Qty
+                        //than update the  CurrentQty on Cost Queue Tab.
+
+                        if (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["ActualQty"]) >=
+                            (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) + Qty))
+                        {
+                            sql += " CurrentQty = CurrentQty + " + Qty +
+                              @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                            int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
+
+                            // Create Cost Queue Transactional Record
+                            if (!MCostQueueTransaction.CreateCostQueueTransaction(cd.GetCtx(), cd.GetAD_Client_ID(),
+                                Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["AD_Org_ID"]),
+                                Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), cd, Qty, costingCheck))
+                            {
+                                return false;
+                            }
+                            break;
+                        }
+
+                        else
+                        {
+                            //Difference between ActualQty and CurrentQty
+                            diffActualandCurrentQty = (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["ActualQty"])
+                                - Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]));
+                            if (diffActualandCurrentQty < Qty)
+                            {
+                                // Difference between Qty and diffActualandCurrentQty
+                                var pendingQty = Math.Abs(Qty - diffActualandCurrentQty);
+                                Qty = Qty - pendingQty;
+                                sql += " CurrentQty = CurrentQty + " + Qty +
+                                @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
+                                int no = DB.ExecuteQuery(sql, null, cd.Get_Trx());
+
+                                // Create Cost Queue Transactional Record
+                                if (!MCostQueueTransaction.CreateCostQueueTransaction(cd.GetCtx(), cd.GetAD_Client_ID(),
+                                    Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["AD_Org_ID"]),
+                                    Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]), cd, Qty, costingCheck))
+                                {
+                                    return false;
+                                }
+                                Qty = pendingQty;
+                            }
+                        }
                     }
                     // when qty on Queue Transaction is less than 
                     else if (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) < Qty)
