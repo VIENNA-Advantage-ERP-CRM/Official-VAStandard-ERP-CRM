@@ -1343,7 +1343,7 @@ namespace VAdvantage.Process
                 if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
                 {
                     sql.Append($@" INNER JOIN C_Period prd ON (prd.C_Period_ID = {objInventoryRevaluation.GetC_Period_ID()}) ");
-                    sql.Append($@" WHERE pcpw.Created BETWEEN prd.StartDate AND prd.EndDate  ");
+                    sql.Append($@" WHERE pcpw.C_Period_ID = prd.C_Period_ID  ");
                 }
                 else
                 {
