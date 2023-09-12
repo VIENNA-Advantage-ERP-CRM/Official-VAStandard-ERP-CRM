@@ -24,131 +24,137 @@ namespace VAdvantage.Model
     public class MAcctSchemaGL : X_C_AcctSchema_GL
     {
         /**	Logger							*/
-	protected static VLogger			_log = VLogger.GetVLogger(typeof(MAcctSchemaGL).FullName);
-    /// <summary>
-    /// Get Accounting Schema GL Info
-	/// </summary>
-    /// <param name="ctx">context</param>
-    /// <param name="C_AcctSchema_ID">id</param>
-    /// <returns>defaults</returns>
-	public static MAcctSchemaGL Get(Ctx ctx, int C_AcctSchema_ID)
-	{
-		MAcctSchemaGL retValue = null;
-		String sql = "SELECT * FROM C_AcctSchema_GL WHERE C_AcctSchema_ID=@Param1";
-        SqlParameter[] Param=new SqlParameter[1];
-        IDataReader idr=null;
-        DataTable dt=null;
-		//PreparedStatement pstmt = null;
-		try 
-		{
-            Param[0]=new SqlParameter("@Param1",C_AcctSchema_ID);
-			//pstmt = DataBase.prepareStatement(sql, null);
-			//pstmt.setInt(1, C_AcctSchema_ID);
-            idr=DataBase.DB.ExecuteReader(sql,Param,null);
-            dt=new DataTable();
-            dt.Load(idr);
-			//ResultSet rs = pstmt.executeQuery();
-            idr.Close();
-            foreach(DataRow dr in dt.Rows)
-			{
-				retValue = new MAcctSchemaGL (ctx, dr, null);
-			}
-			
-		}
-		catch (Exception e)
-		{
-            if (idr != null)
-            {
-                idr.Close();
-            }
-			_log.Log(Level.SEVERE, sql, e);
-		}
-		finally
+        protected static VLogger _log = VLogger.GetVLogger(typeof(MAcctSchemaGL).FullName);
+        /// <summary>
+        /// Get Accounting Schema GL Info
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="C_AcctSchema_ID">id</param>
+        /// <returns>defaults</returns>
+        public static MAcctSchemaGL Get(Ctx ctx, int C_AcctSchema_ID)
         {
-            if (idr != null)
+            MAcctSchemaGL retValue = null;
+            String sql = "SELECT * FROM C_AcctSchema_GL WHERE C_AcctSchema_ID=@Param1";
+            SqlParameter[] Param = new SqlParameter[1];
+            IDataReader idr = null;
+            DataTable dt = null;
+            //PreparedStatement pstmt = null;
+            try
             {
+                Param[0] = new SqlParameter("@Param1", C_AcctSchema_ID);
+                //pstmt = DataBase.prepareStatement(sql, null);
+                //pstmt.setInt(1, C_AcctSchema_ID);
+                idr = DataBase.DB.ExecuteReader(sql, Param, null);
+                dt = new DataTable();
+                dt.Load(idr);
+                //ResultSet rs = pstmt.executeQuery();
                 idr.Close();
+                foreach (DataRow dr in dt.Rows)
+                {
+                    retValue = new MAcctSchemaGL(ctx, dr, null);
+                }
+
             }
-            dt = null;
-        }
-		return retValue;
-	}	//	get
-	
-	/// <summary>
-    /// Load Constructor
-    /// </summary>
-    /// <param name="ctx">context</param>
-    /// <param name="C_AcctSchema_ID">AcctSchema </param>
-    /// <param name="trxName">transaction</param>
-	public MAcctSchemaGL (Ctx ctx, int C_AcctSchema_ID, Trx trxName):base(ctx, C_AcctSchema_ID, trxName)
-	{
-		//super(ctx, C_AcctSchema_ID, trxName);
-		if (C_AcctSchema_ID == 0)
-		{
-			SetUseCurrencyBalancing(false);
-			SetUseSuspenseBalancing(false);
-			SetUseSuspenseError(false);
-		}
-	}	//	MAcctSchemaGL
+            catch (Exception e)
+            {
+                if (idr != null)
+                {
+                    idr.Close();
+                }
+                _log.Log(Level.SEVERE, sql, e);
+            }
+            finally
+            {
+                if (idr != null)
+                {
+                    idr.Close();
+                }
+                dt = null;
+            }
+            return retValue;
+        }   //	get
 
-	/// <summary>
-	/// Load Constructor
-	/// </summary>
-	/// <param name="ctx">context</param>
-	/// <param name="dr">datarow</param>
-    /// <param name="trxName">transaction</param>
-	public MAcctSchemaGL(Ctx ctx,DataRow dr, Trx trxName):base(ctx, dr, trxName)
-	{
-		//super(ctx, rs, trxName);
-	}	//	MAcctSchemaGL
-
-	/// <summary>
-	/// 	Get Acct Info list 
-	/// </summary>
-    /// <returns>list</returns>
-	//public ArrayList<KeyNamePair> getAcctInfo()
-    public List<KeyNamePair> GetAcctInfo()
-	{
-		//ArrayList<KeyNamePair> list = new ArrayList<KeyNamePair>();
-        List<KeyNamePair> list = new List<KeyNamePair>();
-		for (int i = 0; i < Get_ColumnCount(); i++)
-		{
-			String columnName = Get_ColumnName(i);
-			if (columnName.EndsWith("Acct"))
-			{
-				int id =Utility.Util.GetValueOfInt(Get_Value(i));
-				list.Add(new KeyNamePair (id, columnName));
-			}
-		}
-		return list;
-	}	//	getAcctInfo
-	
-	/// <summary>
-	/// Set Value (don't use)
-	/// </summary>
-	/// <param name="columnName">column name</param>
-    /// <param name="value">value</param>
-	/// <returns>true if set</returns>
-	public Boolean SetValue(String columnName,int value)
-	{
-		return base.Set_Value (columnName, value);
-	}	//	setValue
-	
-	/// <summary>
-	/// Before Save
-	/// </summary>
-	/// <param name="newRecord">new</param>
-	/// <returns>true</returns>
-	protected Boolean beforeSave (Boolean newRecord)
-	{
-        if (GetAD_Org_ID() != 0)
+        /// <summary>
+        /// Load Constructor
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="C_AcctSchema_ID">AcctSchema </param>
+        /// <param name="trxName">transaction</param>
+        public MAcctSchemaGL(Ctx ctx, int C_AcctSchema_ID, Trx trxName) : base(ctx, C_AcctSchema_ID, trxName)
         {
-            SetAD_Org_ID(0);
+            //super(ctx, C_AcctSchema_ID, trxName);
+            if (C_AcctSchema_ID == 0)
+            {
+                SetUseCurrencyBalancing(false);
+                SetUseSuspenseBalancing(false);
+                SetUseSuspenseError(false);
+            }
+        }   //	MAcctSchemaGL
+
+        /// <summary>
+        /// Load Constructor
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="dr">datarow</param>
+        /// <param name="trxName">transaction</param>
+        public MAcctSchemaGL(Ctx ctx, DataRow dr, Trx trxName) : base(ctx, dr, trxName)
+        {
+            //super(ctx, rs, trxName);
+        }   //	MAcctSchemaGL
+
+        /// <summary>
+        /// 	Get Acct Info list 
+        /// </summary>
+        /// <returns>list</returns>
+        //public ArrayList<KeyNamePair> getAcctInfo()
+        public List<KeyNamePair> GetAcctInfo()
+        {
+            //ArrayList<KeyNamePair> list = new ArrayList<KeyNamePair>();
+            List<KeyNamePair> list = new List<KeyNamePair>();
+            for (int i = 0; i < Get_ColumnCount(); i++)
+            {
+                String columnName = Get_ColumnName(i);
+                if (columnName.EndsWith("Acct"))
+                {
+                    int id = Utility.Util.GetValueOfInt(Get_Value(i));
+                    list.Add(new KeyNamePair(id, columnName));
+                }
+            }
+            return list;
+        }   //	getAcctInfo
+
+        /// <summary>
+        /// Set Value (don't use)
+        /// </summary>
+        /// <param name="columnName">column name</param>
+        /// <param name="value">value</param>
+        /// <returns>true if set</returns>
+        public Boolean SetValue(String columnName, int value)
+        {
+            return base.Set_Value(columnName, value);
+        }   //	setValue
+
+        /// <summary>
+        /// Before Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <returns>true</returns>       
+        protected override bool BeforeSave(bool newRecord)
+        {
+            if (GetAD_Org_ID() != 0)
+            {
+                SetAD_Org_ID(0);
+            }
+            //VAI082: DevOps Task ID:2425, When Tolerance Range To less than Tolerance Range From than show message
+            if (Util.GetValueOfInt(Get_Value("FRPT_ToleranceRangeTo")) < Util.GetValueOfInt(Get_Value("FRPT_ToleranceRangeFrom")))
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_CompareToleranceRange"));
+                return false;
+            }
+            return true;
         }
-		return true;
-	}	//	beforeSave
 
-}	//	MAcctSchemaGL
+    }   //	MAcctSchemaGL
 
-   
+
 }
