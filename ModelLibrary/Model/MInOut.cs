@@ -1761,9 +1761,12 @@ namespace VAdvantage.Model
         /// <returns>value in accounting currency</returns>
         public decimal GetShipmentAmt()
         {
+            // Rounding amount in precision of Base Currency
+            int BaseCurrency = GetCtx().GetContextAsInt("$C_Currency_ID");
             decimal retValue;
-            string sql = "SELECT SUM(COALESCE("
-                + "CURRENCYBASEWITHCONVERSIONTYPE((ol.LineTotalAmt/ol.QtyOrdered)*il.MovementQty,o.C_Currency_ID,o.DateOrdered, o.AD_Client_ID,o.AD_Org_ID, o.C_CONVERSIONTYPE_ID) ,0)) "
+            string sql = "SELECT ROUND(SUM(COALESCE("
+                + "CURRENCYBASEWITHCONVERSIONTYPE((ol.LineTotalAmt/ol.QtyOrdered)*il.MovementQty,o.C_Currency_ID,o.DateOrdered, o.AD_Client_ID,o.AD_Org_ID, o.C_CONVERSIONTYPE_ID), 0)), "
+                + MCurrency.Get(GetCtx(), BaseCurrency).GetStdPrecision() + ")"
                 + " FROM M_InOutLine il INNER JOIN C_OrderLine ol ON (il.C_OrderLine_ID=ol.C_OrderLine_ID)"
                 + " INNER JOIN C_Order o ON (ol.C_Order_ID=o.C_Order_ID) "
                 + " WHERE il.M_InOut_ID=" + Get_ID();
