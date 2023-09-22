@@ -3665,7 +3665,8 @@ namespace VAdvantage.Model
                                             costingCheck.inoutline = sLine;
 
                                             //VIS_45: 29-July-22 --> Get Transaction ID From Material Policy
-                                            if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0)
+                                            // VIS_45: 22-Sept-2023 --> Task ID: 2474 --> check product is Stocked item or not
+                                            if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0 && product1.IsStocked())
                                             {
                                                 costingCheck.M_Transaction_ID = Util.GetValueOfInt(dsTransactionID.Tables[0].Select("M_InoutLine_ID =" + line.GetM_InOutLine_ID())[0]["M_Transaction_ID"]);
                                             }
@@ -4005,7 +4006,8 @@ namespace VAdvantage.Model
                                             }
 
                                             //VIS_45: 29-July-22 --> Get Transaction ID From Material Policy
-                                            if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0)
+                                            // VIS_45: 22-Sept-2023 --> Task ID: 2474 --> check product is Stocked item or not
+                                            if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0 && product1.IsStocked())
                                             {
                                                 costingCheck.M_Transaction_ID = Util.GetValueOfInt(dsTransactionID.Tables[0].Select("M_InoutLine_ID =" + line.GetM_InOutLine_ID())[0]["M_Transaction_ID"]);
                                             }
@@ -4315,7 +4317,8 @@ namespace VAdvantage.Model
                                         costingCheck.inoutline = sLine;
 
                                         //VIS_45: 29-July-22 --> Get Transaction ID From Material Policy
-                                        if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0)
+                                        // VIS_45: 22-Sept-2023 --> Task ID: 2474 --> check product is Stocked item or not
+                                        if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0 && product1.IsStocked())
                                         {
                                             costingCheck.M_Transaction_ID = Util.GetValueOfInt(dsTransactionID.Tables[0].Select("M_InoutLine_ID =" + line.GetM_InOutLine_ID())[0]["M_Transaction_ID"]);
                                         }
@@ -4670,7 +4673,8 @@ namespace VAdvantage.Model
                                         costingCheck.inoutline = sLine;
 
                                         //VIS_45: 29-July-22 --> Get Transaction ID From Material Policy
-                                        if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0)
+                                        // VIS_45: 22-Sept-2023 --> Task ID: 2474 --> check product is Stocked item or not
+                                        if (dsTransactionID != null && dsTransactionID.Tables[0].Rows.Count > 0 && product1.IsStocked())
                                         {
                                             costingCheck.M_Transaction_ID = Util.GetValueOfInt(dsTransactionID.Tables[0].Select("M_InoutLine_ID =" + line.GetM_InOutLine_ID())[0]["M_Transaction_ID"]);
                                         }
