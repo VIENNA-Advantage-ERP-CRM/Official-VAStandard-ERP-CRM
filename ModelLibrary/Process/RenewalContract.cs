@@ -38,13 +38,13 @@ namespace VAdvantage.Process
         DateTime? EndDate;
         #endregion
         protected override string DoIt()
-        {            
+        {
             int C_OldContract_ID = GetRecord_ID();
             MVASContractMaster _oldCont = new MVASContractMaster(GetCtx(),
                                 C_OldContract_ID, Get_Trx());
             MVASContractMaster _newCont = new MVASContractMaster(GetCtx(),
                                         0, Get_Trx());
-            if(StartDate < _oldCont.GetVAS_RenewalDate())
+            if (StartDate < _oldCont.GetVAS_RenewalDate())
             {
                 return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");             //Start date should not be less than Renewal date
             }
@@ -58,11 +58,10 @@ namespace VAdvantage.Process
             _newCont.SetEndDate(EndDate);
             _newCont.SetVAS_RenewalDate(null);
             _newCont.SetDocumentNo(string.Empty);
-            _newCont.SetIsExpiredContracts("N");
-            _newCont.SetVAS_ContractDuration(Util.GetValueOfString(
-                Math.Round((decimal.Subtract(EndDate.Value.Year,StartDate.Value.Year) * 12 + decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month))/12,1)));
+            _newCont.SetIsExpiredContracts(false);
+            _newCont.SetVAS_ContractDuration(Math.Round((decimal.Subtract(EndDate.Value.Year, StartDate.Value.Year) * 12 + decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month)) / 12, 1));
             var monthDiff = (EndDate - StartDate).Value.Days;
-            _newCont.SetVAS_ContractMonths(Util.GetValueOfString(Math.Round((decimal)monthDiff / 30, 1)));
+            _newCont.SetVAS_ContractMonths(Math.Round((decimal)monthDiff / 30, 1));
             if (!_newCont.Save())
             {
                 pp = VLogger.RetrieveError();
@@ -196,7 +195,7 @@ namespace VAdvantage.Process
                 }
             }
 
-            if(string.IsNullOrEmpty(rMsg))
+            if (string.IsNullOrEmpty(rMsg))
             {
                 rMsg = Msg.GetMsg(GetCtx(), "VAS_ContractRenewed") + _newCont.GetDocumentNo();
             }

@@ -50,6 +50,12 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
+            
+            // VIS0060: Set Contract Status as Terminated when contract is marked as Terminated.
+            if (IsVAS_Terminate())
+            {
+                SetVAS_Status(VAS_STATUS_Terminated);
+            }
             return true;
         }
     }

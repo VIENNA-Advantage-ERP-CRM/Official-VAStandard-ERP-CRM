@@ -272,7 +272,7 @@ namespace VAdvantage.Report
 
                 // Delete the balances
                 DeleteBalance(ctx.GetAD_Client_ID(), C_AcctSchema_ID,
-                            dateFrom, trx, accum.GetFACT_ACCUMULATION_ID(), svrPrc);
+                            dateFrom, trx, accum.GetFact_Accumulation_ID(), svrPrc);
 
                 /** Insert		**/
                 //param = new List<Object>();
@@ -296,7 +296,7 @@ namespace VAdvantage.Report
                     // when balance Accumulation type = null, then consider system date as account date
                     select = select + " , SYSDATE  ";
                 }
-                select = select + " ,Account_ID, PostingType, " + accum.GetFACT_ACCUMULATION_ID();
+                select = select + " ,Account_ID, PostingType, " + accum.GetFact_Accumulation_ID();
                 if (accum.IsPRODUCT())
                     select = select + " ,M_Product_ID ";
                 else
