@@ -801,14 +801,19 @@ namespace VIS.Models
 
             List<ReqLineData> result = new List<ReqLineData>();
             DataSet _ds = null;
-            StringBuilder sql = new StringBuilder(@"SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName, 
+            StringBuilder sql = new StringBuilder(@" SELECT t.*,(SELECT SUM(cl.VA097_TenderQuantity) AS OrdQty FROM VA097_RequisitionLines cl 
+                        INNER JOIN VA097_TenderLine tl ON (tl.VA097_TenderLine_ID=cl.VA097_TenderLine_ID) INNER JOIN VA097_Tender t ON 
+                        t.VA097_Tender_ID = tl.VA097_Tender_ID WHERE cl.M_RequisitionLine_ID = t.M_RequisitionLine_ID AND t.DocStatus NOT IN('RE', 'VO')) AS TenderQty FROM(
+                        SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName, 
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
                         reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, 0 AS OrdQty
                         FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID 
                         LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
                         LEFT JOIN M_Product pro ON (reqln.M_Product_ID=pro.M_Product_ID) LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID=uom.C_UOM_ID)
                         WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
-                        + @" AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
+                        + @" AND reqln.IsActive='Y' 
+                        AND cl.M_RequisitionLine_ID IS NULL
+
                         UNION
                         SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
@@ -816,13 +821,13 @@ namespace VIS.Models
                         FROM M_RequisitionLine reqln INNER JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID = cl.M_RequisitionLine_ID
                         INNER JOIN C_RfqLineQty rl ON (rl.C_RfqLine_ID=cl.C_RfqLine_ID) LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
                         LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
-                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' AND reqln.C_OrderLine_ID IS NOT NULL
+                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' 
                         AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
                         WHERE req.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
                         + @" AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
                         AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
-                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty");
+                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty)t");
             try
             {
                 _ds = DB.ExecuteDataset(sql.ToString());
@@ -832,6 +837,7 @@ namespace VIS.Models
                     {
                         decimal DelQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["DelQty"]);
                         decimal OrdQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["OrdQty"]);
+                        decimal TenderQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["TenderQty"]);
 
                         // Check if Requisition and Product UOM are different then convert Delivered Qty into Requisition UOM.
                         if (Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]) > 0 && DelQty > 0
@@ -842,11 +848,12 @@ namespace VIS.Models
                         }
 
                         // Check if Requisition Qty are already delivered or ordered than skip that line.
-                        if (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= OrdQty)
+                        if (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= OrdQty ||
+                            Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= TenderQty)
                         {
                             continue;
                         }
-
+                       
                         ReqLineData res = new ReqLineData();
                         res.M_Product_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Product_ID"]);
                         res.Product = Util.GetValueOfString(_ds.Tables[0].Rows[i]["ProdName"]);
@@ -856,7 +863,7 @@ namespace VIS.Models
                         res.ASI_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
                         res.ReqQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]);
                         res.Price = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["PriceActual"]);
-                        res.EnteredQty = res.ReqQty - DelQty - OrdQty;
+                        res.EnteredQty = res.ReqQty - DelQty - OrdQty-TenderQty;
                         res.PendingQty = res.EnteredQty;
                         res.M_ReqLine_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_RequisitionLine_ID"]);
                         res.M_Requisition_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Requisition_ID"]);
