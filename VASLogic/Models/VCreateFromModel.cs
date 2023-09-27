@@ -802,7 +802,7 @@ namespace VIS.Models
             List<ReqLineData> result = new List<ReqLineData>();
             DataSet _ds = null;
             StringBuilder sql = new StringBuilder(@" SELECT t.*");
-            if (Env.IsModuleInstalled("VA068_"))
+            if (Env.IsModuleInstalled("VA097_"))
             {
                 sql.Append(",(SELECT SUM(cl.VA097_TenderQuantity) AS OrdQty FROM VA097_RequisitionLines cl " +
                            " INNER JOIN VA097_TenderLine tl ON(tl.VA097_TenderLine_ID= cl.VA097_TenderLine_ID) INNER JOIN VA097_Tender t ON" +
@@ -847,7 +847,7 @@ namespace VIS.Models
                     {
                         decimal DelQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["DelQty"]);
                         decimal OrdQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["OrdQty"]);
-                        if (Env.IsModuleInstalled("VA068_"))
+                        if (Env.IsModuleInstalled("VA097_"))
                         {
                             TenderQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["TenderQty"]);
                         }
@@ -861,7 +861,7 @@ namespace VIS.Models
 
                         // Check if Requisition Qty are already delivered or ordered than skip that line.
                         if ((Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= OrdQty) ||
-                            (Env.IsModuleInstalled("VA068_") ?  (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= TenderQty ) : false))
+                            (Env.IsModuleInstalled("VA097_") ?  (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= TenderQty ) : false))
                         {
                             continue;
                         }
@@ -875,7 +875,7 @@ namespace VIS.Models
                         res.ASI_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
                         res.ReqQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]);
                         res.Price = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["PriceActual"]);
-                        res.EnteredQty = res.ReqQty - DelQty - OrdQty  + (Env.IsModuleInstalled("VA068_") ? (- TenderQty) : 0);
+                        res.EnteredQty = res.ReqQty - DelQty - OrdQty  + (Env.IsModuleInstalled("VA097_") ? (- TenderQty) : 0);
                         res.PendingQty = res.EnteredQty;
                         res.M_ReqLine_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_RequisitionLine_ID"]);
                         res.M_Requisition_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Requisition_ID"]);
