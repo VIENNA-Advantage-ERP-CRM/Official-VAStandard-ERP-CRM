@@ -452,7 +452,7 @@ namespace VAdvantage.Model
             }
             if (countVAFAM > 0)
             {
-                Set_Value("VAFAM_AssetType", _assetGroup.Get_Value("VAFAM_AssetType").ToString());
+                Set_Value("VAFAM_AssetType", Util.GetValueOfString(_assetGroup.Get_Value("VAFAM_AssetType")));
                 Set_Value("VAFAM_DepreciationType_ID", Utility.Util.GetValueOfInt(_assetGroup.Get_Value("VAFAM_DepreciationType_ID")));
             }
 
