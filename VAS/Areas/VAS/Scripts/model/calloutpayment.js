@@ -487,14 +487,7 @@
         {
             return "";
         }
-        var C_Invoice_ID = ctx.getContextAsInt(windowNo, "C_Invoice_ID");
-         //VIS_427 Bug ID:2488 :- Defined Variables to get precision of currency present on bank
-        var paramString; var stdPrecision = 2;
-        paramString = ctx.getContextAsInt(windowNo, "C_BankAccount_ID").toString();
-        var dr = VIS.dataContext.getJSONRecord("MCurrency/GetBankCurrencyPrecision", paramString);
-        if (dr != null) {
-            stdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
-        }
+        var C_Invoice_ID = ctx.getContextAsInt(windowNo, "C_Invoice_ID");     
         //	New Payment
         if (ctx.getContextAsInt(windowNo, "C_Payment_ID") == 0
             && ctx.getContextAsInt(windowNo, "C_BPartner_ID") == 0
@@ -584,8 +577,7 @@
 
             //	Get Info from Tab
             if (colName == "PaymentAmount") {
-                mTab.setValue("PaymentAmount", Util.getValueOfDecimal(mTab.getValue("PaymentAmount")).toFixed(stdPrecision));
-                mTab.setValue("PayAmt", Util.getValueOfDecimal(mTab.getValue("PaymentAmount")).toFixed(stdPrecision));
+                mTab.setValue("PayAmt", (mTab.getValue("PaymentAmount")));
             }
             var payAmt = Util.getValueOfDecimal(mTab.getValue("PayAmt") == null ? VIS.Env.ZERO : mTab.getValue("PayAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt") == null ? VIS.Env.ZERO : mTab.getValue("WriteOffAmt"));
@@ -769,6 +761,8 @@
                 if (checkPrecision) {
                     mTab.setValue("DiscountAmt", Util.getValueOfDecimal(discountAmt.toFixed(precision)));
                     mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt.toFixed(precision)));
+                    mTab.setValue("PayAmt", Util.getValueOfDecimal(payAmt.toFixed(precision)));
+                    mTab.setValue("PaymentAmount", Util.getValueOfDecimal(payAmt.toFixed(precision)));
                 }
                 else {
                     mTab.setValue("DiscountAmt", discountAmt);
@@ -1139,13 +1133,6 @@
         }
         //	No Invoice
         var C_Invoice_ID = mTab.getValue("C_Invoice_ID");
-        //VIS_427 Bug ID:2488 :- Defined Variables to get precision of currency present on bank account
-        var paramString; var stdPrecision = 2;
-        paramString = ctx.getContextAsInt(windowNo, "C_BankAccount_ID").toString();
-        var dr = VIS.dataContext.getJSONRecord("MCurrency/GetBankCurrencyPrecision", paramString);
-        if (dr != null) {
-            stdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
-        }
         if (C_Invoice_ID == 0) {
             return "";
         }
@@ -1155,6 +1142,7 @@
         var C_InvoicePaySchedule_ID = 0;
         if (mTab.getValue("C_InvoicePaySchedule_ID") != null) {
             C_InvoicePaySchedule_ID = mTab.getValue("C_InvoicePaySchedule_ID");
+        }
 
             var invoiceOpenAmt = VIS.Env.ZERO;
             var IsReturnTrx = "N";
@@ -1174,7 +1162,7 @@
             if (ts == null) {
                 ts = new Date();
             }
-            paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+            var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
             var dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
             if (dr != null) {
                 C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);
@@ -1233,7 +1221,7 @@
             }
             //	Changed Column
             var colName = mField.getColumnName();
-            paramString = C_Currency_Invoice_ID.toString();
+            var paramString = C_Currency_Invoice_ID.toString();
             var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", paramString);
             var precision = currency["StdPrecision"];
             //  PayAmt - calculate write off
@@ -1302,23 +1290,7 @@
                     VIS.ADialog.info("LessScheduleAmount");
                 }
             }
-        }
-        //VIS_427 Bug ID:2488 :- Set value according to precision if value is changed for any column
-        else {
-            if (colName == "Amount") {
-                mTab.setValue("Amount", value.toFixed(stdPrecision));
-            }
-            if (colName == "WriteOffAmt") {
-                mTab.setValue("WriteOffAmt", value.toFixed(stdPrecision));
-            }
-            if (colName == "OverUnderAmt") {
-                mTab.setValue("OverUnderAmt", value.toFixed(stdPrecision));
-            }
-            if (colName == "DiscountAmt") {
-                mTab.setValue("DiscountAmt", value.toFixed(stdPrecision));
-            }
-        }
-
+        
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
