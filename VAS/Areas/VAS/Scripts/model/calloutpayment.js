@@ -488,6 +488,13 @@
             return "";
         }
         var C_Invoice_ID = ctx.getContextAsInt(windowNo, "C_Invoice_ID");
+         //VIS_427 Bug ID:2488 :- Defined Variables to get precision of currency present on bank
+        var paramString; var stdPrecision = 2;
+        paramString = ctx.getContextAsInt(windowNo, "C_BankAccount_ID").toString();
+        var dr = VIS.dataContext.getJSONRecord("MCurrency/GetBankCurrencyPrecision", paramString);
+        if (dr != null) {
+            stdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
+        }
         //	New Payment
         if (ctx.getContextAsInt(windowNo, "C_Payment_ID") == 0
             && ctx.getContextAsInt(windowNo, "C_BPartner_ID") == 0
@@ -577,7 +584,8 @@
 
             //	Get Info from Tab
             if (colName == "PaymentAmount") {
-                mTab.setValue("PayAmt", mTab.getValue("PaymentAmount"))
+                mTab.setValue("PaymentAmount", Util.getValueOfDecimal(mTab.getValue("PaymentAmount")).toFixed(stdPrecision));
+                mTab.setValue("PayAmt", Util.getValueOfDecimal(mTab.getValue("PaymentAmount")).toFixed(stdPrecision));
             }
             var payAmt = Util.getValueOfDecimal(mTab.getValue("PayAmt") == null ? VIS.Env.ZERO : mTab.getValue("PayAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt") == null ? VIS.Env.ZERO : mTab.getValue("WriteOffAmt"));
@@ -1131,6 +1139,13 @@
         }
         //	No Invoice
         var C_Invoice_ID = mTab.getValue("C_Invoice_ID");
+        //VIS_427 Bug ID:2488 :- Defined Variables to get precision of currency present on bank account
+        var paramString; var stdPrecision = 2;
+        paramString = ctx.getContextAsInt(windowNo, "C_BankAccount_ID").toString();
+        var dr = VIS.dataContext.getJSONRecord("MCurrency/GetBankCurrencyPrecision", paramString);
+        if (dr != null) {
+            stdPrecision = Util.getValueOfInt(dr["StdPrecision"]);
+        }
         if (C_Invoice_ID == 0) {
             return "";
         }
@@ -1140,150 +1155,167 @@
         var C_InvoicePaySchedule_ID = 0;
         if (mTab.getValue("C_InvoicePaySchedule_ID") != null) {
             C_InvoicePaySchedule_ID = mTab.getValue("C_InvoicePaySchedule_ID");
-        }
-        var invoiceOpenAmt = VIS.Env.ZERO;
-        var IsReturnTrx = "N";
-        var C_Currency_Invoice_ID = 0;
-        var checkPrecision = true;
-        var amount = Util.getValueOfDecimal(mTab.getValue("Amount"));
-        var discountAmt = Util.getValueOfDecimal(mTab.getValue("DiscountAmt"));
-        var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"));
-        var overUnderAmt = Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"));
-        var invoiceAmt = Util.getValueOfDecimal(mTab.getValue("InvoiceAmt"));
-        this.log.fine("Amt=" + amount + ", Discount=" + discountAmt
-            + ", WriteOff=" + writeOffAmt + ", OverUnder=" + overUnderAmt
-            + ", Invoice=" + invoiceAmt);
 
-        // Added by Bharat on 23 june 2017 to remove client side queries
-        var ts = ctx.getContext(windowNo, "DateTrx");
-        if (ts == null) {
-            ts = new Date();
-        }
-        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
-        var dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
-        if (dr != null) {
-            C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);
-            invoiceOpenAmt = Util.getValueOfDecimal(dr["invoiceOpen"]);
-            if (invoiceOpenAmt == null) {
-                invoiceOpenAmt = VIS.Env.ZERO;
-            }
-            if (VIS.Env.ZERO == discountAmt) {
-                discountAmt = Util.getValueOfDecimal(dr["invoiceDiscount"]);
-            }
-            IsReturnTrx = dr["IsReturnTrx"];
-        }
-        if (IsReturnTrx == "Y") {
-            if (amount > 0) {
-                amount = amount * -1;
-                mTab.setValue("Amount", amount);
-            }
+            var invoiceOpenAmt = VIS.Env.ZERO;
+            var IsReturnTrx = "N";
+            var C_Currency_Invoice_ID = 0;
+            var checkPrecision = true;
+            var amount = Util.getValueOfDecimal(mTab.getValue("Amount"));
+            var discountAmt = Util.getValueOfDecimal(mTab.getValue("DiscountAmt"));
+            var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"));
+            var overUnderAmt = Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"));
+            var invoiceAmt = Util.getValueOfDecimal(mTab.getValue("InvoiceAmt"));
+            this.log.fine("Amt=" + amount + ", Discount=" + discountAmt
+                + ", WriteOff=" + writeOffAmt + ", OverUnder=" + overUnderAmt
+                + ", Invoice=" + invoiceAmt);
 
-            if (discountAmt > 0) {
-                discountAmt = discountAmt * -1;
+            // Added by Bharat on 23 june 2017 to remove client side queries
+            var ts = ctx.getContext(windowNo, "DateTrx");
+            if (ts == null) {
+                ts = new Date();
             }
+            paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+            var dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
+            if (dr != null) {
+                C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);
+                invoiceOpenAmt = Util.getValueOfDecimal(dr["invoiceOpen"]);
+                if (invoiceOpenAmt == null) {
+                    invoiceOpenAmt = VIS.Env.ZERO;
+                }
+                if (VIS.Env.ZERO == discountAmt) {
+                    discountAmt = Util.getValueOfDecimal(dr["invoiceDiscount"]);
+                }
+                IsReturnTrx = dr["IsReturnTrx"];
+            }
+            if (IsReturnTrx == "Y") {
+                if (amount > 0) {
+                    amount = amount * -1;
+                    mTab.setValue("Amount", amount);
+                }
 
-            if (writeOffAmt > 0) {
-                writeOffAmt = writeOffAmt * -1;
-                mTab.setValue("WriteOffAmt", writeOffAmt);
-            }
+                if (discountAmt > 0) {
+                    discountAmt = discountAmt * -1;
+                }
 
-            if (overUnderAmt > 0) {
-                overUnderAmt = overUnderAmt * -1;
-                mTab.setValue("OverUnderAmt", overUnderAmt);
-            }
-            if (invoiceOpenAmt > 0) {
-                invoiceOpenAmt = invoiceOpenAmt * -1;
-            }
-        }
-        else {
-            if (amount < 0) {
-                amount = amount * -1;
-                mTab.setValue("Amount", amount);
-            }
+                if (writeOffAmt > 0) {
+                    writeOffAmt = writeOffAmt * -1;
+                    mTab.setValue("WriteOffAmt", writeOffAmt);
+                }
 
-            if (discountAmt < 0) {
-                discountAmt = discountAmt * -1;
+                if (overUnderAmt > 0) {
+                    overUnderAmt = overUnderAmt * -1;
+                    mTab.setValue("OverUnderAmt", overUnderAmt);
+                }
+                if (invoiceOpenAmt > 0) {
+                    invoiceOpenAmt = invoiceOpenAmt * -1;
+                }
             }
-            if (writeOffAmt < 0) {
-                writeOffAmt = writeOffAmt * -1;
-                mTab.setValue("WriteOffAmt", writeOffAmt);
+            else {
+                if (amount < 0) {
+                    amount = amount * -1;
+                    mTab.setValue("Amount", amount);
+                }
+
+                if (discountAmt < 0) {
+                    discountAmt = discountAmt * -1;
+                }
+                if (writeOffAmt < 0) {
+                    writeOffAmt = writeOffAmt * -1;
+                    mTab.setValue("WriteOffAmt", writeOffAmt);
+                }
+                if (overUnderAmt < 0) {
+                    overUnderAmt = overUnderAmt * -1;
+                    mTab.setValue("OverUnderAmt", overUnderAmt);
+                }
+                if (invoiceOpenAmt < 0) {
+                    invoiceOpenAmt = invoiceOpenAmt * -1;
+                }
             }
-            if (overUnderAmt < 0) {
-                overUnderAmt = overUnderAmt * -1;
-                mTab.setValue("OverUnderAmt", overUnderAmt);
-            }
-            if (invoiceOpenAmt < 0) {
-                invoiceOpenAmt = invoiceOpenAmt * -1;
-            }
-        }
-        //	Changed Column
-        var colName = mField.getColumnName();
-        paramString = C_Currency_Invoice_ID.toString();
-        var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", paramString);
-        var precision = currency["StdPrecision"];
-        //  PayAmt - calculate write off
-        if (colName == "Amount") {
-            //writeOffAmt = Decimal.Subtract(Decimal.Subtract(Decimal.Subtract(invoiceAmt, amount), discountAmt), overUnderAmt);
-            //writeOffAmt = (((invoiceAmt - amount) - discountAmt) - overUnderAmt);
-            overUnderAmt = (((invoiceOpenAmt - amount) - discountAmt) - writeOffAmt);
-            //mTab.setValue("WriteOffAmt", writeOffAmt);
-            if ((IsReturnTrx == "N" && overUnderAmt > 0) || (IsReturnTrx == "Y" && overUnderAmt < 0)) {
-                VIS.ADialog.info("LessScheduleAmount");
-            }
-            if ((IsReturnTrx == "Y" && overUnderAmt > 0) || (IsReturnTrx == "N" && overUnderAmt < 0)) {
-                VIS.ADialog.info("MoreScheduleAmount");
-                amount = ((invoiceOpenAmt - discountAmt) - writeOffAmt);
+            //	Changed Column
+            var colName = mField.getColumnName();
+            paramString = C_Currency_Invoice_ID.toString();
+            var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", paramString);
+            var precision = currency["StdPrecision"];
+            //  PayAmt - calculate write off
+            if (colName == "Amount") {
+                //writeOffAmt = Decimal.Subtract(Decimal.Subtract(Decimal.Subtract(invoiceAmt, amount), discountAmt), overUnderAmt);
+                //writeOffAmt = (((invoiceAmt - amount) - discountAmt) - overUnderAmt);
                 overUnderAmt = (((invoiceOpenAmt - amount) - discountAmt) - writeOffAmt);
+                //mTab.setValue("WriteOffAmt", writeOffAmt);
+                if ((IsReturnTrx == "N" && overUnderAmt > 0) || (IsReturnTrx == "Y" && overUnderAmt < 0)) {
+                    VIS.ADialog.info("LessScheduleAmount");
+                }
+                if ((IsReturnTrx == "Y" && overUnderAmt > 0) || (IsReturnTrx == "N" && overUnderAmt < 0)) {
+                    VIS.ADialog.info("MoreScheduleAmount");
+                    amount = ((invoiceOpenAmt - discountAmt) - writeOffAmt);
+                    overUnderAmt = (((invoiceOpenAmt - amount) - discountAmt) - writeOffAmt);
+                    if (checkPrecision) {
+                        mTab.setValue("Amount", amount.toFixed(precision));
+                    }
+                    else {
+                        mTab.setValue("Amount", amount);
+                    }
+                }
                 if (checkPrecision) {
+                    mTab.setValue("DiscountAmt", discountAmt.toFixed(precision));
+                    mTab.setValue("OverUnderAmt", overUnderAmt.toFixed(precision));
                     mTab.setValue("Amount", amount.toFixed(precision));
                 }
                 else {
-                    mTab.setValue("Amount", amount);
+                    mTab.setValue("DiscountAmt", discountAmt);
+                    mTab.setValue("OverUnderAmt", overUnderAmt);
                 }
             }
-            if (checkPrecision) {
-                mTab.setValue("DiscountAmt", discountAmt.toFixed(precision));
-                mTab.setValue("OverUnderAmt", overUnderAmt.toFixed(precision));
-            }
-            else {
-                mTab.setValue("DiscountAmt", discountAmt);
-                mTab.setValue("OverUnderAmt", overUnderAmt);
+            else    //  calculate Amount
+            {
+                //amount = Decimal.Subtract(Decimal.Subtract(Decimal.Subtract(invoiceAmt, discountAmt), writeOffAmt), overUnderAmt);
+                amount = (((invoiceOpenAmt - discountAmt) - writeOffAmt) - overUnderAmt);
+
+                if ((IsReturnTrx == "Y" && amount > 0) || (IsReturnTrx == "N" && amount < 0)) {
+                    VIS.ADialog.info("MoreScheduleAmount");
+                    if (colName == "OverUnderAmt") {
+                        amount = ((invoiceOpenAmt - discountAmt) - writeOffAmt);
+                        overUnderAmt = (((invoiceOpenAmt - amount) - discountAmt) - writeOffAmt);
+                    }
+                    if (colName == "DiscountAmt") {
+                        amount = ((invoiceOpenAmt - overUnderAmt) - writeOffAmt);
+                        discountAmt = (((invoiceOpenAmt - amount) - overUnderAmt) - writeOffAmt);
+                    }
+                    if (colName == "WriteOffAmt") {
+                        amount = ((invoiceOpenAmt - discountAmt) - overUnderAmt);
+                        writeOffAmt = (((invoiceOpenAmt - amount) - discountAmt) - overUnderAmt);
+                    }
+                }
+                if (checkPrecision) {
+                    mTab.setValue("Amount", amount.toFixed(precision));
+                    mTab.setValue("DiscountAmt", discountAmt.toFixed(precision));
+                    mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(precision));
+                    mTab.setValue("OverUnderAmt", overUnderAmt.toFixed(precision));
+                }
+                else {
+                    mTab.setValue("Amount", amount);
+                    mTab.setValue("DiscountAmt", discountAmt);
+                    mTab.setValue("WriteOffAmt", writeOffAmt);
+                    mTab.setValue("OverUnderAmt", overUnderAmt);
+                }
+                if ((IsReturnTrx == "N" && overUnderAmt > 0) || (IsReturnTrx == "Y" && overUnderAmt < 0)) {
+                    VIS.ADialog.info("LessScheduleAmount");
+                }
             }
         }
-        else    //  calculate Amount
-        {
-            //amount = Decimal.Subtract(Decimal.Subtract(Decimal.Subtract(invoiceAmt, discountAmt), writeOffAmt), overUnderAmt);
-            amount = (((invoiceOpenAmt - discountAmt) - writeOffAmt) - overUnderAmt);
-
-            if ((IsReturnTrx == "Y" && amount > 0) || (IsReturnTrx == "N" && amount < 0)) {
-                VIS.ADialog.info("MoreScheduleAmount");
-                if (colName == "OverUnderAmt") {
-                    amount = ((invoiceOpenAmt - discountAmt) - writeOffAmt);
-                    overUnderAmt = (((invoiceOpenAmt - amount) - discountAmt) - writeOffAmt);
-                }
-                if (colName == "DiscountAmt") {
-                    amount = ((invoiceOpenAmt - overUnderAmt) - writeOffAmt);
-                    discountAmt = (((invoiceOpenAmt - amount) - overUnderAmt) - writeOffAmt);
-                }
-                if (colName == "WriteOffAmt") {
-                    amount = ((invoiceOpenAmt - discountAmt) - overUnderAmt);
-                    writeOffAmt = (((invoiceOpenAmt - amount) - discountAmt) - overUnderAmt);
-                }
+        //VIS_427 Bug ID:2488 :- Set value according to precision if value is changed for any column
+        else {
+            if (colName == "Amount") {
+                mTab.setValue("Amount", value.toFixed(stdPrecision));
             }
-            if (checkPrecision) {
-                mTab.setValue("Amount", amount.toFixed(precision));
-                mTab.setValue("DiscountAmt", discountAmt.toFixed(precision));
-                mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(precision));
-                mTab.setValue("OverUnderAmt", overUnderAmt.toFixed(precision));
+            if (colName == "WriteOffAmt") {
+                mTab.setValue("WriteOffAmt", value.toFixed(stdPrecision));
             }
-            else {
-                mTab.setValue("Amount", amount);
-                mTab.setValue("DiscountAmt", discountAmt);
-                mTab.setValue("WriteOffAmt", writeOffAmt);
-                mTab.setValue("OverUnderAmt", overUnderAmt);
+            if (colName == "OverUnderAmt") {
+                mTab.setValue("OverUnderAmt", value.toFixed(stdPrecision));
             }
-            if ((IsReturnTrx == "N" && overUnderAmt > 0) || (IsReturnTrx == "Y" && overUnderAmt < 0)) {
-                VIS.ADialog.info("LessScheduleAmount");
+            if (colName == "DiscountAmt") {
+                mTab.setValue("DiscountAmt", value.toFixed(stdPrecision));
             }
         }
 
