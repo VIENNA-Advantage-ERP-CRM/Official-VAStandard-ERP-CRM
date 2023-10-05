@@ -577,7 +577,7 @@
 
             //	Get Info from Tab
             if (colName == "PaymentAmount") {
-                mTab.setValue("PayAmt", mTab.getValue("PaymentAmount"))
+                mTab.setValue("PayAmt", (mTab.getValue("PaymentAmount")));
             }
             var payAmt = Util.getValueOfDecimal(mTab.getValue("PayAmt") == null ? VIS.Env.ZERO : mTab.getValue("PayAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt") == null ? VIS.Env.ZERO : mTab.getValue("WriteOffAmt"));
@@ -761,6 +761,8 @@
                 if (checkPrecision) {
                     mTab.setValue("DiscountAmt", Util.getValueOfDecimal(discountAmt.toFixed(precision)));
                     mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt.toFixed(precision)));
+                    mTab.setValue("PayAmt", Util.getValueOfDecimal(payAmt.toFixed(precision)));
+                    mTab.setValue("PaymentAmount", Util.getValueOfDecimal(payAmt.toFixed(precision)));
                 }
                 else {
                     mTab.setValue("DiscountAmt", discountAmt);
@@ -1141,6 +1143,7 @@
         if (mTab.getValue("C_InvoicePaySchedule_ID") != null) {
             C_InvoicePaySchedule_ID = mTab.getValue("C_InvoicePaySchedule_ID");
         }
+
         var invoiceOpenAmt = VIS.Env.ZERO;
         var IsReturnTrx = "N";
         var C_Currency_Invoice_ID = 0;
@@ -1218,7 +1221,7 @@
         }
         //	Changed Column
         var colName = mField.getColumnName();
-        paramString = C_Currency_Invoice_ID.toString();
+        var paramString = C_Currency_Invoice_ID.toString();
         var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", paramString);
         var precision = currency["StdPrecision"];
         //  PayAmt - calculate write off
@@ -1244,6 +1247,7 @@
             if (checkPrecision) {
                 mTab.setValue("DiscountAmt", discountAmt.toFixed(precision));
                 mTab.setValue("OverUnderAmt", overUnderAmt.toFixed(precision));
+                mTab.setValue("Amount", amount.toFixed(precision));
             }
             else {
                 mTab.setValue("DiscountAmt", discountAmt);
