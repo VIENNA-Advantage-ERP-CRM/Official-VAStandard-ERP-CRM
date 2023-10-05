@@ -5246,7 +5246,9 @@ namespace VAdvantage.Model
             wh.SetC_Location_ID(_Location_ID);
             if (wh.Save())
             {
-                MLocator mLoc = new MLocator(wh, "Drop Ship Locator");
+                //MLocator mLoc = new MLocator(wh, "Drop Ship Locator");
+                // VIS0060: Handled issue of duplicate search key while creating the Locator for Drop Shipment Warehouse.
+                MLocator mLoc = new MLocator(wh, "");
                 mLoc.SetIsDefault(true);
                 mLoc.SetPriorityNo(50);
                 mLoc.Save();
