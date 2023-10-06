@@ -71,12 +71,32 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
             if (MOrder.DOCSTATUS_Closed.Equals(order.GetDocStatus()))
             {
                 order.SetDocStatus(MOrder.DOCSTATUS_Completed);
+                MOrderLine[] lines = order.GetLines(true, "M_Product_ID");
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    MOrderLine line = lines[i];
+                    Decimal old = line.GetQtyLostSales();
+                    if (line.GetQtyLostSales() != 0)
+                    {
+                        //VIS430:Reverse the purchase ordered record after close and show the impact on fields.
+                        line.SetQtyOrdered(Decimal.Add(line.GetQtyLostSales(),line.GetQtyDelivered()));
+                        line.SetQtyLostSales(0);
+                        //Set property to false because close event is called
+                        line.SetIsClosedDocument(false);
+                        line.AddDescription("Open (" + line.GetQtyOrdered() + ")");
+                        line.Save(Get_TrxName());
+                    }
+                }
                 return order.Save() ? "@OK@" : "@Error@";
             }
             else
             {
                 throw new Exception("Order is not closed");
             }
+           
         }
+       
+       
+       
     }
 }
