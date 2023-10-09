@@ -19,14 +19,14 @@ namespace VIS.Controllers
 
         public JsonResult GetCurrency(string fields)
         {
-           
+
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MCurrencyModel objCurrency = new MCurrencyModel();
-                retJSON = JsonConvert.SerializeObject(objCurrency.GetCurrency(ctx,fields));
-            }            
+                retJSON = JsonConvert.SerializeObject(objCurrency.GetCurrency(ctx, fields));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
     }

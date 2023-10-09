@@ -34,9 +34,11 @@ namespace VAdvantage.Process
         {
 
             StringBuilder sql = new StringBuilder();
+            // VIS0060: Work done to set Status as Expired when Contract got expired 
             sql.Append(@" UPDATE VAS_ContractMaster SET IsExpiredContracts = 
-                CASE WHEN (EndDate = Sysdate) THEN 'Y' 
-                WHEN (EndDate < SYSDATE) THEN 'Y' ELSE 'N' END ");
+                CASE WHEN (EndDate <= Sysdate) THEN 'Y' ELSE 'N' END,
+                SET VAS_Status = CASE WHEN (EndDate <= Sysdate) THEN 'EXP' 
+                ELSE VAS_Status END");
             if (Util.GetValueOfInt(DB.ExecuteQuery
                 (sql.ToString(), null, Get_Trx())) < 0)
             {

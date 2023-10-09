@@ -204,7 +204,7 @@ namespace VAdvantage.Model
                     + " WHERE IsDefault = 'Y'"
                     + " AND IsActive = 'Y' "
                     + " AND AD_Client_ID = " + GetAD_Client_ID()
-                    + " AND Fact_Accumulation_ID <> " + GetFACT_ACCUMULATION_ID();
+                    + " AND Fact_Accumulation_ID <> " + GetFact_Accumulation_ID();
                 IDataReader idr = null;
                 try
                 {
@@ -252,7 +252,7 @@ namespace VAdvantage.Model
                 {
                     Boolean exists = false;
                     String sql = "SELECT * FROM Fact_Acct_Balance "
-                        + " WHERE Fact_Accumulation_ID = " + GetFACT_ACCUMULATION_ID();
+                        + " WHERE Fact_Accumulation_ID = " + GetFact_Accumulation_ID();
                     IDataReader idr = null;
                     try
                     {

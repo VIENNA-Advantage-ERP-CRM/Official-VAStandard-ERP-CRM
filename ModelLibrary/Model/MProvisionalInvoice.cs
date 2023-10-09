@@ -407,7 +407,7 @@ namespace VAdvantage.Model
         /// </summary>
         /// <returns>true if success</returns>
         public bool ReverseCorrectIt()
-        {
+        {            
             _log.Info(ToString());
 
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), GetDocBaseType(), GetAD_Org_ID()))
@@ -433,7 +433,7 @@ namespace VAdvantage.Model
 
             MProvisionalInvoice reversal = new MProvisionalInvoice(GetCtx(), 0, Get_Trx());
             PO.CopyValues(this, reversal, GetAD_Client_ID(), GetAD_Org_ID());
-
+           
             reversal.SetDocumentNo(GetDocumentNo() + REVERSE_INDICATOR);	//	indicate reversals
             reversal.SetDocStatus(DOCSTATUS_Drafted);
             reversal.SetDocAction(DOCACTION_Complete);

@@ -60,6 +60,7 @@ namespace VAdvantage.Model
         string conversionNotFoundInOut = "";
         string conversionNotFoundInOut1 = "";
         string conversionNotFoundInvoice = "";
+        DataSet CostOnOriginalDoc = null;
 
         private static VLogger _log = VLogger.GetVLogger(typeof(MInOut).FullName);
 
@@ -2289,6 +2290,18 @@ namespace VAdvantage.Model
                                         LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
                                         WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID());
 
+            //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
+            if (IsSOTrx() && IsReturnTrx())
+            {
+                CostOnOriginalDoc = DB.ExecuteDataset($@"SELECT orgiol.CurrentCostPrice , orgiol.PostCurrentCostPrice, 
+                                        retiol.C_OrderLine_ID AS RMALine_ID, retiol.M_InOutLine_ID 
+                                        FROM M_InOutLine retiol
+                                        INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
+                                        INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
+                                        INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
+                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}");
+            }
+
             //	Outstanding (not processed) Incoming Confirmations ?
             MInOutConfirm[] confirmations = GetConfirmations(true);
             Int32 confirmationCount = 0;
@@ -3657,7 +3670,7 @@ namespace VAdvantage.Model
                                     currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                                       sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                     @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                 @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
                                     if (!query.ToString().Contains("ProductApproxCost"))
@@ -4107,8 +4120,21 @@ namespace VAdvantage.Model
                 }
                 else // Customer Return
                 {
-                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                       sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID(), false);
+                    if (sLine.GetC_OrderLine_ID() == 0)
+                    {
+                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                           sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID(), false);
+                    }
+                    else if (CostOnOriginalDoc != null && CostOnOriginalDoc.Tables.Count > 0 && CostOnOriginalDoc.Tables[0].Rows.Count > 0)
+                    {
+                        //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
+                        // and update it on Return Document
+                        DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + sLine.GetM_InOutLine_ID());
+                        if (dr != null && dr.Length > 0)
+                        {
+                            currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                        }
+                    }
                 }
                 DB.ExecuteQuery("UPDATE M_InOutLine SET CurrentCostPrice = " + currentCostPrice +
                                                   @" WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
@@ -4234,18 +4260,24 @@ namespace VAdvantage.Model
                     {
                         if (costingMethod != "")
                         {
-                            currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), sLine.GetAD_Client_ID(),
-                                                sLine.GetAD_Org_ID(), sLine.GetM_Product_ID(),
-                                costingCheck.M_ASI_ID, 0, sLine.GetM_InOutLine_ID(), costingMethod, GetM_Warehouse_ID(), false, Get_Trx());
+                            if (sLine.GetC_OrderLine_ID() == 0)
+                            {
+                                currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), sLine.GetAD_Client_ID(),
+                                                    sLine.GetAD_Org_ID(), sLine.GetM_Product_ID(),
+                                    costingCheck.M_ASI_ID, 0, sLine.GetM_InOutLine_ID(), costingMethod, GetM_Warehouse_ID(), false, Get_Trx());
+                            }
                             DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice =  " + currentCostPrice +
-                                           @"  , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                       @"  , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                         }
                         else
                         {
-                            currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
-                                                 sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID(), false);
+                            if (sLine.GetC_OrderLine_ID() == 0)
+                            {
+                                currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                     sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID(), false);
+                            }
                             DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                           @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                       @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                         }
 
                         // Transaction Update Query

@@ -70,6 +70,15 @@ namespace VAdvantage.Model
                 return success;
             }
 
+            // VIS0060: Set Except Manual checkbox on Performance Criteria based on having Goal Type Manual
+            if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("VA068_Goal_ID")))
+            {
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(PA_SLA_Goal_ID) FROM PA_SLA_Goal WHERE IsActive = 'Y' AND VA068_GoalType='MNL'
+                          AND PA_SLA_Criteria_ID =  " + GetPA_SLA_Criteria_ID(), null, Get_Trx()));
+                DB.ExecuteQuery(@"UPDATE PA_SLA_Criteria SET VA068_ExceptManual= " + (count > 0 ? "'N'" : "'Y'") 
+                    + " WHERE IsActive = 'Y' AND PA_SLA_Criteria_ID = " + GetPA_SLA_Criteria_ID(), null, Get_Trx());
+            }
+
             if (Env.IsModuleInstalled("VA068_") && (newRecord || Is_ValueChanged("VA068_WeightagePertage") || Is_ValueChanged("IsActive")))
             {
                 log.Fine("afterSave");
@@ -101,6 +110,20 @@ namespace VAdvantage.Model
         /// <returns>true if deleted</returns>
         protected override bool AfterDelete(bool success)
         {
+            if (!success)
+            {
+                return success;
+            }
+
+            // VIS0060: Set Except Manual checkbox on Performance Criteria based on having Goal Type Manual
+            if (Env.IsModuleInstalled("VA068_"))
+            {
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(PA_SLA_Goal_ID) FROM PA_SLA_Goal WHERE IsActive = 'Y' AND VA068_GoalType='MNL'
+                          AND PA_SLA_Criteria_ID =  " + GetPA_SLA_Criteria_ID(), null, Get_Trx()));
+                DB.ExecuteQuery(@"UPDATE PA_SLA_Criteria SET VA068_ExceptManual= " + (count > 0 ? "'N'" : "'Y'")
+                    + " WHERE IsActive = 'Y' AND PA_SLA_Criteria_ID = " + GetPA_SLA_Criteria_ID(), null, Get_Trx());
+            }
+
             // Check Record is Valid or Not
             if (Env.IsModuleInstalled("VA068_"))
             {

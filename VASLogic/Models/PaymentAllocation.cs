@@ -4906,6 +4906,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
             decimal amtToAllocate = 0, remainingAmt = 0, netAmt = 0;
             decimal balanceAmt = 0;
             string msg = string.Empty;
+            string status = string.Empty; //VIS_427 Bug Id : 2178 variable defined to get document status
             int C_InvoicePaySchedule_ID = 0;
             int Neg_C_InvoicePaySchedule_Id = 0;
 
@@ -6051,7 +6052,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     }
                 }
                 #endregion
-
+                
                 if (rowsCash.Count == 0 && rowsPayment.Count == 0 && rowsInvoice.Count == 0)
                 {
                     trx.Rollback();
@@ -6065,7 +6066,9 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (alloc.Save())
                     {
-                        msg = alloc.GetDocumentNo();
+                         msg = alloc.GetDocumentNo();
+                        //VIS_427 Bug Id : 2178 get the doc status of allocation tab on allocation window
+                        status = alloc.GetDocStatus();
                     }
                     else
                     {
@@ -6148,8 +6151,8 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                         {
                             amtPayment = Util.GetValueOfDecimal(result);
                         }
-
-                        if (amtPayment == 0)
+                        //VIS_427 Bug Id : 2178 Handled Condition to Set Allocated checkbox true if doc status is completed
+                        if (amtPayment == 0 && status.Equals(X_C_AllocationHdr.DOCSTATUS_Completed))
                         {
                             pay.SetIsAllocated(true);
                         }
@@ -6246,7 +6249,8 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                         //                    INNER JOIN GL_JOURNALLINE jl ON jl.GL_JOURNALLINE_ID = al.GL_JOURNALLINE_ID INNER JOIN GL_JOURNAL j ON j.GL_JOURNAL_ID 
                         //                    = jl.GL_JOURNAL_ID WHERE al.GL_JOURNALLINE_ID = " + _GL_JournalLine_ID + @" AND AR.DOCSTATUS IN('CO', 'CL') ";
                         //decimal result = Util.GetValueOfDecimal(DB.ExecuteScalar(sqlGetOpenGlAmt, null, trx));
-                        if (Util.GetValueOfBool(rowsGL[i]["IsPaid"]) == true)
+                        //VIS_427 Bug Id : 2178 Handled Condition to Set Allocated checkbox true if doc status is completed
+                        if (Util.GetValueOfBool(rowsGL[i]["IsPaid"]) == true && status.Equals(X_C_AllocationHdr.DOCSTATUS_Completed))
                         {
                             chk = DB.ExecuteQuery(@" UPDATE GL_JOURNALLINE SET isAllocated ='Y' WHERE GL_JOURNALLINE_ID =" + Util.GetValueOfInt(rowsGL[i]["GL_JournalLine_ID"]), null, trx);
                             if (chk < 0)
