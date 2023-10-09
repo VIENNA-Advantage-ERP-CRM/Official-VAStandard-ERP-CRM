@@ -3280,7 +3280,7 @@ namespace VAdvantage.Model
         * 	@param lines order lines (ordered by M_Product_ID for deadlock prevention)
         * 	@return true if (un) reserved
         */
-        private bool ReserveStock(MDocType dt, MOrderLine[] lines)
+        public bool ReserveStock(MDocType dt, MOrderLine[] lines)
         {
             try
             {

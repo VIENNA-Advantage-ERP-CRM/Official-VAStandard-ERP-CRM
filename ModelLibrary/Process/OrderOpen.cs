@@ -100,9 +100,22 @@ namespace VAdvantage.Process
                         }
                     }
                 }
+
+                // Reserve Re-Open Quantity
+                if (!order.ReserveStock(null, lines))
+                {
+                    Get_TrxName().Rollback();
+                    return Msg.GetMsg(GetCtx(), "VAS_StockNotReserve");
+                }
+
                 order.SetDocStatus(MOrder.DOCSTATUS_Completed);
                 order.SetDocAction(MOrder.DOCACTION_Close);
-                return order.Save() ? "@OK@" : "@Error@";
+                if (!order.Save())
+                {
+                    Get_TrxName().Rollback();
+                    return "@Error@";
+                }
+                return "@OK@";
             }
             else
             {
