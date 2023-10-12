@@ -60,12 +60,7 @@ namespace ViennaAdvantageServer.Process
         /// <returns></returns>
         protected override string DoIt()
         {
-            /* TaskID:2346 System will check the Organization access to user. If user not having access of selected organization on record then
-             * system will not generate invoice.*/
-            if (!CheckOrgAccess())
-            {
-                return Msg.GetMsg(GetCtx(), "OrgAccess");
-            }
+
 
             int C_Contract_ID = Util.GetValueOfInt(GetRecord_ID());
             // Get Invoice TableId and DocAction ProcessId to execute workflow
@@ -84,7 +79,12 @@ namespace ViennaAdvantageServer.Process
             if (C_Contract_ID != 0)
             {
                 cont = new VAdvantage.Model.X_C_Contract(GetCtx(), C_Contract_ID, Get_TrxName());
-
+                /* VAI082: DevOps TaskID:2346 System will check the Organization access to user. If user not having access of selected organization on record then
+                * system will not generate invoice.*/
+                if (!CheckOrgAccess())
+                {
+                    return Msg.GetMsg(GetCtx(), "OrgNotAccess");
+                }
                 #region CheckDocTypeandPaymentMethod
 
                 // If ContractType not defined on Service Contract Window / Payment Method not defind on business partner
@@ -126,7 +126,8 @@ namespace ViennaAdvantageServer.Process
                 sql.Append("SELECT * FROM C_Contract WHERE IsActive = 'Y' AND TOTALINVOICE-INVOICESGENERATED>0 AND AD_Client_ID = " + GetAD_Client_ID() + " ORDER BY C_CONTRACT_ID");
                 try
                 {
-                    ds = DB.ExecuteDataset(sql.ToString(), null, Get_TrxName());
+                    //Add MRole Security to check AD_Org_ID and AD_Client_ID
+                    ds = DB.ExecuteDataset(MRole.GetDefault(GetCtx(), false).AddAccessSQL(sql.ToString(), "C_Contract", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO));                    
                     if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {
                         for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -134,7 +135,11 @@ namespace ViennaAdvantageServer.Process
                             DocPaymentCheck = true;
                             //Get Contract Detail
                             cont = new VAdvantage.Model.X_C_Contract(GetCtx(), ds.Tables[0].Rows[i], Get_TrxName());
-
+                            /*VAI082: DevOps TaskID:2346 When user not access of selected organization on record then continue */
+                            if (!CheckOrgAccess())
+                            {
+                                continue;
+                            }
                             #region CheckDocTypeandPaymentMethod
                             // If ContractType not defined on Service Contract Window / Payment Method not defind on business partner
                             if (GetDocType() == 0 || !CheckPaymentMethod())
@@ -464,9 +469,9 @@ namespace ViennaAdvantageServer.Process
             MRole.OrgAccess[] accesss = MRole.GetDefault(GetCtx()).GetOrgAccess();//Get Organizations
             for (int i = 0; i < accesss.Length; i++)
             {
-                if (accesss[i].AD_Org_ID.Equals(GetAD_Org_ID()))
+                if (accesss[i].AD_Org_ID.Equals(cont.GetAD_Org_ID()))
                 {
-                    return true;                   
+                    return true;
                 }
             }
 
