@@ -476,9 +476,12 @@ namespace ViennaAdvantage.Process
                 {
                     MInvoiceLine line = new MInvoiceLine(invoice);
                     //VIS_47 16/10/2023 feteched data row  from dataset result and match it with c_orderline_id present in M_InoutLine Table
-                    drProd = dsToCheckProd.Tables[0].Select($@"C_OrderLine_ID={sLine.GetC_OrderLine_ID()}");
+                    if (dsToCheckProd != null && dsToCheckProd.Tables[0].Rows.Count > 0)
+                    {
+                        drProd = dsToCheckProd.Tables[0].Select($@"C_OrderLine_ID={sLine.GetC_OrderLine_ID()}");
+                    }
                     // JID_1850 Avoid the duplicate charge line 
-                    if (sLine.GetC_Charge_ID() > 0 && (!isAllownonItem || _GenerateCharges) && drProd.Length == 0)
+                    if (sLine.GetC_Charge_ID() > 0 && (!isAllownonItem || _GenerateCharges) && (drProd == null || drProd.Length == 0))
                     {
                         continue;
                     }
