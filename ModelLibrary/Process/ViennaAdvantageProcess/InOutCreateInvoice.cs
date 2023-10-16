@@ -327,6 +327,15 @@ namespace ViennaAdvantage.Process
             count = 0;
             DataSet ds = null;
             DataSet dsDoc = null;
+            //VIS_427 16/10/2023 Fetched That order which only contains charge not product
+            DataRow[] drProd = null;
+            string sqlToCheckProd = @"SELECT ol.C_Order_ID,ol.C_OrderLine_ID FROM M_InOutLine ml 
+                                    INNER JOIN C_OrderLine ol ON ol.C_OrderLine_ID = ml.C_OrderLine_ID WHERE ol.C_Order_ID 
+                                    NOT IN (SELECT ol.C_Order_ID FROM M_InOutLine ml 
+                                    INNER JOIN C_OrderLine ol ON ol.C_OrderLine_ID = ml.C_OrderLine_ID WHERE ml.M_InOut_ID = " + _M_InOut_ID + @" 
+                                     AND ol.M_Product_ID IS NOT NULL) AND  ml.M_InOut_ID=" + _M_InOut_ID;
+            DataSet dsToCheckProd = DB.ExecuteDataset(sqlToCheckProd);
+
 
             for (int i = 0; i < shipLines.Length; i++)
             {
@@ -466,8 +475,10 @@ namespace ViennaAdvantage.Process
                 else
                 {
                     MInvoiceLine line = new MInvoiceLine(invoice);
+                    //VIS_47 16/10/2023 feteched data row  from dataset result and match it with c_orderline_id present in M_InoutLine Table
+                    drProd = dsToCheckProd.Tables[0].Select($@"C_OrderLine_ID={sLine.GetC_OrderLine_ID()}");
                     // JID_1850 Avoid the duplicate charge line 
-                    if (sLine.GetC_Charge_ID() > 0 && (!isAllownonItem || _GenerateCharges))
+                    if (sLine.GetC_Charge_ID() > 0 && (!isAllownonItem || _GenerateCharges) && drProd.Length == 0)
                     {
                         continue;
                     }
