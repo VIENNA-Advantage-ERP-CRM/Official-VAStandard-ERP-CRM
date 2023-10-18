@@ -15,6 +15,7 @@ using VAdvantage.Utility;
 
 namespace VAdvantage.Model
 {
+    //VIS0336:add class as public
     public class MVASContractLine : X_VAS_ContractLine
     {
         public MVASContractLine(Ctx ctx, int VAS_ContractLine_ID, Trx Trx_Name)
