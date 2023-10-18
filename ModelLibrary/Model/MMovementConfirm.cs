@@ -866,7 +866,7 @@ namespace VAdvantage.Model
                     mmLine.SetQtyEntered(confirm.GetDifferenceQty());
                     mmLine.SetC_UOM_ID(mLine.GetC_UOM_ID());
                     mmLine.SetC_BPartner_ID(mLine.GetC_BPartner_ID());
-                    mmLine.SetMovementQty(mLine.GetMovementQty());
+                    mmLine.SetMovementQty(confirm.GetDifferenceQty());
                     mmLine.SetDTD001_AttributeNumber(mLine.GetDTD001_AttributeNumber());
                     //mmLine.SetTargetQty(mLine.GetTargetQty());
                     // mmLine.SetConfirmedQty(mLine.GetConfirmedQty());
