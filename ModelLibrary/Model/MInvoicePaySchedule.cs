@@ -160,7 +160,9 @@ namespace VAdvantage.Model
                 SetDueAmt(due);
                 Decimal discount = Decimal.Multiply(due, Decimal.Divide(paySchedule.GetDiscount(),
                     Decimal.Round(HUNDRED, scale, MidpointRounding.AwayFromZero)));
-                SetDiscountAmt(discount);
+                /*VIS_427 BugId-2613 20/10/2023: Handled discount value according to precision
+                when user select payment term with multiple schedules */
+                SetDiscountAmt(Decimal.Round(discount, scale, MidpointRounding.AwayFromZero));
                 SetIsValid(true);
             }
 
