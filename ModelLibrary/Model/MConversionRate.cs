@@ -210,7 +210,7 @@ namespace VAdvantage.Model
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     DataRow dr = ds.Tables[0].Rows[i];
-                    retValue = Utility.Util.GetValueOfDecimal(dr[0].ToString()); 
+                    retValue = Utility.Util.GetValueOfDecimal(dr[0].ToString());
                     //when record found then not to continue with another record
                     break;
                 }
@@ -657,9 +657,20 @@ namespace VAdvantage.Model
             return true;
         }
 
+        /// <summary>
+        /// Implement After Save Logic
+        /// </summary>
+        /// <param name="newRecord">newRecord</param>
+        /// <param name="success">Success</param>
+        /// <returns>true, when success</returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
-            //by Amit - 6-5-2016
+            // VIS_045 - 26/Oct/2023 - Task ID: 2658 --  When record not saved, then retutn false.
+            if (!success)
+            {
+                return success;
+            }
+
             if (newRecord)
             {
                 string sql = @"SELECT COUNT(*) FROM C_Conversion_Rate WHERE ISActive = 'Y' AND c_currency_id = " + GetC_Currency_To_ID() +
@@ -684,10 +695,10 @@ namespace VAdvantage.Model
                     {
                         ValueNamePair pp = VLogger.RetrieveError();
                         log.Info("Conversion Rate not saved : " + pp.GetValue() + " AND " + pp.GetName());
+                        return false;
                     }
                 }
             }
-            //end
             return true;
         }
 
