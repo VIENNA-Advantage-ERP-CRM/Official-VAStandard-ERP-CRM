@@ -160,7 +160,8 @@ namespace VAdvantage.Model
                 SetDueAmt(due);
                 Decimal discount = Decimal.Multiply(due, Decimal.Divide(paySchedule.GetDiscount(),
                     Decimal.Round(HUNDRED, scale, MidpointRounding.AwayFromZero)));
-                SetDiscountAmt(discount);
+                //VIS_427 20/10/2023 BugId:2613 Handled Value according to precision on discount field
+                SetDiscountAmt(Decimal.Round(discount, scale, MidpointRounding.AwayFromZero));
                 SetIsValid(true);
             }
 
