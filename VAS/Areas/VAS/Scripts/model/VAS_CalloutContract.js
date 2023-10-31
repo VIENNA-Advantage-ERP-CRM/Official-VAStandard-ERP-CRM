@@ -116,7 +116,7 @@
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate = endDate.toISOString();
         renewalDate = renewalDate.toISOString();
-        if (mTab.getValue("EndDate") != null) {//VIS430:Renewal date must be greater than end date
+        if (mTab.getValue("EndDate") != null && mTab.getValue("VAS_RenewalDate") != null) {//VIS430:Renewal date must be greater than end date
             if (renewalDate < endDate) {
                 mTab.setValue("VAS_RenewalDate", null);
                 this.setCalloutActive(false);
