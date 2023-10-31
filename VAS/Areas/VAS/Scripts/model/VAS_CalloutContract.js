@@ -129,6 +129,36 @@
     };
 
     /**
+     * *****************Callout check Termination Date must be greater than Start Date********************
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    VAS_CalloutContract.prototype.TerminationDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var terminationDate = new Date(mTab.getValue("VAS_TerminationDate"));
+        var startDate = new Date(mTab.getValue("StartDate"));
+        terminationDate = terminationDate.toISOString();
+        startDate = startDate.toISOString();
+        if (mTab.getValue("StartDate") != null && mTab.getValue("VAS_TerminationDate") != null) {//VIS430:Termination date must be greater than start date
+            if (terminationDate < startDate) {
+                mTab.setValue("VAS_TerminationDate", null);
+                this.setCalloutActive(false);
+                return "VAS_TerminationMustGreater";
+            }
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+    /**
 * VIS0336:for checking contract and contract start date
 * @param {any} ctx
 * @param {any} windowNo

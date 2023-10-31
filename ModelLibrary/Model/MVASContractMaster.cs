@@ -71,12 +71,12 @@ namespace VAdvantage.Model
 
                 }
             }
-            if (Util.GetValueOfBool(Get_Value("VAS_Terminate")) == true && GetVAS_TerminationDate() == null)
+            if (IsVAS_Terminate() && GetVAS_TerminationDate() == null)
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_TerminateMustFilled"));
                 return false;
             }
-            else
+            if (IsVAS_Terminate())
             {
                 SetVAS_Status(VAS_STATUS_Terminated);
             }
