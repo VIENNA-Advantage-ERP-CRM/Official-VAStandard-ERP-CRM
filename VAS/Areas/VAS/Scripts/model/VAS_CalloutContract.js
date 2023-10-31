@@ -112,7 +112,7 @@
             return "";
         }
         this.setCalloutActive(true);
-        var renewalDate = new Date(value);
+        var renewalDate = new Date(mTab.getValue("VAS_RenewalDate"));
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate = endDate.toISOString();
         renewalDate = renewalDate.toISOString();
@@ -135,7 +135,7 @@
 * @param {any} mTab
 * @param {any} mField
 * @param {any} value
-* @param {any} oldValue
+* @param {any} oldValueVIS.Model.VAS_CalloutContract
 */
     VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (this.isCalloutActive() || value == null || value.toString() == "") {
@@ -474,7 +474,7 @@
         }
         return diff;
     };
-    VIS.Model.VAS_CalloutContract = VAS_CalloutContract;
+    VIS.Model.VAS_CalloutContract= VAS_CalloutContract;
     //***************VAS_CalloutContract End ************
 
 })(VIS, jQuery);
