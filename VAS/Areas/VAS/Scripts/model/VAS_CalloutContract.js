@@ -135,7 +135,7 @@
 * @param {any} mTab
 * @param {any} mField
 * @param {any} value
-* @param {any} oldValueVIS.Model.VAS_CalloutContract
+* @param {any} oldValue
 */
     VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (this.isCalloutActive() || value == null || value.toString() == "") {
