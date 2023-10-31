@@ -50,13 +50,38 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
-            
-            // VIS0060: Set Contract Status as Terminated when contract is marked as Terminated.
+
+            // VIS430: Validation popup for renewal date, renewal type, no of cycle, notice days and termination date
+            if (GetRenewalType() == "ATC" || GetRenewalType() == "MNL")
+            {
+                if (GetVAS_RenewalDate() == null)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RenewalMustFilled"));
+                    return false;
+                }
+                if (GetCycles() == 0 && GetRenewalType() == "ATC")
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CyclesMustFilled"));
+                    return false;
+                }
+                else if (GetCancelBeforeDays() == 0 && GetRenewalType() == "ATC")
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CancelBeforeDaysMustFilled"));
+                    return false;
+
+                }
+            }
+            if (IsVAS_Terminate() && GetVAS_TerminationDate() == null)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_TerminateMustFilled"));
+                return false;
+            }
             if (IsVAS_Terminate())
             {
                 SetVAS_Status(VAS_STATUS_Terminated);
             }
             return true;
         }
+
     }
 }
