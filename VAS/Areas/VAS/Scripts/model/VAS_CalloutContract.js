@@ -99,6 +99,36 @@
     };
 
     /**
+     * *****************Callout check Renewal Date must be greater than End Date********************
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    VAS_CalloutContract.prototype.RenewalDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var renewalDate = new Date(value);
+        var endDate = new Date(mTab.getValue("EndDate"));
+        endDate = endDate.toISOString();
+        renewalDate = renewalDate.toISOString();
+        if (mTab.getValue("EndDate") != null) {//VIS430:Renewal date must be greater than end date
+            if (renewalDate < endDate) {
+                mTab.setValue("VAS_RenewalDate", null);
+                this.setCalloutActive(false);
+                return "VAS_RenewalMustGreater";
+            }
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+    /**
 * VIS0336:for checking contract and contract start date
 * @param {any} ctx
 * @param {any} windowNo
