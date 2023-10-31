@@ -56,7 +56,6 @@ namespace VAdvantage.Model
             {
                 SetVAS_Status(VAS_STATUS_Terminated);
             }
-
             // VIS430: Validation popup for renewal date, renewal type, no of cycle, notice days and termination date
             if (GetRenewalType() == "ATC" || GetRenewalType() == "MNL")
             {
