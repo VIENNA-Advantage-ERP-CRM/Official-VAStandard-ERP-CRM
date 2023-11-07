@@ -158,39 +158,40 @@
         return "";
     };
 
-    /**
-* VIS0336:for checking contract and contract start date
-* @param {any} ctx
-* @param {any} windowNo
-* @param {any} mTab
-* @param {any} mField
-* @param {any} value
-* @param {any} oldValue
-*/
-    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        if (this.isCalloutActive() || value == null || value.toString() == "") {
-            return "";
-        }
-        this.setCalloutActive(true);
+//    /**
+//* VIS0336:for checking contract and contract start date
+    //* VAI050-Comment callout 
+//* @param {any} ctx
+//* @param {any} windowNo
+//* @param {any} mTab
+//* @param {any} mField
+//* @param {any} value
+//* @param {any} oldValue
+//*/
+//    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
+//        if (this.isCalloutActive() || value == null || value.toString() == "") {
+//            return "";
+//        }
+//        this.setCalloutActive(true);
 
-        var DocDate = mTab.getValue("DateDoc");
-        var StartDate = mTab.getValue("StartDate");
-        if (DocDate != null && StartDate != null) {
-            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
-                mTab.setValue("DateDoc", null);
-                this.setCalloutActive(false);
-                return "VAS_ContractDateMustGreater";
-            }
-            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
-                mTab.setValue("StartDate", null);
-                this.setCalloutActive(false);
-                return "VAS_ContractDateMustGreater";
-            }
-        }
-        this.setCalloutActive(false);
-        ctx = windowNo = mTab = mField = value = oldValue = null;
-        return "";
-    };
+//        var DocDate = mTab.getValue("DateDoc");
+//        var StartDate = mTab.getValue("StartDate");
+//        if (DocDate != null && StartDate != null) {
+//            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
+//                mTab.setValue("DateDoc", null);
+//                this.setCalloutActive(false);
+//                return "VAS_ContractDateMustGreater";
+//            }
+//            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
+//                mTab.setValue("StartDate", null);
+//                this.setCalloutActive(false);
+//                return "VAS_ContractDateMustGreater";
+//            }
+//        }
+//        this.setCalloutActive(false);
+//        ctx = windowNo = mTab = mField = value = oldValue = null;
+//        return "";
+//    };
 
     VAS_CalloutContract.prototype.ContractRef = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  

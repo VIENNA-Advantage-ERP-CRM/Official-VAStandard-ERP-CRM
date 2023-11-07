@@ -52,7 +52,8 @@ namespace VAdvantage.Model
             }
 
             // VIS430: Validation popup for renewal date, renewal type, no of cycle, notice days and termination date
-            if (GetRenewalType() == "ATC" || GetRenewalType() == "MNL")
+            // VAI050:Remove Manual Renewal Type check 
+            if (GetRenewalType() == "ATC")
             {
                 if (GetVAS_RenewalDate() == null)
                 {
