@@ -431,7 +431,7 @@
                 }
 
                 // VIS0060: Set Trx Organization from Blanket Order Line
-                mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);                
+                mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);
             }
         }
         catch (err) {
@@ -700,7 +700,7 @@
                 else
                     mTab.setValue("Bill_Location_ID", bill_Location_ID);
 
-               // VIS0336_Set location acc to selected record in Info window
+                // VIS0336_Set location acc to selected record in Info window
                 var shipTo_ID = Util.getValueOfInt(dr["C_BPartner_Location_ID"]);
                 if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
                     var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
@@ -714,7 +714,7 @@
                 else {
                     mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
                     if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	//	set the same
-                    mTab.setValue("Bill_Location_ID", shipTo_ID);
+                        mTab.setValue("Bill_Location_ID", shipTo_ID);
                 }
 
 
@@ -2178,7 +2178,7 @@
                 epl = Util.getValueOfString(dr["EnforcePriceLimit"]);
                 IsTaxIncluded = Util.getValueOfString(dr["IsTaxIncluded"]);
             }
-            var QtyEntered, QtyOrdered, PriceEntered, PriceActual, PriceLimit, Discount, PriceList, DiscountSchema;
+            var QtyEntered, QtyOrdered, PriceEntered, PriceActual, PriceLimit, Discount, PriceList, DiscountSchema, DiscountApplied;
             //	get values
             QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
             QtyOrdered = Util.getValueOfDecimal(mTab.getValue("QtyOrdered"));
@@ -2187,6 +2187,8 @@
             PriceEntered = Util.getValueOfDecimal(mTab.getValue("PriceEntered"));
             PriceActual = Util.getValueOfDecimal(mTab.getValue("PriceActual"));
 
+            // VIS0060: DevOPs ID 2587 - On Change of quantity, price should be fetched based on discount schema.
+            DiscountApplied = Util.getValueOfBoolean(mTab.getValue("VAS_IsDiscountApplied"));
             Discount = Util.getValueOfDecimal(mTab.getValue("Discount"));
             PriceLimit = Util.getValueOfDecimal(mTab.getValue("PriceLimit"));
             PriceList = Util.getValueOfDecimal(mTab.getValue("PriceList"));
@@ -2263,9 +2265,10 @@
                         var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
                         DiscountSchema = Util.getValueOfString(prices["DiscountSchema"]);
 
-                        // VIS0060: Handle zero price issue on quantity change.
-                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfString(prices["DiscountCalculate"]) == "Y" && Util.getValueOfDecimal(prices["PriceEntered"]) != 0) ||
-                            (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
+                        // VIS0060: DevOPs ID 2587 - On Change of quantity, price should be fetched based on discount schema.
+                        if (mField.getColumnName() == "M_Product_ID" || ((Util.getValueOfString(prices["DiscountCalculate"]) == "Y" || DiscountApplied)
+                            && Util.getValueOfDecimal(prices["PriceEntered"]) != 0) || (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
+                            mTab.setValue("VAS_IsDiscountApplied", Util.getValueOfString(prices["DiscountCalculate"]).equals("Y"));
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
                             PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
