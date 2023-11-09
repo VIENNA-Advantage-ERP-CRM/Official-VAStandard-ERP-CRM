@@ -300,7 +300,7 @@ namespace VAdvantage.Model
             {
                 string sql = "SELECT DTD001_ReservedQty,Qty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
                 DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
-                if (ds != null && ds.Tables[0].Rows.Count > 0 && ds.Tables.Count > 0)
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     if (Util.GetValueOfDecimal(Get_Value("QtyEntered")) > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"])))
                     {
