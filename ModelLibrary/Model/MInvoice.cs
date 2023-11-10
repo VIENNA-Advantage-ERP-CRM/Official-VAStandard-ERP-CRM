@@ -164,6 +164,13 @@ namespace VAdvantage.Model
             //
             to.SetDateInvoiced(dateDoc);
             to.SetDateAcct(dateDoc);
+            /* VIS_427 10/11/2023 BugID 2869 During creation of new Invoice entry - Due date is calculated as days between 
+             (Date invoiced of original invoice - Due Date of original invoice) is added into date invoiced of new invoice */
+            if (from.GetDateInvoiced() != null && from.GetDueDate() != null && !(!counter && setOrder))
+            {
+                int DaysDiff = (from.GetDueDate()-from.GetDateInvoiced()).Value.Days;
+                to.SetDueDate(to.GetDateInvoiced().Value.AddDays(DaysDiff));
+            }
             to.SetDatePrinted(null);
             to.SetIsPrinted(false);
 
