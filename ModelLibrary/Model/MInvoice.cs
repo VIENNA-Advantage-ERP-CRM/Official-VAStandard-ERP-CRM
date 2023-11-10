@@ -164,6 +164,12 @@ namespace VAdvantage.Model
             //
             to.SetDateInvoiced(dateDoc);
             to.SetDateAcct(dateDoc);
+            //VIS_427 10/11/2023 BugID 2869 Handled Due Date issue when user create invoice through recurring window
+            if(from.GetDateInvoiced() != null && from.GetDueDate() != null)
+            {
+                int DaysDiff = (from.GetDueDate()-from.GetDateInvoiced()).Value.Days;
+                to.SetDueDate(to.GetDateInvoiced().Value.AddDays(DaysDiff));
+            }
             to.SetDatePrinted(null);
             to.SetIsPrinted(false);
 
