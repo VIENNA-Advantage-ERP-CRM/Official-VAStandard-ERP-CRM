@@ -164,9 +164,9 @@ namespace VAdvantage.Model
             //
             to.SetDateInvoiced(dateDoc);
             to.SetDateAcct(dateDoc);
-            /* VIS_427 10/11/2023 BugID 2869 Handled Due Date issue i.e. Subtracting Invoice date from due date of original Invoice and adding 
-            those days to set duedate of that invoice which is created from recurring window */
-            if(from.GetDateInvoiced() != null && from.GetDueDate() != null && !(!counter && setOrder))
+            /* VIS_427 10/11/2023 BugID 2869 During creation of new Invoice entry - Due date is calculated as days between 
+             (Date invoiced of original invoice - Due Date of original invoice) is added into date invoiced of new invoice */
+            if (from.GetDateInvoiced() != null && from.GetDueDate() != null && !(!counter && setOrder))
             {
                 int DaysDiff = (from.GetDueDate()-from.GetDateInvoiced()).Value.Days;
                 to.SetDueDate(to.GetDateInvoiced().Value.AddDays(DaysDiff));
