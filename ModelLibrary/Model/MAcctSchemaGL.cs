@@ -146,7 +146,7 @@ namespace VAdvantage.Model
                 SetAD_Org_ID(0);
             }
             //VAI082: DevOps Task ID:2425, When Tolerance Range To less than Tolerance Range From than show message
-            if (Util.GetValueOfInt(Get_Value("FRPT_ToleranceRangeTo")) < Util.GetValueOfInt(Get_Value("FRPT_ToleranceRangeFrom")))
+            if (Util.GetValueOfDecimal(Get_Value("FRPT_ToleranceRangeTo")) < Util.GetValueOfDecimal(Get_Value("FRPT_ToleranceRangeFrom")))
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VIS_CompareToleranceRange"));
                 return false;
