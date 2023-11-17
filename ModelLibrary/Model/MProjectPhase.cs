@@ -159,7 +159,7 @@ namespace VAdvantage.Model
             for (int i = 0; i < fromTasks.Length; i++)
             {
                 //	Check if Task already exists
-                C_Task_ID= fromTasks[i].GetC_ProjectTask_ID();
+                C_Task_ID = fromTasks[i].GetC_ProjectTask_ID();
                 exists = false;
                 if (C_Task_ID == 0)
                     exists = false;
@@ -418,64 +418,82 @@ namespace VAdvantage.Model
                 .Append("]");
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Before Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
             if (GetEndDate() < GetStartDate())
             {
-                log.SaveError("Error", Msg.GetMsg(GetCtx(), "EnddategrtrthnStartdate"));
+                log.SaveError("", Msg.GetMsg(GetCtx(), "EnddategrtrthnStartdate"));
                 return false;
             }
             return true;
         }
 
+        /// <summary>
+        /// After Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">success</param>
+        /// <returns>success</returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+            {
+                return success;
+            }
+
             //Used transaction object because total was not updating on header
             string isCam = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsCampaign FROM C_Project WHERE C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName()));
             string isOpp = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsOpportunity FROM C_Project WHERE C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName()));
 
             if (isOpp.Equals("N") && isCam.Equals("N"))
             {
-                // set sum of total amount of phase tab to project tab, similalary Commitment amount
+                // set sum of total amount of phase tab to project tab, similalary Commitment amount                
+                //project.SetPlannedAmt(Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0) FROM C_Projectphase pl WHERE pl.IsActive = 'Y' AND pl.C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName())));
+                //project.SetCommittedAmt(Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.CommittedAmt),0) FROM C_Projectphase pl WHERE pl.IsActive = 'Y' AND pl.C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName())));
+                //if (!project.Save())
+                //{
+                //    log.Warning("Project not updated");
+                //}
+
+                // DevOps ID: 2786 - Planned Quantity not updated in Quantity field on header of Project screen from Phase line tab.
                 MProject project = new MProject(GetCtx(), GetC_Project_ID(), Get_TrxName());
-                project.SetPlannedAmt(Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0)  FROM C_Projectphase pl WHERE pl.IsActive = 'Y' AND pl.C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName())));
-                project.SetCommittedAmt(Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.CommittedAmt),0)  FROM C_Projectphase pl WHERE pl.IsActive = 'Y' AND pl.C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName())));
-                if (!project.Save())
+                StringBuilder Sql = new StringBuilder();
+                if (project.GetProjectLineLevel().Equals("T") || project.GetProjectLineLevel().Equals("Y"))
                 {
-
+                    //VIS0060: Set sum of planned margin and planned quantity from Task line to Project tab
+                    Sql.Append(@"SELECT COALESCE(SUM(pp.PlannedAmt),0) AS PlannedAmt, COALESCE(SUM(pp.CommittedAmt),0) AS CommittedAmt, 
+                        SUM(pl.PlannedMarginAmt) AS PlannedMarginAmt, SUM(pl.PlannedQty) AS PlannedQty
+                        FROM C_ProjectPhase pp INNER JOIN C_ProjectTask pt ON pp.C_Projectphase_ID = pt.C_Projectphase_ID 
+                        INNER JOIN C_ProjectLine pl ON pl.C_ProjectTask_ID = pt.C_ProjectTask_ID
+                        WHERE pp.C_Project_ID = " + project.GetC_Project_ID());
                 }
-
-                // set sum of planned margin from task line to project tab
-                string Sql = @"SELECT SUM(pl.PlannedMarginAmt) ,  SUM(pl.PlannedQty)
-                          FROM c_Project p INNER JOIN c_projectphase pp ON p.c_project_id = pp.c_project_id
-                          INNER JOIN c_projecttask pt ON pp.c_projectphase_id = pt.c_projectphase_id INNER JOIN c_projectline pl ON pl.c_projecttask_id = pt.c_projecttask_id
-                          WHERE p.c_project_id   = " + project.GetC_Project_ID();
-                DataSet ds = new DataSet();
-                ds = DB.ExecuteDataset(Sql, null, Get_TrxName());
-                if (ds != null)
+                else
                 {
-                    if (ds.Tables[0].Rows.Count > 0)
+                    //VIS0060: Set sum of planned margin and planned quantity from Phase line to Project tab
+                    Sql.Append(@"SELECT COALESCE(SUM(pp.PlannedAmt),0) AS PlannedAmt, COALESCE(SUM(pp.CommittedAmt),0) AS CommittedAmt, 
+                        SUM(pl.PlannedMarginAmt) AS PlannedMarginAmt, SUM(pl.PlannedQty) AS PlannedQty
+                        FROM C_ProjectPhase pp INNER JOIN C_ProjectLine pl ON pl.C_ProjectPhase_ID = pp.C_ProjectPhase_ID
+                        WHERE pp.C_Project_ID  = " + project.GetC_Project_ID());
+                }
+                DataSet ds = DB.ExecuteDataset(Sql.ToString(), null, Get_TrxName());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    project.SetPlannedAmt(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PlannedAmt"]));
+                    project.SetCommittedAmt(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CommittedAmt"]));
+                    project.SetPlannedMarginAmt(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PlannedMarginAmt"]));
+                    project.SetPlannedQty(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PlannedQty"]));
+                    if (!project.Save())
                     {
-                        project.SetPlannedMarginAmt(Util.GetValueOfDecimal(ds.Tables[0].Rows[0][0]));
-                        project.SetPlannedQty(Util.GetValueOfDecimal(ds.Tables[0].Rows[0][1]));
-                        project.Save();
+                        log.Warning("Project not updated");
                     }
                 }
                 ds.Dispose();
-
-                //Set Total Amount Of Phase Line on Phase Tab
-                MProjectPhase prjph = null;
-                if (GetC_Project_ID() != 0)
-                {
-                    isCam = Util.GetValueOfString(DB.ExecuteScalar("SELECT IsCampaign FROM C_Project WHERE C_Project_ID = " + GetC_Project_ID(), null, Get_TrxName()));
-                }
-                if (isCam.Equals("N"))                             // Project Window
-                {
-                    //Used transaction object because total was not updating on header
-                    prjph = new MProjectPhase(GetCtx(), GetC_ProjectPhase_ID(), Get_TrxName());
-                    decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(PlannedAmt),0) FROM C_ProjectLine WHERE IsActive= 'Y' AND C_ProjectPhase_ID= " + GetC_ProjectPhase_ID(), null, Get_TrxName()));
-                    DB.ExecuteQuery("UPDATE C_ProjectPhase SET PlannedAmt=" + plnAmt + " WHERE C_ProjectPhase_ID=" + GetC_ProjectPhase_ID(), null, Get_TrxName());
-                }
             }
             return true;
         }
