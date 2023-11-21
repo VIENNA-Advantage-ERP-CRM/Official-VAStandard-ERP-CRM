@@ -47,7 +47,7 @@ namespace VAS
                   "~/Areas/VAS/Scripts/app/forms/vpayprint.js",
                   "~/Areas/VAS/Scripts/app/forms/vBOMdrop.js",
                   "~/Areas/VAS/Scripts/app/forms/vtrxmaterial.js",
-                  "~/Areas/VAS/Scripts/app/forms/TestAlertRuleSql.js",
+                  "~/Areas/VAS/Scripts/app/forms/TabAlertRuleSql.js",
                    "~/Areas/VAS/Scripts/model/Callouts.js",
                    "~/Areas/VAS/Scripts/model/CalloutAssignment.js",
                    "~/Areas/VAS/Scripts/model/calloutbankstatement.js",
@@ -86,15 +86,13 @@ namespace VAS
                    );
 
 
-            //style.Include("~/Areas/VAS/Content/PaymentRule.css",
-            //    "~/Areas/VAS/Content/VPaySelect.css");
+            style.Include("~/Areas/VAS/Content/PaymentRule.css",
+                "~/Areas/VAS/Content/style.css",
+                "~/Areas/VAS/Content/VPaySelect.css");
 
             //style.Include("~/Areas/VAS/Content/VIS.rtl.css");
-
-
-            style.Include("~/Areas/VAS/Content/VAS.all.min.css",
-                "~/Areas/VAS/Content/style.css");
-            modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");
+            //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
+            //modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");
 
 
 

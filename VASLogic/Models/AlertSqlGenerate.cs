@@ -1,4 +1,12 @@
-﻿using System;
+﻿/*******************************************************
+       * Module Name    : VAS
+       * Purpose        : Create SQL Generator For TabAlertRule.
+       * chronological development.
+       * WindowName     :Alert
+       * Created Date   : 21 Nov 2023
+       * Created by     : Ruby
+      ******************************************************/
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -14,6 +22,11 @@ namespace VIS.Models
 {
     public class AlertSqlGenerate
     {
+        /// <summary>
+        /// Geting Windows and Tabs.
+        /// </summary>
+        /// <param name="ctx">Context</param>        
+        /// <returns>Window Name/Tab Name/TableId</returns>
         public List<Windows> GetWindows(Ctx ctx)
         {
             List<Windows> window = new List<Windows>();
@@ -37,6 +50,12 @@ namespace VIS.Models
             return window;
         }
 
+        /// <summary>
+        ///  Geting Table
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="tabID"></param>
+        /// <returns>TableName/TableID</returns>
         public List<Tabs> GetTable(Ctx ctx, int tabID)
         {
             List<Tabs> Tab = new List<Tabs>();
@@ -59,6 +78,12 @@ namespace VIS.Models
             return Tab;
         }
 
+        /// <summary>
+        /// Geting Columns
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="tableID"></param>
+        /// <returns>ColumnList</returns>
         public List<Columnsdetail> GetColumns(Ctx ctx, int tableID)
         {
             string sql = @"SELECT DISTINCT T.TableName AS TableName,C.NAME AS ColumnName,C.AD_REFERENCE_ID AS DataType,F.Name AS FieldName, C.ColumnName AS DBColumn 
@@ -85,6 +110,11 @@ namespace VIS.Models
             return column;
         }
 
+        /// <summary>
+        /// Check DROP Keyword,Truncate, Update And Delete
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <returns>true/false</returns>
         private bool ValidateSql(string sql)
         {
             if (string.IsNullOrEmpty(sql))
@@ -99,11 +129,16 @@ namespace VIS.Models
                 return false;
             }
             return true;
-
-            //Check DROP Keyword
-            //Check Truncate And Delete 
-            //Check Update
         }
+
+        /// <summary>
+        /// Geting result of Query
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="query"></param>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns>ListofRecords</returns>
         public List<Dictionary<string, string>> GetResult(Ctx ctx, string query,int pageNo,int pageSize)
         {
             List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
@@ -152,8 +187,18 @@ namespace VIS.Models
                 }
             }
             return results;
-
         }
+
+        /// <summary>
+        /// Save query in AlertRule Window
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="query"></param>
+        /// <param name="tableName"></param>
+        /// <param name="TableID"></param>
+        /// <param name="alertID"></param>
+        /// <param name="alertRuleID"></param>
+        /// <returns>saved/notsaved</returns>
         public string SaveQuery(Ctx ctx,string query, string tableName,int TableID, int alertID, int alertRuleID)
         {
             if(query!=null&&query.Length>0){
@@ -161,111 +206,139 @@ namespace VIS.Models
                 int indexOfFrom = query.IndexOf("FROM");
                 int indexOfWhere = query.IndexOf("WHERE");
                 int indexOfOrder = query.IndexOf("ORDER BY");
-                string selectClause = query.Substring(7, indexOfFrom - 7).Trim();
-                string fromClause = "";
-                string otherClause = string.Empty;
-                string whereClause = string.Empty;
-                if (indexOfWhere != -1)
+                if (indexOfFrom != -1)
                 {
-                    fromClause = query.Substring(indexOfFrom + 4, indexOfWhere - (indexOfFrom + 4)).Trim();
-                    if (indexOfOrder != -1)
+                    string selectClause = query.Substring(7, indexOfFrom - 7).Trim();
+                    string fromClause = "";
+                    string otherClause = string.Empty;
+                    string whereClause = string.Empty;
+                    if (indexOfWhere != -1)
                     {
-                        whereClause = query.Substring(indexOfWhere+5, indexOfOrder - (indexOfWhere+5)).Trim();
-                        otherClause = query.Substring(indexOfOrder).Trim();
+                        fromClause = query.Substring(indexOfFrom + 4, indexOfWhere - (indexOfFrom + 4)).Trim();
+                        if (indexOfOrder != -1)
+                        {
+                            whereClause = query.Substring(indexOfWhere + 5, indexOfOrder - (indexOfWhere + 5)).Trim();
+                            otherClause = query.Substring(indexOfOrder).Trim();
+                        }
+                        else
+                        {
+                            whereClause = query.Substring(indexOfWhere + 5).Trim();
+                        }
                     }
                     else
                     {
-                        whereClause = query.Substring(indexOfWhere+5).Trim();
+                        fromClause = (indexOfOrder != -1) ? query.Substring(indexOfFrom + 4, indexOfOrder - (indexOfFrom + 4)).Trim() : query.Substring(indexOfFrom + 4).Trim();
+                    }
+
+                    MAlertRule obj = new MAlertRule(ctx, 0, null);
+                    obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                    obj.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                    obj.SetAD_Alert_ID(Util.GetValueOfInt(alertID));
+                    obj.SetSelectClause(Util.GetValueOfString(selectClause));
+                    obj.SetFromClause(Util.GetValueOfString(fromClause));
+                    obj.SetWhereClause(Util.GetValueOfString(whereClause));
+                    obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
+                    if (tableName != null && tableName != "")
+                    {
+                        obj.SetName(Util.GetValueOfString(tableName));
+                    }
+                    else
+                    {
+                        obj.SetName(Util.GetValueOfString("AlertRule"));
+                    }
+                    obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
+                    obj.SetIsActive(true);
+                    obj.SetIsValid(true);
+                    if (obj.Save())
+                    {
+                        return Msg.GetMsg(ctx, "Saved");
+                    }
+                    else
+                    {
+                        ValueNamePair vnp = VLogger.RetrieveError();
+                        string info = vnp.GetName();
+                        return Msg.GetMsg(ctx, "NotSaved");
                     }
                 }
-                else
-                {
-                    fromClause = (indexOfOrder != -1) ? query.Substring(indexOfFrom + 4, indexOfOrder - (indexOfFrom + 4)).Trim() : query.Substring(indexOfFrom + 4).Trim();
-                }
-
-                MAlertRule obj = new MAlertRule(ctx, 0, null);
-                obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
-                obj.SetAD_Org_ID(ctx.GetAD_Org_ID());
-                obj.SetAD_Alert_ID(Util.GetValueOfInt(alertID));
-                obj.SetSelectClause(Util.GetValueOfString(selectClause));
-                obj.SetFromClause(Util.GetValueOfString(fromClause));
-                obj.SetWhereClause(Util.GetValueOfString(whereClause));
-                obj.SetOtherClause(Util.GetValueOfString(" "+otherClause));
-                if (tableName != null&& tableName!="")
-                {
-                    obj.SetName(Util.GetValueOfString(tableName));
-                }
-                else {
-                    obj.SetName(Util.GetValueOfString("AlertRule"));
-                }
-                obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
-                obj.SetIsActive(true);
-                obj.SetIsValid(true);
-                if (obj.Save())
-                {
-                    return "Saved Successfully";
-                }
-                else
-                {
-                    ValueNamePair vnp = VLogger.RetrieveError();
-                    string info = vnp.GetName();
-                    return "not save";
-                }
+                return Msg.GetMsg(ctx, "Write in Proper format");
             }
             return "";
         }
+
+        /// <summary>
+        /// Update record of AlertRule
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="query"></param>
+        /// <param name="TableID"></param>
+        /// <param name="alertID"></param>
+        /// <param name="alertRuleID"></param>
+        /// <returns>Updated/NotUpdated</returns>
         public string UpdateQuery(Ctx ctx,string query, int TableID, int alertID, int alertRuleID)
         {
-            if (query != null && query.Length > 0 && alertID>0)
+            if (query != null && query.Length > 0 && alertID > 0)
             {
-                if (alertRuleID == 0) {
-                    SaveQuery(ctx,query, "AlertRule",TableID, alertID, alertRuleID);
-                    return "saved";
+                if (alertRuleID == 0)
+                {
+                    SaveQuery(ctx, query, "AlertRule", TableID, alertID, alertRuleID);
+                    return Msg.GetMsg(ctx, "Saved");
                 }
                 int indexOfFrom = query.IndexOf("FROM");
                 int indexOfWhere = query.IndexOf("WHERE");
                 int indexOfOrder = query.IndexOf("ORDER BY");
-                string selectClause = query.Substring(7, indexOfFrom - 7).Trim();
-                string fromClause = string.Empty;
-                string otherClause = string.Empty;
-                string whereClause = string.Empty;
-                if (indexOfWhere != -1)
+                if (indexOfFrom != -1)
                 {
-                    fromClause = query.Substring(indexOfFrom + 4, indexOfWhere - (indexOfFrom + 4)).Trim();
-                    if (indexOfOrder != -1)
+                    string selectClause = query.Substring(7, indexOfFrom - 7).Trim();
+                    string fromClause = string.Empty;
+                    string otherClause = string.Empty;
+                    string whereClause = string.Empty;
+                    if (indexOfWhere != -1)
                     {
-                        whereClause = query.Substring(indexOfWhere + 5, indexOfOrder - (indexOfWhere + 5)).Trim();
-                        otherClause = query.Substring(indexOfOrder).Trim();
+                        fromClause = query.Substring(indexOfFrom + 4, indexOfWhere - (indexOfFrom + 4)).Trim();
+                        if (indexOfOrder != -1)
+                        {
+                            whereClause = query.Substring(indexOfWhere + 5, indexOfOrder - (indexOfWhere + 5)).Trim();
+                            otherClause = query.Substring(indexOfOrder).Trim();
+                        }
+                        else
+                        {
+                            whereClause = query.Substring(indexOfWhere + 5).Trim();
+                        }
                     }
                     else
                     {
-                        whereClause = query.Substring(indexOfWhere + 5).Trim();
+                        fromClause = (indexOfOrder != -1) ? query.Substring(indexOfFrom + 4, indexOfOrder - (indexOfFrom + 4)).Trim() : query.Substring(indexOfFrom + 4).Trim();
+                    }
+                    MAlertRule obj = new MAlertRule(ctx, alertRuleID, null);
+                    obj.SetSelectClause(Util.GetValueOfString(selectClause));
+                    obj.SetFromClause(Util.GetValueOfString(fromClause));
+                    obj.SetWhereClause(Util.GetValueOfString(whereClause + " "));
+                    obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
+                    obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
+                    obj.SetIsActive(true);
+                    if (obj.Save())
+                    {
+                        return Msg.GetMsg(ctx, "Updated");
+                    }
+                    else
+                    {
+                        ValueNamePair vnp = VLogger.RetrieveError();
+                        string info = vnp.GetName();
+                        return Msg.GetMsg(ctx, "NotUpdated");
                     }
                 }
-                else
-                {
-                    fromClause = (indexOfOrder != -1) ? query.Substring(indexOfFrom + 4, indexOfOrder - (indexOfFrom + 4)).Trim() : query.Substring(indexOfFrom + 4).Trim();
-                }
-                MAlertRule obj = new MAlertRule(ctx, alertRuleID, null);
-                obj.SetSelectClause(Util.GetValueOfString(selectClause));
-                obj.SetFromClause(Util.GetValueOfString(fromClause));
-                obj.SetWhereClause(Util.GetValueOfString(whereClause+" "));
-                obj.SetOtherClause(Util.GetValueOfString(" "+otherClause));
-                obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
-                obj.SetIsActive(true);
-                if (obj.Save())
-                {
-                    return "Updated Successfully";
-                }
-                else
-                {
-                    ValueNamePair vnp = VLogger.RetrieveError();
-                    string info = vnp.GetName();
-                    return "not Updated";
-                }
+                return Msg.GetMsg(ctx, "Write SQL in Proper format");
             }
             return "";
         }
+
+        /// <summary>
+        /// Getting AlertRule RecordInfo
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="alertID"></param>
+        /// <param name="alertRuleID"></param>
+        /// <returns>RecordInfo</returns>
         public string GetAlertData(Ctx ctx, int alertID, int alertRuleID)
         {
             string sql = "";          
@@ -289,17 +362,20 @@ namespace VIS.Models
             return sql;
         }
     }
+
     public class Windows
     {
         public string TabName { get; set; }
         public string WindowName { get; set; }
         public int TableID { get; set; }
     }
+
     public class Tabs
     {
         public string TableName { get; set; }
         public int TableID { get; set; }
     }
+
     public class Columnsdetail
     {
         public string FieldName { get; set; }
@@ -308,6 +384,7 @@ namespace VIS.Models
         public string DBColumn { get; set; }
         public int DataType { get; set; }
     }
+
     public class ASearch
     {
         public int Value { get; set; }
