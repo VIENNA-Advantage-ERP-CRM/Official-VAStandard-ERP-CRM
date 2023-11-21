@@ -1340,7 +1340,7 @@ namespace VAdvantage.Model
 
                             //	Transaction
                             trx = new MTransaction(GetCtx(), line.GetAD_Org_ID(),
-                                MTransaction.MOVEMENTTYPE_InventoryIn,
+                                MTransaction.MOVEMENTTYPE_InventoryOut,  // VAI050-Update Movement Type Inventory Out on Product Transcation tab
                                 line.GetM_Locator_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
                                 maxDiff, GetMovementDate(), Get_TrxName());
                             trx.SetM_InventoryLine_ID(line.GetM_InventoryLine_ID());
