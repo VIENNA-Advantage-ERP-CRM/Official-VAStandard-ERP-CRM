@@ -1,6 +1,6 @@
-﻿; VIS = window.VIS || {};
-; (function (VIS, $) {
-    VIS.SQL = function () {
+﻿; VAS = window.VAS || {};
+; (function (VAS, $) {
+    VAS.TabAlertRuleSql = function () {
         this.windowNo = 0;
         this.curTab = null;
         this.selectedRow = null;
@@ -31,17 +31,17 @@
         var $joinMultiSelect = $("<div class='vis-join-multiselect'>");
         var dGrid = null;
         var dGrid2 = null;
-        var $sqlBtn = $("<input class='VIS_Pref_btn-2 active' type='button' value='SQL'>");
+        var $sqlBtn = $("<input class='VIS_Pref_btn-2 active' type='button' value=' " + VIS.Msg.getMsg("SQL") + "'>");
         var $sqlResultDiv = $("<div class='vas-sql-result-msg'>");
-        var $sqlGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-sql-generator' type='button' value='SQL Generator'>");
-        var $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' type='button' value='Test SQL'>");
-        var $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' type='button' value='Test SQL'>");
-        var $saveBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value='Save'>");
-        var $updateGenerateBtn = $("<input class='VIS_Pref_btn-2 vas-update-btn' type='button' value='Update'>");
-        var $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value='Save'>");
-        var $addJoinBtn = $("<input class='VIS_Pref_btn-2' type='button' value='Add Join'>");
-        var $addFilterBtn = $("<input class='VIS_Pref_btn-2 vis-add-btn' type='button' value='Add Filter'>");
-        var $addSortBtn = $("<input class='VIS_Pref_btn-2 vis-add-btn' type='button' value='Add Sort'>");
+        var $sqlGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-sql-generator' type='button' value=' " + VIS.Msg.getMsg("SQLGenerator") + "'>");
+        var $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' type='button' value=' " + VIS.Msg.getMsg("TestSql") + "'>");
+        var $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' type='button' value=' " + VIS.Msg.getMsg("TestSql") + "'>");
+        var $saveBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value=' " + VIS.Msg.getMsg("Save") + "'>");
+        var $updateGenerateBtn = $("<input class='VIS_Pref_btn-2 vas-update-btn' type='button' value=' " + VIS.Msg.getMsg("Update") + "'>");
+        var $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value=' " + VIS.Msg.getMsg("Save") + "'>");
+        var $addJoinBtn = $("<input class='VIS_Pref_btn-2' type='button' value=' " + VIS.Msg.getMsg("AddJoin") + "'>");
+        var $addFilterBtn = $("<input class='VIS_Pref_btn-2 vis-add-btn' type='button' value=' " + VIS.Msg.getMsg("AddFilter") + "'>");
+        var $addSortBtn = $("<input class='VIS_Pref_btn-2 vis-add-btn' type='button' value=' " + VIS.Msg.getMsg("AddSort") + "'>");
         var $windowTabDiv = $("<div class='vas-windowtab'>");
         var $windowTabLabel = $("<label>");
         var $joinFieldColumnLabel = $("<label>");
@@ -52,7 +52,6 @@
         var $joinFieldMultiSelect = $("<div class='vas-joinfieldcol-select'>");
         var $joinsSelect = $("<div style='display: none;' class='vas-joins-select vas-common-style vas-windowtab'>");
         var $selectQuery = $("<div class='vas-query-input' contenteditable='true'>");
-        var highLightedWord = ["select", "where", "from"];
         var $selectGeneratorQuery = $("<textarea>");
         var $multiSelect = $("<div class='vas-multiselect'>");
         var $selectBox = $("<div class='vas-selectBox vas-windowtab'><select><option>Select All</option></select><div class='vas-overselect'></div></div>");
@@ -1089,7 +1088,7 @@
     /*
         Function to start the Tab Panel
     */
-    VIS.SQL.prototype.startPanel = function (windowNo, curTab) {
+    VAS.TabAlertRuleSql.prototype.startPanel = function (windowNo, curTab) {
         this.windowNo = windowNo;
         this.curTab = curTab;
         this.init();
@@ -1098,7 +1097,7 @@
     /*
         Function to update tab panel based on selected record
     */
-    VIS.SQL.prototype.refreshPanelData = function (ParentId, selectedRow) {
+    VAS.TabAlertRuleSql.prototype.refreshPanelData = function (ParentId, selectedRow) {
         this.ParentId = ParentId;
         this.selectedRow = selectedRow;
         this.SqlQuery(ParentId);
@@ -1107,16 +1106,16 @@
     /*
         Function to resize tab panel based on selected record
     */
-    VIS.SQL.prototype.sizeChanged = function (width) {
+    VAS.TabAlertRuleSql.prototype.sizeChanged = function (width) {
         this.panelWidth = width;
     };
 
     // Function of Memory Dealocation
-    VIS.SQL.prototype.dispose = function () {
+    VAS.TabAlertRuleSql.prototype.dispose = function () {
         this.windowNo = 0;
         this.curTab = null;
         this.rowSource = null;
         this.panelWidth = null;
     }
 
-})(VIS, jQuery);
+})(VAS, jQuery);
