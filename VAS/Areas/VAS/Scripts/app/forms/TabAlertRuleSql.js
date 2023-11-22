@@ -310,7 +310,7 @@
             }
 
             // Click event on SQL Button
-            $sqlBtn.on(VIS.Events.onTouchStartOrClick, function () {               
+            $sqlBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 $sqlResultDiv.hide();
                 $sqlContent.show();
                 $testSqlBtn.show();
@@ -463,7 +463,11 @@
                     var fromIndex = sql.indexOf('FROM');
                     if (fromIndex != -1) {
                         var fromClause = sql.slice(fromIndex);
-                        sql = sql.slice(0, fromIndex) + seletedJoinCloumn + " " + fromClause;
+                        if (seletedJoinCloumn.length > 0) {
+                            sql = sql.slice(0, fromIndex) + ", " + seletedJoinCloumn + " " + fromClause;
+                        } else {
+                            sql = sql.slice(0, fromIndex) + fromClause;
+                        }
                         joinQuery = " " + $joinsDropdown.val() + " " + TABLE2 + ' ON (' + keyColumn1 + " = " + keyColumn2 + ")";
                     }
                     var whereIndex = sql.indexOf('WHERE');
@@ -539,8 +543,8 @@
         function deleteFilter() {
             var currentValue = $selectGeneratorQuery.val();
             var conditionToRemove = $(event.target).parents('.vis-filter-item').find(".vis-filters-block").text();
-            var orIndexCR = conditionToRemove.indexOf('OR');
-            var orIndexSql = currentValue.indexOf('OR');
+            var orIndexCR = conditionToRemove.indexOf("OR");
+            var orIndexSql = currentValue.indexOf("OR");
             var andIndexCR = conditionToRemove.indexOf('AND');
             var andIndexSQl = currentValue.indexOf('AND');
             var whereIndex = currentValue.indexOf('WHERE');
@@ -601,6 +605,7 @@
             andFlag = true;
             sortFlag = true;
             orderbyFlag = true;
+            $sqlResultDiv.hide();
         }
 
         // Function to get Window/Tab data in Joins
@@ -707,7 +712,7 @@
                         $sortByDropdown.prepend("<option selected='select'>Select</option>");
                         $filterPrice.prepend("<option selected='select'>Select</option>");
                         for (var i = 1; i < result.length; i++) {
-                            $joinOnFieldColumnName1.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + result[i].ColumnName + "</option>");
+                            $joinOnFieldColumnName1.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + result[i].DBColumn + "</option>");
                             $sortByDropdown.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + "</option>");
                             $filterPrice.append(" <option value=" + result[i].DataType + ":" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + "</option>");
                             $checkBoxes.append(" <div class='vas-column-list-item'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
@@ -759,7 +764,7 @@
                     if (result && result.length > 0) {
                         TABLE2 = result[0].TableName;
                         for (var i = 1; i < result.length; i++) {
-                            $joinOnFieldColumnName2.append(" <option value=" + TABLE2 + "." + result[i].DBColumn + ">" + result[i].ColumnName + "</option>");
+                            $joinOnFieldColumnName2.append(" <option value=" + TABLE2 + "." + result[i].DBColumn + ">" + result[i].DBColumn + "</option>");
                             $joinMultiSelect.append(" <div class='vas-column-list-item'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                             $sortByDropdown.append(" <option value=" + TABLE2 + "." + result[i].DBColumn + ">" + TABLE2 + " > " + result[i].ColumnName + "</option>");
                             $filterPrice.append(" <option value=" + result[i].DataType + ":" + TABLE2 + "." + result[i].DBColumn + ">" + TABLE2 + " > " + result[i].ColumnName + "</option>");
@@ -895,7 +900,7 @@
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
-                        if (result != null) {
+                        if (result != null && result!=[]) {
                             if (result.length > 0) {
 
                                 if (loadTotalPages) {
@@ -920,6 +925,10 @@
                             }
                             else {
                                 $sqlResultDiv.show();
+                                $selectGeneratorQuery.show();
+                                gridDiv2.hide();
+                                $sqlGeneratorQueryResultGrid.hide();
+                                $testSqlGeneratorBtn.val(testSQL);
                                 $sqlResultDiv.text(VIS.Msg.translate(VIS.Env.getCtx(), "NoRecordFound"));
                             }
                         }
@@ -931,7 +940,13 @@
                                 $selectQuery.show();
                                 $saveBtn.hide();
                             }
-                            $testSqlBtn.removeClass('vis-show-grid');
+                            else {
+                                $selectGeneratorQuery.show();
+                                gridDiv2.hide();
+                                $sqlGeneratorQueryResultGrid.hide();
+                                $testSqlGeneratorBtn.val(testSQL);
+                            }
+                           // $testSqlBtn.removeClass('vis-show-grid');
                             $sqlResultDiv.show();
                             $sqlResultDiv.text(VIS.Msg.translate(VIS.Env.getCtx(), "VAS_ValidQuery"));
 
