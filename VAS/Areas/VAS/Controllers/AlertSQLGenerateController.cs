@@ -3,7 +3,7 @@
        * Purpose        : Get values for SQLGenerator in TabAlerRule.
        * chronological development.
        * Created Date   : 21 Nov 2023
-       * Created by     : Ruby
+       * Created by     : VAI055
       ******************************************************/
 using Newtonsoft.Json;
 using System;
@@ -26,56 +26,54 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Get Windows
+        /// Get all Windows for Alert SqlGenerator
         /// </summary>
-        /// <returns>Window Name/Tab Name/TableId</returns>
+        /// <returns>AD_Window Name/Ad_Tab Name/AD_Table_ID</returns>
         public JsonResult GetWindows()
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                List<Windows> result = objForecast.GetWindows(ctx);
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                List<Windows> result = obj.GetWindows(ctx);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        ///  Geting Table
+        ///  Get Table information From Tab
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="tabID"></param>
-        /// <returns>TableName/TableID</returns>
+        /// <param name="tabID">AD_Tab_ID</param>
+        /// <returns>TableName/AD_Table_ID</returns>
         public JsonResult GetTable(int tabID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                List<Tabs> result= objForecast.GetTable(ctx, tabID);
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                List<Tabs> result= obj.GetTable(ctx, tabID);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// Geting result of Query
+        /// Get Result Of Query
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="pageNo"></param>
-        /// <param name="pageSize"></param>
+        /// <param name="query">Query</param>
+        /// <param name="pageNo">Page No</param>
+        /// <param name="pageSize">page Size</param>
         /// <returns>ListofRecords</returns>
         public JsonResult GetResult(string query, int pageNo,int pageSize)
         {
             if (Session["Ctx"] != null)
-            {              
-                var ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                var jsonResult = Json(JsonConvert.SerializeObject(objForecast.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }
@@ -83,81 +81,77 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Geting Columns
+        /// Get All Columns From Table
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="tableID"></param>
-        /// <returns>ColumnList</returns>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <returns>ColumnInfornationList</returns>
         public JsonResult GetColumns(int tableID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(objForecast.GetColumns(ctx, tableID));
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// Save query in AlertRule Window
+        /// Saving SqlGenerator query in AlertRule Window
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="tableName"></param>
-        /// <param name="TableID"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="query">Query</param>
+        /// <param name="tableName">AD_Table Name</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>saved/notsaved</returns>
-        public JsonResult SaveQuery(string query,string tableName,int TableID,int alertID,int alertRuleID)
+        public JsonResult SaveQuery(string query,string tableName,int tableID,int alertID,int alertRuleID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(objForecast.SaveQuery(ctx, query, tableName, TableID, alertID, alertRuleID));
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.SaveQuery(ctx, query, tableName, tableID, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// Update record of AlertRule
+        /// Update record of AlertRule by TabSqlGenerator 
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="TableID"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="query">Query</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>Updated/NotUpdated</returns>
-        public JsonResult UpdateQuery(string query,int TableID, int alertID,int alertRuleID)
+        public JsonResult UpdateQuery(string query,int tableID, int alertID,int alertRuleID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(objForecast.UpdateQuery(ctx, query, TableID, alertID, alertRuleID));
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.UpdateQuery(ctx, query, tableID, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// Getting AlertRule RecordInfo
+        /// Get AlertRule RecordInfo for TabSqlGenerator
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
         public JsonResult GetAlertData(int alertID,int alertRuleID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate objForecast = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(objForecast.GetAlertData(ctx, alertID, alertRuleID));
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }      

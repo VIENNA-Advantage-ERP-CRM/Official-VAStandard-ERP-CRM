@@ -4,7 +4,7 @@
        * chronological development.
        * WindowName     :Alert
        * Created Date   : 21 Nov 2023
-       * Created by     : Ruby
+       * Created by     : VAI055
       ******************************************************/
 using System;
 using System.Collections.Generic;
@@ -23,16 +23,16 @@ namespace VIS.Models
     public class AlertSqlGenerate
     {
         /// <summary>
-        /// Geting Windows and Tabs.
+        /// Get all Windows for Alert SqlGenerator
         /// </summary>
-        /// <param name="ctx">Context</param>        
-        /// <returns>Window Name/Tab Name/TableId</returns>
+        /// <param name="ctx">Contex</param>
+        /// <returns>AD_Window Name/Ad_Tab Name/AD_Table_ID</returns>
         public List<Windows> GetWindows(Ctx ctx)
         {
             List<Windows> window = new List<Windows>();
-            string sql = @"SELECT T.NAME AS TabName,W.DisplayName As WindowName,T.AD_Table_ID 
-                     FROM AD_Tab T INNER JOIN AD_Window W ON T.AD_Window_ID=W.AD_Window_ID 
-                     WHERE T.IsACtive='Y' AND W.IsACtive='Y'
+            string sql = @"SELECT t.Name AS TabName,w.DisplayName AS WindowName,t.AD_Table_ID 
+                     FROM AD_Tab t INNER JOIN AD_Window w ON (t.AD_Window_ID=w.AD_Window_ID) 
+                     WHERE t.IsActive='Y' AND w.IsActive='Y'
                      ORDER BY WindowName,TabName";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet ds = DB.ExecuteDataset(sql);
@@ -51,17 +51,17 @@ namespace VIS.Models
         }
 
         /// <summary>
-        ///  Geting Table
+        ///  Get Table information From Tab
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="tabID"></param>
-        /// <returns>TableName/TableID</returns>
+        /// <param name="ctx">Contex</param>
+        /// <param name="tabID">AD_Tab_ID</param>
+        /// <returns>TableName/AD_Table_ID</returns>
         public List<Tabs> GetTable(Ctx ctx, int tabID)
         {
             List<Tabs> Tab = new List<Tabs>();
-            string sql = @"SELECT DISTINCT TL.Name,TB.Ad_Table_ID
-                     FROM AD_Tab TB INNER JOIN Ad_Table TL ON TL.Ad_Table_ID=TB.Ad_Table_ID
-                     WHERE TL.IsACtive='Y' AND TB.AD_Tab_ID=" + tabID;
+            string sql = @"SELECT DISTINCT tl.Name,tb.Ad_Table_ID
+                     FROM AD_Tab tb INNER JOIN Ad_Table tl ON (tl.Ad_Table_ID=tb.Ad_Table_ID)
+                     WHERE tl.IsActive='Y' AND tb.IsActive='Y' AND tb.AD_Tab_ID=" + tabID;
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
@@ -79,18 +79,20 @@ namespace VIS.Models
         }
 
         /// <summary>
-        /// Geting Columns
+        /// Get All Columns From Table
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="tableID"></param>
-        /// <returns>ColumnList</returns>
+        /// <param name="ctx">Contex</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <returns>ColumnInfornationList</returns>
         public List<Columnsdetail> GetColumns(Ctx ctx, int tableID)
         {
-            string sql = @"SELECT DISTINCT T.TableName AS TableName,C.NAME AS ColumnName,C.AD_REFERENCE_ID AS DataType,F.Name AS FieldName, C.ColumnName AS DBColumn 
-                    FROM AD_Table T 
-                    INNER JOIN AD_Column C ON (T.AD_Table_ID=C.AD_Table_ID)
-                    LEFT JOIN Ad_Field F ON (F.AD_Column_ID=C.AD_Column_ID) WHERE T.AD_Table_ID=" + tableID + @"
-                    AND T.IsActive='Y' AND C.IsActive='Y' ORDER BY FieldName";
+            string sql = @"SELECT DISTINCT t.TableName AS TableName,c.Name AS ColumnName,
+                    c.AD_Reference_ID AS DataType,f.Name AS FieldName, c.ColumnName AS DBColumn 
+                    FROM AD_Table t 
+                    INNER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
+                    LEFT JOIN Ad_Field f ON (f.AD_Column_ID=c.AD_Column_ID)
+                    WHERE t.AD_Table_ID=" + tableID + @"
+                    AND t.IsActive='Y' AND c.IsActive='Y' ORDER BY FieldName";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Table", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet ds = DB.ExecuteDataset(sql);
             List<Columnsdetail> column = new List<Columnsdetail>();
@@ -113,7 +115,7 @@ namespace VIS.Models
         /// <summary>
         /// Check DROP Keyword,Truncate, Update And Delete
         /// </summary>
-        /// <param name="sql"></param>
+        /// <param name="sql">SQL Query</param>
         /// <returns>true/false</returns>
         private bool ValidateSql(string sql)
         {
@@ -132,24 +134,24 @@ namespace VIS.Models
         }
 
         /// <summary>
-        /// Geting result of Query
+        /// Get Result Of Query 
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="pageNo"></param>
-        /// <param name="pageSize"></param>
+        /// <param name="query">Query</param>
+        /// <param name="pageNo">Page No</param>
+        /// <param name="pageSize">page Size</param>
         /// <returns>ListofRecords</returns>
         public List<Dictionary<string, string>> GetResult(Ctx ctx, string query,int pageNo,int pageSize)
         {
+            query = query.Trim();
             List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
-            string pattern = @"FROM\s+([\w.]+)";
+           /* string pattern = @"FROM\s+([\w.]+)";
             Match match = Regex.Match(query, pattern, RegexOptions.IgnoreCase);
             if (match.Success)
             {
                 string tableName = match.Groups[1].Value;
-               // query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            }          
-            query += " Fetch First 100 Rows Only";
+                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            } */         
+            query += " FETCH FIRST 100 ROWS ONLY";
             if (ValidateSql(query))
             {
                 DataSet ds = new DataSet();
@@ -190,16 +192,16 @@ namespace VIS.Models
         }
 
         /// <summary>
-        /// Save query in AlertRule Window
+        /// Saving SqlGenerator query in AlertRule Window
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="tableName"></param>
-        /// <param name="TableID"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="ctx">Contex</param>
+        /// <param name="query">Query</param>
+        /// <param name="tableName">AD_Table Name</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>saved/notsaved</returns>
-        public string SaveQuery(Ctx ctx,string query, string tableName,int TableID, int alertID, int alertRuleID)
+        public string SaveQuery(Ctx ctx,string query, string tableName,int tableID, int alertID, int alertRuleID)
         {
             if(query!=null&&query.Length>0){
              //  query= query.ToUpper();
@@ -246,12 +248,12 @@ namespace VIS.Models
                     {
                         obj.SetName(Util.GetValueOfString("AlertRule"));
                     }
-                    obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
+                    obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
                     obj.SetIsActive(true);
                     obj.SetIsValid(true);
                     if (obj.Save())
                     {
-                        return Msg.GetMsg(ctx, "Saved");
+                        return Msg.GetMsg(ctx, "VAS_Saved");
                     }
                     else
                     {
@@ -260,28 +262,28 @@ namespace VIS.Models
                         return Msg.GetMsg(ctx, "NotSaved");
                     }
                 }
-                return Msg.GetMsg(ctx, "Write in Proper format");
+                return Msg.GetMsg(ctx, "SQLProperformat");
             }
             return "";
         }
 
         /// <summary>
-        /// Update record of AlertRule
+        /// Update record of AlertRule by TabSqlGenerator 
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="query"></param>
-        /// <param name="TableID"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="ctx">Contex</param>
+        /// <param name="query">Query</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>Updated/NotUpdated</returns>
-        public string UpdateQuery(Ctx ctx,string query, int TableID, int alertID, int alertRuleID)
+        public string UpdateQuery(Ctx ctx,string query, int tableID, int alertID, int alertRuleID)
         {
             if (query != null && query.Length > 0 && alertID > 0)
             {
                 if (alertRuleID == 0)
                 {
-                    SaveQuery(ctx, query, "AlertRule", TableID, alertID, alertRuleID);
-                    return Msg.GetMsg(ctx, "Saved");
+                    SaveQuery(ctx, query, "AlertRule", tableID, alertID, alertRuleID);
+                    return Msg.GetMsg(ctx, "VAS_Saved");
                 }
                 int indexOfFrom = query.IndexOf("FROM");
                 int indexOfWhere = query.IndexOf("WHERE");
@@ -314,11 +316,11 @@ namespace VIS.Models
                     obj.SetFromClause(Util.GetValueOfString(fromClause));
                     obj.SetWhereClause(Util.GetValueOfString(whereClause + " "));
                     obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
-                    obj.SetAD_Table_ID(Util.GetValueOfInt(TableID));
+                    obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
                     obj.SetIsActive(true);
                     if (obj.Save())
                     {
-                        return Msg.GetMsg(ctx, "Updated");
+                        return Msg.GetMsg(ctx, "VAS_Updated");
                     }
                     else
                     {
@@ -327,17 +329,17 @@ namespace VIS.Models
                         return Msg.GetMsg(ctx, "NotUpdated");
                     }
                 }
-                return Msg.GetMsg(ctx, "Write SQL in Proper format");
+                return Msg.GetMsg(ctx, "SQLProperformat");
             }
             return "";
         }
 
         /// <summary>
-        /// Getting AlertRule RecordInfo
+        /// Get AlertRule RecordInfo for TabSqlGenerator
         /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="alertID"></param>
-        /// <param name="alertRuleID"></param>
+        /// <param name="ctx">Contex</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
         public string GetAlertData(Ctx ctx, int alertID, int alertRuleID)
         {

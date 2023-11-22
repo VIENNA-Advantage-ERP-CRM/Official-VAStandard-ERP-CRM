@@ -1,5 +1,4 @@
-﻿[5:47 PM] Harpreet Singh
-* {
+﻿* {
     box-sizing: border-box;
 }
 
@@ -457,8 +456,13 @@ div#grid_gridForm1_body {
     font-size: 20px;
 }
 
-.vas-sql-result {
+.vas-sql-result-msg {
     display: inline-block;
     width: auto;
     padding: 0 10px;
+    color: rgba(var(--v-c-primary));
 }
+
+    .vas-sql-result-msg.vas-sql-result-error {
+        color: var(--redColor);
+    }
