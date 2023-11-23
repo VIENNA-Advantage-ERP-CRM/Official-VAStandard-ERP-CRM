@@ -897,7 +897,7 @@
             DivSearchCtrlWrap.append(locDep);
             DivSearchBtnWrap.append($joinsWindowTabSelect.getBtn(0));
             DivSearchBtnWrap.append($joinsWindowTabSelect.getBtn(1));
-            $joinsWindowTabSelect.setCustomInfo('SQLGeneratorAlertTab');
+            $joinsWindowTabSelect.setCustomInfo('VAS_AlertSQLGenerator');
         }
 
         /*
@@ -906,7 +906,6 @@
         function getWindow() {
             var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, "");
             $windowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", true, false, true, VIS.DisplayType.Search, lookups);
-            // $windowTabSelect.append($windowTabLabel.getControl());
             var locDep = $windowTabSelect.getControl().attr('placeholder', ' Search here').attr("id", "Ad_Table_ID");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');
             var DivSearchBtnWrap = $('<div class="input-group-append">');
@@ -915,7 +914,7 @@
             DivSearchCtrlWrap.append(locDep);
             DivSearchBtnWrap.append($windowTabSelect.getBtn(0));
             DivSearchBtnWrap.append($windowTabSelect.getBtn(1));
-            $windowTabSelect.setCustomInfo('SQLGeneratorAlertTab');
+            $windowTabSelect.setCustomInfo('VAS_AlertSQLGenerator');
         }
 
         /*
@@ -1019,7 +1018,6 @@
                                 gridDiv2.hide();
                                 $sqlGeneratorQueryResultGrid.hide();
                                 $testSqlGeneratorBtn.val(testSQL);
-                                $sqlResultDiv.text(VIS.Msg.translate(VIS.Env.getCtx(), "NoRecordFound"));
                                 $sqlResultDiv.text(VIS.Msg.getMsg("VIS_NoRecordFound"));
                                 $sqlResultDiv.addClass('vas-sql-result-error');
                             }

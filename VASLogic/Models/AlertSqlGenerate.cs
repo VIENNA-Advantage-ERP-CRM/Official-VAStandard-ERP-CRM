@@ -245,13 +245,13 @@ namespace VIS.Models
                     obj.SetIsValid(true);
                     if (obj.Save())
                     {
-                        return Msg.GetMsg(ctx, "VAS_Saved");
+                        return Msg.GetMsg(ctx, "SavedSuccessfully");
                     }
                     else
                     {
                         ValueNamePair vnp = VLogger.RetrieveError();
                         string info = vnp.GetName();
-                        return Msg.GetMsg(ctx, "VAS_NotSaved");
+                        return Msg.GetMsg(ctx, "NotSaved");
                     }
                 }
                 return Msg.GetMsg(ctx, "VAS_SQLProperformat");
@@ -275,7 +275,7 @@ namespace VIS.Models
                 if (alertRuleID == 0)
                 {
                     SaveQuery(ctx, query, "AlertRule", tableID, alertID, alertRuleID);
-                    return Msg.GetMsg(ctx, "VAS_Saved");
+                    return Msg.GetMsg(ctx, "SavedSuccessfully");
                 }
                 int indexOfFrom = query.IndexOf("FROM");
                 int indexOfWhere = query.IndexOf("WHERE");
