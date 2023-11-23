@@ -142,15 +142,7 @@ namespace VIS.Models
         /// <returns>ListofRecords</returns>
         public List<Dictionary<string, string>> GetResult(Ctx ctx, string query,int pageNo,int pageSize)
         {
-            query = query.Trim();
-            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
-           /* string pattern = @"FROM\s+([\w.]+)";
-            Match match = Regex.Match(query, pattern, RegexOptions.IgnoreCase);
-            if (match.Success)
-            {
-                string tableName = match.Groups[1].Value;
-                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            } */         
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();               
             query += " FETCH FIRST 100 ROWS ONLY";
             if (ValidateSql(query))
             {
@@ -259,10 +251,10 @@ namespace VIS.Models
                     {
                         ValueNamePair vnp = VLogger.RetrieveError();
                         string info = vnp.GetName();
-                        return Msg.GetMsg(ctx, "NotSaved");
+                        return Msg.GetMsg(ctx, "VAS_NotSaved");
                     }
                 }
-                return Msg.GetMsg(ctx, "SQLProperformat");
+                return Msg.GetMsg(ctx, "VAS_SQLProperformat");
             }
             return "";
         }
@@ -326,10 +318,10 @@ namespace VIS.Models
                     {
                         ValueNamePair vnp = VLogger.RetrieveError();
                         string info = vnp.GetName();
-                        return Msg.GetMsg(ctx, "NotUpdated");
+                        return Msg.GetMsg(ctx, "VAS_NotUpdated");
                     }
                 }
-                return Msg.GetMsg(ctx, "SQLProperformat");
+                return Msg.GetMsg(ctx, "VAS_SQLProperformat");
             }
             return "";
         }

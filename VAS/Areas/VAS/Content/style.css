@@ -20,7 +20,7 @@ input[type='button'] {
     background: rgba(var(--v-c-primary));
 }
 
-.vas-add-label-content .vas-select-plus-btn .vis-add-btn {
+.vas-add-label-content .vas-select-plus-btn .vas-add-btn {
     color: rgba(var(--v-c-primary)) !important;
     border: 1px solid rgba(var(--v-c-primary));
     background-color: #fff;
@@ -272,7 +272,7 @@ div#grid_gridForm1_body {
     height: 100% !important;
 }
 
-.vis-join-multiselect {
+.vas-join-multiselect {
     float: left;
     width: 100%;
     min-height: 35px;
@@ -289,38 +289,38 @@ div#grid_gridForm1_body {
     width: 100%;
 }
 
-    .vas-filters .vis-filter-item.vas-filters-row {
+    .vas-filters .vas-filter-item.vas-filters-row {
         background: var(--bgGreyColor);
         padding: 15px 10px;
     }
 
-        .vas-filters .vis-filter-item.vas-filters-row:not(:last-child) {
+        .vas-filters .vas-filter-item.vas-filters-row:not(:last-child) {
             padding-bottom: 0px;
         }
 
-    .vas-filters .vis-filter-item .vis-filter-item-inner {
+    .vas-filters .vas-filter-item .vas-filter-item-inner {
         float: left;
         width: 100%;
         background: #fff;
         padding: 10px 10px;
     }
 
-    .vas-filters .vis-filter-item {
+    .vas-filters .vas-filter-item {
         background: #fff;
         float: left;
         width: 100%;
     }
 
-        .vas-filters .vis-filter-item .glyphicon-edit {
+        .vas-filters .vas-filter-item .glyphicon-edit {
             color: var(--yellowColor);
             margin-right: 5px;
         }
 
-        .vas-filters .vis-filter-item .glyphicon-trash {
+        .vas-filters .vas-filter-item .glyphicon-trash {
             color: var(--redColor);
         }
 
-        .vas-filters .vis-filter-item:last-child {
+        .vas-filters .vas-filter-item:last-child {
             margin-bottom: 0px;
         }
 
@@ -346,20 +346,20 @@ div#grid_gridForm1_body {
     border: 1px solid var(--fieldBorderColor);
 }
 
-.vis-filters-block {
+.vas-filters-block {
     float: left;
     width: calc(100% - 25%);
 }
 
-    .vis-filters-block div {
+    .vas-filters-block div {
         float: left;
     }
 
-.vis-filters-editdelete-btns div {
+.vas-filters-editdelete-btns div {
     float: left;
 }
 
-.vis-filters-editdelete-btns {
+.vas-filters-editdelete-btns {
     float: right;
     width: auto;
 }
@@ -466,3 +466,38 @@ div#grid_gridForm1_body {
     .vas-sql-result-msg.vas-sql-result-error {
         color: var(--redColor);
     }
+
+.vas-root {
+    height: 100%;
+    width: 100%;
+}
+
+.vas-grid-div1 {
+    width: 100%;
+    height: 90%;
+    margin-right: 15px;
+    margin-top: 1px;
+    border: 1px solid darkgray;
+}
+
+.vas-grid-div2 {
+    width: 100%;
+    height: calc(100% - 21%);
+    margin-right: 15px;
+    margin-top: 1px;
+    border: 1px solid darkgray;
+    display: none;
+}
+
+.vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
+    pointer-events: none;
+    color: lightgray;
+}
+
+.vas-control-wrap {
+    width: calc(100% - 70px);
+}
+
+.VIS-AMTD-InputBtns input {
+    width: 100%;
+}
