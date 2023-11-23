@@ -100,7 +100,7 @@ namespace VAdvantage.Model
                 //pstmt.setString(2, "N");
                 sql.Append(" AND IsSOPriceList='N'"); // YS: Changed from hard code to Parameter
             }
-            sql.Append("ORDER BY M_PriceList_ID");
+            sql.Append(" ORDER BY M_PriceList_ID");
 
             //String sql = "SELECT * FROM M_PriceList "
             //    + "WHERE AD_Client_ID=" + AD_Client_ID
@@ -206,7 +206,7 @@ namespace VAdvantage.Model
             String sql = "SELECT * FROM M_PriceList_Version "
                 + "WHERE M_PriceList_ID=" + GetM_PriceList_ID()
                 + " AND TRUNC(ValidFrom,'DD')<='" + valid + "' AND IsActive='Y'"
-                + "ORDER BY ValidFrom DESC";
+                + " ORDER BY ValidFrom DESC";
             DataSet ds = new DataSet();
             try
             {

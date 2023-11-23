@@ -136,7 +136,7 @@ namespace VAdvantage.Model
                     + "GROUP BY C_OrderLine_ID, Qty "
                     + "HAVING COUNT(*) = 2) "
                 + " AND AD_Client_ID=" + ctx.GetAD_Client_ID()
-                + "ORDER BY C_OrderLine_ID, M_InOutLine_ID";
+                + " ORDER BY C_OrderLine_ID, M_InOutLine_ID";
             int success = 0;
             int errors = 0;
             try

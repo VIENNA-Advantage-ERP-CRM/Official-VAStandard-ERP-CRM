@@ -975,7 +975,7 @@
                 sql += " AND (C_Order.C_BPartner_ID = " + C_BPartner_ID + " OR C_Order.Bill_BPartner_ID = " + C_BPartner_ID + ")";
             }
             else {
-                sql += "AND C_Order.C_BPartner_ID = " + C_BPartner_ID;
+                sql += " AND C_Order.C_BPartner_ID = " + C_BPartner_ID;
             }
         }
 
@@ -995,7 +995,7 @@
                 + " WHERE  PI.IsActive = 'Y' AND pi.DocStatus  NOT IN('VO', 'RE'))";
         }
 
-        sql += "AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
+        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
             + "(SELECT C_Order_ID FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID,ol.QtyOrdered,"
             + " (SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y') AS Qty,"
             + " (SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"
@@ -1169,7 +1169,7 @@
             sql += whereCondition;
         }
 
-        sql += "AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
+        sql += " AND C_Order.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND C_Order.IsDropShip='" + (_isdrop ? "Y" : "N") + "'  AND C_Order.C_Order_ID IN "
             + "(SELECT C_Order_ID FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID,ol.QtyOrdered,"
             + " (SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID = m.C_OrderLine_ID AND NVL(" + column + ", 0) != 0 AND m.ISACTIVE = 'Y') AS Qty,"
             + " (SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID"

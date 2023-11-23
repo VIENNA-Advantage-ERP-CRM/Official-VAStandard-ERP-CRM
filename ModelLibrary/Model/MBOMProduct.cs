@@ -245,7 +245,7 @@ namespace VAdvantage.Model
         {
             // return lines for Current Active, Master BOM
             String sql = "SELECT M_BOM_ID FROM M_BOM WHERE M_Product_ID= " + product.GetM_Product_ID() +
-            "AND BOMType ='" + bomType + "'  AND BOMUse ='" + bomUse + "'  AND IsActive = 'Y' ";
+            " AND BOMType ='" + bomType + "'  AND BOMUse ='" + bomUse + "'  AND IsActive = 'Y' ";
             Trx trx = product.Get_Trx();
             int bomID = 0;
             IDataReader idr = null;
@@ -416,7 +416,7 @@ namespace VAdvantage.Model
         {
             // return lines for Current Active, Master BOM
             String sql = "SELECT M_BOM_ID FROM M_BOM WHERE M_Product_ID= " + product.GetM_Product_ID() +
-            "AND BOMType ='" + bomType + "' AND BOMUse ='" + bomUse + "' AND IsActive = 'Y'";
+            " AND BOMType ='" + bomType + "' AND BOMUse ='" + bomUse + "' AND IsActive = 'Y'";
             Trx trx = product.Get_Trx();
             int bomID = 0;
             IDataReader idr = null;

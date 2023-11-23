@@ -144,7 +144,7 @@ namespace VAdvantage.Model
             int M_ReturnPolicyLine_ID = 0;
 
             if (M_Product_ID != 0)
-                sql.Append("AND M_Product_ID =" + M_Product_ID);
+                sql.Append(" AND M_Product_ID =" + M_Product_ID);
 
             DataSet ds = null;
             try
@@ -179,7 +179,7 @@ namespace VAdvantage.Model
             int M_ReturnPolicyLine_ID = 0;
 
             if (M_Product_Category_ID != 0)
-                sql.Append("AND M_Product_ID IS NULL AND M_Product_Category_ID = " + M_Product_Category_ID);
+                sql.Append(" AND M_Product_ID IS NULL AND M_Product_Category_ID = " + M_Product_Category_ID);
 
             try
             {

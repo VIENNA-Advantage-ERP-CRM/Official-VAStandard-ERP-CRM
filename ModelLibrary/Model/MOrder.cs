@@ -1556,7 +1556,7 @@ namespace VAdvantage.Model
                 + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                 + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                 + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
+                + " ORDER BY plv.ValidFrom DESC";
 
             //	Use newest price list - may not be future
             DataTable dt = null;
@@ -2670,7 +2670,7 @@ namespace VAdvantage.Model
                         String sql = "UPDATE C_Invoice i "
                             + "SET (PaymentRule,C_PaymentTerm_ID,DateAcct,C_Payment_ID,C_CashLine_ID)="
                                 + "(SELECT PaymentRule,C_PaymentTerm_ID,DateAcct,C_Payment_ID,C_CashLine_ID "
-                                + "FROM C_Order o WHERE i.C_Order_ID=o.C_Order_ID)"
+                                + "FROM C_Order o WHERE i.C_Order_ID=o.C_Order_ID) "
                             + "WHERE DocStatus NOT IN ('RE','CL') AND C_Order_ID=" + GetC_Order_ID();
                         //	Don't touch Closed/Reversed entries
                         int no = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, Get_TrxName()));
@@ -3196,7 +3196,7 @@ namespace VAdvantage.Model
         private bool ExplodeBOM()
         {
             bool retValue = false;
-            String where = "AND IsActive='Y' AND EXISTS "
+            String where = " AND IsActive='Y' AND EXISTS "
                 + "(SELECT * FROM M_Product p WHERE C_OrderLine.M_Product_ID=p.M_Product_ID"
                 + " AND	p.IsBOM='Y' AND p.IsVerified='Y' AND p.IsStocked='N')";
             //

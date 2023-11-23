@@ -289,7 +289,7 @@ namespace ViennaAdvantage.Process
                                             sql.Clear();
                                             sql.Append(@"Select ValidTo from C_Conversion_Rate  where IsActive='Y' AND C_ConversionType_id=" + defaultconversionType + " AND  C_Currency_ID=" + _lstCurr[k].baseCurrencyID + " AND C_Currency_To_ID=" + myCurrencyID
                                                  + "  AND Created=(SELECT Max(Created) FROM C_Conversion_Rate  WHERE isactive ='Y' AND C_ConversionType_id=" + defaultconversionType + " AND "
-                                                 + "  C_Currency_ID   =" + _lstCurr[k].baseCurrencyID + "  AND C_Currency_To_ID=" + myCurrencyID + ") AND AD_Client_ID = " + _lstCurr[k].AD_Client_ID + "AND AD_Org_ID= " + _lstCurr[k].AD_Org_ID);
+                                                 + "  C_Currency_ID   =" + _lstCurr[k].baseCurrencyID + "  AND C_Currency_To_ID=" + myCurrencyID + ") AND AD_Client_ID = " + _lstCurr[k].AD_Client_ID + " AND AD_Org_ID= " + _lstCurr[k].AD_Org_ID);
                                             //the Maximum date from Converted rate of every currency
                                             object validDate = DB.ExecuteScalar(sql.ToString(), null, Get_Trx());
                                             //Check if valid date available.. and less than current date..

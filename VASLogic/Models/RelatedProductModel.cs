@@ -104,7 +104,7 @@ namespace VIS.Models
                     BOMPRICELIMITUOM(P.M_PRODUCT_ID, PR.M_PRICELIST_VERSION_ID, PR.M_ATTRIBUTESETINSTANCE_ID, PR.C_UOM_ID) AS LimitPrice
                     FROM M_RelatedProduct R INNER JOIN M_PRODUCT P ON (p.M_Product_ID = R.RelatedProduct_ID) LEFT JOIN M_PRODUCTPRICE PR ON ( P.M_PRODUCT_ID = PR.M_PRODUCT_ID AND PR.ISACTIVE = 'Y' 
                     AND NVL(PR.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID + " AND PR.M_PRICELIST_VERSION_ID = " + M_PriceList_Version_ID
-                    + "AND PR.C_UOM_ID = " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @") WHERE R.M_Product_ID = " + M_Product_ID;
+                    + " AND PR.C_UOM_ID = " + (C_UOM_ID > 0 ? C_UOM_ID.ToString() : "P.C_UOM_ID") + @") WHERE R.M_Product_ID = " + M_Product_ID;
             if (!String.IsNullOrEmpty(Relatedtype))
             {
                 sql += " AND R.RelatedProductType = " + DB.TO_STRING(Relatedtype);
