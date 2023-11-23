@@ -532,6 +532,9 @@ namespace VAdvantage.Model
         {
             if (!success)
                 return success;
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
+              if user delete refernce of invoice from cash line*/
+            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A");
             return UpdateCbAndLine();
             //return UpdateHeader();
         }
@@ -778,6 +781,9 @@ namespace VAdvantage.Model
                 else if (bp.IsCreditWatch(GetC_BPartner_Location_ID()))
                     log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
             }
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
+              if user Save refernce of invoice from cash line*/
+            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J");
 
             return true;
         }
@@ -1035,6 +1041,22 @@ namespace VAdvantage.Model
             log.Fine("Cash Allocated=" + test
                 + " (" + alloc + "=" + total + ")");
             return change;
+        }
+
+        /// <summary>
+        /// 23/11/2023 BugId:3069 Change the Execution Status of Payment schedule if user save/delete it to cash journal window
+        /// </summary>
+        /// <param name="ScheduleId">Invoice Schedule ID</param>
+        /// <param name="FromStatus">Status That is present on field</param>
+        /// <param name="ToStatus">Status which is to be changed on field</param>
+        /// <author>VIS_427</author>
+        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus)
+        {
+            if (ScheduleId > 0)
+            {
+               int count = DB.ExecuteQuery(@"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus= CASE VA009_ExecutionStatus WHEN "+ GlobalVariable.TO_STRING(FromStatus)+ " THEN "+ GlobalVariable.TO_STRING(ToStatus) +
+                                             " ELSE " + GlobalVariable.TO_STRING(FromStatus) + " END WHERE C_InvoicePaySchedule_ID =" + ScheduleId);
+            }
         }
         /// <summary>
         ///   Get Allocated Amt in Payment Currency
