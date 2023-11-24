@@ -797,7 +797,7 @@ namespace VIS.Models
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
                 + "WHERE t.IsActive='Y' AND t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {
@@ -1920,7 +1920,7 @@ namespace VIS.Models
                     // Product Based
                     sql = "SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE "
                                + "M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC";
+                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC";
                     dsDiscountBreak = DB.ExecuteDataset(sql);
                     if (dsDiscountBreak != null && dsDiscountBreak.Tables.Count > 0 && dsDiscountBreak.Tables[0].Rows.Count > 0)
                     {
@@ -1957,7 +1957,7 @@ namespace VIS.Models
                     // Product Category Based
                     sql = "SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE "
                                + " M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC";
+                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC";
                     dsDiscountBreak = DB.ExecuteDataset(sql);
                     if (dsDiscountBreak != null && dsDiscountBreak.Tables.Count > 0 && dsDiscountBreak.Tables[0].Rows.Count > 0)
                     {
@@ -1994,7 +1994,7 @@ namespace VIS.Models
                     // Otherwise
                     sql = "SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE "
                                + " M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC";
+                               + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC";
                     dsDiscountBreak = DB.ExecuteDataset(sql);
                     if (dsDiscountBreak != null && dsDiscountBreak.Tables.Count > 0 && dsDiscountBreak.Tables[0].Rows.Count > 0)
                     {
