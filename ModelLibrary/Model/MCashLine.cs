@@ -534,7 +534,7 @@ namespace VAdvantage.Model
                 return success;
             /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
               if user delete refernce of invoice from cash line*/
-            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A");
+            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A",Get_Trx());
             return UpdateCbAndLine();
             //return UpdateHeader();
         }
@@ -783,7 +783,7 @@ namespace VAdvantage.Model
             }
             /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
               if user Save refernce of invoice from cash line*/
-            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J");
+            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J", Get_Trx());
 
             return true;
         }
@@ -1049,13 +1049,14 @@ namespace VAdvantage.Model
         /// <param name="ScheduleId">Invoice Schedule ID</param>
         /// <param name="FromStatus">Status That is present on field</param>
         /// <param name="ToStatus">Status which is to be changed on field</param>
+        /// <param name="trx">Used for Transactions</param>
         /// <author>VIS_427</author>
-        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus)
+        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus,Trx trx)
         {
             if (ScheduleId > 0)
             {
                 int count = DB.ExecuteQuery(@"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
-                                              " ELSE VA009_ExecutionStatus END WHERE C_InvoicePaySchedule_ID =" + ScheduleId);
+                                              " ELSE VA009_ExecutionStatus END WHERE C_InvoicePaySchedule_ID =" + ScheduleId, null, trx);
             }
         }
 
