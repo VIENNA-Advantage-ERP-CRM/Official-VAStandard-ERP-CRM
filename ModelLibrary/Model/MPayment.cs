@@ -2917,7 +2917,7 @@ namespace VAdvantage.Model
                 }
                 if (GetC_Order_ID() != 0)
                 {
-                    if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(VA009_OrderPaySchedule_ID) from VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID() + "AND VA009_OrderPaySchedule_ID=" + GetVA009_OrderPaySchedule_ID() + " AND VA009_IsPaid='Y'")) > 0)
+                    if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(VA009_OrderPaySchedule_ID) from VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID() + " AND VA009_OrderPaySchedule_ID=" + GetVA009_OrderPaySchedule_ID() + " AND VA009_IsPaid='Y'")) > 0)
                     {
                         _processMsg = "Payment is already done for selected order Schedule";
                         return DocActionVariables.STATUS_INVALID;
@@ -5319,7 +5319,7 @@ namespace VAdvantage.Model
                         //changed DocStatus Condition
                         DB.ExecuteQuery("UPDATE C_BankStatementLine bsl SET bsl.C_Payment_ID = null WHERE" +
                             " EXISTS(SELECT * FROM C_BankStatement bs WHERE bsl.C_BankStatement_ID = bs.C_BankStatement_ID  AND bs.DocStatus NOT IN('CO', 'CL', 'RE', 'VO')) " +
-                            "AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
+                            " AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
                     }
                 }
                 // if Payment aginst Claims is voided and payment is drafted remove reference of payment from Claim requisition lines and set Payment Generated to false on Header
@@ -5446,7 +5446,7 @@ namespace VAdvantage.Model
                 int count = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE VA027_PostDatedCheck SET VA027_GeneratePayment ='N', VA027_PaymentGenerated ='N', C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID(), null, Get_Trx()));
                 if (count > 0)
                 {
-                    DB.ExecuteQuery("UPDATE VA027_ChequeDetails SET C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID() + "AND C_Payment_ID= " + GetC_Payment_ID(), null, Get_Trx());
+                    DB.ExecuteQuery("UPDATE VA027_ChequeDetails SET C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID() + " AND C_Payment_ID= " + GetC_Payment_ID(), null, Get_Trx());
 
                 }
             }
@@ -5648,7 +5648,7 @@ namespace VAdvantage.Model
                     //changed DocStatus Condition
                     DB.ExecuteQuery(" UPDATE C_BankStatementLine bsl SET bsl.C_Payment_ID = null WHERE" +
                         " EXISTS(SELECT * FROM C_BankStatement bs WHERE bsl.C_BankStatement_ID = bs.C_BankStatement_ID  AND bs.DocStatus NOT IN('CO', 'CL', 'RE', 'VO')) " +
-                        "AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
+                        " AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
                 }
             }
 

@@ -222,28 +222,28 @@ namespace VIS.Models
                        (SELECT ProductPrice.PriceStd 
                        FROM M_ProductPrice ProductPrice WHERE  ProductPrice.M_Product_ID=Product.M_Product_ID AND ProductPrice.M_PriceList_Version_ID = 
                        (SELECT MAX(M_PriceList_Version_ID) FROM M_PriceList_Version WHERE IsActive = 'Y' AND M_PriceList_ID=" + PriceList + " ) " +
-                       "AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
-                       "FROM C_Order Orders " +
-                       "INNER JOIN C_OrderLine OrderLine  ON Orders.C_Order_ID =  OrderLine.C_Order_ID " +
-                       "INNER JOIN C_Doctype d ON Orders.C_DocTypeTarget_ID = d.C_Doctype_ID " +
-                       "INNER JOIN C_Currency Currency ON Currency.C_Currency_ID=Orders.C_Currency_ID " +
-                       "LEFT JOIN M_Product Product ON Product.M_Product_ID=OrderLine.M_Product_ID " +
-                       "WHERE d.DocSubTypeSo NOT IN ('" + MDocType.DOCSUBTYPESO_BlanketOrder + "','" + MDocType.DOCSUBTYPESO_Proposal + "')" +
+                       " AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
+                       " FROM C_Order Orders " +
+                       " INNER JOIN C_OrderLine OrderLine  ON Orders.C_Order_ID =  OrderLine.C_Order_ID " +
+                       " INNER JOIN C_Doctype d ON Orders.C_DocTypeTarget_ID = d.C_Doctype_ID " +
+                       " INNER JOIN C_Currency Currency ON Currency.C_Currency_ID=Orders.C_Currency_ID " +
+                       " LEFT JOIN M_Product Product ON Product.M_Product_ID=OrderLine.M_Product_ID " +
+                       " WHERE d.DocSubTypeSo NOT IN ('" + MDocType.DOCSUBTYPESO_BlanketOrder + "','" + MDocType.DOCSUBTYPESO_Proposal + "')" +
                       " AND Orders.IsSOTrx='Y' AND Orders.IsReturnTrx='N' AND Orders.AD_Org_ID =" + Org_ID + " AND NVL(OrderLine.M_Product_ID,0)>0 " +
                       " AND Orders.DocStatus IN('CO','CL') AND OrderLine.QtyOrdered = OrderLine.QtyDelivered AND NVL(OrderLine.C_OrderLine_ID,0) NOT IN");
                     if (!IsMasterForecast && !IsBudgetForecast)
                     {
                         //Team Forecast --case
                         sql.Append("(SELECT NVL(C_OrderLine_ID, 0) FROM C_ForecastLine " +
-                       "INNER JOIN C_Forecast ON C_Forecast.C_Forecast_ID = C_ForecastLine.C_Forecast_ID WHERE C_Forecast.AD_Org_ID =" + Org_ID +
+                       " INNER JOIN C_Forecast ON C_Forecast.C_Forecast_ID = C_ForecastLine.C_Forecast_ID WHERE C_Forecast.AD_Org_ID =" + Org_ID +
                        " AND C_Forecast.DocStatus NOT IN ('VO','RE')  )");
                     }
                     else if (IsMasterForecast)
                     {
                         // Master Forecast --case
                         sql.Append("(SELECT NVL(C_OrderLine_ID, 0) FROM C_MasterForecastLineDetails LineDetails " +
-                            "INNER JOIN C_MasterForecastLine Line ON Line.C_MasterForecastLine_ID=LineDetails.C_MasterForecastLine_ID " +
-                            "INNER JOIN C_MasterForecast Forecast ON Forecast.C_MasterForecast_ID=Line.C_MasterForecast_ID WHERE Forecast.AD_Org_ID =" + Org_ID +
+                            " INNER JOIN C_MasterForecastLine Line ON Line.C_MasterForecastLine_ID=LineDetails.C_MasterForecastLine_ID " +
+                            " INNER JOIN C_MasterForecast Forecast ON Forecast.C_MasterForecast_ID=Line.C_MasterForecast_ID WHERE Forecast.AD_Org_ID =" + Org_ID +
                             " AND Forecast.DocStatus NOT IN ('VO','RE')   ) AND NVL(OrderLine.C_OrderLine_ID,0) NOT IN (SELECT NVL(line.C_OrderLine_ID, 0) " +
                             " FROM C_ForecastLine Line INNER JOIN C_Forecast Forecast ON Forecast.C_Forecast_ID = Line.C_Forecast_ID INNER JOIN " +
                             " C_MasterForecastLineDetails Details ON  line.C_ForecastLine_ID = Details.C_ForecastLine_ID INNER JOIN c_masterforecastline  mLine " +
@@ -257,13 +257,13 @@ namespace VIS.Models
                         //Budget Forecast -- case
                         sql.Append("(SELECT NVL(C_OrderLine_ID, 0) FROM VA073_ForecastLine FLine INNER JOIN VA073_ProductLine PLine ON FLine.VA073_ProductLine_ID=" +
                             "PLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast Forecast ON Forecast.VA073_SalesForecast_ID=PLine.VA073_SalesForecast_ID " +
-                            "WHERE Forecast.AD_Org_ID =" + Org_ID + " AND Forecast.DocStatus NOT IN ('VO','RE')) AND NVL(OrderLine.C_OrderLine_ID,0) NOT IN " +
+                            " WHERE Forecast.AD_Org_ID =" + Org_ID + " AND Forecast.DocStatus NOT IN ('VO','RE')) AND NVL(OrderLine.C_OrderLine_ID,0) NOT IN " +
                             "(SELECT NVL(LineDetails.C_OrderLine_ID, 0) FROM C_MasterForecastLineDetails LineDetails INNER JOIN C_MasterForecastLine Line ON " +
                             "LineDetails.C_MasterForecastLine_ID = Line.C_MasterForecastLine_ID INNER JOIN C_MasterForecast Master ON  Master.C_MasterForecast_ID = Line.C_MasterForecast_ID " +
                             "INNER JOIN VA073_ForecastLine FLine ON FLine.C_MasterForecastLine_ID = Line.C_MasterForecastLine_ID INNER JOIN VA073_ProductLine PLine ON " +
                             "PLine.VA073_ProductLine_ID=FLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast Forecast ON Forecast.VA073_SalesForecast_ID = PLine.VA073_SalesForecast_ID " +
-                            "WHERE Forecast.ad_org_id =" + Org_ID + " AND Forecast.docstatus NOT IN ( 'VO', 'RE' ) AND Master.ad_org_id = " + Org_ID + " " +
-                            "AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
+                            " WHERE Forecast.ad_org_id =" + Org_ID + " AND Forecast.docstatus NOT IN ( 'VO', 'RE' ) AND Master.ad_org_id = " + Org_ID + " " +
+                            " AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
                     }
                     if (Period_ID > 0)
                     {
@@ -366,7 +366,7 @@ namespace VIS.Models
                        (SELECT ProductPrice.PriceStd 
                        FROM M_ProductPrice ProductPrice WHERE  ProductPrice.M_Product_ID=Product.M_Product_ID AND ProductPrice.M_PriceList_Version_ID = 
                        (SELECT MAX(M_PriceList_Version_ID) FROM M_PriceList_Version WHERE IsActive = 'Y' AND M_PriceList_ID=" + PriceList + " ) " +
-                       "AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
+                       " AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
                        "FROM C_Order Orders " +
                        "INNER JOIN C_OrderLine OrderLine  ON Orders.C_Order_ID =  OrderLine.C_Order_ID " +
                        "INNER JOIN C_Doctype d ON Orders.C_DocTypeTarget_ID = d.C_Doctype_ID " +
@@ -407,7 +407,7 @@ namespace VIS.Models
                             "INNER JOIN VA073_ForecastLine FLine ON FLine.C_MasterForecastLine_ID = Line.C_MasterForecastLine_ID INNER JOIN VA073_ProductLine PLine ON " +
                             "PLine.VA073_ProductLine_ID=FLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast Forecast ON Forecast.VA073_SalesForecast_ID = PLine.VA073_SalesForecast_ID " +
                             "WHERE Forecast.ad_org_id =" + Org_ID + " AND Forecast.docstatus NOT IN ( 'VO', 'RE' ) AND Master.ad_org_id = " + Org_ID + " " +
-                            "AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
+                            " AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
                     }
                     if (!string.IsNullOrEmpty(OpenOrders))
                     {
@@ -576,11 +576,11 @@ namespace VIS.Models
                 Project.C_BPartner_Location_ID,Product.C_UOM_ID AS BaseUOM,Project.C_EnquiryrDate ,(SELECT ProductPrice.PriceStd 
                 FROM M_ProductPrice ProductPrice WHERE  ProductPrice.M_Product_ID=Product.M_Product_ID AND ProductPrice.M_PriceList_Version_ID = 
                 (SELECT MAX(M_PriceList_Version_ID) FROM M_PriceList_Version WHERE IsActive = 'Y' AND M_PriceList_ID=" + PriceList + " ) " +
-                "AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
+                " AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
                 "FROM C_Project Project INNER JOIN C_ProjectLine ProjectLine ON Project.C_Project_ID = ProjectLine.C_Project_ID " +
                 "INNER JOIN M_Product Product ON Product.M_Product_ID= ProjectLine.M_Product_ID INNER JOIN C_Currency Currency ON " +
                 "Currency.C_Currency_ID= Project.C_Currency_ID  WHERE Project.C_Order_ID IS NULL " +
-                "AND Project.Ref_Order_ID IS NULL AND Project.AD_Org_ID = " + Org_ID + " AND NVL(C_ProjectLine_ID,0) NOT IN ");
+                " AND Project.Ref_Order_ID IS NULL AND Project.AD_Org_ID = " + Org_ID + " AND NVL(C_ProjectLine_ID,0) NOT IN ");
 
             if (!IsMasterForecast && !IsBudgetForecast)
             {
@@ -615,7 +615,7 @@ namespace VIS.Models
                     "INNER JOIN VA073_ForecastLine FLine ON FLine.C_MasterForecastLine_ID = Line.C_MasterForecastLine_ID INNER JOIN VA073_ProductLine PLine ON " +
                     "PLine.VA073_ProductLine_ID=FLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast Forecast ON Forecast.VA073_SalesForecast_ID = PLine.VA073_SalesForecast_ID " +
                     "WHERE Forecast.ad_org_id =" + Org_ID + " AND Forecast.docstatus NOT IN ( 'VO', 'RE' ) AND Master.ad_org_id = " + Org_ID + " " +
-                    "AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
+                    " AND Master.docstatus NOT IN ( 'VO', 'RE' )) ");
             }
 
             if (!string.IsNullOrEmpty(Opportunities))
@@ -727,8 +727,8 @@ namespace VIS.Models
 
             sql.Append(@" FROM M_Product Product LEFT JOIN M_ProductPrice ProductPrice ON Product.M_Product_ID = ProductPrice.M_Product_ID AND ProductPrice.M_PriceList_Version_ID = 
             (SELECT MAX(M_PriceList_Version_ID) FROM M_PriceList_Version WHERE IsActive = 'Y' AND M_PriceList_ID =" + (IsBudgetForecast ? SalesPriceList_ID : PriceList) + " ) " +
-             "AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0) " +
-             "WHERE Product.IsActive = 'Y' AND Product.M_Product_Category_ID IN(" + ProductCategories + ") AND Product.AD_Org_ID IN (0," + Org_ID + ")");
+             " AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0) " +
+             " WHERE Product.IsActive = 'Y' AND Product.M_Product_Category_ID IN(" + ProductCategories + ") AND Product.AD_Org_ID IN (0," + Org_ID + ")");
 
 
             string sql1 = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "M_Product", true, true);
@@ -884,7 +884,7 @@ namespace VIS.Models
                 ",Project.C_BPartner_ID AS ProjectBPartner,Mforcast.TrxDate, (SELECT ProductPrice.PriceStd " +
                 "FROM M_ProductPrice ProductPrice WHERE  ProductPrice.M_Product_ID = Product.M_Product_ID AND ProductPrice.M_PriceList_Version_ID = " +
                 "(SELECT MAX(M_PriceList_Version_ID) FROM M_PriceList_Version WHERE IsActive = 'Y' AND M_PriceList_ID = " + PriceList + ") " +
-                "AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
+                " AND ProductPrice.C_UOM_ID=Product.C_UOM_ID AND NVL(ProductPrice.M_AttributeSetInstance_ID,0)=NVL(Product.M_AttributeSetInstance_ID,0)) AS PurchasePrice " +
                 "FROM C_MasterForecast Mforcast  " +
                 "INNER JOIN C_MasterForecastLine Line ON Mforcast.C_MasterForecast_ID = Line.C_MasterForecast_ID " +
                 "INNER JOIN C_MasterForecastLineDetails Details ON Line.C_MasterForecastLine_ID= Details.C_MasterForecastLine_ID  " +
@@ -897,10 +897,10 @@ namespace VIS.Models
                 "( SELECT nvl(FLine.C_MasterForecastLine_ID, 0) FROM va073_forecastline FLine INNER JOIN VA073_ProductLine PLine ON FLine.VA073_ProductLine_ID = " +
                 "PLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast  Forecast ON Forecast.VA073_SalesForecast_ID = PLine.VA073_SalesForecast_ID " +
                 "WHERE Forecast.DocStatus NOT IN ( 'VO', 'RE' ) AND Forecast.AD_Org_ID= " + Org_ID + " AND NVL(FLine.C_MasterForecastLine_ID,0) <> 0 ) " +
-                "AND NVL(Details.C_OrderLine_ID,0) NOT IN (SELECT NVL(C_OrderLine_ID,0) FROM VA073_forecastline FLine INNER JOIN VA073_ProductLine PLine ON " +
+                " AND NVL(Details.C_OrderLine_ID,0) NOT IN (SELECT NVL(C_OrderLine_ID,0) FROM VA073_forecastline FLine INNER JOIN VA073_ProductLine PLine ON " +
                 "FLine.VA073_ProductLine_ID = PLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast  Forecast ON Forecast.VA073_SalesForecast_ID = " +
                 "PLine.VA073_SalesForecast_ID WHERE Forecast.DocStatus NOT IN ( 'VO', 'RE' ) AND Forecast.AD_Org_ID= " + Org_ID + " AND NVL(C_OrderLine_ID,0) <>0) " +
-                "AND NVL(Details.C_ProjectLine_ID,0) NOT IN (SELECT NVL(C_ProjectLine_ID,0) FROM VA073_forecastline FLine INNER JOIN VA073_ProductLine    " +
+                " AND NVL(Details.C_ProjectLine_ID,0) NOT IN (SELECT NVL(C_ProjectLine_ID,0) FROM VA073_forecastline FLine INNER JOIN VA073_ProductLine    " +
                 "PLine ON FLine.VA073_ProductLine_ID = PLine.VA073_ProductLine_ID INNER JOIN VA073_SalesForecast  Forecast ON Forecast.VA073_SalesForecast_ID = " +
                 "PLine.VA073_SalesForecast_ID WHERE Forecast.DocStatus NOT IN ( 'VO', 'RE' ) AND Forecast.AD_Org_ID= " + Org_ID + " AND NVL(C_ProjectLine_ID,0) <>0)");
 

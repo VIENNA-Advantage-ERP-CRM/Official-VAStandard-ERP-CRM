@@ -68,7 +68,7 @@ namespace VIS.Models
                  AND O.IsBlanketTrx = 'N' AND O.ISSALESQUOTATION = 'N' AND o.DocStatus IN('CL', 'CO') ");
             if (OrgId > 0)
             {
-                sql.Append("AND o.AD_Org_ID = " + OrgId);
+                sql.Append(" AND o.AD_Org_ID = " + OrgId);
             }
             if (C_BPartner_ID > 0)
             {

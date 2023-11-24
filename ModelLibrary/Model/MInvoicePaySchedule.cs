@@ -57,10 +57,10 @@ namespace VAdvantage.Model
             }
             else
             {
-                sql += "WHERE EXISTS (SELECT * FROM C_InvoicePaySchedule xps"
+                sql += " WHERE EXISTS (SELECT * FROM C_InvoicePaySchedule xps"
                 + " WHERE xps.c_invoicepayschedule_id=" + C_InvoicePaySchedule_ID + " AND ips.C_Invoice_ID=xps.C_Invoice_ID) ";
             }
-            sql += "ORDER BY duedate";
+            sql += " ORDER BY duedate";
 
             //
             List<MInvoicePaySchedule> list = new List<MInvoicePaySchedule>();

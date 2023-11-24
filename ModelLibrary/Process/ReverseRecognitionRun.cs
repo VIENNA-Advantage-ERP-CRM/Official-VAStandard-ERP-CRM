@@ -203,7 +203,7 @@ namespace VAdvantage.Process
                                     }
                                 }
                                 sql = "UPDATE C_RevenueRecognition_Run  set Gl_Journal_ID= " + journal.GetGL_Journal_ID() +
-                                    " WHERE C_RevenueRecognition_Plan_ID= " + revenueRecognitionPlan.GetC_RevenueRecognition_Plan_ID() + "AND NVL(Gl_Journal_ID,0)=0";
+                                    " WHERE C_RevenueRecognition_Plan_ID= " + revenueRecognitionPlan.GetC_RevenueRecognition_Plan_ID() + " AND NVL(Gl_Journal_ID,0)=0";
                                int count= DB.ExecuteQuery(sql, null, Get_Trx());
                                log.Log(Level.INFO,(Msg.GetMsg(GetCtx(), "RevenueRecognitionRunUpdated") + count));
                             }

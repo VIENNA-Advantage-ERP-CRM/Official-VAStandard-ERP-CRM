@@ -113,7 +113,7 @@ namespace VAdvantage.Model
                         // Get Accounting default and combination from "Default Accounting" tab of Accounting schema based on "Related To" (withholding)
                         _sql.Clear();
                         _sql.Append(@"SELECT Frpt_Acctdefault_Id,C_Validcombination_Id FROM Frpt_Acctschema_Default
-                                        WHERE ISACTIVE='Y' AND AD_CLIENT_ID=" + GetAD_Client_ID() + "AND C_Acctschema_Id=" + _AcctSchema_ID +
+                                        WHERE ISACTIVE='Y' AND AD_CLIENT_ID=" + GetAD_Client_ID() + " AND C_Acctschema_Id=" + _AcctSchema_ID +
                                         " AND Frpt_Relatedto = " + relatedtoProduct);
                         dsDefaultAcct = DB.ExecuteDataset(_sql.ToString(), null, Get_Trx());
                         if (dsDefaultAcct != null && dsDefaultAcct.Tables[0].Rows.Count > 0)

@@ -76,9 +76,9 @@ namespace VAdvantage.Model
 		IDataReader idr=null;
         SqlParameter[] param=new SqlParameter[4];
 		String sql = "SELECT * FROM CM_CStage WHERE CM_WebProject_ID=@param1 AND RelativeURL LIKE @param2 " + //1,2
-				"AND CM_CStage_ID IN (SELECT Node_ID FROM AD_TreeNodeCMS WHERE " +
+				" AND CM_CStage_ID IN (SELECT Node_ID FROM AD_TreeNodeCMS WHERE " +
 					" AD_Tree_ID=@param3 AND Parent_ID=@param4)" + // 3, 4
-				"ORDER BY CM_CStage_ID";
+				" ORDER BY CM_CStage_ID";
 		try
 		{
 			//pstmt = DataBase.prepareStatement (sql, project.get_TrxName());

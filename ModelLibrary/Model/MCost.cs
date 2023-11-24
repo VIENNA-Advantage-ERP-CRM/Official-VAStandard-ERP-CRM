@@ -292,32 +292,32 @@ namespace VAdvantage.Model
                             AND M_CostQueue.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM AD_ClientInfo WHERE AD_Client_ID =M_CostQueue.AD_Client_ID)";
                 if (WindowName == (int)windowName.M_InventoryLine_ID)
                 {
-                    sql += "AND M_InventoryLine_ID = " + RecordLine_ID;
+                    sql += " AND M_InventoryLine_ID = " + RecordLine_ID;
                 }
                 else if (WindowName == (int)windowName.M_InOutLine_ID)
                 {
-                    sql += "AND M_InOutLine_ID = " + RecordLine_ID;
+                    sql += " AND M_InOutLine_ID = " + RecordLine_ID;
                 }
                 else if (WindowName == (int)windowName.M_MovementLine_ID)
                 {
-                    sql += "AND M_MovementLine_ID = " + RecordLine_ID + " AND M_CostQueue.M_Warehouse_ID IN (0,  " + M_Warehouse_ID + @")
+                    sql += " AND M_MovementLine_ID = " + RecordLine_ID + " AND M_CostQueue.M_Warehouse_ID IN (0,  " + M_Warehouse_ID + @")
                             AND M_CostQueue.AD_Org_ID IN (0, " + AD_Org_ID + ")";
                 }
                 else if (WindowName == (int)windowName.C_ProjectIssue_ID)
                 {
-                    sql += "AND C_ProjectIssue_ID = " + RecordLine_ID;
+                    sql += " AND C_ProjectIssue_ID = " + RecordLine_ID;
                 }
                 else if (WindowName == (int)windowName.VAFAM_AssetDisposal_ID)
                 {
-                    sql += "AND VAFAM_AssetDisposal_ID = " + RecordLine_ID;
+                    sql += " AND VAFAM_AssetDisposal_ID = " + RecordLine_ID;
                 }
                 else if (WindowName == (int)windowName.VAMFG_M_WrkOdrRscTxnLine_ID)
                 {
-                    sql += "AND VAMFG_M_WrkOdrRscTxnLine_ID = " + RecordLine_ID;
+                    sql += " AND VAMFG_M_WrkOdrRscTxnLine_ID = " + RecordLine_ID;
                 }
                 else if (WindowName == (int)windowName.VAMFG_M_WrkOdrTrnsctionLine_ID)
                 {
-                    sql += "AND VAMFG_M_WrkOdrTrnsctionLine_ID = " + RecordLine_ID;
+                    sql += " AND VAMFG_M_WrkOdrTrnsctionLine_ID = " + RecordLine_ID;
                 }
                 Cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
 
@@ -1969,11 +1969,11 @@ namespace VAdvantage.Model
             MCost cost = null;
             String sql = "SELECT * "
                 + "FROM M_Cost c "
-                + "WHERE AD_Client_ID=" + product.GetAD_Client_ID() + " AND AD_Org_ID=" + AD_Org_ID
+                + " WHERE AD_Client_ID=" + product.GetAD_Client_ID() + " AND AD_Org_ID=" + AD_Org_ID
                 + " AND M_Product_ID=" + product.GetM_Product_ID()
                 + " AND M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID
                 + " AND M_CostType_ID=" + as1.GetM_CostType_ID() + " AND C_AcctSchema_ID=" + as1.GetC_AcctSchema_ID()
-                + " AND M_CostElement_ID=" + M_CostElement_ID + "AND A_Asset_ID=" + A_Asset_ID + "AND ISAssetCost= 'Y'";
+                + " AND M_CostElement_ID=" + M_CostElement_ID + " AND A_Asset_ID=" + A_Asset_ID + " AND ISAssetCost= 'Y'";
             sql += " AND NVL(M_Warehouse_ID,0) = " + M_Warehouse_ID;
             DataTable dt = null;
             IDataReader idr = null;
