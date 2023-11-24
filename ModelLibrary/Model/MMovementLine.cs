@@ -411,7 +411,7 @@ namespace VAdvantage.Model
 
             //	Qty Precision
             if (newRecord || Is_ValueChanged("QtyEntered"))
-                SetMovementQty(GetMovementQty());
+                SetMovementQty(GetQtyEntered());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. 
 
             StringBuilder qry = new StringBuilder();
             if (!mov.IsProcessing() || newRecord)
