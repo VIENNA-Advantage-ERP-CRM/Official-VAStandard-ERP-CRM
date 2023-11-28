@@ -213,7 +213,7 @@ namespace VAdvantage.Model
             //VAI050-To Validate Requestion Quantity with Cart Quantity
             //Quanttity can not greater than Requestion Quantity
             if (GetM_RequisitionLine_ID() > 0)
-            { 
+            {
                 string sql = "SELECT DTD001_ReservedQty,Qty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID="+ GetM_RequisitionLine_ID();
                 DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
                 if (ds!=null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count>0)
@@ -224,7 +224,7 @@ namespace VAdvantage.Model
                         return false;
                     }
                 }
-            }          
+            }
             // chck pallet Functionality applicable or not
             bool isContainrApplicable = MTransaction.ProductContainerApplicable(GetCtx());
 
@@ -411,7 +411,7 @@ namespace VAdvantage.Model
 
             //	Qty Precision
             if (newRecord || Is_ValueChanged("QtyEntered"))
-                SetMovementQty(GetQtyEntered());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. 
+                SetMovementQty(GetMovementQty());
 
             StringBuilder qry = new StringBuilder();
             if (!mov.IsProcessing() || newRecord)
