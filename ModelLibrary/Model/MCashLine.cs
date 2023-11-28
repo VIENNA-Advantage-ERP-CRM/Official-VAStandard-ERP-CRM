@@ -534,7 +534,16 @@ namespace VAdvantage.Model
                 return success;
             /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
               if user delete refernce of invoice from cash line*/
-            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A",Get_Trx());
+            if (GetC_InvoicePaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A", "C_InvoicePaySchedule", Get_Trx());
+            }
+            /*VIS_427 28/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
+              if user delete refernce of order from cash line*/
+            else if (GetVA009_OrderPaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetVA009_OrderPaySchedule_ID(), "J", "A", "VA009_OrderPaySchedule", Get_Trx());
+            }
             return UpdateCbAndLine();
             //return UpdateHeader();
         }
@@ -783,7 +792,16 @@ namespace VAdvantage.Model
             }
             /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
               if user Save refernce of invoice from cash line*/
-            UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J", Get_Trx());
+            if (GetC_InvoicePaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J", "C_InvoicePaySchedule", Get_Trx());
+            }
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
+              if user Save refernce of order from cash line*/
+            else if (GetVA009_OrderPaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetVA009_OrderPaySchedule_ID(), "A", "J", "VA009_OrderPaySchedule", Get_Trx());
+            }
 
             return true;
         }
@@ -1044,19 +1062,20 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
-        /// 23/11/2023 BugId:3069 This Function is used to update the Execution Status of Invoice Pay Schedule
+        /// 23/11/2023 BugId:3069 This Function is used to update the Execution Status of Invoice/Order Pay Schedule
         /// </summary>
         /// <param name="ScheduleId">Invoice Schedule ID</param>
         /// <param name="FromStatus">Status That is present on field</param>
         /// <param name="ToStatus">Status which is to be changed on field</param>
+        /// <param name="TableName">Name of Table</param>
         /// <param name="trx">Used for Transactions</param>
         /// <author>VIS_427</author>
-        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus,Trx trx)
+        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus,string TableName,Trx trx)
         {
             if (ScheduleId > 0)
             {
-                int count = DB.ExecuteQuery(@"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
-                                              " ELSE VA009_ExecutionStatus END WHERE C_InvoicePaySchedule_ID =" + ScheduleId, null, trx);
+                int count = DB.ExecuteQuery(@"UPDATE "+ TableName+" SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
+                                              " ELSE VA009_ExecutionStatus END WHERE "+ TableName + "_ID = " + ScheduleId, null, trx);
             }
         }
 
