@@ -116,20 +116,11 @@
         renewalDate.setHours(0, 0, 0, 0);
         var endDate = new Date(mTab.getValue("EndDate"));
         endDate.setHours(0, 0, 0, 0);
-        var currentDate = new Date(); //VAI050-To validate renewal date with current date
-        currentDate.setHours(0, 0, 0, 0);
-
         if (mTab.getValue("EndDate") != null && mTab.getValue("VAS_RenewalDate") != null) {//VIS430:Renewal date must be greater than end date
             if (renewalDate < endDate) {
                 mTab.setValue("VAS_RenewalDate", null);
                 this.setCalloutActive(false);
                 return "VAS_RenewalMustGreater";
-            }
-            else if (renewalDate > currentDate) //VAI050-To validate renewal date
-            {
-                mTab.setValue("VAS_RenewalDate", null);
-                this.setCalloutActive(false);
-                return "VAS_RenewalMustLess"; //renewal date must be less than current date               
             }
         }
         this.setCalloutActive(false);

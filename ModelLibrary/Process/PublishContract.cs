@@ -35,10 +35,10 @@ namespace VAdvantage.Process
             if (GetRecord_ID() > 0)
             {
                 int recordId = GetRecord_ID();
-                query.Append(@"SELECT VAS_ContractMaster_ID,(SELECT VAS_ContractLine_ID FROM VAS_ContractLine WHERE VAS_ContractMaster_ID=" + recordId +
-                              "FETCH FIRST 1 ROWS ONLY) AS VAS_ContractLine_ID, (SELECT VAS_ContractOwner_ID FROM VAS_ContractOwner WHERE " +
-                              "VAS_ContractMaster_ID =" + recordId + "FETCH FIRST 1 ROWS ONLY) AS VAS_ContractOwner_ID  FROM VAS_ContractMaster " +
-                              "WHERE VAS_ContractMaster_ID =" + recordId);
+                query.Append(@"SELECT (SELECT COUNT(VAS_ContractLine_ID) FROM VAS_ContractLine WHERE VAS_ContractMaster_ID=" + recordId +
+                                    ") AS VAS_ContractLine_ID, (SELECT COUNT(VAS_ContractOwner_ID) FROM VAS_ContractOwner WHERE " +
+                                    "VAS_ContractMaster_ID =" + recordId + ") AS VAS_ContractOwner_ID  FROM VAS_ContractMaster " +
+                                    "WHERE VAS_ContractMaster_ID =" + recordId);
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -56,17 +56,14 @@ namespace VAdvantage.Process
                         count = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                         return Msg.GetMsg(GetCtx(), "VAS_PublishContract"); //Process executed
                     }
-                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractLine_ID"]) = null && Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractOwner_ID"]) = null)
-                    {
-                        return Msg.GetMsg(GetCtx(), "VAS_PublishContractRecord"); //  record not found on both tabs
-                    }
-                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractOwner_ID"]) = null)
+                   
+                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractOwner_ID"]) = 0)
                     {
                         return Msg.GetMsg(GetCtx(), "VAS_ContractOwnerRecord"); // record not found on ContractOwner
                     }
-                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractLine_ID"]) = null)
+                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractLine_ID"]) = 0)
                     {
-                        return Msg.GetMsg(GetCtx(), "VAS_ContractLineRecord"); //record not found on both tab Contract Line
+                        return Msg.GetMsg(GetCtx(), "VAS_ContractLineRecord"); //record not found on  Contract Line
                     }
                 }
                 else
