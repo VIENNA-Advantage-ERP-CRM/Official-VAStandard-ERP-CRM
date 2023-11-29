@@ -112,11 +112,11 @@
             return "";
         }
         this.setCalloutActive(true);
-        var renewalDate = new Date(mTab.getValue("VAS_RenewalDate"));
-        renewalDate.setHours(0, 0, 0, 0);
-        var endDate = new Date(mTab.getValue("EndDate"));
-        endDate.setHours(0, 0, 0, 0);
         if (mTab.getValue("EndDate") != null && mTab.getValue("VAS_RenewalDate") != null) {//VIS430:Renewal date must be greater than end date
+            var renewalDate = new Date(mTab.getValue("VAS_RenewalDate"));
+            renewalDate.setHours(0, 0, 0, 0);
+            var endDate = new Date(mTab.getValue("EndDate"));
+            endDate.setHours(0, 0, 0, 0);
             if (renewalDate < endDate) {
                 mTab.setValue("VAS_RenewalDate", null);
                 this.setCalloutActive(false);

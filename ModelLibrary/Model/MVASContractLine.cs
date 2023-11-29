@@ -56,7 +56,7 @@ namespace VAdvantage.Model
                         int UtilizeAmount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["UtilizeAmount"]);
                         sql.Clear();
                         sql.Append("SELECT NVL(SUM(Amount),0) AS TotalAmount FROM  VAS_ContractLine WHERE VAS_ContractMaster_Id=" 
-                            + GetVAS_ContractMaster_ID() + " AND VAS_ContractLine_Id NOT IN(" + GetVAS_ContractLine_ID() + ")");
+                            + GetVAS_ContractMaster_ID() + " AND VAS_ContractLine_Id !=" + GetVAS_ContractLine_ID() );
                         int TotalAmount = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
                         TotalAmount = TotalAmount + Util.GetValueOfInt(GetAmount()); //All Contract Lines Amount Total
                         if (TotalAmount < UtilizeAmount) // Total Amount should be greater than utilize amount
