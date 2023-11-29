@@ -99,7 +99,7 @@
     };
 
     /**
-     * *****************Callout check Renewal Date must be greater than End Date********************
+     * *****************Callout check Renewal Date must be greater than End Date and less than Current Date********************
      * @param {any} ctx
      * @param {any} windowNo
      * @param {any} mTab
@@ -112,11 +112,11 @@
             return "";
         }
         this.setCalloutActive(true);
-        var renewalDate = new Date(mTab.getValue("VAS_RenewalDate"));
-        var endDate = new Date(mTab.getValue("EndDate"));
-        endDate = endDate.toISOString();
-        renewalDate = renewalDate.toISOString();
         if (mTab.getValue("EndDate") != null && mTab.getValue("VAS_RenewalDate") != null) {//VIS430:Renewal date must be greater than end date
+            var renewalDate = new Date(mTab.getValue("VAS_RenewalDate"));
+            renewalDate.setHours(0, 0, 0, 0);
+            var endDate = new Date(mTab.getValue("EndDate"));
+            endDate.setHours(0, 0, 0, 0);
             if (renewalDate < endDate) {
                 mTab.setValue("VAS_RenewalDate", null);
                 this.setCalloutActive(false);
@@ -158,40 +158,40 @@
         return "";
     };
 
-//    /**
-//* VIS0336:for checking contract and contract start date
+    //    /**
+    //* VIS0336:for checking contract and contract start date
     //* VAI050-Comment callout 
-//* @param {any} ctx
-//* @param {any} windowNo
-//* @param {any} mTab
-//* @param {any} mField
-//* @param {any} value
-//* @param {any} oldValue
-//*/
-//    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
-//        if (this.isCalloutActive() || value == null || value.toString() == "") {
-//            return "";
-//        }
-//        this.setCalloutActive(true);
+    //* @param {any} ctx
+    //* @param {any} windowNo
+    //* @param {any} mTab
+    //* @param {any} mField
+    //* @param {any} value
+    //* @param {any} oldValue
+    //*/
+    //    VAS_CalloutContract.prototype.DateDoc = function (ctx, windowNo, mTab, mField, value, oldValue) {
+    //        if (this.isCalloutActive() || value == null || value.toString() == "") {
+    //            return "";
+    //        }
+    //        this.setCalloutActive(true);
 
-//        var DocDate = mTab.getValue("DateDoc");
-//        var StartDate = mTab.getValue("StartDate");
-//        if (DocDate != null && StartDate != null) {
-//            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
-//                mTab.setValue("DateDoc", null);
-//                this.setCalloutActive(false);
-//                return "VAS_ContractDateMustGreater";
-//            }
-//            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
-//                mTab.setValue("StartDate", null);
-//                this.setCalloutActive(false);
-//                return "VAS_ContractDateMustGreater";
-//            }
-//        }
-//        this.setCalloutActive(false);
-//        ctx = windowNo = mTab = mField = value = oldValue = null;
-//        return "";
-//    };
+    //        var DocDate = mTab.getValue("DateDoc");
+    //        var StartDate = mTab.getValue("StartDate");
+    //        if (DocDate != null && StartDate != null) {
+    //            if (DocDate > StartDate && mField.getColumnName() == "DateDoc") {
+    //                mTab.setValue("DateDoc", null);
+    //                this.setCalloutActive(false);
+    //                return "VAS_ContractDateMustGreater";
+    //            }
+    //            if (DocDate > StartDate && mField.getColumnName() == "StartDate") {
+    //                mTab.setValue("StartDate", null);
+    //                this.setCalloutActive(false);
+    //                return "VAS_ContractDateMustGreater";
+    //            }
+    //        }
+    //        this.setCalloutActive(false);
+    //        ctx = windowNo = mTab = mField = value = oldValue = null;
+    //        return "";
+    //    };
 
     VAS_CalloutContract.prototype.ContractRef = function (ctx, windowNo, mTab, mField, value, oldValue) {
         //  
@@ -505,7 +505,7 @@
         }
         return diff;
     };
-    VIS.Model.VAS_CalloutContract= VAS_CalloutContract;
+    VIS.Model.VAS_CalloutContract = VAS_CalloutContract;
     //***************VAS_CalloutContract End ************
 
 })(VIS, jQuery);
