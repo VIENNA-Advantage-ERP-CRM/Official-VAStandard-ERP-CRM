@@ -211,27 +211,32 @@ namespace VAdvantage.Model
             Decimal VA024_ProvisionPrice = 0;
             MProduct product = MProduct.Get(GetCtx(), GetM_Product_ID());
             //VAI050-To Validate Requestion Quantity with Cart Quantity
-            //Quanttity can not be greater than Requestion Quantity
+            //Quantity can not be greater than Requisition Quantity
             if (GetM_RequisitionLine_ID() > 0)
             {
                 string sql = "SELECT Qty,DTD001_DeliveredQty,DTD001_ReservedQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
                 DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    decimal RemainingQty= Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
+                    decimal RemainingQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
                     {
-                        if (RemainingQty < Util.GetValueOfDecimal(GetQtyEntered()))
+                        decimal? movementqty = MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered")));
+                        if (movementqty == null)
+                        {
+                            movementqty = GetQtyEntered();
+                        }
+                        if (RemainingQty < movementqty)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                             return false;
-                        }                      
+                        }
                     }
                     else
                     {
                         decimal Value = 0;
-                        Value = Util.GetValueOfDecimal(GetQtyEntered()) - Util.GetValueOfDecimal(Get_ValueOld("QtyEntered"));
+                        Value = Util.GetValueOfDecimal(GetMovementQty()) - Util.GetValueOfDecimal(Get_ValueOld("MovementQty"));
                         if (Value > 0)
                         {
                             if (RemainingQty < Value)

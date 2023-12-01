@@ -295,7 +295,7 @@ namespace VAdvantage.Model
         protected override bool BeforeSave(bool newRecord)
         {
             //VAI050-To Validate Requestion Quantity with Cart Quantity
-            //Quanttity can not be  greater than Requestion Quantity
+            //Quantity can not be greater than Requisition Quantity
             if (GetM_RequisitionLine_ID() > 0)
             {
                 string sql = "SELECT Qty,DTD001_DeliveredQty,DTD001_ReservedQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
@@ -306,7 +306,13 @@ namespace VAdvantage.Model
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
                     {
-                        if (RemainingQty < Util.GetValueOfDecimal(Get_Value("QtyEntered")))
+                        decimal? intUseQty = MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(),
+            Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered")));
+                        if (intUseQty == null)
+                        {
+                            intUseQty = Util.GetValueOfDecimal(Get_Value("QtyEntered"));
+                        }
+                        if (RemainingQty < intUseQty)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                             return false;
@@ -315,7 +321,7 @@ namespace VAdvantage.Model
                     else
                     {
                         decimal Value = 0;
-                        Value = Util.GetValueOfDecimal(Get_Value("QtyEntered")) - Util.GetValueOfDecimal(Get_ValueOld("QtyEntered"));
+                        Value = Util.GetValueOfDecimal(Get_Value("QtyInternalUse")) - Util.GetValueOfDecimal(Get_ValueOld("QtyInternalUse"));
                         if (Value > 0)
                         {
                             if (RemainingQty < Value)
