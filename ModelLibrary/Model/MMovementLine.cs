@@ -211,14 +211,20 @@ namespace VAdvantage.Model
             Decimal VA024_ProvisionPrice = 0;
             MProduct product = MProduct.Get(GetCtx(), GetM_Product_ID());
             //VAI050-To Validate Requestion Quantity with Cart Quantity
-            //Quanttity can not greater than Requestion Quantity
+            //Quanttity can not be greater than Requestion Quantity
             if (GetM_RequisitionLine_ID() > 0)
             {
-                string sql = "SELECT DTD001_ReservedQty,Qty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID="+ GetM_RequisitionLine_ID();
-                DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
-                if (ds!=null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count>0)
+                StringBuilder sql = new StringBuilder();
+                sql.Append("SELECT Qty,DTD001_DeliveredQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID());
+                DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    if (Util.GetValueOfDecimal(GetQtyEntered()) > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"])))
+                    sql.Clear();
+                    sql.Append("SELECT NVL(SUM(QtyEntered),0) AS TotalQty FROM  M_MovementLine WHERE M_RequisitionLine_ID="
+                        + GetM_RequisitionLine_ID() + " AND M_MovementLine_ID != " + GetM_MovementLine_ID());
+                    decimal TotalQuantity = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                    TotalQuantity = TotalQuantity + Util.GetValueOfDecimal(GetQtyEntered()); //Total quantity i.e  Sum of all M_MovementLine quantity with same requisition
+                    if (TotalQuantity > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"])))
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                         return false;

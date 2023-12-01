@@ -295,14 +295,20 @@ namespace VAdvantage.Model
         protected override bool BeforeSave(bool newRecord)
         {
             //VAI050-To Validate Requestion Quantity with Cart Quantity
-            //Quanttity can not greater than Requestion Quantity
+            //Quanttity can not be  greater than Requestion Quantity
             if (GetM_RequisitionLine_ID() > 0)
             {
-                string sql = "SELECT DTD001_ReservedQty,Qty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
-                DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+                StringBuilder sql = new StringBuilder();
+                sql.Append("SELECT Qty,DTD001_DeliveredQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID());
+                DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    if (Util.GetValueOfDecimal(Get_Value("QtyEntered")) > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"])))
+                    sql.Clear();
+                    sql.Append("SELECT NVL(SUM(QtyEntered),0) AS TotalQty FROM  M_InventoryLine WHERE M_RequisitionLine_ID=" 
+                               + GetM_RequisitionLine_ID() + " AND M_InventoryLine_ID != " + GetM_InventoryLine_ID());
+                    decimal TotalQuantity = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())); 
+                    TotalQuantity = TotalQuantity + Util.GetValueOfDecimal(Util.GetValueOfDecimal(Get_Value("QtyEntered")));//Total quantity i.e  Sum of all InventoryLine quantity with same requisition
+                    if (TotalQuantity > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"])))
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                         return false;
