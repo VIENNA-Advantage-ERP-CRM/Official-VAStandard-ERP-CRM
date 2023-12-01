@@ -1159,7 +1159,11 @@ namespace VIS.Models
                              + "(SELECT NVL(C_InvoicePaySchedule_ID,0) FROM C_InvoicePaySchedule WHERE c_payment_id IN"
                              + "(SELECT NVL(c_payment_id,0) FROM C_InvoicePaySchedule)  union "
                              + " SELECT NVL(C_InvoicePaySchedule_id,0) FROM C_InvoicePaySchedule WHERE c_cashline_id IN"
-                             + "(SELECT NVL(c_cashline_id,0) FROM C_InvoicePaySchedule )) "
+                             + "(SELECT NVL(c_cashline_id,0) FROM C_InvoicePaySchedule )) AND ips.C_InvoicePaySchedule_ID NOT IN ("
+                             + "SELECT CASE WHEN C_Payment.C_Payment_ID != COALESCE(C_PaymentAllocate.C_Payment_ID, 0)"
+                             + " THEN COALESCE(C_Payment.C_InvoicePaySchedule_ID,0)  ELSE COALESCE(C_PaymentAllocate.C_InvoicePaySchedule_ID,0) END"
+                             + " FROM C_Payment LEFT JOIN C_PaymentAllocate ON(C_PaymentAllocate.C_Payment_ID = C_Payment.C_Payment_ID)"
+                             + " WHERE C_Payment.DocStatus NOT IN('CO', 'CL', 'RE', 'VO')) AND ips.VA009_ExecutionStatus NOT IN ('Y','J')"
                              + " ORDER BY ips.duedate ASC) t WHERE rownum=1";
             }
             else
