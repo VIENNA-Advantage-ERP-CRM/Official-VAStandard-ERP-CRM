@@ -214,21 +214,35 @@ namespace VAdvantage.Model
             //Quanttity can not be greater than Requestion Quantity
             if (GetM_RequisitionLine_ID() > 0)
             {
-                StringBuilder sql = new StringBuilder();
-                sql.Append("SELECT Qty,DTD001_DeliveredQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID());
-                DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                string sql = "SELECT Qty,DTD001_DeliveredQty,DTD001_ReservedQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
+                DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    sql.Clear();
-                    sql.Append("SELECT NVL(SUM(QtyEntered),0) AS TotalQty FROM  M_MovementLine WHERE M_RequisitionLine_ID="
-                        + GetM_RequisitionLine_ID() + " AND M_MovementLine_ID != " + GetM_MovementLine_ID());
-                    decimal TotalQuantity = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                    TotalQuantity = TotalQuantity + Util.GetValueOfDecimal(GetQtyEntered()); //Total quantity i.e  Sum of all M_MovementLine quantity with same requisition
-                    if (TotalQuantity > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"])))
+                    decimal RemainingQty= Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
+                             Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
+                    if (newRecord)
                     {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
-                        return false;
+                        if (RemainingQty < Util.GetValueOfDecimal(GetQtyEntered()))
+                        {
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                            return false;
+                        }                      
                     }
+                    else
+                    {
+                        decimal Value = 0;
+                        Value = Util.GetValueOfDecimal(GetQtyEntered()) - Util.GetValueOfDecimal(Get_ValueOld("QtyEntered"));
+                        if (Value > 0)
+                        {
+                            if (RemainingQty < Value)
+                            {
+                                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                                return false;
+                            }
+                        }
+                    }
+
+
                 }
             }
             // chck pallet Functionality applicable or not
