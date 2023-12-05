@@ -1299,10 +1299,11 @@ namespace VAdvantage.Model
 
                     StringBuilder sql = new StringBuilder();
                     //VA230:Update paid amount and payment method related detail
+                    //VIS_427 Bug id 3139 05/12/2023 Changed value of execution status to Received if cash journal is completed with order schedule
                     sql.Append("UPDATE VA009_OrderPaySchedule SET VA009_IsPaid='Y',C_CashLine_ID=" + line.GetC_CashLine_ID() +
                                     @" , VA009_PaidAmntInvce = " + Math.Abs(line.GetAmount()) +
                                     @" , VA009_PaidAmnt = " + Math.Abs(basePaidAmt) +
-                                    @" , VA009_ExecutionStatus = 'I' ");
+                                    @" , VA009_ExecutionStatus = 'R' ");
                     if (dsPaymentMethod != null && dsPaymentMethod.Tables.Count > 0 && dsPaymentMethod.Tables[0].Rows.Count > 0)
                     {
                         if (dsPaymentBaseType != null && dsPaymentBaseType.Tables.Count > 0 && dsPaymentBaseType.Tables[0].Rows.Count > 0)
