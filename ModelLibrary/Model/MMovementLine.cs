@@ -210,6 +210,16 @@ namespace VAdvantage.Model
         {
             Decimal VA024_ProvisionPrice = 0;
             MProduct product = MProduct.Get(GetCtx(), GetM_Product_ID());
+            // change to set Converted Quantity in Movement quantity if there is differnce in UOM of Base Product and UOM Selected on line
+            if (newRecord || Is_ValueChanged("QtyEntered") || Is_ValueChanged("C_UOM_ID"))
+            {
+                Decimal? qty = Util.GetValueOfDecimal(Get_Value("QtyEntered"));
+                if (product.GetC_UOM_ID() != Util.GetValueOfInt(Get_Value("C_UOM_ID")))
+                {
+                    SetMovementQty(MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered"))));
+                }
+            }
+
             //VAI050-To Validate Requestion Quantity with Cart Quantity
             //Quantity can not be greater than Requisition Quantity
             if (GetM_RequisitionLine_ID() > 0)
@@ -221,13 +231,8 @@ namespace VAdvantage.Model
                     decimal RemainingQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
-                    {
-                        decimal? movementqty = MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered")));
-                        if (movementqty == null)
-                        {
-                            movementqty = GetQtyEntered();
-                        }
-                        if (RemainingQty < movementqty)
+                    { 
+                        if (GetMovementQty() > RemainingQty)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                             return false;
@@ -239,15 +244,13 @@ namespace VAdvantage.Model
                         Value = Util.GetValueOfDecimal(GetMovementQty()) - Util.GetValueOfDecimal(Get_ValueOld("MovementQty"));
                         if (Value > 0)
                         {
-                            if (RemainingQty < Value)
+                            if (Value > RemainingQty)
                             {
                                 log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
                                 return false;
                             }
                         }
                     }
-
-
                 }
             }
             // chck pallet Functionality applicable or not
@@ -423,16 +426,6 @@ namespace VAdvantage.Model
             //	Qty Precision
             if (newRecord || Is_ValueChanged("QtyEntered"))
                 SetQtyEntered(GetQtyEntered());
-
-            // change to set Converted Quantity in Movement quantity if there is differnce in UOM of Base Product and UOM Selected on line
-            if (newRecord || Is_ValueChanged("QtyEntered") || Is_ValueChanged("C_UOM_ID"))
-            {
-                Decimal? qty = Util.GetValueOfDecimal(Get_Value("QtyEntered"));
-                if (product.GetC_UOM_ID() != Util.GetValueOfInt(Get_Value("C_UOM_ID")))
-                {
-                    SetMovementQty(MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered"))));
-                }
-            }
 
             //	Qty Precision
             if (newRecord || Is_ValueChanged("QtyEntered"))
