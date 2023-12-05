@@ -210,6 +210,11 @@ namespace VAdvantage.Model
         {
             Decimal VA024_ProvisionPrice = 0;
             MProduct product = MProduct.Get(GetCtx(), GetM_Product_ID());
+
+            //	Qty Precision
+            if (newRecord || Is_ValueChanged("QtyEntered"))
+                SetQtyEntered(GetQtyEntered());
+
             // change to set Converted Quantity in Movement quantity if there is differnce in UOM of Base Product and UOM Selected on line
             if (newRecord || Is_ValueChanged("QtyEntered") || Is_ValueChanged("C_UOM_ID"))
             {
@@ -219,6 +224,10 @@ namespace VAdvantage.Model
                     SetMovementQty(MUOMConversion.ConvertProductFrom(GetCtx(), GetM_Product_ID(), Util.GetValueOfInt(Get_Value("C_UOM_ID")), Util.GetValueOfDecimal(Get_Value("QtyEntered"))));
                 }
             }
+
+            //	Qty Precision
+            if (newRecord || Is_ValueChanged("QtyEntered"))
+                SetMovementQty(GetMovementQty());
 
             //VAI050-To Validate Requestion Quantity with Cart Quantity
             //Quantity can not be greater than Requisition Quantity
@@ -231,7 +240,7 @@ namespace VAdvantage.Model
                     decimal RemainingQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
-                    { 
+                    {
                         if (GetMovementQty() > RemainingQty)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
@@ -240,8 +249,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        decimal Value = 0;
-                        Value = Util.GetValueOfDecimal(GetMovementQty()) - Util.GetValueOfDecimal(Get_ValueOld("MovementQty"));
+                        decimal Value = Util.GetValueOfDecimal(GetMovementQty()) - Util.GetValueOfDecimal(Get_ValueOld("MovementQty"));
                         if (Value > 0)
                         {
                             if (Value > RemainingQty)
@@ -422,14 +430,6 @@ namespace VAdvantage.Model
                 log.SaveError("Message", Msg.GetMsg(GetCtx(), "DTD001_CannotCreate"));
                 return false;
             }
-
-            //	Qty Precision
-            if (newRecord || Is_ValueChanged("QtyEntered"))
-                SetQtyEntered(GetQtyEntered());
-
-            //	Qty Precision
-            if (newRecord || Is_ValueChanged("QtyEntered"))
-                SetMovementQty(GetMovementQty());
 
             StringBuilder qry = new StringBuilder();
             if (!mov.IsProcessing() || newRecord)

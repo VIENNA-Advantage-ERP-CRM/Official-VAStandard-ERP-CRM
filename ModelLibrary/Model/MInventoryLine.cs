@@ -402,8 +402,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        decimal Value = 0;
-                        Value = Util.GetValueOfDecimal(GetQtyInternalUse()) - Util.GetValueOfDecimal(Get_ValueOld("QtyInternalUse"));
+                        decimal Value = Util.GetValueOfDecimal(GetQtyInternalUse()) - Util.GetValueOfDecimal(Get_ValueOld("QtyInternalUse"));
                         if (Value > 0)
                         {
                             if (Value > RemainingQty)
