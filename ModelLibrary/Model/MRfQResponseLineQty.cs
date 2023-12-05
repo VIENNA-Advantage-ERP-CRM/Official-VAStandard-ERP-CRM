@@ -25,7 +25,7 @@ using VAdvantage.Logging;
 
 namespace VAdvantage.Model
 {
-    public class MRfQResponseLineQty : X_C_RfQResponseLineQty,IComparer<PO>
+    public class MRfQResponseLineQty : X_C_RfQResponseLineQty, IComparer<PO>
     {
         //	RfQ Line Qty	
         private MRfQLineQty _rfqQty = null;
@@ -62,8 +62,8 @@ namespace VAdvantage.Model
         public MRfQResponseLineQty(Ctx ctx, DataRow dr, Trx trxName)
             : base(ctx, dr, trxName)
         {
-            
-        }	
+
+        }
 
         /// <summary>
         /// Parent Constructor
@@ -76,7 +76,7 @@ namespace VAdvantage.Model
             SetClientOrg(line);
             SetC_RfQResponseLine_ID(line.GetC_RfQResponseLine_ID());
             SetC_RfQLineQty_ID(qty.GetC_RfQLineQty_ID());
-        }	
+        }
 
         /// <summary>
         /// Get RfQ Line Qty
@@ -98,7 +98,7 @@ namespace VAdvantage.Model
         public bool IsValidAmt()
         {
             Decimal price = GetPrice();
-            if ( Env.ZERO.CompareTo(price) == 0)
+            if (Env.ZERO.CompareTo(price) == 0)
             {
                 log.Warning("No Price - " + price);
                 return false;
@@ -133,14 +133,14 @@ namespace VAdvantage.Model
         public Decimal? GetNetAmt()
         {
             Decimal price = GetPrice();
-            if ( Env.ZERO.CompareTo(price) == 0)
+            if (Env.ZERO.CompareTo(price) == 0)
             {
                 return null;
-               // return 0;
+                // return 0;
             }
             //	
             Decimal discount = GetDiscount();
-            if ( Env.ZERO.CompareTo(discount) == 0)
+            if (Env.ZERO.CompareTo(discount) == 0)
             {
                 return price;
             }
@@ -164,7 +164,7 @@ namespace VAdvantage.Model
                 .Append("]");
             return sb.ToString();
         }
-        
+
         /// <summary>
         /// Compare based on net amount
         /// throws exception if the arguments' types prevent them from
@@ -272,6 +272,64 @@ namespace VAdvantage.Model
                 SetRanking(999);
             }
             return true;
+        }
+        /// <summary>
+        /// VIS0336:changes done for setting the Total Price on RFQ Response tab
+        /// </summary>
+        /// <param name="newRecord">true/false</param>
+        /// <param name="success"></param>
+        /// <returns></returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+                return success;
+            if (Is_ValueChanged("Price") || newRecord)
+            {
+                if (!HeaderUpdate())
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_UpdateError"));
+                    return false;
+
+                }
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// VIS0336:changes done for setting the Total Price on RFQ Response tab
+        /// </summary>
+        /// <param name="success"></param>
+        /// <returns>true/false</returns>
+        protected override bool AfterDelete(bool success)
+        {
+            if (!success)
+                return success;
+            if (!HeaderUpdate())
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_UpdateError"));
+                return false;
+
+            }
+            return true;
+        }
+        /// <summary>
+        /// VIS0336:changes done for setting the Total Price on RFQ Response tab
+        /// </summary>
+        /// <returns></returns>
+        public bool HeaderUpdate()
+        {
+            string Sql = "UPDATE C_RfQResponse  SET Price=(SELECT SUM(Price) FROM C_RfQResponseLineQty WHERE C_RfQResponseLine_ID IN " +
+               " (SELECT C_RfQResponseLine_ID FROM C_RfQResponseLine WHERE C_RfQResponse_ID=(SELECT C_RfQResponse_ID FROM C_RfQResponseLine" +
+               "  WHERE C_RfQResponseLine_ID=" + GetC_RfQResponseLine_ID() + "))) WHERE  C_RfQResponse_ID= (SELECT C_RfQResponse_ID FROM C_RfQResponseLine WHERE " +
+               "   C_RfQResponseLine_ID=" + GetC_RfQResponseLine_ID() + ")";
+            int no = DB.ExecuteQuery(Sql, null, Get_Trx());
+            if (no < 0)
+            {
+                Get_Trx().Rollback();
+                return false;
+            }
+            return true;
+
         }
     }
 }
