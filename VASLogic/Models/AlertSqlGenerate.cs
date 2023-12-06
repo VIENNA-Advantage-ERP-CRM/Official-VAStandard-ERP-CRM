@@ -59,7 +59,7 @@ namespace VIS.Models
         public List<Tabs> GetTable(Ctx ctx, int tabID)
         {
             List<Tabs> Tab = new List<Tabs>();
-            string sql = @"SELECT DISTINCT tl.Name,tb.Ad_Table_ID
+            string sql = @"SELECT DISTINCT tl.Name,tb.Ad_Table_ID,tb.AD_Tab_ID
                      FROM AD_Tab tb INNER JOIN Ad_Table tl ON (tl.Ad_Table_ID=tb.Ad_Table_ID)
                      WHERE tl.IsActive='Y' AND tb.IsActive='Y' AND tb.AD_Tab_ID=" + tabID;
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Tab", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -71,6 +71,7 @@ namespace VIS.Models
                     Tabs obj = new Tabs();
                     
                     obj.TableID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Table_ID"]);
+                    obj.TabID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Tab_ID"]);
                     obj.TableName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     Tab.Add(obj);
                 }
@@ -141,8 +142,15 @@ namespace VIS.Models
         /// <param name="pageSize">page Size</param>
         /// <returns>ListofRecords</returns>
         public List<Dictionary<string, string>> GetResult(Ctx ctx, string query,int pageNo,int pageSize)
-        {
-            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();               
+        {           
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
+            string pattern = @"FROM\s+([\w.]+)";
+            Match match = Regex.Match(query, pattern, RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                string tableName = match.Groups[1].Value;
+                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            }
             query += " FETCH FIRST 100 ROWS ONLY";
             if (ValidateSql(query))
             {
@@ -368,6 +376,7 @@ namespace VIS.Models
     {
         public string TableName { get; set; }
         public int TableID { get; set; }
+        public int TabID { get; set; }
     }
 
     public class Columnsdetail

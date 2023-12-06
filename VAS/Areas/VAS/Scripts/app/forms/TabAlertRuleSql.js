@@ -9,15 +9,21 @@
         var $self = this;
         var pageSize = 20;
         var pageNo = 0;
-        var TableID = 0;
+        var tableID = 0;
+        var tabID = 0;
         var alertID = 0;
         var alertRuleID = 0;
         var tableName = null;
+        var seletedCloumn = null;
         var andFlag = true;
         var orderbyFlag = true;
         var sqlGenerateFlag = false;
+        var removeColumnJoins = null;
         var sqlFlag = true;
+        var filterIndex = null;
+        var joinIndex = null;
         var WhereCondition;
+        var oldFilterVal = null;
         var totalPages;
         var loadTotalPages = true;
         var joinTable;
@@ -26,28 +32,26 @@
         var gridDiv = $("<div class='vas-grid-div1'>");
         var gridDiv2 = $("<div class='vas-grid-div2'>");
         var $joinMultiSelect = $("<div class='vas-join-multiselect'>");
-        var dGrid = null;
-        var dGrid2 = null;
-        var $sqlBtn = $("<input class='VIS_Pref_btn-2 active' type='button' value=' " + VIS.Msg.getMsg("VAS_SQL") + "'>");
         var $sqlResultDiv = $("<div class='vas-sql-result-msg'>");
-        var $sqlGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-sql-generator' type='button' value=' " + VIS.Msg.getMsg("VAS_SQLGenerator") + "'>");
-        var $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' type='button' value=' " + VIS.Msg.getMsg("TestSql") + "'>");
-        var $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' type='button' value=' " + VIS.Msg.getMsg("VAS_TestSql") + "'>");
-        var $saveBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value=' " + VIS.Msg.getMsg("VAS_Save") + "'>");
-        var $updateGenerateBtn = $("<input class='VIS_Pref_btn-2 vas-update-btn' type='button' value=' " + VIS.Msg.getMsg("Update") + "'>");
-        var $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' value=' " + VIS.Msg.getMsg("VAS_Save") + "'>");
-        var $addJoinBtn = $("<input class='VIS_Pref_btn-2' type='button' value=' " + VIS.Msg.getMsg("VAS_AddJoin") + "'>");
-        var $addFilterBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' type='button' value=' " + VIS.Msg.getMsg("VAS_AddFilter") + "'>");
-        var $addSortBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' type='button' value=' " + VIS.Msg.getMsg("VAS_AddSort") + "'>");
+        var $sqlGeneratorBtn = null;
+        var $testSqlGeneratorBtn = null;
+        var $testSqlBtn = null;
+        var $saveBtn = null;
+        var $updateGenerateBtn = null;
+        var $saveGeneratorBtn = null;
+        var $addJoinBtn = null;
+        var $addFilterBtn = null;
+        var $addSortBtn = null;
         var $windowTabDiv = $("<div class='vas-windowtab'>");
         var $windowTabLabel = $("<label>");
         var $joinFieldColumnLabel = $("<label>");
         var $windowTabSelect = null;
         var $txtWindow = $("<div class='VIS-AMTD-formData VIS-AMTD-InputBtns input-group vas-input-wrap'>");
         var $windowFieldColumnLabel = $("<label>");
-        var $windowFieldColumnSelect = $("<div class='vas-windowfieldcol-select vas-windowtab'></div>");
+        var $windowFieldColumnSelect = $("<div class='vas-windowfieldcol-select vas-windowtab vis-ev-col-mandatory'></div>");
+        var downArrow = $('<span class="vis vis-arrow-down"></span>');
         var $joinsSelect = $("<div style='display: none;' class='vas-joins-select vas-common-style vas-windowtab'>");
-        var $selectQuery = $("<div class='vas-query-input' contenteditable='true'>");
+        var $selectQuery = $("<div class='vas-query-input' id='query-input' contenteditable='true'>");
         var $selectGeneratorQuery = $("<textarea>");
         var $multiSelect = $("<div class='vas-multiselect'>");
         var $selectBox = $("<div class='vas-selectBox vas-windowtab'><select><option>" + VIS.Msg.getMsg("VAS_SelectAll") + "</option></select><div class='vas-overselect'></div></div>");
@@ -59,25 +63,33 @@
         var $addJoinsDiv = $("<div class='vas-add-label-content'>");
         var $joinsWindowTabSelect = null;
         var $txtJoinWindow = $("<div class='VIS-AMTD-formData VIS-AMTD-InputBtns input-group vas-input-wrap'>");
-        var $joinsDropdown = $("<select class='vas-joins-collection'><option>INNER JOIN</option><option>LEFT JOIN</option><option>RIGHT JOIN</option><option>FULL JOIN</option></select>");
+        var $joinsDropdown = null;
+        var $removeJoins = null;
+        var $filterEditDiv = $("<div style='display:none;'>");
         var $joinOnFieldColumnName1Div = $("<div class='vas-windowtab'>");
         var $joinOnFieldColumnName1Label = $("<label>");
         var $joinOnFieldColumnName2Div = $("<div class='vas-windowtab'>");
         var $joinOnFieldColumnName2Label = $("<label>");
-        var $joinOnFieldColumnName1 = $("<select><option>" + VIS.Msg.getMsg("VAS_MainTable_Column") + "</option></select>");
-        var $joinOnFieldColumnName2 = $("<select><option>" + VIS.Msg.getMsg("VAS_JoinTable_Column") + "</option></select>");
+        var $joinOnFieldColumnName1 = null;
+        var $joinOnFieldColumnName2 = null;
         var $filters = $("<div class='vas-filters'>");
         var $joinsFieldColumnSelect = $("<select>");
         var $filterDiv = $("<div class='vas-add-label'>");
         var $filterLabel = $("<label>");
-        var $addFilterText = $("<div>");
+        var $addFilterText = $("<div class='vas-addfiltertext'>");
         var $addFilterSelectButton = $("<div class='vas-select-plus-btn'>");
         var $addFilterDiv = $("<div class='vas-add-label-content'>");
+        var $filterColumnNameLabel = $("<label>");
+        var $filterColumnNameDiv = $("<div class='vas-windowtab'>");
+        var $filterOperatorLabel = $("<label>");
+        var $filterOperatorDiv = $("<div class='vas-windowtab'>");
+        var $filterValueLabel = $("<label>");
+        var $filterValueDiv = $("<div class='vas-windowtab'>");
         var $filterPrice = $("<select class='vas-filter-text-input'>");
         var $filterCondition = $("<select><option>=</option><option>></option><option><</option><option><=</option><option>>=</option><option><></option><option>IS NULL</option><option>IS NOT NULL</option><option>IN</option><option>NOT IN</option></select>");
         var $filterPriceValue = $("<input type='textbox' class='vas-filter-text-input'>");
-        var $filterConditionV2 = $("<select><option>AND</option><option>OR</option></select>");
-        var $sortElements = $("<select><option>ASC</option><option>DESC</option></select>");
+        var $filterConditionV2 = null;
+        var $sortElements = null;
         var $sortByDiv = $("<div class='vas-add-label'>");
         var $sortByLabel = $("<label>");
         var $addSortByText = $("<div>");
@@ -89,19 +101,36 @@
         var $queryMessage = $("<div class='vas-query-message'>");
         var $sqlContent = $("<div class='vas-sql-content'></div>");
         var $queryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");
-        var $sqlGeneratorContent = $("<div class='vas-sqlgenerator' style='display: none;'><div class='vas-sqlgenerator-column vas-sqlgenerator-column1'></div><div class='vas-sqlgenerator-column vas-sqlgenerator-column2'></div></div>");
-        var $sqlGeneratorQueryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");     
-        $sqlBtns.append($sqlBtn)
-            .append($sqlGeneratorBtn)
-             .append($sqlResultDiv)
-             .append($testSqlBtn)
-             .append($testSqlGeneratorBtn);
+        var $sqlGeneratorContent = null;
+        var $sqlGeneratorQueryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");
         var sqlQuery = VIS.Msg.getMsg("VAS_SQLQuery");
         var testSQL = VIS.Msg.getMsg("VAS_TestSql");
         var $root = $("<div class='vas-root'>");
 
         // Initialize UI Elements
         this.init = function () {
+            $sqlBtn = $("<input class='VIS_Pref_btn-2 active' id='vas-sql-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_SQL") + "'>");
+            $sqlGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-sql-generator' id='vas-sql-generatorbtn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_SQLGenerator") + "'>");
+            $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' id='vas-testsql-generatorbtn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("TestSql") + "'>");
+            $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' id='vas-testsql-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_TestSql") + "'>");
+            $saveBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' id='vas-save-btn" + $self.windowNo + "' value=' " + VIS.Msg.getMsg("VAS_Save") + "'>");
+            $updateGenerateBtn = $("<input class='VIS_Pref_btn-2 vas-update-btn' id='vas-updategenerator-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("Update") + "'>");
+            $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' id='vas-savegenerator-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_Save") + "'>");
+            $addJoinBtn = $("<input class='VIS_Pref_btn-2' id='vas-addjoin-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_AddJoin") + "'>");
+            $addFilterBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' id='vas-addfilter-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_AddFilter") + "'>");
+            $addSortBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' id='vas-addsort-btn" + $self.windowNo + "' type='button' value=' " + VIS.Msg.getMsg("VAS_AddSort") + "'>");
+            $sqlGeneratorContent = $("<div class='vas-sqlgenerator' id='vas-sqlgeneratorcontent" + $self.windowNo + "' style='display: none;'><div class='vas-sqlgenerator-column vas-sqlgenerator-column1'></div><div class='vas-sqlgenerator-column vas-sqlgenerator-column2'></div></div>");
+            $joinsDropdown = $("<select class='vas-joins-collection'><option>INNER JOIN</option><option>LEFT JOIN</option><option>RIGHT JOIN</option><option>FULL JOIN</option></select>");
+            $joinOnFieldColumnName1 = $("<select><option>" + VIS.Msg.getMsg("VAS_MainTable_Column") + "</option></select>");
+            $joinOnFieldColumnName2 = $("<select><option>" + VIS.Msg.getMsg("VAS_JoinTable_Column") + "</option></select>");
+            $filterConditionV2 = $("<select><option>AND</option><option>OR</option></select>");
+            $sortElements = $("<select><option>ASC</option><option>DESC</option></select>");
+
+            $sqlBtns.append($sqlBtn)
+                .append($sqlGeneratorBtn)
+                .append($sqlResultDiv)
+                .append($testSqlBtn)
+                .append($testSqlGeneratorBtn);
             $windowTabLabel.text(VIS.Msg.getMsg("VAS_WindowTab"));
             $windowFieldColumnLabel.text(VIS.Msg.getMsg("VAS_FieldColumn"));
             $joinOnFieldColumnName1Label.text(VIS.Msg.getMsg("VAS_MainTable_Column"));
@@ -113,11 +142,14 @@
             $sortByLabel.text(VIS.Msg.getMsg("VAS_Sort"));
             $addFilterText.text(VIS.Msg.getMsg("VAS_AddFilter"));
             $addSortByText.text(VIS.Msg.getMsg("VAS_AddSort"));
+            $filterColumnNameLabel.text(VIS.Msg.getMsg("VAS_FieldColumn"));
+            $filterOperatorLabel.text(VIS.Msg.getMsg("Operator"));
+            $filterValueLabel.text(VIS.Msg.getMsg("VAS_ColumnValue"));
             $selectGeneratorQuery.attr('disabled', true);
             $root.append($sqlBtns).append($contentArea).append(gridDiv).append(gridDiv2);
             $contentArea.append($sqlContent)
-                 .append($sqlGeneratorContent)
-                 .append($queryMessage);
+                .append($sqlGeneratorContent)
+                .append($queryMessage);
             $queryResultGrid.append(gridDiv);
             $sqlGeneratorQueryResultGrid.append(gridDiv2);
             $sqlGeneratorContent.find(".vas-sqlgenerator-column1")
@@ -133,26 +165,30 @@
             $windowTabDiv.append($windowTabLabel).append($txtWindow);
             $multiSelect.append($windowFieldColumnSelect).append($checkBoxes);
             $windowFieldColumnSelect.append($windowFieldColumnLabel);
+            $windowFieldColumnSelect.append(downArrow);
             $joinsDiv.append($joinsLabel);
-
             $joinOnFieldColumnName1Div.append($joinOnFieldColumnName1Label).append($joinOnFieldColumnName1);
             $joinOnFieldColumnName2Div.append($joinOnFieldColumnName2Label).append($joinOnFieldColumnName2);
             $addJoinsDiv.append($addJoinsHeading)
-                   .append($txtJoinWindow)
-                   .append($joinsSelect)           
-                   .append($joinMultiSelect)
-                   .append($joinsDropdown)
-                    .append($joinOnFieldColumnName1Div)
-                    .append($joinOnFieldColumnName2Div)
-                   .append($addJoinBtn)
-                   .append($joins);
+                .append($txtJoinWindow)
+                .append($joinsSelect)
+                .append($joinMultiSelect)
+                .append($joinsDropdown)
+                .append($joinOnFieldColumnName1Div)
+                .append($joinOnFieldColumnName2Div)
+                .append($addJoinBtn)
+                .append($joins);
             $joinsSelect.append($joinFieldColumnLabel);
             $filterDiv.append($filterLabel);
+            $filterColumnNameDiv.append($filterColumnNameLabel).append($filterPrice);
+            $filterOperatorDiv.append($filterOperatorLabel).append($filterCondition);
+            $filterValueDiv.append($filterValueLabel).append($filterPriceValue);
             $addFilterDiv.append($addFilterText)
-                .append($filterPrice)
-                .append($filterCondition)
-                .append($filterPriceValue)
-                .append($addFilterSelectButton);
+                .append($filterColumnNameDiv)
+                .append($filterOperatorDiv)
+                .append($filterValueDiv)
+                .append($addFilterSelectButton)
+                .append($filterEditDiv);
             $addFilterSelectButton.append($filterConditionV2).append($addFilterBtn);
             $sortByDiv.append($sortByLabel);
             $addSortByDiv.append($addSortByText).append($sortByDropdown).append($addSortBySelectWithButton);
@@ -168,7 +204,7 @@
                SQL Tab
             */
             $testSqlBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                if ($selectQuery && $selectQuery.text().length>0) {
+                if ($selectQuery && $selectQuery.text().length > 0) {
                     if ($sqlBtn.hasClass('active')) {
                         $(this).toggleClass('vas-show-grid');
                         if (!$(this).hasClass('vas-show-grid')) {
@@ -241,19 +277,17 @@
                on UI when user select the
                dropdowns in Filter Accordion
             */
-            let filterArray = [];
-            let index = 0;
+            var filterArray = [];
             function readFilterData() {
                 var data = '';
-
                 for (var i = 0; i < filterArray.length; i++) {
-                     var dataType= filterArray[i].dataType;
+                    var dataType = filterArray[i].dataType;
                     data += '<div class=vas-filter-item>';
                     data += '<div class=vas-filter-whitebg>';
                     data += '<div class="vas-filters-block">';
-                    data += '<div class="vas-filter-andor-value" style=display:none;>' + filterArray[i].filterAndOrValue + ' ' + '</div>';
-                    data += '<div class="vas-selecttable">' + filterArray[i].filterPriceText + ' ' + '</div>';
-                    data += '<div class="vas-filter-condition">' + filterArray[i].filterCondition + ' ' + '</div>';
+                    data += '<div class="vas-filter-andor-value" style=display:none;>' + filterArray[i].filterAndOrValue + '</div>';
+                    data += '<div class="vas-selecttable">' + filterArray[i].filterPriceText + '</div>';
+                    data += '<div class="vas-filter-condition">' + filterArray[i].filterCondition + '</div>';
                     if (VIS.DisplayType.IsID == dataType || VIS.DisplayType.IsNumeric == dataType || VIS.DisplayType.IsSearch == dataType) {
                         data += '<div class="vas-filter-price-value">' + filterArray[i].filterPriceValue + '</div>';
                     }
@@ -265,7 +299,7 @@
                     }
                     data += '</div>';
                     data += '<div class="vas-filters-editdelete-btns">';
-                    data += '<div style=display:none;><span class="glyphicon glyphicon-edit"></span></div>';
+                    data += '<div><span class="glyphicon glyphicon-edit"></span></div>';
                     data += '<div><span class="glyphicon glyphicon-trash"></span></div>';
                     data += '</div>';
                     data += '</div>';
@@ -280,24 +314,18 @@
                dropdowns in Filter Accordion
             */
             function addFilter() {
-                //var dataType =[];
                 var filterPriceval = $filterPrice.find('option:selected').val();
                 let filterPriceText = filterPriceval.slice(filterPriceval.indexOf(':') + 1);
                 let filterCondition = $filterCondition.find('option:selected').val();
                 let filterPriceValue = $filterPriceValue.val();
-                 var dataType = filterPriceval.slice(0, filterPriceval.indexOf(':'));
+                var dataType = filterPriceval.slice(0, filterPriceval.indexOf(':'));
                 let filterAndOrValue = $filterConditionV2.find('option:selected').val();
                 const filterObj = { filterPriceText, filterCondition, filterPriceValue, filterAndOrValue, dataType: dataType }
                 filterArray.push(filterObj);
-                index += 1;
                 $filters.empty();
                 readFilterData();
                 if ($filters && $filters.length > 0) {
                     $filters.find('.vas-filter-item').addClass('vas-filters-row');
-                }
-
-                if ($('.vas-filters .vas-filter-item').length > 1) {
-                    $('.vas-filters .vas-filter-item:first').addClass('vas-first-delete-icon');
                 }
             }
 
@@ -308,16 +336,20 @@
             $filters.on(VIS.Events.onTouchStartOrClick, function (event) {
                 if ($(event.target).hasClass('glyphicon-trash')) {
                     filterArray.splice($(event.target), 1);
-                    deleteFilter();
+
                     $(event.target).parents('.vas-filter-item').remove();
                     if ($('.vas-filters .vas-filter-item').length < 2) {
                         $('.vas-filters .vas-filter-item').removeClass('vas-first-delete-icon');
                     }
+
+                    deleteFilter();
                 }
                 if ($(event.target).hasClass('glyphicon-edit')) {
-                    let filterSelectTableVal = $(event.target).parents('.vas-filter-item').find(".vas-selecttable").text();
-                    let filterPriceValue = $(event.target).parents('.vas-filter-item').find(".vas-filter-price-value").text();
-                    let filterCondition = $(event.target).parents('.vas-filter-item').find(".vas-filter-condition").text();
+                    $addFilterBtn.val('Update Filter');
+                    updateFilter();
+                    var filterSelectTableVal = $(event.target).parents('.vas-filter-item').find(".vas-selecttable").text();
+                    var filterPriceValue = $(event.target).parents('.vas-filter-item').find(".vas-filter-price-value").text();
+                    var filterCondition = $(event.target).parents('.vas-filter-item').find(".vas-filter-condition").text();
                     $(event.target).parents('.vas-filter-item').siblings().find(".vas-filter-condition").removeClass('active');
                     $(event.target).parents('.vas-filter-item').siblings().find(".vas-filter-price-value").removeClass('active');
                     $(event.target).parents('.vas-filter-item').find(".vas-filter-condition").addClass('active');
@@ -326,19 +358,24 @@
                     $filterCondition.val(filterCondition);
                     $filterPriceValue.val(filterPriceValue);
                     $addFilterBtn.addClass('vas-edit-btn');
+                    $filterPrice.attr('disabled', true);
                 }
             });
+
 
             /*
                Function to update the filter
                in Filter Accordion
             */
             function updateFilter() {
-                $addFilterBtn.val('Add Filter');
-                var updatedFilterPriceValue = $filterPriceValue.val();
-                $('.vas-filter-price-value.active').text(updatedFilterPriceValue);
-                var updatedFilterConditionValue = $filterCondition.find('option:selected').val();
-                $('.vas-filter-condition.active').text(updatedFilterConditionValue);
+                var andOrVal = $(event.target).parents('.vas-filter-item').find(".vas-filter-andor-value").text();
+                var filterSelectTableVal = $(event.target).parents('.vas-filter-item').find(".vas-selecttable").text();
+                var filterPriceValue = $(event.target).parents('.vas-filter-item').find(".vas-filter-price-value").text();
+                var filterCondition = $(event.target).parents('.vas-filter-item').find(".vas-filter-condition").text();
+                var filterConditionV2 = $(event.target).parents('.vas-filter-item').find(".vas-filter-andor-value").text();
+                oldFilterVal = filterCondition + " " + filterPriceValue;
+                $filterEditDiv.text(oldFilterVal);
+                filterIndex = $(event.target).parents('.vas-filter-item').attr('index');
             }
 
             /*
@@ -420,8 +457,8 @@
                to save the query
             */
             $saveBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                var query = $selectQuery.text();
-                alertID = VIS.context.getContext(windowNo, 'AD_Alert_ID');
+                var query = $selectQuery.text().trim();
+                alertID = VIS.context.getContext($self.windowNo, 'AD_Alert_ID');
                 if (alertID > 0) {
                     UpdateAlertRule(query);
                 }
@@ -433,7 +470,7 @@
               to save the query
            */
             $saveGeneratorBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                var query = $selectGeneratorQuery.val();
+                var query = $selectGeneratorQuery.val().trim();
                 SaveAlertRule(query);
             });
 
@@ -442,7 +479,7 @@
                to update the query
             */
             $updateGenerateBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                var query = $selectGeneratorQuery.val();
+                var query = $selectGeneratorQuery.val().trim();
                 UpdateAlertRule(query);
             });
 
@@ -450,6 +487,7 @@
                Click event on Add Filter Button
                to add/update filters
             */
+
             $addFilterBtn.on(VIS.Events.onTouchStartOrClick, function (event) {
                 let filterCondition = $filterCondition.find('option:selected').val();
                 var filterPriceValue = $filterPriceValue.val();
@@ -460,17 +498,34 @@
                     else {
                         WhereCondition = $filterConditionV2.val();
                     }
-                    ApplyFilter(WhereCondition);
+
                     if ($(this).hasClass('vas-edit-btn')) {
-                        updateFilter();
+                        var updatedFilterPriceValue = $filterPriceValue.val();
+                        $('.vas-filter-price-value.active').text(updatedFilterPriceValue);
+                        var updatedFilterConditionValue = $filterCondition.find('option:selected').val();
+                        $('.vas-filter-condition.active').text(updatedFilterConditionValue);
+                        var updatedFilterConditionAndOr = $filterConditionV2.find('option:selected').val();
+                        var newQuery = updatedFilterConditionValue + " " + updatedFilterPriceValue;
                         $(this).removeClass('vas-edit-btn');
                         ClearText();
+                        $addFilterBtn.val("Add Filter");
+                        $filterPrice.removeAttr("disabled");
+                        var oldQuery = $filterEditDiv.text();
+                        $selectGeneratorQuery.empty();
+                        var editedQuery = $selectGeneratorQuery.val().replace(oldQuery, newQuery);
+                        $selectGeneratorQuery.val(editedQuery);
+                        if (filterIndex > -1) {
+                            filterArray[filterIndex].filterCondition = updatedFilterConditionValue;
+                            filterArray[filterIndex].filterPriceValue = updatedFilterPriceValue;
+                        }
                     }
                     else {
                         if (filterCondition) {
                             $addFilterDiv.append($filters);
+                            ApplyFilter(WhereCondition);
                             addFilter();
                         }
+
                     }
                     ClearText();
                 }
@@ -485,15 +540,18 @@
                on UI when user select the
                dropdowns in Joins Accordion
             */
-            let joinsArray = [];
-            let joinIndex = 0;
+            var joinsArray = [];
             function readJoinsData() {
                 var data = '';
                 for (var i = 0; i < joinsArray.length; i++) {
                     data += '<div class=vas-join-item>';
                     data += '<div class="vas-joins-bg">';
                     data += '<div class="vas-joins-block">';
-                    data += '<div class="vas-selecttable">' + joinsArray[i].joinsDropDown + '</div>';
+                    data += '<div class="vas-selecttable join-title">' + joinsArray[i].joinsDropDown + '</div>';
+                    data += '<div class="vas-selecttable join-tab">' + joinsArray[i].joinTableName + '</div>';
+                    data += '<div class="vas-selecttable join-base-table">' + joinsArray[i].keyColumn1 + '</div>';
+                    data += '<div class="vas-selecttable join-jointable">' + joinsArray[i].keyColumn2 + '</div>';
+                    data += '<div class="vas-selecttable join-joinselectedcolumn">' + joinsArray[i].joinSelectedColumn + '</div>';
                     data += '</div>';
                     data += '<div class="vas-delete-join-btn">';
                     data += '<div><span class="glyphicon glyphicon-trash"></span></div>';
@@ -507,13 +565,23 @@
             // Click event on Edit and Delete Buttons for Joins
             $joins.on(VIS.Events.onTouchStartOrClick, function (event) {
                 if ($(event.target).hasClass('glyphicon-trash')) {
-                    var joinsDropDown = $(event.target).parents('.vas-join-item').find('.vas-selecttable').text();
-                    joinsArray.splice($(event.target), 1);
+                    var joinsTitle = $(event.target).parents('.vas-delete-join-btn').prev('.vas-joins-block').find('.join-title').text();
+                    var joinsTab = $(event.target).parents('.vas-delete-join-btn').prev('.vas-joins-block').find('.join-tab').text();
+                    var joinsBaseTable = $(event.target).parents('.vas-delete-join-btn').prev('.vas-joins-block').find('.join-base-table').text();
+                    var joinsJoinTable = $(event.target).parents('.vas-delete-join-btn').prev('.vas-joins-block').find('.join-jointable').text();
+                    var columnToRemove = ", " + $(event.target).parents('.vas-delete-join-btn').prev('.vas-joins-block').find('.join-joinselectedcolumn').text();
+                    var reqJoinQuery = joinsTitle + " " + joinsTab + " " + 'ON (' + joinsBaseTable + " = " + joinsJoinTable + ")";
+
+
+                    $removeJoins = $selectGeneratorQuery.val().replace(reqJoinQuery, '').trim();
+                    $selectGeneratorQuery.val($removeJoins);
+                    removeColumnJoins = $selectGeneratorQuery.val().replace(columnToRemove, '');
+                    $selectGeneratorQuery.empty();
+                    $selectGeneratorQuery.val(removeColumnJoins);
                     $(event.target).parents('.vas-join-item').remove();
-                    if ($selectGeneratorQuery.val().indexOf(joinsDropDown) > -1) {
-                        var desiredResult = $selectGeneratorQuery.val().slice(0, $selectGeneratorQuery.val().lastIndexOf(joinsDropDown));
-                        $selectGeneratorQuery.val(desiredResult);
-                    }
+                    joinsArray.splice($(event.target), 1);
+                    // joinIndex = $(event.target).parents('.vas-filter-item').attr('index');
+
                 }
             });
 
@@ -523,21 +591,29 @@
             */
             $addJoinBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var joinQuery;
+                var joinTableName = joinTable;
+                var joinSelectedColumn = seletedJoinCloumn;
                 var keyColumn1 = $joinOnFieldColumnName1.val();
                 var keyColumn2 = $joinOnFieldColumnName2.val();
                 var sql = $selectGeneratorQuery.val();
                 var joinsDropDown = $joinsDropdown.find('option:selected').val();
-                const joinsObj = { joinsDropDown }
+                const joinsObj = { joinsDropDown, joinTableName, keyColumn1, keyColumn2, joinSelectedColumn };
+                joinsArray.push(joinsObj);
+                //seletedJoinCloumn = [];
+                $joins.empty();
                 if (sql != '' && keyColumn1 != '' && keyColumn2 != '' && keyColumn1 != null && keyColumn2 != null) {
                     var fromIndex = sql.indexOf('FROM');
                     if (fromIndex != -1) {
                         var fromClause = sql.slice(fromIndex);
                         if (seletedJoinCloumn.length > 0) {
-                            sql = sql.slice(0, fromIndex) + ", " + seletedJoinCloumn + " " + fromClause;
+                            sql = sql.slice(0, fromIndex) + ", " + seletedJoinCloumn + fromClause;
                         } else {
                             sql = sql.slice(0, fromIndex) + fromClause;
                         }
                         joinQuery = " " + $joinsDropdown.val() + " " + joinTable + ' ON (' + keyColumn1 + " = " + keyColumn2 + ")";
+                        var addJoinQuery = $joinsDropdown.val() + " " + joinTable + ' ON (' + keyColumn1 + " = " + keyColumn2 + ")";
+                        $selectGeneratorQuery.text(addJoinQuery);
+
                     }
                     var whereIndex = sql.indexOf('WHERE');
                     if (whereIndex != -1) {
@@ -546,13 +622,17 @@
                     } else {
                         sql += joinQuery;
                     }
+                    readJoinsData();
                     $selectGeneratorQuery.val('');
                     $selectGeneratorQuery.val(sql);
                     $joinMultiSelect.val('');
                     $joinOnFieldColumnName2.val('');
                     $joinOnFieldColumnName1.val('');
                     filterFlag = true;
+                    seletedJoinCloumn = [];
+
                 }
+                console.log(joinsArray);
             });
 
             /*
@@ -560,12 +640,13 @@
                to add sorts like ASC, DESC etc
             */
             $addSortBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                var sortQuery;
+                var sortQuery = "";
                 var sortColumn = $sortByDropdown.val();
                 var sql = $selectGeneratorQuery.val();
                 if (sql != '' && sortColumn != '') {
                     if (orderbyFlag) {
                         sortQuery = " ORDER BY " + sortColumn + " " + $sortElements.val();
+                        orderbyFlag = false;
                     }
                     else {
                         sortQuery = ", " + sortColumn + " " + $sortElements.val();
@@ -574,7 +655,6 @@
                 sql += sortQuery;
                 $selectGeneratorQuery.val('');
                 $selectGeneratorQuery.val(sql);
-                orderbyFlag = false;
             });
 
             /*
@@ -586,7 +666,7 @@
                 $(e).addClass('active');
             }
             getWindow();
-            getJoinWindow();
+            getJoinWindow(0, 0);
             eventHandling();
         }
 
@@ -617,24 +697,71 @@
         /*
             Function to delete the particular filter in Filter Accordion
         */
+
+
         function deleteFilter() {
+            var andOrVal = $(event.target).parents('.vas-filter-item').find(".vas-filter-andor-value").text();
+            var filterSelectTableVal = $(event.target).parents('.vas-filter-item').find(".vas-selecttable").text();
+            var filterPriceValue = $(event.target).parents('.vas-filter-item').find(".vas-filter-price-value").text();
+
+            var filterCondition = $(event.target).parents('.vas-filter-item').find(".vas-filter-condition").text();
             var currentValue = $selectGeneratorQuery.val();
-            var conditionToRemove = $(event.target).parents('.vas-filter-item').find(".vas-filters-block").text();
-            var orIndexCR = conditionToRemove.indexOf("OR");
-            var orIndexSql = currentValue.indexOf("OR");
-            var andIndexCR = conditionToRemove.indexOf('AND');
-            var andIndexSQl = currentValue.indexOf('AND');
+            currentValue = currentValue.replace(/\s{2,}/g, ' ');
+            var orderByIndex = currentValue.indexOf('ORDER BY');
             var whereIndex = currentValue.indexOf('WHERE');
-            if (andIndexSQl == -1 && andIndexCR != -1) {
-                conditionToRemove = conditionToRemove.replace("AND", "").trim();
+            var conditionToRemove = andOrVal + " " + filterSelectTableVal + " " + filterCondition + " " + filterPriceValue;
+            var orderBySQL = "";
+            if (orderByIndex > -1) {
+                orderBySQL = currentValue.slice(orderByIndex);
+                currentValue = currentValue.slice(0, orderByIndex).trim();
             }
-            if (whereIndex != -1 && andIndexSQl == -1) {
+            var orIndexCR = conditionToRemove.indexOf('OR');
+            var orIndexSql = currentValue.indexOf('OR');
+            var andIndexCR = conditionToRemove.indexOf('AND');
+            var andIndexSql = currentValue.indexOf('AND');
+            if (whereIndex > -1 && andIndexSql == -1 && orIndexSql == -1) {
+                if (orIndexCR !== -1) {
+                    conditionToRemove = conditionToRemove.replace("OR", "").trim();
+                }
+                if (andIndexCR !== -1) {
+                    conditionToRemove = conditionToRemove.replace("AND", "").trim();
+                }
                 currentValue = currentValue.replace("WHERE", "").trim();
                 andFlag = true;
-            }            
+            }
+            var handleWhereSql = conditionToRemove;
+            if (andIndexSql > -1 || orIndexSql > -1) {
+                if (andIndexCR > -1) {
+                    handleWhereSql = conditionToRemove.replace("AND", "").trim();
+                }
+                if (orIndexCR > -1) {
+                    handleWhereSql = conditionToRemove.replace("OR", "").trim();
+                }
+                var conditionIndex = currentValue.indexOf(handleWhereSql);
+                var conditionLength = handleWhereSql.length;
+
+                var beforeCondition = currentValue.slice(conditionIndex - 6, conditionIndex);
+                var whereExistIndex = beforeCondition.indexOf('WHERE');
+                if (whereExistIndex > -1) {
+                    var afterCondition = currentValue.slice(conditionIndex, conditionIndex + conditionLength + 4).trim();
+                    var orExistIndexCR = afterCondition.indexOf('OR');
+                    var andExistIndexSql = afterCondition.indexOf('AND');
+
+                    if (orExistIndexCR > -1) {
+                        handleWhereSql = currentValue.slice(conditionIndex, conditionIndex + conditionLength + 3).trim();
+                    }
+                    if (andExistIndexSql > -1) {
+                        handleWhereSql = currentValue.slice(conditionIndex, conditionIndex + conditionLength + 4).trim();
+                    }
+                    conditionToRemove = handleWhereSql;
+                }
+            }
             var updatedQuery = currentValue.replace(conditionToRemove, "").trim();
+            updatedQuery += " " + orderBySQL;
             $selectGeneratorQuery.val('');
+            updatedQuery = updatedQuery.replace(/\s{2,}/g, ' ');
             $selectGeneratorQuery.val(updatedQuery);
+
         }
 
         /*
@@ -642,7 +769,6 @@
         */
         function eventHandling() {
             $windowTabSelect.fireValueChanged = OnChange;
-            $joinsWindowTabSelect.fireValueChanged = joinsTableOnChange;
         }
 
         /*
@@ -654,7 +780,7 @@
             Onchange function to get the table data
         */
         function OnChange() {
-            TableID = 0;
+            tableID = 0;
             var tabID = $windowTabSelect.getValue();
             if (tabID > 0) {
                 $.ajax({
@@ -665,8 +791,9 @@
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result && result.length > 0) {
-                            TableID = result[0].TableID;
+                            tableID = result[0].TableID;
                             tableName = result[0].TableName;
+                            tabID = result[0].TabID;
                         }
                     },
                     error: function (error) {
@@ -676,18 +803,26 @@
 
             }
             $selectGeneratorQuery.val('');
-            if (TableID > 0) {
-                getColumns(TableID);
+            if (tableID > 0) {
+                getColumns(tableID);
+                $windowTabSelect.getControl().removeClass("vis-ev-col-mandatory");
             }
             else {
                 getColumns(0);
+                $joinsDiv.css("pointer-events", "none");
+                $filterDiv.css("pointer-events", "none");
+                $sortByDiv.css("pointer-events", "none");
+                $windowTabSelect.getControl().addClass("vis-ev-col-mandatory");
             }
+            $txtJoinWindow.empty();
+            getJoinWindow(tabID, tableID);
             $selectGeneratorQuery.show();
             gridDiv2.hide();
             $sqlGeneratorQueryResultGrid.hide();
             andFlag = true;
             orderbyFlag = true;
             $sqlResultDiv.hide();
+            $joinsWindowTabSelect.fireValueChanged = joinsTableOnChange;
         }
 
         /*
@@ -774,13 +909,13 @@
         function ClearText() {
             $filterPrice.val('');
             $filterPriceValue.val('');
-            $filterCondition.val('=');
+            $filterCondition.val('');
         }
 
         /*
             Function to get the columns from Table in Window/Tab
         */
-        function getColumns(TableID) {
+        function getColumns(tableID) {
             $selectBox.find('select').empty();
             var flag = true;
             var seletedCloumn = [];
@@ -790,7 +925,7 @@
             $joinOnFieldColumnName1.empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/GetColumns",
-                data: { tableID: TableID },
+                data: { tableID: tableID },
                 type: "POST",
                 async: false,
                 success: function (result) {
@@ -799,7 +934,7 @@
                         tableName = result[0].TableName;
                         $selectBox.find('select').prepend("<option>Select</option>");
                         $joinOnFieldColumnName1.prepend("<option selected='select'></option>");
-                        $sortByDropdown.prepend("<option selected='select'>Select</option>");
+                        $sortByDropdown.prepend("<option selected='select'></option>");
                         $filterPrice.prepend("<option selected='select'>Select</option>");
                         for (var i = 1; i < result.length; i++) {
                             $joinOnFieldColumnName1.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + result[i].DBColumn + "</option>");
@@ -808,7 +943,6 @@
                             $checkBoxes.append(" <div class='vas-column-list-item'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                     }
-
                     seletedCloumn = [];
                     $(".vas-column-list-item .vas-column-checkbox").on('click', function (eve) {
                         if (!flag) {
@@ -816,7 +950,14 @@
                             flag = true;
                         }
                         var selectedItem = $(this).parent('.vas-column-list-item').text();
-                        var desiredResult = tableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + selectedItem.slice(0, selectedItem.indexOf('-') - 1) + '" ';
+                        var fieldName = selectedItem.slice(0, selectedItem.indexOf('-') - 1);
+                        fieldName = fieldName.replace(/[^a-zA-Z0-9\s]+/g, '');
+                        if (fieldName != "") {
+                            var desiredResult = tableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + fieldName + '" ';
+                        }
+                        else {
+                            var desiredResult = tableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " ";
+                        }
                         if (this.checked) {
                             seletedCloumn.push(desiredResult);
                         }
@@ -826,8 +967,20 @@
                             });
                         }
                         GetSQL(seletedCloumn);
+                        if (seletedCloumn.length > 0) {
+                            $joinsDiv.css("pointer-events", "all");
+                            $filterDiv.css("pointer-events", "all");
+                            $sortByDiv.css("pointer-events", "all");
+                            $windowFieldColumnSelect.removeClass("vis-ev-col-mandatory");
+                        }
+                        else {
+                            $joinsDiv.css("pointer-events", "none");
+                            $filterDiv.css("pointer-events", "none");
+                            $sortByDiv.css("pointer-events", "none");
+                            $selectGeneratorQuery.val('');
+                            $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
+                        }
                     });
-
 
                 },
                 error: function (error) {
@@ -886,8 +1039,8 @@
         /*
             Search functionality for Joins
         */
-        function getJoinWindow() {
-            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, "");
+        function getJoinWindow(tabID, tableID) {
+            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, "TB.AD_Tab_ID <> " + tabID + " AND TB.AD_Table_ID<>" + tableID);
             $joinsWindowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", true, false, true, VIS.DisplayType.Search, lookups);
             var locDep = $joinsWindowTabSelect.getControl().attr('placeholder', ' Search here').attr("id", "Ad_Tab_ID");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');
@@ -915,6 +1068,7 @@
             DivSearchBtnWrap.append($windowTabSelect.getBtn(0));
             DivSearchBtnWrap.append($windowTabSelect.getBtn(1));
             $windowTabSelect.setCustomInfo('VAS_AlertSQLGenerator');
+            $windowTabSelect.getControl().addClass("vis-ev-col-mandatory");
         }
 
         /*
@@ -923,11 +1077,11 @@
         function SaveAlertRule(query) {
             if (query != null) {
                 alertRuleID = 0;
-                alertID = VIS.context.getContext(windowNo, 'AD_Alert_ID');
+                alertID = VIS.context.getContext($self.windowNo, 'AD_Alert_ID');
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/SaveQuery",
                     type: "POST",
-                    data: { query: query, alertRuleID: alertRuleID, alertID: alertID, tableName: tableName, tableID: TableID },
+                    data: { query: VIS.secureEngine.encrypt(query), alertRuleID: alertRuleID, alertID: alertID, tableName: tableName, tableID: tableID },
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
@@ -935,6 +1089,7 @@
                             $sqlResultDiv.text(result);
                             $sqlResultDiv.removeClass('vas-sql-result-error');
                             $sqlResultDiv.show();
+                            $self.curTab.dataRefreshAll();
                         }
                     },
                     error: function (error) {
@@ -953,7 +1108,7 @@
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/UpdateQuery",
                     type: "POST",
-                    data: { query: query, alertRuleID: alertRuleID, alertID: alertID, tableID: TableID },
+                    data: { query: VIS.secureEngine.encrypt(query), alertRuleID: alertRuleID, alertID: alertID, tableID: tableID },
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
@@ -961,6 +1116,7 @@
                             $sqlResultDiv.text(result);
                             $sqlResultDiv.removeClass('vas-sql-result-error');
                             $sqlResultDiv.show();
+                            $self.curTab.dataRefreshAll();
                         }
                     },
                     error: function (error) {
@@ -988,9 +1144,17 @@
             Function to display SQL based on Column Values in SQL Generator Tab
         */
         function GetSQL(columnValue) {
+            var currentSql = $selectGeneratorQuery.val();
+            var fromIndex = currentSql.indexOf('FROM');
             $selectGeneratorQuery.val('');
-            if (columnValue.length > 0) {
-                $selectGeneratorQuery.val("SELECT " + columnValue + " FROM " + tableName);
+            if (fromIndex == -1) {
+                if (columnValue.length > 0) {
+                    $selectGeneratorQuery.val("SELECT " + columnValue + "FROM " + tableName);
+                }
+            }
+            else {
+                var fromSql = currentSql.slice(fromIndex).trim();
+                $selectGeneratorQuery.val("SELECT " + columnValue + fromSql);
             }
         }
 
@@ -1000,25 +1164,35 @@
         */
         function getResult(query) {
             if (query != null) {
+                query = query.trim();
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetResult",
-                    data: { Query: query, pageNo: pageNo, pageSize: pageSize },
+                    data: { Query: VIS.secureEngine.encrypt(query), pageNo: pageNo, pageSize: pageSize },
                     type: "POST",
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result != null && result != []) {
-                            if (result.length > 0) {                               
+                            if (result.length > 0) {
                                 loadGrid(result);
                                 $sqlResultDiv.hide();
                             }
                             else {
+                                if (sqlFlag) {
+                                    $testSqlBtn.val(testSQL);
+                                    $queryResultGrid.hide();
+                                    $query.show();
+                                    $selectQuery.show();
+                                    $saveBtn.hide();
+                                }
+                                if (sqlGenerateFlag) {
+                                    $selectGeneratorQuery.show();
+                                    gridDiv2.hide();
+                                    $sqlGeneratorQueryResultGrid.hide();
+                                    $testSqlGeneratorBtn.val(testSQL);
+                                }
                                 $sqlResultDiv.show();
-                                $selectGeneratorQuery.show();
-                                gridDiv2.hide();
-                                $sqlGeneratorQueryResultGrid.hide();
-                                $testSqlGeneratorBtn.val(testSQL);
-                                $sqlResultDiv.text(VIS.Msg.getMsg("VIS_NoRecordFound"));
+                                $sqlResultDiv.text(VIS.Msg.getMsg("NoRecordFound"));
                                 $sqlResultDiv.addClass('vas-sql-result-error');
                             }
                         }
@@ -1030,7 +1204,7 @@
                                 $selectQuery.show();
                                 $saveBtn.hide();
                             }
-                            else {
+                            if (sqlGenerateFlag) {
                                 $selectGeneratorQuery.show();
                                 gridDiv2.hide();
                                 $sqlGeneratorQueryResultGrid.hide();
@@ -1058,6 +1232,11 @@
                 loadTotalPages = false;
                 result = result.slice(0, 20);
             }
+            if ($self.dGrid != null) {
+                $self.dGrid.destroy();
+                $self.dGrid = null;
+            }
+            $self.dGrid = null;
             var grdCols = [];
             for (var i = 0; i < Object.keys(result[0]).length; i++) {
                 if (Object.keys(result[0])[i] != 'recid') {
@@ -1065,16 +1244,19 @@
                 }
             }
             if (sqlGenerateFlag) {
-                dGrid2 = $(gridDiv2).w2grid({
+                $self.dGrid = $(gridDiv2).w2grid({
                     name: "gridForm2" + $self.windowNo,
                     recordHeight: 35,
                     multiSelect: true,
                     columns: grdCols,
                     records: w2utils.encodeTags(result)
                 });
-
-            } else {
-                dGrid = $(gridDiv).w2grid({
+                $selectGeneratorQuery.hide();
+                gridDiv2.show();
+                $sqlGeneratorQueryResultGrid.show();
+            }
+            if (sqlFlag) {
+                $self.dGrid = $(gridDiv).w2grid({
                     name: "gridForm" + $self.windowNo,
                     recordHeight: 35,
                     multiSelect: true,
@@ -1085,10 +1267,73 @@
                 $query.hide();
                 $queryResultGrid.show();
             }
+            $self.dGrid.refresh();
         }
 
         this.getRoot = function () {
             return $root;
+        };
+
+        this.disposeComponent = function () {
+            if ($testSqlBtn)
+                $testSqlBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($testSqlGeneratorBtn)
+                $testSqlGeneratorBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($filters)
+                $filters.off(VIS.Events.onTouchStartOrClick);
+            if ($sqlBtn)
+                $sqlBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($sqlGeneratorBtn)
+                $sqlGeneratorBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($joinsDiv)
+                $joinsDiv.off(VIS.Events.onTouchStartOrClick);
+            if ($filterDiv)
+                $filterDiv.off(VIS.Events.onTouchStartOrClick);
+            if ($sortByDiv)
+                $sortByDiv.off(VIS.Events.onTouchStartOrClick);
+            if ($windowFieldColumnSelect)
+                $windowFieldColumnSelect.off(VIS.Events.onTouchStartOrClick);
+            if ($joinsSelect)
+                $joinsSelect.off(VIS.Events.onTouchStartOrClick);
+            if ($saveBtn)
+                $saveBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($saveGeneratorBtn)
+                $saveGeneratorBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($updateGenerateBtn)
+                $updateGenerateBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($addFilterBtn)
+                $addFilterBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($joins)
+                $joins.off(VIS.Events.onTouchStartOrClick);
+            if ($addJoinBtn)
+                $addJoinBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($addSortBtn)
+                $addSortBtn.off(VIS.Events.onTouchStartOrClick);
+            if ($root != null) {
+                $root.remove();
+            }
+            $root = null;
+            $self = null;
+            $sqlBtn = null;
+            $sqlGeneratorBtn = null;
+            $testSqlGeneratorBtn = null;
+            $testSqlBtn = null;
+            $saveBtn = null;
+            $updateGenerateBtn = null;
+            $saveGeneratorBtn = null;
+            $addJoinBtn = null;
+            $addFilterBtn = null;
+            $addSortBtn = null;
+            $sqlGeneratorContent = null;
+            $joinsDropdown = null;
+            $joinOnFieldColumnName1 = null;
+            $joinOnFieldColumnName2 = null;
+            $filterCondition = null;
+            $filterConditionV2 = null;
+            $sortElements = null;
+            this.getRoot = null;
+            this.dGrid = null;
+            this.disposeComponent = null;
         };
     };
 
@@ -1123,6 +1368,7 @@
         this.curTab = null;
         this.rowSource = null;
         this.panelWidth = null;
+        this.disposeComponent();
     }
 
 })(VAS, jQuery);

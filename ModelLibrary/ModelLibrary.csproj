@@ -99,14 +99,22 @@
     <Reference Include="System.Xml" />
     <Reference Include="VAModelAD">
       <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="VAWorkflow">
       <HintPath>..\ViennaAdvantageWeb\Dll\VAWorkflow.dll</HintPath>
     </Reference>
+    <Reference Include="VISPRO">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VISPRO.dll</HintPath>
+    </Reference>
+    <Reference Include="VISPROSvc">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VISPROSvc.dll</HintPath>
+    </Reference>
     <Reference Include="WebGrease, Version=1.6.5135.21930, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\WebGrease.1.6.0\lib\WebGrease.dll</HintPath>
     </Reference>
-    <Reference Include="XModel">
+    <Reference Include="XModel, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
@@ -562,6 +570,7 @@
     <Compile Include="Process\DocumentEngine.cs" />
     <Compile Include="Process\InventoryRevaluation.cs" />
     <Compile Include="Process\MarkExpireContract.cs" />
+    <Compile Include="Process\AlertTestMailAttachment.cs" />
     <Compile Include="Process\RenewalContract.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />
@@ -620,7 +629,6 @@
     <Compile Include="Process\DropFullMoveContainerLines.cs" />
     <Compile Include="Process\DunningPrint.cs" />
     <Compile Include="Process\DunningRunCreate.cs" />
-    <Compile Include="Process\EMailTest.cs" />
     <Compile Include="Process\ExpenseAPInvoice.cs" />
     <Compile Include="Process\ExpenseSOrder.cs" />
     <Compile Include="Process\FactAcctReset.cs" />
@@ -872,7 +880,16 @@
       <LastGenOutput>Reference.cs</LastGenOutput>
     </None>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\VASLogic\VASLogic.csproj">
+      <Project>{8c7533eb-0edb-49f7-9628-4a2d708af52b}</Project>
+      <Name>VASLogic</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\VAS\VAS.csproj">
+      <Project>{ac2e105f-03f2-4e7b-9ea8-51c2d97b7060}</Project>
+      <Name>VAS</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
