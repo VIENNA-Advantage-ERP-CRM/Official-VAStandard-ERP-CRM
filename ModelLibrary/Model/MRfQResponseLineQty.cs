@@ -306,7 +306,7 @@ namespace VAdvantage.Model
                 return success;
             if (!HeaderUpdate())
             {
-                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_UpdateError"));
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RFQResponseNotUpdated"));
                 return false;
 
             }
@@ -318,14 +318,13 @@ namespace VAdvantage.Model
         /// <returns></returns>
         public bool HeaderUpdate()
         {
-            string Sql = "UPDATE C_RfQResponse  SET Price=(SELECT SUM(Price) FROM C_RfQResponseLineQty WHERE C_RfQResponseLine_ID IN " +
-               " (SELECT C_RfQResponseLine_ID FROM C_RfQResponseLine WHERE C_RfQResponse_ID=(SELECT C_RfQResponse_ID FROM C_RfQResponseLine" +
-               "  WHERE C_RfQResponseLine_ID=" + GetC_RfQResponseLine_ID() + "))) WHERE  C_RfQResponse_ID= (SELECT C_RfQResponse_ID FROM C_RfQResponseLine WHERE " +
+            string Sql = "UPDATE C_RfQResponse r SET Price=(SELECT SUM(Price) FROM C_RfQResponseLineQty WHERE C_RfQResponseLine_ID IN " +
+               " (SELECT C_RfQResponseLine_ID FROM C_RfQResponseLine WHERE C_RfQResponse_ID=r.C_RfQResponse_ID)) WHERE  C_RfQResponse_ID= (SELECT C_RfQResponse_ID FROM C_RfQResponseLine WHERE " +
                "   C_RfQResponseLine_ID=" + GetC_RfQResponseLine_ID() + ")";
             int no = DB.ExecuteQuery(Sql, null, Get_Trx());
             if (no < 0)
             {
-                Get_Trx().Rollback();
+                
                 return false;
             }
             return true;
