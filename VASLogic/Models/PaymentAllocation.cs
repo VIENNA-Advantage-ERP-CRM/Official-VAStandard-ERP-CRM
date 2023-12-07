@@ -5715,7 +5715,9 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 {
                                     for (int k = 0; k < negList.Count; k++)
                                     {
-                                        if (Util.GetValueOfInt(rowsInvoice[i]["cinvoiceid"]) == Util.GetValueOfInt(negList[k]["cinvoiceid"]))
+                                        /* VIS_427 DevOpsId 3333 07/12/2023 Handled issue When user allocate the Invoice schedules with GL Journal line ,
+                                        then system should create all paid invocie schedule with their respective amounts */
+                                        if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
                                         {
                                             paid = Util.GetValueOfDecimal(negList[k]["paidAmt"]) + netAmt;
                                             negList[k]["paidAmt"] = paid.ToString();
