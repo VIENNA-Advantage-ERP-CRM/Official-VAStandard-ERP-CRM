@@ -10,6 +10,8 @@
     --bgGreyColor: #F5F5F5;
     --yellowColor: #F9B31D;
     --redColor: #FF0000;
+    --joinBgColor: #FFE9A1;
+    --purpleColor: #8F67D54D;
 }
 
 label {
@@ -208,6 +210,7 @@ input[type='button'] {
     float: left;
     width: 100%;
     margin-top: 10px;
+    pointer-events: none;
 }
 
     .vas-add-label.active + .vas-add-label-content {
@@ -257,6 +260,9 @@ input[type='button'] {
     border: 1px solid #E1E1E1;
     min-height: 35px;
     margin: 15px 0 0;
+    position: relative;
+    cursor: pointer;
+    background: none;
 }
 
 .vas-filter-text-input {
@@ -316,13 +322,13 @@ div#grid_gridForm1_body {
             margin-right: 5px;
         }
 
-        .vas-filters .vas-filter-item .glyphicon-trash {
-            color: var(--redColor);
-        }
+.glyphicon-trash {
+    color: var(--redColor);
+}
 
-        .vas-filters .vas-filter-item:last-child {
-            margin-bottom: 0px;
-        }
+.vas-filters .vas-filter-item:last-child {
+    margin-bottom: 0px;
+}
 
 .vas-common-style {
     float: left;
@@ -337,10 +343,17 @@ div#grid_gridForm1_body {
 }
 
     .vas-joins .vas-join-item {
-        border: 1px solid rgba(var(--v-c-primary));
-        padding: 10px;
+        border: 1px solid #42335D0D;
+        padding: 10px 10px 2px;
         margin-bottom: 10px;
+        border-radius: 3px;
+        background: #FBFBFB;
+        transition: all 0.3s ease-in-out;
     }
+
+        .vas-joins .vas-join-item:hover {
+            border-color: rgba(var(--v-c-primary));
+        }
 
 .vas-joins-select {
     border: 1px solid var(--fieldBorderColor);
@@ -500,4 +513,80 @@ div#grid_gridForm1_body {
 
 .VIS-AMTD-InputBtns input {
     width: 100%;
+    min-height: 35px;
+}
+
+.vas-highlight {
+    color: rgba(var(--v-c-primary));
+}
+
+span.vis.vis-arrow-down {
+    position: absolute;
+    right: 10px;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    height: 16px;
+    font-size: 8px;
+    border: 1px solid rgba(var(--v-c-primary));
+    border-radius: 50%;
+    line-height: 16px;
+    width: 16px;
+    text-align: center;
+    color: rgba(var(--v-c-primary));
+}
+
+.vas-joins-bg {
+    display: flex;
+    justify-content: space-between;
+}
+
+.vas-join-item .vas-selecttable:first-child {
+    float: none;
+}
+
+.vas-delete-join-btn {
+    float: left;
+    width: 15%;
+    text-align: right;
+}
+
+    .vas-delete-join-btn .glyphicon-trash {
+        cursor: pointer;
+    }
+
+.vas-join-item .vas-selecttable {
+    float: left;
+    width: calc(50% - 6px);
+    word-wrap: break-word;
+    background-color: rgba(var(--v-c-primary));
+    margin-bottom: 10px;
+    margin-right: 12px;
+    padding: 1px 10px;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+    .vas-join-item .vas-selecttable.join-base-table, .vas-join-item .vas-selecttable.join-jointable {
+        background-color: var(--purpleColor);
+    }
+
+    .vas-join-item .vas-selecttable:nth-child(2n+1) {
+        margin-right: 0;
+    }
+
+.vas-selecttable.join-title {
+    background-color: var(--joinBgColor);
+    text-align: center;
+}
+
+.vis-ev-col-mandatory {
+    border-color: var(--redColor) !important;
+    background: none;
+}
+
+.vas-addfiltertext {
+    margin: 0 0 10px;
 }
