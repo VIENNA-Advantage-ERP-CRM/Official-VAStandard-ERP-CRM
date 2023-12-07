@@ -46,8 +46,21 @@
     <Reference Include="BaseLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\BaseLibrary.dll</HintPath>
     </Reference>
+    <Reference Include="ClosedXML, Version=0.95.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\Dll\ClosedXML.dll</HintPath>
+    </Reference>
     <Reference Include="CoreLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml">
+      <HintPath>..\ViennaAdvantageWeb\Dll\DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="ExcelNumberFormat">
+      <HintPath>..\ViennaAdvantageWeb\Dll\ExcelNumberFormat.dll</HintPath>
+    </Reference>
+    <Reference Include="ExpressionEvaluator">
+      <HintPath>..\ViennaAdvantageWeb\Dll\ExpressionEvaluator.dll</HintPath>
     </Reference>
     <Reference Include="FRPTSvc">
       <HintPath>..\ViennaAdvantageWeb\Dll\FRPTSvc.dll</HintPath>

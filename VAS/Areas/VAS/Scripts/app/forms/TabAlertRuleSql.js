@@ -548,8 +548,8 @@
                     data += '<div class="vas-joins-bg">';
                     data += '<div class="vas-joins-block">';
                     data += '<div class="vas-selecttable join-title">' + joinsArray[i].joinsDropDown + '</div>';
-                    data += '<div class="vas-selecttable join-tab">' + joinsArray[i].joinTableName + '</div>';
                     data += '<div class="vas-selecttable join-base-table">' + joinsArray[i].keyColumn1 + '</div>';
+                    data += '<div class="vas-selecttable join-tab">' + joinsArray[i].joinTableName + '</div>';
                     data += '<div class="vas-selecttable join-jointable">' + joinsArray[i].keyColumn2 + '</div>';
                     data += '<div class="vas-selecttable join-joinselectedcolumn">' + joinsArray[i].joinSelectedColumn + '</div>';
                     data += '</div>';
@@ -598,9 +598,9 @@
                 var sql = $selectGeneratorQuery.val();
                 var joinsDropDown = $joinsDropdown.find('option:selected').val();
                 const joinsObj = { joinsDropDown, joinTableName, keyColumn1, keyColumn2, joinSelectedColumn };
-                joinsArray.push(joinsObj);
-                //seletedJoinCloumn = [];
-                $joins.empty();
+                if (joinsDropDown && joinTableName && keyColumn1 && keyColumn2 && joinSelectedColumn) {
+                    joinsArray.push(joinsObj);
+                }
                 if (sql != '' && keyColumn1 != '' && keyColumn2 != '' && keyColumn1 != null && keyColumn2 != null) {
                     var fromIndex = sql.indexOf('FROM');
                     if (fromIndex != -1) {
@@ -622,6 +622,7 @@
                     } else {
                         sql += joinQuery;
                     }
+                    $joins.empty();
                     readJoinsData();
                     $selectGeneratorQuery.val('');
                     $selectGeneratorQuery.val(sql);
@@ -630,9 +631,7 @@
                     $joinOnFieldColumnName1.val('');
                     filterFlag = true;
                     seletedJoinCloumn = [];
-
                 }
-                console.log(joinsArray);
             });
 
             /*
@@ -1331,6 +1330,9 @@
             $filterCondition = null;
             $filterConditionV2 = null;
             $sortElements = null;
+            removeColumnJoins = null;
+            oldFilterVal = null;
+            filterIndex = null;
             this.getRoot = null;
             this.dGrid = null;
             this.disposeComponent = null;

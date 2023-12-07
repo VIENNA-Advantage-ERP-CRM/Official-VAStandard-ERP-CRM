@@ -7,6 +7,7 @@
  * VAI055         : 05-Dec-2023
   ******************************************************/
 using System;
+using ClosedXML.Excel;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -87,7 +88,7 @@ namespace ViennaAdvantage.Process
         /// </summary>
         /// <param name="data">sql Result</param>
         /// <returns>file</returns>
-        private FileInfo CreateExcelFile(List<List<Object>> data)
+        private FileInfo CreateExcelFile(DataTable data)
         {
             try
             {
@@ -97,12 +98,24 @@ namespace ViennaAdvantage.Process
                 if (!Directory.Exists(filePath))
                     Directory.CreateDirectory(filePath);
                 log.Log(Level.INFO, "AlertProcessor=> Create Directory in CreateExcelFile");
-                string fileName = filePath + path + ".xls";
-                FileStream file = File.Create(fileName);
-                log.Log(Level.INFO, "AlertProcessor=> Create File in CreateExcelFile");
-                VAdvantageProSvc.Classes.ArrayExcelExporter exporter = new VAdvantageProSvc.Classes.ArrayExcelExporter(GetCtx(), data);
-                log.Log(Level.INFO, "AlertProcessor=> Create exporter in CreateExcelFile");
-                exporter.Export(file, null, false);
+                string fileName = filePath + path + ".xlsx";
+                using (XLWorkbook wb = new XLWorkbook())
+                {
+                    IXLWorksheet worksheet = wb.Worksheets.Add("AlertSheet");
+                    for (int i = 0; i < data.Columns.Count; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = data.Columns[i].ColumnName;
+                    }
+                    for (int r = 0; r < data.Rows.Count; r++)
+                    {
+                        for (int c = 0; c < data.Columns.Count; c++)
+                        {
+                            object cellValue = data.Rows[r][c] ?? ""; 
+                            worksheet.Cell(r + 2, c + 1).Value = cellValue.ToString(); 
+                        }
+                    }
+                    wb.SaveAs(fileName);
+                }
                 log.Log(Level.INFO, "AlertProcessor=> Create Exporter.export in CreateExcelFile");
                 FileInfo fInfo = new FileInfo(fileName);
                 log.Log(Level.INFO, "AlertProcessor=> Create new File Info in CreateExcelFile");
@@ -121,38 +134,37 @@ namespace ViennaAdvantage.Process
         /// <param name="sql">Sql Query</param>
         /// <param name="trxName">Transaction Name</param>
         /// <returns>Query data</returns>
-        private List<List<Object>> GetData(String sql, Trx trxName)
+        private DataTable GetData(String sql, Trx trxName)
         {
-            List<List<Object>> data = new List<List<Object>>();
+            DataTable data = new DataTable();
             IDataReader rs = null;
             Exception error = null;
             try
             {
                 if (!ValidateSql(sql))
                 {
-                    throw new Exception("Potential dangrous sql query");
+                    throw new Exception("Potential dangerous SQL query");
                 }
 
                 rs = DB.ExecuteReader(sql, null, trxName);
                 bool isFirstRow = true;
                 while (rs.Read())
                 {
-                    List<Object> header = (isFirstRow ? new List<Object>() : null);
-                    List<Object> row = new List<Object>();
+                    if (isFirstRow)
+                    {
+                        for (int col = 0; col < rs.FieldCount; col++)
+                        {
+                            string columnName = rs.GetName(col);
+                            data.Columns.Add(columnName);
+                        }
+                        isFirstRow = false;
+                    }
+                    DataRow row = data.NewRow();
                     for (int col = 0; col < rs.FieldCount; col++)
                     {
-                        if (isFirstRow)
-                        {
-                            String columnName = rs.GetName(col);
-                            header.Add(columnName);
-                        }
-                        Object o = rs[col];
-                        row.Add(o);
+                        row[col] = rs[col];
                     }
-                    if (isFirstRow)
-                        data.Add(header);
-                    data.Add(row);
-                    isFirstRow = false;
+                    data.Rows.Add(row);
                 }
             }
             catch (Exception e)
@@ -279,8 +291,8 @@ namespace ViennaAdvantage.Process
         /// <returns></returns>
         private String GetExcelReport(MAlertRule rule, String sql, Trx trxName, List<FileInfo> attachments)
         {
-            List<List<Object>> data = GetData(sql, trxName);
-            if (data.Count <= 1)
+            DataTable data = GetData(sql, trxName);
+            if (data == null)
             {
                 log.Log(Level.SEVERE, "AlertProcessor=>Error executing sql on GetExcelReport");
                 return null;
