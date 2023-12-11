@@ -55,13 +55,12 @@ namespace VAdvantage.Process
                         query.Append("UPDATE VAS_ContractMaster SET Processed='Y' WHERE VAS_ContractMaster_ID =" + recordId);
                         count = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                         return Msg.GetMsg(GetCtx(), "VAS_PublishContract"); //Process executed
-                    }
-                   
-                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractOwner_ID"]) = 0)
+                    }                   
+                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractOwner_ID"]) == 0)
                     {
                         return Msg.GetMsg(GetCtx(), "VAS_ContractOwnerRecord"); // record not found on ContractOwner
                     }
-                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractLine_ID"]) = 0)
+                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ContractLine_ID"]) == 0)
                     {
                         return Msg.GetMsg(GetCtx(), "VAS_ContractLineRecord"); //record not found on  Contract Line
                     }
