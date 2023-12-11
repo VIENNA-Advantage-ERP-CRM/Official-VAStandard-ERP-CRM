@@ -13,6 +13,7 @@ using System.Web;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VIS.Classes;
 using VIS.Models;
 
 namespace VAS.Areas.VAS.Controllers
@@ -73,6 +74,11 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
+                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(query))
+                {
+                    return Json(null);
+                }
                 var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
@@ -113,6 +119,11 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
+                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(query))
+                {
+                    return Json(null);
+                }
                 retJSON = JsonConvert.SerializeObject(obj.SaveQuery(ctx, query, tableName, tableID, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -133,6 +144,11 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
+                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(query))
+                {
+                    return Json(null);
+                }
                 retJSON = JsonConvert.SerializeObject(obj.UpdateQuery(ctx, query, tableID, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);

@@ -1,4 +1,4 @@
-﻿/*Version 1.0.0.1*/
+﻿/*Version 1.0.0.2*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -63,6 +63,510 @@
 .vis-payment-AmountField {
     /*float:right;
     margin-right:2px;*/
+}
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --whiteColor: #fff;
+    --horizontalBorderColor: #EFEFEF;
+    --verticalBorderColor: #95B3C42E;
+    --fieldBorderColor: #E1E1E1;
+    --bgGreyColor: #F5F5F5;
+    --yellowColor: #F9B31D;
+    --redColor: #FF0000;
+}
+
+label {
+    font-weight: 400;
+}
+
+input[type='button'] {
+    background: rgba(var(--v-c-primary));
+}
+
+.vas-add-label-content .vas-select-plus-btn .vas-add-btn {
+    color: rgba(var(--v-c-primary)) !important;
+    border: 1px solid rgba(var(--v-c-primary));
+    background-color: #fff;
+}
+
+.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head span i::before {
+    content: "\2716";
+    color: var(--whiteColor);
+}
+
+.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head > span {
+    display: inline-block;
+}
+
+.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head {
+    background: rgba(var(--v-c-primary)) 0% 0% no-repeat padding-box;
+    border-radius: 5px 0px 0px 0px;
+    position: relative;
+    align-items: center;
+}
+
+    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head.vas-pull-left::before {
+        width: 0;
+        height: 0;
+        border-top: 8px solid transparent;
+        border-bottom: 8px solid transparent;
+        border-left: 8px solid rgba(var(--v-c-primary));
+        content: '';
+        position: absolute;
+        right: -7px;
+        top: 0;
+        bottom: 0;
+        margin: auto;
+    }
+
+    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head h3 {
+        color: var(--whiteColor);
+    }
+
+.vis-ad-w-p-actionpanel-r .vas-sql-btns {
+    padding: 13px 10px;
+    border-bottom: 1px solid var(--horizontalBorderColor);
+}
+
+    .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
+        background: none;
+        border: 1px solid rgba(var(--v-c-primary));
+        border-radius: 3px;
+        float: none;
+        margin: 0 5px;
+        color: var(--whiteColor);
+    }
+
+        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
+            color: rgba(var(--v-c-primary)) !important;
+        }
+
+        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
+            background-color: rgba(var(--v-c-primary));
+            color: var(--whiteColor);
+        }
+
+        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
+            float: right;
+        }
+
+.vis-ad-w-p-actionpanel-r .vas-content-area {
+    float: left;
+    width: 100%;
+    height: calc(100% - 70px);
+    position: relative;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sql-content {
+    padding: 10px 15px;
+    height: 100%;
+}
+
+    .vis-ad-w-p-actionpanel-r .vas-sql-content textarea {
+        width: 100%;
+        height: 100%;
+        font-size: 20px;
+    }
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column {
+    width: 50%;
+    float: left;
+    padding: 10px 15px;
+}
+
+    .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
+        border-left: 1px solid var(--verticalBorderColor);
+        height: 100%;
+    }
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 {
+    position: relative;
+    padding: 10px 15px 20px;
+}
+
+.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-icorbar {
+    display: block;
+}
+
+    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-icorbar i {
+        color: rgba(var(--v-c-primary));
+    }
+
+.vis-ad-w-p-ap-tp-o-icorbar li.vis-ad-w-p-ap-tp-o-li-selected {
+    border-color: rgba(var(--v-c-primary));
+}
+
+    .vis-ad-w-p-ap-tp-o-icorbar li.vis-ad-w-p-ap-tp-o-li-selected::before {
+        border-left-color: rgba(var(--v-c-primary));
+    }
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab-label {
+    position: relative;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+    .vis-ad-w-p-actionpanel-r .vas-windowtab label {
+        font-size: 12px;
+        font-weight: 400;
+        position: absolute;
+        top: -8px;
+        left: 9px;
+        background: linear-gradient(#fff 50%, transparent 50%);
+        padding: 0 5px 0 3px;
+        z-index: 9;
+    }
+
+    .vis-ad-w-p-actionpanel-r .vas-windowtab select {
+        width: 100%;
+        min-height: 35px;
+        border-radius: 2px;
+        font-size: 14px;
+        border-color: #E1E1E1;
+    }
+
+.vas-add-label label, .vas-add-filter label {
+    width: 100%;
+    border-bottom: 1px solid rgba(var(--v-c-primary));
+    padding-bottom: 10px;
+    position: relative;
+    cursor: pointer;
+}
+
+    .vas-add-label label::after, .vas-add-filter label::after {
+        content: '+';
+        font-size: 20px;
+        position: absolute;
+        right: 0;
+        top: 0px;
+        background: #E1E1E1;
+        line-height: 19px;
+        width: 22px;
+        text-align: center;
+        height: 22px;
+        font-weight: bold;
+        border-radius: 5px;
+        color: rgba(var(--v-c-primary));
+    }
+
+.vas-add-label.active label::after {
+    content: '-';
+}
+
+.vas-add-label-content {
+    display: none;
+}
+
+    .vas-add-label-content select {
+        width: 100%;
+        margin-bottom: 10px;
+        min-height: 29px;
+    }
+
+.vas-add-label {
+    float: left;
+    width: 100%;
+    margin-top: 10px;
+}
+
+    .vas-add-label.active + .vas-add-label-content {
+        display: inline-block;
+        width: 100%;
+    }
+
+.vas-select-plus-btn {
+    float: left;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+    .vas-select-plus-btn select {
+        width: 30%;
+        float: left;
+    }
+
+    .vas-select-plus-btn input[type='button'] {
+        margin: 0px;
+    }
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column2 textarea {
+    width: 100%;
+    height: 100%;
+    font-size: 20px;
+}
+
+.vas-sqlgenerator {
+    float: left;
+    height: 100%;
+    width: 100%;
+}
+
+.vas-multiselect .vas-checkboxes {
+    display: none;
+    border-left: 1px solid var(--fieldBorderColor);
+    border-right: 1px solid var(--fieldBorderColor);
+    border-bottom: 1px solid var(--fieldBorderColor);
+    float: left;
+    padding: 15px 10px;
+}
+
+.vas-windowfieldcol-select.vas-windowtab {
+    width: 100%;
+    float: left;
+    border: 1px solid #E1E1E1;
+    min-height: 35px;
+    margin: 15px 0 0;
+}
+
+.vas-filter-text-input {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.vas-queryresult-grid {
+    height: 100%;
+}
+
+div#grid_gridForm1_body {
+    height: 100% !important;
+}
+
+.vas-join-multiselect {
+    float: left;
+    width: 100%;
+    min-height: 35px;
+    display: none;
+    border-left: 1px solid var(--fieldBorderColor);
+    border-right: 1px solid var(--fieldBorderColor);
+    border-bottom: 1px solid var(--fieldBorderColor);
+    margin: -10px 0 10px 0;
+    padding: 15px 10px;
+}
+
+.vas-filters {
+    float: left;
+    width: 100%;
+}
+
+    .vas-filters .vas-filter-item.vas-filters-row {
+        background: var(--bgGreyColor);
+        padding: 15px 10px;
+    }
+
+        .vas-filters .vas-filter-item.vas-filters-row:not(:last-child) {
+            padding-bottom: 0px;
+        }
+
+    .vas-filters .vas-filter-item .vas-filter-item-inner {
+        float: left;
+        width: 100%;
+        background: #fff;
+        padding: 10px 10px;
+    }
+
+    .vas-filters .vas-filter-item {
+        background: #fff;
+        float: left;
+        width: 100%;
+    }
+
+        .vas-filters .vas-filter-item .glyphicon-edit {
+            color: var(--yellowColor);
+            margin-right: 5px;
+        }
+
+        .vas-filters .vas-filter-item .glyphicon-trash {
+            color: var(--redColor);
+        }
+
+        .vas-filters .vas-filter-item:last-child {
+            margin-bottom: 0px;
+        }
+
+.vas-common-style {
+    float: left;
+    width: 100%;
+    min-height: 35px;
+}
+
+.vas-joins {
+    float: left;
+    width: 100%;
+    margin-top: 10px;
+}
+
+    .vas-joins .vas-join-item {
+        border: 1px solid rgba(var(--v-c-primary));
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+.vas-joins-select {
+    border: 1px solid var(--fieldBorderColor);
+}
+
+.vas-filters-block {
+    float: left;
+    width: calc(100% - 25%);
+}
+
+    .vas-filters-block div {
+        float: left;
+    }
+
+.vas-filters-editdelete-btns div {
+    float: left;
+}
+
+.vas-filters-editdelete-btns {
+    float: right;
+    width: auto;
+}
+
+.vas-column-list-item {
+    float: left;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+    .vas-column-list-item input[type="checkbox"] {
+        margin-right: 7px;
+        min-width: 15px;
+        min-height: 15px;
+        position: relative;
+        top: 3px;
+    }
+
+        .vas-column-list-item input[type="checkbox"]:checked {
+            border-color: rgba(var(--v-c-primary));
+        }
+
+            .vas-column-list-item input[type="checkbox"]:checked:before {
+                background-color: rgba(var(--v-c-primary));
+                transform: none;
+                border: none;
+                width: 10px;
+                height: 10px;
+                text-align: center;
+                left: 0;
+                right: 0;
+                margin: auto;
+                top: 0;
+                bottom: 0;
+            }
+
+.vas-multiselect {
+    float: left;
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.vas-update-btn {
+    margin-right: 15px;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'], .vas-sqlgenerator-column2 input[type='button'] {
+    background: none;
+    color: rgba(var(--v-c-primary)) !important;
+    border: 1px solid rgba(var(--v-c-primary));
+}
+
+.vas-filter-whitebg {
+    float: left;
+    width: 100%;
+    background-color: #fff;
+    padding: 10px;
+}
+
+.VIS-AMTD-formData.VIS-AMTD-InputBtns {
+    padding-right: 0px;
+    margin-bottom: 10px;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 .vas-windowtab .VIS-AMTD-formData.VIS-AMTD-InputBtns {
+    margin-bottom: 5px;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sql-content .vas-queryresult-grid {
+    height: calc(100% - 50px);
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sql-content .vas-save-btn {
+    margin: 0px;
+    background: none;
+    color: rgba(var(--v-c-primary)) !important;
+    border: 1px solid rgba(var(--v-c-primary));
+}
+
+.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'] {
+    margin: 0;
+}
+
+.vas-query-input {
+    padding: 1em;
+    color: #000;
+    margin: 2px;
+    overflow: auto;
+    border: 1px solid #EFEFEF;
+    border-radius: 3px;
+    width: 100%;
+    margin: auto;
+    height: calc(100% - 10%);
+    font-size: 20px;
+}
+
+.vas-sql-result-msg {
+    display: inline-block;
+    width: auto;
+    padding: 0 10px;
+    color: rgba(var(--v-c-primary));
+}
+
+    .vas-sql-result-msg.vas-sql-result-error {
+        color: var(--redColor);
+    }
+
+.vas-root {
+    height: 100%;
+    width: 100%;
+}
+
+.vas-grid-div1 {
+    width: 100%;
+    height: 90%;
+    margin-right: 15px;
+    margin-top: 1px;
+    border: 1px solid darkgray;
+}
+
+.vas-grid-div2 {
+    width: 100%;
+    height: calc(100% - 21%);
+    margin-right: 15px;
+    margin-top: 1px;
+    border: 1px solid darkgray;
+    display: none;
+}
+
+.vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
+    pointer-events: none;
+    color: lightgray;
+}
+
+.vas-control-wrap {
+    width: calc(100% - 70px);
+}
+
+.VIS-AMTD-InputBtns input {
+    width: 100%;
 }
 
 .vis-pSelectInfo {
