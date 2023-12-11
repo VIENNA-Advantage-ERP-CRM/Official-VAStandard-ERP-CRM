@@ -159,12 +159,7 @@ namespace VIS.Models
             string[] paramValue = param.Split(',');
 
             Dictionary<String, object> retPro = new Dictionary<string, object>();
-
-            //Assign parameter value
-            int VAS_ContractLine_ID;
-            VAS_ContractLine_ID = Util.GetValueOfInt(paramValue[0].ToString());
-            //End Assign parameter value
-            DataSet ds = DB.ExecuteDataset(@" SELECT M_AttributeSetInstance_ID,C_UOM_ID,M_Product_ID,C_Charge_ID FROM VAS_ContractLine WHERE VAS_ContractLine_ID = " + VAS_ContractLine_ID, null, null);
+            DataSet ds = DB.ExecuteDataset(@" SELECT M_AttributeSetInstance_ID,C_UOM_ID,M_Product_ID,C_Charge_ID FROM VAS_ContractLine WHERE VAS_ContractLine_ID = " + Util.GetValueOfInt(paramValue[0].ToString()), null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"])>0)
@@ -172,7 +167,7 @@ namespace VIS.Models
                     retPro["M_Product"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]);
 
                 }
-                if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"])>0)
+                else 
                 {
                     retPro["C_Charge"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"]);
                 }

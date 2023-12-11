@@ -126,17 +126,17 @@
             this.setCalloutActive(true);
             var paramString = Util.getValueOfInt(value);
             var cl = VIS.dataContext.getJSONRecord("MVASContract/GetContractData", paramString);
-            if (Util.getValueOfInt(cl.M_Product) > 0) {
-                mTab.setValue("M_Product_ID", Util.getValueOfInt(cl.M_Product));
+            if (cl!= null) {
+                if (Util.getValueOfInt(cl.M_Product) > 0) {
+                    mTab.setValue("M_Product_ID", Util.getValueOfInt(cl.M_Product));
+                }
+                if (Util.getValueOfInt(cl.C_Charge) > 0) {
+                    mTab.setValue("C_Charge_ID", Util.getValueOfInt(cl.C_Charge));
+                }
+                mTab.setValue("C_UOM_ID", cl["C_UOM"]);
+                mTab.setValue("M_AttributeSetInstance_ID", cl["M_AttributeSetInstance"]);
+                mTab.setValue("QtyEntered", 1);
             }
-            if (Util.getValueOfInt(cl.C_Charge) > 0) {
-                mTab.setValue("C_Charge_ID", Util.getValueOfInt(cl.C_Charge));
-            }
-            //mTab.setValue("M_Product_ID", cl["M_Product_ID"]);
-            //mTab.setValue("C_Charge_ID", cl["C_Charge_ID"]);
-            mTab.setValue("C_UOM_ID", cl["C_UOM"]);
-            mTab.setValue("M_AttributeSetInstance_ID", cl["M_AttributeSetInstance"]);
-            mTab.setValue("QtyEntered",1);
             this.setCalloutActive(false);
         }
         catch (err) {
