@@ -158,7 +158,7 @@ namespace VIS.Models
         {
             string[] paramValue = param.Split(',');
 
-            Dictionary<String, object> retDic = new Dictionary<string, object>();
+            Dictionary<String, object> retPro = new Dictionary<string, object>();
 
             //Assign parameter value
             int VAS_ContractLine_ID;
@@ -167,12 +167,19 @@ namespace VIS.Models
             DataSet ds = DB.ExecuteDataset(@" SELECT M_AttributeSetInstance_ID,C_UOM_ID,M_Product_ID,C_Charge_ID FROM VAS_ContractLine WHERE VAS_ContractLine_ID = " + VAS_ContractLine_ID, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
-                  retDic["M_Product_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]);
-                  retDic["C_Charge_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"]);
-                  retDic["M_AttributeSetInstance_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
-                  retDic["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+                if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"])>0)
+                {
+                    retPro["M_Product"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]);
+
+                }
+                if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"])>0)
+                {
+                    retPro["C_Charge"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"]);
+                }
+                    retPro["M_AttributeSetInstance"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
+                    retPro["C_UOM"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
             }
-            return retDic;
+            return retPro;
         }   
     }
 }
