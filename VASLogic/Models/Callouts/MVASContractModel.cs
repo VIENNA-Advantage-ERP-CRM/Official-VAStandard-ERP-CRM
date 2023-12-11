@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using VAdvantage.DataBase;
+using VAdvantage.Model;
 using VAdvantage.Utility;
 
 namespace VIS.Models
@@ -146,5 +147,32 @@ namespace VIS.Models
             int UOM = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return UOM;
         }
+
+        /// <summary>
+        /// VIS430:Get contractline data
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns>Product,charge,Attribute set instance and Uom</returns>
+        public Dictionary<string, object> GetContractData(Ctx ctx, string param)
+        {
+            string[] paramValue = param.Split(',');
+
+            Dictionary<String, object> retDic = new Dictionary<string, object>();
+
+            //Assign parameter value
+            int VAS_ContractLine_ID;
+            VAS_ContractLine_ID = Util.GetValueOfInt(paramValue[0].ToString());
+            //End Assign parameter value
+            DataSet ds = DB.ExecuteDataset(@" SELECT M_AttributeSetInstance_ID,C_UOM_ID,M_Product_ID,C_Charge_ID FROM VAS_ContractLine WHERE VAS_ContractLine_ID = " + VAS_ContractLine_ID, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                  retDic["M_Product_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]);
+                  retDic["C_Charge_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Charge_ID"]);
+                  retDic["M_AttributeSetInstance_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
+                  retDic["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+            }
+            return retDic;
+        }   
     }
 }
