@@ -385,7 +385,7 @@ namespace VAdvantage.Model
                             }
                             //}
                         }
-                     }
+                    }
                     //
                     SetC_Tax_ID(oLine.GetC_Tax_ID());
                     SetLineNetAmt(oLine.GetLineNetAmt());
@@ -3019,7 +3019,7 @@ namespace VAdvantage.Model
                         // when order not linked then get difference between current Cost Price on Vendor Return and APC
                         ds = DB.ExecuteDataset($@"SELECT ROUND(CurrencyConvert( CurrentCostPrice , {GetCtx().GetContextAsInt("$C_Currency_ID")},
                                                     {invoiceline.GetParent().GetC_Currency_ID()},
-                                                    {GlobalVariable.TO_DATE( invoiceline.GetParent().GetDateAcct() , true)},
+                                                    {GlobalVariable.TO_DATE(invoiceline.GetParent().GetDateAcct(), true)},
                                                     {invoiceline.GetParent().GetC_ConversionType_ID()},
                                                     {GetAD_Client_ID()} , {GetAD_Org_ID()})
                                                     * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS TaxableAmt  
@@ -3681,8 +3681,8 @@ namespace VAdvantage.Model
                             }
                         }
                         /* Devops TaskID:1985 This method will not be called when invoice is creating 
-                          with Order reference .Because price will be the defined on Order only.*/                        
-                        if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
+                          with Order reference .Because price will be the defined on Order only.*/
+                        if (GetC_OrderLine_ID() == 0)//if Orderline_ID equals to zero then SetPrice function will call
                         {
                             SetPrice();
                         }
@@ -3966,6 +3966,31 @@ namespace VAdvantage.Model
                     Set_Value("VA077_MarginPercent", marginper);
 
                 }
+
+                //VIS0336:-restrict the user to add extra amount while creating line with contract line refr
+                string query = "SELECT (c.Amount-(a.t1+b.t2)) Actual  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
+                          " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
+                          " AND ol.VAS_ContractLine_ID = " + Get_Value("VAS_ContractLine_ID") + " ) a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                          " C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
+                          " il.VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ") b , (SELECT Amount  FROM VAS_ContractLine" +
+                          "  WHERE VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ")c";
+                DataSet ds1 = DB.ExecuteDataset(query, null, Get_Trx());
+                decimal RemainingQty = 0;
+                if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+                {
+                    RemainingQty = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["ActualAmount"]);
+
+                }
+
+                if (newRecord || Is_ValueChanged("LineNetAmt"))
+                {
+                    if (GetLineNetAmt() > RemainingQty)
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                        return false;
+                    }
+                }
+
 
             }
             catch (Exception ex)

@@ -2590,7 +2590,7 @@ namespace VAdvantage.Model
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
                         return false;
-                    }                    
+                    }
                 }
 
                 if (IsReturnTrx())
@@ -4532,7 +4532,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return  "@VAS_OrigPONotFound@";
+                        return"@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -4598,42 +4598,50 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
                 if (ContractID > 0)
                 {
-                    MVASContractMaster _vasCont = new
-                        MVASContractMaster(GetCtx(), ContractID, Get_Trx());
-                    decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
-                                             _vasCont.GetVAS_ContractUtilizedAmount();
-                    if (!_vasCont.IsVAS_OverLimit())
+                    //VIS0336:-these changes are handled on before save logic of order line.
+                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetGrandTotal() + " )" +
+                                                      " WHERE VAS_ContractMaster_ID=" + ContractID;
+                    int no = DB.ExecuteQuery(query, null, Get_Trx());
+                    if (no < 0)
                     {
-                        if (GetGrandTotal() > ContractRemainingAmt)
-                        {
-                            SetProcessed(false);
-                            log.Warning("GrandTotal is greater than " +
-                                "contract amount " + (GetGrandTotal() -
-                                (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
-                            _processMsg = "@VAS_GrndTtllAmtGrtr@";
-                            return false;
-                        }
-                        else if (GetGrandTotal() <= ContractRemainingAmt)
-                        {
-                            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                + GetGrandTotal());
-                            if (!_vasCont.Save())
-                            {
-                                log.Warning("ContractUtilizedAmount Not Updated");
-                            }
-                            return true;
-                        }
+                        log.Warning(Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated"));
                     }
-                    else
-                    {
-                        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                               + GetGrandTotal());
-                        if (!_vasCont.Save())
-                        {
-                            log.Warning("ContractUtilizedAmount Not Updated");
-                        }
-                        return true;
-                    }
+                    //MVASContractMaster _vasCont = new
+                    //    MVASContractMaster(GetCtx(), ContractID, Get_Trx());
+                    //decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
+                    //                         _vasCont.GetVAS_ContractUtilizedAmount();
+                    //if (!_vasCont.IsVAS_OverLimit())
+                    //{
+                    //    if (GetGrandTotal() > ContractRemainingAmt)
+                    //    {
+                    //        SetProcessed(false);
+                    //        log.Warning("GrandTotal is greater than " +
+                    //            "contract amount " + (GetGrandTotal() -
+                    //            (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                    //        _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                    //        return false;
+                    //    }
+                    //    else  if (GetGrandTotal() <= ContractRemainingAmt)
+                    //    {
+                    //        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                    //            + GetGrandTotal());
+                    //        if (!_vasCont.Save())
+                    //        {
+                    //            log.Warning("ContractUtilizedAmount Not Updated");
+                    //        }
+                    //        return true;
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //_vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                    //       + GetGrandTotal());
+                    //if (!_vasCont.Save())
+                    //{
+                    //    log.Warning("ContractUtilizedAmount Not Updated");
+                    //}
+                    return true;
+                    // }
                 }
             }
             return true;
