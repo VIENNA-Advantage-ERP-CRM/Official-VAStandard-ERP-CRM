@@ -562,6 +562,8 @@
     <Compile Include="Process\DocumentEngine.cs" />
     <Compile Include="Process\InventoryRevaluation.cs" />
     <Compile Include="Process\MarkExpireContract.cs" />
+    <Compile Include="Process\PublishContract.cs" />
+    <Compile Include="Process\ReActiveContract.cs" />
     <Compile Include="Process\RenewalContract.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />

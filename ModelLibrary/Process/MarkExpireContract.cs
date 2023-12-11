@@ -38,7 +38,7 @@ namespace VAdvantage.Process
             sql.Append(@" UPDATE VAS_ContractMaster SET IsExpiredContracts = 
                 CASE WHEN (EndDate <= Sysdate) THEN 'Y' ELSE 'N' END,
                 VAS_Status = CASE WHEN (EndDate <= Sysdate) THEN 'EXP' 
-                ELSE VAS_Status END");
+                ELSE VAS_Status END WHERE VAS_Terminate='N'"); //VAI050-Terminate Contract Should not be expired
             if (Util.GetValueOfInt(DB.ExecuteQuery
                 (sql.ToString(), null, Get_Trx())) < 0)
             {
