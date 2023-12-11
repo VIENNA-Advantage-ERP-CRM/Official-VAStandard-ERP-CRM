@@ -196,15 +196,13 @@ namespace VIS.Models
         /// </summary>
         /// <param name="ctx">Contex</param>
         /// <param name="query">Query</param>
-        /// <param name="tableName">AD_Table Name</param>
         /// <param name="tableID">AD_Table_ID</param>
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>saved/notsaved</returns>
-        public string SaveQuery(Ctx ctx,string query, string tableName,int tableID, int alertID, int alertRuleID)
+        public string SaveQuery(Ctx ctx,string query,int tableID, int alertID, int alertRuleID)
         {
             if(query!=null&&query.Length>0){
-             //  query= query.ToUpper();
                 int indexOfFrom = query.IndexOf("FROM");
                 int indexOfWhere = query.IndexOf("WHERE");
                 int indexOfOrder = query.IndexOf("ORDER BY");
@@ -240,14 +238,7 @@ namespace VIS.Models
                     obj.SetFromClause(Util.GetValueOfString(fromClause));
                     obj.SetWhereClause(Util.GetValueOfString(whereClause));
                     obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
-                    if (tableName != null && tableName != "")
-                    {
-                        obj.SetName(Util.GetValueOfString(tableName));
-                    }
-                    else
-                    {
-                        obj.SetName(Util.GetValueOfString("AlertRule"));
-                    }
+                    obj.SetName(Util.GetValueOfString("AlertRule"));
                     obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
                     obj.SetIsActive(true);
                     obj.SetIsValid(true);
@@ -282,7 +273,7 @@ namespace VIS.Models
             {
                 if (alertRuleID == 0)
                 {
-                    SaveQuery(ctx, query, "AlertRule", tableID, alertID, alertRuleID);
+                    SaveQuery(ctx, query, tableID, alertID, alertRuleID);
                     return Msg.GetMsg(ctx, "SavedSuccessfully");
                 }
                 int indexOfFrom = query.IndexOf("FROM");

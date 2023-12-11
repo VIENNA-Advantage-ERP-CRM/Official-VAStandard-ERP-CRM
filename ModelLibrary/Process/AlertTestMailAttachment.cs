@@ -76,7 +76,10 @@ namespace ViennaAdvantage.Process
                             msg = " No sql result found";
                         }
                     }
-                    GetResult(alert, rule, sql, attachments, message);
+                    if (!GetResult(alert, rule, sql, attachments, message))
+                    {
+                        return Msg.GetMsg(GetCtx(), "VAS_MailNotSent");
+                    }
                 }
                 return Msg.GetMsg(GetCtx(), "MailSent") + msg;
             }
@@ -97,7 +100,7 @@ namespace ViennaAdvantage.Process
                 string filePath = GlobalVariable.PhysicalPath + "TempDownload\\";
                 if (!Directory.Exists(filePath))
                     Directory.CreateDirectory(filePath);
-                log.Log(Level.INFO, "AlertProcessor=> Create Directory in CreateExcelFile");
+                log.Log(Level.INFO, "TestAlert=> Create Directory in CreateExcelFile");
                 string fileName = filePath + path + ".xlsx";
                 using (XLWorkbook wb = new XLWorkbook())
                 {
@@ -116,14 +119,14 @@ namespace ViennaAdvantage.Process
                     }
                     wb.SaveAs(fileName);
                 }
-                log.Log(Level.INFO, "AlertProcessor=> Create Exporter.export in CreateExcelFile");
+                log.Log(Level.INFO, "TestAlert=> Create Exporter.export in CreateExcelFile");
                 FileInfo fInfo = new FileInfo(fileName);
-                log.Log(Level.INFO, "AlertProcessor=> Create new File Info in CreateExcelFile");
+                log.Log(Level.INFO, "TestAlert=> Create new File Info in CreateExcelFile");
                 return fInfo;
             }
             catch (Exception e)
             {
-                log.Log(Level.SEVERE, "AlertProcessor=>Error creating File in TempDownload in Excel on CreateExcelFile", e);
+                log.Log(Level.SEVERE, "TestAlert=>Error creating File in TempDownload in Excel on CreateExcelFile", e);
                 return null;
             }
         }
@@ -220,7 +223,6 @@ namespace ViennaAdvantage.Process
         /// <returns>true/false</returns>
         private bool GetResult(MAlert alert, MAlertRule rule, String sql, List<FileInfo> attachments, StringBuilder message)
         {
-            bool valid = true;
             StringBuilder finalMsg = new StringBuilder(message.ToString());        
             SimpleDateFormat df = DisplayType.GetDateFormat(DisplayType.DateTime);
             finalMsg.Append("\n\n" + Msg.Translate(GetCtx(), "Date") + (" : ") + (df.Format(DateTime.Now)));
@@ -238,8 +240,9 @@ namespace ViennaAdvantage.Process
                     finalMsg.Append("\n\n" + text);
                     int index = text.IndexOf(":");
                     if (index > 0 && index < 5)
-                       m_summary.Append(text.Substring(0, index));
+                        m_summary.Append(text.Substring(0, index));
                 }
+               
             }
             catch (Exception e)
             {
@@ -247,10 +250,12 @@ namespace ViennaAdvantage.Process
                 m_errors.Append("Select=" + e.Message);
                 rule.SetIsValid(false);
                 rule.Save();
-                valid = false;
             }
-            SendInfo(AD_User_ID, alert.GetAlertSubject(), finalMsg.ToString(), attachments);
-            return valid;
+            if (SendInfo(AD_User_ID, alert.GetAlertSubject(), finalMsg.ToString(), attachments))
+            {
+               return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -261,7 +266,7 @@ namespace ViennaAdvantage.Process
         /// <param name="message">Mail Content</param>
         /// <param name="attachments">Excel file</param>
         /// <returns>void</returns>
-        private void SendInfo(int AD_User_ID, string subject, string message, List<FileInfo> attachments)
+        private bool SendInfo(int AD_User_ID, string subject, string message, List<FileInfo> attachments)
         {           
             m_client = MClient.Get(GetCtx(), GetCtx().GetAD_Client_ID());
             MUser user = MUser.Get(GetCtx(), AD_User_ID);
@@ -276,9 +281,13 @@ namespace ViennaAdvantage.Process
                     {
                         email.AddAttachment(f);
                     }
-                    email.Send();
+                    if (email.Send() == EMail.SENT_OK)
+                    {
+                        return true;
+                    }
                 }
             }
+            return false;
         }
 
         /// <summary>
@@ -294,22 +303,22 @@ namespace ViennaAdvantage.Process
             DataTable data = GetData(sql, trxName);
             if (data == null)
             {
-                log.Log(Level.SEVERE, "AlertProcessor=>Error executing sql on GetExcelReport");
+                log.Log(Level.SEVERE, "TestAlert=>Error executing sql on GetExcelReport");
                 return null;
             }
             try
             {
-                log.Log(Level.INFO, "AlertProcessor=> File to CreateExcelFile");
+                log.Log(Level.INFO, "TestAlert=> File to CreateExcelFile");
                 FileInfo fInfo = CreateExcelFile(data);
-                log.Log(Level.INFO, "AlertProcessor=>File to Attachments");
+                log.Log(Level.INFO, "TestAlert=>File to Attachments");
                 attachments.Add(fInfo);
                 String msg = rule.GetName() + " (@SeeAttachment@ " + fInfo.Name + ")" + Env.NL;
-                log.Log(Level.INFO, "AlertProcessor=> " + msg);
+                log.Log(Level.INFO, "TestAlert=> " + msg);
                 return Msg.ParseTranslation(GetCtx(), msg);
             }
             catch
             {
-                log.Log(Level.SEVERE, "AlertProcessor=>Error writing data in Excel on GetExcelReport");
+                log.Log(Level.SEVERE, "TestAlert=>Error writing data in Excel on GetExcelReport");
                 return null;
 
             }

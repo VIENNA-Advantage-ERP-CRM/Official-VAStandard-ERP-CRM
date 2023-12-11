@@ -101,33 +101,7 @@ namespace VAS.Areas.VAS.Controllers
                 retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
-
-        /// <summary>
-        /// Saving SqlGenerator query in AlertRule Window
-        /// </summary>
-        /// <param name="query">Query</param>
-        /// <param name="tableName">AD_Table Name</param>
-        /// <param name="tableID">AD_Table_ID</param>
-        /// <param name="alertID">AD_Alert_ID</param>
-        /// <param name="alertRuleID">AD_AlertRule_ID</param>
-        /// <returns>saved/notsaved</returns>
-        public JsonResult SaveQuery(string query,string tableName,int tableID,int alertID,int alertRuleID)
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate obj = new AlertSqlGenerate();
-                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
-                if (!QueryValidator.IsValid(query))
-                {
-                    return Json(null);
-                }
-                retJSON = JsonConvert.SerializeObject(obj.SaveQuery(ctx, query, tableName, tableID, alertID, alertRuleID));
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
+        }       
 
         /// <summary>
         /// Update record of AlertRule by TabSqlGenerator 
