@@ -133,10 +133,27 @@
                 if (Util.getValueOfInt(cl.C_Charge) > 0) {
                     mTab.setValue("C_Charge_ID", Util.getValueOfInt(cl.C_Charge));
                 }
-                mTab.setValue("C_UOM_ID", cl["C_UOM"]);
                 mTab.setValue("M_AttributeSetInstance_ID", cl["M_AttributeSetInstance"]);
+                mTab.setValue("C_UOM_ID", cl["C_UOM"]);
                 mTab.setValue("QtyEntered", 1);
             }
+            var M_Product_ID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
+            var C_BPartner_ID = Util.getValueOfInt(mTab.getValue("C_BPartner_ID"));
+            var QtyEntered = Util.getValueOfInt(mTab.getValue("QtyEntered"));
+            var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
+
+            var params = mTab.getValue("M_Product_ID").toString().concat("," + ctx.getAD_Client_ID().toString() + "," + (mTab.getValue("C_Order_ID")).toString() +
+                "," + (C_BPartner_ID).toString() + "," + (mTab.getValue("QtyEntered")).toString() + "," + (mTab.getValue("C_UOM_ID")).toString());
+            var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnProductChange", params);
+            PriceListPrecision = Util.getValueOfInt(params["PriceListPrecision"]);
+            PriceList = Util.getValueOfDecimal(prices["PriceList"]);
+            mTab.setValue("PriceList", PriceList);
+            PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"]);
+            mTab.setValue("PriceEntered", PriceEntered);
+            PriceActual = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
+            mTab.setValue("PriceActual", PriceActual);
+            mTab.setValue("QtyOrdered", Util.getValueOfDecimal(prices["QtyOrdered"].toFixed(prices["UOMStdPrecision"])));
+
             this.setCalloutActive(false);
         }
         catch (err) {
