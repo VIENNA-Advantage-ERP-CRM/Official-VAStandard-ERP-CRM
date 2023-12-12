@@ -4598,7 +4598,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
                 if (ContractID > 0)
                 {
-                    //VIS0336:-these changes are handled on before save logic of order line.
+                   //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Order is completed and and Contact master id is greater than 0.
                     String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetGrandTotal() + " )" +
                                                       " WHERE VAS_ContractMaster_ID=" + ContractID;
                     int no = DB.ExecuteQuery(query, null, Get_Trx());
@@ -4606,6 +4606,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     {
                         log.Warning(Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated"));
                     }
+                    //VIS0336:-these changes are handled on before save logic of order line.
                     //MVASContractMaster _vasCont = new
                     //    MVASContractMaster(GetCtx(), ContractID, Get_Trx());
                     //decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
