@@ -137,14 +137,17 @@
                 mTab.setValue("C_UOM_ID", cl["C_UOM"]);
                 mTab.setValue("QtyEntered", 1);
             }
+
             var M_Product_ID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
             var C_BPartner_ID = Util.getValueOfInt(mTab.getValue("C_BPartner_ID"));
-            var QtyEntered = Util.getValueOfInt(mTab.getValue("QtyEntered"));
-            var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
-
-            var params = mTab.getValue("M_Product_ID").toString().concat("," + ctx.getAD_Client_ID().toString() + "," + (mTab.getValue("C_Order_ID")).toString() +
-                "," + (C_BPartner_ID).toString() + "," + (mTab.getValue("QtyEntered")).toString() + "," + (mTab.getValue("C_UOM_ID")).toString());
-            var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnProductChange", params);
+            var isSOTrx = (ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y");
+            var params = M_Product_ID.toString().concat(",", (mTab.getValue("C_Order_ID")).toString() +
+                "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
+                "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
+                "," + C_BPartner_ID.toString() +
+                "," + (mTab.getValue("QtyEntered")).toString() +
+                "," + isSOTrx + "," + 1 + "," + 1);
+            var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
             PriceListPrecision = Util.getValueOfInt(params["PriceListPrecision"]);
             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
             mTab.setValue("PriceList", PriceList);
@@ -153,7 +156,6 @@
             PriceActual = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
             mTab.setValue("PriceActual", PriceActual);
             mTab.setValue("QtyOrdered", Util.getValueOfDecimal(prices["QtyOrdered"].toFixed(prices["UOMStdPrecision"])));
-
             this.setCalloutActive(false);
         }
         catch (err) {
