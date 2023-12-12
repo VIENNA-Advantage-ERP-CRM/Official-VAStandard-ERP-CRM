@@ -5488,7 +5488,9 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 decimal arcAmt = 0;
                                 for (int j = 0; j < rowsGL.Count; j++)
                                 {
-                                    if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) < 0)
+                                    /*VIS_427 BugId:3417 12/12/2023 Handled issue When user allocate the single/multiple Invoice schedules(ARC) of same/different invoice with GL Journal line ,
+                                        then system should create the allocation of  ARC with GL if applied amount Gl Journal line is greater then 0*/
+                                    if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) > 0)
                                     {
                                         saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
                                             Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
@@ -5717,7 +5719,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                     {
                                         /* VIS_427 DevOpsId 3333 07/12/2023 Handled issue When user allocate the multiple Invoice schedules of same invoice with GL Journal line ,
                                         then system will pick the paid amount and set the same amount on the reference of that invoice schedule */
-                                        if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
+                                    if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
                                         {
                                             paid = Util.GetValueOfDecimal(negList[k]["paidAmt"]) + netAmt;
                                             negList[k]["paidAmt"] = paid.ToString();
