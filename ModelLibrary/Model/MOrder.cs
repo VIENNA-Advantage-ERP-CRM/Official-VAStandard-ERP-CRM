@@ -4641,7 +4641,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     //{
                     //    log.Warning("ContractUtilizedAmount Not Updated");
                     //}
-                    return true;
+                    //return true;
                     // }
                 }
             }

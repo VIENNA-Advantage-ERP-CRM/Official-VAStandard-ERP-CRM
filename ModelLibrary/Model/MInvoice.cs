@@ -168,7 +168,7 @@ namespace VAdvantage.Model
              (Date invoiced of original invoice - Due Date of original invoice) is added into date invoiced of new invoice */
             if (from.GetDateInvoiced() != null && from.GetDueDate() != null && !(!counter && setOrder))
             {
-                int DaysDiff = (from.GetDueDate()-from.GetDateInvoiced()).Value.Days;
+                int DaysDiff = (from.GetDueDate() - from.GetDateInvoiced()).Value.Days;
                 to.SetDueDate(to.GetDateInvoiced().Value.AddDays(DaysDiff));
             }
             to.SetDatePrinted(null);
@@ -5301,13 +5301,12 @@ namespace VAdvantage.Model
                     //            log.Warning("ContractUtilizedAmount Not Updated");
                     //        }
                     //        return true;
-                }
 
-                else
-                {
-                    return true;
+                    //else
+                    //{
+                    //    return true;
+                    //}
                 }
-
             }
             return true;
         }

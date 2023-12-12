@@ -3968,7 +3968,7 @@ namespace VAdvantage.Model
                 }
 
                 //VIS0336:-Restrict the user to add greater amount than contract line Amount while creating PO line with contract line refrence.
-                if (newRecord || Is_ValueChanged("LineNetAmt"))
+                if ((newRecord || Is_ValueChanged("LineNetAmt")) && Util.GetValueOfInt(Get_Value("VAS_ContractLine_ID")) > 0)
                 {
                     string query = "SELECT (c.Amount-(a.t1+b.t2)) Actual  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
                           " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
