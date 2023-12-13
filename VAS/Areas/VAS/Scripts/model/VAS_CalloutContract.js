@@ -54,11 +54,13 @@
         }
         this.setCalloutActive(true);
         var startDate = new Date(mTab.getValue("StartDate"));
+        var docDate = new Date(mTab.getValue("DateDoc"));
         var endDate = new Date(value);
         endDate = endDate.toISOString();
         startDate = startDate.toISOString();
-        if (mTab.getValue("StartDate") != null) {
-            if (endDate < startDate) {
+        docDate = docDate.toISOString();
+        if (mTab.getValue("StartDate") != null || mTab.getValue("DateDoc") != null) {//VIS430:Contract End Date not less than contract date
+            if (endDate < startDate || endDate < docDate) {
                 mTab.setValue("EndDate", null);
                 this.setCalloutActive(false);
                 return "VAS_EndDateMustGreater";
