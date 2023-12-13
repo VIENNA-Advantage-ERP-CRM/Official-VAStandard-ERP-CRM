@@ -56,9 +56,9 @@
         var startDate = new Date(mTab.getValue("StartDate"));
         var docDate = new Date(mTab.getValue("DateDoc"));
         var endDate = new Date(value);
-        endDate = endDate.toISOString();
-        startDate = startDate.toISOString();
-        docDate = docDate.toISOString();
+        endDate = endDate.setHours(0, 0, 0, 0);
+        startDate = startDate.setHours(0, 0, 0, 0);
+        docDate = docDate.setHours(0, 0, 0, 0);
         if (mTab.getValue("StartDate") != null || mTab.getValue("DateDoc") != null) {//VIS430:Contract End Date not less than contract date
             if (endDate < startDate || endDate < docDate) {
                 mTab.setValue("EndDate", null);
