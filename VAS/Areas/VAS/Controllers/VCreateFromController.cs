@@ -267,7 +267,7 @@ namespace VIS.Controllers
                       + "l.M_Product_ID,c.Name,c.Value,l.M_AttributeSetInstance_ID, l.Line,l.C_OrderLine_ID, ins.description, " + precision + ", l.IsDropShip , o.C_PaymentTerm_ID , t.Name, l.PriceEntered");
             }
             // JID_1287: Line number sequence to be maintained when we create lines from the reference of other documents.
-            string sqlNew = "SELECT * FROM (" + sql.ToString() + ") t WHERE QUANTITY > 0 " + (isProvisionalInvoice ? ("AND " + GetProvisionalLine()) : "") + " ORDER BY LINE";
+            string sqlNew = "SELECT * FROM (" + sql.ToString() + ") t WHERE QUANTITY > 0 " + (isProvisionalInvoice ? (" AND " + GetProvisionalLine()) : "") + " ORDER BY LINE";
 
             return sqlNew;
         }

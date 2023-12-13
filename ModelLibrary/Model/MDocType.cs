@@ -132,7 +132,7 @@ namespace VAdvantage.Model
             List<MDocType> list = new List<MDocType>();
             String sql = "SELECT * FROM C_DocType "
                 + "WHERE AD_Client_ID=" + ctx.GetAD_Client_ID() + " AND DocBaseType='" + docBaseType + "' AND IsActive='Y'"
-                + "ORDER BY C_DocType_ID";
+                + " ORDER BY C_DocType_ID";
             DataSet pstmt = null;
             try
             {

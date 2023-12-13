@@ -60,7 +60,7 @@ namespace VAdvantage.Process
                     + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                     + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                     + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                    + "ORDER BY plv.ValidFrom DESC";
+                    + " ORDER BY plv.ValidFrom DESC";
 
                     int M_PriceList_Version_ID = 0;
                     int C_Currency_ID = 0;

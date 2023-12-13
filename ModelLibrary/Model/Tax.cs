@@ -412,7 +412,7 @@ namespace VAdvantage.Model
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
                 + "WHERE t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {

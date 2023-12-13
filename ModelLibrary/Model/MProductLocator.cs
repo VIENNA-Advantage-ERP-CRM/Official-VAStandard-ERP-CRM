@@ -40,7 +40,7 @@ namespace VAdvantage.Model
                 + " AND (M_Locator_ID IN (SELECT M_Locator_ID FROM M_Product WHERE M_Product_ID=" + product.GetM_Product_ID() + ")"
                 + " OR M_Locator_ID IN (SELECT M_Locator_ID FROM M_ProductLocator WHERE M_Product_ID=" + product.GetM_Product_ID() + " AND IsActive='Y'))"
                 + " AND M_Warehouse_ID=" + M_Warehouse_ID
-                + "ORDER BY PriorityNo DESC";
+                + " ORDER BY PriorityNo DESC";
             DataTable dt = null;
             IDataReader idr = null;
             try
@@ -91,7 +91,7 @@ namespace VAdvantage.Model
                 + " AND (M_Locator_ID IN (SELECT M_Locator_ID FROM M_Product WHERE M_Product_ID=" + product.GetM_Product_ID() + ")"
                 + " OR M_Locator_ID IN (SELECT M_Locator_ID FROM M_ProductLocator WHERE M_Product_ID=" + product.GetM_Product_ID() + " AND IsActive='Y'))"
                 + " AND M_Warehouse_ID= " + M_Warehouse_ID
-                + "ORDER BY PriorityNo DESC";
+                + " ORDER BY PriorityNo DESC";
             DataTable dt = null;
             IDataReader idr = null;
             try

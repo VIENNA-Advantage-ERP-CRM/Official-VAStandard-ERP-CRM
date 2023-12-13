@@ -331,8 +331,8 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
 
                 /** Calculations	**/
                 MProductPrice[] pp = _plv.GetProductPrice(
-                    "AND EXISTS (SELECT * FROM T_Selection s "
-                    + "WHERE s.T_Selection_ID=M_ProductPrice.M_Product_ID)");
+                    " AND EXISTS (SELECT * FROM T_Selection s "
+                    + " WHERE s.T_Selection_ID=M_ProductPrice.M_Product_ID)");
                 for (int j = 0; j < pp.Length; j++)
                 {
                     MProductPrice price = pp[j];

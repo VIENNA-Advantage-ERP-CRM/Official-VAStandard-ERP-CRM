@@ -321,7 +321,7 @@ namespace VAdvantage.Model
             //if (attributeApplicable)//M_ASI_ID != 0 && 
             sql += " AND NVL(M_AttributeSetInstance_ID, 0)=@asi";
             sql += " AND CurrentQty<>0 ";
-            sql += "ORDER BY queuedate ";
+            sql += " ORDER BY queuedate ";
             if (!ce.IsFifo())
                 sql += "DESC ";
             sql += " , M_AttributeSetInstance_ID ";
@@ -435,7 +435,7 @@ namespace VAdvantage.Model
                 sql += " AND NVL(M_AttributeSetInstance_ID, 0)=" + M_ASI_ID;
             }
             sql += " AND CurrentQty<>0 ";
-            sql += "ORDER BY queuedate ";
+            sql += " ORDER BY queuedate ";
             if (!ce.IsFifo())
                 sql += "DESC ";
             sql += " , M_AttributeSetInstance_ID ";
@@ -552,7 +552,7 @@ namespace VAdvantage.Model
             if (attributeApplicable)
                 sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0)=@asi");
             sql.Append(" AND CurrentQty<>0 ");
-            sql.Append("ORDER BY queuedate ");
+            sql.Append(" ORDER BY queuedate ");
             if (!isFifo)
                 sql.Append("DESC ");
             sql.Append(" , M_AttributeSetInstance_ID ");

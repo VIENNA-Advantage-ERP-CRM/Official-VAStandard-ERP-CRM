@@ -658,7 +658,7 @@ namespace VAdvantage.Model
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
                 + "WHERE t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {
@@ -2194,7 +2194,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             DataSet dsDiscountBreak = new DataSet();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2239,7 +2239,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2284,7 +2284,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2355,7 +2355,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 DataSet dsDiscountBreak = new DataSet();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2400,7 +2400,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2445,7 +2445,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)

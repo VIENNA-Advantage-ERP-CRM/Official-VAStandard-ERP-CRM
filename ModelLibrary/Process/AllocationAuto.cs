@@ -298,13 +298,13 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 + " AND IsPrepayment='N' AND C_Charge_ID IS NULL ";
             if (_ONLY_AP.Equals(_APAR))
             {
-                sql += "AND IsReceipt='N' ";
+                sql += " AND IsReceipt='N' ";
             }
             else if (_ONLY_AR.Equals(_APAR))
             {
-                sql += "AND IsReceipt='Y' ";
+                sql += " AND IsReceipt='Y' ";
             }
-            sql += "ORDER BY DateTrx";
+            sql += " ORDER BY DateTrx";
             SqlParameter[] param = new SqlParameter[1];
             DataTable dt = null;
             IDataReader idr = null;
@@ -365,10 +365,10 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
             String sql = "SELECT * FROM C_Invoice "
                 + "WHERE IsPaid='N' AND Processed='Y' AND C_BPartner_ID=@param1 ";
             if (_ONLY_AP.Equals(_APAR))
-                sql += "AND IsSOTrx='N' ";
+                sql += " AND IsSOTrx='N' ";
             else if (_ONLY_AR.Equals(_APAR))
-                sql += "AND IsSOTrx='Y' ";
-            sql += "ORDER BY DateInvoiced";
+                sql += " AND IsSOTrx='Y' ";
+            sql += " ORDER BY DateInvoiced";
             ;
             SqlParameter[] param = new SqlParameter[1];
             DataTable dt = null;

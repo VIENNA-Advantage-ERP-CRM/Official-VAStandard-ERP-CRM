@@ -1170,13 +1170,13 @@ namespace VAdvantage.Model
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines "
                     + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
-                    + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                    + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines+"
                         + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
                         + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
-                        + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                        + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {
@@ -2369,7 +2369,7 @@ namespace VAdvantage.Model
                         //If Payment Term Is Advance than system will check for there is any lines exist which is created without order Reference or through Independent Invoice.
                         int _OrdCount = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(TOTAL) FROM (SELECT COUNT(VA009_OrderPaySchedule_ID)AS TOTAL
                         FROM VA009_OrderPaySchedule WHERE IsActive = 'Y' AND VA009_IsPaid='N' AND C_Order_ID= " + GetC_Order_ID() +
-                        @"UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
+                        @" UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
                         WHERE C_Invoice_ID = " + GetC_Invoice_ID() + " AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0)t"));
                         if (_OrdCount > 0)
                         {
@@ -2556,7 +2556,7 @@ namespace VAdvantage.Model
          */
         private void ExplodeBOM()
         {
-            String where = "AND IsActive='Y' AND EXISTS "
+            String where = " AND IsActive='Y' AND EXISTS "
                 + "(SELECT * FROM M_Product p WHERE C_InvoiceLine.M_Product_ID=p.M_Product_ID"
                 + " AND	p.IsBOM='Y' AND p.IsVerified='Y' AND p.IsStocked='N')";
             //
@@ -7062,7 +7062,7 @@ namespace VAdvantage.Model
                 + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                 + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                 + " AND pl.M_PriceList_ID=" + M_PriceList_ID                        //	1
-                + "ORDER BY plv.ValidFrom DESC";
+                + " ORDER BY plv.ValidFrom DESC";
             //	Use newest price list - may not be future
             IDataReader dr = null;
             try

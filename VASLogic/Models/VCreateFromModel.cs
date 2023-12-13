@@ -68,17 +68,17 @@ namespace VIS.Models
                  AND O.IsBlanketTrx = 'N' AND O.ISSALESQUOTATION = 'N' AND o.DocStatus IN('CL', 'CO') ");
             if (OrgId > 0)
             {
-                sql.Append("AND o.AD_Org_ID = " + OrgId);
+                sql.Append(" AND o.AD_Org_ID = " + OrgId);
             }
             if (C_BPartner_ID > 0)
             {
                 if (isProvisionalInvoice || forInvoices)
                 {
-                    sql.Append("AND (o.C_BPartner_ID = " + C_BPartner_ID + " OR o.Bill_BPartner_ID = " + C_BPartner_ID + ")");
+                    sql.Append(" AND (o.C_BPartner_ID = " + C_BPartner_ID + " OR o.Bill_BPartner_ID = " + C_BPartner_ID + ")");
                 }
                 else
                 {
-                    sql.Append("AND o.C_BPartner_ID = " + C_BPartner_ID);
+                    sql.Append(" AND o.C_BPartner_ID = " + C_BPartner_ID);
                 }
             }
 
@@ -99,7 +99,7 @@ namespace VIS.Models
             }
             // when create lines fom open from M_Inout then pick records from match po having m_inoutline is not null 
             // when create lines fom open from M_Invoiceline then pick records from match po having m_invoiceline is not null 
-            sql.Append("AND o.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND o.IsDropShip='" + (DropShip ? "Y" : "N") + "'  AND o.C_Order_ID IN "
+            sql.Append(" AND o.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND o.IsDropShip='" + (DropShip ? "Y" : "N") + "'  AND o.C_Order_ID IN "
             + @"(SELECT C_Order_ID FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID,ol.QtyOrdered, 
             (SELECT SUM(m.qty) FROM m_matchPO m WHERE ol.C_OrderLine_ID=m.C_OrderLine_ID AND NVL(" + column + @", 0) != 0 AND m.ISACTIVE = 'Y' ) AS Qty,
             (SELECT SUM(IL.QtyInvoiced)  FROM C_INVOICELINE IL INNER JOIN C_Invoice I ON I.C_INVOICE_ID = IL.C_INVOICE_ID

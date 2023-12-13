@@ -4066,7 +4066,7 @@ namespace VIS.Models
             //------Filter data on the basis of new parameters
             if (!String.IsNullOrEmpty(docNo))
             {
-                sqlInvoice.Append("AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
+                sqlInvoice.Append(" AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
             }
             if (c_docType_ID > 0)
             {

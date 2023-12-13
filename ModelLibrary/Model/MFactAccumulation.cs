@@ -35,12 +35,12 @@ namespace VAdvantage.Model
         public static List<MFactAccumulation> GetAll(Ctx ctx, int C_AcctSchema_ID)
         {
             StringBuilder sql = new StringBuilder("SELECT * FROM Fact_Accumulation "
-                + "WHERE IsActive='Y' AND AD_Client_ID=" + ctx.GetAD_Client_ID());
+                + " WHERE IsActive='Y' AND AD_Client_ID=" + ctx.GetAD_Client_ID());
             if (C_AcctSchema_ID > 0)
             {
-                sql.Append("AND C_AcctSchema_ID= " + C_AcctSchema_ID);
+                sql.Append(" AND C_AcctSchema_ID= " + C_AcctSchema_ID);
             }
-            sql.Append("ORDER BY C_AcctSchema_ID ");
+            sql.Append(" ORDER BY C_AcctSchema_ID ");
 
             List<MFactAccumulation> list = new List<MFactAccumulation>();
             IDataReader idr = null;

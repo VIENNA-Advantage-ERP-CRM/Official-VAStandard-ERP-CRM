@@ -542,7 +542,7 @@ namespace VAdvantage.Process
            + " AND C_Charge_ID IS NULL"
            + " AND DocStatus IN ('CO','CL')"
            //	Only BP and BPGroup with Dunning defined
-           + "AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
+           + " AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
            " AND dl.C_Dunning_ID  IN  (SELECT COALESCE(bp.C_Dunning_ID, bpg.C_Dunning_ID)  FROM C_BPartner bp  " +
            "INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE p.C_BPartner_ID=bp.C_BPartner_ID ))");
             if (_C_BPartner_ID != 0)
@@ -733,12 +733,12 @@ namespace VAdvantage.Process
                 "FROM c_CashLine cl" +
                 " INNER JOIN C_Cash c on cl.C_Cash_ID = c.C_Cash_ID"+
                 " WHERE cl.cashtype ='B' AND cl.IsAllocated='N'  " +
-                "AND c.DocStatus In ('CO','Cl') " +
-                "AND cl.Ad_Client_ID =" + _run.GetAD_Client_ID() + " AND cl.Ad_Org_ID=  " + _run.GetAD_Org_ID() +
+                " AND c.DocStatus In ('CO','Cl') " +
+                " AND cl.Ad_Client_ID =" + _run.GetAD_Client_ID() + " AND cl.Ad_Org_ID=  " + _run.GetAD_Org_ID() +
                  //	Only BP and BPGroup with Dunning defined
                  " AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
                  " AND dl.C_Dunning_ID  IN  (SELECT COALESCE(bp.C_Dunning_ID, bpg.C_Dunning_ID)  FROM C_BPartner bp  " +
-                 "INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE cl.C_BPartner_ID=bp.C_BPartner_ID ))");
+                 " INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE cl.C_BPartner_ID=bp.C_BPartner_ID ))");
 
 
             if (_C_BPartner_ID != 0)
@@ -748,7 +748,7 @@ namespace VAdvantage.Process
             else if (_C_BP_Group_ID != 0)
             {
                 sql.Append(" AND EXISTS (SELECT * FROM C_BPartner bp "
-                    + "WHERE cl.C_BPartner_ID=bp.C_BPartner_ID AND bp.C_BP_Group_ID=" + _C_BP_Group_ID + ")");	//	##3
+                    + " WHERE cl.C_BPartner_ID=bp.C_BPartner_ID AND bp.C_BP_Group_ID=" + _C_BP_Group_ID + ")");	//	##3
             }
             //only single currency
             if (!_IsAllCurrencies)
@@ -894,13 +894,13 @@ namespace VAdvantage.Process
                 "FROM Gl_JournalLine GL " +
                 "INNER JOIN GL_Journal J ON GL.GL_Journal_ID =J.GL_Journal_ID " +
                 "INNER JOIN C_ElementValue EV ON Gl.Account_ID = EV.C_ElementValue_ID " +
-                "WHERE EV.IsAllocationRelated ='Y' AND GL.IsAllocated='N'  " +
-                "AND J.DocStatus In ('CO','Cl') " +
-                "AND GL.Ad_Client_ID ="+ _run.GetAD_Client_ID()+" AND GL.Ad_Org_ID=  "+_run.GetAD_Org_ID() +
+                " WHERE EV.IsAllocationRelated ='Y' AND GL.IsAllocated='N'  " +
+                " AND J.DocStatus In ('CO','Cl') " +
+                " AND GL.Ad_Client_ID ="+ _run.GetAD_Client_ID()+" AND GL.Ad_Org_ID=  "+_run.GetAD_Org_ID() +
                 //	Only BP and BPGroup with Dunning defined
                 " AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
                 " AND dl.C_Dunning_ID  IN  (SELECT COALESCE(bp.C_Dunning_ID, bpg.C_Dunning_ID)  FROM C_BPartner bp  " +
-                "INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE Gl.C_BPartner_ID=bp.C_BPartner_ID ))");
+                " INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE Gl.C_BPartner_ID=bp.C_BPartner_ID ))");
 
   
             if (_C_BPartner_ID != 0)
@@ -910,7 +910,7 @@ namespace VAdvantage.Process
             else if (_C_BP_Group_ID != 0)
             {
                 sql.Append(" AND EXISTS (SELECT * FROM C_BPartner bp "
-                    + "WHERE GL.C_BPartner_ID=bp.C_BPartner_ID AND bp.C_BP_Group_ID=" + _C_BP_Group_ID + ")");	//	##3
+                    + " WHERE GL.C_BPartner_ID=bp.C_BPartner_ID AND bp.C_BP_Group_ID=" + _C_BP_Group_ID + ")");	//	##3
             }
             //only single currency
             if (!_IsAllCurrencies)
@@ -1040,12 +1040,12 @@ namespace VAdvantage.Process
                 "END AS VA027_PayAmt " +
                 "FROM  VA027_PostDatedCheck pdc INNER JOIN C_DocType dt on pdc.C_DocType_ID = dt.C_DocType_ID " +
                 "WHERE pdc.VA027_PaymentGenerated='N' " +
-                "AND DocStatus IN ('CO','CL')" +
-                "AND pdc.Ad_Client_ID =" + _run.GetAD_Client_ID() + " AND pdc.Ad_Org_ID=  " + _run.GetAD_Org_ID() +
+                " AND DocStatus IN ('CO','CL')" +
+                " AND pdc.Ad_Client_ID =" + _run.GetAD_Client_ID() + " AND pdc.Ad_Org_ID=  " + _run.GetAD_Org_ID() +
                  //	Only BP and BPGroup with Dunning defined
-                "AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
+                " AND EXISTS  (SELECT *  FROM C_DunningLevel dl  WHERE dl.C_DunningLevel_ID=  " + _run.GetC_DunningLevel_ID() +
                 " AND dl.C_Dunning_ID  IN  (SELECT COALESCE(bp.C_Dunning_ID, bpg.C_Dunning_ID)  FROM C_BPartner bp  " +
-                "INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE pdc.C_BPartner_ID=bp.C_BPartner_ID ))");
+                " INNER JOIN C_BP_Group bpg  ON (bp.C_BP_Group_ID =bpg.C_BP_Group_ID) WHERE pdc.C_BPartner_ID=bp.C_BPartner_ID ))");
 
 
             if (_C_BPartner_ID != 0)

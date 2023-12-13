@@ -135,13 +135,13 @@ namespace VIS.Models
                    "FROM ((SELECT c.iso_code,  invoiceOpen (i.C_Invoice_ID,i.C_InvoicePaySchedule_ID)*MultiplierAP AS OpenAmt FROM C_Invoice_V i " +
                    "LEFT JOIN C_Currency C ON C.C_Currency_ID=i.C_Currency_ID " +
                    "LEFT JOIN C_InvoicePaySchedule IPS ON IPS.c_invoice_ID = i.c_invoice_ID " +
-                   "WHERE i.docstatus IN ('CO','CL') AND i.IsActive ='Y' AND i.ispaid ='N' " +
-                   "AND ips.duedate IS NOT NULL AND NVL(ips.dueamt,0)!=0 AND i.c_bpartner_id = " + bp_BusinessPartner + " AND i.AD_Client_ID=" + Client_ID +
+                   " WHERE i.docstatus IN ('CO','CL') AND i.IsActive ='Y' AND i.ispaid ='N' " +
+                   " AND ips.duedate IS NOT NULL AND NVL(ips.dueamt,0)!=0 AND i.c_bpartner_id = " + bp_BusinessPartner + " AND i.AD_Client_ID=" + Client_ID +
                     //" AND TRUNC(ips.duedate) <= (CASE WHEN  TRUNC(@param1) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param2) END ) " +
                    " AND TRUNC(ips.duedate) <= TRUNC(@param1) ) " +
-                   "UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
-                   "FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
-                   "LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
+                   " UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
+                   " FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
+                   " LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
                    " AND p.C_BPARTNER_ID = " + bp_BusinessPartner + " AND p.DocStatus     IN ('CO','CL') " + " AND p.AD_Client_ID=" + Client_ID +
                     //" AND TRUNC(pay.DateTrx) <= ( CASE WHEN TRUNC(@param3) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param4) END) " +
                    " AND TRUNC(pay.DateTrx) <= TRUNC(@param2) " +

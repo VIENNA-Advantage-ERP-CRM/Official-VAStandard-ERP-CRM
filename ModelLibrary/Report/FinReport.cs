@@ -878,7 +878,7 @@ namespace VAdvantage.Report
                 + "FROM T_Report r2 "
                 + "WHERE r1.AD_PInstance_ID=r2.AD_PInstance_ID AND r1.PA_ReportLine_ID=r2.PA_ReportLine_ID"
                 + " AND r2.Record_ID=0 AND r2.Fact_Acct_ID=0)"
-            + "WHERE SeqNo IS NULL");
+            + " WHERE SeqNo IS NULL");
         no = DataBase.DB.ExecuteQuery(sql.ToString(),null, Get_TrxName());
         log.Fine("SeqNo #=" + no);
 

@@ -447,7 +447,7 @@ namespace VAdvantage.Model
                     + "     WriteOffAmt= (SELECT COALESCE(SUM(WriteOffAmt),0) FROM C_PaymentAllocate il WHERE  il.IsActive = 'Y' AND  i.C_Payment_ID=il.C_Payment_ID) , "
                     + "     OverUnderAmt= (SELECT COALESCE(SUM(OverUnderAmt),0) FROM C_PaymentAllocate il WHERE  il.IsActive = 'Y' AND  i.C_Payment_ID=il.C_Payment_ID)  "
                     + (pay.Get_ColumnIndex("PaymentAmount") > 0 ? ", PaymentAmount =  (SELECT COALESCE(SUM(Amount),0) FROM C_PaymentAllocate il WHERE il.IsActive = 'Y' AND i.C_Payment_ID=il.C_Payment_ID)" : "")
-                    + "WHERE C_Payment_ID=" + GetC_Payment_ID();
+                    + " WHERE C_Payment_ID=" + GetC_Payment_ID();
                 int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
                 if (no != 1)
                 {
@@ -497,7 +497,7 @@ namespace VAdvantage.Model
                     + "     WriteOffAmt= (SELECT COALESCE(SUM(WriteOffAmt),0) FROM C_PaymentAllocate il WHERE  il.IsActive = 'Y' AND  i.C_Payment_ID=il.C_Payment_ID) , "
                     + "     OverUnderAmt= (SELECT COALESCE(SUM(OverUnderAmt),0) FROM C_PaymentAllocate il WHERE  il.IsActive = 'Y' AND  i.C_Payment_ID=il.C_Payment_ID)  "
                     + (pay.Get_ColumnIndex("PaymentAmount") > 0 ? ", PaymentAmount =  (SELECT COALESCE(SUM(Amount),0) FROM C_PaymentAllocate il WHERE il.IsActive = 'Y' AND i.C_Payment_ID=il.C_Payment_ID)" : "")
-                    + "WHERE C_Payment_ID=" + GetC_Payment_ID();
+                    + " WHERE C_Payment_ID=" + GetC_Payment_ID();
                 int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
                 if (no != 1)
                 {
