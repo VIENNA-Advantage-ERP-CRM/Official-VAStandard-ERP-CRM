@@ -344,32 +344,33 @@
             //if (this.isCalloutActive() || "I" != mTab.getValue("CashType")) {
             return "";
         }
-        var total = 0, invTotalAmt = 0;
-        // Check, if InvTotalAmt exists
-        if ("I" == mTab.getValue("CashType")) {
-            var total = ctx.getContext("InvTotalAmt");
-            if (total == null || total.toString().length == 0) {
-                total = ctx.getContext(windowNo, "InvTotalAmt");
-            }
-            if (total == null || total.toString().length == 0) {
-                return "";
-            }
-            //Decimal invTotalAmt = new Decimal(total);
-            var invTotalAmt = Util.getValueOfDecimal(total);
+        //VIS_427 Handle the issue on subtraction of write off, discount, and over under and it should update fields with accurate amount.
+        var invTotalAmt = 0;
+        var colName = mField.getColumnName();
+        var payAmt = Util.getValueOfDecimal(mTab.getValue("Amount"));
+        //Get the standard precision to set the values according to same
+        var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", Util.getValueOfInt(mTab.getValue("C_Currency_ID")));
+        var stdPrecision = Util.getValueOfInt(currency["StdPrecision"]);
+        if (stdPrecision == null || stdPrecision == 0)
+        {
+            stdPrecision = 2;
         }
         this.setCalloutActive(true);
-        var convertedAmt = 0;
-        var payAmt = Util.getValueOfDecimal(mTab.getValue("Amount"));
+        var convertedAmt = 0;   
         if ("I" == mTab.getValue("CashType")) {
             var discountAmt = Util.getValueOfDecimal(mTab.getValue("DiscountAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"));
             var overUnderAmt = Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"));
-            var colName = mField.getColumnName();
+            //Getting the open amount of invoice schedule
+            var AmountSched = VIS.dataContext.getJSONRecord("MCashBook/GetInvSchedDueAmt", Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")));
+            if (AmountSched != null) {
+                invTotalAmt = Util.getValueOfDecimal(AmountSched["DueAmt"]);
+            }
             var PaymentType = mTab.getValue("VSS_PaymentType");
             if (PaymentType == "P") {
                 if (payAmt > 0) {
                     payAmt = payAmt * -1;
-                    mTab.setValue("PayAmt", payAmt);
+                    mTab.setValue("Amount", payAmt);
                 }
 
                 if (discountAmt > 0) {
@@ -390,7 +391,7 @@
             else {
                 if (payAmt < 0) {
                     payAmt = payAmt * -1;
-                    mTab.setValue("PayAmt", payAmt);
+                    mTab.setValue("Amount", payAmt);
                 }
 
                 if (discountAmt < 0) {
@@ -403,7 +404,7 @@
                 if (overUnderAmt < 0) {
                     overUnderAmt = overUnderAmt * -1;
                     mTab.setValue("OverUnderAmt", overUnderAmt);
-                }
+                }               
                 if (invTotalAmt < 0) {
                     invTotalAmt = invTotalAmt * -1;
                 }
@@ -414,8 +415,8 @@
 
             // Amount - calculate write off
             if (colName == "Amount") {
-                var sub = invTotalAmt - payAmt;
-                overUnderAmt = sub - discountAmt - writeOffAmt;
+                var sub = (invTotalAmt - payAmt);
+                overUnderAmt = ((sub - discountAmt) - writeOffAmt).toFixed(stdPrecision);
                 //  writeOffAmt = Decimal.Subtract(Decimal.Subtract(invTotalAmt, payAmt), discountAmt);
                 if ((PaymentType == "R" && overUnderAmt > 0) || (PaymentType == "P" && overUnderAmt < 0)) {
                     VIS.ADialog.info("LessScheduleAmount");
@@ -425,15 +426,18 @@
                     VIS.ADialog.info("MoreScheduleAmount");
                     payAmt = ((invTotalAmt - discountAmt) - writeOffAmt);
                     overUnderAmt = (((invTotalAmt - payAmt) - discountAmt) - writeOffAmt);
-                    mTab.setValue("PayAmt", payAmt);
+                    mTab.setValue("Amount", payAmt.toFixed(stdPrecision));
                 }
-                mTab.setValue("DiscountAmt", discountAmt);
-                mTab.setValue("OverUnderAmt", overUnderAmt);
+                //precised value's according to precision
+                mTab.setValue("DiscountAmt", discountAmt.toFixed(stdPrecision));
+                mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt).toFixed(stdPrecision));
+                mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
+                mTab.setValue("Amount", payAmt.toFixed(stdPrecision));
             }
             else // calculate PayAmt
-            {
-                sub = invTotalAmt - discountAmt;
-                payAmt = sub - writeOffAmt - overUnderAmt;
+            {               
+                var sub = (invTotalAmt - discountAmt);
+                payAmt = ((sub - writeOffAmt) - overUnderAmt).toFixed(stdPrecision);
                 //payAmt = Decimal.Subtract(Decimal.Subtract(invTotalAmt, discountAmt), writeOffAmt);
 
                 if ((PaymentType == "P" && payAmt > 0) || (PaymentType == "R" && payAmt < 0)) {
@@ -446,15 +450,15 @@
                     if (colName == "DiscountAmt") {
                         payAmt = ((invTotalAmt - overUnderAmt) - writeOffAmt);
                         discountAmt = (((invTotalAmt - payAmt) - overUnderAmt) - writeOffAmt);
-                        mTab.setValue("DiscountAmt", discountAmt);
+                        mTab.setValue("DiscountAmt", discountAmt.toFixed(stdPrecision));
                     }
                     if (colName == "WriteOffAmt") {
                         payAmt = ((invTotalAmt - discountAmt) - overUnderAmt);
                         writeOffAmt = (((invTotalAmt - payAmt) - discountAmt) - overUnderAmt);
-                        mTab.setValue("WriteOffAmt", writeOffAmt);
+                        mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
                     }
                 }
-                mTab.setValue("Amount", payAmt);
+                mTab.setValue("Amount", Util.getValueOfDecimal(payAmt).toFixed(stdPrecision));
 
                 if ((PaymentType == "R" && overUnderAmt > 0) || (PaymentType == "P" && overUnderAmt < 0)) {
                     VIS.ADialog.info("LessScheduleAmount");
@@ -484,7 +488,7 @@
         else {
             convertedAmt = payAmt;
         }
-        mTab.setValue("convertedAmt", convertedAmt);
+        mTab.setValue("convertedAmt", Util.getValueOfDecimal(convertedAmt).toFixed(stdPrecision));
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
