@@ -37,7 +37,7 @@ namespace VAdvantage.Process
             {
                 int recordId = GetRecord_ID();
                 int count = 0;
-                query.Append("UPDATE VAS_ContractMaster SET Processed='N',VAS_IsApproved='N' WHERE VAS_ContractMaster_ID =" + recordId);
+                query.Append("UPDATE VAS_ContractMaster SET Processed='N',VAS_IsApproved='N',VAS_Status='DFT' WHERE VAS_ContractMaster_ID =" + recordId);
                 count = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                 query.Clear();
                 query.Append("UPDATE VAS_ContractLine SET Processed='N' WHERE VAS_ContractMaster_ID =" + recordId);

@@ -95,6 +95,9 @@ namespace VAdvantage.Process
             _newCont.SetDocumentNo(string.Empty);
             _newCont.SetIsExpiredContracts(false);
             _newCont.Set_Value("Vas_Contractreferral","Renew"); //VAI050-Set value in Contract Referal field
+            _newCont.SetVAS_IsApproved(false); //VAI050-Set value false 
+            _newCont.SetVAS_Status("DFT"); //VAI050-Set Drafted in Status field
+            _newCont.Set_Value("Processed", false); //VAI050-Set false  for Processed
             _newCont.SetVAS_ContractDuration(Math.Round((decimal.Subtract(EndDate.Value.Year, StartDate.Value.Year) * 12 + decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month)) / 12, 1));
             var monthDiff = (EndDate - StartDate).Value.Days;
             _newCont.SetVAS_ContractMonths(Math.Round((decimal)monthDiff / 30, 1));
@@ -233,13 +236,13 @@ namespace VAdvantage.Process
             if (string.IsNullOrEmpty(rMsg))
             {
                 //VAI050-To set VAS_IsRenewable true in existing contract when contract renewed
-                DB.ExecuteQuery("UPDATE VAS_ContractMaster SET VAS_Isrenewable='Y' WHERE VAS_ContractMaster_ID=" + GetRecord_ID(), null, Get_Trx());
+                DB.ExecuteQuery("UPDATE VAS_ContractMaster SET VAS_Isrenewable='Y', Processed='Y' WHERE VAS_ContractMaster_ID=" + GetRecord_ID(), null, Get_Trx());
                 rMsg = Msg.GetMsg(GetCtx(), "VAS_ContractRenewed") + _newCont.GetDocumentNo();
             }
 
             return rMsg;
         }
-
+         
 
     }
 }
