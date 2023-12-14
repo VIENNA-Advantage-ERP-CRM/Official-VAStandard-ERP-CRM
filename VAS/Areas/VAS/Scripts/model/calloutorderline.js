@@ -107,4 +107,47 @@
     VIS.Model.CalloutOrderlineRecording = CalloutOrderlineRecording;
     //***********CalloutOrderlineRecording End********
 
+    //VIS430:Set Product,Charge,Uom and Attribute set Instance when select contract line id
+    //***********CalloutContractLineStart********
+    function CalloutContractLine() {
+        VIS.CalloutEngine.call(this, "VIS.CalloutContractLine"); //must call
+    };
+    VIS.Utility.inheritPrototype(CalloutContractLine, VIS.CalloutEngine);//inherit CalloutEngine
+
+    CalloutContractLine.prototype.Contractlines = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        //  
+        if (value == null || value.toString() == "" || Util.getValueOfInt(value) == 0) {
+            return "";
+        }
+        if (this.isCalloutActive()) {
+            return "";
+        }
+        try {
+            this.setCalloutActive(true);
+            var paramString = Util.getValueOfInt(value);
+            var cl = VIS.dataContext.getJSONRecord("MVASContract/GetContractData", paramString);
+            if (cl!= null) {
+                if (Util.getValueOfInt(cl.M_Product) > 0) {
+                    mTab.setValue("M_Product_ID", Util.getValueOfInt(cl.M_Product));
+                }
+                if (Util.getValueOfInt(cl.C_Charge) > 0) {
+                    mTab.setValue("C_Charge_ID", Util.getValueOfInt(cl.C_Charge));
+                }
+                mTab.setValue("M_AttributeSetInstance_ID", cl["M_AttributeSetInstance"]);
+                mTab.setValue("C_UOM_ID", cl["C_UOM"]);
+                mTab.setValue("QtyEntered", 1);
+            }
+        }
+        catch (err) {
+            this.setCalloutActive(false);
+            return err;
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+    VIS.Model.CalloutContractLine = CalloutContractLine;
+    //***********CalloutContractLine End********
+
+
 })(VIS, jQuery);
