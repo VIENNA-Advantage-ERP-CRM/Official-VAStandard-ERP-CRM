@@ -155,11 +155,6 @@
                 return "VAS_TerminationMustGreater";
             }
         }
-        else {
-            mTab.setValue("VAS_TerminationDate", null);
-            this.setCalloutActive(false);
-            return "VAS_CheckContractDate";
-        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";

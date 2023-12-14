@@ -236,13 +236,13 @@ namespace VAdvantage.Process
             if (string.IsNullOrEmpty(rMsg))
             {
                 //VAI050-To set VAS_IsRenewable true in existing contract when contract renewed
-                DB.ExecuteQuery("UPDATE VAS_ContractMaster SET VAS_Isrenewable='Y' WHERE VAS_ContractMaster_ID=" + GetRecord_ID(), null, Get_Trx());
+                DB.ExecuteQuery("UPDATE VAS_ContractMaster SET VAS_Isrenewable='Y', Processed='Y' WHERE VAS_ContractMaster_ID=" + GetRecord_ID(), null, Get_Trx());
                 rMsg = Msg.GetMsg(GetCtx(), "VAS_ContractRenewed") + _newCont.GetDocumentNo();
             }
 
             return rMsg;
         }
-
+         
 
     }
 }
