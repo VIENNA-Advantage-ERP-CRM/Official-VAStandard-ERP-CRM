@@ -142,18 +142,23 @@
             return "";
         }
         this.setCalloutActive(true);
-        var terminationDate = new Date(mTab.getValue("VAS_TerminationDate"));
-        terminationDate.setHours(0, 0, 0, 0);
-        var contractStartDate = new Date(mTab.getValue("StartDate"));
-        contractStartDate.setHours(0, 0, 0, 0);
-        var contractDate = new Date(mTab.getValue("DateDoc"));
-        contractDate.setHours(0, 0, 0, 0);
-        if (mTab.getValue("StartDate") != null && mTab.getValue("VAS_TerminationDate") != null && mTab.getValue("DateDoc")!=null) {//VIS430:Termination date must be greater than contract start date
+        if (mTab.getValue("StartDate") != null && mTab.getValue("VAS_TerminationDate") != null && mTab.getValue("DateDoc") != null) {//VIS430:Termination date must be greater than contract start date
+            var terminationDate = new Date(mTab.getValue("VAS_TerminationDate"));
+            terminationDate.setHours(0, 0, 0, 0);
+            var contractStartDate = new Date(mTab.getValue("StartDate"));
+            contractStartDate.setHours(0, 0, 0, 0);
+            var contractDate = new Date(mTab.getValue("DateDoc"));
+            contractDate.setHours(0, 0, 0, 0);
             if (terminationDate < contractStartDate || terminationDate < contractDate) { //VAI050-Terminate date should not be less than Contract Date and  Contract Start date
                 mTab.setValue("VAS_TerminationDate", null);
                 this.setCalloutActive(false);
                 return "VAS_TerminationMustGreater";
             }
+        }
+        else {
+            mTab.setValue("VAS_TerminationDate", null);
+            this.setCalloutActive(false);
+            return "VAS_CheckContractDate";
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
