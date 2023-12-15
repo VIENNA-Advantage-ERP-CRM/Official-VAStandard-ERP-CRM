@@ -346,6 +346,7 @@
                 var M_AttributeSetInstance_ID = Util.getValueOfInt(dr["M_AttributeSetInstance_ID"]);
                 var C_Tax_ID = Util.getValueOfInt(dr["C_Tax_ID"]);
                 var AD_OrgTrx_ID = Util.getValueOfInt(dr["AD_OrgTrx_ID"]);
+                var VAS_ContractLine_ID = Util.getValueOfInt(dr["VAS_ContractLine_ID"]); // VAI050-Get contractline
 
 
                 QtyEntered = Util.getValueOfDecimal(Qty);
@@ -429,7 +430,7 @@
                 if (C_Tax_ID != 0 && C_Tax_ID != null) {
                     mTab.setValue("C_Tax_ID", C_Tax_ID);
                 }
-
+                mTab.setValue("VAS_ContractLine_ID", VAS_ContractLine_ID); // VAI050-set contractline
                 // VIS0060: Set Trx Organization from Blanket Order Line
                 mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);
             }
@@ -482,7 +483,7 @@
                 var C_ProjectRef_ID = Util.getValueOfDouble(dr["C_ProjectRef_ID"]);
                 var SalesRep_ID = Util.getValueOfDouble(dr["SalesRep_ID"]);
                 var PriorityRule = Util.getValueOfDouble(dr["PriorityRule"]);
-
+                var VAS_ContractMaster_ID = Util.getValueOfDouble(dr["VAS_ContractMaster_ID"]); // VAI050-Get ContractMasterID
                 if (C_BPartner_ID != 0 && C_BPartner_ID != null) {
                     mTab.setValue("C_BPartner_ID", C_BPartner_ID);
                 }
@@ -532,7 +533,7 @@
                 if (PriorityRule != 0 && PriorityRule != null) {
                     mTab.setValue("PriorityRule", PriorityRule);
                 }
-
+                mTab.setValue("VAS_ContractMaster_ID", VAS_ContractMaster_ID);  // VAI050-set contractmasterid              
                 // Added by Bharat on 07 Feb 2018 to set Inco Term from Order
                 if (mTab.getField("C_IncoTerm_ID") != null) {
                     mTab.setValue("C_IncoTerm_ID", Util.getValueOfInt(dr["C_IncoTerm_ID"]));

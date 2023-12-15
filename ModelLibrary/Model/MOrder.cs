@@ -131,6 +131,7 @@ namespace VAdvantage.Model
             to.SetIsTransferred(false);
             to.SetPosted(false);
             to.SetProcessed(false);
+            to.Set_Value("VAS_ContractMaster_ID", from.Get_ValueAsInt("VAS_ContractMaster_ID")); //VAI050-set contractmasterid 
             if (counter)
             {
                 to.SetRef_Order_ID(from.GetC_Order_ID());
@@ -1313,6 +1314,7 @@ namespace VAdvantage.Model
                     line.Set_ValueNoCheck("C_OrderLine_ID", I_ZERO);	//	new
                     line.Set_ValueNoCheck("C_Contract_ID", I_ZERO);
                     line.SetCreateServiceContract("N");
+                    line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_ValueAsInt("VAS_ContractLine_ID")); //VAI050-set contractlineid
                     //	References
                     if (!copyASI)
                     {

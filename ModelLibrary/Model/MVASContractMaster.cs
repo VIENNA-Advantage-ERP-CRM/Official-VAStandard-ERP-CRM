@@ -30,6 +30,31 @@ namespace VAdvantage.Model
 
         protected override bool BeforeSave(bool newRecord)
         {
+            if (!newRecord)  //VAI050-If transcation exists than restrict to update
+            {
+                string query = "SELECT a.OrderId , b.InvoiceId  FROM ( SELECT COUNT(VAS_ContractMaster_ID) AS OrderId FROM C_Order " +
+                     "WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID="+GetVAS_ContractMaster_ID()+"  )  a,   ( SELECT COUNT(VAS_ContractMaster_ID) AS InvoiceId " +
+                     " FROM C_Invoice WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID= "+GetVAS_ContractMaster_ID()+" )  b";
+                DataSet ds = DB.ExecuteDataset(query, null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["OrderId"]) > 0 || Util.GetValueOfInt(ds.Tables[0].Rows[0]["InvoiceId"]) > 0)
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CheckOrder")); 
+                        return false;
+                    }
+                }
+            }
+            if (!newRecord && (Is_ValueChanged("VAS_TerminationReason") || Is_ValueChanged("VAS_TerminationDate")))  //VAI050-Should not allow to change any details of termination if contract is already terminated
+            {
+                if (Util.GetValueOfBool(Get_ValueOld("VAS_Terminate")))
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_TerminateStatus"));
+                    return false;
+                }
+
+            }
+
             if (Util.GetValueOfDateTime(GetStartDate()) > Util.GetValueOfDateTime(GetEndDate()))
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_EndDateMustGreater"));

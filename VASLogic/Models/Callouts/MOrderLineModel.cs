@@ -70,6 +70,7 @@ namespace VIS.Models
             retDic["QtyReleased"] = Util.GetValueOfString(orderline.GetQtyReleased());
             retDic["IsDropShip"] = orderline.IsDropShip() ? "Y" : "N";
             retDic["PrintDescription"] = Util.GetValueOfString(orderline.Get_Value("PrintDescription"));
+            retDic["VAS_ContractLine_ID"] = Util.GetValueOfString(orderline.Get_Value("VAS_ContractLine_ID")); //VAI050-get contractlineid
 
             if (Env.IsModuleInstalled("VA077_"))
             {
