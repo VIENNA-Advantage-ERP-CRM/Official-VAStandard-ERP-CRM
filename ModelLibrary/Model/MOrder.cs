@@ -6354,7 +6354,11 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             DB.ExecuteQuery("UPDATE M_RequisitionLine SET C_OrderLine_ID = NULL WHERE C_OrderLine_ID IN (SELECT C_OrderLine_ID FROM C_OrderLine WHERE C_Order_ID = " + GetC_Order_ID() + ")", null, Get_TrxName());
 
 
-            ReverseContractMaster();
+            if (!ReverseContractMaster())
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
+                return false;
+            }
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6580,10 +6584,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>false</returns>
         public bool ReverseAccrualIt()
         {
-            //log.Info(ToString());
-            //return false;
-           
-            return true;
+            log.Info(ToString());
+            return false;
+
         }
         /// <summary>
         /// VIS0336:changes done for updating the amount on CM when record is void/reverse/reactivate
@@ -6591,9 +6594,6 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>true/false</returns>
         public bool ReverseContractMaster()
         {
-            //log.Info(ToString());
-            //return false;
-
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
             {
                 int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
@@ -6604,7 +6604,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     int no = DB.ExecuteQuery(query, null, Get_Trx());
                     if (no < 0)
                     {
-                        log.Warning(Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated"));
+                        Get_Trx().Rollback();
+                        return false;
                     }
                 }
             }
@@ -6798,6 +6799,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     SetIsReActivated(true);
                 }
 
+                if (!ReverseContractMaster())
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
+                    return false;
+                }
+
                 SetDocAction(DOCACTION_Complete);
                 SetProcessed(false);
                 // In case of purchase order reverse budget breach
@@ -6808,7 +6815,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     SetIsBudgetBreachApproved(false);
                 }
 
-                ReverseContractMaster();
+               
             }
             catch
             {
