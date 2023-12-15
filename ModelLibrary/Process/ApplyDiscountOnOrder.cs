@@ -72,13 +72,9 @@ namespace VAdvantage.Process
 
             MOrderLine[] lines = obj.GetLines();
 
-            if (_IsCLearDiscount == "Y")//VIS430:Show message when user did not apply the discount and tries to clear the discount.
+            if (_IsCLearDiscount == "Y" && (_DiscountAmt == 0 && _DiscountPercent == 0))//VIS430:Show message when user did not apply the discount and tries to clear the discount.
             {
-                if (_DiscountAmt == 0 && _DiscountPercent == 0)
-                {
-                    return Msg.GetMsg(GetCtx(), "NoDocumentFound");
-                }
-
+               return Msg.GetMsg(GetCtx(), "NoLines");
             }
 
             if (_IsCLearDiscount == "N")
@@ -87,13 +83,9 @@ namespace VAdvantage.Process
                 {
                     return Msg.GetMsg(GetCtx(), "PlsSelAtlstOneField");
                 }
-                if (_DiscountAmt != 0 && _DiscountPercent != 0)
+                if (lines.Length == 0 && (_DiscountAmt != 0 ||_DiscountPercent != 0))//VIS430:Show message when user apply the discount without inserting the lines
                 {
-                    return Msg.GetMsg(GetCtx(), "PlsSelOneField");
-                }
-                if (lines.Length == 0 && _DiscountAmt != 0 ||_DiscountPercent != 0)//VIS430:Show message when user apply the discount without inserting the lines
-                {
-                    return Msg.GetMsg(GetCtx(), "NoDocumentFound");
+                    return Msg.GetMsg(GetCtx(), "NoLines");
                 }
 
                 // get amount on which we have to apply discount
