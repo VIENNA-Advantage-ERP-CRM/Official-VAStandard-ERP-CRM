@@ -30,7 +30,8 @@ namespace VAdvantage.Model
 
         protected override bool BeforeSave(bool newRecord)
         {
-            if (!newRecord)  //VAI050-If transcation exists than restrict to update
+            //VAI050-If transaction available for contract, then system should not allow to edit any information on the header of contract
+            if (!newRecord) 
             {
                 string query = "SELECT a.OrderId , b.InvoiceId  FROM ( SELECT COUNT(VAS_ContractMaster_ID) AS OrderId FROM C_Order " +
                      "WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID="+GetVAS_ContractMaster_ID()+"  )  a,   ( SELECT COUNT(VAS_ContractMaster_ID) AS InvoiceId " +
@@ -45,7 +46,8 @@ namespace VAdvantage.Model
                     }
                 }
             }
-            if (!newRecord && (Is_ValueChanged("VAS_TerminationReason") || Is_ValueChanged("VAS_TerminationDate")))  //VAI050-Should not allow to change any details of termination if contract is already terminated
+            //VAI050-Should not allow to change any details of termination if contract is already terminated
+            if (!newRecord && (Is_ValueChanged("VAS_TerminationReason") || Is_ValueChanged("VAS_TerminationDate")))  
             {
                 if (Util.GetValueOfBool(Get_ValueOld("VAS_Terminate")))
                 {

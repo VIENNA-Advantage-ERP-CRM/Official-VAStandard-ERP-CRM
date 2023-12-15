@@ -131,9 +131,10 @@ namespace VAdvantage.Model
             to.SetIsTransferred(false);
             to.SetPosted(false);
             to.SetProcessed(false);
+            //VAI050-Set VAS_ContractMaster_ID  when we create Purchase order from Create release order process on Blanket Purchase order screen
             if (to.Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(from.Get_Value("VAS_ContractMaster_ID")) > 0)
             {
-                to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID")); //VAI050-set contractmasterid 
+                to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID"));
             }
             if (counter)
             {
@@ -1317,9 +1318,10 @@ namespace VAdvantage.Model
                     line.Set_ValueNoCheck("C_OrderLine_ID", I_ZERO);	//	new
                     line.Set_ValueNoCheck("C_Contract_ID", I_ZERO);
                     line.SetCreateServiceContract("N");
+                    //VAI050-Set VAS_ContractLine_ID  when we create Purchase order from Create release order process on Blanket Purchase order screen
                     if (line.Get_ColumnIndex("VAS_ContractLine_ID") >= 0 && Util.GetValueOfInt(fromLines[i].Get_Value("VAS_ContractLine_ID")) > 0)
                     {
-                        line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_Value("VAS_ContractLine_ID"));  //VAI050-Set contract line id
+                        line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_Value("VAS_ContractLine_ID")); 
                     }
                     //	References
                     if (!copyASI)

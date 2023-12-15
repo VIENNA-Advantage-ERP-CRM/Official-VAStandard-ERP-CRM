@@ -430,7 +430,7 @@
                 if (C_Tax_ID != 0 && C_Tax_ID != null) {
                     mTab.setValue("C_Tax_ID", C_Tax_ID);
                 }
-                mTab.setValue("VAS_ContractLine_ID", VAS_ContractLine_ID); // VAI050-set contractline
+                mTab.setValue("VAS_ContractLine_ID", VAS_ContractLine_ID); // VAI050-Set Contract Line Reference
                 // VIS0060: Set Trx Organization from Blanket Order Line
                 mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);
             }
@@ -533,7 +533,7 @@
                 if (PriorityRule != 0 && PriorityRule != null) {
                     mTab.setValue("PriorityRule", PriorityRule);
                 }
-                mTab.setValue("VAS_ContractMaster_ID", VAS_ContractMaster_ID);  // VAI050-set contractmasterid              
+                mTab.setValue("VAS_ContractMaster_ID", VAS_ContractMaster_ID);  // VAI050-Set ContractMasterId reference          
                 // Added by Bharat on 07 Feb 2018 to set Inco Term from Order
                 if (mTab.getField("C_IncoTerm_ID") != null) {
                     mTab.setValue("C_IncoTerm_ID", Util.getValueOfInt(dr["C_IncoTerm_ID"]));
