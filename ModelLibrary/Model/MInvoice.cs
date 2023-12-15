@@ -6450,6 +6450,7 @@ namespace VAdvantage.Model
                 return ReverseCorrectIt();
             }
 
+            ReverseContractMaster();
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6860,8 +6861,7 @@ namespace VAdvantage.Model
                 "C_Invoice_ID= " + GetC_Invoice_ID() + "))");
 
 
-
-
+            ReverseContractMaster();
 
             // code commented for updating open amount against customer while reversing invoice, code already exist
             // Done by Vivek on 24/11/2017
@@ -6983,6 +6983,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
             return false;
+
         }
 
         /** 
@@ -6991,8 +6992,35 @@ namespace VAdvantage.Model
          */
         public bool ReActivateIt()
         {
-            log.Info(ToString());
-            return false;
+            //log.Info(ToString());
+            //return false;
+            ReverseContractMaster();
+                return true;
+        }
+        /// <summary>
+        /// VIS0336:changes done for updating the amount on CM when record is void/reverse/reactivate
+        /// </summary>
+        /// <returns>true/false</returns>
+        public bool ReverseContractMaster()
+        {
+            //log.Info(ToString());
+            //return false;
+
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
+            {
+                int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
+                if (ContractID > 0 )
+                {
+                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) - " + GetGrandTotal() + " )" +
+                                                        " WHERE VAS_ContractMaster_ID=" + ContractID;
+                    int no = DB.ExecuteQuery(query, null, Get_Trx());
+                    if (no < 0)
+                    {
+                        log.Warning(Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated"));
+                    }
+                }
+            }
+            return true;
         }
 
         /***

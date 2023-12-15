@@ -4532,7 +4532,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return"@VAS_OrigPONotFound@";
+                        return "@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -4596,9 +4596,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
             {
                 int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
-                if (ContractID > 0)
+                if (ContractID > 0 && !!Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
                 {
-                   //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Order is completed and and Contact master id is greater than 0.
+                    //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Order is completed and and Contact master id is greater than 0.
                     String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetGrandTotal() + " )" +
                                                       " WHERE VAS_ContractMaster_ID=" + ContractID;
                     int no = DB.ExecuteQuery(query, null, Get_Trx());
@@ -6353,6 +6353,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             // JID_0658: After Creating PO from Open Requisition, & the PO record is Void, PO line reference is not getting removed from Requisition Line.
             DB.ExecuteQuery("UPDATE M_RequisitionLine SET C_OrderLine_ID = NULL WHERE C_OrderLine_ID IN (SELECT C_OrderLine_ID FROM C_OrderLine WHERE C_Order_ID = " + GetC_Order_ID() + ")", null, Get_TrxName());
 
+
+            ReverseContractMaster();
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6578,9 +6580,37 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>false</returns>
         public bool ReverseAccrualIt()
         {
-            log.Info(ToString());
-            return false;
+            //log.Info(ToString());
+            //return false;
+           
+            return true;
         }
+        /// <summary>
+        /// VIS0336:changes done for updating the amount on CM when record is void/reverse/reactivate
+        /// </summary>
+        /// <returns>true/false</returns>
+        public bool ReverseContractMaster()
+        {
+            //log.Info(ToString());
+            //return false;
+
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
+            {
+                int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
+                if (ContractID > 0 && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
+                {
+                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) - " + GetGrandTotal() + " )" +
+                                                        " WHERE VAS_ContractMaster_ID=" + ContractID;
+                    int no = DB.ExecuteQuery(query, null, Get_Trx());
+                    if (no < 0)
+                    {
+                        log.Warning(Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated"));
+                    }
+                }
+            }
+            return true;
+        }
+
 
         /// <summary>
         /// Re-activate.
@@ -6777,6 +6807,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     SetIsBudgetBreach(false);
                     SetIsBudgetBreachApproved(false);
                 }
+
+                ReverseContractMaster();
             }
             catch
             {
