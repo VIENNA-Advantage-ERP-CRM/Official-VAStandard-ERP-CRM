@@ -129,9 +129,11 @@
             if (cl!= null) {
                 if (Util.getValueOfInt(cl.M_Product) > 0) {
                     mTab.setValue("M_Product_ID", Util.getValueOfInt(cl.M_Product));
+                    mTab.setValue("C_Charge_ID", null);//VIS430:When contract line change then set charge, Product and Attribute set instance null
                 }
                 if (Util.getValueOfInt(cl.C_Charge) > 0) {
                     mTab.setValue("C_Charge_ID", Util.getValueOfInt(cl.C_Charge));
+                    mTab.setValue("M_Product_ID", null);
                 }
                 mTab.setValue("M_AttributeSetInstance_ID", cl["M_AttributeSetInstance"]);
                 mTab.setValue("C_UOM_ID", cl["C_UOM"]);

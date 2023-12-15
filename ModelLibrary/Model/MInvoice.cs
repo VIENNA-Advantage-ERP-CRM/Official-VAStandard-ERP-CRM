@@ -1619,7 +1619,7 @@ namespace VAdvantage.Model
 
             // If lines are available and user is changing the pricelist/conversiontype on header than we have to restrict it because
             // those lines are saved as privious pricelist prices or Payment term.. standard sheet issue no : SI_0344 / JID_0564 / JID_1536_1 by Manjot
-            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")))
+            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")|| Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -1629,9 +1629,11 @@ namespace VAdvantage.Model
                     log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_CantChange"));
                     return false;
                 }
-            }
 
-            if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
+            }
+            
+
+                if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
             {
                 MInvoiceLine[] lines = GetLines(true);
 

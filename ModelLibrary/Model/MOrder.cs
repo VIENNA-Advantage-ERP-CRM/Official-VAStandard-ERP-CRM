@@ -2316,7 +2316,7 @@ namespace VAdvantage.Model
         {
             MBPartner bp = null;
             try
-            {
+            {   
                 //	Client/Org Check
                 if (GetAD_Org_ID() == 0)
                 {
@@ -2414,7 +2414,7 @@ namespace VAdvantage.Model
 
                 // If lines are available and user is changing the pricelist, Order or Ship/Receipt on header than we have to restrict it because
                 // JID_0399_1: After change the receipt or order system will give the error message
-                if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID")))
+                if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
                 {
                     //MOrderLine[] lines = GetLines(false, null);
                     //if (lines.Length > 0)
