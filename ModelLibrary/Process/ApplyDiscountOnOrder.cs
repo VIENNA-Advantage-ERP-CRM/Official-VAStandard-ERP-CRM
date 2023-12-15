@@ -72,7 +72,7 @@ namespace VAdvantage.Process
 
             MOrderLine[] lines = obj.GetLines();
 
-            if (_DiscountAmt == 0 && _DiscountPercent == 0)//VIS430:Show message when user did not apply the discount and tries to clear the discount.
+            if (_IsCLearDiscount == "Y" && _DiscountAmt == 0 && _DiscountPercent == 0)//VIS430:Show message when user did not apply the discount and tries to clear the discount.
             {
                return Msg.GetMsg(GetCtx(), "NoLines");
             }
