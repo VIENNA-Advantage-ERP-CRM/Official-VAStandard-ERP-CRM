@@ -124,6 +124,8 @@
         }
         try {
             this.setCalloutActive(true);
+            mTab.setValue("M_Product_ID", null);
+            mTab.setValue("C_Charge_ID", null);//VIS430:Set C_Charge_ID and M_Product_ID null
             var paramString = Util.getValueOfInt(value);
             var cl = VIS.dataContext.getJSONRecord("MVASContract/GetContractData", paramString);
             if (cl!= null) {
