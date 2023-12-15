@@ -188,6 +188,14 @@ namespace VAdvantage.Model
             to.SetIsTransferred(false);
             to.SetPosted(false);
             to.SetProcessed(false);
+            //VIS:0336:changes done for copy the contract id to reversal document.
+            if (to.Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
+            {
+                if (Util.GetValueOfInt(from.Get_Value("VAS_ContractMaster_ID")) > 0)
+                {
+                    to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID"));
+                }
+            }
             //	delete references
             to.SetIsSelfService(false);
             if (!setOrder)
@@ -1108,6 +1116,15 @@ namespace VAdvantage.Model
                 //end 
 
                 line.SetProcessed(false);
+                //VIS:0336:changes done for copy the contract line id to reversal document.
+                if (line.Get_ColumnIndex("VAS_ContractLine_ID") >= 0)
+                {
+                    if (Util.GetValueOfInt(fromLine.Get_Value("VAS_ContractLine_ID")) > 0)
+                    {
+                        line.Set_Value("VAS_ContractLine_ID", fromLine.Get_Value("VAS_ContractLine_ID"));
+                    }
+                }
+
                 if (line.Save(Get_TrxName()))
                 {
                     count++;
@@ -6450,7 +6467,6 @@ namespace VAdvantage.Model
                 return ReverseCorrectIt();
             }
 
-            ReverseContractMaster();
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
