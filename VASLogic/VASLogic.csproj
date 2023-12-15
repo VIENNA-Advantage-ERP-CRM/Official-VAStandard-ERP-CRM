@@ -121,6 +121,7 @@
     <Compile Include="Models\Callouts\MProfitTaxModel.cs" />
     <Compile Include="Models\Callouts\MProjectModel.cs" />
     <Compile Include="Models\Callouts\MRequestTypeModel.cs" />
+    <Compile Include="Models\Callouts\MRfqResponseModel.cs" />
     <Compile Include="Models\Callouts\MStorageModel.cs" />
     <Compile Include="Models\Callouts\MTaxModel.cs" />
     <Compile Include="Models\Callouts\MTeamForcastModel.cs" />

@@ -191,6 +191,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MProjectController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MRequestController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MRequestTypeController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MRFQResponseController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MStorageController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MTaxController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MTeamForcastController.cs" />

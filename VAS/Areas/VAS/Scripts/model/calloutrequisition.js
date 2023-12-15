@@ -486,6 +486,37 @@
         this.setCalloutActive(false);
         return "";
     };
+
+    /// <summary>
+    /// VAI051; save the Value of Price * Quantity on the Final price after Discount Field on Requisition Line .
+    /// </summary>
+    /// <param name="ctx">context</param>
+    /// <param name="windowNo">current Window No</param>
+    /// <param name="mTab">Grid Tab</param>
+    /// <param name="mField">Grid Field</param>
+    /// <param name="value"> New Value</param>
+    /// <returns>null or error message</returns>
+
+    CalloutRequisition.prototype.SetFixedPrice = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null) {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var RfQLineID = Util.getValueOfInt(mTab.getValue("C_RfQLineQty_ID"));
+        if (RfQLineID > 0) {
+            var data = VIS.dataContext.getJSONRecord("MRFQResponse/GetPrice", RfQLineID);
+            if (data != null) {
+                var price = Util.getValueOfDecimal(mTab.getValue("Price"));
+                var discount = Util.getValueOfDecimal(mTab.getValue("discount"));
+                price = price - ((price / 100) * discount);
+                mTab.setValue("VA068_FinalPrice", (data * price));
+            }
+        }
+        this.setCalloutActive(false);
+        return "";
+    };
+
+
     VIS.Model.CalloutRequisition = CalloutRequisition;
 
 })(VIS, jQuery);
