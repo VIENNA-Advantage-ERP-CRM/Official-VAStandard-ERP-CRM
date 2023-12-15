@@ -29,6 +29,7 @@ namespace VAdvantage.Process
     public class ApplyDiscountOnOrder : SvrProcess
     {
         // Order			
+        
         private String _IsCLearDiscount = "N";
         private Decimal _DiscountAmt = 0.0M;
         private Decimal _DiscountPercent = 0.0M;
@@ -72,16 +73,23 @@ namespace VAdvantage.Process
 
             MOrderLine[] lines = obj.GetLines();
 
+            if (_IsCLearDiscount == "Y")//VIS430:Show message when user did not apply the discount and tries to clear the discount.
+            {
+                if (_DiscountAmt == 0 && _DiscountPercent == 0)
+                {
+                    return Msg.GetMsg(GetCtx(), "NoDocumentFound");
+                }
+
+            }
             if (_IsCLearDiscount == "N")
             {
                 if (_DiscountAmt == 0 && _DiscountPercent == 0)
                 {
                     return Msg.GetMsg(GetCtx(), "PlsSelAtlstOneField");
                 }
-
-                if (_DiscountAmt != 0 && _DiscountPercent != 0)
+                if (lines.Length == 0 && _DiscountAmt != 0 && _DiscountPercent != 0)//VIS430:Show message when user apply the discount without inserting the lines
                 {
-                    return Msg.GetMsg(GetCtx(), "PlsSelOneField");
+                    return Msg.GetMsg(GetCtx(), "NoDocumentFound");
                 }
 
                 // get amount on which we have to apply discount
