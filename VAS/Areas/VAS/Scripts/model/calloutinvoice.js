@@ -1261,8 +1261,8 @@
             }
             //	UOM Changed - convert from Entered -> Product
             // JID_0540: System should check the Price in price list for selected Attribute set instance and UOM,If price is not there is will multiple the base UOM price with UOM conversion multipy value and set that price.
-            else if (mField.getColumnName().toString().equals("C_UOM_ID") || mField.getColumnName().toString().equals("M_AttributeSetInstance_ID")) {
-                var C_UOM_To_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
+            else if (mField.getColumnName().toString().equals("C_UOM_ID") || mField.getColumnName().toString().equals("M_AttributeSetInstance_ID") || mField.getColumnName().toString().equals("VAS_ContractLine_ID")) {
+                var C_UOM_To_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID")); 
                 QtyEntered = mTab.getValue("QtyEntered");
 
                 /*** Start Amit ***/
