@@ -67,11 +67,12 @@ namespace VAdvantage.Model
                     {
                         return true;
                     }
+                    //VAI066 15/12/2023 BugId-3460 Add W in the query to Handeled the Weighted AVerage Cost 
                     sql.Clear();
                     sql.Append(@"SELECT COUNT(*) FROM M_CostElementLine WHERE AD_Client_ID = " + GetAD_Client_ID()
                                   + " AND M_CostElement_ID = " + GetM_CostElement_ID()
                                   + " AND CAST(M_Ref_CostElement AS INTEGER) IN (SELECT M_CostElement_ID FROM M_CostElement WHERE IsActive = 'Y' AND "
-                                  + " CostingMethod IN ('A' , 'F' , 'I' , 'L' , 'S' , 'i' , 'p')) AND M_CostElementLine_ID != " + GetM_CostElementLine_ID());
+                                  + " CostingMethod IN ('A' , 'F' , 'I' , 'L' , 'S' , 'i' , 'p', 'W')) AND M_CostElementLine_ID != " + GetM_CostElementLine_ID());
                     countRecord = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
                     if (countRecord > 0)
                     {
