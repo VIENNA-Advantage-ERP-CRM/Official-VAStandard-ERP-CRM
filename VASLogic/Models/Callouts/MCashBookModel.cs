@@ -144,7 +144,8 @@ namespace VIS.Models
 
         /// <summary>
         /// Get Invoice Pay Schedule Due Amount
-        /// </summary>        
+        /// </summary>   
+        /// <param name="ctx">Context</param>
         /// <param name="C_InvoicePaySchedule_ID"></param>
         /// <returns></returns>
         public Dictionary<string, object> GetInvSchedDueAmount(Ctx ctx,string fields)
