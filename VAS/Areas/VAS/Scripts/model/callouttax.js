@@ -285,12 +285,15 @@
     CalloutTaxAmount.prototype.CashLineTaxAmount = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
-        }
+        }        
         this.setCalloutActive(true);
         try {
-            // get precision from currency
-            var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", ctx.getContext(windowNo, "C_Currency_ID").toString());
-            var StdPrecision = currency["StdPrecision"];
+            var StdPrecision = 2;
+            // get precision from currency if tax id is greater than 0
+            if (mField.getColumnName() == "C_Tax_ID" || Util.getValueOfInt(mTab.getValue("C_Tax_ID")) > 0) {
+                var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", ctx.getContext(windowNo, "C_Currency_ID").toString());
+                StdPrecision = currency["StdPrecision"];
+            }
 
             if (mField.getColumnName() == "C_Tax_ID") {
                 if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
