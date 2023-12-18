@@ -388,9 +388,11 @@
                 // when order line contains charge, it will be selected on Shipment Line on selection of Order Line
                 if (M_Product_ID != 0 && M_Product_ID != null) {
                     mTab.setValue("M_Product_ID", M_Product_ID);
+                    mTab.setValue("C_Charge_ID", null); //VAI050-Set charge null if product selected
                 }
                 else {
                     mTab.setValue("C_Charge_ID", C_Charge_ID);
+                    mTab.setValue("M_Product_ID", null);  //VAI050-Set product null if charge selected
                 }
 
                 if (Qty != 0 && Qty != null) {
