@@ -115,7 +115,7 @@ namespace VAdvantage.Model
         {
             string sql = "SELECT (a.t1+b.t2) AS LineAmount  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
                          " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
-                        "AND ol.VAS_ContractLine_ID = "+GetVAS_ContractLine_ID()+" ) a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                        "AND ol.VAS_ContractLine_ID = "+GetVAS_ContractLine_ID()+ " AND o.IsBlanketTrx!='Y') a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
                         "C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
                         "il.VAS_ContractLine_ID ="+GetVAS_ContractLine_ID()+") b";
             decimal LineAmount = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
