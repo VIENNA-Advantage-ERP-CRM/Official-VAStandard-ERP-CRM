@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Web;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
@@ -143,20 +144,27 @@ namespace VIS.Models
 
         /// <summary>
         /// Get Invoice Pay Schedule Due Amount
-        /// </summary>        
+        /// </summary>   
+        /// <param name="ctx">Context</param>
         /// <param name="C_InvoicePaySchedule_ID"></param>
         /// <returns></returns>
-        public Dictionary<string, object> GetInvSchedDueAmount(string fields)
+        public Dictionary<string, object> GetInvSchedDueAmount(Ctx ctx,string fields)
         {
             Dictionary<string, object> retValue = null;
+            string[] paramValue = fields.Split(',');
             string qry = @"SELECT NVL(DueAmt , 0) AS DueAmt, i.IsReturnTrx FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID"
-                + " INNER JOIN C_DocType d ON i.C_DocTypeTarget_ID = d.C_DocType_ID WHERE ips.C_InvoicePaySchedule_ID = " + Util.GetValueOfInt(fields);
+                + " INNER JOIN C_DocType d ON i.C_DocTypeTarget_ID = d.C_DocType_ID WHERE ips.C_InvoicePaySchedule_ID = " + Util.GetValueOfInt(paramValue[0]);
+
             DataSet _ds = DB.ExecuteDataset(qry);
             if (_ds.Tables[0].Rows.Count > 0 && _ds != null)
             {
                 retValue = new Dictionary<string, object>();
                 retValue["DueAmt"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["DueAmt"]);
                 retValue["IsReturnTrx"] = Util.GetValueOfString(_ds.Tables[0].Rows[0]["IsReturnTrx"]);
+            }
+            if (paramValue.Length > 1)
+            {
+                retValue["StdPrecision"] = MCurrency.GetStdPrecision(ctx, Util.GetValueOfInt(paramValue[1]));
             }
             return retValue;
         }

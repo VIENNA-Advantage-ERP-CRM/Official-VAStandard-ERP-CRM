@@ -348,23 +348,19 @@
         var invTotalAmt = 0;
         var colName = mField.getColumnName();
         var payAmt = Util.getValueOfDecimal(mTab.getValue("Amount"));
-        //Get the standard precision to set the values according to same
-        var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", Util.getValueOfInt(mTab.getValue("C_Currency_ID")));
-        var stdPrecision = Util.getValueOfInt(currency["StdPrecision"]);
-        if (stdPrecision == null || stdPrecision == 0)
-        {
-            stdPrecision = 2;
-        }
+        var stdPrecision = 2;
         this.setCalloutActive(true);
         var convertedAmt = 0;   
-        if ("I" == mTab.getValue("CashType")) {
+        if ("I" == mTab.getValue("CashType")) {            
             var discountAmt = Util.getValueOfDecimal(mTab.getValue("DiscountAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"));
             var overUnderAmt = Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"));
+            var paramstring = Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")).toString() + "," + Util.getValueOfInt(mTab.getValue("C_Currency_ID")).toString();
             //Getting the open amount of invoice schedule
-            var AmountSched = VIS.dataContext.getJSONRecord("MCashBook/GetInvSchedDueAmt", Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")));
+            var AmountSched = VIS.dataContext.getJSONRecord("MCashBook/GetInvSchedDueAmt", paramstring);
             if (AmountSched != null) {
                 invTotalAmt = Util.getValueOfDecimal(AmountSched["DueAmt"]);
+                stdPrecision = Util.getValueOfInt(AmountSched["StdPrecision"]);
             }
             var PaymentType = mTab.getValue("VSS_PaymentType");
             if (PaymentType == "P") {
@@ -428,11 +424,19 @@
                     overUnderAmt = (((invTotalAmt - payAmt) - discountAmt) - writeOffAmt);
                     mTab.setValue("Amount", payAmt.toFixed(stdPrecision));
                 }
-                //precised value's according to precision
-                mTab.setValue("DiscountAmt", discountAmt.toFixed(stdPrecision));
-                mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt).toFixed(stdPrecision));
-                mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
-                mTab.setValue("Amount", payAmt.toFixed(stdPrecision));
+                //precised value's according to precision if value does not match
+                if (discountAmt.toFixed(stdPrecision) != Util.getValueOfDecimal(mTab.getValue("DiscountAmt"))) {
+                    mTab.setValue("DiscountAmt", discountAmt.toFixed(stdPrecision));
+                }
+                if (overUnderAmt != Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"))) {
+                    mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt).toFixed(stdPrecision));
+                }
+                if (writeOffAmt.toFixed(stdPrecision) != Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"))) {
+                    mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
+                }
+                if (payAmt.toFixed(stdPrecision) != Util.getValueOfDecimal(mTab.getValue("Amount"))) {
+                    mTab.setValue("Amount", payAmt.toFixed(stdPrecision));
+                }
             }
             else // calculate PayAmt
             {               
@@ -458,8 +462,19 @@
                         mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
                     }
                 }
-                mTab.setValue("Amount", Util.getValueOfDecimal(payAmt).toFixed(stdPrecision));
-
+                //precised value's according to precision if value does not match
+                if (discountAmt.toFixed(stdPrecision) != Util.getValueOfDecimal(mTab.getValue("DiscountAmt"))) {
+                    mTab.setValue("DiscountAmt", discountAmt.toFixed(stdPrecision));
+                }
+                if (writeOffAmt.toFixed(stdPrecision) != Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"))) {
+                    mTab.setValue("WriteOffAmt", writeOffAmt.toFixed(stdPrecision));
+                }
+                if (overUnderAmt != Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"))) {
+                    mTab.setValue("OverUnderAmt", Util.getValueOfDecimal(overUnderAmt).toFixed(stdPrecision));
+                }
+                if (payAmt != Util.getValueOfDecimal(mTab.getValue("Amount"))) {
+                    mTab.setValue("Amount", Util.getValueOfDecimal(payAmt).toFixed(stdPrecision));
+                }
                 if ((PaymentType == "R" && overUnderAmt > 0) || (PaymentType == "P" && overUnderAmt < 0)) {
                     VIS.ADialog.info("LessScheduleAmount");
                 }
@@ -762,10 +777,14 @@
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);
         }
         else if (Util.getValueOfString(mTab.getValue("CashType")) == "I" || Util.getValueOfString(mTab.getValue("CashType")) == "O") { //VA230:Invoice and Order
-            mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);
+            mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);            
         }
         else {
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(false);
+        }
+        //VIS_427 Set Tax to null if case type is not charge
+        if (Util.getValueOfString(mTab.getValue("CashType")) != "C") {
+            mTab.setValue("C_Tax_ID", null);
         }
 
         if (Util.getValueOfString(mTab.getValue("VSS_PAYMENTTYPE")) == "P" ||
