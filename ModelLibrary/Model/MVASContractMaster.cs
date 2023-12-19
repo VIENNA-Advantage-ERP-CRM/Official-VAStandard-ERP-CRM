@@ -38,7 +38,7 @@ namespace VAdvantage.Model
                 string sql = "SELECT COUNT(VAS_ContractMaster_ID) FROM VAS_ContractLine WHERE VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + " AND IsActive = 'Y'";
                 if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
                 {
-                    log.SaveWarning("pleaseDeleteLinesFirst", "");
+                    log.SaveError("pleaseDeleteLinesFirst", "");
                     return false;
                 }
             }
