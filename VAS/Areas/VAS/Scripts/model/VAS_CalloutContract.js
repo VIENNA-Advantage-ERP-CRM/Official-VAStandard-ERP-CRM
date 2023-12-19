@@ -54,18 +54,20 @@
         }
         this.setCalloutActive(true);
         if (mTab.getValue("StartDate") != null || mTab.getValue("DateDoc") != null) {  //VIS430:Contract End Date not less than contract date
-        var startDate = new Date(mTab.getValue("StartDate"));
-        var docDate = new Date(mTab.getValue("DateDoc"));
-        var endDate = new Date(value);
-        endDate = endDate.setHours(0, 0, 0, 0);
-        startDate = startDate.setHours(0, 0, 0, 0);
-        docDate = docDate.setHours(0, 0, 0, 0);
-        if (endDate < startDate || endDate < docDate) {
+            var startDate = new Date(mTab.getValue("StartDate"));
+            var docDate = new Date(mTab.getValue("DateDoc"));
+            var endDate = new Date(value);
+            var EndDate = new Date(value);
+            endDate = endDate.setHours(0, 0, 0, 0);
+            startDate = startDate.setHours(0, 0, 0, 0);
+            docDate = docDate.setHours(0, 0, 0, 0);
+            if (endDate < startDate || endDate < docDate) {
                 mTab.setValue("EndDate", null);
                 this.setCalloutActive(false);
                 return "VAS_EndDateMustGreater";
             }
         }
+        mTab.setValue("VAS_RenewalDate", new Date(EndDate.setDate(EndDate.getDate() + 1)));
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
@@ -119,7 +121,7 @@
             renewalDate.setHours(0, 0, 0, 0);
             var endDate = new Date(mTab.getValue("EndDate"));
             endDate.setHours(0, 0, 0, 0);
-            if (renewalDate < endDate) {              
+            if (renewalDate < endDate) {
                 mTab.setValue("VAS_RenewalDate", null);
                 this.setCalloutActive(false);
                 return "VAS_RenewalMustGreater";

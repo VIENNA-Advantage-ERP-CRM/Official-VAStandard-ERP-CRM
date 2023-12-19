@@ -30,6 +30,18 @@ namespace VAdvantage.Model
 
         protected override bool BeforeSave(bool newRecord)
         {
+
+            //VIS0336:Restrict the user not to change the below fields if contract line exists for this contract.
+            if (!newRecord && (Is_ValueChanged("ContractType") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_PaymentTerm_ID") || Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("VA009_PaymentMethod_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
+            {
+               
+                string sql = "SELECT COUNT(VAS_ContractMaster_ID) FROM VAS_ContractLine WHERE VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + " AND IsActive = 'Y'";
+                if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
+                {
+                    log.SaveError("pleaseDeleteLinesFirst", "");
+                    return false;
+                }
+            }
             //VAI050-If transaction available for contract, then system should not allow to edit any information on the header of contract
             if (!newRecord && !Is_ValueChanged("VAS_TerminationReason") && !Is_ValueChanged("VAS_TerminationDate") && !Is_ValueChanged("VAS_Terminate")) 
             {

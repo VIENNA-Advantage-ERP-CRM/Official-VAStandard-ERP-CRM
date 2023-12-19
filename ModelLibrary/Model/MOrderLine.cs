@@ -4670,10 +4670,11 @@ namespace VAdvantage.Model
             }
             //VIS0336:-Restrict the user to add greater amount than contract line Amount while creating Invoice line with contract line refrence.
             if ((newRecord || Is_ValueChanged("LineNetAmt")) && Util.GetValueOfInt(Get_Value("VAS_ContractLine_ID"))>0)
+
             {
                 string query = "SELECT (c.Amount-(a.t1+b.t2)) Actual  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
                         " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
-                        " AND ol.VAS_ContractLine_ID = " + Get_Value("VAS_ContractLine_ID") + " AND ol.C_OrderLine_ID!="+GetC_OrderLine_ID()+ " ) a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                        " AND ol.VAS_ContractLine_ID = " + Get_Value("VAS_ContractLine_ID") + " AND ol.C_OrderLine_ID!="+GetC_OrderLine_ID() + (!Util.GetValueOfBool(Ord.Get_Value("IsBlanketTrx"))? " AND IsBlanketTrx = 'N'":"") +" ) a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
                         " C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
                         " il.VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ") b , (SELECT Amount  FROM VAS_ContractLine" +
                         "  WHERE VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ")c";
