@@ -1321,7 +1321,7 @@ namespace VAdvantage.Model
                     //VAI050-Set VAS_ContractLine_ID  when we create Purchase order from Create release order process on Blanket Purchase order screen
                     if (line.Get_ColumnIndex("VAS_ContractLine_ID") >= 0 && Util.GetValueOfInt(fromLines[i].Get_Value("VAS_ContractLine_ID")) > 0)
                     {
-                        line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_Value("VAS_ContractLine_ID")); 
+                        line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_Value("VAS_ContractLine_ID"));
                     }
                     //	References
                     if (!copyASI)
@@ -2326,7 +2326,7 @@ namespace VAdvantage.Model
         {
             MBPartner bp = null;
             try
-            {   
+            {
                 //	Client/Org Check
                 if (GetAD_Org_ID() == 0)
                 {
@@ -6364,10 +6364,13 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             // JID_0658: After Creating PO from Open Requisition, & the PO record is Void, PO line reference is not getting removed from Requisition Line.
             DB.ExecuteQuery("UPDATE M_RequisitionLine SET C_OrderLine_ID = NULL WHERE C_OrderLine_ID IN (SELECT C_OrderLine_ID FROM C_OrderLine WHERE C_Order_ID = " + GetC_Order_ID() + ")", null, Get_TrxName());
 
-        //VIS0336: changes done for updating the amount on CM when record is void / reverse / reactivate
-            if (!ReverseContractMaster())
+            //VIS0336: changes done for updating the amount on CM when record is void / reverse / reactivate
+            if (MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))
             {
-                return false;
+                if (!ReverseContractMaster())
+                {
+                    return false;
+                }
             }
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
