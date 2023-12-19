@@ -57,7 +57,7 @@
             var startDate = new Date(mTab.getValue("StartDate"));
             var docDate = new Date(mTab.getValue("DateDoc"));
             var endDate = new Date(value);
-            var EndDate = Util.getValueOfDate(endDate);
+            var EndDate = new Date(value);
             endDate = endDate.setHours(0, 0, 0, 0);
             startDate = startDate.setHours(0, 0, 0, 0);
             docDate = docDate.setHours(0, 0, 0, 0);
@@ -67,7 +67,7 @@
                 return "VAS_EndDateMustGreater";
             }
         }
-        (mTab.setValue("VAS_RenewalDate", new Date(new Date().setDate(new Date(EndDate).getDate() + 1))));
+        mTab.setValue("VAS_RenewalDate", new Date(EndDate.setDate(EndDate.getDate() + 1)));
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
