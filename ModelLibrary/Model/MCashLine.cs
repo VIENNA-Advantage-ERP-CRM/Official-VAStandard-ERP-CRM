@@ -532,6 +532,18 @@ namespace VAdvantage.Model
         {
             if (!success)
                 return success;
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
+              if user delete refernce of invoice from cash line*/
+            if (GetC_InvoicePaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "J", "A", "C_InvoicePaySchedule", Get_Trx());
+            }
+            /*VIS_427 28/11/2023 Bug Id:3069 Handled issue to set execution status to 'Awaited' from 'Assign to Journal'
+              if user delete refernce of order from cash line*/
+            else if (GetVA009_OrderPaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetVA009_OrderPaySchedule_ID(), "J", "A", "VA009_OrderPaySchedule", Get_Trx());
+            }
             return UpdateCbAndLine();
             //return UpdateHeader();
         }
@@ -777,6 +789,29 @@ namespace VAdvantage.Model
                     log.SaveWarning("Warning", retMsg);
                 else if (bp.IsCreditWatch(GetC_BPartner_Location_ID()))
                     log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
+            }
+            //VIS_427 14/12/2023 Bug Id:3069 Handled issue if user change the schedule from drop down then it should change the status of old schedule to 'Awaited'
+            int oldInvoiceScheduleid = Util.GetValueOfInt(Get_ValueOld("C_InvoicePaySchedule_ID"));
+            if (oldInvoiceScheduleid > 0 && (oldInvoiceScheduleid != GetC_InvoicePaySchedule_ID()))
+            {
+                UpdateExecutionStatus(oldInvoiceScheduleid, "J", "A", "C_InvoicePaySchedule", Get_Trx());
+            }
+            int oldOrderScheduleid = Util.GetValueOfInt(Get_ValueOld("VA009_OrderPaySchedule_ID"));
+            if (oldOrderScheduleid > 0 && (oldOrderScheduleid != GetVA009_OrderPaySchedule_ID()))
+            {
+                UpdateExecutionStatus(oldOrderScheduleid, "J", "A", "VA009_OrderPaySchedule", Get_Trx());
+            }
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
+              if user Save refernce of invoice from cash line*/
+            if (GetC_InvoicePaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetC_InvoicePaySchedule_ID(), "A", "J", "C_InvoicePaySchedule", Get_Trx());
+            }
+            /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
+              if user Save refernce of order from cash line*/
+            else if (GetVA009_OrderPaySchedule_ID() > 0)
+            {
+                UpdateExecutionStatus(GetVA009_OrderPaySchedule_ID(), "A", "J", "VA009_OrderPaySchedule", Get_Trx());
             }
 
             return true;
@@ -1036,6 +1071,25 @@ namespace VAdvantage.Model
                 + " (" + alloc + "=" + total + ")");
             return change;
         }
+
+        /// <summary>
+        /// 23/11/2023 BugId:3069 This Function is used to update the Execution Status of Invoice/Order Pay Schedule
+        /// </summary>
+        /// <param name="ScheduleId">Invoice Schedule ID</param>
+        /// <param name="FromStatus">Status That is present on field</param>
+        /// <param name="ToStatus">Status which is to be changed on field</param>
+        /// <param name="TableName">Name of Table</param>
+        /// <param name="trx">Used for Transactions</param>
+        /// <author>VIS_427</author>
+        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus,string TableName,Trx trx)
+        {
+            if (ScheduleId > 0)
+            {
+                int count = DB.ExecuteQuery(@"UPDATE "+ TableName+" SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
+                                              " ELSE VA009_ExecutionStatus END WHERE "+ TableName + "_ID = " + ScheduleId, null, trx);
+            }
+        }
+
         /// <summary>
         ///   Get Allocated Amt in Payment Currency
         ///   Author:VA230

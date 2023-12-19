@@ -4037,7 +4037,12 @@ namespace VIS.Models
             INNER JOIN AD_Org o ON (o.AD_Org_ID = i.AD_Org_ID) INNER JOIN C_Currency c ON (i.C_Currency_ID = c.C_Currency_ID)
             INNER JOIN C_InvoicePaySchedule ips ON (i.C_Invoice_ID = ips.C_Invoice_ID AND i.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID ) 
             INNER JOIN VA009_PaymentMethod pm ON (ips.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID) 
-            WHERE i.IsPaid='N' AND i.Processed = 'Y' AND ips.IsHoldPayment='N'");
+            WHERE i.IsPaid='N' AND i.Processed = 'Y' AND ips.IsHoldPayment='N' AND ips.C_InvoicePaySchedule_ID NOT IN (
+                SELECT CASE WHEN C_Payment.C_Payment_ID != COALESCE(C_PaymentAllocate.C_Payment_ID,0) 
+                THEN COALESCE(C_Payment.C_InvoicePaySchedule_ID,0)  ELSE COALESCE(C_PaymentAllocate.C_InvoicePaySchedule_ID,0) END 
+                FROM C_Payment LEFT JOIN C_PaymentAllocate ON (C_PaymentAllocate.C_Payment_ID = C_Payment.C_Payment_ID) 
+                WHERE C_Payment.DocStatus NOT IN ('CO', 'CL' ,'RE','VO')) 
+            AND ips.VA009_ExecutionStatus NOT IN ('Y','J')");
 
             //to get invoice schedules against related business partner
             if (!string.IsNullOrEmpty(relatedBpids))
@@ -4636,7 +4641,12 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 ON cb.C_BPartner_ID = jl.C_BPartner_ID WHERE j.docstatus IN ('CO','CL') AND jl.isallocated ='N' AND EV.isAllocationrelated='Y' AND EV.AccountType IN ('A','L')
                 AND jl.GL_JournalLine_ID NOT IN ( SELECT NVL(al.GL_JournalLine_ID,0) FROM C_AllocationHdr ah 
                                         INNER JOIN C_AllocationLine al ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID)
-                                        WHERE ah.DocStatus NOT IN ('CO', 'CL' ,'RE','VO'))");
+                                        WHERE ah.DocStatus NOT IN ('CO', 'CL' ,'RE','VO'))  
+                AND jl.GL_JournalLine_ID NOT IN ( 
+                SELECT CASE WHEN C_Payment.C_Payment_ID != COALESCE(C_PaymentAllocate.C_Payment_ID,0) 
+                THEN COALESCE(C_Payment.GL_JournalLine_ID,0)  ELSE COALESCE(C_PaymentAllocate.GL_JournalLine_ID,0) END 
+                FROM C_Payment LEFT JOIN C_PaymentAllocate ON (C_PaymentAllocate.C_Payment_ID = C_Payment.C_Payment_ID) 
+                WHERE C_Payment.DocStatus NOT IN ('CO', 'CL' ,'RE','VO'))");
 
             //filter based on inter company parameter
             if (!isInterComp)
@@ -5705,7 +5715,9 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 {
                                     for (int k = 0; k < negList.Count; k++)
                                     {
-                                        if (Util.GetValueOfInt(rowsInvoice[i]["cinvoiceid"]) == Util.GetValueOfInt(negList[k]["cinvoiceid"]))
+                                        /* VIS_427 DevOpsId 3333 07/12/2023 Handled issue When user allocate the multiple Invoice schedules of same invoice with GL Journal line ,
+                                        then system will pick the paid amount and set the same amount on the reference of that invoice schedule */
+                                        if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
                                         {
                                             paid = Util.GetValueOfDecimal(negList[k]["paidAmt"]) + netAmt;
                                             negList[k]["paidAmt"] = paid.ToString();
