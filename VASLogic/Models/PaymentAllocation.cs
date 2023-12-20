@@ -5479,39 +5479,40 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 {
 
                     #region In case of Multiple gl Journals and multiple invoice and credit memo
-                    if (i == 0)
-                    {
-                        for (int k = 0; k < rowsInvoice.Count; k++)
-                        {
-                            if (rowsInvoice[k]["Docbasetype"] == "ARC")
-                            {
-                                decimal arcAmt = 0;
-                                for (int j = 0; j < rowsGL.Count; j++)
-                                {
-                                    /*VIS_427 BugId:3417 12/12/2023 Handled issue When user allocate the single/multiple Invoice schedules(ARC) of same/different invoice with GL Journal line ,
-                                        then system should create the allocation of  ARC with GL if applied amount Gl Journal line is greater then 0*/
-                                    if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) > 0)
-                                    {
-                                        saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
-                                            Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
-                                            Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
-                                        arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
-                                        rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
-                                        rowsGL[j]["OpenAmount"] = arcAmt.ToString();
-                                    }
-                                    else
-                                    {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    //VIS_427 Bugid 3417 20/12/2023 Identified that there is no requirement of this code in case of ARC as it can be handled with rest of code
+                    //if (i == 0)
+                    //{
+                    //    for (int k = 0; k < rowsInvoice.Count; k++)
+                    //    {
+                    //        if (rowsInvoice[k]["Docbasetype"] == "ARC")
+                    //        {
+                    //            decimal arcAmt = 0;
+                    //            for (int j = 0; j < rowsGL.Count; j++)
+                    //            {
+                    //                /*VIS_427 BugId:3417 12/12/2023 Handled issue When user allocate the single/multiple Invoice schedules(ARC) of same/different invoice with GL Journal line ,
+                    //                    then system should create the allocation of  ARC with GL if applied amount Gl Journal line is greater then 0*/
+                    //                if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) > 0)
+                    //                {
+                    //                    saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
+                    //                        Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
+                    //                        Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
+                    //                    arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
+                    //                    rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
+                    //                    rowsGL[j]["OpenAmount"] = arcAmt.ToString();
+                    //                }
+                    //                else
+                    //                {
+                    //                    continue;
+                    //                }
+                    //            }
+                    //        }
+                    //    }
+                    //}
 
-                    if (rowsInvoice[i]["Docbasetype"] == "ARC")
-                    {
-                        continue;
-                    }
+                    //if (rowsInvoice[i]["Docbasetype"] == "ARC")
+                    //{
+                    //    continue;
+                    //}
                     #endregion
 
                     //isScheduleAllocated = false;
@@ -6083,6 +6084,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (alloc.Save())
                     {
+                        alloc = new MAllocationHdr(ctx, alloc.Get_ID(), trx);
                          msg = alloc.GetDocumentNo();
                         //VIS_427 Bug Id : 2178 get the doc status of allocation tab on allocation window
                         status = alloc.GetDocStatus();
