@@ -5214,15 +5214,15 @@ namespace VAdvantage.Model
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0)
             {
                 //VIS430:Changes done for updating the utilized amount on contract master header when invoice is completed and invoice grandtotal is greater than PO/SO grandtotal
-                int utilizeAmount;
+                decimal utilizeAmount;
                 if (GetC_Order_ID() > 0)
                 {
                     
-                    int orderTotal = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
+                    decimal orderTotal = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
                                  WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx()));
                     if (GetTotalLines() > orderTotal)
                     {
-                         utilizeAmount = Util.GetValueOfInt(Util.GetValueOfInt(GetTotalLines()) - Util.GetValueOfInt(orderTotal));
+                         utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(GetTotalLines()) - Util.GetValueOfDecimal(orderTotal));
                     }
                     else
                     {
@@ -5232,7 +5232,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    utilizeAmount = Util.GetValueOfInt(GetTotalLines());
+                    utilizeAmount = Util.GetValueOfDecimal(GetTotalLines());
                 }
                 int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + utilizeAmount + " )" +
                                                         " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")), null, Get_Trx());
