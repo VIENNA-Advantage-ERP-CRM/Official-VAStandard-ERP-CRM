@@ -4609,7 +4609,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 if (ContractID > 0 && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
                 {
                     //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Order is completed and and Contact master id is greater than 0.
-                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetGrandTotal() + " )" +
+                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetTotalLines() + " )" +
                                                       " WHERE VAS_ContractMaster_ID=" + ContractID;
                     int no = DB.ExecuteQuery(query, null, Get_Trx());
                     if (no < 0)
@@ -6610,7 +6610,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0 && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
             {
 
-                String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) - " + GetGrandTotal() + " )" +
+                String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) - " + GetTotalLines() + " )" +
                                                     " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
                 int no = DB.ExecuteQuery(query, null, Get_Trx());
                 if (no < 0)
