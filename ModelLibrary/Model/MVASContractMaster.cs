@@ -34,7 +34,7 @@ namespace VAdvantage.Model
             //VIS0336:Restrict the user not to change the below fields if contract line exists for this contract.
             if (!newRecord && (Is_ValueChanged("ContractType") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_PaymentTerm_ID") || Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("VA009_PaymentMethod_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
-               
+
                 string sql = "SELECT COUNT(VAS_ContractMaster_ID) FROM VAS_ContractLine WHERE VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + " AND IsActive = 'Y'";
                 if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
                 {
@@ -43,27 +43,35 @@ namespace VAdvantage.Model
                 }
             }
             //VAI050-If transaction available for contract, then system should not allow to edit any information on the header of contract
-            if (!newRecord && !Is_ValueChanged("VAS_TerminationReason") && !Is_ValueChanged("VAS_TerminationDate") && !Is_ValueChanged("VAS_Terminate")) 
+            if (!newRecord && !Is_ValueChanged("VAS_TerminationReason") && !Is_ValueChanged("VAS_TerminationDate") && !Is_ValueChanged("VAS_Terminate"))
             {
                 string query = "SELECT a.OrderId , b.InvoiceId  FROM ( SELECT COUNT(VAS_ContractMaster_ID) AS OrderId FROM C_Order " +
-                     "WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID="+GetVAS_ContractMaster_ID()+ " AND IsBlanketTrx!='Y' )  a,   ( SELECT COUNT(VAS_ContractMaster_ID) AS InvoiceId " +
-                     " FROM C_Invoice WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID= "+GetVAS_ContractMaster_ID()+" )  b";
+                     "WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID=" + GetVAS_ContractMaster_ID() + " AND IsBlanketTrx!='Y' )  a,   ( SELECT COUNT(VAS_ContractMaster_ID) AS InvoiceId " +
+                     " FROM C_Invoice WHERE DocAction NOT IN ('VO','RC') AND VAS_ContractMaster_ID= " + GetVAS_ContractMaster_ID() + " )  b";
                 DataSet ds = DB.ExecuteDataset(query, null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["OrderId"]) > 0 || Util.GetValueOfInt(ds.Tables[0].Rows[0]["InvoiceId"]) > 0)
                     {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CheckOrder")); 
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CheckOrder"));
                         return false;
                     }
                 }
+
             }
+
             //VAI050-Should not allow to change any details of termination if contract is already terminated
-            if (!newRecord && (Is_ValueChanged("VAS_TerminationReason") || Is_ValueChanged("VAS_TerminationDate") || Is_ValueChanged("VAS_Terminate")))  
+            if (!newRecord && (Is_ValueChanged("VAS_TerminationReason") || Is_ValueChanged("VAS_TerminationDate") || Is_ValueChanged("VAS_Terminate")))
             {
                 if (Util.GetValueOfBool(Get_ValueOld("VAS_Terminate")))
                 {
                     log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_TerminateStatus"));
+                    return false;
+                }
+                //VIS0336:Implement check for restricting the user to enter termination date less than contract start date and end date.
+                if (GetVAS_TerminationDate() < GetStartDate() || GetVAS_TerminationDate() < GetDateDoc())
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_TerminationMustGreaters"));
                     return false;
                 }
 
