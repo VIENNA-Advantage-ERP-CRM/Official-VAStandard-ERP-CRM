@@ -5213,12 +5213,30 @@ namespace VAdvantage.Model
         {
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0)
             {
-
-                //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Invoice is completed and and Contact master id is greater than 0.
-                String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetGrandTotal() + " )" +
-                                                  " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
-                int no = DB.ExecuteQuery(query, null, Get_Trx());
-                if (no < 0)
+                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is completed and invoice grandtotal is greater than PO/SO grandtotal
+                int utilizeAmount;
+                if (GetC_Order_ID() > 0)
+                {
+                    
+                    int orderTotal = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
+                                 WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx()));
+                    if (GetTotalLines() > orderTotal)
+                    {
+                         utilizeAmount = Util.GetValueOfInt(Util.GetValueOfInt(GetTotalLines()) - Util.GetValueOfInt(orderTotal));
+                    }
+                    else
+                    {
+                        utilizeAmount = 0;
+                    }
+                    
+                }
+                else
+                {
+                    utilizeAmount = Util.GetValueOfInt(GetTotalLines());
+                }
+                int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + utilizeAmount + " )" +
+                                                        " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")), null, Get_Trx());
+                if (count < 0)
                 {
                     _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
                     return false;
