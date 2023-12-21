@@ -85,19 +85,7 @@ namespace VAS.Areas.VAS.Controllers
                 retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID, tabID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }    
-        
-        public ActionResult AutoCompleteFilter()
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.AutoCompleteFilter(ctx));
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }       
+        }   
 
         /// <summary>
         /// Update record of AlertRule by TabSqlGenerator 
