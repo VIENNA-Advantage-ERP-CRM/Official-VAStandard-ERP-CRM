@@ -3123,8 +3123,9 @@ namespace VAdvantage.Model
                             decimal expectedAmt = 0;
                             decimal expectedQty = 0;
                             query.Clear();
+                            //VIS_045: 20/Dec/2023, Task ID - 3605, Get Currency of Landed cost Allocation
                             query.Append(@"SELECT C_ExpectedCost.M_CostElement_ID , C_Expectedcostdistribution.Amt , C_Expectedcostdistribution.Qty,
-                                                 C_Expectedcostdistribution.C_Expectedcostdistribution_ID , C_Order.C_Currency_ID , C_Order.C_ConversionType_ID 
+                                                 C_Expectedcostdistribution.C_Expectedcostdistribution_ID , C_ExpectedCost.C_Currency_ID , C_ExpectedCost.C_ConversionType_ID 
                                           FROM C_Expectedcostdistribution INNER JOIN C_ExpectedCost ON C_Expectedcostdistribution.C_ExpectedCost_ID = C_ExpectedCost.C_ExpectedCost_ID 
                                           INNER JOIN C_OrderLine ON C_OrderLine.C_OrderLine_ID = C_Expectedcostdistribution.C_OrderLine_ID
                                           INNER JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID 
@@ -3136,7 +3137,13 @@ namespace VAdvantage.Model
                                 int OrderCurrency_ID;
                                 for (int lca = 0; lca < dsExpectedLandedCostAllocation.Tables[0].Rows.Count; lca++)
                                 {
-                                    OrderCurrency_ID = order.GetC_Currency_ID();
+                                    //VIS_045: 20/Dec/2023, Task ID - 3605, Get Currency of Landed cost Allocation
+                                    OrderCurrency_ID = Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_Currency_ID"]);
+                                    if (OrderCurrency_ID == 0)
+                                    {
+                                        // when currency not defined on expected landed cost the pick order currency
+                                        OrderCurrency_ID = order.GetC_Currency_ID();
+                                    }
                                     // total distributed amount against orderline
                                     expectedAmt = Util.GetValueOfDecimal(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["Amt"]);
                                     // Orderline qty
@@ -3167,8 +3174,11 @@ namespace VAdvantage.Model
 
                                     if (OrderCurrency_ID != acctSchema.GetC_Currency_ID())
                                     {
+                                        //VIS_045: 20/Dec/2023, Task ID - 3605, convert amount from Currency of Landed cost Allocation to accounting schema currency
                                         expectedAmt = MConversionRate.Convert(ctx, expectedAmt, OrderCurrency_ID, acctSchema.GetC_Currency_ID(),
-                                                                     inout.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
+                                                                     inout.GetDateAcct(), Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) != 0 ?
+                                                                     Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) :
+                                                                     order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                         if (expectedAmt == 0)
                                         {
                                             if (optionalstr != "window")
@@ -3539,7 +3549,7 @@ namespace VAdvantage.Model
                                 costingElementId = costingCheck.Lifo_ID;
                             }
                             costElement = MCostElement.Get(ctx, costingElementId);
-                            backwardInOut:
+                        backwardInOut:
                             if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
                             {
                                 #region Phy. Inventory / Internal Use Inventory
@@ -3792,7 +3802,7 @@ namespace VAdvantage.Model
                                 }
                                 else
                                 {
-                                    backwardSupportPE:
+                                backwardSupportPE:
                                     //1st entry either of FIFO of LIFO 
                                     if (po.Get_ValueAsInt("ReversalDoc_ID") > 0 && !backwardCompatabilitySupport)
                                     {
