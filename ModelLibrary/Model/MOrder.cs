@@ -131,6 +131,11 @@ namespace VAdvantage.Model
             to.SetIsTransferred(false);
             to.SetPosted(false);
             to.SetProcessed(false);
+            //VAI050-Set VAS_ContractMaster_ID  when we create Purchase order from Create release order process on Blanket Purchase order screen
+            if (to.Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(from.Get_Value("VAS_ContractMaster_ID")) > 0)
+            {
+                to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID"));
+            }
             if (counter)
             {
                 to.SetRef_Order_ID(from.GetC_Order_ID());
@@ -1313,6 +1318,11 @@ namespace VAdvantage.Model
                     line.Set_ValueNoCheck("C_OrderLine_ID", I_ZERO);	//	new
                     line.Set_ValueNoCheck("C_Contract_ID", I_ZERO);
                     line.SetCreateServiceContract("N");
+                    //VAI050-Set VAS_ContractLine_ID  when we create Purchase order from Create release order process on Blanket Purchase order screen
+                    if (line.Get_ColumnIndex("VAS_ContractLine_ID") >= 0 && Util.GetValueOfInt(fromLines[i].Get_Value("VAS_ContractLine_ID")) > 0)
+                    {
+                        line.Set_Value("VAS_ContractLine_ID", fromLines[i].Get_Value("VAS_ContractLine_ID"));
+                    }
                     //	References
                     if (!copyASI)
                     {
@@ -1556,7 +1566,7 @@ namespace VAdvantage.Model
                 + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                 + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                 + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
+                + " ORDER BY plv.ValidFrom DESC";
 
             //	Use newest price list - may not be future
             DataTable dt = null;
@@ -2414,7 +2424,7 @@ namespace VAdvantage.Model
 
                 // If lines are available and user is changing the pricelist, Order or Ship/Receipt on header than we have to restrict it because
                 // JID_0399_1: After change the receipt or order system will give the error message
-                if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID")))
+                if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("Orig_Order_ID") || Is_ValueChanged("Orig_InOut_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
                 {
                     //MOrderLine[] lines = GetLines(false, null);
                     //if (lines.Length > 0)
@@ -2590,7 +2600,7 @@ namespace VAdvantage.Model
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
                         return false;
-                    }                    
+                    }
                 }
 
                 if (IsReturnTrx())
@@ -2670,7 +2680,7 @@ namespace VAdvantage.Model
                         String sql = "UPDATE C_Invoice i "
                             + "SET (PaymentRule,C_PaymentTerm_ID,DateAcct,C_Payment_ID,C_CashLine_ID)="
                                 + "(SELECT PaymentRule,C_PaymentTerm_ID,DateAcct,C_Payment_ID,C_CashLine_ID "
-                                + "FROM C_Order o WHERE i.C_Order_ID=o.C_Order_ID)"
+                                + "FROM C_Order o WHERE i.C_Order_ID=o.C_Order_ID) "
                             + "WHERE DocStatus NOT IN ('RE','CL') AND C_Order_ID=" + GetC_Order_ID();
                         //	Don't touch Closed/Reversed entries
                         int no = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, Get_TrxName()));
@@ -3196,7 +3206,7 @@ namespace VAdvantage.Model
         private bool ExplodeBOM()
         {
             bool retValue = false;
-            String where = "AND IsActive='Y' AND EXISTS "
+            String where = " AND IsActive='Y' AND EXISTS "
                 + "(SELECT * FROM M_Product p WHERE C_OrderLine.M_Product_ID=p.M_Product_ID"
                 + " AND	p.IsBOM='Y' AND p.IsVerified='Y' AND p.IsStocked='N')";
             //
@@ -4532,7 +4542,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return  "@VAS_OrigPONotFound@";
+                        return "@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -4596,44 +4606,54 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
             {
                 int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
-                if (ContractID > 0)
+                if (ContractID > 0 && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
                 {
-                    MVASContractMaster _vasCont = new
-                        MVASContractMaster(GetCtx(), ContractID, Get_Trx());
-                    decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
-                                             _vasCont.GetVAS_ContractUtilizedAmount();
-                    if (!_vasCont.IsVAS_OverLimit())
+                    //VIS0336:Did changes for updating the Utilized amount on Contract Master header when Order is completed and and Contact master id is greater than 0.
+                    String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + GetTotalLines() + " )" +
+                                                      " WHERE VAS_ContractMaster_ID=" + ContractID;
+                    int no = DB.ExecuteQuery(query, null, Get_Trx());
+                    if (no < 0)
                     {
-                        if (GetGrandTotal() > ContractRemainingAmt)
-                        {
-                            SetProcessed(false);
-                            log.Warning("GrandTotal is greater than " +
-                                "contract amount " + (GetGrandTotal() -
-                                (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
-                            _processMsg = "@VAS_GrndTtllAmtGrtr@";
-                            return false;
-                        }
-                        else if (GetGrandTotal() <= ContractRemainingAmt)
-                        {
-                            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                + GetGrandTotal());
-                            if (!_vasCont.Save())
-                            {
-                                log.Warning("ContractUtilizedAmount Not Updated");
-                            }
-                            return true;
-                        }
+                        _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
+                        return false;
                     }
-                    else
-                    {
-                        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                               + GetGrandTotal());
-                        if (!_vasCont.Save())
-                        {
-                            log.Warning("ContractUtilizedAmount Not Updated");
-                        }
-                        return true;
-                    }
+                    //VIS0336:-these changes are handled on before save logic of order line.
+                    //MVASContractMaster _vasCont = new
+                    //    MVASContractMaster(GetCtx(), ContractID, Get_Trx());
+                    //decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
+                    //                         _vasCont.GetVAS_ContractUtilizedAmount();
+                    //if (!_vasCont.IsVAS_OverLimit())
+                    //{
+                    //    if (GetGrandTotal() > ContractRemainingAmt)
+                    //    {
+                    //        SetProcessed(false);
+                    //        log.Warning("GrandTotal is greater than " +
+                    //            "contract amount " + (GetGrandTotal() -
+                    //            (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                    //        _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                    //        return false;
+                    //    }
+                    //    else  if (GetGrandTotal() <= ContractRemainingAmt)
+                    //    {
+                    //        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                    //            + GetGrandTotal());
+                    //        if (!_vasCont.Save())
+                    //        {
+                    //            log.Warning("ContractUtilizedAmount Not Updated");
+                    //        }
+                    //        return true;
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //_vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                    //       + GetGrandTotal());
+                    //if (!_vasCont.Save())
+                    //{
+                    //    log.Warning("ContractUtilizedAmount Not Updated");
+                    //}
+                    //return true;
+                    // }
                 }
             }
             return true;
@@ -6314,6 +6334,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     line.SetQtyLostSales(old);
                     line.SetQty(Env.ZERO);
                     line.SetLineNetAmt(Env.ZERO);
+                    line.SetLineTotalAmt(Env.ZERO);//VAI050-Set Line Total Amount zero
 
                     // Remove Reference of Requisition from PO line after Void.
                     line.Set_Value("M_RequisitionLine_ID", 0);
@@ -6343,6 +6364,14 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             // JID_0658: After Creating PO from Open Requisition, & the PO record is Void, PO line reference is not getting removed from Requisition Line.
             DB.ExecuteQuery("UPDATE M_RequisitionLine SET C_OrderLine_ID = NULL WHERE C_OrderLine_ID IN (SELECT C_OrderLine_ID FROM C_OrderLine WHERE C_Order_ID = " + GetC_Order_ID() + ")", null, Get_TrxName());
 
+            //VIS0336: changes done for updating the amount on CM when record is void / reverse / reactivate
+            if (MOrder.DOCSTATUS_Completed.Equals(GetDocStatus()))
+            {
+                if (!ReverseContractMaster())
+                {
+                    return false;
+                }
+            }
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6570,7 +6599,30 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         {
             log.Info(ToString());
             return false;
+
         }
+        /// <summary>
+        /// VIS0336:changes done for updating the amount on CM when record is void/reverse/reactivate
+        /// </summary>
+        /// <returns>true/false</returns>
+        public bool ReverseContractMaster()
+        {
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0 && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
+            {
+
+                String query = " UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) - " + GetTotalLines() + " )" +
+                                                    " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
+                int no = DB.ExecuteQuery(query, null, Get_Trx());
+                if (no < 0)
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
+                    return false;
+
+                }
+            }
+            return true;
+        }
+
 
         /// <summary>
         /// Re-activate.
@@ -6757,6 +6809,11 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 {
                     SetIsReActivated(true);
                 }
+                // VIS0336: changes done for updating the amount on CM when record is void / reverse / reactivate
+                if (!ReverseContractMaster())
+                {
+                    return false;
+                }
 
                 SetDocAction(DOCACTION_Complete);
                 SetProcessed(false);
@@ -6767,6 +6824,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     SetIsBudgetBreach(false);
                     SetIsBudgetBreachApproved(false);
                 }
+
+
             }
             catch
             {

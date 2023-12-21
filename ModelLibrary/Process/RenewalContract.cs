@@ -37,16 +37,51 @@ namespace VAdvantage.Process
         DateTime? StartDate;
         DateTime? EndDate;
         #endregion
+
+        protected override void Prepare()
+        {
+            ProcessInfoParameter[] para = GetParameter();
+            for (int i = 0; i < para.Length; i++)
+            {
+                String name = para[i].GetParameterName();
+                if (para[i].GetParameter() == null)
+                {
+                    ;
+                }
+                else if (name.Equals("StartDate"))
+                {
+                    StartDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
+                               Util.GetValueOfDateTime(para[i].GetParameter()) : null;
+                    EndDate = Util.GetValueOfDateTime(para[i].GetParameter_To()).HasValue ?
+                           Util.GetValueOfDateTime(para[i].GetParameter_To()) : null;
+                }
+                else
+                {
+                    log.Log(Level.SEVERE, "Unknown Parameter: " + name);
+                }
+            }
+        }
         protected override string DoIt()
         {
+            if (StartDate > EndDate)
+            {
+                return Msg.GetMsg(GetCtx(), "VAS_ContractDate"); //VAI050-Contract Start date Should be Less than End Date
+            }
             int C_OldContract_ID = GetRecord_ID();
             MVASContractMaster _oldCont = new MVASContractMaster(GetCtx(),
                                 C_OldContract_ID, Get_Trx());
             MVASContractMaster _newCont = new MVASContractMaster(GetCtx(),
                                         0, Get_Trx());
-            if (StartDate < _oldCont.GetVAS_RenewalDate())
+            if (_oldCont.GetVAS_RenewalDate() == null)
             {
-                return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");             //Start date should not be less than Renewal date
+                return Msg.GetMsg(GetCtx(), "VAS_CheckRenewalDate");      //VAI050--Check renewal date not null
+            }
+            else
+            {
+                if (_oldCont.GetVAS_RenewalDate() > StartDate) //VAI050- Start date Should be greater than Renewal date
+                {
+                    return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");
+                }
             }
             _oldCont.CopyTo(_newCont);
             _newCont.SetAD_Client_ID(GetAD_Client_ID());
@@ -59,6 +94,10 @@ namespace VAdvantage.Process
             _newCont.SetVAS_RenewalDate(null);
             _newCont.SetDocumentNo(string.Empty);
             _newCont.SetIsExpiredContracts(false);
+            _newCont.Set_Value("Vas_Contractreferral","Renew"); //VAI050-Set value in Contract Referal field
+            _newCont.SetVAS_IsApproved(false); //VAI050-Set value false 
+            _newCont.SetVAS_Status("DFT"); //VAI050-Set Drafted in Status field
+            _newCont.Set_Value("Processed", false); //VAI050-Set false  for Processed
             _newCont.SetVAS_ContractDuration(Math.Round((decimal.Subtract(EndDate.Value.Year, StartDate.Value.Year) * 12 + decimal.Subtract(EndDate.Value.Month, StartDate.Value.Month)) / 12, 1));
             var monthDiff = (EndDate - StartDate).Value.Days;
             _newCont.SetVAS_ContractMonths(Math.Round((decimal)monthDiff / 30, 1));
@@ -194,40 +233,16 @@ namespace VAdvantage.Process
                     }
                 }
             }
-
             if (string.IsNullOrEmpty(rMsg))
             {
+                //VAI050-To set VAS_IsRenewable true in existing contract when contract renewed
+                DB.ExecuteQuery("UPDATE VAS_ContractMaster SET VAS_Isrenewable='Y', Processed='Y' WHERE VAS_ContractMaster_ID=" + GetRecord_ID(), null, Get_Trx());
                 rMsg = Msg.GetMsg(GetCtx(), "VAS_ContractRenewed") + _newCont.GetDocumentNo();
             }
 
             return rMsg;
         }
+         
 
-        protected override void Prepare()
-        {
-            ProcessInfoParameter[] para = GetParameter();
-            for (int i = 0; i < para.Length; i++)
-            {
-                String name = para[i].GetParameterName();
-                if (para[i].GetParameter() == null)
-                {
-                    ;
-                }
-                else if (name.Equals("StartDate"))
-                {
-                    StartDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
-                               Util.GetValueOfDateTime(para[i].GetParameter()) : null;
-                }
-                else if (name.Equals("EndDate"))
-                {
-                    EndDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
-                             Util.GetValueOfDateTime(para[i].GetParameter()) : null;
-                }
-                else
-                {
-                    log.Log(Level.SEVERE, "Unknown Parameter: " + name);
-                }
-            }
-        }
     }
 }

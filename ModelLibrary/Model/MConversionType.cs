@@ -74,7 +74,7 @@ namespace VAdvantage.Model
                 + "FROM C_ConversionType "
                 + "WHERE IsActive='Y'"
                 + " AND AD_Client_ID IN (0, @param1)"		//	#1
-                + "ORDER BY IsDefault DESC, AD_Client_ID DESC";
+                + " ORDER BY IsDefault DESC, AD_Client_ID DESC";
             C_ConversionType_ID = DataBase.DB.GetSQLValue(null, sql, AD_Client_ID);
 
             //	Return

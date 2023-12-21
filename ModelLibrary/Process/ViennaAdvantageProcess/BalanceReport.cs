@@ -608,11 +608,11 @@ namespace ViennaAdvantage.Process
             }
             if (_C_Period_ID != 0 )
             {
-                sql.Append("and e.C_Period_ID=" + _C_Period_ID + "");
+                sql.Append(" and e.C_Period_ID=" + _C_Period_ID + "");
             }
             if (_LedgerType != "")
             {
-                sql.Append("and e.LedgerType=" + _LedgerType + "");
+                sql.Append(" and e.LedgerType=" + _LedgerType + "");
             }
 
             //if (_GL_Budget_ID == 0 && _C_BPartner_ID == 0 && _AD_OrgTrx_ID == 0 && _UserElement2_ID == 0 && _UserElement1_ID == 0 && _User1_ID == 0 && _User2_ID == 0 &&

@@ -101,9 +101,9 @@ namespace ViennaAdvantage.Process
             }
             if (!_IsReValidate)
             {
-                sql += "AND IsVerified<>'Y' ";
+                sql += " AND IsVerified<>'Y' ";
             }
-            sql += "ORDER BY Name";
+            sql += " ORDER BY Name";
 
             try
             {
@@ -153,15 +153,7 @@ namespace ViennaAdvantage.Process
             {
                 return product.GetName() + " @NotValid@ @M_BOM_ID@";
             }
-            //VIS_336 : Changes done for checking records exist in BOM and BOM Component tab.
-            string Sql = @"SELECT COUNT(M_BOMProduct_ID) FROM M_BOMProduct WHERE M_BOM_ID IN (SELECT M_BOM_ID FROM M_BOM WHERE M_Product_ID=" + product.GetM_Product_ID() + " AND ISACTIVE='Y')" +
-                          "AND ISACTIVE='Y' ";
-            int Count = Util.GetValueOfInt(DB.ExecuteScalar(Sql));
-            if (Count <= 0)
-            {
-                return product.GetName() + " @VAS_BomNotDefined@";
-            }
-
+            
             _product = product;
             //	Check Old Product BOM Structure
             log.Config(_product.GetName());
@@ -190,14 +182,22 @@ namespace ViennaAdvantage.Process
                 }
 
                 VAdvantage.Model.MBOM[] boms = VAdvantage.Model.MBOM.GetOfProduct(GetCtx(), _M_Product_ID, Get_Trx(), null);
-                // if manufacturing module  exist and  BOM not contain any record against this product then not to verify Product
-                // JID_0690: If manufaturing Module is not downloaded validate BOM Process was not working.
-                //if (count > 0 && boms.Length == 0)
-                //{
-                //    _product.SetIsVerified(false);
-                //    _product.Save();
-                //    return _product.GetName() + " @NotValid@";
-                //}                
+                //VIS0060: if BOM not contain any record against this product then not to verify Product                
+                if (boms.Length == 0)
+                {
+                    _product.SetIsVerified(false);
+                    _product.Save();
+                    return _product.GetName() + " @VAS_BomNotDefined@";
+                }
+
+                //VIS_336 : Changes done for checking records exist in BOM and BOM Component tab.
+                string Sql = @"SELECT COUNT(M_BOMProduct_ID) FROM M_BOMProduct WHERE M_BOM_ID IN (SELECT M_BOM_ID FROM M_BOM WHERE M_Product_ID=" 
+                            + product.GetM_Product_ID() + " AND IsActive='Y') AND IsActive='Y'";
+                int Count = Util.GetValueOfInt(DB.ExecuteScalar(Sql));
+                if (Count <= 0)
+                {
+                    return product.GetName() + " @VAS_BomNotDefined@";
+                }
 
                 for (int i = 0; i < boms.Length; i++)
                 {

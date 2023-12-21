@@ -1248,7 +1248,7 @@ namespace VAdvantage.Model
                 + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                 + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                 + " AND pl.M_PriceList_ID=" + M_PriceList_ID						//	1
-                + "ORDER BY plv.ValidFrom DESC";
+                + " ORDER BY plv.ValidFrom DESC";
 
             //	Use newest price list - may not be future
             DataTable dt = null;

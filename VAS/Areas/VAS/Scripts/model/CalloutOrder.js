@@ -346,6 +346,7 @@
                 var M_AttributeSetInstance_ID = Util.getValueOfInt(dr["M_AttributeSetInstance_ID"]);
                 var C_Tax_ID = Util.getValueOfInt(dr["C_Tax_ID"]);
                 var AD_OrgTrx_ID = Util.getValueOfInt(dr["AD_OrgTrx_ID"]);
+                var VAS_ContractLine_ID = Util.getValueOfInt(dr["VAS_ContractLine_ID"]); // VAI050-Get contractline
 
 
                 QtyEntered = Util.getValueOfDecimal(Qty);
@@ -387,9 +388,11 @@
                 // when order line contains charge, it will be selected on Shipment Line on selection of Order Line
                 if (M_Product_ID != 0 && M_Product_ID != null) {
                     mTab.setValue("M_Product_ID", M_Product_ID);
+                    mTab.setValue("C_Charge_ID", null); //VAI050-Set charge null if product selected
                 }
                 else {
                     mTab.setValue("C_Charge_ID", C_Charge_ID);
+                    mTab.setValue("M_Product_ID", null);  //VAI050-Set product null if charge selected
                 }
 
                 if (Qty != 0 && Qty != null) {
@@ -429,9 +432,9 @@
                 if (C_Tax_ID != 0 && C_Tax_ID != null) {
                     mTab.setValue("C_Tax_ID", C_Tax_ID);
                 }
-
+                mTab.setValue("VAS_ContractLine_ID", VAS_ContractLine_ID); // VAI050-Set Contract Line Reference
                 // VIS0060: Set Trx Organization from Blanket Order Line
-                mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);                
+                mTab.setValue("AD_OrgTrx_ID", AD_OrgTrx_ID);
             }
         }
         catch (err) {
@@ -482,7 +485,7 @@
                 var C_ProjectRef_ID = Util.getValueOfDouble(dr["C_ProjectRef_ID"]);
                 var SalesRep_ID = Util.getValueOfDouble(dr["SalesRep_ID"]);
                 var PriorityRule = Util.getValueOfDouble(dr["PriorityRule"]);
-
+                var VAS_ContractMaster_ID = Util.getValueOfDouble(dr["VAS_ContractMaster_ID"]); // VAI050-Get ContractMasterID
                 if (C_BPartner_ID != 0 && C_BPartner_ID != null) {
                     mTab.setValue("C_BPartner_ID", C_BPartner_ID);
                 }
@@ -532,7 +535,7 @@
                 if (PriorityRule != 0 && PriorityRule != null) {
                     mTab.setValue("PriorityRule", PriorityRule);
                 }
-
+                mTab.setValue("VAS_ContractMaster_ID", VAS_ContractMaster_ID);  // VAI050-Set ContractMasterId reference          
                 // Added by Bharat on 07 Feb 2018 to set Inco Term from Order
                 if (mTab.getField("C_IncoTerm_ID") != null) {
                     mTab.setValue("C_IncoTerm_ID", Util.getValueOfInt(dr["C_IncoTerm_ID"]));
@@ -700,7 +703,7 @@
                 else
                     mTab.setValue("Bill_Location_ID", bill_Location_ID);
 
-               // VIS0336_Set location acc to selected record in Info window
+                // VIS0336_Set location acc to selected record in Info window
                 var shipTo_ID = Util.getValueOfInt(dr["C_BPartner_Location_ID"]);
                 if (C_BPartner_ID.toString().equals(ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_ID").toString())) {
                     var loc = ctx.getWindowTabContext(windowNo, VIS.EnvConstants.TAB_INFO, "C_BPARTNER_LOCATION_ID");
@@ -714,7 +717,7 @@
                 else {
                     mTab.setValue("C_BPartner_Location_ID", shipTo_ID);
                     if ("Y" == Util.getValueOfString(dr["IsShipTo"]))	//	set the same
-                    mTab.setValue("Bill_Location_ID", shipTo_ID);
+                        mTab.setValue("Bill_Location_ID", shipTo_ID);
                 }
 
 
@@ -2178,7 +2181,7 @@
                 epl = Util.getValueOfString(dr["EnforcePriceLimit"]);
                 IsTaxIncluded = Util.getValueOfString(dr["IsTaxIncluded"]);
             }
-            var QtyEntered, QtyOrdered, PriceEntered, PriceActual, PriceLimit, Discount, PriceList, DiscountSchema;
+            var QtyEntered, QtyOrdered, PriceEntered, PriceActual, PriceLimit, Discount, PriceList, DiscountSchema, DiscountApplied;
             //	get values
             QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
             QtyOrdered = Util.getValueOfDecimal(mTab.getValue("QtyOrdered"));
@@ -2187,6 +2190,8 @@
             PriceEntered = Util.getValueOfDecimal(mTab.getValue("PriceEntered"));
             PriceActual = Util.getValueOfDecimal(mTab.getValue("PriceActual"));
 
+            // VIS0060: DevOPs ID 2587 - On Change of quantity, price should be fetched based on discount schema.
+            DiscountApplied = Util.getValueOfBoolean(mTab.getValue("VAS_IsDiscountApplied"));
             Discount = Util.getValueOfDecimal(mTab.getValue("Discount"));
             PriceLimit = Util.getValueOfDecimal(mTab.getValue("PriceLimit"));
             PriceList = Util.getValueOfDecimal(mTab.getValue("PriceList"));
@@ -2263,9 +2268,10 @@
                         var prices = VIS.dataContext.getJSONRecord("MOrderLine/GetPricesOnChange", params);
                         DiscountSchema = Util.getValueOfString(prices["DiscountSchema"]);
 
-                        // VIS0060: Handle zero price issue on quantity change.
-                        if (mField.getColumnName() == "M_Product_ID" || (Util.getValueOfString(prices["DiscountCalculate"]) == "Y" && Util.getValueOfDecimal(prices["PriceEntered"]) != 0) ||
-                            (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
+                        // VIS0060: DevOPs ID 2587 - On Change of quantity, price should be fetched based on discount schema.
+                        if (mField.getColumnName() == "M_Product_ID" || ((Util.getValueOfString(prices["DiscountCalculate"]) == "Y" || DiscountApplied)
+                            && Util.getValueOfDecimal(prices["PriceEntered"]) != 0) || (Util.getValueOfDecimal(prices["PriceEntered"]) != 0 && mTab.getValue("PriceEntered") == 0)) {
+                            mTab.setValue("VAS_IsDiscountApplied", Util.getValueOfString(prices["DiscountCalculate"]).equals("Y"));
                             PriceList = Util.getValueOfDecimal(prices["PriceList"]);
                             mTab.setValue("PriceList", Util.getValueOfDecimal(prices["PriceList"]));
                             PriceEntered = Util.getValueOfDecimal(prices["PriceEntered"].toFixed(PriceListPrecision));
@@ -2698,7 +2704,7 @@
                 mTab.setValue("QtyOrdered", QtyOrdered);
             }
             //	UOM Changed - convert from Entered -> Product
-            else if (mField.getColumnName() == "C_UOM_ID" || mField.getColumnName() == "M_AttributeSetInstance_ID" || mField.getColumnName() == "StartDate") {
+            else if (mField.getColumnName() == "C_UOM_ID" || mField.getColumnName() == "M_AttributeSetInstance_ID" || mField.getColumnName() == "StartDate" || mField.getColumnName() == "VAS_ContractLine_ID") {
                 var C_UOM_To_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
                 QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
 

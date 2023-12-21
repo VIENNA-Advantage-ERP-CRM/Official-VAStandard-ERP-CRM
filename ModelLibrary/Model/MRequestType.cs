@@ -54,7 +54,7 @@ namespace VAdvantage.Model
             int AD_Client_ID = ctx.GetAD_Client_ID();
             String sql = "SELECT * FROM R_RequestType "
                 + "WHERE AD_Client_ID IN (0,11) AND IsActive='Y'"
-                + "ORDER BY IsDefault DESC, AD_Client_ID DESC, R_Request_ID DESC";
+                + " ORDER BY IsDefault DESC, AD_Client_ID DESC, R_Request_ID DESC";
             DataSet ds;
             try
             {

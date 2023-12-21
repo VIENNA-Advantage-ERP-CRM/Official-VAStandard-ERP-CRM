@@ -55,5 +55,23 @@ namespace VIS.Controllers
             MVASContractModel Obj = new MVASContractModel();
             return Json(JsonConvert.SerializeObject(Obj.GetProductUOM(fields)), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VIS430:Get contactline data
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Product,charge,Attribute set instance and Uom</returns>
+        public JsonResult GetContractData(string fields)
+        {
+
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MVASContractModel objContractDtl = new MVASContractModel();
+                retJSON = JsonConvert.SerializeObject(objContractDtl.GetContractData(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }

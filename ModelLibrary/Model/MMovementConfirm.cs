@@ -1110,6 +1110,7 @@ namespace VAdvantage.Model
             }	//	Scrapped
 
             mLine.SetQtyEntered(confirm.GetConfirmedQty()+confirm.GetScrappedQty());
+            mLine.SetMovementQty(confirm.GetConfirmedQty()+confirm.GetScrappedQty());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. 
             mLine.Save(Get_Trx());
             return true;
         }

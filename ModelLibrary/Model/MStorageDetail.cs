@@ -377,7 +377,7 @@ namespace VAdvantage.Model
             //if (!types.isEmpty())
             if (types.Count > 0)
             {
-                qtyTypesSql.Append("AND QtyType in (");
+                qtyTypesSql.Append(" AND QtyType in (");
                 foreach (var type in types)
                 {
                     qtyTypesSql.Append("'");

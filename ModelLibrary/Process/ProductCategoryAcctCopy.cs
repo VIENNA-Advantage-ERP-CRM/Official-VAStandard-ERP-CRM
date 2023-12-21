@@ -124,7 +124,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 + " ,acct.P_Resource_Absorption_Acct, acct.P_MaterialOverhd_Acct"
                 + " FROM M_Product p"
                 + " INNER JOIN M_Product_Category_Acct acct ON (acct.M_Product_Category_ID=p.M_Product_Category_ID)"
-                + "WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
+                + " WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
                 + " AND p.M_Product_Category_ID=" + _M_Product_Category_ID	//	#
                 + " AND NOT EXISTS (SELECT * FROM M_Product_Acct pa "
                     + "WHERE pa.M_Product_ID=p.M_Product_ID"

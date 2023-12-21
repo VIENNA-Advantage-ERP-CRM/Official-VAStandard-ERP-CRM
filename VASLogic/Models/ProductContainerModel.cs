@@ -101,7 +101,7 @@ namespace VIS.Models
             }
             sql = MRole.GetDefault(_ctx).AddAccessSQL(sql, "M_Warehouse", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO); // fully qualidfied - RO
 
-            sql += "order by Name asc";
+            sql += " ORDER BY Name ASC";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {

@@ -119,7 +119,7 @@ namespace VAdvantage.Model
                 //
                 String sql = "SELECT * FROM M_AttributeValue "
                     + "WHERE IsActive='Y' AND M_Attribute_ID=" + GetM_Attribute_ID()
-                    + "ORDER BY Value";
+                    + " ORDER BY Value";
                 DataSet ds = null;
                 try
                 {

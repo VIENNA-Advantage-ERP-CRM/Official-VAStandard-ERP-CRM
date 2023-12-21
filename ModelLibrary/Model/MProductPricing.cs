@@ -459,7 +459,7 @@ namespace VAdvantage.Model
                         + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
                         + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
                         + " AND pp.IsActive='Y'"
-                        + "ORDER BY pv.ValidFrom DESC";
+                        + " ORDER BY pv.ValidFrom DESC";
                 }
                 else
                 {
@@ -477,7 +477,7 @@ namespace VAdvantage.Model
                         + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
                         + " AND pl.M_PriceList_ID= " + _M_PriceList_ID			//	#2
                         + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
-                        + "ORDER BY pv.ValidFrom DESC";
+                        + " ORDER BY pv.ValidFrom DESC";
                 }
             }
             else
@@ -496,7 +496,7 @@ namespace VAdvantage.Model
                     + "WHERE pv.IsActive='Y'"
                     + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
                     + " AND pl.M_PriceList_ID= " + _M_PriceList_ID			//	#2
-                    + "ORDER BY pv.ValidFrom DESC";
+                    + " ORDER BY pv.ValidFrom DESC";
             }
             _calculated = false;
             if (_PriceDate == null)

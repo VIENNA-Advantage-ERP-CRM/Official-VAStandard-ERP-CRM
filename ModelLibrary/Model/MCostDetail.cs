@@ -4316,7 +4316,7 @@ namespace VAdvantage.Model
             {
                 sql += " AND ce.M_CostElement_ID = " + costElementId1;
             }
-            sql += "ORDER BY ce.M_CostElement_ID , iscostMethod DESC";
+            sql += " ORDER BY ce.M_CostElement_ID , iscostMethod DESC";
             DataSet ds = new DataSet();
             ds = DB.ExecuteDataset(sql, null, null);
             try
@@ -5414,7 +5414,7 @@ namespace VAdvantage.Model
             String sql = "SELECT * FROM M_CostDetail "
                 + "WHERE M_Product_ID=" + product.GetM_Product_ID()
                 + " AND Processed='N' "
-                + "ORDER BY C_AcctSchema_ID, M_CostElement_ID, AD_Org_ID, M_AttributeSetInstance_ID, Created";
+                + " ORDER BY C_AcctSchema_ID, M_CostElement_ID, AD_Org_ID, M_AttributeSetInstance_ID, Created";
             int counterOK = 0;
             int counterError = 0;
             try
