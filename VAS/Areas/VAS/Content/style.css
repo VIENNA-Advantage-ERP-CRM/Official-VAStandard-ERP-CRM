@@ -14,53 +14,28 @@
     --purpleColor: #8F67D54D;
 }
 
-label {
-    font-weight: 400;
+.vas-root {
+    height: 100%;
+    width: 100%;
 }
 
-input[type='button'] {
-    background: rgba(var(--v-c-primary));
-}
+    .vas-root label {
+        font-weight: 400;
+    }
+
+    .vas-root .glyphicon-trash {
+        color: var(--redColor);
+    }
+
+    .vas-root input[type='button'] {
+        background: rgba(var(--v-c-primary));
+    }
 
 .vas-add-label-content .vas-select-plus-btn .vas-add-btn {
     color: rgba(var(--v-c-primary)) !important;
     border: 1px solid rgba(var(--v-c-primary));
     background-color: #fff;
 }
-
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head span i::before {
-    content: "\2716";
-    color: var(--whiteColor);
-}
-
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head > span {
-    display: inline-block;
-}
-
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head {
-    background: rgba(var(--v-c-primary)) 0% 0% no-repeat padding-box;
-    border-radius: 5px 0px 0px 0px;
-    position: relative;
-    align-items: center;
-}
-
-    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head.vas-pull-left::before {
-        width: 0;
-        height: 0;
-        border-top: 8px solid transparent;
-        border-bottom: 8px solid transparent;
-        border-left: 8px solid rgba(var(--v-c-primary));
-        content: '';
-        position: absolute;
-        right: -7px;
-        top: 0;
-        bottom: 0;
-        margin: auto;
-    }
-
-    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head h3 {
-        color: var(--whiteColor);
-    }
 
 .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     padding: 13px 10px;
@@ -101,6 +76,10 @@ input[type='button'] {
     height: 100%;
 }
 
+    .vis-ad-w-p-actionpanel-r .vas-sql-content.vas-grid-height {
+        height: calc(100% - 80px);
+    }
+
     .vis-ad-w-p-actionpanel-r .vas-sql-content textarea {
         width: 100%;
         height: 100%;
@@ -118,9 +97,13 @@ input[type='button'] {
         height: 100%;
     }
 
+        .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 .vas-query-input {
+            height: calc(100% - 30px);
+        }
+
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 {
     position: relative;
-    padding: 10px 15px 20px;
+    padding: 10px 15px 20px 10px;
 }
 
 .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-icorbar {
@@ -176,21 +159,29 @@ input[type='button'] {
     cursor: pointer;
 }
 
-    .vas-add-label label::after, .vas-add-filter label::after {
-        content: '+';
-        font-size: 20px;
-        position: absolute;
-        right: 0;
-        top: 0px;
-        background: #E1E1E1;
-        line-height: 19px;
-        width: 22px;
-        text-align: center;
-        height: 22px;
-        font-weight: bold;
-        border-radius: 5px;
-        color: rgba(var(--v-c-primary));
+.vas-highlighted {
+    color: rgba(var(--v-c-primary));
+}
+
+    .vas-highlighted.vas-join-keyword {
+        color: #EB23A1;
     }
+
+.vas-add-label label::after, .vas-add-filter label::after {
+    content: '+';
+    font-size: 25px;
+    position: absolute;
+    right: 0;
+    top: 0px;
+    background: #E1E1E1;
+    line-height: 16px;
+    width: 21px;
+    text-align: center;
+    height: 21px;
+    font-weight: bold;
+    border-radius: 5px;
+    color: rgba(var(--v-c-primary));
+}
 
 .vas-add-label.active label::after {
     content: '-';
@@ -207,7 +198,7 @@ input[type='button'] {
     }
 
 .vas-add-label {
-    float: left;
+    display: inline-block;
     width: 100%;
     margin-top: 10px;
     pointer-events: none;
@@ -217,6 +208,10 @@ input[type='button'] {
         display: inline-block;
         width: 100%;
     }
+
+        .vas-add-label.active + .vas-add-label-content h4 {
+            font-size: 14px;
+        }
 
 .vas-select-plus-btn {
     float: left;
@@ -240,7 +235,7 @@ input[type='button'] {
 }
 
 .vas-sqlgenerator {
-    float: left;
+    display: flex;
     height: 100%;
     width: 100%;
 }
@@ -259,10 +254,11 @@ input[type='button'] {
     float: left;
     border: 1px solid #E1E1E1;
     min-height: 35px;
-    margin: 15px 0 0;
+    margin: 10px 0 0px;
     position: relative;
-    cursor: pointer;
     background: none;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
 }
 
 .vas-filter-text-input {
@@ -271,12 +267,12 @@ input[type='button'] {
 }
 
 .vas-queryresult-grid {
-    height: 100%;
+    height: calc(100% - 80px);
 }
 
-div#grid_gridForm1_body {
-    height: 100% !important;
-}
+    .vas-queryresult-grid #grid_gridForm1_body {
+        height: 100% !important;
+    }
 
 .vas-join-multiselect {
     float: left;
@@ -291,7 +287,7 @@ div#grid_gridForm1_body {
 }
 
 .vas-filters {
-    float: left;
+    display: inline-block;
     width: 100%;
 }
 
@@ -322,13 +318,9 @@ div#grid_gridForm1_body {
             margin-right: 5px;
         }
 
-.glyphicon-trash {
-    color: var(--redColor);
-}
-
-.vas-filters .vas-filter-item:last-child {
-    margin-bottom: 0px;
-}
+        .vas-filters .vas-filter-item:last-child {
+            margin-bottom: 0px;
+        }
 
 .vas-common-style {
     float: left;
@@ -337,9 +329,9 @@ div#grid_gridForm1_body {
 }
 
 .vas-joins {
-    float: left;
     width: 100%;
     margin-top: 10px;
+    display: inline-block;
 }
 
     .vas-joins .vas-join-item {
@@ -379,8 +371,11 @@ div#grid_gridForm1_body {
 
 .vas-column-list-item {
     float: left;
-    width: 100%;
     margin-bottom: 10px;
+    white-space: nowrap;
+    width: 300px;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
     .vas-column-list-item input[type="checkbox"] {
@@ -432,17 +427,13 @@ div#grid_gridForm1_body {
     padding: 10px;
 }
 
-.VIS-AMTD-formData.VIS-AMTD-InputBtns {
+.vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
     padding-right: 0px;
     margin-bottom: 10px;
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 .vas-windowtab .VIS-AMTD-formData.VIS-AMTD-InputBtns {
     margin-bottom: 5px;
-}
-
-.vis-ad-w-p-actionpanel-r .vas-sql-content .vas-queryresult-grid {
-    height: calc(100% - 50px);
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sql-content .vas-save-btn {
@@ -460,14 +451,18 @@ div#grid_gridForm1_body {
     padding: 1em;
     color: #000;
     margin: 2px;
-    overflow: auto;
     border: 1px solid #EFEFEF;
     border-radius: 3px;
     width: 100%;
     margin: auto;
-    height: calc(100% - 10%);
-    font-size: 20px;
+    overflow-y: auto;
+    font-size: 16px;
+    word-wrap: break-word;
 }
+
+    .vas-query-input.vas-sql-query-input {
+        height: calc(100% - 40px);
+    }
 
 .vas-sql-result-msg {
     display: inline-block;
@@ -479,11 +474,6 @@ div#grid_gridForm1_body {
     .vas-sql-result-msg.vas-sql-result-error {
         color: var(--redColor);
     }
-
-.vas-root {
-    height: 100%;
-    width: 100%;
-}
 
 .vas-grid-div1 {
     width: 100%;
@@ -500,6 +490,7 @@ div#grid_gridForm1_body {
     margin-top: 1px;
     border: 1px solid darkgray;
     display: none;
+    overflow-y: auto;
 }
 
 .vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
@@ -511,7 +502,7 @@ div#grid_gridForm1_body {
     width: calc(100% - 70px);
 }
 
-.VIS-AMTD-InputBtns input {
+.vas-sqlgenerator .VIS-AMTD-InputBtns input {
     width: 100%;
     min-height: 35px;
 }
@@ -520,7 +511,7 @@ div#grid_gridForm1_body {
     color: rgba(var(--v-c-primary));
 }
 
-span.vis.vis-arrow-down {
+.vas-multiselect .vas-arrow-down {
     position: absolute;
     right: 10px;
     top: 0;
@@ -545,9 +536,15 @@ span.vis.vis-arrow-down {
     float: none;
 }
 
+.vas-joins-block {
+    width: 85%;
+    display: inline-block;
+    vertical-align: top;
+}
+
 .vas-delete-join-btn {
-    float: left;
     width: 15%;
+    display: inline-block;
     text-align: right;
 }
 
@@ -582,11 +579,88 @@ span.vis.vis-arrow-down {
     text-align: center;
 }
 
-.vis-ev-col-mandatory {
+.vis-ad-w-p-actionpanel-r .vas-windowtab .vis-ev-col-mandatory, .vis-ad-w-p-actionpanel-r .vas-multiselect .vis-ev-col-mandatory {
     border-color: var(--redColor) !important;
     background: none;
 }
 
 .vas-addfiltertext {
     margin: 0 0 10px;
+}
+
+.vas-sqlquery-text {
+    margin-bottom: 10px;
+    color: #000000;
+}
+
+.vas-column1 {
+    display: inline-block;
+    width: 100%;
+    padding: 5px 5px 0;
+    overflow-y: auto;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab label.vas-label-space {
+    top: -3px;
+    left: 13px;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
+    float: left;
+    width: 100%;
+}
+
+    html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns .vas-sql-btn, html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns .vas-sql-generator {
+        float: right !important;
+    }
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-windowtab label {
+    right: 9px;
+    left: auto;
+}
+
+html[dir="rtl"] .vas-add-label label::after, .vas-add-filter label::after {
+    right: auto;
+    left: 0;
+}
+
+html[dir="rtl"] .vas-column-list-item input[type="checkbox"] {
+    margin-left: 7px;
+    margin-right: 0px;
+}
+
+html[dir="rtl"] .vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
+    padding-left: 0px;
+}
+
+html[dir="rtl"] .vas-multiselect {
+    float: none;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'] {
+    float: right !important;
+}
+
+html[dir="rtl"] .vas-multiselect .vas-arrow-down {
+    left: 10px;
+    right: auto;
+}
+
+html[dir="rtl"] .vas-grid-div2 {
+    margin-left: 15px;
+    margin-right: 0px;
+}
+
+html[dir="rtl"] .vas-grid-div1 {
+    margin-right: 0px;
+    margin-left: 15px;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
+    border-right: 1px solid var(--verticalBorderColor);
+    border-left: 0px;
+}
+
+html[dir="rtl"] .vas-sql-result-msg {
+    margin: 10px 0 0;
 }
