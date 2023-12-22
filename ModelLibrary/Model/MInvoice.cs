@@ -615,7 +615,12 @@ namespace VAdvantage.Model
             SetIsDiscountPrinted(order.IsDiscountPrinted());
             SetIsSelfService(order.IsSelfService());
             SetSendEMail(order.IsSendEMail());
-            //
+            //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of sales order.
+            if (order.Get_ValueAsInt("VAS_ContractMaster_ID") > 0)
+            {
+                Set_Value("VAS_ContractMaster_ID", order.Get_Value("VAS_ContractMaster_ID"));
+            }
+
             SetM_PriceList_ID(order.GetM_PriceList_ID());
             if (Util.GetValueOfInt(order.GetVAPOS_POSTerminal_ID()) > 0)
             {
@@ -656,7 +661,7 @@ namespace VAdvantage.Model
 
             SetIsSOTrx(ship.IsSOTrx());
             //vikas 9/16/14 Set cb partner 
-            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());
+            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());            
             MBPartner bp = null;
             if (Util.GetValueOfInt(ship.GetC_Order_ID()) > 0)
             {
@@ -671,7 +676,7 @@ namespace VAdvantage.Model
             //vikas
             //MBPartner bp = new MBPartner(GetCtx(), ship.GetC_BPartner_ID(), null);
             SetBPartner(bp);
-            SetAD_User_ID(ord.GetBill_User_ID());
+            SetAD_User_ID(ord.GetBill_User_ID());            
             //
             SetSendEMail(ship.IsSendEMail());
             //
@@ -702,6 +707,12 @@ namespace VAdvantage.Model
             {
                 SetC_Order_ID(ship.GetC_Order_ID());
                 MOrder order = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_TrxName());
+                //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of shipment.
+                if (order.Get_ValueAsInt("VAS_ContractMaster_ID") > 0)
+                {
+                    Set_Value("VAS_ContractMaster_ID", order.Get_Value("VAS_ContractMaster_ID"));
+                }
+
                 SetIsDiscountPrinted(order.IsDiscountPrinted());
                 SetDateOrdered(order.GetDateOrdered());
                 SetM_PriceList_ID(order.GetM_PriceList_ID());
