@@ -964,12 +964,13 @@
         var _isSoTrx = "Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsSOTrx"));
         //JID_0976
         var recordId = VIS.context.getWindowContextAsInt(this.windowNo, "C_Invoice_ID", true);
+        var Contract_ID = VIS.context.getWindowContextAsInt(this.windowNo, "VAS_ContractMaster_ID", true);
         var whereCondition = "";
         var sql = " C_Order.IsSOTrx ='" + (_isSoTrx ? "Y" : "N") + "' AND C_Order.IsBlanketTrx='N' AND C_Order.ISSALESQUOTATION='N' AND C_Order.DocStatus IN ('CL', 'CO')";
         if (OrgId > 0) {
             sql += " AND C_Order.AD_Org_ID = " + OrgId;
         }
-
+        
         if (C_BPartner_ID > 0) {
             if (forInvoice) {
                 sql += " AND (C_Order.C_BPartner_ID = " + C_BPartner_ID + " OR C_Order.Bill_BPartner_ID = " + C_BPartner_ID + ")";
@@ -978,7 +979,7 @@
                 sql += " AND C_Order.C_BPartner_ID = " + C_BPartner_ID;
             }
         }
-
+       
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
                 { "columns": column, "forInvoices": forInvoice, "recordID": recordId, "Table": "C_Order" }, null);
@@ -987,7 +988,10 @@
         if (whereCondition != null && whereCondition != "") {
             sql += whereCondition;
         }
-
+        //VAI082 12/22/2023 DevOps Task ID:-Order will be filtered on Create lines from when "ContractId" is greater than Zero.
+        if (Contract_ID > 0) {
+            sql += " AND C_Order.VAS_ContractMaster_ID=" + Contract_ID;
+        }
         if (forInvoice && !_isSoTrx) {
             sql += " AND C_Order.C_Order_ID NOT IN(SELECT DISTINCT OL.C_Order_ID FROM C_ProvisionalInvoice PI"
                 + " INNER JOIN C_ProvisionalInvoiceLine IL ON IL.C_ProvisionalInvoice_ID = PI.C_ProvisionalInvoice_ID"
