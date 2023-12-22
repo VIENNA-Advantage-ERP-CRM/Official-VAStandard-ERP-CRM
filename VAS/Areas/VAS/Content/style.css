@@ -2,18 +2,6 @@
     box-sizing: border-box;
 }
 
-:root {
-    --whiteColor: #fff;
-    --horizontalBorderColor: #EFEFEF;
-    --verticalBorderColor: #95B3C42E;
-    --fieldBorderColor: #E1E1E1;
-    --bgGreyColor: #F5F5F5;
-    --yellowColor: #F9B31D;
-    --redColor: #FF0000;
-    --joinBgColor: #FFE9A1;
-    --purpleColor: #8F67D54D;
-}
-
 .vas-root {
     height: 100%;
     width: 100%;
@@ -21,10 +9,6 @@
 
     .vas-root label {
         font-weight: 400;
-    }
-
-    .vas-root .glyphicon-trash {
-        color: var(--redColor);
     }
 
     .vas-root input[type='button'] {
@@ -39,7 +23,7 @@
 
 .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     padding: 13px 10px;
-    border-bottom: 1px solid var(--horizontalBorderColor);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
 }
 
     .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
@@ -48,7 +32,7 @@
         border-radius: 3px;
         float: none;
         margin: 0 5px;
-        color: var(--whiteColor);
+        color: rgba(var(--v-c-on-primary));
     }
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
@@ -57,7 +41,7 @@
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
             background-color: rgba(var(--v-c-primary));
-            color: var(--whiteColor);
+            color: rgba(var(--v-c-on-primary));
         }
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
@@ -93,7 +77,7 @@
 }
 
     .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
-        border-left: 1px solid var(--verticalBorderColor);
+        border-left: 1px solid rgba(var(--v-c-secondary),1);
         height: 100%;
     }
 
@@ -148,7 +132,7 @@
         min-height: 35px;
         border-radius: 2px;
         font-size: 14px;
-        border-color: #E1E1E1;
+        border-color: rgba(var(--v-c-secondary),1);
     }
 
 .vas-add-label label, .vas-add-filter label {
@@ -163,17 +147,13 @@
     color: rgba(var(--v-c-primary));
 }
 
-    .vas-highlighted.vas-join-keyword {
-        color: #EB23A1;
-    }
-
 .vas-add-label label::after, .vas-add-filter label::after {
     content: '+';
     font-size: 25px;
     position: absolute;
     right: 0;
     top: 0px;
-    background: #E1E1E1;
+    background: rgba(var(--v-c-secondary),1);
     line-height: 16px;
     width: 21px;
     text-align: center;
@@ -242,9 +222,9 @@
 
 .vas-multiselect .vas-checkboxes {
     display: none;
-    border-left: 1px solid var(--fieldBorderColor);
-    border-right: 1px solid var(--fieldBorderColor);
-    border-bottom: 1px solid var(--fieldBorderColor);
+    border-left: 1px solid rgba(var(--v-c-secondary),1);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     float: left;
     padding: 15px 10px;
 }
@@ -252,7 +232,7 @@
 .vas-windowfieldcol-select.vas-windowtab {
     width: 100%;
     float: left;
-    border: 1px solid #E1E1E1;
+    border: 1px solid rgba(var(--v-c-secondary),1);
     min-height: 35px;
     margin: 10px 0 0px;
     position: relative;
@@ -270,7 +250,7 @@
     height: calc(100% - 80px);
 }
 
-    .vas-queryresult-grid #grid_gridForm1_body {
+    .vas-queryresult-grid .w2ui-grid-body {
         height: 100% !important;
     }
 
@@ -279,9 +259,9 @@
     width: 100%;
     min-height: 35px;
     display: none;
-    border-left: 1px solid var(--fieldBorderColor);
-    border-right: 1px solid var(--fieldBorderColor);
-    border-bottom: 1px solid var(--fieldBorderColor);
+    border-left: 1px solid rgba(var(--v-c-secondary),1);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     margin: -10px 0 10px 0;
     padding: 15px 10px;
 }
@@ -292,7 +272,7 @@
 }
 
     .vas-filters .vas-filter-item.vas-filters-row {
-        background: var(--bgGreyColor);
+        background: rgba(var(--v-c-secondary),1);
         padding: 15px 10px;
     }
 
@@ -303,24 +283,23 @@
     .vas-filters .vas-filter-item .vas-filter-item-inner {
         float: left;
         width: 100%;
-        background: #fff;
+        background: rgba(var(--v-c-on-primary));
         padding: 10px 10px;
     }
 
     .vas-filters .vas-filter-item {
-        background: #fff;
+        background: rgba(var(--v-c-on-primary));
         float: left;
         width: 100%;
     }
 
-        .vas-filters .vas-filter-item .glyphicon-edit {
-            color: var(--yellowColor);
-            margin-right: 5px;
-        }
+.vas-filters-editdelete-btns .vis-edit {
+    margin-right: 5px;
+}
 
-        .vas-filters .vas-filter-item:last-child {
-            margin-bottom: 0px;
-        }
+.vas-filters .vas-filter-item:last-child {
+    margin-bottom: 0px;
+}
 
 .vas-common-style {
     float: left;
@@ -335,11 +314,11 @@
 }
 
     .vas-joins .vas-join-item {
-        border: 1px solid #42335D0D;
+        border: 1px solid rgba(var(--v-c-on-secondary),1);
         padding: 10px 10px 2px;
         margin-bottom: 10px;
         border-radius: 3px;
-        background: #FBFBFB;
+        background: rgba(var(--v-c-secondary),1);
         transition: all 0.3s ease-in-out;
     }
 
@@ -348,7 +327,7 @@
         }
 
 .vas-joins-select {
-    border: 1px solid var(--fieldBorderColor);
+    border: 1px solid rgba(var(--v-c-secondary),1);
 }
 
 .vas-filters-block {
@@ -423,7 +402,7 @@
 .vas-filter-whitebg {
     float: left;
     width: 100%;
-    background-color: #fff;
+    background-color: rgba(var(--v-c-on-primary));
     padding: 10px;
 }
 
@@ -451,7 +430,7 @@
     padding: 1em;
     color: #000;
     margin: 2px;
-    border: 1px solid #EFEFEF;
+    border: 1px solid rgba(var(--v-c-secondary),1);
     border-radius: 3px;
     width: 100%;
     margin: auto;
@@ -472,7 +451,7 @@
 }
 
     .vas-sql-result-msg.vas-sql-result-error {
-        color: var(--redColor);
+        color: #ff0000;
     }
 
 .vas-grid-div1 {
@@ -480,7 +459,7 @@
     height: 90%;
     margin-right: 15px;
     margin-top: 1px;
-    border: 1px solid darkgray;
+    border: 1px solid rgba(var(--v-c-on-secondary), 1);
 }
 
 .vas-grid-div2 {
@@ -488,14 +467,14 @@
     height: calc(100% - 21%);
     margin-right: 15px;
     margin-top: 1px;
-    border: 1px solid darkgray;
+    border: 1px solid rgba(var(--v-c-on-secondary), 1);
     display: none;
     overflow-y: auto;
 }
 
 .vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
     pointer-events: none;
-    color: lightgray;
+    color: rgba(var(--v-c-secondary),1);
 }
 
 .vas-control-wrap {
@@ -548,15 +527,11 @@
     text-align: right;
 }
 
-    .vas-delete-join-btn .glyphicon-trash {
-        cursor: pointer;
-    }
-
 .vas-join-item .vas-selecttable {
     float: left;
     width: calc(50% - 6px);
     word-wrap: break-word;
-    background-color: rgba(var(--v-c-primary));
+    background-color: rgba(var(--v-c-on-primary));
     margin-bottom: 10px;
     margin-right: 12px;
     padding: 1px 10px;
@@ -566,21 +541,20 @@
     justify-content: center;
 }
 
-    .vas-join-item .vas-selecttable.join-base-table, .vas-join-item .vas-selecttable.join-jointable {
-        background-color: var(--purpleColor);
-    }
-
     .vas-join-item .vas-selecttable:nth-child(2n+1) {
         margin-right: 0;
     }
 
 .vas-selecttable.join-title {
-    background-color: var(--joinBgColor);
     text-align: center;
 }
 
+.vas-delete-join-btn i, .vas-filters-editdelete-btns i {
+    font-size: 16px;
+}
+
 .vis-ad-w-p-actionpanel-r .vas-windowtab .vis-ev-col-mandatory, .vis-ad-w-p-actionpanel-r .vas-multiselect .vis-ev-col-mandatory {
-    border-color: var(--redColor) !important;
+    border-color: #ff0000;
     background: none;
 }
 
@@ -590,7 +564,6 @@
 
 .vas-sqlquery-text {
     margin-bottom: 10px;
-    color: #000000;
 }
 
 .vas-column1 {
@@ -657,7 +630,7 @@ html[dir="rtl"] .vas-grid-div1 {
 }
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
-    border-right: 1px solid var(--verticalBorderColor);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
     border-left: 0px;
 }
 
