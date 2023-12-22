@@ -40,26 +40,7 @@ namespace VAdvantage.Process
 
         protected override void Prepare()
         {
-            //ProcessInfoParameter[] para = GetParameter();
-            //for (int i = 0; i < para.Length; i++)
-            //{
-            //    String name = para[i].GetParameterName();
-            //    if (para[i].GetParameter() == null)
-            //    {
-            //        ;
-            //    }
-            //    else if (name.Equals("StartDate"))
-            //    {
-            //        StartDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
-            //                   Util.GetValueOfDateTime(para[i].GetParameter()) : null;
-            //        EndDate = Util.GetValueOfDateTime(para[i].GetParameter_To()).HasValue ?
-            //               Util.GetValueOfDateTime(para[i].GetParameter_To()) : null;
-            //    }
-            //    else
-            //    {
-            //        log.Log(Level.SEVERE, "Unknown Parameter: " + name);
-            //    }
-            //}
+           
         }
         protected override string DoIt()
         {
@@ -69,23 +50,16 @@ namespace VAdvantage.Process
                                 C_OldContract_ID, Get_Trx());
             MVASContractMaster _newCont = new MVASContractMaster(GetCtx(),
                                         0, Get_Trx());
-            //VIS0336:Set start date as Renewal date and End date= renewal date+ duration month + year, for Renewal document.
-            StartDate = _oldCont.GetVAS_RenewalDate();
-            EndDate = _oldCont.GetVAS_RenewalDate().Value.AddYears(Util.GetValueOfInt(_oldCont.GetVAS_ContractDuration())).
-                       AddMonths(Util.GetValueOfInt(_oldCont.GetVAS_ContractMonths()));
-
+           
             if (_oldCont.GetVAS_RenewalDate() == null)
             {
                 return Msg.GetMsg(GetCtx(), "VAS_CheckRenewalDate");      //VAI050--Check renewal date not null
             }
-            else
-            {
-                if (_oldCont.GetVAS_RenewalDate() > StartDate) //VAI050- Start date Should be greater than Renewal date
-                {
-                    return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");
-                }
-            }
 
+            //VIS0336:Set start date as Renewal date and End date= renewal date+ duration month + year, for Renewal document.
+            StartDate = _oldCont.GetVAS_RenewalDate();
+            EndDate = _oldCont.GetVAS_RenewalDate().Value.AddYears(Util.GetValueOfInt(_oldCont.GetVAS_ContractDuration())).
+                       AddMonths(Util.GetValueOfInt(_oldCont.GetVAS_ContractMonths()));
 
             _oldCont.CopyTo(_newCont);
             _newCont.SetAD_Client_ID(GetAD_Client_ID());
