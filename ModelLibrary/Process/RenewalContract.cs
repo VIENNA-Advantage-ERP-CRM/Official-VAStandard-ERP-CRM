@@ -40,38 +40,40 @@ namespace VAdvantage.Process
 
         protected override void Prepare()
         {
-            ProcessInfoParameter[] para = GetParameter();
-            for (int i = 0; i < para.Length; i++)
-            {
-                String name = para[i].GetParameterName();
-                if (para[i].GetParameter() == null)
-                {
-                    ;
-                }
-                else if (name.Equals("StartDate"))
-                {
-                    StartDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
-                               Util.GetValueOfDateTime(para[i].GetParameter()) : null;
-                    EndDate = Util.GetValueOfDateTime(para[i].GetParameter_To()).HasValue ?
-                           Util.GetValueOfDateTime(para[i].GetParameter_To()) : null;
-                }
-                else
-                {
-                    log.Log(Level.SEVERE, "Unknown Parameter: " + name);
-                }
-            }
+            //ProcessInfoParameter[] para = GetParameter();
+            //for (int i = 0; i < para.Length; i++)
+            //{
+            //    String name = para[i].GetParameterName();
+            //    if (para[i].GetParameter() == null)
+            //    {
+            //        ;
+            //    }
+            //    else if (name.Equals("StartDate"))
+            //    {
+            //        StartDate = Util.GetValueOfDateTime(para[i].GetParameter()).HasValue ?
+            //                   Util.GetValueOfDateTime(para[i].GetParameter()) : null;
+            //        EndDate = Util.GetValueOfDateTime(para[i].GetParameter_To()).HasValue ?
+            //               Util.GetValueOfDateTime(para[i].GetParameter_To()) : null;
+            //    }
+            //    else
+            //    {
+            //        log.Log(Level.SEVERE, "Unknown Parameter: " + name);
+            //    }
+            //}
         }
         protected override string DoIt()
         {
-            if (StartDate > EndDate)
-            {
-                return Msg.GetMsg(GetCtx(), "VAS_ContractDate"); //VAI050-Contract Start date Should be Less than End Date
-            }
+
             int C_OldContract_ID = GetRecord_ID();
             MVASContractMaster _oldCont = new MVASContractMaster(GetCtx(),
                                 C_OldContract_ID, Get_Trx());
             MVASContractMaster _newCont = new MVASContractMaster(GetCtx(),
                                         0, Get_Trx());
+            //VIS0336:Set start date as Renewal date and End date= renewal date+ duration month + year, for Renewal document.
+            StartDate = _oldCont.GetVAS_RenewalDate();
+            EndDate = _oldCont.GetVAS_RenewalDate().Value.AddYears(Util.GetValueOfInt(_oldCont.GetVAS_ContractDuration())).
+                       AddMonths(Util.GetValueOfInt(_oldCont.GetVAS_ContractMonths()));
+
             if (_oldCont.GetVAS_RenewalDate() == null)
             {
                 return Msg.GetMsg(GetCtx(), "VAS_CheckRenewalDate");      //VAI050--Check renewal date not null
@@ -83,6 +85,8 @@ namespace VAdvantage.Process
                     return Msg.GetMsg(GetCtx(), "VAS_RenewalDate");
                 }
             }
+
+
             _oldCont.CopyTo(_newCont);
             _newCont.SetAD_Client_ID(GetAD_Client_ID());
             _newCont.SetAD_Org_ID(GetAD_Org_ID());
@@ -91,10 +95,10 @@ namespace VAdvantage.Process
             _newCont.SetDateDoc(_oldCont.GetVAS_RenewalDate());
             _newCont.SetStartDate(StartDate);
             _newCont.SetEndDate(EndDate);
-            _newCont.SetVAS_RenewalDate(null);
+            _newCont.SetVAS_RenewalDate(EndDate.Value.AddDays(1));
             _newCont.SetDocumentNo(string.Empty);
             _newCont.SetIsExpiredContracts(false);
-            _newCont.Set_Value("Vas_Contractreferral","Renew"); //VAI050-Set value in Contract Referal field
+            _newCont.Set_Value("Vas_Contractreferral", "Renew"); //VAI050-Set value in Contract Referal field
             _newCont.SetVAS_IsApproved(false); //VAI050-Set value false 
             _newCont.SetVAS_Status("DFT"); //VAI050-Set Drafted in Status field
             _newCont.Set_Value("Processed", false); //VAI050-Set false  for Processed
@@ -242,7 +246,7 @@ namespace VAdvantage.Process
 
             return rMsg;
         }
-         
+
 
     }
 }
