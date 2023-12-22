@@ -2,25 +2,18 @@
     box-sizing: border-box;
 }
 
-:root {
-    --whiteColor: #fff;
-    --horizontalBorderColor: #EFEFEF;
-    --verticalBorderColor: #95B3C42E;
-    --fieldBorderColor: #E1E1E1;
-    --bgGreyColor: #F5F5F5;
-    --yellowColor: #F9B31D;
-    --redColor: #FF0000;
-    --joinBgColor: #FFE9A1;
-    --purpleColor: #8F67D54D;
+.vas-root {
+    height: 100%;
+    width: 100%;
 }
 
-label {
-    font-weight: 400;
-}
+    .vas-root label {
+        font-weight: 400;
+    }
 
-input[type='button'] {
-    background: rgba(var(--v-c-primary));
-}
+    .vas-root input[type='button'] {
+        background: rgba(var(--v-c-primary));
+    }
 
 .vas-add-label-content .vas-select-plus-btn .vas-add-btn {
     color: rgba(var(--v-c-primary)) !important;
@@ -28,43 +21,9 @@ input[type='button'] {
     background-color: #fff;
 }
 
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head span i::before {
-    content: "\2716";
-    color: var(--whiteColor);
-}
-
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head > span {
-    display: inline-block;
-}
-
-.vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head {
-    background: rgba(var(--v-c-primary)) 0% 0% no-repeat padding-box;
-    border-radius: 5px 0px 0px 0px;
-    position: relative;
-    align-items: center;
-}
-
-    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head.vas-pull-left::before {
-        width: 0;
-        height: 0;
-        border-top: 8px solid transparent;
-        border-bottom: 8px solid transparent;
-        border-left: 8px solid rgba(var(--v-c-primary));
-        content: '';
-        position: absolute;
-        right: -7px;
-        top: 0;
-        bottom: 0;
-        margin: auto;
-    }
-
-    .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-b-head h3 {
-        color: var(--whiteColor);
-    }
-
 .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     padding: 13px 10px;
-    border-bottom: 1px solid var(--horizontalBorderColor);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
 }
 
     .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
@@ -73,7 +32,7 @@ input[type='button'] {
         border-radius: 3px;
         float: none;
         margin: 0 5px;
-        color: var(--whiteColor);
+        color: rgba(var(--v-c-on-primary));
     }
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
@@ -82,7 +41,7 @@ input[type='button'] {
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
             background-color: rgba(var(--v-c-primary));
-            color: var(--whiteColor);
+            color: rgba(var(--v-c-on-primary));
         }
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
@@ -101,6 +60,10 @@ input[type='button'] {
     height: 100%;
 }
 
+    .vis-ad-w-p-actionpanel-r .vas-sql-content.vas-grid-height {
+        height: calc(100% - 80px);
+    }
+
     .vis-ad-w-p-actionpanel-r .vas-sql-content textarea {
         width: 100%;
         height: 100%;
@@ -114,13 +77,17 @@ input[type='button'] {
 }
 
     .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
-        border-left: 1px solid var(--verticalBorderColor);
+        border-left: 1px solid rgba(var(--v-c-secondary),1);
         height: 100%;
     }
 
+        .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 .vas-query-input {
+            height: calc(100% - 30px);
+        }
+
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 {
     position: relative;
-    padding: 10px 15px 20px;
+    padding: 10px 15px 20px 10px;
 }
 
 .vis-ad-w-p-actionpanel-r .vis-ad-w-p-ap-tp-o-icorbar {
@@ -165,7 +132,7 @@ input[type='button'] {
         min-height: 35px;
         border-radius: 2px;
         font-size: 14px;
-        border-color: #E1E1E1;
+        border-color: rgba(var(--v-c-secondary),1);
     }
 
 .vas-add-label label, .vas-add-filter label {
@@ -176,21 +143,25 @@ input[type='button'] {
     cursor: pointer;
 }
 
-    .vas-add-label label::after, .vas-add-filter label::after {
-        content: '+';
-        font-size: 20px;
-        position: absolute;
-        right: 0;
-        top: 0px;
-        background: #E1E1E1;
-        line-height: 19px;
-        width: 22px;
-        text-align: center;
-        height: 22px;
-        font-weight: bold;
-        border-radius: 5px;
-        color: rgba(var(--v-c-primary));
-    }
+.vas-highlighted {
+    color: rgba(var(--v-c-primary));
+}
+
+.vas-add-label label::after, .vas-add-filter label::after {
+    content: '+';
+    font-size: 25px;
+    position: absolute;
+    right: 0;
+    top: 0px;
+    background: rgba(var(--v-c-secondary),1);
+    line-height: 16px;
+    width: 21px;
+    text-align: center;
+    height: 21px;
+    font-weight: bold;
+    border-radius: 5px;
+    color: rgba(var(--v-c-primary));
+}
 
 .vas-add-label.active label::after {
     content: '-';
@@ -207,7 +178,7 @@ input[type='button'] {
     }
 
 .vas-add-label {
-    float: left;
+    display: inline-block;
     width: 100%;
     margin-top: 10px;
     pointer-events: none;
@@ -217,6 +188,10 @@ input[type='button'] {
         display: inline-block;
         width: 100%;
     }
+
+        .vas-add-label.active + .vas-add-label-content h4 {
+            font-size: 14px;
+        }
 
 .vas-select-plus-btn {
     float: left;
@@ -240,16 +215,16 @@ input[type='button'] {
 }
 
 .vas-sqlgenerator {
-    float: left;
+    display: flex;
     height: 100%;
     width: 100%;
 }
 
 .vas-multiselect .vas-checkboxes {
     display: none;
-    border-left: 1px solid var(--fieldBorderColor);
-    border-right: 1px solid var(--fieldBorderColor);
-    border-bottom: 1px solid var(--fieldBorderColor);
+    border-left: 1px solid rgba(var(--v-c-secondary),1);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     float: left;
     padding: 15px 10px;
 }
@@ -257,12 +232,13 @@ input[type='button'] {
 .vas-windowfieldcol-select.vas-windowtab {
     width: 100%;
     float: left;
-    border: 1px solid #E1E1E1;
+    border: 1px solid rgba(var(--v-c-secondary),1);
     min-height: 35px;
-    margin: 15px 0 0;
+    margin: 10px 0 0px;
     position: relative;
-    cursor: pointer;
     background: none;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
 }
 
 .vas-filter-text-input {
@@ -271,32 +247,32 @@ input[type='button'] {
 }
 
 .vas-queryresult-grid {
-    height: 100%;
+    height: calc(100% - 80px);
 }
 
-div#grid_gridForm1_body {
-    height: 100% !important;
-}
+    .vas-queryresult-grid .w2ui-grid-body {
+        height: 100% !important;
+    }
 
 .vas-join-multiselect {
     float: left;
     width: 100%;
     min-height: 35px;
     display: none;
-    border-left: 1px solid var(--fieldBorderColor);
-    border-right: 1px solid var(--fieldBorderColor);
-    border-bottom: 1px solid var(--fieldBorderColor);
+    border-left: 1px solid rgba(var(--v-c-secondary),1);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     margin: -10px 0 10px 0;
     padding: 15px 10px;
 }
 
 .vas-filters {
-    float: left;
+    display: inline-block;
     width: 100%;
 }
 
     .vas-filters .vas-filter-item.vas-filters-row {
-        background: var(--bgGreyColor);
+        background: rgba(var(--v-c-secondary),1);
         padding: 15px 10px;
     }
 
@@ -307,23 +283,18 @@ div#grid_gridForm1_body {
     .vas-filters .vas-filter-item .vas-filter-item-inner {
         float: left;
         width: 100%;
-        background: #fff;
+        background: rgba(var(--v-c-on-primary));
         padding: 10px 10px;
     }
 
     .vas-filters .vas-filter-item {
-        background: #fff;
+        background: rgba(var(--v-c-on-primary));
         float: left;
         width: 100%;
     }
 
-        .vas-filters .vas-filter-item .glyphicon-edit {
-            color: var(--yellowColor);
-            margin-right: 5px;
-        }
-
-.glyphicon-trash {
-    color: var(--redColor);
+.vas-filters-editdelete-btns .vis-edit {
+    margin-right: 5px;
 }
 
 .vas-filters .vas-filter-item:last-child {
@@ -337,17 +308,17 @@ div#grid_gridForm1_body {
 }
 
 .vas-joins {
-    float: left;
     width: 100%;
     margin-top: 10px;
+    display: inline-block;
 }
 
     .vas-joins .vas-join-item {
-        border: 1px solid #42335D0D;
+        border: 1px solid rgba(var(--v-c-on-secondary),1);
         padding: 10px 10px 2px;
         margin-bottom: 10px;
         border-radius: 3px;
-        background: #FBFBFB;
+        background: rgba(var(--v-c-secondary),1);
         transition: all 0.3s ease-in-out;
     }
 
@@ -356,7 +327,7 @@ div#grid_gridForm1_body {
         }
 
 .vas-joins-select {
-    border: 1px solid var(--fieldBorderColor);
+    border: 1px solid rgba(var(--v-c-secondary),1);
 }
 
 .vas-filters-block {
@@ -379,8 +350,11 @@ div#grid_gridForm1_body {
 
 .vas-column-list-item {
     float: left;
-    width: 100%;
     margin-bottom: 10px;
+    white-space: nowrap;
+    width: 300px;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
     .vas-column-list-item input[type="checkbox"] {
@@ -428,21 +402,17 @@ div#grid_gridForm1_body {
 .vas-filter-whitebg {
     float: left;
     width: 100%;
-    background-color: #fff;
+    background-color: rgba(var(--v-c-on-primary));
     padding: 10px;
 }
 
-.VIS-AMTD-formData.VIS-AMTD-InputBtns {
+.vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
     padding-right: 0px;
     margin-bottom: 10px;
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 .vas-windowtab .VIS-AMTD-formData.VIS-AMTD-InputBtns {
     margin-bottom: 5px;
-}
-
-.vis-ad-w-p-actionpanel-r .vas-sql-content .vas-queryresult-grid {
-    height: calc(100% - 50px);
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sql-content .vas-save-btn {
@@ -460,14 +430,18 @@ div#grid_gridForm1_body {
     padding: 1em;
     color: #000;
     margin: 2px;
-    overflow: auto;
-    border: 1px solid #EFEFEF;
+    border: 1px solid rgba(var(--v-c-secondary),1);
     border-radius: 3px;
     width: 100%;
     margin: auto;
-    height: calc(100% - 10%);
-    font-size: 20px;
+    overflow-y: auto;
+    font-size: 16px;
+    word-wrap: break-word;
 }
+
+    .vas-query-input.vas-sql-query-input {
+        height: calc(100% - 40px);
+    }
 
 .vas-sql-result-msg {
     display: inline-block;
@@ -477,20 +451,15 @@ div#grid_gridForm1_body {
 }
 
     .vas-sql-result-msg.vas-sql-result-error {
-        color: var(--redColor);
+        color: #ff0000;
     }
-
-.vas-root {
-    height: 100%;
-    width: 100%;
-}
 
 .vas-grid-div1 {
     width: 100%;
     height: 90%;
     margin-right: 15px;
     margin-top: 1px;
-    border: 1px solid darkgray;
+    border: 1px solid rgba(var(--v-c-on-secondary), 1);
 }
 
 .vas-grid-div2 {
@@ -498,20 +467,21 @@ div#grid_gridForm1_body {
     height: calc(100% - 21%);
     margin-right: 15px;
     margin-top: 1px;
-    border: 1px solid darkgray;
+    border: 1px solid rgba(var(--v-c-on-secondary), 1);
     display: none;
+    overflow-y: auto;
 }
 
 .vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
     pointer-events: none;
-    color: lightgray;
+    color: rgba(var(--v-c-secondary),1);
 }
 
 .vas-control-wrap {
     width: calc(100% - 70px);
 }
 
-.VIS-AMTD-InputBtns input {
+.vas-sqlgenerator .VIS-AMTD-InputBtns input {
     width: 100%;
     min-height: 35px;
 }
@@ -520,7 +490,7 @@ div#grid_gridForm1_body {
     color: rgba(var(--v-c-primary));
 }
 
-span.vis.vis-arrow-down {
+.vas-multiselect .vas-arrow-down {
     position: absolute;
     right: 10px;
     top: 0;
@@ -545,21 +515,23 @@ span.vis.vis-arrow-down {
     float: none;
 }
 
-.vas-delete-join-btn {
-    float: left;
-    width: 15%;
-    text-align: right;
+.vas-joins-block {
+    width: 85%;
+    display: inline-block;
+    vertical-align: top;
 }
 
-    .vas-delete-join-btn .glyphicon-trash {
-        cursor: pointer;
-    }
+.vas-delete-join-btn {
+    width: 15%;
+    display: inline-block;
+    text-align: right;
+}
 
 .vas-join-item .vas-selecttable {
     float: left;
     width: calc(50% - 6px);
     word-wrap: break-word;
-    background-color: rgba(var(--v-c-primary));
+    background-color: rgba(var(--v-c-on-primary));
     margin-bottom: 10px;
     margin-right: 12px;
     padding: 1px 10px;
@@ -569,24 +541,99 @@ span.vis.vis-arrow-down {
     justify-content: center;
 }
 
-    .vas-join-item .vas-selecttable.join-base-table, .vas-join-item .vas-selecttable.join-jointable {
-        background-color: var(--purpleColor);
-    }
-
     .vas-join-item .vas-selecttable:nth-child(2n+1) {
         margin-right: 0;
     }
 
 .vas-selecttable.join-title {
-    background-color: var(--joinBgColor);
     text-align: center;
 }
 
-.vis-ev-col-mandatory {
-    border-color: var(--redColor) !important;
+.vas-delete-join-btn i, .vas-filters-editdelete-btns i {
+    font-size: 16px;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab .vis-ev-col-mandatory, .vis-ad-w-p-actionpanel-r .vas-multiselect .vis-ev-col-mandatory {
+    border-color: #ff0000;
     background: none;
 }
 
 .vas-addfiltertext {
     margin: 0 0 10px;
+}
+
+.vas-sqlquery-text {
+    margin-bottom: 10px;
+}
+
+.vas-column1 {
+    display: inline-block;
+    width: 100%;
+    padding: 5px 5px 0;
+    overflow-y: auto;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab label.vas-label-space {
+    top: -3px;
+    left: 13px;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
+    float: left;
+    width: 100%;
+}
+
+    html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns .vas-sql-btn, html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns .vas-sql-generator {
+        float: right !important;
+    }
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-windowtab label {
+    right: 9px;
+    left: auto;
+}
+
+html[dir="rtl"] .vas-add-label label::after, .vas-add-filter label::after {
+    right: auto;
+    left: 0;
+}
+
+html[dir="rtl"] .vas-column-list-item input[type="checkbox"] {
+    margin-left: 7px;
+    margin-right: 0px;
+}
+
+html[dir="rtl"] .vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
+    padding-left: 0px;
+}
+
+html[dir="rtl"] .vas-multiselect {
+    float: none;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'] {
+    float: right !important;
+}
+
+html[dir="rtl"] .vas-multiselect .vas-arrow-down {
+    left: 10px;
+    right: auto;
+}
+
+html[dir="rtl"] .vas-grid-div2 {
+    margin-left: 15px;
+    margin-right: 0px;
+}
+
+html[dir="rtl"] .vas-grid-div1 {
+    margin-right: 0px;
+    margin-left: 15px;
+}
+
+html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenerator-column2 {
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-left: 0px;
+}
+
+html[dir="rtl"] .vas-sql-result-msg {
+    margin: 10px 0 0;
 }

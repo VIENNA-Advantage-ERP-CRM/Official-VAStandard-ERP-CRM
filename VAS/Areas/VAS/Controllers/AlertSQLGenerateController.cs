@@ -27,23 +27,6 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Get all Windows for Alert SqlGenerator
-        /// </summary>
-        /// <returns>AD_Window Name/Ad_Tab Name/AD_Table_ID</returns>
-        public JsonResult GetWindows()
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate obj = new AlertSqlGenerate();
-                List<Windows> result = obj.GetWindows(ctx);
-                retJSON = JsonConvert.SerializeObject(result);
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
-
-        /// <summary>
         ///  Get Table information From Tab
         /// </summary>
         /// <param name="tabID">AD_Tab_ID</param>
@@ -74,7 +57,8 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!string.IsNullOrEmpty(query))
+                    query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
                 if (!QueryValidator.IsValid(query))
                 {
                     return Json(null);
@@ -91,17 +75,17 @@ namespace VAS.Areas.VAS.Controllers
         /// </summary>
         /// <param name="tableID">AD_Table_ID</param>
         /// <returns>ColumnInfornationList</returns>
-        public JsonResult GetColumns(int tableID)
+        public JsonResult GetColumns(int tableID,int tabID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID));
+                retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID, tabID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }       
+        }   
 
         /// <summary>
         /// Update record of AlertRule by TabSqlGenerator 
@@ -118,7 +102,8 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!string.IsNullOrEmpty(query))
+                    query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
                 if (!QueryValidator.IsValid(query))
                 {
                     return Json(null);
