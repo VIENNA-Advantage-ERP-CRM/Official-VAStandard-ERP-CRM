@@ -61,7 +61,7 @@
 }
 
     .vis-ad-w-p-actionpanel-r .vas-sql-content.vas-grid-height {
-        height: calc(100% - 80px);
+        overflow-y: auto;
     }
 
     .vis-ad-w-p-actionpanel-r .vas-sql-content textarea {
@@ -227,6 +227,8 @@
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     float: left;
     padding: 15px 10px;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
 .vas-windowfieldcol-select.vas-windowtab {
@@ -247,7 +249,7 @@
 }
 
 .vas-queryresult-grid {
-    height: calc(100% - 80px);
+    height: 100%;
 }
 
     .vas-queryresult-grid .w2ui-grid-body {
@@ -440,7 +442,7 @@
 }
 
     .vas-query-input.vas-sql-query-input {
-        height: calc(100% - 40px);
+        height: calc(100% - 30px);
     }
 
 .vas-sql-result-msg {
@@ -464,7 +466,7 @@
 
 .vas-grid-div2 {
     width: 100%;
-    height: calc(100% - 21%);
+    height: 100%;
     margin-right: 15px;
     margin-top: 1px;
     border: 1px solid rgba(var(--v-c-on-secondary), 1);
