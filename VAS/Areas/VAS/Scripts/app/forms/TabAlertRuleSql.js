@@ -93,7 +93,7 @@
         var $filterValueLabel = $("<label>");
         var $filterValueDiv = $("<div class='vas-windowtab'>");
         var $filterPrice = $("<select class='vas-filter-text-input'>");
-        var $filterCondition = $("<select><option>=</option><option>></option><option><</option><option><=</option><option>>=</option><option><></option><option>IS NULL</option><option>IS NOT NULL</option></select>");
+        var $filterCondition = $("<select><option>=</option><option>></option><option><</option><option><=</option><option>>=</option><option><></option><option>IS NULL</option><option>IS NOT NULL</option><option>IN</option><option>NOT IN</option></select>");
         var $filterPriceValue = $("<input type='textbox' class='vas-filter-text-input'>");
         var $filterConditionV2 = null;
         var $sortElements = null;
@@ -223,11 +223,13 @@
                             $selectQuery.show();
                             $sqlContent.find($saveBtn).hide();
                             $sqlResultDiv.hide();
+                            $sqlContent.removeClass('vas-grid-height');
                         }
                         else {
                             $(this).val(sqlQuery);
                             $sqlContent.append($saveBtn);
                             $sqlContent.find($saveBtn).show();
+                            $sqlContent.addClass('vas-grid-height');
                             var query = $selectQuery.text();
                             getResult(query);
                         }
@@ -295,10 +297,10 @@
                     data += '<div class="vas-filters-block">';
                     data += '<div class="vas-filter-andor-value" style=display:none;>' + filterArray[i].filterAndOrValue + '</div>';
                     if (VIS.DisplayType.Date == dataType || VIS.DisplayType.DateTime == dataType) {
-                        data += '<div class="vas-selecttable">' + " TO_CHAR(" + filterArray[i].filterPriceval + ", 'yyyy-mm-dd')"+ '</div>';
+                        data += '<div class="vas-selecttable">' + " TO_CHAR(" + filterArray[i].filterPriceval + ", 'yyyy-mm-dd')" + '</div>';
 
                     }
-                    else{
+                    else {
                         data += '<div class="vas-selecttable">' + filterArray[i].filterPriceval + '</div>';
                     }
                     data += '<div class="vas-filter-condition">' + filterArray[i].filterCondition + '</div>';
@@ -309,12 +311,12 @@
                     else if (VIS.DisplayType.String == dataType || VIS.DisplayType.List == dataType || VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType
                         || VIS.DisplayType.DateTime == dataType || VIS.DisplayType.Date == dataType) {
                         data += '<div class="vas-filter-price-value">' + "'" + filterArray[i].filterValue + "'" + '</div>';
-                    }                    
+                    }
                     else if (VIS.DisplayType.YesNo == dataType) {
                         if ($filterPriceValue.is(':checked')) {
-                            data += '<div class="vas-filter-price-value">' + "'Y'" + '</div>';
+                            data += '<div class="vas-filter-price-value">' + " 'Y'" + '</div>';
                         } else {
-                            data += '<div class="vas-filter-price-value">' + "'N'" + '</div>';
+                            data += '<div class="vas-filter-price-value">' + " 'N'" + '</div>';
                         }
                     }
                     else {
@@ -373,7 +375,7 @@
                 }
                 if ($(event.target).hasClass('vis-edit')) {
                     $addFilterBtn.val(VIS.Msg.getMsg("VAS_UpdateFilter"));
-                    updateFilter();                   
+                    updateFilter();
                     var filterSelectTableVal = filterItem.find(".vas-selecttable").text();
                     var filterValue = filterItem.find(".vas-filter-price-value").text();
                     var filterCondition = filterItem.find(".vas-filter-condition").text();
@@ -396,13 +398,14 @@
                in Filter Accordion
             */
             function updateFilter() {
-                var filterItem = $(event.target).parents('.vas-filter-item');                
+                var filterItem = $(event.target).parents('.vas-filter-item');
                 var filterValue = filterItem.find(".vas-filter-price-value").text();
-                var filterCondition = filterItem.find(".vas-filter-condition").text();               
+                var filterCondition = filterItem.find(".vas-filter-condition").text();
                 oldFilterVal = filterCondition + " " + filterValue;
                 $filterEditDiv.text(oldFilterVal);
                 filterIndex = filterItem.attr('index');
             }
+
 
             /*
                Click event on SQL Button
@@ -519,12 +522,12 @@
                     else {
                         WhereCondition = $filterConditionV2.val();
                     }
-
                     if ($(this).hasClass('vas-edit-btn')) {
                         var updatedFilterPriceValue = $filterPriceValue.val();
                         $('.vas-filter-price-value.active').text(updatedFilterPriceValue);
                         var updatedFilterConditionValue = $filterCondition.find('option:selected').val();
                         $('.vas-filter-condition.active').text(updatedFilterConditionValue);
+                        var updatedFilterConditionAndOr = $filterConditionV2.find('option:selected').val();
                         var newQuery = updatedFilterConditionValue + " " + updatedFilterPriceValue;
                         $(this).removeClass('vas-edit-btn');
                         ClearText();
@@ -644,9 +647,9 @@
                     if (joinData != null) {
                         if (joinData && joinData.length > 0) {
                             tableName = joinData[0].TableName;
-                            for (var i = 1; i < joinData.length; i++) {
+                            for (var i = 0; i < joinData.length; i++) {
                                 var optionValue = tableName + "." + joinData[i].DBColumn;
-                                var optionText = tableName + "> " + joinData[i].DBColumn;
+                                var optionText = tableName + " > " + joinData[i].DBColumn;
                                 if (!addedOptions.includes(optionValue)) {
                                     $joinOnFieldColumnMainTable.append(" <option value=" + optionValue + ">" + optionText + "</option>");
                                     addedOptions.push(optionValue);
@@ -677,7 +680,6 @@
                 }
                 else if (displayType == VIS.DisplayType.Integer || displayType == VIS.DisplayType.ID || displayType == VIS.DisplayType.Amount) {
                     $filterPriceValue.attr('type', 'number');
-                    //$filterPriceValue.attr('min', '0');
                     $filterPriceValue.prev('label').removeClass('vas-label-space');
                 }
                 else if (displayType == VIS.DisplayType.YesNo) {
@@ -692,7 +694,7 @@
 
             autoComValue = null;
             $filterPriceValue.vaautocomplete({
-                minLength:2,
+                minLength: 2,
                 source: function (term, response) {
                     var displayType = $filterPrice.find('option:selected').attr("datatype");
                     if (displayType == VIS.DisplayType.TableDir || displayType == VIS.DisplayType.Table || displayType == VIS.DisplayType.Search) {
@@ -758,10 +760,10 @@
                 }
             });
 
-            
+
             /*   Click event on Add Sort Button
                to add sorts like ASC, DESC etc*/
-            
+
             $addSortBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var sortQuery = "";
                 var sortColumn = $sortByDropdown.val();
@@ -944,7 +946,7 @@
             orderbyFlag = true;
             $joinsWindowTabSelect.fireValueChanged = joinsTableOnChange;
             addedOptions = [];
-            joinData = null;           
+            joinData = null;
             $filterPriceValue.attr('type', 'Textbox');
             $filterPriceValue.val('');
         }
@@ -1000,7 +1002,6 @@
                         if (autoComValue != null) {
                             filterValue = autoComValue;
                         }
-                        
                         sql += " " + WhereCondition;
                         if (VIS.DisplayType.Integer == dataType || VIS.DisplayType.ID == dataType || VIS.DisplayType.IsSearch == dataType) {
                             sql += " " + filterColumn + " " + $filterCondition.val() + " " + filterValue;
@@ -1035,10 +1036,9 @@
                         }
                         else if (VIS.DisplayType.YesNo == dataType) {
                             if ($filterPriceValue.is(':checked')) {
-                                sql += " " + filterColumn + " " + $filterCondition.val() + " 'Y'";
-                            }
-                            else {
-                                sql += " " + filterColumn + " " + $filterCondition.val() + " 'N'";
+                                whereSql += " " + filterColumn + " " + $filterCondition.val() + " 'Y'";
+                            } else {
+                                whereSql += " " + filterColumn + " " + $filterCondition.val() + " 'N'";
                             }
                         }
                         else {
@@ -1086,12 +1086,11 @@
                         $joinOnFieldColumnMainTable.prepend("<option selected='select'></option>");
                         $sortByDropdown.prepend("<option selected='select'></option>");
                         $filterPrice.prepend("<option selected='select'>Select</option>");
-                        for (var i = 1; i < result.length; i++) {
+                        for (var i = 0; i < result.length; i++) {
                             $joinOnFieldColumnMainTable.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + tableName + "> " + result[i].DBColumn + "</option>");
                             $sortByDropdown.append(" <option value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + "</option>");
-                            $filterPrice.append(" <option refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID
-                                + " columnID=" + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + "</option>");
-                            $checkBoxes.append(" <div class='vas-column-list-item'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $filterPrice.append(" <option refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " columnID=" + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + "</option>");
+                            $checkBoxes.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                     }
                     seletedCloumn = [];
@@ -1161,12 +1160,11 @@
                     joinData = result;
                     if (result && result.length > 0) {
                         joinTable = result[0].TableName;
-                        for (var i = 1; i < result.length; i++) {
+                        for (var i = 0; i < result.length; i++) {
                             $joinOnFieldColumnJoinTable.append(" <option value=" + joinTable + "." + result[i].DBColumn + ">" + joinTable + "> " + result[i].DBColumn + "</option>");
                             $joinMultiSelect.append(" <div class='vas-column-list-item'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                             $sortByDropdown.append(" <option value=" + joinTable + "." + result[i].DBColumn + ">" + joinTable + " > " + result[i].ColumnName + "</option>");
-                            $filterPrice.append(" <option refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " tabID=" + tabID
-                                + " columnID=" + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + joinTable + "." + result[i].DBColumn + ">" + joinTable+"> " + result[i].ColumnName + "</option>");
+                            $filterPrice.append(" <option refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " tabID=" + tabID + " columnID=" + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + joinTable + "." + result[i].DBColumn + ">" + joinTable + ">" + tableName + " > " + result[i].ColumnName + "</option>");
                         }
                         filterFlag = false;
                         seletedJoinCloumn = [];
