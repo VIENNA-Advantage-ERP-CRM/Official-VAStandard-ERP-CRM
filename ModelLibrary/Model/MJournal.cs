@@ -898,7 +898,12 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 m_processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
             }
-
+            //VIS_427 27/12/2023 BugId 3199 handled transaction for non-business day
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            {
+                m_processMsg = Common.Common.NONBUSINESSDAY;
+                return DocActionVariables.STATUS_INVALID;
+            }
             // JID_0521 - Restrict if debit and credit amount is not equal.-Mohit-12-jun-2019.
             if (GetTotalCr() != GetTotalDr())
             {
