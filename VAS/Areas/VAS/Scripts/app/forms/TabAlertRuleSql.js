@@ -53,7 +53,7 @@
         var $windowTabSelect = null;
         var $txtWindow = $("<div class='VIS-AMTD-formData VIS-AMTD-InputBtns input-group vas-input-wrap'>");
         var $windowFieldColumnLabel = $("<label>");
-        var $windowFieldColumnSelect = $("<div class='vas-windowfieldcol-select vas-windowtab vis-ev-col-mandatory'></div>");
+        var $windowFieldColumnSelect = $("<div class='vas-windowfieldcol-select vas-windowtab vis-ev-col-mandatory' style='display: none;'></div>");
         var downArrow = $('<span class="vis vis-arrow-down vas-arrow-down"></span>');
         var $joinsSelect = $("<div style='display: none;' class='vas-joins-select vas-common-style vas-windowtab'>");
         var $selectQuerySqlText = $("<div class='vas-sqlquery-text'>");
@@ -74,9 +74,9 @@
         var $joinsDropdown = null;
         var $removeJoins = null;
         var $filterEditDiv = $("<div style='display:none;'>");
-        var $joinOnFieldColumnName1Div = $("<div class='vas-windowtab'>");
+        var $joinOnFieldColumnName1Div = $("<div class='vas-windowtab vas-join-field'>");
         var $joinOnFieldColumnName1Label = $("<label>");
-        var $joinOnFieldColumnName2Div = $("<div class='vas-windowtab'>");
+        var $joinOnFieldColumnName2Div = $("<div class='vas-windowtab vas-join-field'>");
         var $joinOnFieldColumnName2Label = $("<label>");
         var $joinOnFieldColumnMainTable = null;
         var $joinOnFieldColumnJoinTable = null;
@@ -87,16 +87,18 @@
         var $addFilterSelectButton = $("<div class='vas-select-plus-btn'>");
         var $addFilterDiv = $("<div class='vas-add-label-content'>");
         var $filterColumnNameLabel = $("<label>");
-        var $filterColumnNameDiv = $("<div class='vas-windowtab'>");
+        var $filterColumnNameDiv = $("<div class='vas-windowtab vas-filter-field'>");
         var $filterOperatorLabel = $("<label>");
-        var $filterOperatorDiv = $("<div class='vas-windowtab'>");
+        var $filterOperatorDiv = $("<div class='vas-windowtab vas-operator'>");
         var $filterValueLabel = $("<label>");
-        var $filterValueDiv = $("<div class='vas-windowtab'>");
+        var $filterValueDiv = $("<div class='vas-windowtab vas-columnval'>");
         var $filterPrice = $("<select class='vas-filter-text-input'>");
         var $filterCondition = $("<select><option>=</option><option>></option><option><</option><option><=</option><option>>=</option><option><></option><option>IS NULL</option><option>IS NOT NULL</option><option>IN</option><option>NOT IN</option></select>");
         var $filterPriceValue = $("<input type='textbox' class='vas-filter-text-input'>");
         var $filterConditionV2 = null;
         var $sortElements = null;
+        var $fieldColDropdown = $("<input class='vas-select-col' type='textbox' placeholder='" + VIS.Msg.getMsg("VAS_TypeColumn") + "'>");
+        var $fieldJoinColDropdown = $("<input class='vas-join-select-col' type='textbox' placeholder='" + VIS.Msg.getMsg("VAS_TypeColumn") + "'>");
         var $sortByDiv = $("<div class='vas-add-label'>");
         var $sortByLabel = $("<label>");
         var $addSortByText = $("<h4>");
@@ -172,6 +174,7 @@
                 .append($addSortByDiv);
 
             $windowTabDiv.append($windowTabLabel).append($txtWindow);
+            $multiSelect.append($fieldColDropdown);
             $multiSelect.append($windowFieldColumnSelect).append($checkBoxes);
             $windowFieldColumnSelect.append($windowFieldColumnLabel);
             $windowFieldColumnSelect.append(downArrow);
@@ -180,6 +183,7 @@
             $joinOnFieldColumnName2Div.append($joinOnFieldColumnName2Label).append($joinOnFieldColumnJoinTable);
             $addJoinsDiv.append($addJoinsHeading)
                 .append($txtJoinWindow)
+                .append($fieldJoinColDropdown)
                 .append($joinsSelect)
                 .append($joinMultiSelect)
                 .append($joinsDropdown)
@@ -204,6 +208,32 @@
             $addSortBySelectWithButton.append($sortElements).append($addSortBtn);
             $sqlContent.append($selectQuerySqlText).append($selectQuery).append($queryResultGrid);
             $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText).append($selectGeneratorQuery).append(gridDiv2);
+
+            $fieldColDropdown.on("keyup", function () {
+                var $fieldColDropdownVal = $(this).val().toLowerCase();
+                let windowFieldItem = $checkBoxes.children('.vas-column-list-item').length;
+                if (windowFieldItem > 0) {
+                    $checkBoxes.show();
+                    $('.vas-checkboxes .vas-column-list-item').filter(function () {
+                        $(this).toggle($(this).text().toLowerCase().indexOf($fieldColDropdownVal) > -1);                        
+                    });
+                }
+                else {              
+                    $checkBoxes.hide();
+                }
+            });
+
+            $fieldJoinColDropdown.on("keyup", function () {
+                var $joinColDropdownVal = $(this).val().toLowerCase();
+                let joinFieldItem = $checkBoxes.children('.vas-column-list-item').length;
+                if (joinFieldItem > 0) {
+                    $joinMultiSelect.show();
+                    $('.vas-join-multiselect .vas-column-list-item').filter(function () {
+                        $(this).toggle($(this).text().toLowerCase().indexOf($joinColDropdownVal) > -1);
+                    });
+                }
+            });
+
 
             /*
                Click event on Test SQL Button 
@@ -313,10 +343,10 @@
                         data += '<div class="vas-filter-price-value">' + "'" + filterArray[i].filterValue + "'" + '</div>';
                     }
                     else if (VIS.DisplayType.YesNo == dataType) {
-                        if ($filterPriceValue.is(':checked')) {
-                            data += '<div class="vas-filter-price-value">' + " 'Y'" + '</div>';
+                        if (filterArray[i].IsChecked) {
+                            data += '<div class="vas-filter-price-value">' + "'Y'" + '</div>';
                         } else {
-                            data += '<div class="vas-filter-price-value">' + " 'N'" + '</div>';
+                            data += '<div class="vas-filter-price-value">' + "'N'" + '</div>';
                         }
                     }
                     else {
@@ -347,8 +377,9 @@
                     autoComValue = null;
                 }
                 var dataType = $filterPrice.find('option:selected').attr("datatype");
+                var IsChecked = $filterPriceValue.is(':checked');
                 let filterAndOrValue = $filterConditionV2.find('option:selected').val();
-                const filterObj = { filterPriceval, filterCondition, filterValue, filterAndOrValue, dataType: dataType }
+                const filterObj = { filterPriceval, filterCondition, filterValue, filterAndOrValue, dataType: dataType, IsChecked: IsChecked }
                 filterArray.push(filterObj);
                 $filters.empty();
                 readFilterData();
@@ -479,9 +510,9 @@
                Click event on Window/Field Column in Joins 
                to display the data in form of multiple checkboxes 
             */
-            $joinsSelect.on(VIS.Events.onTouchStartOrClick, function () {
-                $(this).next().toggle();
-            });
+            //$joinsSelect.on(VIS.Events.onTouchStartOrClick, function () {
+            //    $(this).next().toggle();
+            //});
 
             /*
                Click event on Save Button 
@@ -879,6 +910,7 @@
                     conditionToRemove = handleWhereSql;
                 }
             }
+            conditionToRemove = conditionToRemove.replace(/\s{2,}/g, ' ');
             var updatedQuery = currentValue.replace(conditionToRemove, "").trim();
             updatedQuery += " " + orderBySQL;
             $selectGeneratorQuery.text('');
@@ -1006,7 +1038,7 @@
                         if (VIS.DisplayType.Integer == dataType || VIS.DisplayType.ID == dataType || VIS.DisplayType.IsSearch == dataType) {
                             sql += " " + filterColumn + " " + $filterCondition.val() + " " + filterValue;
                         }
-                        else if (VIS.DisplayType.String == dataType || VIS.DisplayType.List == dataType) {
+                        else if (VIS.DisplayType.String == dataType || VIS.DisplayType.List == dataType || VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType) {
                             sql += " " + filterColumn + " " + $filterCondition.val() + " '" + filterValue + "'";
                         }
                         else if (VIS.DisplayType.Date == dataType || VIS.DisplayType.DateTime == dataType) {
@@ -1028,7 +1060,7 @@
                         if (VIS.DisplayType.Integer == dataType || VIS.DisplayType.ID == dataType || VIS.DisplayType.IsSearch == dataType) {
                             whereSql += " " + filterColumn + " " + $filterCondition.val() + " " + filterValue;
                         }
-                        else if (VIS.DisplayType.String == dataType || VIS.DisplayType.IsDate == dataType || VIS.DisplayType.IsText == dataType) {
+                        else if (VIS.DisplayType.String == dataType || VIS.DisplayType.IsDate == dataType || VIS.DisplayType.IsText == dataType || VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType) {
                             whereSql += " " + filterColumn + " " + $filterCondition.val() + " '" + filterValue + "'";
                         }
                         else if (VIS.DisplayType.Date == dataType || VIS.DisplayType.DateTime == dataType) {
@@ -1148,7 +1180,7 @@
             $joinOnFieldColumnJoinTable.empty();
             $joinMultiSelect.empty();
             $joinOnFieldColumnJoinTable.prepend("<option selected='select'></option>");
-            $joinsSelect.show();
+            // $joinsSelect.show();
             $joinsSelect.css("margin-bottom", "10px");
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/GetColumns",

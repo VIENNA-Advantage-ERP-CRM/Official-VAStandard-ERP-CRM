@@ -116,7 +116,7 @@
     width: 100%;
 }
 
-    .vis-ad-w-p-actionpanel-r .vas-windowtab label {
+    .vis-ad-w-p-actionpanel-r .vas-windowtab label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval label {
         font-size: 12px;
         font-weight: 400;
         position: absolute;
@@ -125,6 +125,10 @@
         background: linear-gradient(#fff 50%, transparent 50%);
         padding: 0 5px 0 3px;
         z-index: 9;
+    }
+
+    .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
+        top: 2px;
     }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab select {
@@ -173,7 +177,7 @@
 
     .vas-add-label-content select {
         width: 100%;
-        margin-bottom: 10px;
+        margin: 10px 0;
         min-height: 29px;
     }
 
@@ -191,6 +195,7 @@
 
         .vas-add-label.active + .vas-add-label-content h4 {
             font-size: 14px;
+            margin: 0;
         }
 
 .vas-select-plus-btn {
@@ -227,8 +232,7 @@
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     float: left;
     padding: 15px 10px;
-    max-height: 150px;
-    overflow-y: auto;
+    width: 100%;
 }
 
 .vas-windowfieldcol-select.vas-windowtab {
@@ -389,6 +393,22 @@
     float: left;
     width: 100%;
     margin-bottom: 5px;
+}
+
+    .vas-multiselect .vas-select-col {
+        width: 100%;
+        border-bottom-left-radius: 0px;
+        border-bottom-right-radius: 0px;
+        min-height: 35px;
+        font-size: 15px;
+    }
+
+.vas-column1 .vas-join-select-col {
+    width: 100%;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    min-height: 35px;
+    font-size: 15px;
 }
 
 .vas-update-btn {
