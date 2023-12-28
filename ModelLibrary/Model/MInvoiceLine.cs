@@ -380,7 +380,7 @@ namespace VAdvantage.Model
                             if (prod.GetC_UOM_ID() == oLine.GetC_UOM_ID())
                             {
                                 decimal rate = (sLine.GetMovementQty() / sLine.GetQtyEntered());
-                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() * rate,priceListPrcision,MidpointRounding.AwayFromZero));
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceActual(Decimal.Round(oLine.GetPriceActual() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceLimit(Decimal.Round(oLine.GetPriceLimit() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceList(Decimal.Round(oLine.GetPriceList() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
@@ -388,10 +388,10 @@ namespace VAdvantage.Model
                             else if (prod.GetC_UOM_ID() != oLine.GetC_UOM_ID())
                             {
                                 decimal rate = (oLine.GetQtyOrdered() / oLine.GetQtyEntered());
-                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered()/rate, priceListPrcision,MidpointRounding.AwayFromZero));
-                                SetPriceActual(Decimal.Round(oLine.GetPriceActual()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                SetPriceList(Decimal.Round(oLine.GetPriceList()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceActual(Decimal.Round(oLine.GetPriceActual() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceList(Decimal.Round(oLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
                             }
                             //}
                         }
@@ -5800,12 +5800,15 @@ namespace VAdvantage.Model
         {
             Decimal differenceAmt = 0.0M;
             // get expected freight amount of each (round upto 15 in query only) 
+            //VIS_045: 20/Dec/2023, Task ID - 3605, Get detail from exxpected Landed cost and GRN
             String sql = @"Select CASE When C_Expectedcostdistribution.Qty = 0 THEN 0
                             ELSE  ROUND(C_Expectedcostdistribution.Amt / C_Expectedcostdistribution.Qty , 15) 
-                            END AS Amt , CASE WHEN M_Product.IsCostAdjustmentOnLost='Y' THEN C_Expectedcostdistribution.Qty ELSE 0 END AS OrderlineQty 
-                        From M_Inoutline Inner Join C_Expectedcostdistribution On M_Inoutline.C_Orderline_Id = C_Expectedcostdistribution.C_Orderline_Id
-                        INNER JOIN C_Expectedcost ON C_Expectedcost.C_Expectedcost_Id = C_Expectedcostdistribution.C_Expectedcost_Id
-                        INNER JOIN M_Product ON M_Product.M_Product_ID = M_Inoutline.M_Product_ID 
+                            END AS Amt , CASE WHEN M_Product.IsCostAdjustmentOnLost='Y' THEN C_Expectedcostdistribution.Qty ELSE 0 END AS OrderlineQty,
+                            C_ExpectedCost.C_Currency_ID , C_ExpectedCost.C_ConversionType_ID, M_InOut.DateAcct
+                        From M_Inoutline Inner Join C_Expectedcostdistribution On (M_Inoutline.C_Orderline_Id = C_Expectedcostdistribution.C_Orderline_Id) 
+                        INNER JOIN C_Expectedcost ON (C_Expectedcost.C_Expectedcost_Id = C_Expectedcostdistribution.C_Expectedcost_Id) 
+                        INNER JOIN M_Product ON (M_Product.M_Product_ID = M_Inoutline.M_Product_ID) 
+                        INNER JOIN M_InOut ON (M_InOut.M_InOut_ID = M_Inoutline.M_InOut_ID)
                         WHERE m_inoutline.M_InoutLine_ID = " + M_Inoutline_ID + @"  AND C_Expectedcost.C_ExpectedCost_ID=" + C_ExpectedCost_ID;
             //differenceAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
@@ -5813,7 +5816,22 @@ namespace VAdvantage.Model
             Decimal orderedQty = 0;
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
+                // VIS_045: 20/Dec/2023, Task ID - 3605, Get Invoice Detail
+                sql = $@"SELECT C_Currency_ID, C_ConversionType_ID FROM C_Invoice WHERE C_Invoice_ID = {GetC_Invoice_ID()}";
+                DataSet dsInvoice = DB.ExecuteDataset(sql, null, Get_Trx());
+
                 differenceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Amt"]);
+
+                // Convert Expected landed cost amount from his currency to invoice currency
+                if (dsInvoice != null && dsInvoice.Tables[0].Rows.Count > 0 && 
+                    Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != 0 &&
+                    Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]))
+                {
+                    differenceAmt = MConversionRate.Convert(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
+                                Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]),
+                                Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateAcct"]),
+                                Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]), lc.GetAD_Client_ID(), lc.GetAD_Org_ID());
+                }
                 orderedQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["OrderlineQty"]);
             }
 
