@@ -3188,6 +3188,7 @@ namespace VAdvantage.Model
                                             conversionNotFound = inout.GetDocumentNo();
                                             _log.Info("CostingEngine: Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                            costingCheck.errorMessage += " Price / Conversion not avialable";
                                             return false;
                                         }
                                     }
