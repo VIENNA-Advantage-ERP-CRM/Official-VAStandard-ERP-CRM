@@ -4474,6 +4474,8 @@ namespace VAdvantage.Model
                 }
                 if (invoice.GetC_Withholding_ID() > 0)
                 {
+                    //VIS_427 BugId-3717 02/01/2024 Created the invoice object in order to get updated Grand total
+                    invoice = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_TrxName());
                     if (!invoice.SetWithholdingAmount(invoice))
                     {
                         log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "WrongBackupWithholding"));
