@@ -5242,7 +5242,10 @@ namespace VAdvantage.Model
                     }
                    
                 }
-
+                else
+                {
+                    utilizeAmount = invoiceAmount;
+                }
                 int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) " + (IsReversal() ? " - " : " + ") + utilizeAmount + ")" +
                                                         " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")), null, Get_Trx());
                 if (count < 0)
