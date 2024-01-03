@@ -5236,10 +5236,7 @@ namespace VAdvantage.Model
                     {
                         utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(invoiceAmount) - Util.GetValueOfDecimal(orderTotal));
                     }
-                    else
-                    {
-                        utilizeAmount = 0;
-                    }
+                    
                    
                 }
                 else
