@@ -1642,9 +1642,9 @@ namespace VAdvantage.Model
                 }
 
             }
-            
 
-                if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
+
+            if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -5222,36 +5222,46 @@ namespace VAdvantage.Model
         /// <returns>True/False to complete record or not</returns>
         private bool CheckContractData(MDocType dt)
         {
+
             if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0)
             {
-                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is completed and invoice grandtotal is greater than PO/SO grandtotal
-                decimal utilizeAmount;
-                if (GetC_Order_ID() > 0)
+                decimal invoiceAmount = 0;
+                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is Reversed 
+                if (IsReversal())
                 {
-                    
-                    decimal orderTotal = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
-                                 WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx()));
-                    if (GetTotalLines() > orderTotal)
-                    {
-                         utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(GetTotalLines()) - Util.GetValueOfDecimal(orderTotal));
-                    }
-                    else
-                    {
-                        utilizeAmount = 0;
-                    }
-                    
+                    string SQL = "SELECT abs(TotalLines) FROM C_Invoice WHERE  C_Invoice_ID =" + GetC_Invoice_ID();
+                    invoiceAmount = Util.GetValueOfDecimal(DB.ExecuteScalar(SQL, null, Get_Trx()));
                 }
                 else
                 {
-                    utilizeAmount = Util.GetValueOfDecimal(GetTotalLines());
+                    invoiceAmount = GetTotalLines();
                 }
-                int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) + " + utilizeAmount + " )" +
+                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is completed and invoice TotalLines is greater than PO/SO TotalLines
+                decimal utilizeAmount = 0;
+                if (GetC_Order_ID() > 0)
+                {
+
+                    decimal orderTotal = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
+                                 WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx()));
+                    if (invoiceAmount > orderTotal)
+                    {
+                        utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(invoiceAmount) - Util.GetValueOfDecimal(orderTotal));
+                    }
+                    
+                   
+                }
+                else
+                {
+                    utilizeAmount = invoiceAmount;
+                }
+                int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) " + (IsReversal() ? " - " : " + ") + utilizeAmount + ")" +
                                                         " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")), null, Get_Trx());
                 if (count < 0)
                 {
                     _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
                     return false;
                 }
+                //}
                 //VIS0336:-these changes are handled on before save logic of order line.
                 //MVASContractMaster _vasCont = new
                 //    MVASContractMaster(GetCtx(), ContractID, Get_Trx());
@@ -6869,6 +6879,7 @@ namespace VAdvantage.Model
             //}
             //}
             SetProcessed(true);
+
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
