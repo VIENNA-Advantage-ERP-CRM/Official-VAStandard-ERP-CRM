@@ -1555,6 +1555,12 @@ namespace VAdvantage.Model
                 log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
                 return false;
             }
+            //VIS_427 Bug Id 3717 04/01/2024 Handled the GrandTotalAfterWitholding Amount When user unselect the Witholding id
+            if (GetC_Withholding_ID() == 0 && GetBackupWithholdingAmount() != 0)
+            { 
+                SetGrandTotalAfterWithholding(Decimal.Add(GetGrandTotalAfterWithholding(), GetBackupWithholdingAmount()));
+                SetBackupWithholdingAmount(0);
+            }
 
             //	Price List
             if (GetM_PriceList_ID() == 0)
