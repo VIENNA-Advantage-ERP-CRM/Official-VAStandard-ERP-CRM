@@ -260,9 +260,9 @@ namespace VIS.Models
         {
             if (query != null && query.Length > 0 && alertID > 0)
             {
-                if (alertRuleID == 0)
+                if (alertRuleID <= 0)
                 {
-                    string msg=SaveQuery(ctx, query, tableID, alertID, alertRuleID);
+                    string msg=SaveQuery(ctx, query, tableID, alertID, 0);
                     return msg;
                 }
                 int indexOfFrom = query.IndexOf("FROM");
@@ -321,7 +321,7 @@ namespace VIS.Models
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
-        public string GetAlertData(Ctx ctx, int alertID, int alertRuleID)
+        public string GetAlertData(Ctx ctx, int alertRuleID)
         {
             string sql = "";          
             MAlertRule obj = new MAlertRule(ctx, alertRuleID, null);
