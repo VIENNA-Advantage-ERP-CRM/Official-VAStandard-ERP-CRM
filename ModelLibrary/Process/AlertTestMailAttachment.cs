@@ -61,6 +61,7 @@ namespace ViennaAdvantage.Process
                     sql = rule.GetSql();
                     if (sql != null && sql.Length > 0)
                     {
+                        int AD_Role_User_ID_C = AD_User_ID;
                         if (!ValidateSql(sql))
                         {
                             rule.SetErrorMsg("Pre= Potential dangerous query");
@@ -69,7 +70,29 @@ namespace ViennaAdvantage.Process
                             rule.Save();
                             return "Potential dangerous query";
                         }
+                        string tableName = rule.GetTableName();
+                        bool fullyQualified = MRole.SQL_FULLYQUALIFIED;
+                        if (Util.IsEmpty(tableName))
+                            fullyQualified = MRole.SQL_NOTQUALIFIED;
 
+                        if (AD_Role_User_ID_C > 0)
+                        {
+                            string sql_C = "SELECT AD_Role_ID FROM AD_User_Roles WHERE AD_User_ID = " + AD_Role_User_ID_C + " AND IsActive = 'Y'";
+                            DataSet ds_C = DB.ExecuteDataset(sql_C);
+                            if (ds_C != null && ds_C.Tables[0].Rows.Count > 0)
+                            {
+                                for (int _C = 0; _C < ds_C.Tables[0].Rows.Count; _C++)
+                                {
+                                    MRole role_C = MRole.Get(GetCtx(), Convert.ToInt32(ds_C.Tables[0].Rows[_C]["AD_Role_ID"]));
+                                    if (role_C.IsTableAccess(MTable.Get_Table_ID(tableName), false))
+                                    {
+                                        AD_Role_User_ID_C = AD_User_ID;
+                                        sql = role_C.AddAccessSQL(sql, tableName, fullyQualified, MRole.SQL_RO);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                         int no = DB.ExecuteQuery(sql);
                         if (no == -1)
                         {

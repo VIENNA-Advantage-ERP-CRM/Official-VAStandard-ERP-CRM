@@ -116,17 +116,16 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// Get AlertRule RecordInfo for TabSqlGenerator
         /// </summary>
-        /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
-        public JsonResult GetAlertData(int alertID,int alertRuleID)
+        public JsonResult GetAlertData(int alertRuleID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertID, alertRuleID));
+                retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }      

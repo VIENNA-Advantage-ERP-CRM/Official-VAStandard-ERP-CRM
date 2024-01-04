@@ -21,6 +21,10 @@
     background-color: #fff;
 }
 
+.vas-select-plus-btn.vas-addsort-btn {
+    margin-top: 14px;
+}
+
 .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     padding: 13px 10px;
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
@@ -116,6 +120,14 @@
     width: 100%;
 }
 
+    .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-searchinput-block {
+        margin: 3px 0 4px;
+    }
+
+    .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-sort-block {
+        margin: 4px 0 0;
+    }
+
     .vis-ad-w-p-actionpanel-r .vas-windowtab label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval label {
         font-size: 12px;
         font-weight: 400;
@@ -129,6 +141,7 @@
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
         top: 2px;
+        background-color: rgba(var(--v-c-on-primary));
     }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab select {
@@ -177,7 +190,7 @@
 
     .vas-add-label-content select {
         width: 100%;
-        margin: 10px 0;
+        margin: 12px 0 15px;
         min-height: 29px;
     }
 
@@ -195,13 +208,12 @@
 
         .vas-add-label.active + .vas-add-label-content h4 {
             font-size: 14px;
-            margin: 0;
         }
 
 .vas-select-plus-btn {
     float: left;
     width: 100%;
-    margin-bottom: 15px;
+    margin-top: 4px;
 }
 
     .vas-select-plus-btn select {
@@ -225,13 +237,13 @@
     width: 100%;
 }
 
-.vas-multiselect .vas-checkboxes {
+.vas-multiselect .vas-checkboxes, .vas-single-selection-dropdown {
     display: none;
     border-left: 1px solid rgba(var(--v-c-secondary),1);
     border-right: 1px solid rgba(var(--v-c-secondary),1);
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     float: left;
-    padding: 15px 10px;
+    padding: 15px 10px 7px;
     width: 100%;
 }
 
@@ -269,7 +281,7 @@
     border-right: 1px solid rgba(var(--v-c-secondary),1);
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
     margin: -10px 0 10px 0;
-    padding: 15px 10px;
+    padding: 23px 10px 7px;
 }
 
 .vas-filters {
@@ -390,18 +402,23 @@
             }
 
 .vas-multiselect {
-    float: left;
+    display: inline-block;
     width: 100%;
     margin-bottom: 5px;
 }
 
-    .vas-multiselect .vas-select-col {
-        width: 100%;
-        border-bottom-left-radius: 0px;
-        border-bottom-right-radius: 0px;
-        min-height: 35px;
-        font-size: 15px;
-    }
+.vas-fielddropdown {
+    position: relative;
+    cursor: pointer;
+}
+
+.vas-multiselect .vas-select-col, .vas-single-input .vas-select-col {
+    width: 100%;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    min-height: 35px;
+    font-size: 15px;
+}
 
 .vas-column1 .vas-join-select-col {
     width: 100%;
@@ -430,7 +447,7 @@
 
 .vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
     padding-right: 0px;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 .vas-windowtab .VIS-AMTD-formData.VIS-AMTD-InputBtns {
@@ -442,10 +459,6 @@
     background: none;
     color: rgba(var(--v-c-primary)) !important;
     border: 1px solid rgba(var(--v-c-primary));
-}
-
-.vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'] {
-    margin: 0;
 }
 
 .vas-query-input {
@@ -512,7 +525,25 @@
     color: rgba(var(--v-c-primary));
 }
 
-.vas-multiselect .vas-arrow-down {
+.vas-single-input {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+    .vas-single-input.vas-joiningtable-input {
+        margin: 14px 0 0;
+    }
+
+.vas-fielddropdown.vas-windowtab {
+    margin-top: 5px;
+}
+
+.vas-add-join-btn {
+    margin-top: 14px;
+}
+
+.vas-multiselect .vas-arrow-down, .vas-joinfielddropdown .vas-arrow-down, .vas-single-input .vas-arrow-down {
     position: absolute;
     right: 10px;
     top: 0;
@@ -526,6 +557,7 @@
     width: 16px;
     text-align: center;
     color: rgba(var(--v-c-primary));
+    cursor: pointer;
 }
 
 .vas-joins-bg {
@@ -599,6 +631,36 @@
     top: -3px;
     left: 13px;
 }
+
+.vas-sqlgenerator-column .w2ui-grid .w2ui-grid-body table td.w2ui-grid-data, .vas-queryresult-grid .w2ui-grid .w2ui-grid-body table td.w2ui-grid-data {
+    padding: 0 7px;
+}
+
+.vas-joinfielddropdown {
+    display: inline-block;
+    width: 100%;
+    position: relative;
+}
+
+.vas-disabled-icon {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.vas-sortby-dropdown {
+    display: none;
+    border-left: 1px solid rgba(var(--v-c-secondary),1);
+    border-right: 1px solid rgba(var(--v-c-secondary),1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary),1);
+    float: left;
+    padding: 15px 10px 7px;
+    width: 100%;
+}
+
+    .vas-sortby-dropdown .vas-column-list-item:hover, .vas-single-selection-dropdown .vas-column-list-item:hover {
+        background-color: rgba(var(--v-c-primary));
+        color: rgba(var(--v-c-on-primary));
+    }
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     float: left;
