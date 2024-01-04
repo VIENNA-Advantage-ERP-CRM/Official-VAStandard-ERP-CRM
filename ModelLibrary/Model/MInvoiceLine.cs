@@ -241,7 +241,11 @@ namespace VAdvantage.Model
                 SetLine(oLine.GetLine());
                 SetIsDescription(oLine.IsDescription());
                 SetDescription(oLine.GetDescription());
-                //
+                //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of sales order.
+                if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
+                {
+                    Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
+                }
                 SetC_Charge_ID(oLine.GetC_Charge_ID());
                 //
                 // Set Drop ship Checkbox - Added by Vivek
@@ -294,7 +298,7 @@ namespace VAdvantage.Model
                 M_AttributeSetInstance_ID = sLine.GetM_AttributeSetInstance_ID();
                 SetM_InOutLine_ID(sLine.GetM_InOutLine_ID());
                 SetC_OrderLine_ID(sLine.GetC_OrderLine_ID());
-
+                
                 //
                 SetLine(sLine.GetLine());
                 SetIsDescription(sLine.IsDescription());
@@ -312,6 +316,12 @@ namespace VAdvantage.Model
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
                     MOrder ord = new MOrder(GetCtx(), oLine.GetC_Order_ID(), Get_TrxName());          //Added By Bharat
+                 //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
+                    if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
+                    {
+                        Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
+                    }
+
                     if (Get_ColumnIndex("S_ResourceAssignment_ID") >= 0)
                     {
                         SetS_ResourceAssignment_ID(oLine.GetS_ResourceAssignment_ID());
@@ -4464,6 +4474,8 @@ namespace VAdvantage.Model
                 }
                 if (invoice.GetC_Withholding_ID() > 0)
                 {
+                    //VIS_427 BugId-3717 02/01/2024 Created the invoice object in order to get updated Grand total
+                    invoice = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_TrxName());
                     if (!invoice.SetWithholdingAmount(invoice))
                     {
                         log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "WrongBackupWithholding"));
