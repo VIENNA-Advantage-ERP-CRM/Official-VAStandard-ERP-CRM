@@ -712,7 +712,7 @@ namespace VAdvantage.Model
                     }
                 }//vikas
 
-                if (!newRecord && GetM_RequisitionLine_ID() != 0 && GetConfirmedQty() == 0 && String.IsNullOrEmpty(GetDescription()))
+                if (!newRecord && GetM_RequisitionLine_ID() != 0 && String.IsNullOrEmpty(GetDescription()))//VIS0336:removed the confirm qty check for updating the Reserved qty on movement line orginal document when material trasfer confirmation is complete
                 {
                     MRequisitionLine requisition = new MRequisitionLine(GetCtx(), GetM_RequisitionLine_ID(), Get_Trx());        // Trx used to handle query stuck problem
                     requisition.SetDTD001_ReservedQty(requisition.GetDTD001_ReservedQty() + (GetMovementQty() - qtyReserved));
