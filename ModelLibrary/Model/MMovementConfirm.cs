@@ -891,11 +891,6 @@ namespace VAdvantage.Model
                         return false;
                     }
 
-                    //MMovement Mov = new MMovement(GetCtx(), GetM_Movement_ID(), Get_Trx());
-                    //if (move.GetDocStatus() != DOCSTATUS_Completed)
-                    //{
-                    //    string Status = Mov.CompleteIt();
-                    //}
                 }
                
                 else
