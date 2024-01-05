@@ -34,9 +34,17 @@ namespace VAdvantage.Process
         {
             StringBuilder sql = new StringBuilder();
             // VIS0060: Work done to set Status as Expired when Contract got expired 
-            sql.Append(@"UPDATE VAS_ContractMaster SET IsExpiredContracts = 'Y', VAS_Status ='EXP' , Processed='Y' 
+            if (DatabaseType.IsOracle)
+            {
+                sql.Append(@"UPDATE VAS_ContractMaster SET IsExpiredContracts = 'Y', VAS_Status ='EXP' , Processed='Y' 
                        WHERE TO_DATE(enddate, 'DD-MM-YYYY') < TO_DATE(sysdate, 'DD-MM-YYYY') AND VAS_Terminate='N' 
                        AND IsExpiredContracts = 'N'"); //VAI050-Terminate Contract Should not be expired
+            }
+            else
+            {
+                sql.Append(@"UPDATE VAS_ContractMaster SET IsExpiredContracts = 'Y', VAS_Status ='EXP' , Processed='Y' 
+                       WHERE enddate < CURRENT_DATE AND VAS_Terminate='N' AND IsExpiredContracts = 'N'"); //VAI050-Terminate Contract Should not be expired
+            }
             if (Util.GetValueOfInt(DB.ExecuteQuery
                 (sql.ToString(), null, Get_Trx())) < 0)
             {
