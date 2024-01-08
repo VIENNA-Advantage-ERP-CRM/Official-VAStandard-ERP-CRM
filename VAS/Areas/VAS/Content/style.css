@@ -662,6 +662,14 @@
         color: rgba(var(--v-c-on-primary));
     }
 
+.vas-checkboxoption-hidden option {
+    display: none;
+}
+
+    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     float: left;
     width: 100%;

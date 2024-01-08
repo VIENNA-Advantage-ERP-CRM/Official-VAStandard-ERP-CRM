@@ -65,9 +65,9 @@ namespace VIS.Models
                     c.AD_Reference_ID AS DataType,f.Name AS FieldName,c.AD_REFERENCE_VALUE_ID AS ReferenceValueID,
                     c.ColumnName AS DBColumn
                     FROM AD_Table t 
-                    LEFT JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
-                    LEFT JOIN AD_Tab b ON (b.AD_Table_ID=t.AD_Table_ID)
-                    LEFT JOIN Ad_Field f ON (b.AD_TAB_ID=f.AD_TAB_ID) AND (c.AD_COLUMN_ID = f.AD_COLUMN_ID)
+                    LEFT OUTER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
+                    LEFT OUTER JOIN AD_Tab b ON (b.AD_Table_ID=t.AD_Table_ID)
+                    LEFT OUTER JOIN Ad_Field f ON (b.AD_TAB_ID=f.AD_TAB_ID) AND (c.AD_COLUMN_ID = f.AD_COLUMN_ID)
                     WHERE t.AD_Table_ID=" + tableID + @"
                     AND b.AD_TAB_ID =" + tabID + @"
                     AND t.IsActive='Y' AND c.IsActive='Y' AND b.IsActive='Y' AND c.ColumnSQL IS NULL ORDER BY FieldName";
