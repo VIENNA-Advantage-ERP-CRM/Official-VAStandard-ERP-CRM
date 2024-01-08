@@ -4180,6 +4180,16 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
+            //VAI066:- Task ID 811 Add this Query to set NULL on Invoice if no IvoiceLine have Order is there.
+            //When Invoice line is deleted then update the order feild with another order.
+            if (GetC_OrderLine_ID() > 0)
+            {
+                String sQl = $@"UPDATE C_Invoice SET C_Order_ID = (SELECT MAX(C_OrderLine.C_Order_ID) FROM C_OrderLine 
+                            INNER JOIN C_InvoiceLine  ON (C_InvoiceLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID)
+                            WHERE C_InvoiceLine.C_Invoice_ID = {GetC_Invoice_ID()} AND
+                            C_OrderLine.IsActive = 'Y') WHERE C_Invoice_ID = {GetC_Invoice_ID()} AND IsActive = 'Y'";
+                int nos = DB.ExecuteQuery(sQl, null, Get_Trx());
+            }
 
             return UpdateHeaderTax(inv);
         }
