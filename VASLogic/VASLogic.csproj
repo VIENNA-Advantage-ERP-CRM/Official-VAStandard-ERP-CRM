@@ -83,7 +83,6 @@
     <Compile Include="Classes\VChargeModelClass.cs" />
     <Compile Include="DataContracts\CalloutData.cs" />
     <Compile Include="Models\AcctViewerData.cs" />
-    <Compile Include="Models\AlertSqlGenerate.cs" />
     <Compile Include="Models\CalloutPaymentModel.cs" />
     <Compile Include="Models\Callouts\MAcctSchemaModel.cs" />
     <Compile Include="Models\Callouts\MBankStatementModel.cs" />

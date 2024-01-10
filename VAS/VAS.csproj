@@ -152,7 +152,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Areas\VAS\Controllers\AcctViewerDataController.cs" />
-    <Compile Include="Areas\VAS\Controllers\AlertSQLGenerateController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MAcctSchemaController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MBankStatementController.cs" />
@@ -234,7 +233,6 @@
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
-    <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
