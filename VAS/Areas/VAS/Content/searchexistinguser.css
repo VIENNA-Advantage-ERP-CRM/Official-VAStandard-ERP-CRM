@@ -89,7 +89,7 @@ html[dir="rtl"].vis-businessPartnerInput {
 html[dir="rtl"].vis-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
     width: 32px;
-    height: 32px;
+    height: 34px;
     font-size: 18px !important;
     color: #fff;
     border: none;
@@ -109,3 +109,8 @@ html[dir="rtl"].vis-businessPartnerSearch {
     pointer-events: none;
     opacity: 0.6;
 }
+.vis-errorGridBody {
+    height: calc(100% - 35px);
+    overflow: auto;
+}
+ 

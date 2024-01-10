@@ -1,8 +1,16 @@
-﻿; VAS = window.VAS || {};
+﻿ 
+/********************************************************
+ * Module Name: VAS Standard
+ * Purpose : create existing user 
+ * Employee code: VAI061
+ * Created Date: 10-12-2023
+ * Updated Date:
+ ********************************************************/
 
+; VAS = window.VAS || {};
 //self-invoking function
 ; (function (VAS, $) {
-    // VAI061 08/12/2024 Form Class function fullnamespace
+    // Form Class function fullnamespace
     VAS.AttachUserToBP = function () {
         this.frame;
         this.windowNo;
@@ -16,6 +24,7 @@
         var recordID = null;
         var c_BPartnerID = 0;
         var UserIds = [];
+        var userName = [];
         var $parentdiv = null;
         var $inputDiv = null;
         var $buttonDiv = null;
@@ -26,7 +35,7 @@
         var $textSearchEmployee = null;
 
 
-        // VAI061 08/12/2024 Initialize UI Elements
+        // Initialize UI Elements
 
         function initializeComponent() {
             $parentdiv = $("<div class='vis-parent'>");
@@ -40,12 +49,12 @@
             $cancelBtn = $("<button class='vis-actionbtn'> "+ VIS.Msg.getMsg("Cancel") +" </button>");
             $okBtn = $("<button class='vis-actionbtn vis-disableBtn ' > " + VIS.Msg.getMsg("Ok") + " </button>");
 
-           /* VAI061 08/12/2024 Employee textbox*/
+           /* Employee textbox*/
             $employee = $('<div class="input-group vis-input-wrap mb-0" >');
             $textEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" disabled /><label>Employee</label></div>');
             $employee.append($textEmployee);
 
-           /* VAI061 08/12/2024 SearchExistingUser textbox*/
+           /* SearchExistingUser textbox*/
             $searchEmployee = $('<div class="input-group vis-input-wrap mb-0" >');
             $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" /><label>SearchExistingUser</label></div>');
             $searchEmployee.append($textSearchEmployee);
@@ -56,13 +65,13 @@
             bottomDiv.append($okBtn).append($cancelBtn);
             $root.append($upperDiv).append(lowerDiv).append(bottomDiv);
 
-            /*VAI061 08/12/2024 ok button use to call the getRecordID function */
+            /* ok button use to call the getRecordID function */
             $okBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 getRecordID();
 
             });
 
-          /*  VAI061 08/12/2024
+          /*  
               search button use to 
               search the records from grid 
           */
@@ -72,12 +81,12 @@
 
             });
 
-           //VAI061 08/12/2024 close the form
+           // close the form
             $cancelBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 $self.frame.close();
             });
 
-           /*VAI061 08/12/2024 keyup used to search the record after pressing enter */
+           /* keyup used to search the record after pressing enter */
             $parentdiv.on("keyup", function (e) {
                 arrListColumns = [];
                 if (e.keyCode === 13) {
@@ -86,12 +95,13 @@
             });
         }
 
-       /* VAI061 08/12/2024 function used to get the TableID and userID*/
+       /*  function used to get the TableID and userID*/
         function getRecordID() {
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/MEmployeeMaster/UpdateUser",
                 type: "POST",
                 data: {
+                    userNames: userName,
                     userIds: UserIds,
                    c_BPartnerID: c_BPartnerID 
                 },
@@ -101,16 +111,23 @@
                         $self.frame.close();
                     }
                     else {
-                        var errorName = result[0].error;
-                        VIS.ADialog.error(errorName);
+                        var errorHtml = "<ul>";
+                        for (var i = 0; i < result.length; i++) {
+                            errorHtml += "<li>" + result[i].userName + ":" + result[i].error + "</li>";
+                        }
+                        errorHtml += "</ul>";
+                        var obj = new VAS.AttachError($self.WindowNo,errorHtml);
+                        obj.show();
                     }
-                },
+                        
+                    },
+                
                 error: function (eror) {
                     console.log(eror);
                 }
             }); 
         }
-       /*VAI061 08/12/2024 function used to get the records via ajax */
+       /* function used to get the records via ajax */
             function loadGrid() {
                 var data = [];
                 $.ajax({
@@ -146,7 +163,7 @@
                 return data;
         };
 
-      /* VAI061 08/12/2024 Function used to display the records on grid */
+      /* Function used to display the records on grid */
             function dynInit(data) {
                 if (dGrid != null) {
                     dGrid.destroy();
@@ -172,7 +189,7 @@
                     arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("SuperVisor"), sortable: true, size: '9%', min: 130, hidden: false });
                     arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("User_ID"), sortable: true, size: '7%', min: 130, hidden: false });
 
-                    /*VAI061 08/12/2024 encode the tags */
+                    /* encode the tags */
                     w2utils.encodeTags(data);
 
                     dGrid = $(lowerDiv).w2grid({
@@ -186,17 +203,26 @@
                             
                             if (dGrid.records.length > 0)
                                 recordID = dGrid.get(event.recid).recid;
+                            Name = dGrid.get(event.recid).Name;
                             $($okBtn).removeClass("vis-disableBtn");
-                            UserIds.push(recordID)
+                            UserIds.push(recordID);
+                            userName.push(Name);
                         },
                         onUnselect: function (event) {
 
-                            if (dGrid.records.length > 0)
+                            if (dGrid.records.length > 0) {
                                 recordID = dGrid.get(event.recid).recid;
-                            $($okBtn).addClass("vis-disableBtn");
-                            UserIds = jQuery.grep(UserIds, function (value) {
-                                return value != recordID;
-                            });
+                                Name = dGrid.get(event.recid).Name;
+                                UserIds = jQuery.grep(UserIds, function (value) {
+                                    return value != recordID;
+                                });
+                                userName = jQuery.grep(userName, function (value) {
+                                    return value != Name;
+                                });
+                            }
+                            if (UserIds.length == 0) {
+                                $($okBtn).addClass("vis-disableBtn");
+                            }
                         }   
                     });
                 }
@@ -204,14 +230,14 @@
 
         };
 
-        /* VAI061 08/12/2024 display function used to display the grid */
+        /* display function used to display the grid */
             this.display = function () {
                 loadGrid();
             }
 
 
             this.Initialize = function () {
-                //VAI061 08/12/2024 load by java script
+                // load by java script
                 initializeComponent();
         }
 
@@ -219,7 +245,7 @@
             return $root;
         };
 
-        /*VAI061 08/12/2024 function used to deallocate the memory*/
+        /*function used to deallocate the memory*/
         this.disposeComponent = function () {
             if ($root)
                 $root.remove();
@@ -251,7 +277,7 @@
         };
 
         VAS.AttachUserToBP.prototype.init = function (windowNo, frame) {
-            //VAI061 08/12/2024 Assign to this Varable
+            //Assign to this Varable
             this.frame = frame;//
             c_BPartnerID = frame.getRecord_ID();
             this.windowNo = windowNo;
@@ -261,21 +287,21 @@
             this.display();
         };
       
-        //VAI061 08/12/2024 Must implement dispose
+        // Must implement dispose
         VAS.AttachUserToBP.prototype.dispose = function () {
             this.disposeComponent();
-           // VAI061 08/12/2024 call frame dispose function
+           // call frame dispose function
             if (this.frame)
                 this.frame.dispose();
             this.frame = null;
         };
 
-      /*VAI061 08/12/2024 To set the width of frame */
+      /* To set the width of frame */
         VAS.AttachUserToBP.prototype.setWidth = function () {
             return 900;
         };
 
-        //VAI061 08/12/2024 Load form into VIS
+        // Load form into VIS
         VAS.AttachUserToBP = VAS.AttachUserToBP
     }
 })(VAS, jQuery);
