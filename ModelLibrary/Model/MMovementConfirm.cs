@@ -660,7 +660,11 @@ namespace VAdvantage.Model
                     _processMsg = "ShipLine not saved - " + confirm;
                     return DocActionVariables.STATUS_INVALID;
                 }
-                if (confirm.IsFullyConfirmed())
+                if (GetDescription() != null && GetDescription().Contains("{->"))//VIS0336:placed this check for handling the material confirmation reversal case so that it can't execute the material transfer code again.
+                {
+
+                }
+                else if (confirm.IsFullyConfirmed())
                 {
                     confirm.SetProcessed(true);
                     confirm.Save(Get_TrxName());
@@ -892,7 +896,7 @@ namespace VAdvantage.Model
                     }
 
                 }
-               
+
                 else
                 {
                     //	Get Warehouse for Source
