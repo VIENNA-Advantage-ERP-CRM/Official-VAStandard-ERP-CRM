@@ -92,19 +92,23 @@ html[dir="rtl"].vas-businessPartnerSearch {
     cursor: pointer
 }
 
-.vas-noimageicon {
+.vas-noimageicon,
+html[dir="rtl"].vas-noimageicon {
     font-size: 26px;
 }
 
-.vas-gridImageicon {
+.vas-gridImageicon,
+html[dir="rtl"].vas-gridImageicon {
     font-size: 1.2rem;
 }
 
-.vas-disableBtn {
+.vas-disableBtn,
+html[dir="rtl"].vas-disableBtn {
     pointer-events: none;
     opacity: 0.6;
 }
-.vas-errorGridBody {
+.vas-errorGridBody,
+html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
