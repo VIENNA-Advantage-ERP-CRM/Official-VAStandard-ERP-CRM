@@ -12,7 +12,7 @@
         // Initialize UI Elements
         function load() {
             $root = $("<div style='width: 100%; height: 100%; background-color: white; padding-right:10px'>");
-            $gridBody = $("<div class='vis-errorBody'>").html(errorHtml);
+            $gridBody = $("<div class='vas-errorBody'>").html(errorHtml);
             $root.append($gridBody);
 
         }

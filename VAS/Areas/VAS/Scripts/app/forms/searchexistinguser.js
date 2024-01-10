@@ -38,16 +38,16 @@
         // Initialize UI Elements
 
         function initializeComponent() {
-            $parentdiv = $("<div class='vis-parent'>");
-            $inputDiv = $("<div class='vis-businessPartnerInput py-3'>");
-            $buttonDiv = $("<div class='vis-businessPartnerButton'>");
-            $root = $("<div class='vis-root'>");
+            $parentdiv = $("<div class='vas-parent'>");
+            $inputDiv = $("<div class='vas-businessPartnerInput py-3'>");
+            $buttonDiv = $("<div class='vas-businessPartnerButton'>");
+            $root = $("<div class='vas-root'>");
             $upperDiv = $("<div>");
-            lowerDiv = $("<div class='vis-lowerDiv'>");
-            bottomDiv = $("<div class='vis-bottom'>");
-            $searchButton = $('<button class="vis-businessPartnerSearch"><i class="fa fa-search" aria-hidden="true"></i></button>');
-            $cancelBtn = $("<button class='vis-actionbtn'> "+ VIS.Msg.getMsg("Cancel") +" </button>");
-            $okBtn = $("<button class='vis-actionbtn vis-disableBtn ' > " + VIS.Msg.getMsg("Ok") + " </button>");
+            lowerDiv = $("<div class='vas-lowerDiv'>");
+            bottomDiv = $("<div class='vas-bottom'>");
+            $searchButton = $('<button class="vas-businessPartnerSearch"><i class="fa fa-search" aria-hidden="true"></i></button>');
+            $cancelBtn = $("<button class='vas-actionbtn'> "+ VIS.Msg.getMsg("Cancel") +" </button>");
+            $okBtn = $("<button class='vas-actionbtn vas-disableBtn ' > " + VIS.Msg.getMsg("Ok") + " </button>");
 
            /* Employee textbox*/
             $employee = $('<div class="input-group vis-input-wrap mb-0" >');
@@ -204,7 +204,7 @@
                             if (dGrid.records.length > 0)
                                 recordID = dGrid.get(event.recid).recid;
                             Name = dGrid.get(event.recid).Name;
-                            $($okBtn).removeClass("vis-disableBtn");
+                            $($okBtn).removeClass("vas-disableBtn");
                             UserIds.push(recordID);
                             userName.push(Name);
                         },
@@ -221,7 +221,7 @@
                                 });
                             }
                             if (UserIds.length == 0) {
-                                $($okBtn).addClass("vis-disableBtn");
+                                $($okBtn).addClass("vas-disableBtn");
                             }
                         }   
                     });

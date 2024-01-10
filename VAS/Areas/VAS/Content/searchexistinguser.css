@@ -1,5 +1,5 @@
-﻿.vis-parent,
-html[dir="rtl"].vis-parent {
+﻿.vas-parent,
+html[dir="rtl"].vas-parent {
     display: flex;
     align-items: center;
     padding: 0.5rem;
@@ -7,7 +7,7 @@ html[dir="rtl"].vis-parent {
     margin: -11px -12px -2px -12px;
 }
 
-html[dir="rtl"].vis-parent {
+html[dir="rtl"].vas-parent {
     display: flex;
     align-items: center;
     background: rgba(var(--v-c-secondary),1);
@@ -16,41 +16,36 @@ html[dir="rtl"].vis-parent {
     margin: -11px -12px 10px -12px;
 }
 
-.vis-col,
-html[dir="rtl"].vis-col {
-    width: 100%;
-}
-
-.vis-root,
-html[dir="rtl"].vis-root {
+.vas-root,
+html[dir="rtl"].vas-root {
     width: 100%;
     height: 100%;
     background-color: #FFF;
 }
 
-.vis-lowerDiv,
-html[dir="rtl"].vis-lowerDiv {
+.vas-lowerDiv,
+html[dir="rtl"].vas-lowerDiv {
     height: calc(100% - 115px);
 }
 
-    .vis-lowerDiv .w2ui-grid-body,
-    html[dir="rtl"].vis-lowerDiv .w2ui-grid-body {
+ .vas-lowerDiv .w2ui-grid-body,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
         background-color: transparent;
         height: 100% !important;
     }
 
-    .vis-lowerDiv.w2ui-reset.w2ui-grid > div,
-    html[dir="rtl"].vis-lowerDiv.w2ui-reset.w2ui-grid > div {
+ .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
+    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
         height: 100% !important;
     }
 
-    .vis-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
-    html[dir="rtl"].vis-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+ .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
         overflow-x: hidden !important;
     }
 
-.vis-bottom,
-html[dir="rtl"].vis-bottom {
+.vas-bottom,
+html[dir="rtl"].vas-bottom {
     display: flex;
     align-items: center;
     justify-content: end;
@@ -58,8 +53,8 @@ html[dir="rtl"].vis-bottom {
     margin-top: 16px
 }
 
-.vis-actionbtn,
-html[dir="rtl"].vis-actionbtn {
+.vas-actionbtn,
+html[dir="rtl"].vas-actionbtn {
     background: rgba(var(--v-c-primary), 1);
     border: none;
     color: rgba(var(--v-c-on-primary), 1);
@@ -68,16 +63,16 @@ html[dir="rtl"].vis-actionbtn {
     outline: none;
 }
 
-.vis-businessPartnerImg,
-html[dir="rtl"].vis-businessPartnerImg {
+.vas-businessPartnerImg,
+html[dir="rtl"].vas-businessPartnerImg {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.vis-businessPartnerInput,
-html[dir="rtl"].vis-businessPartnerInput {
+.vas-businessPartnerInput,
+html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
@@ -85,8 +80,8 @@ html[dir="rtl"].vis-businessPartnerInput {
     margin-left: 4px
 }
 
-.vis-businessPartnerSearch,
-html[dir="rtl"].vis-businessPartnerSearch {
+.vas-businessPartnerSearch,
+html[dir="rtl"].vas-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
     width: 32px;
     height: 34px;
@@ -97,19 +92,19 @@ html[dir="rtl"].vis-businessPartnerSearch {
     cursor: pointer
 }
 
-.vis-noimageicon {
+.vas-noimageicon {
     font-size: 26px;
 }
 
-.vis-gridImageicon {
+.vas-gridImageicon {
     font-size: 1.2rem;
 }
 
-.vis-disableBtn {
+.vas-disableBtn {
     pointer-events: none;
     opacity: 0.6;
 }
-.vis-errorGridBody {
+.vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
