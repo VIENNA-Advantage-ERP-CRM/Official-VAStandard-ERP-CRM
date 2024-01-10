@@ -1,7 +1,7 @@
 ﻿ 
 /********************************************************
  * Module Name: VAS Standard
- * Purpose : create existing user 
+ * Purpose : create existing user With Business Partner 
  * Employee code: VAI061
  * Created Date: 10-12-2023
  * Updated Date:
