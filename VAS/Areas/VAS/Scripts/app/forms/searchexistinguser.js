@@ -3,7 +3,7 @@
  * Module Name: VAS Standard
  * Purpose : create existing user With Business Partner 
  * Employee code: VAI061
- * Created Date: 10-12-2023
+ * Created Date: 10-01-2024
  * Updated Date:
  ********************************************************/
 
@@ -176,7 +176,7 @@
                         render: function (rec) {
                             var recImage = rec.Image;
                             if (recImage != null) {
-                                return '<div class="text-center"><img class="vis-businessPartnerImg" alt=' + rec.Image + ' src="' + VIS.Application.contextUrl + rec.Image + '"></div>';
+                                return '<div class="text-center"><img class="vas-businessPartnerImg" alt=' + rec.Image + ' src="' + VIS.Application.contextUrl + rec.Image + '"></div>';
                             }
                             else  { 
                                 return '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap">  <i class="fa fa-user"></i><img src="" alt="profile image"> </div></div>';
