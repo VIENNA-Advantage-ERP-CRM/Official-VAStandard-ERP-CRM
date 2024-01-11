@@ -92,7 +92,7 @@ namespace VAS
             style.Include("~/Areas/VAS/Content/PaymentRule.css",
                 //"~/Areas/VAS/Content/style.css",
                 "~/Areas/VAS/Content/VPaySelect.css",
-                "~/Areas/VAS/Content/searchexistinguser.css");
+                "~/Areas/VAS/Content/vasattachuser.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
             //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
