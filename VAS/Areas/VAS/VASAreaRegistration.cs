@@ -48,6 +48,8 @@ namespace VAS
                   "~/Areas/VAS/Scripts/app/forms/vBOMdrop.js",
                   "~/Areas/VAS/Scripts/app/forms/vtrxmaterial.js",
                   "~/Areas/VAS/Scripts/app/forms/TabAlertRuleSql.js",
+                  "~/Areas/VAS/Scripts/app/forms/vasattachuser.js",
+                  "~/Areas/VAS/Scripts/app/forms/vasattachusererror.js",
                    "~/Areas/VAS/Scripts/model/Callouts.js",
                    "~/Areas/VAS/Scripts/model/CalloutAssignment.js",
                    "~/Areas/VAS/Scripts/model/calloutbankstatement.js",
@@ -83,14 +85,16 @@ namespace VAS
                    "~/Areas/VAS/Scripts/model/callouttimeexpense.js",
                    "~/Areas/VAS/Scripts/model/calloutInvRevaluation.js",
                    "~/Areas/VAS/Scripts/model/VAS_CalloutContract.js"
+                   
                    );
 
 
             style.Include("~/Areas/VAS/Content/PaymentRule.css",
-                "~/Areas/VAS/Content/style.css",
-                "~/Areas/VAS/Content/VPaySelect.css");
+                //"~/Areas/VAS/Content/style.css",
+                "~/Areas/VAS/Content/VPaySelect.css",
+                "~/Areas/VAS/Content/searchexistinguser.css");
 
-            //style.Include("~/Areas/VAS/Content/VIS.rtl.css");
+            style.Include("~/Areas/VAS/Content/VIS.rtl.css");
             //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
             //modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");
 
