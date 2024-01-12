@@ -396,7 +396,7 @@ namespace VAdvantage.Model
                     {
                         if (GetQtyInternalUse() > RemainingQty)
                         {
-                            log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
                             return false;
                         }
                     }
@@ -407,7 +407,7 @@ namespace VAdvantage.Model
                         {
                             if (Value > RemainingQty)
                             {
-                                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
                                 return false;
                             }
                         }
