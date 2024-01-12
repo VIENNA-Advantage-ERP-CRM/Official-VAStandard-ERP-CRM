@@ -36,22 +36,35 @@ namespace ViennaAdvantage.Process
                 {
                     _C_Lead_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Lead_ID"]);
                     X_C_Lead lead = new X_C_Lead(GetCtx(), _C_Lead_ID, Get_TrxName());
-                    
+
                     int Pospect = lead.GetRef_BPartner_ID();
+
                     if (Pospect != 0)
                     {
                         X_C_Project opp = new X_C_Project(GetCtx(), 0, Get_TrxName());
                         X_C_BPartner bp = new X_C_BPartner(GetCtx(), Pospect, Get_TrxName());
+
+                        if (bp.IsCustomer())
+                        {
+                            opp.SetC_BPartner_ID(bp.GetC_BPartner_ID()); 
+
+                        }
+                        else
+                        {
+                            opp.SetC_BPartnerSR_ID(lead.GetRef_BPartner_ID());
+
+                        }
                         opp.SetC_Lead_ID(lead.GetC_Lead_ID());
-                        opp.SetC_BPartnerSR_ID(lead.GetRef_BPartner_ID());
                         opp.SetName(bp.GetName());
                         opp.SetDescription(lead.GetDescription());
                         opp.SetSalesRep_ID(lead.GetSalesRep_ID());
                         opp.SetDateContract(DateTime.Today);
                         opp.SetC_Campaign_ID(lead.GetC_Campaign_ID());
-                        opp.SetAD_User_ID(lead.GetAD_User_ID());                        
+                        opp.SetAD_User_ID(lead.GetAD_User_ID());
                         opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
                         opp.SetIsOpportunity(true);
+                        opp.SetRef_BPartner_ID(lead.GetRef_BPartner_ID());
+
                         if (opp.Save())
                         {
                             lead.SetC_Project_ID(opp.GetC_Project_ID());
