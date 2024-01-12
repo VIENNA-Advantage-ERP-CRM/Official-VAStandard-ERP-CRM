@@ -63,7 +63,7 @@ namespace ViennaAdvantage.Process
                         opp.SetAD_User_ID(lead.GetAD_User_ID()); 
                         opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
                         opp.SetIsOpportunity(true);
-                      // VIA: changes done to set the value of Ref_BPartner_ID for loading data into Uer/Contact and Location .
+                      // VIA051: changes done to set the value of Ref_BPartner_ID for loading data into Uer/Contact and Location .
                         opp.SetRef_BPartner_ID(lead.GetRef_BPartner_ID()); 
 
                         if (opp.Save())
