@@ -71,7 +71,7 @@
             Productdiv = $('<div class = "vas-apInvPoSingleItem"></div>');
             Attributediv = $('<div class = "vas-apInvPoSingleItem"></div>');
             Qtydiv = $('<div class = "vas-apInvPoSingleItem"></div>');
-            InvoiceLineandPhasediv = $('<div class = "vas-apInvPoListItem mb-2"></div>');
+            InvoicePoSubListGroup = $('<div class = "vas-apInvPoListItem mb-2"></div>');
 
             InvoiceLinediv.append(lblInvoiceLineId).append($lblInvoiceLineValue);
             OrderLinediv.append(lblOrderId).append($lblOrderValue)
@@ -79,8 +79,8 @@
             Productdiv.append(lblProductName).append($lblProductValue)
             Attributediv.append(lblAttributeSetInstance).append($lblAttributeSetInstanceValue)
             Qtydiv.append(lblQty).append($lblQtyValue);
-            InvoiceLineandPhasediv.append(InvoiceLinediv).append(OrderLinediv).append(ReceiptLinediv).append(Productdiv).append(Attributediv).append(Qtydiv);
-            InvoicePoListGroup.append(InvoiceLineandPhasediv);
+            InvoicePoSubListGroup.append(InvoiceLinediv).append(OrderLinediv).append(ReceiptLinediv).append(Productdiv).append(Attributediv).append(Qtydiv);
+            InvoicePoListGroup.append(InvoicePoSubListGroup);
             wrapperDiv.append(lblTitle).append(InvoicePoListGroup);
             /* Attach design to Root division */
             $root.append(wrapperDiv);

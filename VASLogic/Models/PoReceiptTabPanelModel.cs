@@ -35,7 +35,7 @@ namespace VASLogic.Models
                         ELSE ' ' END AS InvoiceDocumentLineNo,
                         CASE WHEN IOL.Line > 0 THEN Cast(INO.DocumentNo as varchar(1000)) || '_' || Cast(IOL.Line as varchar(1000))
                         ELSE ' ' END AS InoutDocumentLineNo,
-                        IL.QtyEntered AS Qty,
+                        IL.QtyInvoiced AS Qty,
                         NVL(P.Name, ' ') AS ProductName,
                         NVL(ASI.Description,' ') AS AttributeSetInstance
                         FROM
@@ -60,7 +60,7 @@ namespace VASLogic.Models
                     obj.OrderDocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderDocumentLineNo"]);
                     obj.InvoiceDocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceDocumentLineNo"]);
                     obj.GRNDocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["InoutDocumentLineNo"]);
-                    obj.Qty = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Qty"]);
+                    obj.Qty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Qty"]);
                     obj.ProductName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ProductName"]);
                     obj.AttributeSetInstance = Util.GetValueOfString(ds.Tables[0].Rows[i]["AttributeSetInstance"]);
                     tabPanels.Add(obj);
@@ -75,7 +75,7 @@ namespace VASLogic.Models
 
         public string GRNDocumentNo { get; set; }
 
-        public int Qty { get; set; }
+        public Decimal Qty { get; set; }
 
         public string InvoiceDocumentNo { get; set; }
 
