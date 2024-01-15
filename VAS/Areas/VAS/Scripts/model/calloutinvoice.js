@@ -1075,9 +1075,8 @@
                     //VAI082:-DevOps ID:-4092-On change of quantity, price should be set based on discount schema.               
                     if (mField.getColumnName() == "M_Product_ID" ||                      
                         ((isDiscountApplied.equals("Y") || DiscountApplied)
-                            && PriceEntered != 0) || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0)) {
-
-                        mTab.setValue("VAS_IsDiscountApplied", Util.getValueOfString(isDiscountApplied.equals("Y")));
+                            && PriceEntered != 0) || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0)) {                    
+                        mTab.setValue("VAS_IsDiscountApplied", isDiscountApplied.equals("Y"));                      
                         mTab.setValue("PriceActual", PriceActual);
                         mTab.setValue("PriceEntered", PriceEntered);
                     }                                  
