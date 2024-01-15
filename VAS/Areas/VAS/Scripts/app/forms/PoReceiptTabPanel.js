@@ -22,7 +22,7 @@
         var lblQty = null;
         var lblInvoiceLineId = null;
         var lblProductName = null;
-        var lblMpoAttributeSetInstance = null;
+        var lblAttributeSetInstance = null;
         var lblTitle = null;
         var ctx = this.ctx;
 
@@ -53,8 +53,8 @@
         lblProductName = $("<span class = 'vas-apInvPoTitle'>" + VAS.translatedTexts.VAS_Product + "</span>");
         var $lblProductValue = $('<span class = "vas-apInvPoValue"><label>&nbsp;</label></span>');
 
-        lblMpoAttributeSetInstance = $("<span class = 'vas-apInvPoTitle'>" + VAS.translatedTexts.VAS_Attribute + "</span>");
-        var $lblMpoAttributeSetInstanceValue = $('<span class = "vas-apInvPoValue"><label>&nbsp;</label></span>');
+        lblAttributeSetInstance = $("<span class = 'vas-apInvPoTitle'>" + VAS.translatedTexts.VAS_Attribute + "</span>");
+        var $lblAttributeSetInstanceValue = $('<span class = "vas-apInvPoValue"><label>&nbsp;</label></span>');
 
         lblQty = $("<span class = 'vas-apInvPoTitle'>" + VAS.translatedTexts.VAS_Qty + "</span>");
         var $lblQtyValue = $('<span class = "vas-apInvPoValue"><label>&nbsp;</label></span>');
@@ -64,28 +64,28 @@
         /*  Intialize UI Elements */
         this.init = function () {
             /*Assign the div space for each label */
-            ProjectSectiondiv = $('<div class = "vas-apInvPoListGroup"></div>');
-            ProjectLine1div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLine2div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLine3div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLine4div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLine5div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLine6div = $('<div class = "vas-apInvPoSingleItem"></div>');
-            ProjectLineandPhasediv = $('<div class = "vas-apInvPoListItem mb-2"></div>');
+            InvoicePoListGroup = $('<div class = "vas-apInvPoListGroup"></div>');
+            InvoiceLinediv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            OrderLinediv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            ReceiptLinediv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            Productdiv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            Attributediv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            Qtydiv = $('<div class = "vas-apInvPoSingleItem"></div>');
+            InvoiceLineandPhasediv = $('<div class = "vas-apInvPoListItem mb-2"></div>');
 
-            ProjectLine1div.append(lblInvoiceLineId).append($lblInvoiceLineValue);
-            ProjectLine2div.append(lblOrderId).append($lblOrderValue)
-            ProjectLine3div.append(lblGrnLineId).append($lblGrnLineValue)
-            ProjectLine4div.append(lblProductName).append($lblProductValue)
-            ProjectLine5div.append(lblMpoAttributeSetInstance).append($lblMpoAttributeSetInstanceValue)
-            ProjectLine6div.append(lblQty).append($lblQtyValue);
-            ProjectLineandPhasediv.append(ProjectLine1div).append(ProjectLine2div).append(ProjectLine3div).append(ProjectLine4div).append(ProjectLine5div).append(ProjectLine6div);
-            ProjectSectiondiv.append(ProjectLineandPhasediv);
-            wrapperDiv.append(lblTitle).append(ProjectSectiondiv);
+            InvoiceLinediv.append(lblInvoiceLineId).append($lblInvoiceLineValue);
+            OrderLinediv.append(lblOrderId).append($lblOrderValue)
+            ReceiptLinediv.append(lblGrnLineId).append($lblGrnLineValue)
+            Productdiv.append(lblProductName).append($lblProductValue)
+            Attributediv.append(lblAttributeSetInstance).append($lblAttributeSetInstanceValue)
+            Qtydiv.append(lblQty).append($lblQtyValue);
+            InvoiceLineandPhasediv.append(InvoiceLinediv).append(OrderLinediv).append(ReceiptLinediv).append(Productdiv).append(Attributediv).append(Qtydiv);
+            InvoicePoListGroup.append(InvoiceLineandPhasediv);
+            wrapperDiv.append(lblTitle).append(InvoicePoListGroup);
             /* Attach design to Root division */
             $root.append(wrapperDiv);
             /* Get the tabpanel data returned from ajax method to the lebels */
-            this.getProjectTabDetail = function (parentID) {
+            this.getPoReceiptData = function (parentID) {
                 $.ajax({
                     url: VIS.Application.contextUrl + "VAS/PoReceipt/GetData",
                     type: "GET",
@@ -96,13 +96,13 @@
                         if (JSON.parse(data) != "") {
                             data = JSON.parse(data);
                             console.log(data);
-                            if (data[0].OrderDocumentNo != "" ||  data[0].GRNDOCUMENTNO != ""){
+                            if (data[0].OrderDocumentNo != "" || data[0].GRNDocumentNo != ""){
                                 $lblOrderValue.text(data[0].OrderDocumentNo);
-                                $lblGrnLineValue.text(data[0].GRNDOCUMENTNO);
-                                $lblInvoiceLineValue.text(data[0].INVOICEDOCUMENTNO);
-                                $lblProductValue.text(data[0].PRODUCTNAME);
-                                $lblMpoAttributeSetInstanceValue.text(data[0].MPOAttributeSetInstance);
-                                $lblQtyValue.text(data[0].MPOQTY);
+                                $lblGrnLineValue.text(data[0].GRNDocumentNo);
+                                $lblInvoiceLineValue.text(data[0].InvoiceDocumentNo);
+                                $lblProductValue.text(data[0].ProductName);
+                                $lblAttributeSetInstanceValue.text(data[0].AttributeSetInstance);
+                                $lblQtyValue.text(data[0].Qty);
                             }
                         }
                     },
@@ -126,7 +126,7 @@
         VAS.PoReceiptTabPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
             this.record_ID = recordID;
             this.selectedRow = selectedRow;
-            this.getProjectTabDetail(recordID);
+            this.getPoReceiptData(recordID);
         };
         /* This will set width as per window width in dafault case it is 75% */
         VAS.PoReceiptTabPanel.prototype.sizeChanged = function (width) {
@@ -144,13 +144,13 @@
             lblQty = null;
             lblInvoiceLineId = null;
             lblProductName = null;
-            lblMpoAttributeSetInstance = null;
+            lblAttributeSetInstance = null;
             lblTitle = null;
             $lblInvoiceLineValue = null;
             $lblOrderValue = null;
             $lblGrnLineValue = null;
             $lblProductValue = null;
-            $lblMpoAttributeSetInstanceValue = null;
+            $lblAttributeSetInstanceValue = null;
             $lblQtyValue = null;
         }
     }
