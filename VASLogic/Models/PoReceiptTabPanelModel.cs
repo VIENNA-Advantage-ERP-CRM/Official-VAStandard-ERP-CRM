@@ -35,8 +35,8 @@ namespace VASLogic.Models
                         CASE WHEN IOL.LINE > 0 THEN TO_CHAR(INO.DOCUMENTNO) || '_' || TO_CHAR(IOL.LINE)
                         ELSE ' ' END AS InoutDocumentLineNo,
                         IL.QTYENTERED AS MPOQTY,
-                        NVL(P.NAME, 'N/A') AS PRODUCTNAME,
-                        ASI.DESCRIPTION AS MPOAttributeSetInstance
+                        NVL(P.NAME, ' ') AS PRODUCTNAME,
+                        NVL(ASI.DESCRIPTION,' ') AS MPOAttributeSetInstance
                         FROM
                          C_InvoiceLine IL
                         INNER JOIN C_Invoice I ON I.C_Invoice_ID = IL.C_Invoice_ID
