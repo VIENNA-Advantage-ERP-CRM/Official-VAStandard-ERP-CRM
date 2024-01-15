@@ -82,12 +82,14 @@ namespace VAS
                    "~/Areas/VAS/Scripts/model/calloutteamforecast.js",
                    "~/Areas/VAS/Scripts/model/callouttimeexpense.js",
                    "~/Areas/VAS/Scripts/model/calloutInvRevaluation.js",
-                   "~/Areas/VAS/Scripts/model/VAS_CalloutContract.js"
+                   "~/Areas/VAS/Scripts/model/VAS_CalloutContract.js",
+                   "~/Areas/VAS/Scripts/app/forms/PoReceiptTabPanel.js"
                    );
 
 
             style.Include("~/Areas/VAS/Content/PaymentRule.css",
                 "~/Areas/VAS/Content/style.css",
+                "~/Areas/VAS/Content/PoReceiptTabPanel.css",
                 "~/Areas/VAS/Content/VPaySelect.css");
 
             //style.Include("~/Areas/VAS/Content/VIS.rtl.css");
