@@ -27,7 +27,8 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// Used to get Data for Tab Panel
         /// </summary>
-        /// <param name="parentID">parentID will be order Line ID</param>
+        /// <param name="parentID">parentID will be Invoice Line ID</param>
+        /// <Author>VAI066 DevopsID 4216</Author>
         /// <returns>return the data needed for tab panel</returns>
         public JsonResult GetData(int parentID)
         {
