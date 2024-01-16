@@ -206,6 +206,7 @@
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentRuleController.cs" />
+    <Compile Include="Areas\VAS\Controllers\PoReceiptController.cs" />
     <Compile Include="Areas\VAS\Controllers\PostingController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
@@ -231,9 +232,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
+    <Content Include="Areas\VAS\Content\PoReceiptTabPanel.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />

@@ -133,6 +133,7 @@
     <Compile Include="Models\PaymentAllocation.cs" />
     <Compile Include="Models\PaymentAllocationModel.cs" />
     <Compile Include="Models\PaymentModel.cs" />
+    <Compile Include="Models\PoReceiptTabPanelModel.cs" />
     <Compile Include="Models\PostingModel.cs" />
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
