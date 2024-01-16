@@ -294,9 +294,9 @@ namespace ViennaAdvantageServer.Process
                 if (C_BPartnerSR_ID > 0)
                 {
                     fromProject.SetC_BPartner_ID(fromProject.GetC_BPartnerSR_ID());
-
+                    fromProject.SetC_BPartnerSR_ID(0);
                 }
-                fromProject.SetC_BPartnerSR_ID(0);
+               
                 fromProject.SetGenerate_Order("Y");
 
                 if (!fromProject.Save())
