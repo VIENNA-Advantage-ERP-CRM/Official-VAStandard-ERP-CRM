@@ -290,7 +290,8 @@ namespace ViennaAdvantageServer.Process
                     }
                 }
                 fromProject.SetC_Order_ID(order.GetC_Order_ID());
-                fromProject.SetC_BPartner_ID(fromProject.GetC_BPartnerSR_ID());
+                //VIA051: Update B_Partner While Generateorder
+                fromProject.SetC_BPartner_ID(order.GetC_BPartner_ID());
                 fromProject.SetC_BPartnerSR_ID(0);
                 fromProject.SetGenerate_Order("Y");
 
