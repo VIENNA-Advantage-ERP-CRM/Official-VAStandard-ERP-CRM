@@ -59,10 +59,6 @@ namespace VAS.Areas.VAS.Controllers
                 AlertSqlGenerate obj = new AlertSqlGenerate();
                 if (!string.IsNullOrEmpty(query))
                     query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
-                if (!QueryValidator.IsValid(query))
-                {
-                    return Json(null);
-                }
                 var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
