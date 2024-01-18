@@ -42,5 +42,24 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// 16/1/2024 This function is Used to Get the Invoice tax data 
+        /// </summary>
+        /// <param name="InvoiceId">Invoice ID</param>
+        /// <Author> VIS_427 Devops ID: 4261</Author>
+        /// <returns>returns the Invoice tax data</returns>
+        public JsonResult GetTaxData(int InvoiceId)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<TaxTabPanel> result = obj.GetInvoiceTaxData(ctx, InvoiceId);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
