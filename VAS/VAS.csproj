@@ -236,6 +236,7 @@
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Scripts\app\forms\InvoiceTaxTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
