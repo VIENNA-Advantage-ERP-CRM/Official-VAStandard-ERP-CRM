@@ -26,6 +26,7 @@ namespace VAdvantage.Process
         //	RfQ						
         private int _C_RfQ_ID = 0;
         int OrgID = 0;
+        int TotalRecepients = 0;
 
         /// <summary>
         /// Prepare - e.g., get Parameters.
@@ -63,6 +64,7 @@ namespace VAdvantage.Process
             int counter = 0;
             int sent = 0;
             int notSent = 0;
+            String retValue = string.Empty;
             int rfqResponse_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + _C_RfQ_ID, null, Get_Trx()));
 
             ////ErrorLog.FillErrorLog("", "", "doIt - " + rfq + ", Send=" + _IsSendRfQ, VAdvantage.Framework.Message.MessageType.INFORMATION);
@@ -227,12 +229,15 @@ namespace VAdvantage.Process
                 DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
+                    TotalRecepients = ds.Tables[0].Rows.Count;
                     Thread thread = new Thread(new ThreadStart(() => SendMail(ds)));
                     thread.Start();
                 }
+
+                retValue = " @InviteSent@=" + TotalRecepients;
             }
 
-            String retValue = "@Created@ " + counter;
+            retValue += "@Created@ " + counter;
             if (_IsSendRfQ)
             {
                 retValue += " - @IsSendRfQ@=" + sent + " - @Error@=" + notSent;
@@ -335,6 +340,7 @@ namespace VAdvantage.Process
                     }
                 }
             }
+
         }
 
         public class VA068_RegistedUser
