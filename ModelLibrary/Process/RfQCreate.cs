@@ -160,6 +160,7 @@ namespace VAdvantage.Process
                     }
                 }   //	for all subscribers
 
+                retValue += "@Created@ " + counter;
             }
             else
             {
@@ -170,7 +171,6 @@ namespace VAdvantage.Process
                 for (int i = 0; i < subscribers.Length; i++)
                 {
                     MRfQTopicSubscriber subscriber = subscribers[i];
-                    MRfQResponse response = new MRfQResponse(rfq, subscriber, 0);
 
                     if (_IsSendRfQ)//send mail check
                     {
@@ -214,7 +214,7 @@ namespace VAdvantage.Process
                 retValue = " @InviteSent@=" + TotalRecepients;
             }
 
-            retValue += "@Created@ " + counter;
+
             if (_IsSendRfQ)
             {
                 retValue += " - @IsSendRfQ@=" + sent + " - @Error@=" + notSent;
