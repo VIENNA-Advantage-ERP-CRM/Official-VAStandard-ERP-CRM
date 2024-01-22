@@ -25,7 +25,8 @@ html[dir="rtl"].vas-root {
 
 .vas-lowerDiv,
 html[dir="rtl"].vas-lowerDiv {
-    height: calc(100% - 115px);
+    height: calc(100% - 122px);
+    overflow:auto;
 }
 
  .vas-lowerDiv .w2ui-grid-body,
@@ -112,4 +113,11 @@ html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
- 
+.vas-recordCount,
+html[dir="rtl"].vas-recordCount {
+    display: block;
+    text-align: left;
+    position: absolute;
+    bottom: 17px;
+    left: 20px;
+}

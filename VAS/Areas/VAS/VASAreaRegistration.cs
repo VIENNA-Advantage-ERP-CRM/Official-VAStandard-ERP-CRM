@@ -94,6 +94,7 @@ namespace VAS
                 "~/Areas/VAS/Content/VPaySelect.css",
                 "~/Areas/VAS/Content/vasattachuser.css");
 
+
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
             //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
             //modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");

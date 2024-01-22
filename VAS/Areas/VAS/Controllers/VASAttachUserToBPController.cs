@@ -44,20 +44,23 @@ namespace VAS.Areas.VAS.Controllers
             return View();
         }
 
+
+
         /// <summary>
-        /// To get User List
+        /// Get User list
         /// </summary>
         /// <param name="searchKey"></param>
-        /// <returns>returns User list</returns>
-
-        public JsonResult GetUserList(string searchKey)
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns>returns list of user</returns>
+        public JsonResult GetUserList(string searchKey, int pageNo, int pageSize = 10)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 VASAttachUserToBP obj = new VASAttachUserToBP();
-                List<Userdetail> result = obj.GetUserList(ctx, searchKey);
+                UserInfo result = obj.GetUserList(ctx, searchKey, pageNo, pageSize);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);

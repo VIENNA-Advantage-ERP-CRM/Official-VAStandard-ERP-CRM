@@ -22,7 +22,7 @@
             var ch = new VIS.ChildDialog(); //create object of child dialog
             ch.setHeight($(window).height() - 350);
             ch.setWidth($(window).width() - 700);
-            ch.setTitle(VIS.Msg.getMsg("error"));
+            ch.setTitle(VIS.Msg.getMsg("VAS_error"));
             ch.setContent($root); //set the content
             ch.show();
             ch.onClose = function () {
@@ -42,7 +42,7 @@
 
     };
 
-    AttachError.prototype.dispose = function () {
+    VAS.AttachError.prototype.dispose = function () {
         this.disposeComponent();
     };
 

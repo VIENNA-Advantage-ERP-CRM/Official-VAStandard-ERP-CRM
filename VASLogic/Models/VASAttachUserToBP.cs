@@ -4,8 +4,8 @@
        * Chronological Development
        * Employee code : VAI050
       * Created Date:  19-dec-2023
-       * Updated Date:  
-
+       * Updated Date:  15-01-2024
+ 
       ******************************************************/
 using CoreLibrary.DataBase;
 using System;
@@ -26,11 +26,15 @@ namespace VASLogic.Models
     public class VASAttachUserToBP
     {
         /// <summary>
-        /// Get User list
+        /// Get list of user
         /// </summary>
-        /// <param name="ctx">Contex</param>
-        /// <returns>returns user list</returns>
-        public List<Userdetail> GetUserList(Ctx ctx, string searchKey)
+        /// <param name="ctx"></param>
+        /// <param name="searchKey"></param>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns>returns list of users</returns>
+        public UserInfo GetUserList(Ctx ctx, string searchKey, int pageNo, int pageSize)
+        
         {
             SqlParameter[] param = null;
             StringBuilder sql = new StringBuilder();
@@ -39,7 +43,7 @@ namespace VASLogic.Models
                 "FROM AD_User  a  LEFT JOIN AD_User b ON a.Supervisor_ID=b.AD_User_ID  " +
                 " LEFT JOIN AD_Image c ON a.AD_Image_ID=c.AD_Image_ID WHERE a.C_BPartner_ID " +
                 "IS NULL  AND a.IsActive = 'Y' ");
-            if (searchKey != null && searchKey != string.Empty)
+            if ( !string.IsNullOrEmpty(searchKey) )
             {
                 param = new SqlParameter[1];
                 param[0] = new SqlParameter("@param1", "%" + searchKey + "%");
@@ -47,9 +51,11 @@ namespace VASLogic.Models
                     "UPPER(a.Mobile) LIKE UPPER(@param1) OR UPPER(a.Value) LIKE UPPER(@param1))");
 
             }
-            //sql.Append(" AND AD_Client_ID=" + ctx.GetAD_Client_ID());
-          string  sql1 = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            DataSet ds = DB.ExecuteDataset(sql1, param, null);
+            string sql1 = (MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "a", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO));
+            DataSet ds = DB.ExecuteDataset(sql1, param, null, pageSize, pageNo);
+            sql.Clear();
+            UserInfo userInfo = new UserInfo();
+            userInfo.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_User_ID) FROM ("+sql1+ ")", param,null)); //Set count of records
             List<Userdetail> user = new List<Userdetail>();
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -75,9 +81,10 @@ namespace VASLogic.Models
                     }
                     user.Add(obj);
                 }
+                userInfo.UserList = user;
             }
 
-            return user;
+            return userInfo;
         }
 
         /// <summary>
@@ -86,7 +93,7 @@ namespace VASLogic.Models
         /// <param name="ctx"></param>
         /// <param name="UserIds"></param>
         /// <param name="C_BPartnerID"></param>
-        /// <returns>returns List of users which is not updated</returns>
+        /// <returns>returns count of updated user</returns>
         public List<dynamic> UpdateUser(Ctx ctx, List<String> userNames, List<int> userIds, int c_BPartnerID)
         {
             List<dynamic> obj = new List<dynamic>();
@@ -110,18 +117,17 @@ namespace VASLogic.Models
                         }
                         else
                         {
-                            additionalItem.userID = userIds[i];
+                            additionalItem.userId = userIds[i];
                             additionalItem.userName = userNames[i];
                             additionalItem.error = "couldnotupdated";
                         }
                         obj.Add(additionalItem);
                     }
-                   // obj.Add(additionalItem);
+                    // obj.Add(additionalItem);
                 }
             }
             return obj;
         }
-
         public class Userdetail
         {
             public int recid { get; set; }
@@ -134,6 +140,12 @@ namespace VASLogic.Models
             public string UserID { get; set; }
             public int AD_User_ID { get; set; }
             public string ImageUrl { get; set; }
+        }
+
+        public class UserInfo
+        {
+            public List<Userdetail> UserList { get; set; }
+            public int RecordCount { get; set; }
         }
 
     }
