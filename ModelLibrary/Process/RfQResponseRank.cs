@@ -204,60 +204,29 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 }	//	for all rfq line qtys
             }	//	 for all rfq lines
 
-            //	Select Winner based on line ranking
+            //	VAI050-Set winner and ranking on header on the basis of total amount(total of response price by the vendor for all lines) on header
             MRfQResponse winner = null;
+            int ranking = 1;
+            //	Responses Ordered by Price
             for (int ii = 0; ii < responses.Length; ii++)
             {
                 MRfQResponse response = responses[ii];
-                if (response.IsSelectedWinner())
+                if (response.GetPrice().CompareTo(Env.ZERO) > 0)
                 {
-                    response.SetIsSelectedWinner(false);
+                    if (response.IsSelectedWinner() != (ranking == 1))
+                        response.SetIsSelectedWinner(ranking == 1);
+                    response.SetRanking(ranking);
+                    //
+                    ranking++;
                 }
-                int ranking = 0;
-                MRfQResponseLine[] respLines = response.GetLines(false);
-                for (int jj = 0; jj < respLines.Length; jj++)
+                else
                 {
-                    //	Response Line
-                    MRfQResponseLine respLine = respLines[jj];
-                    if (!respLine.IsActive())
-                    {
-                        continue;
-                    }
-                    if (respLine.IsSelectedWinner())
-                        respLine.SetIsSelectedWinner(false);
-                    MRfQResponseLineQty[] respQtys = respLine.GetQtys(false);
-                    for (int kk = 0; kk < respQtys.Length; kk++)
-                    {
-                        //	Response Line Qty
-                        MRfQResponseLineQty respQty = respQtys[kk];
-                        if (!respQty.IsActive())
-                            continue;
-                        ranking += respQty.GetRanking();
-                        if (respQty.GetRanking() == 1
-                            && respQty.GetRfQLineQty().IsPurchaseQty())
-                        {
-                            respLine.SetIsSelectedWinner(true);
-                            respLine.Save();
-                            break;
-                        }
-                    }
+                    response.SetRanking(999);
+                    if (response.IsSelectedWinner())
+                        response.SetIsSelectedWinner(false);
                 }
-                response.SetRanking(ranking);
                 response.Save();
-                log.Fine("- Response Ranking " + ranking + ": " + response);
-                if (!rfq.IsQuoteSelectedLines())	//	no total selected winner if not all lines
-                {
-                    if (winner == null && ranking > 0)
-                    {
-                        winner = response;
-                    }
-                    if (winner != null
-                            && response.GetRanking() > 0
-                            && response.GetRanking() < winner.GetRanking())
-                    {
-                        winner = response;
-                    }
-                }
+                log.Fine("rankResponse - " + response);
             }
             if (winner != null)
             {
