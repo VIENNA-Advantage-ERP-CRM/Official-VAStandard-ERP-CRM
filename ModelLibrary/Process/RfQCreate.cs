@@ -8,6 +8,7 @@
   ******************************************************/
 using System;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -27,6 +28,7 @@ namespace VAdvantage.Process
         private int _C_RfQ_ID = 0;
         int OrgID = 0;
         int TotalRecepients = 0;
+        MRfQ rfq = null;
 
         /// <summary>
         /// Prepare - e.g., get Parameters.
@@ -59,24 +61,25 @@ namespace VAdvantage.Process
         /// <returns>Message (translated text)</returns>
         protected override String DoIt()
         {
-            MRfQ rfq = new MRfQ(GetCtx(), _C_RfQ_ID, Get_TrxName());
+            rfq = new MRfQ(GetCtx(), _C_RfQ_ID, Get_TrxName());
             log.Info("doIt - " + rfq + ", Send=" + _IsSendRfQ);
             int counter = 0;
             int sent = 0;
             int notSent = 0;
             String retValue = string.Empty;
-            int rfqResponse_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + _C_RfQ_ID, null, Get_Trx()));
 
             ////ErrorLog.FillErrorLog("", "", "doIt - " + rfq + ", Send=" + _IsSendRfQ, VAdvantage.Framework.Message.MessageType.INFORMATION);
+
+            String error = rfq.CheckQuoteTotalAmtOnly();
+            if (error != null && error.Length > 0)
+            {
+                throw new Exception(error);
+            }
             if (!Env.IsModuleInstalled("VA068_"))
             {
-                String error = rfq.CheckQuoteTotalAmtOnly();
-                if (error != null && error.Length > 0)
-                {
-                    throw new Exception(error);
-                }
-
                 // VIS0060: Get Existing Rfq Response
+                int rfqResponse_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + _C_RfQ_ID, null, Get_Trx()));
+
                 if (rfqResponse_ID == 0)
                 {
                     MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VAS_Response"), Get_Trx());
@@ -141,7 +144,8 @@ namespace VAdvantage.Process
                     counter++;
                     if (_IsSendRfQ)//send mail check
                     {
-                        if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0 && response.SendRfqToVendors())
+                        if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0
+                            && response.SendRfqToVendors())
                         {
                             sent++;
                         }
@@ -159,56 +163,29 @@ namespace VAdvantage.Process
             }
             else
             {
-                //	Get all existing responses
-                MRfQResponse[] responses = rfq.GetResponses(false, false);
-                //	Topic
+                //VIS0336:for sendinf the mails to the subscribers
+                //	Topic 
                 MRfQTopic topic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());
                 MRfQTopicSubscriber[] subscribers = topic.GetSubscribers();
                 for (int i = 0; i < subscribers.Length; i++)
                 {
                     MRfQTopicSubscriber subscriber = subscribers[i];
-                    bool skip = false;
-                    //	existing response
-                    for (int r = 0; r < responses.Length; r++)
-                    {
-                        if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0
-                            && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") == Util.GetValueOfInt(responses[r].Get_Value("VA068_VendorRegistration_ID"))
-                                && subscriber.Get_ValueAsInt("VA068_RegisteredLocation_ID") == Util.GetValueOfInt(responses[r].Get_Value("VA068_RegisteredLocation_ID")))
-                        {
-                            skip = true;
-                            break;
-                        }
+                    MRfQResponse response = new MRfQResponse(rfq, subscriber, 0);
 
-                        if (subscriber.GetC_BPartner_ID() > 0 && subscriber.GetC_BPartner_ID() == responses[r].GetC_BPartner_ID()
-                            && subscriber.GetC_BPartner_Location_ID() == responses[r].GetC_BPartner_Location_ID())
-                        {
-                            skip = true;
-                            break;
-                        }
-                    }
-                    if (skip)
-                    {
-                        continue;
-                    }
-
-                    //	Create Response
-                    MRfQResponse response = new MRfQResponse(rfq, subscriber, rfqResponse_ID);
-                    if (response.Get_ID() == 0) //	no lines
-                    {
-                        continue;
-                    }
-
-                    counter++;
                     if (_IsSendRfQ)//send mail check
                     {
-                        if (Env.IsModuleInstalled("VA068_") && subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0 && response.SendRfqToVendors())
+                        if (subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0
+                            && SendRfqToVendors(Util.GetValueOfInt(subscriber.Get_Value("VA068_RegisteredUser_ID"))))
                         {
                             sent++;
                         }
-                        else if (subscriber.GetC_BPartner_ID() > 0 && response.SendRfQ())
+                        else if (subscriber.GetC_BPartner_ID() > 0 &&
+                           SendRfQ(subscriber.GetAD_User_ID()))
+
                         {
                             sent++;
                         }
+
                         else
                         {
                             notSent++;
@@ -216,7 +193,7 @@ namespace VAdvantage.Process
                     }
                 }   //	for all subscribers
 
-                ///VIS0336:- changes done for sending the mail notifications to the registre vendors
+                ///VIS0336:- changes done for sending the mail (for new invitation)notifications to the register vendors
                 StringBuilder sql = new StringBuilder();
                 OrgID = rfq.GetAD_Org_ID();
 
@@ -315,8 +292,7 @@ namespace VAdvantage.Process
                         {
                             res.Append("AuthenticationFailed");
                             log.Fine(res.ToString());
-                            // return Msg.GetMsg(GetCtx(), "error");
-                            //return null;
+                            res.Append(" " + Msg.GetMsg(GetCtx(), "MailNotSentTo"));
                         }
                         else if (res1 == "ConfigurationIncompleteOrNotFound")
                         {
@@ -341,6 +317,179 @@ namespace VAdvantage.Process
                 }
             }
 
+        }
+        /// <summary>
+        /// VIS0336:using this method for sending the mails to subscriber register vendor.
+        /// </summary>
+        /// <param name="AD_User_ID">AD_User_ID</param>
+        /// <param name="ADClientID">ADClientID</param>
+        /// <returns>true/false</returns>
+        public bool SendRfQ(int AD_User_ID)
+        {
+            bool mailSent = false;
+            try
+            {
+                string NotificationType = null;
+                MUser to = MUser.Get(GetCtx(), AD_User_ID);
+                MClient client = MClient.Get(GetCtx());
+                MMailText mtext = new MMailText(GetCtx(), rfq.GetR_MailText_ID(), Get_TrxName());
+
+                if (to.Get_ID() == 0 || to.GetEMail() == null || to.GetEMail().Length == 0)
+                {
+                    log.Log(Level.SEVERE, "No User or no EMail - " + to);
+                    return false;
+                }
+
+                // Check if mail template is set for RfQ window, if not then get from RfQ Topic window.
+                if (mtext.GetR_MailText_ID() == 0)
+                {
+                    MRfQTopic mRfQTopic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());
+                    if (mRfQTopic.GetC_RfQ_Topic_ID() > 0)
+                    {
+                        mtext = new MMailText(GetCtx(), mRfQTopic.GetR_MailText_ID(), Get_TrxName());
+                    }
+                }
+
+                //Replace the email template constants with tables values.
+                StringBuilder message = new StringBuilder();
+                mtext.SetPO(rfq, true);
+                message.Append(mtext.GetMailText(true).Equals(string.Empty) ? "** No Email Body" : mtext.GetMailText(true));
+
+                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader(); ;
+
+                EMail email = client.CreateEMail(to.GetEMail(), to.GetName(), subject, message.ToString());
+                if (email == null)
+                {
+                    return false;
+                }
+                email.AddAttachment(CreatePDF());
+                if (EMail.SENT_OK.Equals(email.Send()))
+                {
+                    mailSent = true;
+
+                }
+
+                if (NotificationType == null)
+                    NotificationType = to.GetNotificationType();
+
+                //	Send Note
+                if (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(NotificationType)
+                    || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(NotificationType))
+                {
+                    MNote note = new MNote(GetCtx(), "Response", to.GetAD_User_ID(), rfq.GetAD_Client_ID(), 0, Get_TrxName());
+                    note.SetRecord(X_C_RfQ.Table_ID, _C_RfQ_ID);
+                    note.SetReference(subject);
+                    note.SetTextMsg(message.ToString());
+                    note.SetAD_Org_ID(0);
+                    note.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Severe(ex.ToString());
+                //MessageBox.Show("error--" + ex.ToString());
+            }
+            return mailSent;
+        }
+        /// <summary>
+        /// VIS0336:using this method for sending the mails to subscribers BPartner.
+        /// </summary>
+        /// <param name="RegisterUserID"></param>
+        /// <returns></returns>
+        public bool SendRfqToVendors(int RegisterUserID)
+        {
+            string mail = "", name = "", notificationType = "";
+            int ad_user_ID = 0;
+            bool mailSent = false;
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(@"SELECT ru.VA068_Email, ru.VA068_FirstName, au.AD_User_ID, au.NotificationType
+                    FROM VA068_RegisteredUser ru LEFT JOIN AD_User au ON (ru.AD_User_ID = au.AD_User_ID) 
+                    WHERE ru.VA068_RegisteredUser_ID = " + RegisterUserID, null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
+                    name = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                    ad_user_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
+                    notificationType = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                }
+
+                MClient client = MClient.Get(GetCtx());
+                MMailText mtext = new MMailText(GetCtx(), rfq.GetR_MailText_ID(), Get_TrxName());
+
+                if (RegisterUserID == 0 || string.IsNullOrEmpty(mail))
+                {
+                    log.Log(Level.SEVERE, "No User or no EMail - " + GetName());
+                    return false;
+                }
+
+                // Check if mail template is set for RfQ window, if not then get from RfQ Topic window.
+                if (mtext.GetR_MailText_ID() == 0)
+                {
+                    MRfQTopic mRfQTopic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());
+                    if (mRfQTopic.GetC_RfQ_Topic_ID() > 0)
+                    {
+                        mtext = new MMailText(GetCtx(), mRfQTopic.GetR_MailText_ID(), Get_TrxName());
+                    }
+                }
+
+                //Replace the email template constants with tables values.
+                StringBuilder message = new StringBuilder();
+                mtext.SetPO(rfq, true);
+                message.Append(mtext.GetMailText(true).Equals(string.Empty) ? "** No Email Body" : mtext.GetMailText(true));
+
+                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader(); ;
+
+                EMail email = client.CreateEMail(mail, name, subject, message.ToString());
+                if (email == null)
+                {
+                    return false;
+                }
+                email.AddAttachment(CreatePDF());
+                if (EMail.SENT_OK.Equals(email.Send()))
+                {
+                    mailSent = true;
+                    //SetDateInvited(DateTime.Now);
+                    // Save();
+                }
+
+                //	Send Note
+                if (ad_user_ID > 0 && (X_AD_User.NOTIFICATIONTYPE_Notice.Equals(notificationType)
+                    || X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice.Equals(notificationType)))
+                {
+                    MNote note = new MNote(GetCtx(), "Response", ad_user_ID, GetAD_Client_ID(), 0, Get_TrxName());
+                    note.SetRecord(X_C_RfQ.Table_ID, _C_RfQ_ID);
+                    note.SetReference(subject);
+                    note.SetTextMsg(message.ToString());
+                    note.SetAD_Org_ID(0);
+                    note.Save();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                log.Severe(ex.ToString());
+                //MessageBox.Show("error--" + ex.ToString());
+            }
+            return mailSent;
+        }
+
+        /// <summary>
+        /// Create PDF file
+        /// </summary>
+        /// <returns>File or null</returns>
+        public FileInfo CreatePDF(FileInfo file)
+        {
+
+            return file;
+        }
+        /// <summary>
+        /// Create PDF file
+        /// </summary>
+        /// <returns>File or null</returns>
+        public FileInfo CreatePDF()
+        {
+            return CreatePDF(null);
         }
 
         public class VA068_RegistedUser
