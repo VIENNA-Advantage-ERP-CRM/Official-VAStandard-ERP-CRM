@@ -4066,7 +4066,7 @@ namespace VIS.Models
             //------Filter data on the basis of new parameters
             if (!String.IsNullOrEmpty(docNo))
             {
-                sqlInvoice.Append("AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
+                sqlInvoice.Append(" AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
             }
             if (c_docType_ID > 0)
             {
@@ -5479,37 +5479,40 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 {
 
                     #region In case of Multiple gl Journals and multiple invoice and credit memo
-                    if (i == 0)
-                    {
-                        for (int k = 0; k < rowsInvoice.Count; k++)
-                        {
-                            if (rowsInvoice[k]["Docbasetype"] == "ARC")
-                            {
-                                decimal arcAmt = 0;
-                                for (int j = 0; j < rowsGL.Count; j++)
-                                {
-                                    if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) < 0)
-                                    {
-                                        saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
-                                            Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
-                                            Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
-                                        arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
-                                        rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
-                                        rowsGL[j]["OpenAmount"] = arcAmt.ToString();
-                                    }
-                                    else
-                                    {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    //VIS_427 Bugid 3417 20/12/2023 Identified that there is no requirement of this code in case of ARC as it can be handled with rest of code
+                    //if (i == 0)
+                    //{
+                    //    for (int k = 0; k < rowsInvoice.Count; k++)
+                    //    {
+                    //        if (rowsInvoice[k]["Docbasetype"] == "ARC")
+                    //        {
+                    //            decimal arcAmt = 0;
+                    //            for (int j = 0; j < rowsGL.Count; j++)
+                    //            {
+                    //                /*VIS_427 BugId:3417 12/12/2023 Handled issue When user allocate the single/multiple Invoice schedules(ARC) of same/different invoice with GL Journal line ,
+                    //                    then system should create the allocation of  ARC with GL if applied amount Gl Journal line is greater then 0*/
+                    //                if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) > 0)
+                    //                {
+                    //                    saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
+                    //                        Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
+                    //                        Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
+                    //                    arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
+                    //                    rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
+                    //                    rowsGL[j]["OpenAmount"] = arcAmt.ToString();
+                    //                }
+                    //                else
+                    //                {
+                    //                    continue;
+                    //                }
+                    //            }
+                    //        }
+                    //    }
+                    //}
 
-                    if (rowsInvoice[i]["Docbasetype"] == "ARC")
-                    {
-                        continue;
-                    }
+                    //if (rowsInvoice[i]["Docbasetype"] == "ARC")
+                    //{
+                    //    continue;
+                    //}
                     #endregion
 
                     //isScheduleAllocated = false;
@@ -5717,7 +5720,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                     {
                                         /* VIS_427 DevOpsId 3333 07/12/2023 Handled issue When user allocate the multiple Invoice schedules of same invoice with GL Journal line ,
                                         then system will pick the paid amount and set the same amount on the reference of that invoice schedule */
-                                        if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
+                                    if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
                                         {
                                             paid = Util.GetValueOfDecimal(negList[k]["paidAmt"]) + netAmt;
                                             negList[k]["paidAmt"] = paid.ToString();
@@ -6081,6 +6084,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (alloc.Save())
                     {
+                        alloc = new MAllocationHdr(ctx, alloc.Get_ID(), trx);
                          msg = alloc.GetDocumentNo();
                         //VIS_427 Bug Id : 2178 get the doc status of allocation tab on allocation window
                         status = alloc.GetDocStatus();

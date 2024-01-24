@@ -628,25 +628,25 @@ namespace VAdvantage.Model
 
                 if (allocationCheck)
                 {
-                    sql += "AND l.IsAvailableForAllocation='Y' ";
+                    sql += " AND l.IsAvailableForAllocation='Y' ";
                 }
 
                 if (M_SourceZone_ID != 0)
                 {
-                    sql += "AND l.M_Locator_ID IN "
+                    sql += " AND l.M_Locator_ID IN "
                             + " (SELECT M_Locator_ID FROM M_ZoneLocator WHERE M_Zone_ID =" + M_SourceZone_ID + " ) ";
                 }
 
                 if (minGuaranteeDate != null)
                 {
-                    sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>'" + minGuaranteeDate + "') "//check date formate minGuaranteeDate.ToString("dd-MMM-yyyy")
-                            + "GROUP BY asi.GuaranteeDate, l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
-                            + "ORDER BY asi.GuaranteeDate, l.PriorityNo DESC, M_AttributeSetInstance_ID";
+                    sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>'" + minGuaranteeDate + "') "//check date formate minGuaranteeDate.ToString("dd-MMM-yyyy")
+                            + " GROUP BY asi.GuaranteeDate, l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
+                            + " ORDER BY asi.GuaranteeDate, l.PriorityNo DESC, M_AttributeSetInstance_ID";
                 }
                 else
                 {
-                    sql += "GROUP BY l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
-                            + "ORDER BY l.PriorityNo DESC, s.M_AttributeSetInstance_ID";
+                    sql += " GROUP BY l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
+                            + " ORDER BY l.PriorityNo DESC, s.M_AttributeSetInstance_ID";
                 }
                 if (!FiFo)
                 {
@@ -663,22 +663,22 @@ namespace VAdvantage.Model
                         + "COALESCE(SUM(CASE WHEN QtyType LIKE 'A' THEN Qty ELSE 0 END),0) QtyAllocated "
                         + "FROM M_STORAGE s"
                         + " INNER JOIN M_Locator l ON (l.M_Locator_ID=s.M_Locator_ID) "
-                        + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
+                        + " WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                         + " AND s.M_Product_ID=" + M_Product_ID
                         + " AND COALESCE(s.M_AttributeSetInstance_ID,0)=" + M_AttributeSetInstance_ID;
 
                 if (allocationCheck)
                 {
-                    sql += "AND l.IsAvailableForAllocation='Y' ";
+                    sql += " AND l.IsAvailableForAllocation='Y' ";
                 }
 
                 if (M_SourceZone_ID != 0)
                 {
-                    sql += "AND l.M_Locator_ID IN "
+                    sql += " AND l.M_Locator_ID IN "
                             + " (SELECT M_Locator_ID FROM M_ZoneLocator WHERE M_Zone_ID =" + M_SourceZone_ID + ") ";
                 }
-                sql += "GROUP BY l.PriorityNo, s.M_Product_ID,s.M_Locator_ID,s.M_AttributeSetInstance_ID "
-                        + "ORDER BY l.PriorityNo DESC, M_AttributeSetInstance_ID";
+                sql += " GROUP BY l.PriorityNo, s.M_Product_ID,s.M_Locator_ID,s.M_AttributeSetInstance_ID "
+                        + " ORDER BY l.PriorityNo DESC, M_AttributeSetInstance_ID";
 
                 if (!FiFo)
                 {

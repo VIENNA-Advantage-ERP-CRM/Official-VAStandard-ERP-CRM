@@ -1340,7 +1340,7 @@ namespace VAdvantage.Model
 
                             //	Transaction
                             trx = new MTransaction(GetCtx(), line.GetAD_Org_ID(),
-                                MTransaction.MOVEMENTTYPE_InventoryIn,
+                                MTransaction.MOVEMENTTYPE_InventoryOut,  // VAI050-Update Movement Type Inventory Out on Product Transcation tab
                                 line.GetM_Locator_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
                                 maxDiff, GetMovementDate(), Get_TrxName());
                             trx.SetM_InventoryLine_ID(line.GetM_InventoryLine_ID());
@@ -1957,12 +1957,13 @@ namespace VAdvantage.Model
                     && Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")) > 0)
                 {
                     //VIS0336:Set VA075_IsMaterialIssued checkbox true in case of inventory.
+                    //VAI050:Set VA075_TotalCost-Update total Cost in SparePart tab When quantity changed
                     int no = 0;
 
                     no = DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET " + (!IsReversal() ? " Processed = 'Y', Quantity=" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered")) + " , " +
-                        " VA075_IsMaterialIssued='Y'" : " VA075_IsMaterialIssued='N'") +
-                        " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
-
+                          " VA075_TotalCost=((SELECT CurrentCostPrice FROM VA075_WorkOrderComponent WHERE  VA075_WorkOrderComponent_ID=" + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")) + ")*" + Util.GetValueOfDecimal(line.Get_Value("QtyEntered")) + " ) , " +
+                          " VA075_IsMaterialIssued='Y'" : " VA075_IsMaterialIssued='N'") +
+                          " WHERE VA075_WorkOrderComponent_ID = " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrderComponent_ID")), null, Get_TrxName());
                     if (no < 0)
                     {
                         log.Info("Spare Part Not Updated For Work Order: " + Util.GetValueOfInt(line.Get_Value("VA075_WorkOrder_ID")));

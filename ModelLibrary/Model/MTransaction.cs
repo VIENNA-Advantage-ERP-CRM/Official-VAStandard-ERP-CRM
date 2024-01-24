@@ -562,7 +562,7 @@ namespace VAdvantage.Model
                 Qry.Clear();
                 Qry.Append("SELECT SUM(MovementQty) FROM M_Transaction WHERE MovementType = '" + GetMovementType() + "' AND  M_Product_ID = " + GetM_Product_ID() +
                            " AND M_Locator_ID = " + GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + GetM_AttributeSetInstance_ID() +
-                           "AND movementdate = " + GlobalVariable.TO_DATE(GetMovementDate(), true));
+                           " AND movementdate = " + GlobalVariable.TO_DATE(GetMovementDate(), true));
                 movementQty = Util.GetValueOfDecimal(DB.ExecuteScalar(Qry.ToString(), null, Get_Trx()));
             }
             else

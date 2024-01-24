@@ -161,9 +161,11 @@ namespace ViennaAdvantage.Process
                 sql += " AND C_Order_ID IN (" + _C_Order_ID + ")";
             }
             // JID_1237 : While creating invoice need to consolidate order on the basis of Org, Payment Term, BP Location (Bill to Location) and Pricelist.
+
+            //VAI082 12/22/2023 DevOps Task ID:-3579, If there are multiple orders in the "Sales Order window" and their contractID are different,so invoice will be created separately.
             sql += " AND EXISTS (SELECT * FROM C_OrderLine ol "
                     + "WHERE o.C_Order_ID=ol.C_Order_ID AND ol.QtyOrdered<>ol.QtyInvoiced AND ol.IsContract ='N') "
-                + "ORDER BY AD_Org_ID, C_BPartner_ID, C_PaymentTerm_ID, M_PriceList_ID, C_ConversionType_ID, C_Order_ID, M_Warehouse_ID, PriorityRule";
+                + "ORDER BY AD_Org_ID, C_BPartner_ID, C_PaymentTerm_ID, M_PriceList_ID, C_ConversionType_ID,VAS_ContractMaster_ID, C_Order_ID, M_Warehouse_ID, PriorityRule";
 
             //sql += " AND EXISTS (SELECT * FROM C_OrderLine ol INNER JOIN c_order ord "
             //      + "  ON (ord.c_order_id = ol.c_order_id) WHERE ord.C_Order_ID  =ol.C_Order_ID "
@@ -272,12 +274,14 @@ namespace ViennaAdvantage.Process
 
                 //	New Invoice Location
                 // JID_1237 : While creating invoice need to consolidate order on the basis of Org, Payment Term, BP Location (Bill to Location) and Pricelist.
+                //VAI082 12/22/2023 DevOps Task ID:-3579,if there are multiple orders in the "Sales Order window" and their contractID are different,so invoice will be created separately.
                 if (!_ConsolidateDocument
                     || (_invoice != null
                     && (_invoice.GetC_BPartner_Location_ID() != order.GetBill_Location_ID()
                         || _invoice.GetC_PaymentTerm_ID() != order.GetC_PaymentTerm_ID()
                         || _invoice.GetM_PriceList_ID() != order.GetM_PriceList_ID()
                         || _invoice.GetAD_Org_ID() != order.GetAD_Org_ID()
+                        || _invoice.Get_ValueAsInt("VAS_ContractMaster_ID") != order.Get_ValueAsInt("VAS_ContractMaster_ID")                        
                         || ((_invoice.GetC_ConversionType_ID() != 0 ? _invoice.GetC_ConversionType_ID() : defaultConversionType)
                              != (order.GetC_ConversionType_ID() != 0 ? order.GetC_ConversionType_ID() : defaultConversionType))
                        )))
@@ -912,7 +916,7 @@ namespace ViennaAdvantage.Process
                 + ", AmtDimSubTotal = null "      // reset Amount Dimension if Sub Total Amount is different
                 + ", AmtDimGrandTotal = null "     // reset Amount Dimension if Grand Total Amount is different
                 + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
-            + "WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
+            + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             int no = DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {
@@ -923,13 +927,13 @@ namespace ViennaAdvantage.Process
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines "
                     + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
-                    + "WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
+                    + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines+"
                         + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0)),"+invoice.GetPrecision()+") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
                         + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + invoice.GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
-                        + "WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
+                        + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             no = DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {

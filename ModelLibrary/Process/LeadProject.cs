@@ -254,7 +254,7 @@ namespace VAdvantage.Process
                 int c_bpTableID = PO.Get_Table_ID("C_BPartner");
                 if (tableID > 0)
                 {
-                    int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + "AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
+                    int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
                     if (RecordIDS.Length > 0)
                     {
                         MMailAttachment1 hist = null;
@@ -281,7 +281,7 @@ namespace VAdvantage.Process
                 #region Copy History Records
                 if (tableID > 0)
                 {
-                    int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + "AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
+                    int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
                     if (RecordsIDS.Length > 0)
                     {
                         MAppointmentsInfo hist = null;

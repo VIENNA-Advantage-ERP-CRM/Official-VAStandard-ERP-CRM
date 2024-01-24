@@ -80,11 +80,15 @@ namespace VAdvantage.Process
 
             //	Copy Lines
             int counter = 0;
+            StringBuilder msg = new StringBuilder();
+            int LineNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT NVL(MAX(Line),0)+10 FROM C_RfQLine WHERE C_RfQ_ID=" + p_To_RfQ_ID, null, Get_Trx()));
+            //VAI050-Get max Line no
+
             MRfQLine[] lines = from.GetLines();
             for (int i = 0; i < lines.Length; i++)
             {
                 MRfQLine newLine = new MRfQLine(to);
-                newLine.SetLine(lines[i].GetLine());
+                newLine.SetLine(LineNo);
                 newLine.SetDescription(lines[i].GetDescription());
                 newLine.SetHelp(lines[i].GetHelp());
                 if (lines[i].GetM_Product_ID() > 0)
@@ -99,7 +103,21 @@ namespace VAdvantage.Process
                 //	newLine.setDateWorkStart();
                 //	newLine.setDateWorkComplete();
                 newLine.SetDeliveryDays(lines[i].GetDeliveryDays());
-                newLine.Save();
+                if (!newLine.Save())
+                {
+                    ValueNamePair vp = VLogger.RetrieveError();
+                    if (vp != null && !string.IsNullOrEmpty(vp.GetName()))
+                    {
+                        msg.Append(vp.GetName());
+                    }
+                    Get_Trx().Rollback();
+                    return msg.Append(Msg.GetMsg(GetCtx(), "VAS_LineNotSaved")).ToString();
+                }
+                else
+                {
+                    LineNo = LineNo + 10; //VAI050-Increment in Line 
+                }
+
                 //	Copy Qtys
                 MRfQLineQty[] qtys = lines[i].GetQtys();
                 for (int j = 0; j < qtys.Length; j++)
@@ -112,10 +130,22 @@ namespace VAdvantage.Process
                     newQty.SetIsOfferQty(qtys[j].IsOfferQty());
                     newQty.SetIsPurchaseQty(qtys[j].IsPurchaseQty());
                     newQty.SetMargin(qtys[j].GetMargin());
-                    newQty.Save();
+                    if (!newQty.Save())
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        if (vp != null && !string.IsNullOrEmpty(vp.GetName()))
+                        {
+                            msg.Append(vp.GetName());
+                        }
+                        Get_Trx().Rollback();
+                        return msg.Append(Msg.GetMsg(GetCtx(), "VAS_QtyNotSaved")).ToString();
+                    }
                 }
                 counter++;
-            }	//	copy all lines	
+            }   //	copy all lines	
+
+
+
             return "Copied=" + counter;
         }
     }

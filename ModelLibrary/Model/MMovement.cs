@@ -889,12 +889,11 @@ namespace VAdvantage.Model
                         {
                             containerCurrentQty = GetContainerQtyFromTransaction(line, GetMovementDate(), line.GetM_Locator_ID(), line.GetM_ProductContainer_ID());
                         }
-
-                        //
+                        //VAI050-Check Reversal To update movement type
                         trxFrom = new MTransaction(GetCtx(), line.GetAD_Org_ID(),
-                            MTransaction.MOVEMENTTYPE_MovementFrom,
-                            line.GetM_Locator_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
-                            Decimal.Negate(ma.GetMovementQty()), GetMovementDate(), Get_TrxName());
+                            (!IsReversal() ? MTransaction.MOVEMENTTYPE_MovementFrom : MTransaction.MOVEMENTTYPE_MovementTo),
+                                                  line.GetM_Locator_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
+                                                  Decimal.Negate(ma.GetMovementQty()), GetMovementDate(), Get_TrxName());
                         trxFrom.SetM_MovementLine_ID(line.GetM_MovementLine_ID());
                         trxFrom.SetCurrentQty(trxQty + Decimal.Negate(ma.GetMovementQty()));
                         // set Material Policy Date
@@ -1159,10 +1158,11 @@ namespace VAdvantage.Model
 
                         // Done to Update Current Qty at Transaction
                         // create transaction entry with To Org
+                        //VAI050-Check Reversal To update movement type
                         MTransaction trxTo = new MTransaction(GetCtx(), line.GetAD_Org_ID(),
-                            MTransaction.MOVEMENTTYPE_MovementTo,
-                            line.GetM_LocatorTo_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
-                            ma.GetMovementQty(), GetMovementDate(), Get_TrxName());
+                             (!IsReversal() ? MTransaction.MOVEMENTTYPE_MovementTo : MTransaction.MOVEMENTTYPE_MovementFrom),
+                                                  line.GetM_LocatorTo_ID(), line.GetM_Product_ID(), ma.GetM_AttributeSetInstance_ID(),
+                                                  ma.GetMovementQty(), GetMovementDate(), Get_TrxName());
                         trxTo.SetM_MovementLine_ID(line.GetM_MovementLine_ID());
                         trxTo.SetCurrentQty(trxQty.Value + ma.GetMovementQty());
                         // set Material Policy Date

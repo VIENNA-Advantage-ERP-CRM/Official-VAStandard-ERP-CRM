@@ -82,7 +82,7 @@ namespace VIS.Models
         public string GetDocSubType(Ctx ctx, string fields)
         {
             string sql = "SELECT dc.DocSubTypeSO FROM C_DocType dc INNER JOIN C_DocBaseType db ON(dc.DocBaseType = db.DocBaseType)"
-                        + "WHERE C_DocType_ID=" + Util.GetValueOfInt(fields) + " AND db.DocBaseType='SOO' AND dc.DocSubTypeSO IN ('WR','WI')";
+                        + " WHERE C_DocType_ID=" + Util.GetValueOfInt(fields) + " AND db.DocBaseType='SOO' AND dc.DocSubTypeSO IN ('WR','WI')";
             string DocSubTypeSO = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
             return DocSubTypeSO;
         }

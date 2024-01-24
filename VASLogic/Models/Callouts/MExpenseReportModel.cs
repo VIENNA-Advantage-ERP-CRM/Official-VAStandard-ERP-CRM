@@ -35,7 +35,7 @@ namespace VIS.Models
             int _m_PriceList_ID = 0;
             int _priceListVersion_Id = 0;
             _m_PriceList_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_ID FROM S_TimeExpense  WHERE S_TimeExpense_ID =" + _s_TimeExpense_ID, null, null));
-            _priceListVersion_Id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_Version_ID,name FROM M_PriceList_Version WHERE IsActive='Y' AND M_PriceList_ID=" + _m_PriceList_ID + "ORDER BY ValidFrom DESC", null, null));
+            _priceListVersion_Id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_PriceList_Version_ID,name FROM M_PriceList_Version WHERE IsActive='Y' AND M_PriceList_ID=" + _m_PriceList_ID + " ORDER BY ValidFrom DESC", null, null));
             sql.Append("SELECT PriceStd , PriceList, PriceLimit FROM M_ProductPrice WHERE Isactive='Y' AND M_Product_ID = " + _m_Product_Id
                         + " AND M_PriceList_Version_ID = " + _priceListVersion_Id
                          + " AND  ( M_AttributeSetInstance_ID = 0 OR M_AttributeSetInstance_ID IS NULL ) "

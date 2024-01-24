@@ -197,7 +197,7 @@ namespace VAdvantage.Model
             String sql = "SELECT * "
                 + "FROM C_AcctProcessorLog "
                 + "WHERE C_AcctProcessor_ID=@C_AcctProcessor_ID"
-                + "ORDER BY Created DESC";
+                + " ORDER BY Created DESC";
             IDataReader idr = null;
             try
             {

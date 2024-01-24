@@ -238,7 +238,7 @@ namespace VAdvantage.Model
             String sql = "SELECT * "
                 + "FROM R_RequestProcessorLog "
                 + "WHERE R_RequestProcessor_ID=" + GetR_RequestProcessor_ID()
-                + "ORDER BY Created DESC";
+                + " ORDER BY Created DESC";
             IDataReader idr = null;
             try
             {

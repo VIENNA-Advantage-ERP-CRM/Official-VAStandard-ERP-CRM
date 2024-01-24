@@ -32,13 +32,19 @@ namespace VAdvantage.Process
         static VLogger log = VLogger.GetVLogger("MarkExpireContract");
         protected override string DoIt()
         {
-
             StringBuilder sql = new StringBuilder();
             // VIS0060: Work done to set Status as Expired when Contract got expired 
-            sql.Append(@" UPDATE VAS_ContractMaster SET IsExpiredContracts = 
-                CASE WHEN (EndDate <= Sysdate) THEN 'Y' ELSE 'N' END,
-                SET VAS_Status = CASE WHEN (EndDate <= Sysdate) THEN 'EXP' 
-                ELSE VAS_Status END");
+            if (DatabaseType.IsOracle)
+            {
+                sql.Append(@"UPDATE VAS_ContractMaster SET IsExpiredContracts = 'Y', VAS_Status ='EXP' , Processed='Y' 
+                       WHERE TO_DATE(EndDate, 'DD-MM-YYYY') < TO_DATE(SYSDATE, 'DD-MM-YYYY') AND VAS_Terminate='N' 
+                       AND IsExpiredContracts = 'N'"); //VAI050-Terminate Contract Should not be expired
+            }
+            else
+            {
+                sql.Append(@"UPDATE VAS_ContractMaster SET IsExpiredContracts = 'Y', VAS_Status ='EXP' , Processed='Y' 
+                       WHERE EndDate < CURRENT_DATE AND VAS_Terminate='N' AND IsExpiredContracts = 'N'"); //VAI050-Terminate Contract Should not be expired
+            }
             if (Util.GetValueOfInt(DB.ExecuteQuery
                 (sql.ToString(), null, Get_Trx())) < 0)
             {

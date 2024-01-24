@@ -19,9 +19,10 @@ namespace VAdvantage.Process
  *  *****************************************************/
     public class CopyFromProjectLine : SvrProcess
     {
+       
         int ProjectID = 0, _org_ID = 0, lineNo;
         string ProjectLine = null;
-        X_M_RequisitionLine requisitionLine = null;
+        MRequisitionLine requisitionLine = null;
         ValueNamePair vp = null;
         StringBuilder msg = new StringBuilder();
         List<int> ProjecLineExist = new List<int>();
@@ -96,7 +97,7 @@ namespace VAdvantage.Process
                         continue;
                     }
 
-                    requisitionLine = new X_M_RequisitionLine(GetCtx(), 0, Get_Trx());
+                    requisitionLine = new MRequisitionLine(GetCtx(), 0, Get_Trx());
                     requisitionLine.SetAD_Org_ID(_org_ID);
                     requisitionLine.SetM_Requisition_ID(GetRecord_ID());
                     requisitionLine.Set_Value("C_Project_ID", ProjectID);
@@ -104,9 +105,11 @@ namespace VAdvantage.Process
                     requisitionLine.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
                     requisitionLine.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]));
                     requisitionLine.SetC_Charge_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Charge_ID"]));
-                    requisitionLine.Set_Value("C_UOM_ID", (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"])));
+                    requisitionLine.Set_ValueNoCheck("C_UOM_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
+                    requisitionLine.SetQty(Util.GetValueOfInt(ds.Tables[0].Rows[i]["PlannedQty"])); //VAI050-Set Reserved quantity
                     requisitionLine.SetPriceActual(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PlannedPrice"]));
                     requisitionLine.SetQtyEntered(Util.GetValueOfInt(ds.Tables[0].Rows[i]["PlannedQty"]));
+                   
                     requisitionLine.SetLine(lineNo);
                     if (!requisitionLine.Save())
                     {

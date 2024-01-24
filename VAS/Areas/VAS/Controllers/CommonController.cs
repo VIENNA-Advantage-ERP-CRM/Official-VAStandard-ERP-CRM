@@ -1185,7 +1185,7 @@ namespace VIS.Controllers
                     continue;
                 }
 
-            newRecord:
+                newRecord:
                 if (model[i].Keys.Contains("QuantityEntered"))
                 {
                     d = Convert.ToDouble(model[i]["QuantityEntered"]);
@@ -1593,6 +1593,15 @@ namespace VIS.Controllers
                 if (_invoice.GetC_Order_ID() <= 0)
                 {
                     _invoice.SetC_Order_ID(_inout.GetC_Order_ID());
+                    //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of shipment.
+                    if (_inout.GetC_Order_ID() > 0)
+                    {
+                        int ContractMaster_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_ContractMaster_ID FROM C_Order WHERE C_Order_ID=" + _inout.GetC_Order_ID()+" AND IsActive='Y'"));
+                        if (ContractMaster_ID > 0)
+                        {
+                            _invoice.Set_Value("VAS_ContractMaster_ID", ContractMaster_ID);
+                        }
+                    }
                 }
                 // Added by Bharat on 29 Jan 2018 to set Inco Term from Order
 
@@ -1606,7 +1615,7 @@ namespace VIS.Controllers
 
             if (_order != null)
             {
-                _invoice.SetOrder(_order);	//	overwrite header values
+                _invoice.SetOrder(_order);  //	overwrite header values
 
                 // Added by Bharat on 29 Jan 2018 to set Inco Term from Order
 

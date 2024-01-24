@@ -230,6 +230,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
+    <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
@@ -302,6 +303,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Areas\VAS\Data\" />
+    <Folder Include="Areas\VAS\Views\AlertRuleSQLGenerate\" />
     <Folder Include="Areas\VAS\Views\Shared\" />
   </ItemGroup>
   <PropertyGroup>

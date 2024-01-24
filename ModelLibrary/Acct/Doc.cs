@@ -351,7 +351,7 @@ namespace VAdvantage.Acct
             }
             else
             {
-                sql += "WHERE AD_Tab.AD_Table_ID = " + AD_Table_ID;
+                sql += " WHERE AD_Tab.AD_Table_ID = " + AD_Table_ID;
             }
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, trxName));
         }
@@ -1070,7 +1070,7 @@ namespace VAdvantage.Acct
             {
                 String sql = "SELECT GL_Category_ID FROM GL_Category "
                     + "WHERE AD_Client_ID=" + GetAD_Client_ID()
-                    + "ORDER BY IsDefault DESC";
+                    + " ORDER BY IsDefault DESC";
                 IDataReader idr = null;
                 try
                 {
