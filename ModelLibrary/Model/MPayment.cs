@@ -1236,7 +1236,7 @@ namespace VAdvantage.Model
                 }
                 return false;
             }
-            //
+             //
             Decimal? alloc = GetAllocatedAmt();
             if (alloc == null)
                 alloc = Env.ZERO;
@@ -1246,8 +1246,20 @@ namespace VAdvantage.Model
                 total = Decimal.Negate(total);
             bool test = total.CompareTo((Decimal)alloc) == 0;
             bool change = test != IsAllocated();
-            if (change)
+            //VIS_427 DevopsId 4680 get unallocated amount By subtracting allocated amount from total amount
+            decimal unallocatedAmt = Math.Abs(total) - Math.Abs(Util.GetValueOfDecimal(alloc));
+            if (change) {
                 SetIsAllocated(test);
+                Set_Value("VAS_UnAllocatedAmount", 0);
+            }
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt greater than zero
+             then set Unallocated amount as positive*/
+            else if (!change && GetPayAmt() > 0)
+                Set_Value("VAS_UnAllocatedAmount", unallocatedAmt);
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt less than zero
+             then set Unallocated amount as negative*/
+            else if (!change && GetPayAmt() < 0)
+                Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(unallocatedAmt));
             log.Fine("Allocated=" + test
                 + " (" + alloc + "=" + total + ")");
             return change;
@@ -5475,6 +5487,8 @@ namespace VAdvantage.Model
             reversal.SetDocAction(DOCACTION_Complete);
             //
             reversal.SetPayAmt(Decimal.Negate(GetPayAmt()));
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document 
+            reversal.Set_Value("VAS_UnAllocatedAmount", 0);
             reversal.SetDiscountAmt(Decimal.Negate(GetDiscountAmt()));
             reversal.SetWriteOffAmt(Decimal.Negate(GetWriteOffAmt()));
             reversal.SetOverUnderAmt(Decimal.Negate(GetOverUnderAmt()));
@@ -5665,6 +5679,8 @@ namespace VAdvantage.Model
             //	Unlink & De-Allocate
             DeAllocate();
             SetIsReconciled(reconciled);
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document
+            Set_Value("VAS_UnAllocatedAmount", 0);
             SetIsAllocated(true);	//	the allocation below is overwritten
             //	Set Status 
             AddDescription("(" + reversal.GetDocumentNo() + "<-)");

@@ -249,13 +249,25 @@ namespace VAdvantage.Model
                     if (!payment.IsCashTrx())
                     {
                         payment.SetIsAllocated(false);
+                        //VIS_427 DevopsId 4680 on reverse of Payment/Allocation get unallocated amount by adding Amount on allocation line and Unallocated amount on Payment tab
+                        decimal addAllocatedtoUnallocated = Math.Abs(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount"))) + Math.Abs(GetAmount());
+                        /*VIS_427 30/01/2024 DevopsId 4680 Handled on reversal of document if PayAmt greater than zero
+                         then set Unallocated amount as positive*/
+                        if (payment.GetPayAmt() > 0)
+                            payment.Set_Value("VAS_UnAllocatedAmount", addAllocatedtoUnallocated);
+                        /*VIS_427 30/01/2024 DevopsId 4680 Handled on reversal of document if PayAmt less than zero
+                         then set Unallocated amount as negative*/
+                        else if (payment.GetPayAmt() < 0)
+                        {
+                            payment.Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(addAllocatedtoUnallocated));
+                        }                       
                         payment.Save();
                     }
                 }
                 else
                 {
-                    if (payment.TestAllocation())
-                        payment.Save();
+                    payment.TestAllocation();
+                    payment.Save();
                 }
             }
 
