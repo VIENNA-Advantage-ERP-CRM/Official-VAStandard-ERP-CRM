@@ -6674,6 +6674,8 @@
             //	Currency
             else if (name == "C_Currency_ID") {
                 _C_Currency_ID = parseInt(value);
+                //VIS_427 The function is called in order to get Precision according to currency
+                loadCurrencyPrecision()
                 ////////loadBPartner();
             }
             //	Date for Multi-Currency

@@ -214,6 +214,26 @@ namespace VAdvantage.Model
             sb.Append("]");
             return sb.ToString();
         }
+        /// <summary>
+        /// 02/02/2024 This Function returns the sum of allocated amount of all alocations except the allocation which
+        /// which is reversed
+        /// </summary>
+        /// <param name="AllocationLine_ID">AllocationLine id of reversed document</param>
+        /// <param name="Payment_Id">payment id</param>
+        /// <author> DevopsId 4680 VIS_427</author>
+        /// <returns>Allocated amount</returns>
+        public Decimal AllocatedAmt(int AllocationLine_ID,int Payment_Id)
+        {
+            String sql = "SELECT SUM(currencyConvert(al.Amount,"
+                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                + "FROM C_AllocationLine al"
+                + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
+                + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
+                + "WHERE al.C_Payment_ID =" + Payment_Id + " AND al.C_AllocationLine_ID NOT IN ("+ AllocationLine_ID +")"
+                + " AND ah.IsActive='Y' AND al.IsActive='Y'";
+            decimal AllocatedAmtValue = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return AllocatedAmtValue;
+        }
 
         /// <summary>
         /// Process Allocation (does not update line).
@@ -251,6 +271,10 @@ namespace VAdvantage.Model
                         payment.SetIsAllocated(false);
                         //VIS_427 DevopsId 4680 on reverse of Payment/Allocation get unallocated amount by adding Amount on allocation line and Unallocated amount on Payment tab
                         decimal addAllocatedtoUnallocated = Math.Abs(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount"))) + Math.Abs(GetAmount());
+                        if(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount")) == 0)
+                        {
+                            addAllocatedtoUnallocated = Math.Abs(payment.GetPayAmt()) - Math.Abs(AllocatedAmt(GetC_AllocationLine_ID(),payment.GetC_Payment_ID()));
+                        }
                         /*VIS_427 30/01/2024 DevopsId 4680 Handled on reversal of document if PayAmt greater than zero
                          then set Unallocated amount as positive*/
                         if (payment.GetPayAmt() > 0)
