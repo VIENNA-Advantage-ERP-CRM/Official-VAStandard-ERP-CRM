@@ -25,7 +25,7 @@ html[dir="rtl"].vas-root {
 
 .vas-lowerDiv,
 html[dir="rtl"].vas-lowerDiv {
-    height: calc(100% - 122px);
+    height: calc(100% - 102px);
     overflow:auto;
 }
 
@@ -49,9 +49,8 @@ html[dir="rtl"].vas-lowerDiv {
 html[dir="rtl"].vas-bottom {
     display: flex;
     align-items: center;
-    justify-content: end;
-    gap: 1rem;
-    margin-top: 16px
+    justify-content: space-between;
+    margin-top: 10px
 }
 
 .vas-actionbtn,
@@ -62,6 +61,7 @@ html[dir="rtl"].vas-actionbtn {
     padding: 0.5rem 1.5rem;
     border-radius: .25rem;
     outline: none;
+    margin-left :10px;
 }
 
 .vas-businessPartnerImg,
@@ -78,20 +78,20 @@ html[dir="rtl"].vas-businessPartnerInput {
     align-items: center;
     flex: 1;
     gap: 0.5rem;
-    margin-left: 4px
+    margin-left: 4px;
+    margin-right: 4px;
 }
 
-.vas-businessPartnerSearch,
+.input-group-text.vas-businessPartnerSearch,
 html[dir="rtl"].vas-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
-    width: 32px;
-    height: 34px;
     font-size: 18px !important;
     color: #fff;
-    border: none;
-    margin-right: 7px;
     cursor: pointer
 }
+.input-group-text.vas-businessPartnerSearch i {
+        color: inherit;
+    }
 
 .vas-noimageicon,
 html[dir="rtl"].vas-noimageicon {
@@ -113,11 +113,13 @@ html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
-.vas-recordCount,
-html[dir="rtl"].vas-recordCount {
-    display: block;
-    text-align: left;
-    position: absolute;
-    bottom: 17px;
-    left: 20px;
+.vas-disablePage,
+html[dir="rtl"].vas-disablePage {
+    pointer-events: none;
+    opacity:0.6;
 }
+.selected-page {
+    background-color: #f0f0f0; 
+    font-weight: bold; 
+}
+

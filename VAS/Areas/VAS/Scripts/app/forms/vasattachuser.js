@@ -4,7 +4,7 @@
  * Purpose : create existing user With Business Partner 
  * Employee code: VAI061
  * Created Date: 10-01-2024
- * Updated Date: 22-01-2024
+ * Updated Date: 14-02-2024
  ********************************************************/
 
 ; VAS = window.VAS || {};
@@ -17,7 +17,8 @@
         var _windowNo;
         var dGrid = null;
         var pageNo = 1;
-        var pageSize = 10;
+        var pageSize = 10;    
+        var ulPaging, liPrevPage, liCurrPage, liNextPage,  selectPage;
         var recordCount = null;
         var $root;
         var $self = this;
@@ -26,23 +27,20 @@
         var lowerDiv = null;
         var bottomDiv = null;
         var $bsyDiv = null;
-        var recordID = null;
         var c_BPartnerID = 0;
-        var countRecords = 0;
-        var UserIds = [];
         var userName = [];
         var $parentdiv = null;
         var $inputDiv = null;
-        var $buttonDiv = null;
         var $okBtn, $cancelBtn, $searchButton;
         var $employee = null;
         var $textEmployee = null;
         var $searchEmployee = null;
         var $textSearchEmployee = null;
-        var totalRecords = 0;
-
-
-
+        var $btnDiv = null;
+        var search = null;
+        var selectedRecord = [];
+        var totalPages = null;
+        var countRecords = 0;
         // Initialize UI Elements
 
         function initializeComponent() {
@@ -50,16 +48,28 @@
             $bsyDiv = $('<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis-busyindicatordiv"></i></div></div>');
             $parentdiv = $("<div class='vas-parent'>");
             recordCount = $("<div id='vas-recordCount'><span class='vas-recordCount'></span></div>");
-            $inputDiv = $("<div class='vas-businessPartnerInput py-3'>");
-            $buttonDiv = $("<div class='vas-businessPartnerButton'>");
+            $inputDiv = $("<div class='vas-businessPartnerInput py-2'>");
             $root = $("<div class='vas-root'>");
             $upperDiv = $("<div>");
+            $btnDiv = $("<div class= 'd-flex'>");
             lowerDiv = $("<div class='vas-lowerDiv'>");
             bottomDiv = $("<div class='vas-bottom'>");
-            $searchButton = $('<button class="vas-businessPartnerSearch"><i class="fa fa-search" aria-hidden="true"></i></button>');
+            $searchButton = $('<div class="input-group-append vas-businessPartnerButton"><button class="input-group-text vas-businessPartnerSearch"><i class="fa fa-search" aria-hidden="true"></i></button></div>');
             $cancelBtn = $("<button class='vas-actionbtn'> " + VIS.Msg.getMsg("Cancel") + " </button>");
             $okBtn = $("<button class='vas-actionbtn vas-disableBtn ' > " + VIS.Msg.getMsg("Ok") + " </button>");
+          
+            ulPaging = $('<ul class="vis-ad-w-p-s-plst"">');
+            liPage = $('<li></li>');
 
+            liPrevPage = $('<li style="opacity: 0.6;" class ="vas-disablePage" ><div><i class="vis vis-pageup" title="' + VIS.Msg.getMsg("PageDown") + '" style="opacity: 0.6;"></i></div></li>');
+
+            selectPage = $("<select class = 'vis-statusbar-combo'></select>");
+
+            liCurrPage = $('<li>').append(selectPage);
+
+            liNextPage = $('<li style="opacity: 1"><div><i class="vis vis-pagedown " title="' + VIS.Msg.getMsg(" PageUp") + '" style = "opacity: 0.6;" ></i ></div ></li> ');
+            ulPaging.append(liPage).append(liPrevPage).append(liCurrPage).append(liNextPage);
+          
             /* Employee textbox*/
             $employee = $('<div class="input-group vis-input-wrap mb-0" >');
             $textEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" disabled /><label>' + VIS.Msg.getMsg("Employee") + ' </label></div>');
@@ -67,32 +77,105 @@
             $textEmployee.find('input').val(VIS.context.getContext(_windowNo, "Value"));
             /* SearchExistingUser textbox*/
             $searchEmployee = $('<div class="input-group vis-input-wrap mb-0" >');
-            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
-            $searchEmployee.append($textSearchEmployee);
-            $inputDiv.append($employee).append($searchEmployee)
-            $buttonDiv.append($searchButton);
-            $parentdiv.append($inputDiv).append($buttonDiv);
+            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" data-hasbtn=" " /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
+            $searchEmployee.append($textSearchEmployee).append($searchButton);
+            $inputDiv.append($employee).append($searchEmployee);       
+            $parentdiv.append($inputDiv);
             $upperDiv.append($parentdiv);
-            bottomDiv.append(recordCount).append($okBtn).append($cancelBtn);
+            $btnDiv.append(ulPaging).append($okBtn).append($cancelBtn);
+            bottomDiv.append(recordCount).append($btnDiv);
             $root.append($upperDiv).append(lowerDiv).append(bottomDiv)
             $root.append($bsyDiv);
+            dropDown();
 
             /* ok button use to call the getRecordID function */
             $okBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 linkPartnerID();
 
             });
+          /* click function on previous div used to call the previous page record*/
+            liPrevPage.on("click", function () {
+                liNextPage.css("opacity", "1");
+                liNextPage.removeClass("vas-disablePage");
+            
+                pageNo = selectPage.val() - 1;
+                if (pageNo >= 1) {                 
+                    loadGrid(pageNo, pageSize, true);
+                    selectPage.val(pageNo);
+                  
+                }
 
-            /*  
-                search button use to 
-                search the records from grid 
-            */
+                if (pageNo <= 1) {
+                    liPrevPage.css("opacity", "0.6");
+                    $(liPrevPage).addClass("vas-disablePage");
+                }
+            });
+            /*click function on nextpage div used to call the next page record */
+
+            liNextPage.on("click", function () {
+                liPrevPage.css("opacity", "1");
+                $(liPrevPage).removeClass("vas-disablePage");
+                 pageNo = parseInt(selectPage.val()) + 1;
+                if (pageNo <= totalPages) {
+                    loadGrid(pageNo, pageSize, true);
+                    selectPage.val(pageNo);
+                }
+                if (pageNo >= totalPages) {
+                    liNextPage.css("opacity", "0.6");
+                    liNextPage.addClass("vas-disablePage");
+                }
+            });
+
+
+        /* function used to change the value of option when we click on the values on dropdown*/
+            function dropDown() {
+                selectPage.on("change", function () {
+                    pageNo = selectPage.val();
+                  
+                    loadGrid(pageNo, pageSize, true);
+                    selectPage.find("option[value='" + pageNo + "']").prop("selected", true);
+                    if (pageNo >= totalPages) {
+                        liNextPage.css("opacity", "0.6");
+                        liNextPage.addClass("vas-disablePage");
+                        liPrevPage.css("opacity", "1");
+                        $(liPrevPage).removeClass("vas-disablePage");
+                    }
+                    else {
+                        liNextPage.css("opacity", "1");
+                        liNextPage.removeClass("vas-disablePage");
+                    }
+                    if (pageNo <= 1) {
+                        liPrevPage.css("opacity", "0.6");
+                        $(liPrevPage).addClass("vas-disablePage");
+                        liNextPage.css("opacity", "1");
+                        liNextPage.removeClass("vas-disablePage");
+
+                    }
+                    else {
+                        liPrevPage.css("opacity", "1");
+                        $(liPrevPage).removeClass("vas-disablePage");
+                    }
+                
+                });
+                
+            };
+           
+                //search button use to 
+                //search the records from grid 
+            
             $searchButton.on(VIS.Events.onTouchStartOrClick, function () {
+                selectedRecord = [];
+                $($okBtn).addClass("vas-disableBtn");
+
+                search = $textSearchEmployee.children('input').val();
                 pageNo = 1;
                 countRecords = 0;
                 arrListColumns = [];
+                busyDiv(true);
                 loadGrid(pageNo, pageSize, true);
-
+                liNextPage.css("opacity", "1");
+                liNextPage.removeClass("vas-disablePage");
+                $textSearchEmployee.children('input').val('');
             });
 
             // close the form
@@ -102,17 +185,35 @@
 
             /* keyup used to search the record after pressing enter */
             $parentdiv.on("keyup", function (e) {
+                search = $textSearchEmployee.children('input').val();
                 pageNo = 1;
                 countRecords = 0;
                  arrListColumns = [];
                 if (e.keyCode === 13) {
-                    loadGrid(pageNo, pageSize,true);
+                    selectedRecord = [];
+                    $($okBtn).addClass("vas-disableBtn");
+                    busyDiv(true);
+                    loadGrid(pageNo, pageSize, true);
+                    liNextPage.css("opacity", "1");
+                    liNextPage.removeClass("vas-disablePage");
+                    $textSearchEmployee.children('input').val('');
                 }
 
             });
-       
+          
         }
-
+      
+       /* function used to get the dropdown values acoroding to number of total pages*/
+        function PageCtrls() {
+            selectPage.empty();
+            if (totalPages > 0) {
+                for (var i = 0; i < totalPages; i++) {
+                    selectPage.append($("<option>").val(i + 1).text(i + 1));
+                }
+                selectPage.val(pageNo);
+            }
+        };    
+    
         /*  function used to link the userID against PartnerID*/
         function linkPartnerID() {
             $.ajax({
@@ -120,7 +221,7 @@
                 type: "POST",
                 data: {
                     userNames: userName,
-                    userIds: UserIds,
+                    userIds: selectedRecord,
                     c_BPartnerID: c_BPartnerID
                 },
                 success: function (result) {
@@ -145,15 +246,72 @@
                 }
             });
         }
+     /* selected row function used to get the selected record data*/
+        function onSelectRow(event) {
+            if (event.recid == undefined) {
+                var countRecords = w2ui['GridDiv' + $self.windowNo].records.length;
+                var selectedRecordSet = new Set(selectedRecord);
+
+                // Iterate over each record in the grid
+                for (var i = 0; i < countRecords; i++) {
+                    var recid = w2ui['GridDiv' + $self.windowNo].records[i].recid;
+
+                    // Check if the recid is not already in the selectedRecord array
+                    if (!selectedRecordSet.has(recid)) {
+                        selectedRecord.push(recid);
+                    }
+                }
+            
+                // Remove the disabled class from the ok button
+                $($okBtn).removeClass("vas-disableBtn");
+            }
+            else {
+                var recordId = event.recid;
+                if (recordId != undefined && selectedRecord.indexOf(recordId) === -1) {
+                    selectedRecord.push(recordId);
+                    for (i = 0; i < selectedRecord.length; i++) {
+                        selectedRecord[i] = parseInt(selectedRecord[i], 10)
+                    }
+                }
+              
+                $($okBtn).removeClass("vas-disableBtn");
+            }
+        };
+       /* function used to deselect the record data and also enable and disbale the ok button*/
+        function onUnselectedRow(event) {
+            if (event.recid == undefined) {
+                var currentRecid = [];
+                countRecords = w2ui['GridDiv' + $self.windowNo].records.length;
+                for (i = 0; i < countRecords; i++) {
+                    recid = w2ui['GridDiv' + $self.windowNo].records[i].recid
+                    currentRecid.push(recid);
+                    selectedRecord = selectedRecord.filter(function (value) {
+                        return value != currentRecid[i];
+                    });
+                }
+                if (selectedRecord.length == 0) {
+                    $($okBtn).addClass("vas-disableBtn");
+                }
+            }
+            else {
+                recordId = event.recid;
+                selectedRecord = selectedRecord.filter(function (value) {
+                    return value != recordId;
+                   
+                });
+                if (selectedRecord.length == 0) {
+                    $($okBtn).addClass("vas-disableBtn");
+                }   
+            }
+        }
         /* function used to get the records via ajax */
         function loadGrid(pageNo, pageSize, isReload) {
             var data = [];
-
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/VASAttachUserToBP/GetUserList",
                 type: "GET",
                 data: {
-                    searchKey: $textSearchEmployee.children('input').val(),
+                    searchKey: search,
                     pageNo: pageNo,
                     pageSize: pageSize
                 },
@@ -161,11 +319,13 @@
                 success: function (result) {
                     result = JSON.parse(result);
                     recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ':' + result.RecordCount);
-                    totalRecords = result.RecordCount;
+                    totalPages = Math.ceil(result.RecordCount /pageSize);
                     if (result != null && (result.UserList) != null) {
+                        countRecords = 0;
                         countRecords = countRecords + (result.UserList).length;
+                        totalRecords = result.RecordCount;
                         for (var i = 0; i < (result.UserList).length; i++) {
-                          
+
                             var line = {};
                             line['recid'] = result.UserList[i].recid;
                             line['Image'] = result.UserList[i].ImageUrl;
@@ -179,11 +339,11 @@
 
                         }
                     }
-
+                 
                     dynInit(data, isReload);
                     busyDiv(false);
 
-
+                  
                 },
                 error: function (eror) {
                     busyDiv(false);
@@ -191,70 +351,49 @@
 
                 }
             });
-
+          
         };
 
         /* Function used to display the records on grid */
         function dynInit(data, isReload) {
             if (dGrid == null) {
-                arrListColumns = [];
-                if (arrListColumns.length == 0) {
-                    arrListColumns.push({ field: "recid", caption: "recid", sortable: true, size: '10%', min: 100, hidden: true });
-                    arrListColumns.push({
-                        field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: true, size: '5%', min: 70, hidden: false,
-                        render: function (rec) {
-                            var recImage = rec.Image;
-                            if (recImage != null) {
-                                return '<div class="text-center"><img class="vas-businessPartnerImg" alt=' + rec.Image + ' src="' + VIS.Application.contextUrl + rec.Image + '"></div>';
-                            }
-                            else {
-                                return '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap">  <i class="fa fa-user"></i><img src="" alt="profile image"> </div></div>';
-                            }
+            arrListColumns = [];
+            if (arrListColumns.length == 0) {
+                arrListColumns.push({ field: "recid", caption: "recid", sortable: true, size: '10%', min: 100, hidden: true });
+                arrListColumns.push({
+                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: true, size: '5%', min: 70, hidden: false,
+                    render: function (rec) {
+                        var recImage = rec.Image;
+                        if (recImage != null) {
+                            return '<div class="vis-grid-row-td-icon-center vis-gridImageicon"><img class="vas-businessPartnerImg" alt=' + rec.Image + ' src="' + VIS.Application.contextUrl + rec.Image + '"></div>';
                         }
-                    });
-                    arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: true, size: '9%', min: 130, hidden: false });
-                    arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: true, size: '9%', min: 130, hidden: false });
-                    arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: true, size: '9%', min: 110, hidden: false });
-                    arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: true, size: '9%', min: 130, hidden: false });
-                    arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: true, size: '7%', min: 130, hidden: false });
-
-                    /* encode the tags */
-                    w2utils.encodeTags(data);
-
-                    dGrid = $(lowerDiv).w2grid({
-                        name: "GridDiv" + $self.windowNo,
-                        recordHeight: 35,
-                        show: { selectColumn: true },
-                        multiSelect: true,
-                        columns: arrListColumns,
-                        records: data,
-                        onSelect: function (event) {
-
-                            if (dGrid.records.length > 0)
-                                recordID = dGrid.get(event.recid).recid;
-                            Name = dGrid.get(event.recid).Name;
-                            $($okBtn).removeClass("vas-disableBtn");
-                            UserIds.push(recordID);
-                            userName.push(Name);
-                        },
-                        onUnselect: function (event) {
-
-                            if (dGrid.records.length > 0) {
-                                recordID = dGrid.get(event.recid).recid;
-                                Name = dGrid.get(event.recid).Name;
-                                UserIds = jQuery.grep(UserIds, function (value) {
-                                    return value != recordID;
-                                });
-                                userName = jQuery.grep(userName, function (value) {
-                                    return value != Name;
-                                });
-                            }
-                            if (UserIds.length == 0) {
-                                $($okBtn).addClass("vas-disableBtn");
-                            }
+                        else {
+                            return '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap">  <i class="fa fa-user"></i><img src="" alt="profile image"> </div></div>';
                         }
-                    });
-                }
+                    }
+                });
+                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: true, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: true, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: true, size: '9%', min: 110, hidden: false });
+                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: true, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: true, size: '7%', min: 130, hidden: false });
+
+                /* encode the tags */
+                w2utils.encodeTags(data);
+
+                dGrid = $(lowerDiv).w2grid({
+                    name: "GridDiv" + $self.windowNo,
+                    recordHeight: 35,
+                    show: { selectColumn: true },
+                    multiSelect: true,
+                    columns: arrListColumns,
+                    records: data,
+                    onSelect: onSelectRow ,
+                    onUnselect: onUnselectedRow
+
+                });
+            }
+                
             }
        /* check applied if reload is true than it clear the dgrid and the updated grid records */
             if (isReload) {
@@ -264,29 +403,24 @@
             else if (pageNo > 1) {
                 dGrid.add(data);
             }
-            /*  onScroll event applied to execute paging on scroll grid */
-
-            lowerDiv.find('#grid_GridDiv' + ($self.windowNo) + '_records').off("scroll");
-            lowerDiv.find('#grid_GridDiv' + ($self.windowNo) + '_records').on("scroll", function () {
-                if ($(this).scrollTop() + $(this).innerHeight() + 5 >= $(this)[0].scrollHeight) {
-                    pageNo += 1;
-
-                    if (totalRecords == countRecords) {
-                        return;
-                    }
-                    busyDiv(true);
-                    loadGrid(pageNo, pageSize, false);
-
-                }
-            });
+            PageCtrls();
+            reapplySelection();
         };
 
+       // function used to select the already records after calling the grid again 
 
+        function reapplySelection() {
+            if (selectedRecord.length > 0 ) {
+                dGrid.select.apply(dGrid,selectedRecord);
+            }
+        }
 
+       
         /* display function used to display the grid */
         this.display = function () {
             busyDiv(true);
-            loadGrid(pageNo, pageSize,false);
+            loadGrid(pageNo, pageSize, false);
+
         }
 
 
@@ -330,13 +464,16 @@
             this.$searchEmployee = null;
             this.$textSearchEmployee = null;
             this.inputDiv = null;
+            userName = null;
 
             if ($okBtn)
                 $okBtn.off(VIS.Events.onTouchStartOrClick);
             if ($cancelBtn)
                 $cancelBtn.off(VIS.Events.onTouchStartOrClick);
             $okBtn = $cancelBtn = null;
-            UserIds = null;
+            selectedRecordIds = null;
+            selectedRecord = null;
+
         };
 
 
@@ -348,7 +485,7 @@
             _windowNo = windowNo;
             this.Initialize();
             this.frame.getContentGrid().append(this.getRoot());
-            this.frame.getContentGrid().height(500);
+            this.frame.getContentGrid().height();
             var sself = this         
             sself.display();
         };
