@@ -40,7 +40,7 @@ namespace VASLogic.Models
             StringBuilder sql = new StringBuilder();
             sql.Append("SELECT a.Name||' '||a.LastName as Name,a.Email,a.Mobile,a.Supervisor_ID,a.AD_User_ID," +
                 "a.AD_Image_ID,a.Value,b.Name as SupervisorName,c.ImageExtension " +
-                "FROM AD_User  a  LEFT JOIN AD_User b ON a.Supervisor_ID=b.AD_User_ID  " +
+                "FROM AD_User a LEFT JOIN AD_User b ON a.Supervisor_ID=b.AD_User_ID  " +
                 " LEFT JOIN AD_Image c ON a.AD_Image_ID=c.AD_Image_ID WHERE a.C_BPartner_ID " +
                 "IS NULL  AND a.IsActive = 'Y' ");
             if ( !string.IsNullOrEmpty(searchKey) )
@@ -55,7 +55,7 @@ namespace VASLogic.Models
             DataSet ds = DB.ExecuteDataset(sql1, param, null, pageSize, pageNo);
             sql.Clear();
             UserInfo userInfo = new UserInfo();
-            userInfo.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_User_ID) FROM ("+sql1+ ")", param,null)); //Set count of records
+            userInfo.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_User_ID) FROM ("+ sql1 + ")", param,null)); //Set count of records
             List<Userdetail> user = new List<Userdetail>();
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
