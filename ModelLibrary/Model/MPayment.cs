@@ -1220,12 +1220,30 @@ namespace VAdvantage.Model
             return retValue;
         }
 
+        /// <summary>
+        /// 02/02/2024 This Function returns the sum of allocated amount of all alocations OF Charge
+        /// </summary>
+        /// <author> DevopsId 4680 VIS_427</author>
+        /// <returns>Allocated amount</returns>
+        public Decimal? GetAllocatedAmtForCharge()
+        {
+            String sql = "SELECT SUM(currencyConvert(al.Amount,"
+                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                + "FROM C_AllocationLine al"
+                + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
+                + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
+                + "WHERE al.C_Payment_ID=" + GetC_Payment_ID() + ""
+                + " AND ah.IsActive='Y' AND al.IsActive='Y'";
+            decimal AllocatedAmtCharge = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return AllocatedAmtCharge;
+        }
         /**
          * 	Test Allocation (and Set allocated flag)
          *	@return true if updated
          */
         public bool TestAllocation()
         {
+            Decimal? alloc = null;
             //	Cash Trx always allocated
             if (IsCashTrx())
             {
@@ -1237,7 +1255,14 @@ namespace VAdvantage.Model
                 return false;
             }
             //
-            Decimal? alloc = GetAllocatedAmt();
+            if (GetC_Charge_ID() != 0)
+            {
+                alloc = GetAllocatedAmtForCharge();
+            }
+            else
+            {
+                alloc = GetAllocatedAmt();
+            }
             if (alloc == null)
                 alloc = Env.ZERO;
             Decimal total = GetPayAmt() + (Get_ColumnIndex("WithholdingAmt") >= 0 ? (GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
@@ -1246,8 +1271,21 @@ namespace VAdvantage.Model
                 total = Decimal.Negate(total);
             bool test = total.CompareTo((Decimal)alloc) == 0;
             bool change = test != IsAllocated();
-            if (change)
-                SetIsAllocated(test);
+            //VIS_427 DevopsId 4680 get unallocated amount By subtracting allocated amount from total amount
+            decimal unallocatedAmt = Math.Abs(total) - Math.Abs(Util.GetValueOfDecimal(alloc)) - (Get_ColumnIndex("WithholdingAmt") >= 0 ? Math.Abs(GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
+            if (change || unallocatedAmt == 0) 
+            {
+                SetIsAllocated(true);
+                Set_Value("VAS_UnAllocatedAmount", 0);
+            }
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt greater than zero
+             then set Unallocated amount as positive*/
+            else if (!change && GetPayAmt() > 0)
+                Set_Value("VAS_UnAllocatedAmount", unallocatedAmt);
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt less than zero
+             then set Unallocated amount as negative*/
+            else if (!change && GetPayAmt() < 0)
+                Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(unallocatedAmt));
             log.Fine("Allocated=" + test
                 + " (" + alloc + "=" + total + ")");
             return change;
@@ -2917,7 +2955,7 @@ namespace VAdvantage.Model
                 }
                 if (GetC_Order_ID() != 0)
                 {
-                    if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(VA009_OrderPaySchedule_ID) from VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID() + "AND VA009_OrderPaySchedule_ID=" + GetVA009_OrderPaySchedule_ID() + " AND VA009_IsPaid='Y'")) > 0)
+                    if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(VA009_OrderPaySchedule_ID) from VA009_OrderPaySchedule Where C_Order_ID=" + GetC_Order_ID() + " AND VA009_OrderPaySchedule_ID=" + GetVA009_OrderPaySchedule_ID() + " AND VA009_IsPaid='Y'")) > 0)
                     {
                         _processMsg = "Payment is already done for selected order Schedule";
                         return DocActionVariables.STATUS_INVALID;
@@ -2937,6 +2975,10 @@ namespace VAdvantage.Model
             {
                 if (!IsPrepayment())
                     SetIsAllocated(true);
+                else
+                {
+                    Set_Value("VAS_UnAllocatedAmount", GetPayAmt());
+                }
             }
             else if (GetReversalDoc_ID() == 0)
             {
@@ -5319,7 +5361,7 @@ namespace VAdvantage.Model
                         //changed DocStatus Condition
                         DB.ExecuteQuery("UPDATE C_BankStatementLine bsl SET bsl.C_Payment_ID = null WHERE" +
                             " EXISTS(SELECT * FROM C_BankStatement bs WHERE bsl.C_BankStatement_ID = bs.C_BankStatement_ID  AND bs.DocStatus NOT IN('CO', 'CL', 'RE', 'VO')) " +
-                            "AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
+                            " AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
                     }
                 }
                 // if Payment aginst Claims is voided and payment is drafted remove reference of payment from Claim requisition lines and set Payment Generated to false on Header
@@ -5446,7 +5488,7 @@ namespace VAdvantage.Model
                 int count = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE VA027_PostDatedCheck SET VA027_GeneratePayment ='N', VA027_PaymentGenerated ='N', C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID(), null, Get_Trx()));
                 if (count > 0)
                 {
-                    DB.ExecuteQuery("UPDATE VA027_ChequeDetails SET C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID() + "AND C_Payment_ID= " + GetC_Payment_ID(), null, Get_Trx());
+                    DB.ExecuteQuery("UPDATE VA027_ChequeDetails SET C_Payment_ID = NULL, VA027_PaymentStatus= '0' WHERE VA027_PostDatedCheck_ID= " + GetVA027_PostDatedCheck_ID() + " AND C_Payment_ID= " + GetC_Payment_ID(), null, Get_Trx());
 
                 }
             }
@@ -5475,6 +5517,8 @@ namespace VAdvantage.Model
             reversal.SetDocAction(DOCACTION_Complete);
             //
             reversal.SetPayAmt(Decimal.Negate(GetPayAmt()));
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document 
+            reversal.Set_Value("VAS_UnAllocatedAmount", 0);
             reversal.SetDiscountAmt(Decimal.Negate(GetDiscountAmt()));
             reversal.SetWriteOffAmt(Decimal.Negate(GetWriteOffAmt()));
             reversal.SetOverUnderAmt(Decimal.Negate(GetOverUnderAmt()));
@@ -5648,7 +5692,7 @@ namespace VAdvantage.Model
                     //changed DocStatus Condition
                     DB.ExecuteQuery(" UPDATE C_BankStatementLine bsl SET bsl.C_Payment_ID = null WHERE" +
                         " EXISTS(SELECT * FROM C_BankStatement bs WHERE bsl.C_BankStatement_ID = bs.C_BankStatement_ID  AND bs.DocStatus NOT IN('CO', 'CL', 'RE', 'VO')) " +
-                        "AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
+                        " AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
                 }
             }
 
@@ -5665,6 +5709,8 @@ namespace VAdvantage.Model
             //	Unlink & De-Allocate
             DeAllocate();
             SetIsReconciled(reconciled);
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document
+            Set_Value("VAS_UnAllocatedAmount", 0);
             SetIsAllocated(true);	//	the allocation below is overwritten
             //	Set Status 
             AddDescription("(" + reversal.GetDocumentNo() + "<-)");

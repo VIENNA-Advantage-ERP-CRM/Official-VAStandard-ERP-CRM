@@ -168,15 +168,15 @@ namespace VAdvantage.Process
                 }
                 if (_DateOrdered_From != null && _DateOrdered_To != null)
                 {
-                    sql += "AND TRUNC(o.DateOrdered,'DD') BETWEEN " + GlobalVariable.TO_DATE(_DateOrdered_From, true) + " AND " + GlobalVariable.TO_DATE(_DateOrdered_To, true);
+                    sql += " AND TRUNC(o.DateOrdered,'DD') BETWEEN " + GlobalVariable.TO_DATE(_DateOrdered_From, true) + " AND " + GlobalVariable.TO_DATE(_DateOrdered_To, true);
                 }
                 else if (_DateOrdered_From != null && _DateOrdered_To == null)
                 {
-                    sql += "AND TRUNC(o.DateOrdered,'DD') >= " + GlobalVariable.TO_DATE(_DateOrdered_From, true);
+                    sql += " AND TRUNC(o.DateOrdered,'DD') >= " + GlobalVariable.TO_DATE(_DateOrdered_From, true);
                 }
                 else if (_DateOrdered_From == null && _DateOrdered_To != null)
                 {
-                    sql += "AND TRUNC(o.DateOrdered,'DD') <= " + GlobalVariable.TO_DATE(_DateOrdered_To, true);
+                    sql += " AND TRUNC(o.DateOrdered,'DD') <= " + GlobalVariable.TO_DATE(_DateOrdered_To, true);
                 }
             }
             DataTable dt = null;

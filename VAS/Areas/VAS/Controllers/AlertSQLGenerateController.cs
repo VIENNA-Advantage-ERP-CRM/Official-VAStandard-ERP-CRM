@@ -13,6 +13,7 @@ using System.Web;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VIS.Classes;
 using VIS.Models;
 
 namespace VAS.Areas.VAS.Controllers
@@ -23,23 +24,6 @@ namespace VAS.Areas.VAS.Controllers
         public ActionResult Index()
         {
             return View();
-        }
-
-        /// <summary>
-        /// Get all Windows for Alert SqlGenerator
-        /// </summary>
-        /// <returns>AD_Window Name/Ad_Tab Name/AD_Table_ID</returns>
-        public JsonResult GetWindows()
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate obj = new AlertSqlGenerate();
-                List<Windows> result = obj.GetWindows(ctx);
-                retJSON = JsonConvert.SerializeObject(result);
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -73,6 +57,8 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
+                if (!string.IsNullOrEmpty(query))
+                    query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
                 var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
@@ -85,38 +71,17 @@ namespace VAS.Areas.VAS.Controllers
         /// </summary>
         /// <param name="tableID">AD_Table_ID</param>
         /// <returns>ColumnInfornationList</returns>
-        public JsonResult GetColumns(int tableID)
+        public JsonResult GetColumns(int tableID,int tabID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID));
+                retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID, tabID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
-
-        /// <summary>
-        /// Saving SqlGenerator query in AlertRule Window
-        /// </summary>
-        /// <param name="query">Query</param>
-        /// <param name="tableName">AD_Table Name</param>
-        /// <param name="tableID">AD_Table_ID</param>
-        /// <param name="alertID">AD_Alert_ID</param>
-        /// <param name="alertRuleID">AD_AlertRule_ID</param>
-        /// <returns>saved/notsaved</returns>
-        public JsonResult SaveQuery(string query,string tableName,int tableID,int alertID,int alertRuleID)
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.SaveQuery(ctx, query, tableName, tableID, alertID, alertRuleID));
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
+        }   
 
         /// <summary>
         /// Update record of AlertRule by TabSqlGenerator 
@@ -133,6 +98,12 @@ namespace VAS.Areas.VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
+                if (!string.IsNullOrEmpty(query))
+                    query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(query))
+                {
+                    return Json(null);
+                }
                 retJSON = JsonConvert.SerializeObject(obj.UpdateQuery(ctx, query, tableID, alertID, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -141,17 +112,16 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// Get AlertRule RecordInfo for TabSqlGenerator
         /// </summary>
-        /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
-        public JsonResult GetAlertData(int alertID,int alertRuleID)
+        public JsonResult GetAlertData(int alertRuleID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertID, alertRuleID));
+                retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }      

@@ -926,8 +926,8 @@ namespace VIS.Models
             String sql = "SELECT t.C_Tax_ID "
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
-                + "WHERE t.IsActive='Y' AND t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " WHERE t.IsActive='Y' AND t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {
@@ -1153,13 +1153,17 @@ namespace VIS.Models
                              + " INNER JOIN C_InvoicePaySchedule ips ON (i.C_Invoice_ID = ips.C_Invoice_ID) "
                              + " INNER JOIN VA009_PAYMENTMETHOD PM  ON (ips.VA009_PaymentMethod_ID = PM.VA009_paymentMethod_ID) WHERE i.IsPayScheduleValid='Y' "
                              + " AND ips.IsValid ='Y' AND ips.isactive ='Y' "
-                             + " AND i.C_Invoice_ID = " + Invoice_ID + "AND ips.VA009_IsPaid='N'"           //VIS404 TaskID: 2248 Cash Journal completed with Zero Amount
+                             + " AND i.C_Invoice_ID = " + Invoice_ID + " AND ips.VA009_IsPaid='N'"           //VIS404 TaskID: 2248 Cash Journal completed with Zero Amount
                              + " AND ips.IsHoldPayment = 'N'"
                              + " AND ips.C_InvoicePaySchedule_ID NOT IN"
-                             + "(SELECT NVL(C_InvoicePaySchedule_ID,0) FROM C_InvoicePaySchedule WHERE c_payment_id IN"
-                             + "(SELECT NVL(c_payment_id,0) FROM C_InvoicePaySchedule)  union "
+                             + " (SELECT NVL(C_InvoicePaySchedule_ID,0) FROM C_InvoicePaySchedule WHERE c_payment_id IN"
+                             + " (SELECT NVL(c_payment_id,0) FROM C_InvoicePaySchedule)  union "
                              + " SELECT NVL(C_InvoicePaySchedule_id,0) FROM C_InvoicePaySchedule WHERE c_cashline_id IN"
-                             + "(SELECT NVL(c_cashline_id,0) FROM C_InvoicePaySchedule )) "
+                             + " (SELECT NVL(c_cashline_id,0) FROM C_InvoicePaySchedule ) UNION "
+                             + "(SELECT CASE WHEN C_Payment.C_Payment_ID != COALESCE(C_PaymentAllocate.C_Payment_ID, 0)"
+                             + " THEN COALESCE(C_Payment.C_InvoicePaySchedule_ID,0) ELSE COALESCE(C_PaymentAllocate.C_InvoicePaySchedule_ID,0) END"
+                             + " FROM C_Payment LEFT JOIN C_PaymentAllocate ON(C_PaymentAllocate.C_Payment_ID = C_Payment.C_Payment_ID)"
+                             + " WHERE C_Payment.DocStatus NOT IN('CO', 'CL', 'RE', 'VO'))) AND ips.VA009_ExecutionStatus NOT IN ('Y','J')"
                              + " ORDER BY ips.duedate ASC) t WHERE rownum=1";
             }
             else
@@ -1168,7 +1172,7 @@ namespace VIS.Models
                                 + " ips.DueAmt, i.IsReturnTrx FROM C_Invoice i  INNER JOIN C_InvoicePaySchedule ips "
                                 + " ON (i.C_Invoice_ID = ips.C_Invoice_ID)  WHERE i.IsPayScheduleValid='Y' "
                                 + " AND ips.IsValid = 'Y' AND ips.isactive = 'Y' "
-                            + " AND i.C_Invoice_ID = " + Invoice_ID + "AND ips.VA009_IsPaid='N'"                    //VIS404 TaskID: 2248 Cash Journal completed with Zero Amount
+                            + " AND i.C_Invoice_ID = " + Invoice_ID + " AND ips.VA009_IsPaid='N'"                    //VIS404 TaskID: 2248 Cash Journal completed with Zero Amount
                             + " AND ips.IsHoldPayment = 'N'"
                             + "  AND ips.C_InvoicePaySchedule_ID NOT IN"
                             + "(SELECT NVL(C_InvoicePaySchedule_ID,0) FROM C_InvoicePaySchedule WHERE c_payment_id IN"
@@ -1566,7 +1570,7 @@ namespace VIS.Models
             + "ba.C_Currency_ID, i.DateInvoiced, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID) as OpenAmt,"
             + " paymentTermDiscount(i.GrandTotal,i.C_Currency_ID,i.C_PaymentTerm_ID,i.DateInvoiced,'" + paramValue[2] + "') As DiscountAmt, i.IsSOTrx "
             + "FROM C_Invoice_v i, C_BankAccount ba "
-            + "WHERE i.C_Invoice_ID=" + paramValue[0] + "AND ba.C_BankAccount_ID=" + paramValue[1] + "";
+            + "WHERE i.C_Invoice_ID=" + paramValue[0] + " AND ba.C_BankAccount_ID=" + paramValue[1] + "";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {

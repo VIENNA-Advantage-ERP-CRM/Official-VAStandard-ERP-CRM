@@ -209,7 +209,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 + "WHERE NOT EXISTS (SELECT * FROM M_Cost c WHERE c.M_Product_ID=p.M_Product_ID"
                 + " AND c.M_CostType_ID=" + as1.GetM_CostType_ID() + " AND c.C_AcctSchema_ID=" + as1.GetC_AcctSchema_ID() + " AND c.M_CostElement_ID=" + _ce.GetM_CostElement_ID()
                 + " AND c.M_AttributeSetInstance_ID=0) "
-                + "AND AD_Client_ID=" + as1.GetAD_Client_ID();
+                + " AND AD_Client_ID=" + as1.GetAD_Client_ID();
             if (_M_Product_Category_ID != 0)
             {
                 sql += " AND M_Product_Category_ID=" + _M_Product_Category_ID;

@@ -294,15 +294,15 @@ namespace VIS.Models
 
                                 // string sqlGetOpenPayments = "SELECT  NVL(currencyConvert(ALLOCPAYMENTAVAILABLE(C_Payment_ID) ,p.C_Currency_ID ," + C_Currency_ID + ",p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID),0) as amt FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
                                 string sqlGetOpenPayments = @"SELECT 
-                             (SUM(NVL(currencyConvert(al.Amount, ah.C_Currency_ID, " + C_Currency_ID + @", ah.DateTrx, " + _CurrencyType_ID + @", ah.AD_Client_ID, ah.AD_Org_ID),0)) -
-                              SUM(NVL(currencyConvert(p.payamt, p.C_Currency_ID, " + C_Currency_ID + @", p.DateTrx, " + _CurrencyType_ID + @", p.AD_Client_ID, p.AD_Org_ID),0))) as OpenAmt
-                            FROM c_allocationline al
-                            INNER JOIN c_allocationhdr ah
-                            on ah.c_allocationhdr_id=al.c_allocationhdr_id
-                            INNER JOIN C_Payment p
-                            ON al.C_Payment_ID=p.c_payment_id
-                            WHERE al.C_Payment_ID = " + C_Payment_ID + @" AND al.IsActive       ='Y'
-                            group by al.C_Payment_ID,al.IsActive ";
+                                 (SUM(NVL(currencyConvert(al.Amount, ah.C_Currency_ID, " + C_Currency_ID + @", ah.DateTrx, " + _CurrencyType_ID + @", ah.AD_Client_ID, ah.AD_Org_ID),0)) -
+                                  SUM(NVL(currencyConvert(p.payamt, p.C_Currency_ID, " + C_Currency_ID + @", p.DateTrx, " + _CurrencyType_ID + @", p.AD_Client_ID, p.AD_Org_ID),0))) as OpenAmt
+                                FROM c_allocationline al
+                                INNER JOIN c_allocationhdr ah
+                                on ah.c_allocationhdr_id=al.c_allocationhdr_id
+                                INNER JOIN C_Payment p
+                                ON al.C_Payment_ID=p.c_payment_id
+                                WHERE al.C_Payment_ID = " + C_Payment_ID + @" AND al.IsActive       ='Y'
+                                group by al.C_Payment_ID,al.IsActive ";
                                 Decimal? result = Util.GetValueOfDecimal(DB.ExecuteScalar(sqlGetOpenPayments, null, trx));
                                 if (result == 0)
                                 {
@@ -3326,49 +3326,50 @@ namespace VIS.Models
 
                 //  Test/Set Payment is fully allocated
                 #region Set Payment Allocated
-                if (rowsPayment.Count > 0)
-                {
-                    for (int i = 0; i < paymentList.Count; i++)
-                    {
-                        int C_Payment_ID = Util.GetValueOfInt(paymentList[i]);
-                        //VA228:Get open amount and removed MPayment class object
-                        string sqlGetOpenPayments = "SELECT currencyConvert(ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) ,p.C_Currency_ID ," + alloc.GetC_Currency_ID() + ", p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID) FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
-                        object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);
-                        Decimal? amtPayment = 0;
-                        if (result == null || result == DBNull.Value)
-                        {
-                            amtPayment = -1;
-                        }
-                        else
-                        {
-                            amtPayment = Util.GetValueOfDecimal(result);
-                        }
+                /*VIS_427 30/01/2024 Devops Id 4680 Identified that Updation of IsAllocation Checkbox is handled on TestAllocation method*/
+                //if (rowsPayment.Count > 0)
+                //{
+                //    for (int i = 0; i < paymentList.Count; i++)
+                //    {
+                //        int C_Payment_ID = Util.GetValueOfInt(paymentList[i]);
+                //        //VA228:Get open amount and removed MPayment class object
+                //        string sqlGetOpenPayments = "SELECT currencyConvert(ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) ,p.C_Currency_ID ," + alloc.GetC_Currency_ID() + ", p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID) FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
+                //        object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);
+                //        Decimal? amtPayment = 0;
+                //        if (result == null || result == DBNull.Value)
+                //        {
+                //            amtPayment = -1;
+                //        }
+                //        else
+                //        {
+                //            amtPayment = Util.GetValueOfDecimal(result);
+                //        }
 
-                        if (DB.ExecuteQuery("UPDATE C_Payment set IsAllocated='" + (amtPayment == 0 ? "Y" : "N") + "' " +
-                                "WHERE C_Payment_ID=" + C_Payment_ID, null, trx) <= 0)
-                        {
-                            _log.SaveError("Error: ", "Payment not saved");
-                            trx.Rollback();
-                            trx.Close();
-                            ValueNamePair pp = VLogger.RetrieveError();
-                            if (pp != null)
-                            {
-                                msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
-                            }
-                            else
-                            {
-                                msg = Msg.GetMsg(ctx, "PaymentNotCreated");
-                            }
-                            //Set Isprocess false
-                            Isprocess(rowsPayment, null, rowsInvoice, null, trx);
-                            return msg;
-                        }
+                //        if (DB.ExecuteQuery("UPDATE C_Payment set IsAllocated='" + (amtPayment == 0 ? "Y" : "N") + "' " +
+                //                "WHERE C_Payment_ID=" + C_Payment_ID, null, trx) <= 0)
+                //        {
+                //            _log.SaveError("Error: ", "Payment not saved");
+                //            trx.Rollback();
+                //            trx.Close();
+                //            ValueNamePair pp = VLogger.RetrieveError();
+                //            if (pp != null)
+                //            {
+                //                msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
+                //            }
+                //            else
+                //            {
+                //                msg = Msg.GetMsg(ctx, "PaymentNotCreated");
+                //            }
+                //            //Set Isprocess false
+                //            Isprocess(rowsPayment, null, rowsInvoice, null, trx);
+                //            return msg;
+                //        }
 
-                        //log.Config("Payment #" + i + (pay.IsAllocated() ? " not" : " is")
-                        //    + " fully allocated");
-                    }
-                }
-                #endregion
+                //              //log.Config("Payment #" + i + (pay.IsAllocated() ? " not" : " is")
+                //              //    + " fully allocated");
+                //          }
+                //        }
+                        #endregion
 
                 paymentList.Clear();
                 amountList.Clear();
@@ -4029,6 +4030,7 @@ namespace VIS.Models
 
             //Changed DateInvoiced to DateAcct because we have to convert currency on Account Date Not on Invoiced Date 
             //Query Replaced with new optimized query
+            //VAI066 DevopsID: 5041 The Invoice schedule is not shown on the payment allocation form after the allocation document is in progress.
             StringBuilder sqlInvoice = new StringBuilder(@" WITH Invoice AS ( SELECT 'false' as SELECTROW, 
             TO_CHAR(i.DateInvoiced, 'YYYY-MM-DD') as DATE1, i.DocumentNo AS DOCUMENTNO, 
             i.C_Invoice_ID AS CINVOICEID, c.ISO_Code AS ISO_CODE, i.C_CONVERSIONTYPE_ID, i.AD_Client_ID, 
@@ -4037,7 +4039,11 @@ namespace VIS.Models
             INNER JOIN AD_Org o ON (o.AD_Org_ID = i.AD_Org_ID) INNER JOIN C_Currency c ON (i.C_Currency_ID = c.C_Currency_ID)
             INNER JOIN C_InvoicePaySchedule ips ON (i.C_Invoice_ID = ips.C_Invoice_ID AND i.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID ) 
             INNER JOIN VA009_PaymentMethod pm ON (ips.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID) 
-            WHERE i.IsPaid='N' AND i.Processed = 'Y' AND ips.IsHoldPayment='N' AND ips.C_InvoicePaySchedule_ID NOT IN (
+            WHERE i.IsPaid='N' AND i.Processed = 'Y' AND ips.IsHoldPayment='N' 
+                AND ips.C_InvoicePaySchedule_ID NOT IN ( SELECT NVL(al.C_InvoicePaySchedule_ID,0) FROM C_AllocationHdr ah 
+                                        INNER JOIN C_AllocationLine al ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID)
+                                        WHERE ah.DocStatus NOT IN ('CO', 'CL' ,'RE','VO'))  
+                AND ips.C_InvoicePaySchedule_ID NOT IN (
                 SELECT CASE WHEN C_Payment.C_Payment_ID != COALESCE(C_PaymentAllocate.C_Payment_ID,0) 
                 THEN COALESCE(C_Payment.C_InvoicePaySchedule_ID,0)  ELSE COALESCE(C_PaymentAllocate.C_InvoicePaySchedule_ID,0) END 
                 FROM C_Payment LEFT JOIN C_PaymentAllocate ON (C_PaymentAllocate.C_Payment_ID = C_Payment.C_Payment_ID) 
@@ -4066,7 +4072,7 @@ namespace VIS.Models
             //------Filter data on the basis of new parameters
             if (!String.IsNullOrEmpty(docNo))
             {
-                sqlInvoice.Append("AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
+                sqlInvoice.Append(" AND Upper(i.documentno) LIKE Upper('%" + docNo + "%')");
             }
             if (c_docType_ID > 0)
             {
@@ -5241,7 +5247,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 if (dsPay != null && dsPay.Tables.Count > 0 && dsPay.Tables[0].Rows.Count > 0)
                 {
                     //for (int i = 0; i < rowsPayment.Count; i++)
-                    for (int i = 0;i<dsPay.Tables[0].Rows.Count ; i++)
+                    for (int i = 0; i < dsPay.Tables[0].Rows.Count; i++)
                     {
                         //amtToAllocate = Math.Abs(Util.GetValueOfDecimal(rowsCash[i]["AppliedAmt"]));
                         amtToAllocate = Util.GetValueOfDecimal(rowsPayment[i]["AppliedAmt"]) - Math.Abs(Util.GetValueOfDecimal(rowsPayment[i]["paidAmt"]));
@@ -5257,7 +5263,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 if (Util.GetValueOfBool(negList[j]["IsPaid"]))
                                     continue;
 
-                                objPayment = new MPayment(ctx,dsPay.Tables[0].Select("C_Payment_ID="+ Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]))[0] , trx);
+                                objPayment = new MPayment(ctx, dsPay.Tables[0].Select("C_Payment_ID=" + Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]))[0], trx);
 
                                 actualAmt = Math.Abs(Util.GetValueOfDecimal(negList[j]["AppliedAmt"])) - Math.Abs(Util.GetValueOfDecimal(negList[j]["paidAmt"]));
                                 if (Math.Abs(remainingAmt) >= actualAmt)
@@ -5278,7 +5284,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 aLine.SetDateTrx(DateTrx);
                                 aLine.SetC_Payment_ID(Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]));
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_Payment", Util.GetValueOfInt(rowsPayment[i]["cpaymentid"])));
-                                aLine.Set_ValueNoCheck("Description", dsPay.Tables[0].Select("C_Payment_ID="+ Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]))[0]["Description"]);
+                                aLine.Set_ValueNoCheck("Description", dsPay.Tables[0].Select("C_Payment_ID=" + Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]))[0]["Description"]);
 
                                 // set withholding amount based on porpotionate
                                 if (objPayment.GetC_Withholding_ID() > 0 || objPayment.GetBackupWithholding_ID() > 0)
@@ -5376,7 +5382,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 if (dsPay != null && dsPay.Tables.Count > 0 && dsPay.Tables[0].Rows.Count > 0)
                 {
                     //for (int i = 0; i < rowsPayment.Count; i++)
-                    for (int i = 0; i<dsPay.Tables[0].Rows.Count ; i++)
+                    for (int i = 0; i < dsPay.Tables[0].Rows.Count; i++)
                     {
                         //amtToAllocate = Math.Abs(Util.GetValueOfDecimal(rowsPayment[i]["AppliedAmt"]));
                         amtToAllocate = Math.Abs(Util.GetValueOfDecimal(rowsPayment[i]["AppliedAmt"])) - Math.Abs(Util.GetValueOfDecimal(rowsPayment[i]["paidAmt"]));
@@ -5479,37 +5485,40 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                 {
 
                     #region In case of Multiple gl Journals and multiple invoice and credit memo
-                    if (i == 0)
-                    {
-                        for (int k = 0; k < rowsInvoice.Count; k++)
-                        {
-                            if (rowsInvoice[k]["Docbasetype"] == "ARC")
-                            {
-                                decimal arcAmt = 0;
-                                for (int j = 0; j < rowsGL.Count; j++)
-                                {
-                                    if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) < 0)
-                                    {
-                                        saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
-                                            Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
-                                            Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
-                                        arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
-                                        rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
-                                        rowsGL[j]["OpenAmount"] = arcAmt.ToString();
-                                    }
-                                    else
-                                    {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    //VIS_427 Bugid 3417 20/12/2023 Identified that there is no requirement of this code in case of ARC as it can be handled with rest of code
+                    //if (i == 0)
+                    //{
+                    //    for (int k = 0; k < rowsInvoice.Count; k++)
+                    //    {
+                    //        if (rowsInvoice[k]["Docbasetype"] == "ARC")
+                    //        {
+                    //            decimal arcAmt = 0;
+                    //            for (int j = 0; j < rowsGL.Count; j++)
+                    //            {
+                    //                /*VIS_427 BugId:3417 12/12/2023 Handled issue When user allocate the single/multiple Invoice schedules(ARC) of same/different invoice with GL Journal line ,
+                    //                    then system should create the allocation of  ARC with GL if applied amount Gl Journal line is greater then 0*/
+                    //                if ((Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"])) > 0)
+                    //                {
+                    //                    saveAllocationLine(alloc, Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]), C_BPartner_ID,
+                    //                        Util.GetValueOfInt(rowsGL[j]["GL_JournalLine_ID"]), Util.GetValueOfInt(rowsInvoice[k]["c_invoicepayschedule_id"]),
+                    //                        Util.GetValueOfInt(rowsInvoice[k]["cinvoiceid"]), trx);
+                    //                    arcAmt = (Util.GetValueOfDecimal(rowsGL[j]["AppliedAmt"]) + Util.GetValueOfDecimal(rowsInvoice[k]["AppliedAmt"]));
+                    //                    rowsGL[j]["AppliedAmt"] = arcAmt.ToString();
+                    //                    rowsGL[j]["OpenAmount"] = arcAmt.ToString();
+                    //                }
+                    //                else
+                    //                {
+                    //                    continue;
+                    //                }
+                    //            }
+                    //        }
+                    //    }
+                    //}
 
-                    if (rowsInvoice[i]["Docbasetype"] == "ARC")
-                    {
-                        continue;
-                    }
+                    //if (rowsInvoice[i]["Docbasetype"] == "ARC")
+                    //{
+                    //    continue;
+                    //}
                     #endregion
 
                     //isScheduleAllocated = false;
@@ -5715,7 +5724,9 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 {
                                     for (int k = 0; k < negList.Count; k++)
                                     {
-                                        if (Util.GetValueOfInt(rowsInvoice[i]["cinvoiceid"]) == Util.GetValueOfInt(negList[k]["cinvoiceid"]))
+                                        /* VIS_427 DevOpsId 3333 07/12/2023 Handled issue When user allocate the multiple Invoice schedules of same invoice with GL Journal line ,
+                                        then system will pick the paid amount and set the same amount on the reference of that invoice schedule */
+                                        if (Util.GetValueOfInt(rowsInvoice[i]["c_invoicepayschedule_id"]) == Util.GetValueOfInt(negList[k]["c_invoicepayschedule_id"]))
                                         {
                                             paid = Util.GetValueOfDecimal(negList[k]["paidAmt"]) + netAmt;
                                             negList[k]["paidAmt"] = paid.ToString();
@@ -6065,7 +6076,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     }
                 }
                 #endregion
-                
+
                 if (rowsCash.Count == 0 && rowsPayment.Count == 0 && rowsInvoice.Count == 0)
                 {
                     trx.Rollback();
@@ -6079,7 +6090,8 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (alloc.Save())
                     {
-                         msg = alloc.GetDocumentNo();
+                        alloc = new MAllocationHdr(ctx, alloc.Get_ID(), trx);
+                        msg = alloc.GetDocumentNo();
                         //VIS_427 Bug Id : 2178 get the doc status of allocation tab on allocation window
                         status = alloc.GetDocStatus();
                     }
@@ -6130,28 +6142,29 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                     {
                         int C_Payment_ID = Util.GetValueOfInt(rowsPayment[i]["cpaymentid"]);
                         MPayment pay = new MPayment(ctx, C_Payment_ID, trx);
-                        if (pay.TestAllocation())
-                        {
-                            if (!pay.Save())
-                            {
-                                trx.Rollback();
-                                trx.Close();
-                                _log.SaveError("Error: ", "Payment not allocated");
-                                ValueNamePair pp = VLogger.RetrieveError();
-                                if (pp != null)
-                                {
-                                    msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
-                                }
-                                else
-                                {
-                                    msg = Msg.GetMsg(ctx, "PaymentNotCreated");
-                                }
-                                //set isprocessing false
-                                Isprocess(rowsPayment, rowsCash, rowsInvoice, rowsGL, trx);
-                                return msg;
-                            }
+                        /*VIS_427 30/01/2024 Devops Id 4680 Identified that Updation of IsAllocation Checkbox is handled on TestAllocation method*/
+                        //if (pay.TestAllocation())
+                        //{
+                        //    if (!pay.Save())
+                        //    {
+                        //        trx.Rollback();
+                        //        trx.Close();
+                        //        _log.SaveError("Error: ", "Payment not allocated");
+                        //        ValueNamePair pp = VLogger.RetrieveError();
+                        //        if (pp != null)
+                        //        {
+                        //            msg = Msg.GetMsg(ctx, "PaymentNotCreated") + ":- " + pp.GetName();
+                        //        }
+                        //        else
+                        //        {
+                        //            msg = Msg.GetMsg(ctx, "PaymentNotCreated");
+                        //        }
+                        //        //set isprocessing false
+                        //        Isprocess(rowsPayment, rowsCash, rowsInvoice, rowsGL, trx);
+                        //        return msg;
+                        //    }
 
-                        }
+                        //}
 
                         string sqlGetOpenPayments = "SELECT  NVL(currencyConvert(ALLOCPAYMENTAVAILABLE(C_Payment_ID) ,p.C_Currency_ID ," + C_Currency_ID + ",p.DateTrx ,p.C_ConversionType_ID ,p.AD_Client_ID ,p.AD_Org_ID),0) as amt FROM C_Payment p Where C_Payment_ID = " + C_Payment_ID;
                         object result = DB.ExecuteScalar(sqlGetOpenPayments, null, trx);

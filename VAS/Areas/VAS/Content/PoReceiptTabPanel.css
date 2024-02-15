@@ -1,0 +1,128 @@
+/*Read the instructions before start
+1. Ignore the fonts folder its already in framework
+2. Ignore the vis-fonts.css file its already in framework
+3. Ignore framework.css
+*/
+
+/*
+
+Only index.html and style.css is for your use There is no need to copy any other file
+
+*/
+
+.vas-apInvPoWrapper{
+  display: flex;
+  flex-direction: column;
+  /*border: 1px solid #eee;*/
+  width: 100%;
+  /* calculate height Dynamically */
+ /* height: 600px;*/
+  padding: 1rem;
+}
+.vas-apInvPoTtl{
+  font-size: 16px;
+  color: rgba(var(--v-c-primary), 1);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.vas-apInvPoListItem{
+  padding: 1rem;
+  box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+  border: 1px solid #eee;
+  border-radius: 0.2rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.vas-apInvPoListItem:hover{
+  border: 1px solid rgba(var(--v-c-primary), .5);
+}
+.vas-apInvPoListGroup {
+  /*height: 535px;*/
+  overflow-y: auto;
+  padding: 4px 4px 4px 1px;
+}
+.vas-apInvPoTitle{
+  font-size: 14px;
+  font-weight: 600;
+  display: block;
+}
+.vas-apInvPoValue{
+  font-size: 14px;
+  display: block;
+}
+
+
+.vas-apTaxWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+}
+
+.vas-apTax-ttl {
+    color: rgba(var(--v-c-primary),1);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom:0;
+}
+
+.vas-apListItem {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border-radius: 0.15rem;
+    padding:0.85rem;
+}
+
+.vas-ap-sglItem {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap: 2.5rem;
+}
+.vas-apcheckbox-label {
+    font-weight: normal;
+    font-size: 12px;
+    margin-bottom: 0;
+}
+.vas-singleTaxElementTTl, .vas-singleTaxElementValue {
+    font-size: 14px;
+    display: block;
+}
+.vas-singleTaxElementValue {
+    font-weight: normal;
+    width:120px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+}
+
+.vas-apcheckbox-label {
+    font-size: 12px;
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.vas-aptaxListGroup {
+    height: calc(100vh - 300px);
+    overflow-y: auto;
+    padding: 5px 5px 0 0;
+}
+
+.vas-apItem-checkbox input[type="checkbox"] {
+    width: 11.5px;
+    height: 11.5px;
+}
+.VAS-TaxDetail{
+    padding: 5px 5px 5px 1px;
+}
+.vas-setTaxWidth{
+    width:24%
+}
+.vas-setTaxPaybleAmtWidth {
+    width: 38%
+}
+.vas-setTaxAmtWidth {
+    width: 38%
+}

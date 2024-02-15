@@ -97,7 +97,7 @@ namespace VIS.Controllers
         {
             Ctx ctx = Session["ctx"] as Ctx;
             MCashBookModel objCashBookModel = new MCashBookModel();
-            return Json(JsonConvert.SerializeObject(objCashBookModel.GetInvSchedDueAmount(fields)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(objCashBookModel.GetInvSchedDueAmount(ctx,fields)), JsonRequestBehavior.AllowGet);
         }
 
         // Get Bank Account Currency

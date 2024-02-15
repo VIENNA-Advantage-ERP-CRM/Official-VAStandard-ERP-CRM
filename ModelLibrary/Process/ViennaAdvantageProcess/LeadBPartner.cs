@@ -118,7 +118,7 @@ namespace ViennaAdvantage.Process
             {
                 lead.Set_Value("IsArchive", true);
                 int statusId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT R_Status_ID FROM R_Status Where Value = 'CNV' AND IsActive = 'Y' " +
-                    "AND R_StatusCategory_ID = (SELECT R_StatusCategory_ID FROM R_RequestType WHERE R_RequestType_ID = (SELECT R_RequestType_ID FROM " +
+                    " AND R_StatusCategory_ID = (SELECT R_StatusCategory_ID FROM R_RequestType WHERE R_RequestType_ID = (SELECT R_RequestType_ID FROM " +
                     "AD_ClientInfo WHERE AD_Client_ID = " + GetAD_Client_ID() + "))", null, null));
 
                 if (statusId > 0)
@@ -306,7 +306,7 @@ namespace ViennaAdvantage.Process
 
             if (tableID > 0)
             {
-                int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + "AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
+                int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
                 if (RecordIDS.Length > 0)
                 {
                     MMailAttachment1 hist = null;
@@ -333,7 +333,7 @@ namespace ViennaAdvantage.Process
             #region Copy History Records
             if (tableID > 0)
             {
-                int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + "AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
+                int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
                 if (RecordsIDS.Length > 0)
                 {
                     MAppointmentsInfo hist = null;
@@ -361,7 +361,7 @@ namespace ViennaAdvantage.Process
             #region Copy Chat Data
             if (tableID > 0)
             {
-                int[] chatID = MChat.GetAllIDs("CM_Chat", "AD_Table_ID=" + tableID + "AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
+                int[] chatID = MChat.GetAllIDs("CM_Chat", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
                 if (chatID.Length > 0)
                 {
                     MChatEntry chatEntry = null;

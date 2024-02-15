@@ -137,7 +137,7 @@ namespace VAdvantage.Model
             // consider Container
             if (isContainerConsider)
             {
-                sql += "AND NVL(s.M_ProductContainer_ID , 0) = " + M_ProductContainer_ID;
+                sql += " AND NVL(s.M_ProductContainer_ID , 0) = " + M_ProductContainer_ID;
             }
 
             if (!FiFo && minGuaranteeDate != null)
@@ -184,7 +184,7 @@ namespace VAdvantage.Model
                 if (minGuaranteeDate != null)
                 {
                     // when gurantee date is null then record to be filtered based on material Policy date
-                    sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")"
+                    sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")"
                         + @" ORDER BY l.PriorityNo DESC , asi.GuaranteeDate, CASE  WHEN asi.GuaranteeDate IS NULL THEN s.MMPolicyDate ELSE asi.GuaranteeDate END ";
                     if (!FiFo)
                         sql += (greater ? " ASC" : " DESC");
@@ -200,7 +200,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    sql += "ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.MMPolicyDate";
+                    sql += " ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.MMPolicyDate";
                     if (!FiFo)
                         //sql += " DESC";
                         sql += (greater ? " ASC" : " DESC");
@@ -276,16 +276,16 @@ namespace VAdvantage.Model
             // PT-225, PT-224 : get record specific attribte wise which is to be selected on document
             if (M_AttributeSetInstance_ID > 0)
             {
-                sql += "AND s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID;
+                sql += " AND s.M_AttributeSetInstance_ID=" + M_AttributeSetInstance_ID;
             }
             else if (M_AttributeSetInstance_ID == 0)
             {
-                sql += "AND (s.M_AttributeSetInstance_ID=0 OR s.M_AttributeSetInstance_ID IS NULL) ";
+                sql += " AND (s.M_AttributeSetInstance_ID=0 OR s.M_AttributeSetInstance_ID IS NULL) ";
             }
             if (minGuaranteeDate != null)
             {
-                sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")";
-                sql += "ORDER BY l.PriorityNo DESC, asi.GuaranteeDate, s.M_AttributeSetInstance_ID";	//	Has Prior over Locator
+                sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")";
+                sql += " ORDER BY l.PriorityNo DESC, asi.GuaranteeDate, s.M_AttributeSetInstance_ID";	//	Has Prior over Locator
                 if (!FiFo)
                     sql += " DESC";
                 //sql += ", l.PriorityNo DESC";
@@ -295,7 +295,7 @@ namespace VAdvantage.Model
             }
             else
             {
-                sql += "ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.MMPolicyDate";
+                sql += " ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.MMPolicyDate";
                 if (!FiFo)
                     sql += " DESC , s.M_AttributeSetInstance_ID DESC";
                 else
@@ -412,13 +412,13 @@ namespace VAdvantage.Model
                 // when check for specific container
                 if (M_ProductContainer_ID > 0)
                 {
-                    sql += "  AND NVL(s.M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
+                    sql += " AND NVL(s.M_ProductContainer_ID, 0) = " + M_ProductContainer_ID;
                 }
                 if (minGuaranteeDate != null)
                     sql += " AND MMPolicyDate " + (greater ? ">" : "<=") + GlobalVariable.TO_DATE(minGuaranteeDate, true);
                 if (minGuaranteeDate != null)
                 {
-                    sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")";
+                    sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")";
                 }
             }
             try

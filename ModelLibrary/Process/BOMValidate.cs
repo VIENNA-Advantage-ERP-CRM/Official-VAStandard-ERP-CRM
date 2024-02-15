@@ -101,9 +101,9 @@ namespace VAdvantage.Process
             }
             if (!_IsReValidate)
             {
-                sql += "AND IsVerified<>'Y' ";
+                sql += " AND IsVerified<>'Y' ";
             }
-            sql += "ORDER BY Name";
+            sql += " ORDER BY Name";
 
             try
             {

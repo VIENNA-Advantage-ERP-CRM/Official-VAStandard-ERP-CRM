@@ -37,29 +37,18 @@ namespace VAdvantage.Model
             if (!newRecord && (Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID")
                 || Is_ValueChanged("C_Charge_ID") || Is_ValueChanged("Amount")))
             {
-                StringBuilder sql = new StringBuilder();
-                sql.Append("SELECT  VAS_ContractMaster_ID,(SELECT VAS_ContractUtilizedAmount FROM VAS_ContractMaster WHERE " +
-                            "VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + ") AS UtilizeAmount  FROM C_Order WHERE VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + " UNION " +
-                        " SELECT VAS_ContractMaster_ID,(SELECT VAS_ContractUtilizedAmount FROM VAS_ContractMaster WHERE " +
-                            "VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID() + ") AS UtilizeAmount    FROM C_Invoice WHERE VAS_ContractMaster_ID = " + GetVAS_ContractMaster_ID());
-                DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                decimal amount = checkTransaction();
+                if (amount > 0)
                 {
                     if (Is_ValueChanged("M_Product_ID") || Is_ValueChanged("M_AttributeSetInstance_ID")
                      || Is_ValueChanged("C_Charge_ID"))
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CheckOrder"));
                         return false;
-                    }                  
-                     else 
+                    }
+                    else
                     {
-                        int UtilizeAmount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["UtilizeAmount"]);
-                        sql.Clear();
-                        sql.Append("SELECT NVL(SUM(Amount),0) AS TotalAmount FROM  VAS_ContractLine WHERE VAS_ContractMaster_Id=" 
-                            + GetVAS_ContractMaster_ID() + " AND VAS_ContractLine_Id !=" + GetVAS_ContractLine_ID() );
-                        int TotalAmount = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                        TotalAmount = TotalAmount + Util.GetValueOfInt(GetAmount()); //All Contract Lines Amount Total
-                        if (TotalAmount < UtilizeAmount) // Total Amount should be greater than utilize amount
+                        if (Util.GetValueOfInt(GetAmount()) < amount) //Amount on line should be greater than utilize amount 
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_UtilizeAmount"));
                             return false;
@@ -67,7 +56,6 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
             //	Product/Charge Must be selected
             if (newRecord || Is_ValueChanged("M_Product_ID") || Is_ValueChanged("C_Charge_ID"))
             {
@@ -102,6 +90,36 @@ namespace VAdvantage.Model
                 success = false;
 
             return success;
+        }
+        /// <summary>
+        /// VAI050-Restrict to delete if any transactions have occurred
+        /// </summary>
+        /// <returns>true if record deleted</returns>
+        protected override bool BeforeDelete()
+        {
+            decimal amount = checkTransaction();
+            if (amount > 0)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_CheckOrder"));
+                return false;
+            }
+            return true;
+        }
+        /// <summary>
+        /// if any transactions have occurred through Blanket Purchase Order (BPO),
+        /// Purchase Order (PO), Accounts Payable (AP), Blanket Sales Order (BSO), Sales Order
+        /// (SO), or Accounts Receivable (AR).To check Line used on SO,P
+        /// </summary>
+        /// <returns>return line amount used</returns>
+        public decimal checkTransaction()
+        {
+            string sql = "SELECT (a.t1+b.t2) AS LineAmount  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
+                         " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
+                        "AND ol.VAS_ContractLine_ID = "+GetVAS_ContractLine_ID()+ " AND o.IsBlanketTrx!='Y') a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                        "C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
+                        "il.VAS_ContractLine_ID ="+GetVAS_ContractLine_ID()+") b";
+            decimal LineAmount = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return LineAmount;
         }
     }
 }

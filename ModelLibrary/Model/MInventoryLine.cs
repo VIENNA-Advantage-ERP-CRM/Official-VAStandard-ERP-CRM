@@ -294,21 +294,6 @@ namespace VAdvantage.Model
         /// <returns>true if can be saved</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            //VAI050-To Validate Requestion Quantity with Cart Quantity
-            //Quanttity can not greater than Requestion Quantity
-            if (GetM_RequisitionLine_ID() > 0)
-            {
-                string sql = "SELECT DTD001_ReservedQty,Qty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
-                DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    if (Util.GetValueOfDecimal(Get_Value("QtyEntered")) > (Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"])))
-                    {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
-                        return false;
-                    }
-                }
-            }
             // chck pallet Functionality applicable or not
             bool isContainrApplicable = MTransaction.ProductContainerApplicable(GetCtx());
 
@@ -397,7 +382,38 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
+            //VAI050-To Validate Requestion Quantity with Cart Quantity
+            //Quantity can not be greater than Requisition Quantity
+            if (GetM_RequisitionLine_ID() > 0)
+            {
+                string sql = "SELECT Qty,DTD001_DeliveredQty,DTD001_ReservedQty FROM M_RequisitionLine WHERE  M_RequisitionLine_ID=" + GetM_RequisitionLine_ID();
+                DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    decimal RemainingQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Qty"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_ReservedQty"]) -
+                             Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
+                    if (newRecord)
+                    {
+                        if (GetQtyInternalUse() > RemainingQty)
+                        {
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        decimal Value = Util.GetValueOfDecimal(GetQtyInternalUse()) - Util.GetValueOfDecimal(Get_ValueOld("QtyInternalUse"));
+                        if (Value > 0)
+                        {
+                            if (Value > RemainingQty)
+                            {
+                                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
             // SI_0644 - As on date and difference should be according to the precision of UOM attached.
             if (newRecord || Is_ValueChanged("AsOnDateCount"))
             {

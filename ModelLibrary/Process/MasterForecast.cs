@@ -139,9 +139,9 @@ namespace ViennaAdvantageServer.Process
                                           + " WHERE " +
                                           "pl.planneddate BETWEEN (SELECT startdate FROM c_period WHERE c_period_id = " + C_Period_ID + ") "
                                           + " AND (SELECT enddate FROM c_period WHERE c_period_id = " + C_Period_ID + ") " +
-                                          "AND pl.m_product_id =  " + Util.GetValueOfInt(dsForecast.Tables[0].Rows[i]["M_Product_ID"]) +
+                                          " AND pl.m_product_id =  " + Util.GetValueOfInt(dsForecast.Tables[0].Rows[i]["M_Product_ID"]) +
                                           " AND p.c_order_id IS NULL AND p.ref_order_id IS NULL AND pl.isactive = 'Y' "
-                                          + "GROUP BY C_Currency_ID,pl.C_UOM_ID";
+                                          + " GROUP BY C_Currency_ID,pl.C_UOM_ID";
 
                                     //totalQtyOpp = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
 

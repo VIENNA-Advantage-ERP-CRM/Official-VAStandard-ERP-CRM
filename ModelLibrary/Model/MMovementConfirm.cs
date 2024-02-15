@@ -660,7 +660,11 @@ namespace VAdvantage.Model
                     _processMsg = "ShipLine not saved - " + confirm;
                     return DocActionVariables.STATUS_INVALID;
                 }
-                if (confirm.IsFullyConfirmed())
+                if (GetDescription() != null && GetDescription().Contains("{->"))//VIS0336:placed this check for handling the material confirmation reversal case so that it can't execute the material transfer code again.
+                {
+
+                }
+                else if (confirm.IsFullyConfirmed())
                 {
                     confirm.SetProcessed(true);
                     confirm.Save(Get_TrxName());
@@ -696,47 +700,47 @@ namespace VAdvantage.Model
                 AddDescription(Msg.Translate(GetCtx(), "M_Movement_ID")
                        + ": " + _movementInfo);
             }
-
+            //VIS0336:Commented this part of code because this is also handled on movemenline after save in case of document update.
             //Amit 21-nov-2014 (Reduce reserved quantity from requisition and warehouse distribution center)
-            Tuple<String, String, String> mInfo = null;
-            if (Env.HasModulePrefix("DTD001_", out mInfo))
-            {
-                MMovementLine movementLine = null;
-                MRequisitionLine requisitionLine = null;
-                MStorage storage = null;
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    MMovementLineConfirm confirm = lines[i];
-                    if (confirm.GetDifferenceQty() > 0)
-                    {
-                        movementLine = new MMovementLine(GetCtx(), confirm.GetM_MovementLine_ID(), Get_Trx());
-                        if (movementLine.GetM_RequisitionLine_ID() > 0)
-                        {
-                            requisitionLine = new MRequisitionLine(GetCtx(), movementLine.GetM_RequisitionLine_ID(), Get_Trx());
-                            requisitionLine.SetDTD001_ReservedQty(decimal.Subtract(requisitionLine.GetDTD001_ReservedQty(), confirm.GetDifferenceQty()));
-                            if (!requisitionLine.Save(Get_Trx()))
-                            {
-                                _processMsg = Msg.GetMsg(GetCtx(), "DTD001_ReqNotUpdate");
-                                // _processMsg = "Requisitionline not updated";
-                                return DocActionVariables.STATUS_INVALID;
-                            }
-                            storage = MStorage.Get(GetCtx(), movementLine.GetM_Locator_ID(), movementLine.GetM_Product_ID(), movementLine.GetM_AttributeSetInstance_ID(), Get_Trx());
-                            if (storage == null)
-                            {
-                                storage = MStorage.Get(GetCtx(), movementLine.GetM_Locator_ID(), movementLine.GetM_Product_ID(), 0, Get_Trx());
-                            }
-                            storage.SetQtyReserved(decimal.Subtract(storage.GetQtyReserved(), confirm.GetDifferenceQty()));
-                            if (!storage.Save(Get_Trx()))
-                            {
-                                Get_Trx().Rollback();
-                                _processMsg = Msg.GetMsg(GetCtx(), "DTD001_StorageNotUpdate");
-                                //_processMsg = "Storage From not updated (MA)";
-                                return DocActionVariables.STATUS_INVALID;
-                            }
-                        }
-                    }
-                }
-            }
+            //Tuple<String, String, String> mInfo = null;
+            //if (Env.HasModulePrefix("DTD001_", out mInfo))
+            //{
+            //    MMovementLine movementLine = null;
+            //    MRequisitionLine requisitionLine = null;
+            //    MStorage storage = null;
+            //    for (int i = 0; i < lines.Length; i++)
+            //    {
+            //        MMovementLineConfirm confirm = lines[i];
+            //        if (confirm.GetDifferenceQty() > 0)
+            //        {
+            //            movementLine = new MMovementLine(GetCtx(), confirm.GetM_MovementLine_ID(), Get_Trx());
+            //            if (movementLine.GetM_RequisitionLine_ID() > 0)
+            //            {
+            //                requisitionLine = new MRequisitionLine(GetCtx(), movementLine.GetM_RequisitionLine_ID(), Get_Trx());
+            //                requisitionLine.SetDTD001_ReservedQty(decimal.Subtract(requisitionLine.GetDTD001_ReservedQty(), confirm.GetDifferenceQty()));
+            //                if (!requisitionLine.Save(Get_Trx()))
+            //                {
+            //                    _processMsg = Msg.GetMsg(GetCtx(), "DTD001_ReqNotUpdate");
+            //                    // _processMsg = "Requisitionline not updated";
+            //                    return DocActionVariables.STATUS_INVALID;
+            //                }
+            //                storage = MStorage.Get(GetCtx(), movementLine.GetM_Locator_ID(), movementLine.GetM_Product_ID(), movementLine.GetM_AttributeSetInstance_ID(), Get_Trx());
+            //                if (storage == null)
+            //                {
+            //                    storage = MStorage.Get(GetCtx(), movementLine.GetM_Locator_ID(), movementLine.GetM_Product_ID(), 0, Get_Trx());
+            //                }
+            //                storage.SetQtyReserved(decimal.Subtract(storage.GetQtyReserved(), confirm.GetDifferenceQty()));
+            //                if (!storage.Save(Get_Trx()))
+            //                {
+            //                    Get_Trx().Rollback();
+            //                    _processMsg = Msg.GetMsg(GetCtx(), "DTD001_StorageNotUpdate");
+            //                    //_processMsg = "Storage From not updated (MA)";
+            //                    return DocActionVariables.STATUS_INVALID;
+            //                }
+            //            }
+            //        }
+            //    }
+            //}
             //Amit
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
@@ -783,6 +787,7 @@ namespace VAdvantage.Model
             //Opening Stock , Qunatity Book => CurrentQty From Transaction of MovementDate
             //As On Date Count = Opening Stock - Diff Qty
             //Qty Count = Qty Book - Diff Qty
+
             query = "SELECT COUNT(*) FROM M_Transaction WHERE movementdate = " + GlobalVariable.TO_DATE(move.GetMovementDate(), true) + @" 
                            AND  M_Product_ID = " + mLine.GetM_Product_ID() + " AND M_Locator_ID = " + mLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + mLine.GetM_AttributeSetInstance_ID();
             result = Util.GetValueOfInt(DB.ExecuteScalar(query));
@@ -813,7 +818,15 @@ namespace VAdvantage.Model
                 }
             }
             //End
-
+            mLine.SetQtyEntered(confirm.GetConfirmedQty() + confirm.GetScrappedQty());
+            mLine.SetMovementQty(confirm.GetConfirmedQty() + confirm.GetScrappedQty());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. (Updating the orignal document first)
+            //mLine.Save(Get_Trx());
+            if (!mLine.Save(Get_Trx()))
+            {
+                log.Warning("MovementLineNotSaved");
+                _processMsg += "Inventory Move Line not created";
+                return false;
+            }
 
             //Lakhwinder
 
@@ -881,6 +894,7 @@ namespace VAdvantage.Model
                         _processMsg += "Inventory Move Line not created";
                         return false;
                     }
+
                 }
 
                 else
@@ -1109,9 +1123,9 @@ namespace VAdvantage.Model
                 }
             }	//	Scrapped
 
-            mLine.SetQtyEntered(confirm.GetConfirmedQty()+confirm.GetScrappedQty());
-            mLine.SetMovementQty(confirm.GetConfirmedQty()+confirm.GetScrappedQty());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. 
-            mLine.Save(Get_Trx());
+            //mLine.SetQtyEntered(confirm.GetConfirmedQty() + confirm.GetScrappedQty());
+            //mLine.SetMovementQty(confirm.GetConfirmedQty() + confirm.GetScrappedQty());//VIS0336:changes done for setting the Movement qty same as qty entered for orignal document when document updates from  matrial transafer confirmation complete button. 
+            //mLine.Save(Get_Trx());
             return true;
         }
 

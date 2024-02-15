@@ -86,7 +86,9 @@ namespace VAdvantage.Process
                           UserElement5_ID, UserElement6_ID, UserElement7_ID, UserElement8_ID, UserElement9_ID , GL_Budget_ID, C_ProjectPhase_ID, C_ProjectTask_ID, LedgerCode,LedgerName, Line ) ");
 
                 qry.Clear();
-                qry.Append(@"select " + (!DB.IsPostgreSQL() ? "MAX" : "") + "(" + C_ProfitLossLines_ID + " + " + DBFunctionCollection.RowNumAggregation("rownum") + ") AS C_ProfitLossLines_id, ft.AD_Client_ID , ft.AD_Org_ID , " + PL.GetC_ProfitLoss_ID() + " , " + prof.GetC_ProfitAndLoss_ID() + ",  ft.C_AcctSchema_ID,ft.PostingType, SUM(NVL(ft.AmtAcctDr, 0)),SUM(NVL(ft.AmtAcctCr, 0)),ft.Account_ID,ft.C_SubAcct_ID,ft.C_BPartner_ID,ft.M_Product_ID,ft.C_Project_ID,ft.C_SalesRegion_ID,ft.C_Campaign_ID,ft.AD_OrgTrx_ID,ft.C_LocFrom_ID,ft.C_LocTo_ID,ft.C_Activity_ID,ft.User1_ID,ft.User2_ID,ft.UserElement1_ID,ft.UserElement2_ID,"
+                //VIS_045: DevOps Task ID - 3355, 12-Dec-2023, Generate primary key column for Profit loss lines 
+                qry.Append(@" SELECT " + "(" + C_ProfitLossLines_ID + " + " + DBFunctionCollection.RowNumAggregation("rownum") + ") AS C_ProfitLossLines_id, t.* FROM (");
+                qry.Append(@"SELECT ft.AD_Client_ID , ft.AD_Org_ID , " + PL.GetC_ProfitLoss_ID() + " , " + prof.GetC_ProfitAndLoss_ID() + ",  ft.C_AcctSchema_ID,ft.PostingType, SUM(NVL(ft.AmtAcctDr, 0)),SUM(NVL(ft.AmtAcctCr, 0)),ft.Account_ID,ft.C_SubAcct_ID,ft.C_BPartner_ID,ft.M_Product_ID,ft.C_Project_ID,ft.C_SalesRegion_ID,ft.C_Campaign_ID,ft.AD_OrgTrx_ID,ft.C_LocFrom_ID,ft.C_LocTo_ID,ft.C_Activity_ID,ft.User1_ID,ft.User2_ID,ft.UserElement1_ID,ft.UserElement2_ID,"
                          + " ft.UserElement3_ID,ft.UserElement4_ID, ft.UserElement5_ID, ft.UserElement6_ID, ft.UserElement7_ID,ft.UserElement8_ID, ft.UserElement9_ID,ft.GL_Budget_ID,ft.C_ProjectPhase_ID,ft.C_ProjectTask_ID,"
                          + @" ev.Value as LedgerCode,ev.Name as LedgerName , " + (!DB.IsPostgreSQL() ? "MAX" : "") + @"((SELECT NVL(MAX(Line), 0) FROM C_ProfitLossLines   WHERE C_ProfitLoss_ID = " + PL.GetC_ProfitLoss_ID() + ") + (" + DBFunctionCollection.RowNumAggregation("rownum") + " * 10)) AS lineno from Fact_Acct ft inner join c_elementvalue ev on ft.account_id = ev.c_elementvalue_id where ft.ad_client_id = " + GetAD_Client_ID());
 
@@ -122,13 +124,15 @@ namespace VAdvantage.Process
                            ft.User2_ID,ft.UserElement1_ID,ft.UserElement2_ID, ft.UserElement3_ID,ft.UserElement4_ID, 
                            ft.UserElement5_ID, ft.UserElement6_ID, ft.UserElement7_ID,ft.UserElement8_ID, 
                            ft.UserElement9_ID,ft.GL_Budget_ID,ft.C_ProjectPhase_ID,ft.C_ProjectTask_ID, ev.Value,ev.Name");
+                qry.Append(" ) t ");
                 insert.Append(qry.ToString());
                 log.Info(insert.ToString());
                 int no = Util.GetValueOfInt(DB.ExecuteQuery(insert.ToString(), null, Get_Trx()));
                 if (no > 0)
                 {
                     // Update curentNext in AD_Sequence 
-                    C_ProfitLossLines_ID += (no + 1);
+                    //VIS_045: DevOps Task ID - 3355, 12-Dec-2023, Get Max Profit Loss lines ID to update the sequence
+                    C_ProfitLossLines_ID = ((Util.GetValueOfInt(DB.ExecuteScalar("SELECT MAX(C_ProfitLossLines_ID) from C_ProfitLossLines", null , Get_Trx()))) + 1);
                     String updateSQL = "UPDATE AD_Sequence SET  CurrentNext = " + C_ProfitLossLines_ID + ", CurrentNextSys = " + C_ProfitLossLines_ID + " "
                     + " WHERE Upper(Name)=Upper('C_ProfitLossLines')"
                     + " AND IsActive='Y' AND IsTableID='Y' AND IsAutoSequence='Y' ";

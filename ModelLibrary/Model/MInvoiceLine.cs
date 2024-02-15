@@ -241,7 +241,11 @@ namespace VAdvantage.Model
                 SetLine(oLine.GetLine());
                 SetIsDescription(oLine.IsDescription());
                 SetDescription(oLine.GetDescription());
-                //
+                //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of sales order.
+                if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
+                {
+                    Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
+                }
                 SetC_Charge_ID(oLine.GetC_Charge_ID());
                 //
                 // Set Drop ship Checkbox - Added by Vivek
@@ -294,7 +298,7 @@ namespace VAdvantage.Model
                 M_AttributeSetInstance_ID = sLine.GetM_AttributeSetInstance_ID();
                 SetM_InOutLine_ID(sLine.GetM_InOutLine_ID());
                 SetC_OrderLine_ID(sLine.GetC_OrderLine_ID());
-
+                
                 //
                 SetLine(sLine.GetLine());
                 SetIsDescription(sLine.IsDescription());
@@ -312,6 +316,12 @@ namespace VAdvantage.Model
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
                     MOrder ord = new MOrder(GetCtx(), oLine.GetC_Order_ID(), Get_TrxName());          //Added By Bharat
+                 //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
+                    if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
+                    {
+                        Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
+                    }
+
                     if (Get_ColumnIndex("S_ResourceAssignment_ID") >= 0)
                     {
                         SetS_ResourceAssignment_ID(oLine.GetS_ResourceAssignment_ID());
@@ -370,7 +380,7 @@ namespace VAdvantage.Model
                             if (prod.GetC_UOM_ID() == oLine.GetC_UOM_ID())
                             {
                                 decimal rate = (sLine.GetMovementQty() / sLine.GetQtyEntered());
-                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() * rate,priceListPrcision,MidpointRounding.AwayFromZero));
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceActual(Decimal.Round(oLine.GetPriceActual() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceLimit(Decimal.Round(oLine.GetPriceLimit() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 SetPriceList(Decimal.Round(oLine.GetPriceList() * rate, priceListPrcision, MidpointRounding.AwayFromZero));
@@ -378,14 +388,14 @@ namespace VAdvantage.Model
                             else if (prod.GetC_UOM_ID() != oLine.GetC_UOM_ID())
                             {
                                 decimal rate = (oLine.GetQtyOrdered() / oLine.GetQtyEntered());
-                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered()/rate, priceListPrcision,MidpointRounding.AwayFromZero));
-                                SetPriceActual(Decimal.Round(oLine.GetPriceActual()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
-                                SetPriceList(Decimal.Round(oLine.GetPriceList()/rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceEntered(Decimal.Round(oLine.GetPriceEntered() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceActual(Decimal.Round(oLine.GetPriceActual() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceLimit(Decimal.Round(oLine.GetPriceLimit() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
+                                SetPriceList(Decimal.Round(oLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
                             }
                             //}
                         }
-                     }
+                    }
                     //
                     SetC_Tax_ID(oLine.GetC_Tax_ID());
                     SetLineNetAmt(oLine.GetLineNetAmt());
@@ -912,7 +922,7 @@ namespace VAdvantage.Model
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
                 + "WHERE t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {
@@ -2426,7 +2436,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
             DataSet dsDiscountBreak = new DataSet();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2471,7 +2481,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2516,7 +2526,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2587,7 +2597,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
                 DataSet dsDiscountBreak = new DataSet();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2632,7 +2642,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2677,7 +2687,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " Order BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2745,7 +2755,7 @@ namespace VAdvantage.Model
                                 AND p.M_Product_ID               = " + GetM_Product_ID()
                                 + " AND pl.M_PriceList_ID            =" + M_PriceList_ID
                                 + " AND pp.M_AttributeSetInstance_ID = " + M_AttributeSetInstance_ID
-                                + "AND pp.C_UOM_ID                  = " + product.GetC_UOM_ID()
+                                + " AND pp.C_UOM_ID                  = " + product.GetC_UOM_ID()
                                 + " AND pp.IsActive                  ='Y' ORDER BY pv.ValidFrom DESC";
                 ds = DB.ExecuteDataset(sql);
                 if (ds.Tables.Count > 0)
@@ -3019,7 +3029,7 @@ namespace VAdvantage.Model
                         // when order not linked then get difference between current Cost Price on Vendor Return and APC
                         ds = DB.ExecuteDataset($@"SELECT ROUND(CurrencyConvert( CurrentCostPrice , {GetCtx().GetContextAsInt("$C_Currency_ID")},
                                                     {invoiceline.GetParent().GetC_Currency_ID()},
-                                                    {GlobalVariable.TO_DATE( invoiceline.GetParent().GetDateAcct() , true)},
+                                                    {GlobalVariable.TO_DATE(invoiceline.GetParent().GetDateAcct(), true)},
                                                     {invoiceline.GetParent().GetC_ConversionType_ID()},
                                                     {GetAD_Client_ID()} , {GetAD_Org_ID()})
                                                     * " + Math.Abs(invoiceline.GetQtyInvoiced()) + @", 10) AS TaxableAmt  
@@ -3681,8 +3691,8 @@ namespace VAdvantage.Model
                             }
                         }
                         /* Devops TaskID:1985 This method will not be called when invoice is creating 
-                          with Order reference .Because price will be the defined on Order only.*/                        
-                        if (GetC_OrderLine_ID()== 0)//if Orderline_ID equals to zero then SetPrice function will call
+                          with Order reference .Because price will be the defined on Order only.*/
+                        if (GetC_OrderLine_ID() == 0)//if Orderline_ID equals to zero then SetPrice function will call
                         {
                             SetPrice();
                         }
@@ -3967,6 +3977,32 @@ namespace VAdvantage.Model
 
                 }
 
+                //VIS0336:-Restrict the user to add greater amount than contract line Amount while creating PO line with contract line refrence.
+                if ((newRecord || Is_ValueChanged("LineNetAmt")) && Util.GetValueOfInt(Get_Value("VAS_ContractLine_ID")) > 0)
+                {
+                    string query = "SELECT (c.Amount-(a.t1+b.t2)) Actual  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
+                          " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
+                          " AND ol.VAS_ContractLine_ID = " + Get_Value("VAS_ContractLine_ID") + " AND o.IsBlanketTrx != 'N') a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                          " C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
+                          " il.VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + " AND il.C_InvoiceLine_ID!=" + GetC_InvoiceLine_ID() + " ) b , (SELECT Amount  FROM VAS_ContractLine" +
+                          "  WHERE VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ")c";
+                    DataSet ds1 = DB.ExecuteDataset(query, null, Get_Trx());
+                    decimal RemainingQty = 0;
+                    if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
+                    {
+                        RemainingQty = Util.GetValueOfDecimal(ds1.Tables[0].Rows[0]["ActualAmount"]);
+
+                    }
+
+
+                    if (GetLineNetAmt() > RemainingQty)
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                        return false;
+                    }
+                }
+
+
             }
             catch (Exception ex)
             {
@@ -4143,6 +4179,16 @@ namespace VAdvantage.Model
                 {
                     return false;
                 }
+            }
+            //VAI066:- Task ID 811 Add this Query to set NULL on Invoice if no IvoiceLine have Order is there.
+            //When Invoice line is deleted then update the order feild with another order.
+            if (GetC_OrderLine_ID() > 0)
+            {
+                String sQl = $@"UPDATE C_Invoice SET C_Order_ID = (SELECT MAX(C_OrderLine.C_Order_ID) FROM C_OrderLine 
+                            INNER JOIN C_InvoiceLine  ON (C_InvoiceLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID)
+                            WHERE C_InvoiceLine.C_Invoice_ID = {GetC_Invoice_ID()} AND
+                            C_OrderLine.IsActive = 'Y') WHERE C_Invoice_ID = {GetC_Invoice_ID()} AND IsActive = 'Y'";
+                int nos = DB.ExecuteQuery(sQl, null, Get_Trx());
             }
 
             return UpdateHeaderTax(inv);
@@ -4406,7 +4452,7 @@ namespace VAdvantage.Model
                 + (resetAmtDim ? ", AmtDimSubTotal = null " : "")       // reset Amount Dimension if Sub Total Amount is different
                 + (resetTotalAmtDim ? ", AmtDimGrandTotal = null " : "")     // reset Amount Dimension if Grand Total Amount is different
                 + (Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
-            + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+            + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {
@@ -4417,13 +4463,13 @@ namespace VAdvantage.Model
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines "
                     + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
-                    + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                    + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines+"
                         + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
                         + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
-                        + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                        + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {
@@ -4438,6 +4484,8 @@ namespace VAdvantage.Model
                 }
                 if (invoice.GetC_Withholding_ID() > 0)
                 {
+                    //VIS_427 BugId-3717 02/01/2024 Created the invoice object in order to get updated Grand total
+                    invoice = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_TrxName());
                     if (!invoice.SetWithholdingAmount(invoice))
                     {
                         log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "WrongBackupWithholding"));
@@ -5764,12 +5812,15 @@ namespace VAdvantage.Model
         {
             Decimal differenceAmt = 0.0M;
             // get expected freight amount of each (round upto 15 in query only) 
+            //VIS_045: 20/Dec/2023, Task ID - 3605, Get detail from exxpected Landed cost and GRN
             String sql = @"Select CASE When C_Expectedcostdistribution.Qty = 0 THEN 0
                             ELSE  ROUND(C_Expectedcostdistribution.Amt / C_Expectedcostdistribution.Qty , 15) 
-                            END AS Amt , CASE WHEN M_Product.IsCostAdjustmentOnLost='Y' THEN C_Expectedcostdistribution.Qty ELSE 0 END AS OrderlineQty 
-                        From M_Inoutline Inner Join C_Expectedcostdistribution On M_Inoutline.C_Orderline_Id = C_Expectedcostdistribution.C_Orderline_Id
-                        INNER JOIN C_Expectedcost ON C_Expectedcost.C_Expectedcost_Id = C_Expectedcostdistribution.C_Expectedcost_Id
-                        INNER JOIN M_Product ON M_Product.M_Product_ID = M_Inoutline.M_Product_ID 
+                            END AS Amt , CASE WHEN M_Product.IsCostAdjustmentOnLost='Y' THEN C_Expectedcostdistribution.Qty ELSE 0 END AS OrderlineQty,
+                            C_ExpectedCost.C_Currency_ID , C_ExpectedCost.C_ConversionType_ID, M_InOut.DateAcct
+                        From M_Inoutline Inner Join C_Expectedcostdistribution On (M_Inoutline.C_Orderline_Id = C_Expectedcostdistribution.C_Orderline_Id) 
+                        INNER JOIN C_Expectedcost ON (C_Expectedcost.C_Expectedcost_Id = C_Expectedcostdistribution.C_Expectedcost_Id) 
+                        INNER JOIN M_Product ON (M_Product.M_Product_ID = M_Inoutline.M_Product_ID) 
+                        INNER JOIN M_InOut ON (M_InOut.M_InOut_ID = M_Inoutline.M_InOut_ID)
                         WHERE m_inoutline.M_InoutLine_ID = " + M_Inoutline_ID + @"  AND C_Expectedcost.C_ExpectedCost_ID=" + C_ExpectedCost_ID;
             //differenceAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
@@ -5777,7 +5828,22 @@ namespace VAdvantage.Model
             Decimal orderedQty = 0;
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
+                // VIS_045: 20/Dec/2023, Task ID - 3605, Get Invoice Detail
+                sql = $@"SELECT C_Currency_ID, C_ConversionType_ID FROM C_Invoice WHERE C_Invoice_ID = {GetC_Invoice_ID()}";
+                DataSet dsInvoice = DB.ExecuteDataset(sql, null, Get_Trx());
+
                 differenceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Amt"]);
+
+                // Convert Expected landed cost amount from his currency to invoice currency
+                if (dsInvoice != null && dsInvoice.Tables[0].Rows.Count > 0 && 
+                    Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != 0 &&
+                    Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]))
+                {
+                    differenceAmt = MConversionRate.Convert(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
+                                Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]),
+                                Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateAcct"]),
+                                Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]), lc.GetAD_Client_ID(), lc.GetAD_Org_ID());
+                }
                 orderedQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["OrderlineQty"]);
             }
 

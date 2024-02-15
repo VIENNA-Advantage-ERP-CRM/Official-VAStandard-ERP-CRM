@@ -691,7 +691,18 @@ namespace VAdvantage.Model
             {
                 SetDateAcct(GetDateDoc());
             }
-
+            //VIS_427 15/1/2024 Bug_ID 3353 Handled Query to check if period belongs to year selected on header of GL Journal window
+            if(GetGL_JournalBatch_ID() > 0)
+            {
+                string sql = @"SELECT COUNT(C_Period_ID) FROM C_Period WHERE 
+                             C_Year_ID = (SELECT C_Year_ID FROM GL_JournalBatch WHERE GL_JournalBatch_ID=" + GetGL_JournalBatch_ID()+") AND C_Period_ID = " + GetC_Period_ID();
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+                if (count == 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_PeriodMisMatch")); 
+                    return false;
+                }
+            }
 
             // set currency of selected accounting schema
             MAcctSchema acctSchema = MAcctSchema.Get(GetCtx(), GetC_AcctSchema_ID());
@@ -898,7 +909,12 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 m_processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
             }
-
+            //VIS_427 27/12/2023 BugId 3199 handled transaction for non-business day
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            {
+                m_processMsg = Common.Common.NONBUSINESSDAY;
+                return DocActionVariables.STATUS_INVALID;
+            }
             // JID_0521 - Restrict if debit and credit amount is not equal.-Mohit-12-jun-2019.
             if (GetTotalCr() != GetTotalDr())
             {

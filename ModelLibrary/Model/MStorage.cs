@@ -329,7 +329,7 @@ namespace VAdvantage.Model
                 + "WHERE l.M_Warehouse_ID=" + M_Warehouse_ID
                 + " AND s.M_Product_ID=" + M_Product_ID
                 + " AND COALESCE(s.M_AttributeSetInstance_ID,0)= " + M_AttributeSetInstance_ID
-                + "ORDER BY l.PriorityNo DESC, M_AttributeSetInstance_ID";
+                + " ORDER BY l.PriorityNo DESC, M_AttributeSetInstance_ID";
             if (!FiFo)
             {
                 sql += " DESC";
@@ -349,15 +349,15 @@ namespace VAdvantage.Model
                 {
                     //sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>'" + String.Format("{0:dd-MMM-yy}", minGuaranteeDate) + "') "
                     //    + "ORDER BY asi.GuaranteeDate, M_AttributeSetInstance_ID";	//	Has Prio over Locator
-                    sql += "AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")"         // Changes done by Bharat for Italian Language
-                        + "ORDER BY NVL(asi.GuaranteeDate, TO_DATE('1970-01-01', 'YYYY-MM-DD')) , M_AttributeSetInstance_ID";	//	Has Prio over Locator
+                    sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>" + GlobalVariable.TO_DATE(minGuaranteeDate, true) + ")"         // Changes done by Bharat for Italian Language
+                        + " ORDER BY NVL(asi.GuaranteeDate, TO_DATE('1970-01-01', 'YYYY-MM-DD')) , M_AttributeSetInstance_ID";	//	Has Prio over Locator
                     if (!FiFo)
                         sql += " DESC";
                     sql += ", l.PriorityNo DESC, s.QtyOnHand DESC";
                 }
                 else
                 {
-                    sql += "ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.M_AttributeSetInstance_ID";
+                    sql += " ORDER BY l.PriorityNo DESC, l.M_Locator_ID, s.M_AttributeSetInstance_ID";
                     if (!FiFo)
                         sql += " DESC";
                     sql += ", s.QtyOnHand DESC";
@@ -1929,7 +1929,7 @@ namespace VAdvantage.Model
             //if (!types.isEmpty())
             if (types.Count > 0)
             {
-                qtyTypesSql.Append("AND QtyType in (");
+                qtyTypesSql.Append(" AND QtyType in (");
                 foreach (var type in types)
                 {
                     qtyTypesSql.Append("'");

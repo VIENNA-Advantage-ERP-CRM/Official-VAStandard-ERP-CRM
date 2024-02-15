@@ -290,8 +290,13 @@ namespace ViennaAdvantageServer.Process
                     }
                 }
                 fromProject.SetC_Order_ID(order.GetC_Order_ID());
-                fromProject.SetC_BPartner_ID(fromProject.GetC_BPartnerSR_ID());
-                fromProject.SetC_BPartnerSR_ID(0);
+                //VIA051: Update B_Partner field on Sales order when we run  Generate Order Process
+                if (C_BPartnerSR_ID > 0)
+                {
+                    fromProject.SetC_BPartner_ID(fromProject.GetC_BPartnerSR_ID());
+                    fromProject.SetC_BPartnerSR_ID(0);
+                }
+               
                 fromProject.SetGenerate_Order("Y");
 
                 if (!fromProject.Save())

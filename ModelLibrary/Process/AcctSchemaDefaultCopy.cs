@@ -155,7 +155,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 + " acct.P_TradeDiscountRec_Acct, acct.P_TradeDiscountGrant_Acct, acct.P_Resource_Absorption_Acct, acct.P_MaterialOverhd_Acct "
 				+ "FROM M_Product p"
 				+ " INNER JOIN M_Product_Category_Acct acct ON (acct.M_Product_Category_ID=p.M_Product_Category_ID)"
-				+ "WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID
+				+ " WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID
 				+ " AND p.M_Product_Category_ID=acct.M_Product_Category_ID"
 				+ " AND NOT EXISTS (SELECT * FROM M_Product_Acct pa "
 					+ "WHERE pa.M_Product_ID=p.M_Product_ID"
@@ -261,7 +261,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
 				+ " acct.C_Receivable_Acct, acct.C_Receivable_Services_Acct, acct.C_PrePayment_Acct "
 				+ "FROM C_BPartner p"
 				+ " INNER JOIN C_BP_Group_Acct acct ON (acct.C_BP_Group_ID=p.C_BP_Group_ID)"
-				+ "WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
+				+ " WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
 				+ " AND p.C_BP_Group_ID=acct.C_BP_Group_ID"
 				+ " AND NOT EXISTS (SELECT * FROM C_BP_Customer_Acct ca "
 					+ "WHERE ca.C_BPartner_ID=p.C_BPartner_ID"
@@ -279,7 +279,7 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
 				+ " acct.V_Liability_Acct, acct.V_Liability_Services_Acct, acct.V_PrePayment_Acct "
 				+ "FROM C_BPartner p"
 				+ " INNER JOIN C_BP_Group_Acct acct ON (acct.C_BP_Group_ID=p.C_BP_Group_ID)"
-				+ "WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
+				+ " WHERE acct.C_AcctSchema_ID=" + _C_AcctSchema_ID			//	#
 				+ " AND p.C_BP_Group_ID=acct.C_BP_Group_ID"
 				+ " AND NOT EXISTS (SELECT * FROM C_BP_Vendor_Acct va "
 					+ "WHERE va.C_BPartner_ID=p.C_BPartner_ID AND va.C_AcctSchema_ID=acct.C_AcctSchema_ID)";

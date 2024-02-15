@@ -56,6 +56,7 @@ namespace VAdvantage.Model
         private bool resetAmtDim = false;
         private bool resetTotalAmtDim = false;
         public bool skipQtyConversion = false;
+        private bool showQtyWarning = false;
         #endregion
 
         /// <summary>
@@ -658,7 +659,7 @@ namespace VAdvantage.Model
                 + "FROM C_Tax t"
                 + " INNER JOIN AD_Org o ON (t.AD_Client_ID=o.AD_Client_ID) "
                 + "WHERE t.IsTaxExempt='Y' AND o.AD_Org_ID= " + AD_Org_ID
-                + "ORDER BY t.Rate DESC";
+                + " ORDER BY t.Rate DESC";
             bool found = false;
             try
             {
@@ -2194,7 +2195,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             DataSet dsDiscountBreak = new DataSet();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2239,7 +2240,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2284,7 +2285,7 @@ namespace VAdvantage.Model
             query.Clear();
             query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                       + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
             dsDiscountBreak.Clear();
             dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
             if (dsDiscountBreak != null)
@@ -2355,7 +2356,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_ID = " + ProductId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 DataSet dsDiscountBreak = new DataSet();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2400,7 +2401,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID = " + productCategoryId
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -2445,7 +2446,7 @@ namespace VAdvantage.Model
                 query.Clear();
                 query.Append(@"SELECT M_Product_Category_ID , M_Product_ID , BreakValue , IsBPartnerFlatDiscount , BreakDiscount FROM M_DiscountSchemaBreak WHERE 
                                                                    M_DiscountSchema_ID = " + DiscountSchemaId + " AND M_Product_Category_ID IS NULL AND m_product_id IS NULL "
-                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + "Order BY BreakValue DESC");
+                                                                           + " AND IsActive='Y'  AND AD_Client_ID=" + ClientId + " ORDER BY BreakValue DESC");
                 dsDiscountBreak.Clear();
                 dsDiscountBreak = DB.ExecuteDataset(query.ToString(), null, null);
                 if (dsDiscountBreak != null)
@@ -4278,6 +4279,8 @@ namespace VAdvantage.Model
                 {
                     SetPriceEntered(Util.GetValueOfDecimal(Get_ValueOld("PriceEntered")));
                     SetPriceActual(GetPriceEntered());
+                    // VIS0060: DevOps ID: 5068 - Needs to give message when user trying to change the price after delivery.
+                    showQtyWarning = true;
                 }
 
                 //JID_1474 : if document is closed then we need to set Delivered qty as Ordered qty Suggested by Gagandeep kaur and Puneet that we do not
@@ -4668,6 +4671,31 @@ namespace VAdvantage.Model
                     }
                 }
             }
+            //VIS0336:-Restrict the user to add greater amount than contract line Amount while creating Invoice line with contract line refrence.
+            if ((newRecord || Is_ValueChanged("LineNetAmt")) && Util.GetValueOfInt(Get_Value("VAS_ContractLine_ID")) > 0)
+
+            {
+                string query = "SELECT (c.Amount-(a.t1+b.t2)) Actual  FROM (SELECT NVL(SUM(ol.LineNetAmt),0) AS t1 FROM C_Order " +
+                        " o INNER JOIN C_OrderLine oL  ON o.C_Order_ID = ol.C_Order_ID WHERE o.DocAction NOT IN ('VO','RC')  " +
+                        " AND ol.VAS_ContractLine_ID = " + Get_Value("VAS_ContractLine_ID") + " AND ol.C_OrderLine_ID!=" + GetC_OrderLine_ID() + (!Util.GetValueOfBool(Ord.Get_Value("IsBlanketTrx")) ? " AND IsBlanketTrx = 'N'" : "") + " ) a, (SELECT  NVL(SUM(il.LineNetAmt ),0) AS t2  FROM C_Invoice i INNER JOIN " +
+                        " C_InvoiceLine il ON i.C_Invoice_ID = il.C_Invoice_ID WHERE i.DocAction NOT IN ('VO','RC') AND " +
+                        " il.VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ") b , (SELECT Amount  FROM VAS_ContractLine" +
+                        "  WHERE VAS_ContractLine_ID =" + Get_Value("VAS_ContractLine_ID") + ")c";
+                DataSet ds = DB.ExecuteDataset(query, null, Get_Trx());
+                decimal RemainingQty = 0;
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    RemainingQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Actual"]);
+
+                }
+
+                if (GetLineNetAmt() > RemainingQty)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_ValidateQuantity"));
+                    return false;
+                }
+            }
+
 
             return true;
         }
@@ -4788,7 +4816,7 @@ namespace VAdvantage.Model
             {
                 resetAmtDim = true;
                 resetTotalAmtDim = true;
-            }
+            }           
 
             if (!IsProcessed())
             {
@@ -4905,8 +4933,13 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
-            return true;
 
+            // VIS0060: DevOps ID: 5068 - Needs to give message when user trying to change the price after delivery.
+            if (showQtyWarning)
+            {
+                log.SaveWarning("", Msg.GetMsg(GetCtx(), "VAS_CantChangePrice"));
+            }
+            return true;
         }
 
         /// <summary>

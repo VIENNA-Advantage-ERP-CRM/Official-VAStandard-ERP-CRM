@@ -790,6 +790,17 @@ namespace VAdvantage.Model
                 else if (bp.IsCreditWatch(GetC_BPartner_Location_ID()))
                     log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
             }
+            //VIS_427 14/12/2023 Bug Id:3069 Handled issue if user change the schedule from drop down then it should change the status of old schedule to 'Awaited'
+            int oldInvoiceScheduleid = Util.GetValueOfInt(Get_ValueOld("C_InvoicePaySchedule_ID"));
+            if (oldInvoiceScheduleid > 0 && (oldInvoiceScheduleid != GetC_InvoicePaySchedule_ID()))
+            {
+                UpdateExecutionStatus(oldInvoiceScheduleid, "J", "A", "C_InvoicePaySchedule", Get_Trx());
+            }
+            int oldOrderScheduleid = Util.GetValueOfInt(Get_ValueOld("VA009_OrderPaySchedule_ID"));
+            if (oldOrderScheduleid > 0 && (oldOrderScheduleid != GetVA009_OrderPaySchedule_ID()))
+            {
+                UpdateExecutionStatus(oldOrderScheduleid, "J", "A", "VA009_OrderPaySchedule", Get_Trx());
+            }
             /*VIS_427 23/11/2023 Bug Id:3069 Handled issue to set execution status to 'Assign to Journal' from 'Awaited'
               if user Save refernce of invoice from cash line*/
             if (GetC_InvoicePaySchedule_ID() > 0)

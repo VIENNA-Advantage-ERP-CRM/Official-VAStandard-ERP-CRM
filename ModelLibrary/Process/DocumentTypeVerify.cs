@@ -115,12 +115,13 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                 + " AND NOT EXISTS"
                 + " (SELECT * FROM C_PeriodControl pc "
                     + "WHERE pc.C_Period_ID=p.C_Period_ID AND pc.DocBaseType=dt.DocBaseType)";
-            IDataReader idr = null;
+            DataSet ds = null;
             int counter = 0;
             try
             {
-                idr = DataBase.DB.ExecuteReader(sql, null, trxName);
-                while (idr.Read())
+                //VIS_045: 19Jan2024, Task ID: 4681, use Dataset irrespective to IDataReader
+                ds = DB.ExecuteDataset(sql, null, trxName);
+                foreach(DataRow idr in ds.Tables[0].Rows)
                 {
                     int Client_ID = Utility.Util.GetValueOfInt(idr[0].ToString());
                     int Org_ID = Utility.Util.GetValueOfInt(idr[1].ToString());             // Get Organization from Period
@@ -139,14 +140,9 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
                     else
                         _log.Warning("Not saved: " + pc);
                 }
-                idr.Close();
             }
             catch (Exception e)
             {
-                if (idr != null)
-                {
-                    idr.Close();
-                }
                 _log.Log(Level.SEVERE, sql, e);
             }
 

@@ -168,7 +168,7 @@ namespace VAdvantage.Model
              (Date invoiced of original invoice - Due Date of original invoice) is added into date invoiced of new invoice */
             if (from.GetDateInvoiced() != null && from.GetDueDate() != null && !(!counter && setOrder))
             {
-                int DaysDiff = (from.GetDueDate()-from.GetDateInvoiced()).Value.Days;
+                int DaysDiff = (from.GetDueDate() - from.GetDateInvoiced()).Value.Days;
                 to.SetDueDate(to.GetDateInvoiced().Value.AddDays(DaysDiff));
             }
             to.SetDatePrinted(null);
@@ -188,6 +188,12 @@ namespace VAdvantage.Model
             to.SetIsTransferred(false);
             to.SetPosted(false);
             to.SetProcessed(false);
+            //VIS:0336:changes done for copy the contract id to reversal document.
+            if (to.Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(from.Get_Value("VAS_ContractMaster_ID")) > 0)
+            {
+                to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID"));
+
+            }
             //	delete references
             to.SetIsSelfService(false);
             if (!setOrder)
@@ -609,7 +615,12 @@ namespace VAdvantage.Model
             SetIsDiscountPrinted(order.IsDiscountPrinted());
             SetIsSelfService(order.IsSelfService());
             SetSendEMail(order.IsSendEMail());
-            //
+            //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of sales order.
+            if (order.Get_ValueAsInt("VAS_ContractMaster_ID") > 0)
+            {
+                Set_Value("VAS_ContractMaster_ID", order.Get_Value("VAS_ContractMaster_ID"));
+            }
+
             SetM_PriceList_ID(order.GetM_PriceList_ID());
             if (Util.GetValueOfInt(order.GetVAPOS_POSTerminal_ID()) > 0)
             {
@@ -650,7 +661,7 @@ namespace VAdvantage.Model
 
             SetIsSOTrx(ship.IsSOTrx());
             //vikas 9/16/14 Set cb partner 
-            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());
+            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());            
             MBPartner bp = null;
             if (Util.GetValueOfInt(ship.GetC_Order_ID()) > 0)
             {
@@ -665,7 +676,7 @@ namespace VAdvantage.Model
             //vikas
             //MBPartner bp = new MBPartner(GetCtx(), ship.GetC_BPartner_ID(), null);
             SetBPartner(bp);
-            SetAD_User_ID(ord.GetBill_User_ID());
+            SetAD_User_ID(ord.GetBill_User_ID());            
             //
             SetSendEMail(ship.IsSendEMail());
             //
@@ -696,6 +707,12 @@ namespace VAdvantage.Model
             {
                 SetC_Order_ID(ship.GetC_Order_ID());
                 MOrder order = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_TrxName());
+                //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of shipment.
+                if (order.Get_ValueAsInt("VAS_ContractMaster_ID") > 0)
+                {
+                    Set_Value("VAS_ContractMaster_ID", order.Get_Value("VAS_ContractMaster_ID"));
+                }
+
                 SetIsDiscountPrinted(order.IsDiscountPrinted());
                 SetDateOrdered(order.GetDateOrdered());
                 SetM_PriceList_ID(order.GetM_PriceList_ID());
@@ -1108,6 +1125,13 @@ namespace VAdvantage.Model
                 //end 
 
                 line.SetProcessed(false);
+                //VIS:0336:changes done for copy the contract line id to reversal document.
+                if (line.Get_ColumnIndex("VAS_ContractLine_ID") >= 0 && Util.GetValueOfInt(fromLine.Get_Value("VAS_ContractLine_ID")) > 0)
+                {
+                    line.Set_Value("VAS_ContractLine_ID", fromLine.Get_Value("VAS_ContractLine_ID"));
+
+                }
+
                 if (line.Save(Get_TrxName()))
                 {
                     count++;
@@ -1170,13 +1194,13 @@ namespace VAdvantage.Model
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines "
                     + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
-                    + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                    + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
                     + "SET GrandTotal=TotalLines+"
                         + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
                         + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
-                        + "WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                        + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
             {
@@ -1531,6 +1555,12 @@ namespace VAdvantage.Model
                 log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
                 return false;
             }
+            //VIS_427 Bug Id 3717 04/01/2024 Handled the GrandTotalAfterWitholding Amount When user unselect the Witholding id
+            if (GetC_Withholding_ID() == 0 && GetBackupWithholdingAmount() != 0)
+            { 
+                SetGrandTotalAfterWithholding(Decimal.Add(GetGrandTotalAfterWithholding(), GetBackupWithholdingAmount()));
+                SetBackupWithholdingAmount(0);
+            }
 
             //	Price List
             if (GetM_PriceList_ID() == 0)
@@ -1606,7 +1636,7 @@ namespace VAdvantage.Model
 
             // If lines are available and user is changing the pricelist/conversiontype on header than we have to restrict it because
             // those lines are saved as privious pricelist prices or Payment term.. standard sheet issue no : SI_0344 / JID_0564 / JID_1536_1 by Manjot
-            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")))
+            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")|| Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -1616,7 +1646,9 @@ namespace VAdvantage.Model
                     log.SaveWarning("", Msg.GetMsg(GetCtx(), "VIS_CantChange"));
                     return false;
                 }
+
             }
+
 
             if (!newRecord && Is_ValueChanged("C_PaymentTerm_ID") && Env.IsModuleInstalled("VA009_"))
             {
@@ -2292,7 +2324,7 @@ namespace VAdvantage.Model
                          WHERE o.InvoiceRule = {GlobalVariable.TO_STRING(MOrder.INVOICERULE_AfterOrderDelivered)}  
                          AND ol.QtyOrdered != ol.QtyDelivered AND inv.C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_TrxName()));
             if (C_InvoiceLine_ID > 0)
-            {               
+            {
                 _processMsg = Msg.GetMsg(GetCtx(), "InvoicingRuleMissMatch");
                 return DocActionVariables.STATUS_INVALID;
             }
@@ -2369,7 +2401,7 @@ namespace VAdvantage.Model
                         //If Payment Term Is Advance than system will check for there is any lines exist which is created without order Reference or through Independent Invoice.
                         int _OrdCount = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT SUM(TOTAL) FROM (SELECT COUNT(VA009_OrderPaySchedule_ID)AS TOTAL
                         FROM VA009_OrderPaySchedule WHERE IsActive = 'Y' AND VA009_IsPaid='N' AND C_Order_ID= " + GetC_Order_ID() +
-                        @"UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
+                        @" UNION SELECT COUNT(C_InvoiceLine_ID) AS TOTAL FROM C_InvoiceLine
                         WHERE C_Invoice_ID = " + GetC_Invoice_ID() + " AND M_Product_ID > 0 AND NVL(C_OrderLine_ID, 0) = 0)t"));
                         if (_OrdCount > 0)
                         {
@@ -2556,7 +2588,7 @@ namespace VAdvantage.Model
          */
         private void ExplodeBOM()
         {
-            String where = "AND IsActive='Y' AND EXISTS "
+            String where = " AND IsActive='Y' AND EXISTS "
                 + "(SELECT * FROM M_Product p WHERE C_InvoiceLine.M_Product_ID=p.M_Product_ID"
                 + " AND	p.IsBOM='Y' AND p.IsVerified='Y' AND p.IsStocked='N')";
             //
@@ -5196,107 +5228,143 @@ namespace VAdvantage.Model
         /// <returns>True/False to complete record or not</returns>
         private bool CheckContractData(MDocType dt)
         {
-            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0)
-            {
-                int ContractID = Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID"));
-                if (ContractID > 0)
-                {
-                    MVASContractMaster _vasCont = new
-                        MVASContractMaster(GetCtx(), ContractID, Get_Trx());
-                    decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
-                                            _vasCont.GetVAS_ContractUtilizedAmount();
-                    decimal OrdAmt = 0;
-                    if ((GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("API"))) ||
-                            (GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("ARI"))))
-                    {
-                        OrdAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@" SELECT GrandTotal 
-                                    FROM C_Order WHERE C_Order_ID = " + GetC_Order_ID(),
-                               null, Get_Trx()));
-                        if (!_vasCont.IsVAS_OverLimit())
-                        {
 
-                            //(Invoice total-purchase order grandtotal)-contractRemainingAmount
-                            //if contracremainingamount is 100 and purchase order was 50, now
-                            // contractavalible amount becomes 50, Invoice created 70 then 20 will be added 
-                            // in utilized amount 1500-1000 > 0
-                            if ((GetGrandTotal() - OrdAmt) > ContractRemainingAmt)
-                            {
-                                SetProcessed(false);
-                                log.Warning("GrandTotal is greater than " +
-                                    "contract amount " + ((GetGrandTotal() - OrdAmt) -
-                                    (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
-                                _processMsg = "@VAS_GrndTtllAmtGrtr@";
-                                return false;
-                            }
-                            else if ((GetGrandTotal() - OrdAmt) <= ContractRemainingAmt)
-                            {
-                                if ((GetGrandTotal() - OrdAmt) > 0)
-                                {
-                                    _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                   + (GetGrandTotal() - OrdAmt));
-                                    if (!_vasCont.Save())
-                                    {
-                                        log.Warning("ContractUtilizedAmount Not Updated");
-                                    }
-                                }
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            if ((GetGrandTotal() - OrdAmt) > 0)
-                            {
-                                _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                   + (GetGrandTotal() - OrdAmt));
-                                if (!_vasCont.Save())
-                                {
-                                    log.Warning("ContractUtilizedAmount Not Updated");
-                                }
-                            }
-                            return true;
-                        }
-                    }
-                    else if ((GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("API"))) ||
-                        (GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("ARI"))))
-                    {
-                        if (!_vasCont.IsVAS_OverLimit())
-                        {
-                            if (GetGrandTotal() > ContractRemainingAmt)
-                            {
-                                SetProcessed(false);
-                                log.Warning("GrandTotal is greater than " +
-                                    "contract amount " + (GetGrandTotal() -
-                                    (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
-                                _processMsg = "@VAS_GrndTtllAmtGrtr@";
-                                return false;
-                            }
-                            else if (GetGrandTotal() <= ContractRemainingAmt)
-                            {
-                                _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                               + GetGrandTotal());
-                                if (!_vasCont.Save())
-                                {
-                                    log.Warning("ContractUtilizedAmount Not Updated");
-                                }
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
-                                   + GetGrandTotal());
-                            if (!_vasCont.Save())
-                            {
-                                log.Warning("ContractUtilizedAmount Not Updated");
-                            }
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        return true;
-                    }
+            if (Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")) > 0)
+            {
+                decimal invoiceAmount = 0;
+                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is Reversed 
+                if (IsReversal())
+                {
+                    string SQL = "SELECT abs(TotalLines) FROM C_Invoice WHERE  C_Invoice_ID =" + GetC_Invoice_ID();
+                    invoiceAmount = Util.GetValueOfDecimal(DB.ExecuteScalar(SQL, null, Get_Trx()));
                 }
+                else
+                {
+                    invoiceAmount = GetTotalLines();
+                }
+                //VIS430:Changes done for updating the utilized amount on contract master header when invoice is completed and invoice TotalLines is greater than PO/SO TotalLines
+                decimal utilizeAmount = 0;
+                if (GetC_Order_ID() > 0)
+                {
+
+                    decimal orderTotal = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT TotalLines FROM C_Order 
+                                 WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx()));
+                    if (invoiceAmount > orderTotal)
+                    {
+                        utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(invoiceAmount) - Util.GetValueOfDecimal(orderTotal));
+                    }
+                    
+                   
+                }
+                else
+                {
+                    utilizeAmount = invoiceAmount;
+                }
+                int count = DB.ExecuteQuery(" UPDATE VAS_ContractMaster SET VAS_ContractUtilizedAmount= (NVL(VAS_ContractUtilizedAmount,0) " + (IsReversal() ? " - " : " + ") + utilizeAmount + ")" +
+                                                        " WHERE VAS_ContractMaster_ID=" + Util.GetValueOfInt(Get_Value("VAS_ContractMaster_ID")), null, Get_Trx());
+                if (count < 0)
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_CMHeaderNotUpdated");
+                    return false;
+                }
+                //}
+                //VIS0336:-these changes are handled on before save logic of order line.
+                //MVASContractMaster _vasCont = new
+                //    MVASContractMaster(GetCtx(), ContractID, Get_Trx());
+                //decimal ContractRemainingAmt = _vasCont.GetVAS_ContractAmount() -
+                //                        _vasCont.GetVAS_ContractUtilizedAmount();
+                //decimal OrdAmt = 0;
+                //if ((GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("API"))) ||
+                //        (GetC_Order_ID() > 0 && (dt.GetDocBaseType().Equals("ARI"))))
+                //{
+                //    OrdAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(@" SELECT GrandTotal 
+                //                FROM C_Order WHERE C_Order_ID = " + GetC_Order_ID(),
+                //           null, Get_Trx()));
+                //    if (!_vasCont.IsVAS_OverLimit())
+                //    {
+
+                //        //(Invoice total-purchase order grandtotal)-contractRemainingAmount
+                //        //if contracremainingamount is 100 and purchase order was 50, now
+                //        // contractavalible amount becomes 50, Invoice created 70 then 20 will be added 
+                //        // in utilized amount 1500-1000 > 0
+                //        if ((GetGrandTotal() - OrdAmt) > ContractRemainingAmt)
+                //        {
+                //            SetProcessed(false);
+                //            log.Warning("GrandTotal is greater than " +
+                //                "contract amount " + ((GetGrandTotal() - OrdAmt) -
+                //                (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                //            _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                //            return false;
+                //        }
+                //        else if ((GetGrandTotal() - OrdAmt) <= ContractRemainingAmt)
+                //        {
+                //            if ((GetGrandTotal() - OrdAmt) > 0)
+                //            {
+                //                _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                //               + (GetGrandTotal() - OrdAmt));
+                //                if (!_vasCont.Save())
+                //                {
+                //                    log.Warning("ContractUtilizedAmount Not Updated");
+                //                }
+                //            }
+                //            return true;
+                //        }
+                //    }
+                //    else
+                //    {
+                //        if ((GetGrandTotal() - OrdAmt) > 0)
+                //        {
+                //            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                //               + (GetGrandTotal() - OrdAmt));
+                //            if (!_vasCont.Save())
+                //            {
+                //                log.Warning("ContractUtilizedAmount Not Updated");
+                //            }
+                //        }
+                //        return true;
+                //    }
+                //}
+
+                //else if ((GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("API"))) ||
+                //    (GetC_Order_ID() == 0 && (dt.GetDocBaseType().Equals("ARI"))))
+                //{
+                //    if (!_vasCont.IsVAS_OverLimit())
+                //    {
+                //        if (GetGrandTotal() > ContractRemainingAmt)
+                //        {
+                //            SetProcessed(false);
+                //            log.Warning("GrandTotal is greater than " +
+                //                "contract amount " + (GetGrandTotal() -
+                //                (_vasCont.GetVAS_ContractAmount() - _vasCont.GetVAS_ContractUtilizedAmount())));
+                //            _processMsg = "@VAS_GrndTtllAmtGrtr@";
+                //            return false;
+                //        }
+                //        else if (GetGrandTotal() <= ContractRemainingAmt)
+                //        {
+                //            _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                //           + GetGrandTotal());
+                //            if (!_vasCont.Save())
+                //            {
+                //                log.Warning("ContractUtilizedAmount Not Updated");
+                //            }
+                //            return true;
+                //        }
+                //    }
+                //    else
+                //    {
+                //        _vasCont.SetVAS_ContractUtilizedAmount(_vasCont.GetVAS_ContractUtilizedAmount()
+                //               + GetGrandTotal());
+                //        if (!_vasCont.Save())
+                //        {
+                //            log.Warning("ContractUtilizedAmount Not Updated");
+                //        }
+                //        return true;
+
+                //else
+                //{
+                //    return true;
+                //}
+
             }
             return true;
         }
@@ -6817,6 +6885,7 @@ namespace VAdvantage.Model
             //}
             //}
             SetProcessed(true);
+
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
@@ -6848,8 +6917,6 @@ namespace VAdvantage.Model
             DB.ExecuteQuery("DELETE FROM C_RevenueRecognition_Plan WHERE C_RevenueRecognition_Plan_ID IN (SELECT C_RevenueRecognition_plan_ID FROM " +
                 "c_revenuerecognition_plan WHERE C_InvoiceLine_ID IN(SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE C_RevenueRecognition_ID IS NOT NULL AND " +
                 "C_Invoice_ID= " + GetC_Invoice_ID() + "))");
-
-
 
 
 
@@ -6973,6 +7040,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
             return false;
+
         }
 
         /** 
@@ -6983,6 +7051,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
             return false;
+
         }
 
         /***
@@ -7052,7 +7121,7 @@ namespace VAdvantage.Model
                 + "WHERE pl.C_Currency_ID=c.C_Currency_ID"
                 + " AND pl.M_PriceList_ID=plv.M_PriceList_ID"
                 + " AND pl.M_PriceList_ID=" + M_PriceList_ID                        //	1
-                + "ORDER BY plv.ValidFrom DESC";
+                + " ORDER BY plv.ValidFrom DESC";
             //	Use newest price list - may not be future
             IDataReader dr = null;
             try

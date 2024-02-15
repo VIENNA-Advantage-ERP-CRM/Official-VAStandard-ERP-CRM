@@ -2762,7 +2762,9 @@ namespace VAdvantage.Model
                                 if (no != 1)
                                     log.Log(Level.SEVERE, "Default Org in AcctSchamaElement NOT updated");
                             }
-                            if (ElementType.Equals("AC"))
+
+                            // VIS_045: 19Jan2024, Task ID: 4681, Update record when Element ID exist
+                            if (ElementType.Equals("AC") && C_Element_ID != 0)
                             {
                                 sqlCmd = new StringBuilder("UPDATE C_AcctSchema_Element SET C_ElementValue_ID=");
                                 sqlCmd.Append(C_ElementValue_ID).Append(", C_Element_ID=").Append(C_Element_ID);
@@ -2774,15 +2776,9 @@ namespace VAdvantage.Model
                         }
                     }
                 }
-                //rs.Close();
-
             }
             catch (Exception e1)
             {
-                //if (rs != null)
-                //{
-                //    rs.Close();
-                //}
                 log.Log(Level.SEVERE, "Elements", e1);
                 result = e1.Message + " Catch1";
                 m_info.Append(e1.Message);
@@ -3747,6 +3743,8 @@ namespace VAdvantage.Model
                 //  ProductPrice
                 MProductPrice pp = new MProductPrice(plv, product.GetM_Product_ID(),
                     Env.ONE, Env.ONE, Env.ONE);
+                // VIS_045: 19Jan2024, Task ID: 4681, set UOM as EACH
+                pp.SetC_UOM_ID(100);
                 if (!pp.Save())
                     log.Log(Level.SEVERE, "ProductPrice NOT inserted");
 
