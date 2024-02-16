@@ -237,7 +237,7 @@ namespace VAdvantage.Model
             // Check applied to restrict the records insertion from organization unit window if Cost center and profit center is not selected.
             if (Get_ColumnIndex("IsOrgUnit") > -1)
             {
-                //VAI082:When "Summary Level" checkbox is true then  profitcenter and costcenter  checkbox will be check.
+                //VAI082:When "Summary Level" checkbox is false then profitcenter and costcenter  checkbox will be check.
                 if (IsOrgUnit() && !IsSummary())
                 {
                     if (!IsProfitCenter() && !IsCostCenter())
