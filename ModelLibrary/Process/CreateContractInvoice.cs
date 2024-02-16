@@ -470,7 +470,7 @@ namespace ViennaAdvantageServer.Process
             MRole.OrgAccess[] accesss = MRole.GetDefault(GetCtx()).GetOrgAccess();//Get Organizations
 
             //VAI082:DevOps TaskID:5142 When user mark "Access All orgs" checkbox on Role window  and user click on Generate Invoice button on Service contract window
-            //then system will generate the invoice .
+            //then system will generate the invoice.
             if (MRole.GetDefault(GetCtx()).IsAccessAllOrgs())
             {
                 return true;
