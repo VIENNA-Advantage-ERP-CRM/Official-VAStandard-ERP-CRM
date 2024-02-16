@@ -47,9 +47,8 @@
             mTab.setValue("M_AttributeSetInstance_ID", null);
             var C_BPartner_ID = ctx.getContextAsInt(windowNo, "C_BPartner_ID");
             var qty = mTab.getValue("Qty");
-            //VAI051:- When change the Product then  RequitionQty and Qauntity should be "1"
-            mTab.setValue("QtyEntered", 1);
-            mTab.setValue("Qty", 1);
+           //VAI051:- When change the Product then  RequitionQty and Qauntity should be updated 
+            mTab.setValue("Qty", mTab.getValue("QtyEntered"));
             var isSOTrx = false;
             var M_PriceList_ID = ctx.getContextAsInt(windowNo, "M_PriceList_ID");
             var M_PriceList_Version_ID = ctx.getContextAsInt(windowNo, "M_PriceList_Version_ID");
