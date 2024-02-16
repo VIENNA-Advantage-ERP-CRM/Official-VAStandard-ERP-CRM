@@ -115,6 +115,10 @@
 
     CalloutInventoryMove.prototype.UOM = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (value == 0 || value == null || value.toString() == "") {
+          //VAI051:- When Qty is zero then Movement Qty should be 0;
+            if (value == 0) {
+                mTab.setValue("MovementQty", 0)
+            }
             return "";
 
         }
