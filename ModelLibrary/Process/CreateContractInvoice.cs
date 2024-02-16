@@ -433,8 +433,9 @@ namespace ViennaAdvantageServer.Process
         {
             _C_DocType_ID = 0;
             sql.Clear();
+            //VAI082:DevOps TaskID:5142 Get "C_DocType_ID" when ExpenseInvoice checkbox is false on Document types window. 
             sql.Append("SELECT C_DocType_ID FROM C_DocType "
-                      + "WHERE AD_Client_ID=" + cont.GetAD_Client_ID() + " AND IsActive='Y' AND AD_Org_ID IN(0," + cont.GetAD_Org_ID() + ") ");
+                      + "WHERE IsExpenseInvoice='N' AND AD_Client_ID=" + cont.GetAD_Client_ID() + " AND IsActive='Y' AND AD_Org_ID IN(0," + cont.GetAD_Org_ID() + ") ");
             // If Contract type not found consider as AR Invoice by default
             // When ContractType is Accounts Receivable
             if (string.IsNullOrEmpty(cont.GetContractType()) || cont.GetContractType().Equals(X_C_Contract.CONTRACTTYPE_AccountsReceivable))
@@ -467,11 +468,22 @@ namespace ViennaAdvantageServer.Process
         private bool CheckOrgAccess()
         {
             MRole.OrgAccess[] accesss = MRole.GetDefault(GetCtx()).GetOrgAccess();//Get Organizations
-            for (int i = 0; i < accesss.Length; i++)
+
+            //VAI082:DevOps TaskID:5142 When user mark "Access All orgs" checkbox on Role window  and user click on Generate Invoice button on Service contract window
+            //then system will generate the invoice .
+            if (MRole.GetDefault(GetCtx()).IsAccessAllOrgs())
             {
-                if (accesss[i].AD_Org_ID.Equals(cont.GetAD_Org_ID()))
+                return true;
+            }
+            
+            else
+            {
+                for (int i = 0; i < accesss.Length; i++)
                 {
-                    return true;
+                    if (accesss[i].AD_Org_ID.Equals(cont.GetAD_Org_ID()))
+                    {
+                        return true;
+                    }
                 }
             }
 
