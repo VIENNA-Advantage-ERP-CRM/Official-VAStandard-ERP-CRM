@@ -105,7 +105,7 @@ namespace VASLogic.Models
         /// 16/2/2024 This function is Used to Get the Order tax data 
         /// </summary>
         /// <param name="ctx">Context</param>
-        /// <param name="OrderId">Invoice ID</param>
+        /// <param name="OrderId">Order ID</param>
         /// <Author>VAI051:- Devops ID:</Author>
         /// <returns>returns the Order tax data</returns>
         public List<PurchaseOrderTabPanel> GetPurchaseOrderTaxData(Ctx ctx, int OrderId)
