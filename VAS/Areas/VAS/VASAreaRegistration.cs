@@ -86,7 +86,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/model/calloutInvRevaluation.js",
                    "~/Areas/VAS/Scripts/model/VAS_CalloutContract.js",
                    "~/Areas/VAS/Scripts/app/forms/PoReceiptTabPanel.js",
-                   "~/Areas/VAS/Scripts/app/forms/InvoiceTaxTabPanel.js"
+                   "~/Areas/VAS/Scripts/app/forms/InvoiceTaxTabPanel.js",
+                    "~/Areas/VAS/Scripts/app/forms/PurchaseOrderTabPanel.js"
                    );
 
 

@@ -100,6 +100,38 @@ namespace VASLogic.Models
             }
             return InvocieTaxTabPanel;
         }
+
+        /// <summary>
+        /// 16/2/2024 This function is Used to Get the Order tax data 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="OrderId">Invoice ID</param>
+        /// <Author>VAI051:- Devops ID:</Author>
+        /// <returns>returns the Order tax data</returns>
+        public List<PurchaseOrderTabPanel> GetPurchaseOrderTaxData(Ctx ctx, int OrderId)
+        {
+            List<PurchaseOrderTabPanel> PurchaseOrderTabPanel = new List<PurchaseOrderTabPanel>();
+            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded,cy.StdPrecision FROM C_OrderTax ct 
+                          INNER JOIN C_Order ci ON (ci.C_Order_ID = ct.C_Order_ID) 
+                          INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Order_ID = " + OrderId + " Order By t.Name";
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    PurchaseOrderTabPanel obj = new PurchaseOrderTabPanel();
+                    obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.TaxPaybleAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxBaseAmt"]);
+                    obj.TaxAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxAmt"]);
+                    obj.IsTaxIncluded = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsTaxIncluded"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    PurchaseOrderTabPanel.Add(obj);
+                }
+            }
+            return PurchaseOrderTabPanel;
+        }
     }
     public class TabPanel
     {
@@ -126,7 +158,23 @@ namespace VASLogic.Models
         public decimal TaxAmt { get; set; }
 
         public string IsTaxIncluded { get; set; }
+
         public int stdPrecision { get; set; }
+
+    }
+    public class PurchaseOrderTabPanel
+    {
+        public string TaxName { get; set; }
+
+        public decimal TaxPaybleAmt { get; set; }
+
+        public decimal TaxAmt { get; set; }
+
+        public string IsTaxIncluded { get; set; }
+
+        public int stdPrecision { get; set; }
+
+
 
     }
 }
