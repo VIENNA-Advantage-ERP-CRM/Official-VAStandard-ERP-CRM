@@ -5208,7 +5208,7 @@ namespace VAdvantage.Model
                 // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
                 if (GetC_Order_ID() > 0)
                 {
-                    MOrderLine.UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
+                    MOrder.UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
                 }
 
                 timeEstimation += " End at " + DateTime.Now.ToUniversalTime();
