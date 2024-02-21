@@ -1,4 +1,4 @@
-/*Read the instructions before start
+/*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
@@ -74,11 +74,20 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
 .vas-ap-sglItem {
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 2.5rem;
+    flex-wrap: wrap;
 }
+.vas-ap-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+}
+
 .vas-apcheckbox-label {
     font-weight: normal;
     font-size: 12px;
@@ -90,12 +99,21 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 .vas-singleTaxElementValue {
     font-weight: normal;
-    width:120px;
+    width:150px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+.vas-singleTaxElementValue1_first {
+    font-size: 14px;
+    display: block;
+    font-weight: normal;
+    width: 150px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .vas-apcheckbox-label {
@@ -117,12 +135,14 @@ Only index.html and style.css is for your use There is no need to copy any other
 .VAS-TaxDetail{
     padding: 5px 5px 5px 1px;
 }
-.vas-setTaxWidth{
-    width:24%
+/*.vas-setTaxWidth {
+    width: 24%
 }
 .vas-setTaxPaybleAmtWidth {
     width: 38%
+
 }
-.vas-setTaxAmtWidth {
+//.vas-setTaxAmtWidth {
     width: 38%
 }
+    */

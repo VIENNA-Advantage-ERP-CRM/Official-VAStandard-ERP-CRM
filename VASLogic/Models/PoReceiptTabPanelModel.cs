@@ -100,6 +100,83 @@ namespace VASLogic.Models
             }
             return InvocieTaxTabPanel;
         }
+
+        /// <summary>
+        /// 16/2/2024 This function is Used to Get the Order tax data 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="OrderId">Order ID</param>
+        /// <Author>VAI051:- Devops ID:</Author>
+        /// <returns>returns the Order tax data</returns>
+        public List<PurchaseOrderTabPanel> GetPurchaseOrderTaxData(Ctx ctx, int OrderId)
+        {
+            List<PurchaseOrderTabPanel> PurchaseOrderTabPanel = new List<PurchaseOrderTabPanel>();
+            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded,cy.StdPrecision FROM C_OrderTax ct 
+                          INNER JOIN C_Order ci ON (ci.C_Order_ID = ct.C_Order_ID) 
+                          INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Order_ID = " + OrderId + " Order By t.Name";
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    PurchaseOrderTabPanel obj = new PurchaseOrderTabPanel();
+                    obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.TaxPaybleAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxBaseAmt"]);
+                    obj.TaxAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxAmt"]);
+                    obj.IsTaxIncluded = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsTaxIncluded"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    PurchaseOrderTabPanel.Add(obj);
+                }
+            }
+            return PurchaseOrderTabPanel;
+        }
+        /// <summary>
+        /// 20/2/2024 This function is Used to Get the Order tax data 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="OrderLineId">Order ID</param>
+        /// <Author>VAI051:- Devops ID:</Author>
+        /// <returns>returns the Order tax data</returns>
+        public List<LineHistoryTabPanel>GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
+        {
+            List<LineHistoryTabPanel> LineHistoryTabPanel = new List<LineHistoryTabPanel>();
+            String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Product,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
+                          ol.PriceList,t.Name AS Tax,ol.Discount,ol.LineNetAmt,ol.Description FROM C_OrderLineHistory ol
+                          LEFT JOIN M_Product p ON p.M_Product_ID=ol.M_Product_ID
+                          LEFT JOIN C_Charge c ON c.C_Charge_ID=ol.C_Charge_ID
+                          LEFT JOIN C_UOM u ON u.C_UOM_ID=ol.C_UOM_ID
+                          INNER JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
+                          WHERE ol.C_OrderLine_ID = " + OrderLineID + " Order By t.Name";
+             DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    LineHistoryTabPanel obj = new LineHistoryTabPanel();
+                    obj.LineNo = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Line"]);
+                    obj.DateOrdered = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]);
+                    obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DatePromised"]);
+                    obj.Product = Util.GetValueOfString(ds.Tables[0].Rows[i]["Product"]);
+                    obj.Charge = Util.GetValueOfString(ds.Tables[0].Rows[i]["Charge"]);
+                    obj.Quantity = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyEntered"]);
+                    obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
+                    obj.QuantityOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
+                    obj.Price = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceEntered"]);
+                    obj.UnitPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceActual"]);
+                    obj.ListPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceList"]);
+                    obj.Tax =    Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
+                    obj.Discount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Discount"]);
+                    obj.LineAmount= Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
+                    obj.Description= Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
+
+                    LineHistoryTabPanel.Add(obj);
+                }
+            }
+            return LineHistoryTabPanel;
+        }
+
     }
     public class TabPanel
     {
@@ -126,7 +203,54 @@ namespace VASLogic.Models
         public decimal TaxAmt { get; set; }
 
         public string IsTaxIncluded { get; set; }
+
         public int stdPrecision { get; set; }
+
+    }
+    public class PurchaseOrderTabPanel
+    {
+        public string TaxName { get; set; }
+
+        public decimal TaxPaybleAmt { get; set; }
+
+        public decimal TaxAmt { get; set; }
+
+        public string IsTaxIncluded { get; set; }
+
+        public int stdPrecision { get; set; }
+    }
+
+    public class LineHistoryTabPanel
+    {
+        public int LineNo { get; set; }
+
+        public DateTime? DateOrdered{ get; set; }
+
+        public DateTime? DatePromised { get; set; }
+
+        public string Product {get;set;}
+
+        public string Charge { get; set; }
+
+        public decimal Quantity { get; set; }
+
+        public string UOM { get; set; }
+
+        public decimal QuantityOrdered { get; set; }
+
+        public decimal Price { get; set; }
+
+        public decimal ListPrice { get; set; }
+
+        public decimal  UnitPrice { get; set; }
+
+        public string Tax { get; set; }
+
+        public decimal Discount { get; set; }
+
+        public decimal LineAmount { get; set; }
+
+        public  string Description { get; set; }
 
     }
 }
