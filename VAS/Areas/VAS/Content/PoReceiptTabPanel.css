@@ -77,8 +77,6 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 2.5rem;
-    flex-wrap: wrap;
 }
 .vas-ap-sgl1Item1_First {
     display: flex;
@@ -99,7 +97,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 .vas-singleTaxElementValue {
     font-weight: normal;
-    width:150px;
+    width:120px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -135,14 +133,14 @@ Only index.html and style.css is for your use There is no need to copy any other
 .VAS-TaxDetail{
     padding: 5px 5px 5px 1px;
 }
-/*.vas-setTaxWidth {
+.vas-setTaxWidth {
     width: 24%
 }
 .vas-setTaxPaybleAmtWidth {
     width: 38%
 
 }
-//.vas-setTaxAmtWidth {
+.vas-setTaxAmtWidth {
     width: 38%
 }
-    */
+    
