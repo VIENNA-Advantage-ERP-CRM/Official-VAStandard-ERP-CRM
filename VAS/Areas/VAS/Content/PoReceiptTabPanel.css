@@ -74,11 +74,13 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
 .vas-ap-sglItem {
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
     gap: 2.5rem;
+    flex-wrap: wrap;
 }
+
 .vas-apcheckbox-label {
     font-weight: normal;
     font-size: 12px;
@@ -90,7 +92,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 .vas-singleTaxElementValue {
     font-weight: normal;
-    width:120px;
+    width:150px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -117,12 +119,14 @@ Only index.html and style.css is for your use There is no need to copy any other
 .VAS-TaxDetail{
     padding: 5px 5px 5px 1px;
 }
-.vas-setTaxWidth{
-    width:24%
+/*.vas-setTaxWidth {
+    width: 24%
 }
 .vas-setTaxPaybleAmtWidth {
     width: 38%
+
 }
-.vas-setTaxAmtWidth {
+//.vas-setTaxAmtWidth {
     width: 38%
 }
+    */
