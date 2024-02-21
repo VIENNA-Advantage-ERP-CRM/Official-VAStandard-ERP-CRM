@@ -5332,29 +5332,6 @@ namespace VAdvantage.Model
                 return false;
             }
             return true;
-        }
-
-        /// <summary>
-        /// VIS0060
-        /// Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
-        /// </summary>
-        /// <param name="C_Order_ID"></param>
-        public static void UpdateOrderStatus(Ctx ctx, int C_Order_ID, Trx trx)
-        {
-            string qry = @"UPDATE C_Order o SET o.VAS_Order_Status = 
-                            (SELECT CASE WHEN (SUM(QtyInvoiced) = 0 AND SUM(QtyDelivered) = 0) THEN 'OP' 
-                            WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN 'IN' 
-                            WHEN (SUM(QtyInvoiced) > 0 AND SUM(QtyInvoiced) < SUM(QtyOrdered)) THEN 'PI' 
-                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE' END AS Status
-                            WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD'
-                            FROM C_OrderLine WHERE C_Order_ID = o.C_Order_ID GROUP BY C_Order_ID) 
-                            WHERE o.C_Order_ID = " + C_Order_ID;
-
-            int no = DB.ExecuteQuery(qry, null, trx);
-            if (no <= 0)
-            {
-                _log.Info(Msg.GetMsg(ctx, "VAS_NotUpdated"));                
-            }            
-        }
+        }       
     }
 }

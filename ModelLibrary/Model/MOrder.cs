@@ -4242,72 +4242,6 @@ namespace VAdvantage.Model
                     }
                 }
 
-                SetProcessed(true);
-                _processMsg = Info.ToString();
-                //
-                SetDocAction(DOCACTION_Close);
-                //Changes by abhishek suggested by lokesh on 7/1/2016
-                //try
-                //{
-                //    int countVAPOS = Util.GetValueOfInt(DB.ExecuteScalar("Select count(*) from AD_ModuleInfo Where Prefix='VAPOS_'"));
-                //    if (countVAPOS > 0)
-                //    {
-                //        MPriceList priceLst = new MPriceList(GetCtx(), GetM_PriceList_ID(), null);
-                //        bool taxInclusive = priceLst.IsTaxIncluded();
-                //        int VAPOS_POSTertminal_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select VAPOS_POSTerminal_ID from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //        if (VAPOS_POSTertminal_ID > 0)
-                //        {
-                //            string cAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_CashPaid from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //            string pAmount = Util.GetValueOfString(DB.ExecuteScalar("Select VAPOS_PayAmt from c_Order Where C_Order_ID=" + GetC_Order_ID()));
-                //            List<string> tax_IDLst = new List<string>();
-                //            List<string> OLTaxAmtLst = new List<string>();
-                //            List<string> DscLineLst = new List<string>();
-
-                //            DataSet dsDE = DB.ExecuteDataset("select ol.C_Tax_ID, ol.VAPOS_DiscountAmount, ol.LINENETAMT, tx.rate from C_OrderLine ol inner join C_Tax tx on(ol.C_Tax_ID=tx.C_Tax_ID)  where C_Order_ID=" + GetC_Order_ID());
-                //            try
-                //            {
-                //                if (dsDE != null)
-                //                {
-                //                    if (dsDE.Tables[0].Rows.Count > 0)
-                //                    {
-                //                        for (int i = 0; i < dsDE.Tables[0].Rows.Count; i++)
-                //                        {
-                //                            tax_IDLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["C_Tax_ID"]));
-                //                            DscLineLst.Add(Util.GetValueOfString(dsDE.Tables[0].Rows[i]["VAPOS_DiscountAmount"]));
-                //                            decimal taxRate = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["rate"]);
-                //                            decimal LINENETAMT = Util.GetValueOfDecimal(dsDE.Tables[0].Rows[i]["LINENETAMT"]);
-                //                            if (taxInclusive)
-                //                            {
-                //                                OLTaxAmtLst.Add(Convert.ToString(((LINENETAMT / (100 + taxRate)) * (taxRate / 100))));
-                //                            }
-                //                            else
-                //                            {
-                //                                OLTaxAmtLst.Add(Convert.ToString(taxRate * LINENETAMT / 100));
-
-                //                            }
-
-                //                        }
-                //                    }
-                //                    dsDE.Dispose();
-                //                }
-                //            }
-                //            catch
-                //            {
-                //                if (dsDE != null) { dsDE.Dispose(); }
-                //            }
-                //            string[] tax_ID = tax_IDLst.ToArray();
-                //            string[] OLTaxAmt = OLTaxAmtLst.ToArray();
-                //            string[] DscLine = DscLineLst.ToArray();
-                //            SaveDayEndRecord(GetCtx(), VAPOS_POSTertminal_ID, cAmount, pAmount, GetC_DocType_ID(), tax_ID, OLTaxAmt, GetGrandTotal().ToString(), DscLine);
-                //        }
-                //    }
-                //}
-
-                //catch
-                //{
-                //    //ShowMessage.Error("MOrder",null,"CompleteIt");
-                //}
-
                 //VIS0336: update tender status po generated
                 if (!IsSOTrx() && Env.IsModuleInstalled("VA097_") && Util.GetValueOfInt(Get_Value("VA097_VendorDetails_ID")) > 0)
                 {
@@ -4320,6 +4254,11 @@ namespace VAdvantage.Model
 
                     }
                 }
+
+                SetProcessed(true);
+                _processMsg = Info.ToString();
+                //
+                SetDocAction(DOCACTION_Close);
             }
 
             catch
@@ -4327,6 +4266,12 @@ namespace VAdvantage.Model
                 //ShowMessage.Error("MOrder",null,"CompleteIt");
                 _processMsg = GetProcessMsg();
                 return DocActionVariables.STATUS_INVALID;
+            }
+
+            // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+            if (GetC_Order_ID() > 0)
+            {
+                UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
             }
 
             // Set the document number from completed document sequence after completed (if needed)
@@ -5155,6 +5100,24 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 }
             }
             return "";
+        }
+
+        /// <summary>
+        /// VIS0060
+        /// Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+        /// </summary>
+        /// <param name="C_Order_ID"></param>
+        public static void UpdateOrderStatus(Ctx ctx, int C_Order_ID, Trx trx)
+        {
+            string qry = @"UPDATE C_Order o SET o.VAS_Order_Status = 
+                            (SELECT CASE WHEN (SUM(QtyInvoiced) = 0 AND SUM(QtyDelivered) = 0) THEN 'OP' 
+                            WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN 'IN' 
+                            WHEN (SUM(QtyInvoiced) > 0 AND SUM(QtyInvoiced) < SUM(QtyOrdered)) THEN 'PI' 
+                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE' END AS Status
+                            WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD'
+                            FROM C_OrderLine WHERE C_Order_ID = o.C_Order_ID GROUP BY C_Order_ID) 
+                            WHERE o.C_Order_ID = " + C_Order_ID;
+            DB.ExecuteQuery(qry, null, trx);
         }
 
         //Changes by abhishek suggested by lokesh on 7/1/2016
