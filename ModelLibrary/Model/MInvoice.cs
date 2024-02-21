@@ -5160,15 +5160,7 @@ namespace VAdvantage.Model
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }   //	project
-
-                //	User Validation
-                String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-                if (valid != null)
-                {
-                    _processMsg = valid;
-                    return DocActionVariables.STATUS_INVALID;
-                }
-
+                
                 try
                 {
                     //	Counter Documents
@@ -5183,14 +5175,44 @@ namespace VAdvantage.Model
                     //Info.Append(" - @CounterDoc@: ").Append(e.Message.ToString());
                     _processMsg = e.Message.ToString();
                     return DocActionVariables.STATUS_INPROGRESS;
+                }                
+
+                /* Creation of allocation against invoice whose payment is done against order */
+                if (Env.IsModuleInstalled("VA009_") && DocActionVariables.STATUS_COMPLETED == "CO" && GetC_Order_ID() > 0)
+                {
+                    if (!AllocationAgainstOrderPayment(this))
+                    {
+                        return DocActionVariables.STATUS_INVALID;
+                    }
                 }
-
-                timeEstimation += " End at " + DateTime.Now.ToUniversalTime();
-
-                log.Warning(timeEstimation + " - " + GetDocumentNo());
+                //Some times when complete the Invoice with zero amount the header ispaid check box not getting true but on 
+                //but on schedule the IsPaid check is true - so handled here
+                //Trx is added to get current changes
+                int _IsNotPaid = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_InvoicePayschedule_ID) AS IsPaid FROM C_InvoicePayschedule WHERE VA009_IsPaid='N' AND IsActive='Y' AND C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx()));
+                if (_IsNotPaid == 0)
+                {
+                    SetIsPaid(true);
+                }
 
                 // JID_1290: Set the document number from completed document sequence after completed (if needed)
                 SetCompletedDocumentNo();
+
+                //	User Validation
+                String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                if (valid != null)
+                {
+                    _processMsg = valid;
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+                if (GetC_Order_ID() > 0)
+                {
+                    MOrderLine.UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
+                }
+
+                timeEstimation += " End at " + DateTime.Now.ToUniversalTime();
+                log.Info(timeEstimation + " - " + GetDocumentNo());
 
                 _processMsg = Info.ToString().Trim();
                 SetProcessed(true);
@@ -5200,24 +5222,7 @@ namespace VAdvantage.Model
             {
                 _log.Severe("Error found at Invoice Completion. Invoice Document no = " + GetDocumentNo() + " " + ex.Message);
                 return DocActionVariables.STATUS_INVALID;
-            }
-
-            /* Creation of allocation against invoice whose payment is done against order */
-            if (Env.IsModuleInstalled("VA009_") && DocActionVariables.STATUS_COMPLETED == "CO" && GetC_Order_ID() > 0)
-            {
-                if (!AllocationAgainstOrderPayment(this))
-                {
-                    return DocActionVariables.STATUS_INVALID;
-                }
-            }
-            //Some times when complete the Invoice with zero amount the header ispaid check box not getting true but on 
-            //but on schedule the IsPaid check is true - so handled here
-            //Trx is added to get current changes
-            int _IsNotPaid = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_InvoicePayschedule_ID) AS IsPaid FROM C_InvoicePayschedule WHERE VA009_IsPaid='N' AND IsActive='Y' AND C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx()));
-            if (_IsNotPaid == 0)
-            {
-                SetIsPaid(true);
-            }
+            }            
             return DocActionVariables.STATUS_COMPLETED;
         }
 
