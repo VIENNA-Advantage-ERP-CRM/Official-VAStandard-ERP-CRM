@@ -5113,8 +5113,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                             (SELECT CASE WHEN (SUM(QtyInvoiced) = 0 AND SUM(QtyDelivered) = 0) THEN 'OP' 
                             WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN 'IN' 
                             WHEN (SUM(QtyInvoiced) > 0 AND SUM(QtyInvoiced) < SUM(QtyOrdered)) THEN 'PI' 
-                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE' END AS Status
-                            WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD'
+                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE'
+                            WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD' END AS Status
                             FROM C_OrderLine WHERE C_Order_ID = o.C_Order_ID GROUP BY C_Order_ID) 
                             WHERE o.C_Order_ID = " + C_Order_ID;
             DB.ExecuteQuery(qry, null, trx);
