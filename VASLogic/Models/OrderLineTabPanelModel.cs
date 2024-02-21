@@ -64,7 +64,9 @@ namespace VASLogic.Models
         public List<MatchingTabPanel> GetMatchingData(Ctx ctx, int OrderLineId)
         {
             List<MatchingTabPanel> MatchingTabPanel = new List<MatchingTabPanel>();
-            String sql = @"SELECT asi.Description As attrdescription, ol.Line As orderlineno , iv.Line As invoicelineno, mt.DocumentNo As shipmentDocNo, inv.DocumentNo || '_' || iv.Line AS invoicedocno, mt.DocumentNo || '_'  || ml.Line AS shipmentlineno, po.DocumentNo || '_' || ol.Line AS PoDocumentNo, pr.Name AS productname, mo.DateTrx, mo.DocumentNo AS matchpono, mo.C_OrderLine_ID, mo.M_InOutLine_ID, mo.C_InvoiceLine_ID, mo.M_Product_ID, mo.M_AttributeSetInstance_ID, mo.Qty FROM M_MatchPO mo 
+            String sql = @"SELECT asi.Description As attrdescription, inv.DocumentNo || '_' || iv.Line AS invoicedocno, 
+                          mt.DocumentNo || '_'  || ml.Line AS shipmentlineno, po.DocumentNo || '_' || ol.Line AS PoDocumentNo, 
+                          pr.Name AS productname, mo.DateTrx, mo.DocumentNo AS matchpono, mo.Qty FROM M_MatchPO mo 
                           INNER JOIN C_OrderLine ol ON (mo.C_OrderLine_ID = ol.C_OrderLine_ID) 
                           INNER JOIN C_Order po ON (po.C_Order_ID = ol.C_Order_ID) 
                           INNER JOIN M_Product pr ON (pr.M_Product_ID = mo.M_Product_ID)
