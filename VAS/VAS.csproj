@@ -238,7 +238,9 @@
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\PurchaseOrderTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\RequisitionLinesTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vasattachusererror.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vasattachuser.js" />
