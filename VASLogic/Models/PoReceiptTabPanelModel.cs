@@ -6,7 +6,6 @@
        * Created by     : VAI066
       ******************************************************/
 using CoreLibrary.DataBase;
-using DocumentFormat.OpenXml.Math;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -143,7 +142,7 @@ namespace VASLogic.Models
         public List<LineHistoryTabPanel>GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
         {
             List<LineHistoryTabPanel> LineHistoryTabPanel = new List<LineHistoryTabPanel>();
-            String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Prodcut,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
+            String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Product,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
                           ol.PriceList,t.Name AS Tax,ol.Discount,ol.LineNetAmt,ol.Description FROM C_OrderLineHistory ol
                           LEFT JOIN M_Product p ON p.M_Product_ID=ol.M_Product_ID
                           LEFT JOIN C_Charge c ON c.C_Charge_ID=ol.C_Charge_ID
@@ -159,14 +158,14 @@ namespace VASLogic.Models
                     obj.LineNo = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Line"]);
                     obj.DateOrdered = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]);
                     obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DatePromised"]);
-                    obj.Product = Util.GetValueOfString(ds.Tables[0].Rows[i]["Prodcut"]);
+                    obj.Product = Util.GetValueOfString(ds.Tables[0].Rows[i]["Product"]);
                     obj.Charge = Util.GetValueOfString(ds.Tables[0].Rows[i]["Charge"]);
                     obj.Quantity = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyEntered"]);
                     obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
                     obj.QuantityOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
                     obj.Price = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceEntered"]);
-                    obj.UnitPrice = Util.GetValueOfInt(ds.Tables[0].Rows[i]["PriceActual"]);
-                    obj.ListPrice = Util.GetValueOfInt(ds.Tables[0].Rows[i]["PriceList"]);
+                    obj.UnitPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceActual"]);
+                    obj.ListPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceList"]);
                     obj.Tax =    Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
                     obj.Discount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Discount"]);
                     obj.LineAmount= Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
