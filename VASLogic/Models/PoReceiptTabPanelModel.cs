@@ -134,7 +134,7 @@ namespace VASLogic.Models
             return PurchaseOrderTabPanel;
         }
         /// <summary>
-        /// 21/2/2024 This function is Used to Get the Order tax data 
+        /// 20/2/2024 This function is Used to Get the Order tax data 
         /// </summary>
         /// <param name="ctx">Context</param>
         /// <param name="OrderLineId">Order ID</param>
@@ -148,10 +148,10 @@ namespace VASLogic.Models
                           LEFT JOIN M_Product p ON p.M_Product_ID=ol.M_Product_ID
                           LEFT JOIN C_Charge c ON c.C_Charge_ID=ol.C_Charge_ID
                           LEFT JOIN C_UOM u ON u.C_UOM_ID=ol.C_UOM_ID
-                          LEFT JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
+                          INNER JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
                           WHERE ol.C_OrderLine_ID = " + OrderLineID + " Order By t.Name";
              DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {

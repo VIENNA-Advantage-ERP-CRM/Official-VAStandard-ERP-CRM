@@ -2,7 +2,7 @@
  * Module Name    : VAS
  * Purpose        : Tab Panel created to get Line History  Data
  * chronological  : Development
- * Created Date   : 21 Feb 2024
+ * Created Date   : 20 Feb 2024
  * Created by     : VAI051
  ***********************************************************/
 ; VAS = window.VAS || {};
@@ -58,7 +58,7 @@
                 '</div>' +
                 '</div>');
         };
-        /*This function is used to get Order tax data*/
+        /*This function is used to get Line History  data*/
         this.getLineHistoryPanel = function (recordID) {
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetLineHistoryData",
