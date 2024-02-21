@@ -130,6 +130,7 @@
     <Compile Include="Models\Callouts\MWarehouseModel.cs" />
     <Compile Include="Models\ForecastFormModel.cs" />
     <Compile Include="Models\MChart.cs" />
+    <Compile Include="Models\OrderLineTabPanelModel.cs" />
     <Compile Include="Models\PaymentAllocation.cs" />
     <Compile Include="Models\PaymentAllocationModel.cs" />
     <Compile Include="Models\PaymentModel.cs" />
