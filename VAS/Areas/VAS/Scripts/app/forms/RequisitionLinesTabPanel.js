@@ -24,7 +24,7 @@
             "VAS_Requition",
             "VAS_Product",
             "VAS_Charge",
-            "VAS_Quantity",
+            "VAS_QuantityReq",
             "VAS_Uom",
             "VAS_UnitPrice",
             "VAS_LineAmount",
@@ -70,11 +70,11 @@
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Requition + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].RequisitionId +  '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].RequitionDocumentNo +  '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].ProductId + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].ProductName + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_QuantityReq + '</span>' +
@@ -82,11 +82,11 @@
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Charge + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].ChargeId + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].ChargeName + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Uom + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].UomId + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].UomName + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_UnitPrice + '</span>' +

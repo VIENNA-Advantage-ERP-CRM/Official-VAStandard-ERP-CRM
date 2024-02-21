@@ -27,7 +27,7 @@
             "VAS_InvoiceLineMatch",
             "VAS_Product",
             "VAS_AttributeSetInstance",
-            "VAS_Quantity",
+            "VAS_QuantityReq",
         ];
 
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
@@ -69,11 +69,11 @@
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_PurchaseOrderNo + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].PurchaseOrderNo + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].MatchPoNo + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderLine + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].OrderLine + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].PoDocumentNo + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_ShipmentLine + '</span>' +
@@ -81,7 +81,7 @@
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_InvoiceLineMatch + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].InvoiceLine + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].InvoiceDocNo + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>' +
