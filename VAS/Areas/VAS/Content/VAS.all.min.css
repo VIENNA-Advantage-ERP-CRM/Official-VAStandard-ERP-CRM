@@ -1,4 +1,4 @@
-﻿/*version 1.3.1.7*/
+﻿/*version 1.4.0.1*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -1213,4 +1213,133 @@ Only index.html and style.css is for your use There is no need to copy any other
     .vis-paymentPrint-field {
         width: 100%;
     }
+}
+
+.vas-parent,
+html[dir="rtl"].vas-parent {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    gap: 0.5rem;
+    margin: -11px -12px -2px -12px;
+}
+
+html[dir="rtl"].vas-parent {
+    display: flex;
+    align-items: center;
+    background: rgba(var(--v-c-secondary),1);
+    padding: 0.5rem;
+    gap: 0.5rem;
+    margin: -11px -12px 10px -12px;
+}
+
+.vas-root,
+html[dir="rtl"].vas-root {
+    width: 100%;
+    height: 100%;
+    background-color: #FFF;
+}
+
+.vas-lowerDiv,
+html[dir="rtl"].vas-lowerDiv {
+    height: calc(100% - 102px);
+    overflow: auto;
+}
+
+    .vas-lowerDiv .w2ui-grid-body,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
+        background-color: transparent;
+        height: 100% !important;
+    }
+
+    .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
+    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
+        height: 100% !important;
+    }
+
+    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+        overflow-x: hidden !important;
+    }
+
+.vas-bottom,
+html[dir="rtl"].vas-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px
+}
+
+.vas-actionbtn,
+html[dir="rtl"].vas-actionbtn {
+    background: rgba(var(--v-c-primary), 1);
+    border: none;
+    color: rgba(var(--v-c-on-primary), 1);
+    padding: 0.5rem 1.5rem;
+    border-radius: .25rem;
+    outline: none;
+    margin-left: 10px;
+}
+
+.vas-businessPartnerImg,
+html[dir="rtl"].vas-businessPartnerImg {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.vas-businessPartnerInput,
+html[dir="rtl"].vas-businessPartnerInput {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 0.5rem;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.input-group-text.vas-businessPartnerSearch,
+html[dir="rtl"].vas-businessPartnerSearch {
+    background: rgba(var(--v-c-primary), 1);
+    font-size: 18px !important;
+    color: #fff;
+    cursor: pointer
+}
+
+    .input-group-text.vas-businessPartnerSearch i {
+        color: inherit;
+    }
+
+.vas-noimageicon,
+html[dir="rtl"].vas-noimageicon {
+    font-size: 26px;
+}
+
+.vas-gridImageicon,
+html[dir="rtl"].vas-gridImageicon {
+    font-size: 1.2rem;
+}
+
+.vas-disableBtn,
+html[dir="rtl"].vas-disableBtn {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.vas-errorGridBody,
+html[dir="rtl"].vas-errorGridBody {
+    height: calc(100% - 35px);
+    overflow: auto;
+}
+
+.vas-disablePage,
+html[dir="rtl"].vas-disablePage {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.selected-page {
+    background-color: #f0f0f0;
+    font-weight: bold;
 }
