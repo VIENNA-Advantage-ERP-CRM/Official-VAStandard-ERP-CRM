@@ -60,7 +60,6 @@
                 success: function (data) {
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
-                        console.log(data);
                         if (data != null && data.length > 0) {
                             for (i = 0; i < data.length; i++) {
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +

@@ -29,14 +29,14 @@ namespace VASLogic.Models
             List<RequitionTabPanel> RequitionTabPanel = new List<RequitionTabPanel>();
             String sql = @"SELECT ch.Name AS chargename,req.DocumentNo AS requitiondocument,um.Name AS uomname,pr.Name As productname,re.Line,re.M_Requisition_ID,re.M_Product_ID,re.C_Charge_ID,re.Qty,re.C_UOM_ID,re.PriceActual,re.LineNetAmt,re.Description FROM M_RequisitionLine re 
                           INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = re.C_OrderLine_ID) 
-                          INNER JOIN M_Product pr ON (pr.M_Product_ID = re.M_Product_ID)
+                          LEFT JOIN M_Product pr ON (pr.M_Product_ID = re.M_Product_ID)
                           INNER JOIN C_UOM um ON (um.C_UOM_ID = re.C_UOM_ID)
                           INNER JOIN M_Requisition req ON (req.M_Requisition_ID = re.M_Requisition_ID)
                           LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = re.C_Charge_ID)
                           WHERE re.C_OrderLine_ID = " + OrderLineId + " Order By re.Line";
 
             DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
@@ -74,7 +74,7 @@ namespace VASLogic.Models
                           WHERE mo.C_OrderLine_ID = " + OrderLineId + " Order By mo.DocumentNo";
 
             DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {

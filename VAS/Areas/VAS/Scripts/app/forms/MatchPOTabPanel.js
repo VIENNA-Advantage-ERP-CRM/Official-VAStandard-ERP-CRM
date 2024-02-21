@@ -59,7 +59,6 @@
                 success: function (data) {
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
-                        console.log(data);
                         if (data != null && data.length > 0) {
                             for (i = 0; i < data.length; i++) {
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
@@ -81,7 +80,7 @@
                                     '<span class="vas-singleTaxElementValue">' + data[i].ShipmentLine + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_InvoiceLineMatch`` + '</span>' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_InvoiceLineMatch + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].InvoiceLine + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
@@ -93,7 +92,7 @@
                                     '<span class="vas-singleTaxElementValue">' + data[i].AttributeSetInstance + '</span>' +
                                     '</div>' +
                                     '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Quantity + '</span>' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_QuantityReq + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].Quantity + '</span>' +
                                     '</div>' +
                                     '</div >' +
