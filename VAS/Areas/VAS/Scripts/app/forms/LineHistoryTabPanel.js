@@ -78,13 +78,13 @@
                                    '<span class="vas-singleTaxElementTTl font-weight-bold">'+ VAS.translatedTexts.VAS_LineNo + '</span>'+
                                    '<span class="vas-singleTaxElementValue1_first">' + data[i].LineNo + '</span>'+
                                    '</div>'+
-                                   '<div class="vas-singleTaxElement ">' +
-                                   '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DateOrdered + '</span>'+
+                                 '<div class="vas-singleTaxElement ">' +
+                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DateOrdered + '</span>'+
                                 '<span class="vas-singleTaxElementValue1_first">' + new Date(data[i].DateOrdered).toLocaleDateString() + '</span>'+
-                                   '</div>'+
+                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DatePromised + '</span>'+
-                                 '<span class="vas-singleTaxElementValue1_first">' + new Date(data[i].DatePromised).toLocaleDateString()+ '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + new Date(data[i].DatePromised).toLocaleDateString()+ '</span>'+
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>'+
@@ -131,10 +131,11 @@
                                 '<span class="vas-singleTaxElementValue1_first">' + data[i].LineAmount + '</span>'+
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Description + '</span>'+
-                                    '<span class="vas-singleTaxElementValue1_first">' + data[i].Description + '</span>'+
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Description + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Description + '</span>'+
                                 '</div>'+
-                                '</div>' 
+                                '</div>'
+                                '</div>';
 
                                 //Appending design to wrapperDiv
                                 wrapperDiv.find('#VAS-TaxDetail_' + this.windowNo).append(TabPaneldesign);
