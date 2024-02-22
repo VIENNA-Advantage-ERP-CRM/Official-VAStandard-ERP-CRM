@@ -1,4 +1,5 @@
-﻿/*version 1.4.0.1*/
+﻿/*version 1.4.0.2*/
+
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -855,7 +856,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     margin: 10px 0 0;
 }
 
-/*Read the instructions before start
+/*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
@@ -940,7 +941,14 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+}
+
+.vas-ap-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
     gap: 2.5rem;
+    flex-wrap: wrap;
 }
 
 .vas-apcheckbox-label {
@@ -963,6 +971,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow: hidden;
 }
 
+.vas-singleTaxElementValue1_first {
+    font-size: 14px;
+    display: block;
+    font-weight: normal;
+    width: 150px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .vas-apcheckbox-label {
@@ -1343,3 +1360,5 @@ html[dir="rtl"].vas-disablePage {
     background-color: #f0f0f0;
     font-weight: bold;
 }
+
+
