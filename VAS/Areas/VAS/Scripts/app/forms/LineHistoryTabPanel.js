@@ -72,72 +72,70 @@
                         console.log(data);
                         if (data != null && data.length > 0) {
                             for (i = 0; i < data.length; i++) {
-                                var TabPaneldesign = (`<div class="vas-apListItem mb-2">
-                                    <div class="vas-ap-sgl1Item1_First mb-2">
-                                    
-                                    <div class="vas-singleTaxElement ">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_LineNo } </span>
-                                    <span class="vas-singleTaxElementValue1_first"> ${data[i].LineNo}</span>
-                                    </div> 
-                                    <div class="vas-singleTaxElement">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_DateOrdered } </span>
-                                    <span class="vas-singleTaxElementValue1_first"> ${new Date(data[i].DateOrdered).toLocaleDateString()} </span>
-                                    </div> 
-                                    <div class="vas-singleTaxElement "> 
-                                    <span class="vas-singleTaxElementTTl font-weight-bold">  ${VAS.translatedTexts.VAS_DatePromised } </span>  
-                                    <span class="vas-singleTaxElementValue1_first"> ${ new Date(data[i].DatePromised).toLocaleDateString()} </span>
-                                    </div> 
-                                    <div class="vas-singleTaxElement ">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold">  ${VAS.translatedTexts.VAS_Product} </span> 
-                                    <span class="vas-singleTaxElementValue"> ${data[i].Product} </span>
-                                    </div> 
-                                    <div class="vas-singleTaxElement ">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_Charge} </span> 
-                                    <span class="vas-singleTaxElementValue"> ${ data[i].Charge} </span> 
-                                    </div>
-                                    <div class="vas-singleTaxElement ">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_Quantity} </span>
-                                    <span class="vas-singleTaxElementValue"> ${data[i].Quantity} </span> 
-                                    </div>
-                                    <div class="vas-singleTaxElement ">
-                                    <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_UOM}  </span>
-                                    <span class="vas-singleTaxElementValue"> ${data[i].UOM} </span> 
-                                        </div>
-                                        <div class="vas-singleTaxElement ">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold"> ${ VAS.translatedTexts.VAS_QuantityOrdered} </span>
-                                        <span class="vas-singleTaxElementValue"> ${data[i].QuantityOrdered } </span>
-                                        </div>
-                                        <div class="vas-singleTaxElement ">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold"> ${ VAS.translatedTexts.VAS_Price} </span>
-                                        <span class="vas-singleTaxElementValue"> ${ data[i].Price } </span>
-                                         </div>
-                                        <div class="vas-singleTaxElement ">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold">  ${VAS.translatedTexts.VAS_ListPrice}  </span>
-                                        <span class="vas-singleTaxElementValue"> ${data[i].ListPrice}</span>
-                                        </div>
-                                        <div class="vas-singleTaxElement ">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold">${ VAS.translatedTexts.VAS_UnitPrice}</span>
-                                        <span class="vas-singleTaxElementValue">${ data[i].UnitPrice }</span>
-                                        </div>
-                                        <div class="vas-singleTaxElement">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_Tax} </span>
-                                        <span class="vas-singleTaxElementValue"> ${data[i].Tax}</span>
-                                        </div>
-                                        <div class="vas-singleTaxElement">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold">${VAS.translatedTexts.VAS_Discount}</span>
-                                        <span class="vas-singleTaxElementValue">${ data[i].Discount} </span>
-                                        </div>
-                                        <div class="vas-singleTaxElement">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold"> ${VAS.translatedTexts.VAS_LineAmount}</span>
-                                        <span class="vas-singleTaxElementValue">${ data[i].LineAmount} </span>
-                                        </div>
-                                        <div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">
-                                        <span class="vas-singleTaxElementTTl font-weight-bold"> ${ VAS.translatedTexts.VAS_Description} </span>
-                                        <span class="vas-singleTaxElementValue"> ${data[i].Description }</span>
-                                        </div>
-                                       </div>
-                                        </div>`);
-                                   
+                                var TabPaneldesign = '<div class="vas-apListItem mb-2">'+
+                                    '<div class="vas-ap-sgl1Item1_First mb-2">'+
+                                   '<div class="vas-singleTaxElement ">' +
+                                   '<span class="vas-singleTaxElementTTl font-weight-bold">'+ VAS.translatedTexts.VAS_LineNo + '</span>'+
+                                   '<span class="vas-singleTaxElementValue1_first">' + data[i].LineNo + '</span>'+
+                                   '</div>'+
+                                   '<div class="vas-singleTaxElement ">' +
+                                   '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DateOrdered + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + new Date(data[i].DateOrdered).toLocaleDateString() + '</span>'+
+                                   '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DatePromised + '</span>'+
+                                 '<span class="vas-singleTaxElementValue1_first">' + new Date(data[i].DatePromised).toLocaleDateString()+ '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                               '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Product + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Charge + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Charge + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Quantity + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Quantity + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_UOM + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].UOM + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_QuantityOrdered + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].QuantityOrdered + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Price + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Price + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_ListPrice + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].ListPrice + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_UnitPrice + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].UnitPrice + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Tax + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Tax + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                               '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Discount + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Discount + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_LineAmount + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + data[i].LineAmount + '</span>'+
+                                '</div>'+
+                                '<div class="vas-singleTaxElement ">' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Description + '</span>'+
+                                    '<span class="vas-singleTaxElementValue1_first">' + data[i].Description + '</span>'+
+                                '</div>'+
+                                '</div>' 
+
                                 //Appending design to wrapperDiv
                                 wrapperDiv.find('#VAS-TaxDetail_' + this.windowNo).append(TabPaneldesign);
                             }
