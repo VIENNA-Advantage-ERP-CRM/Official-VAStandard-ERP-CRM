@@ -88,7 +88,7 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/PoReceiptTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/InvoiceTaxTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/PurchaseOrderTabPanel.js",
-                   "~/Areas/VAS/Scripts/app/forms/LineHistoryTabPanel.js"
+                   "~/Areas/VAS/Scripts/app/forms/LineHistoryTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/RequisitionLinesTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/MatchPOTabPanel.js"
                    );
