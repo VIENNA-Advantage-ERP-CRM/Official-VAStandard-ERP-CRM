@@ -241,7 +241,7 @@ namespace ViennaAdvantageServer.Process
                                 count++;
                                 if (Record_id != 0)
                                 {
-                                    contact.SetRef_Contract_ID(New.GetC_Contract_ID());
+                                    //contact.SetRef_Contract_ID(New.GetC_Contract_ID());VIS430:Not set Updated Document No in Contract Ref field after Renew contract.
                                     contact.SetRenewContract("Y");
                                     if (!contact.Save())
                                     {
@@ -429,7 +429,7 @@ namespace ViennaAdvantageServer.Process
                             {
                                 newcon.Append(New.GetDocumentNo() + ",");
                                 count++;
-                                contact.SetRef_Contract_ID(New.GetC_Contract_ID());
+                                //contact.SetRef_Contract_ID(New.GetC_Contract_ID());VIS430:Not set Updated Document No in Contract Ref field after Renew contract.
                                 contact.SetRenewContract("Y");
                                 if (!contact.Save())
                                 {
