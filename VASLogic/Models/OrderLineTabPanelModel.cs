@@ -72,8 +72,8 @@ namespace VASLogic.Models
                           INNER JOIN M_Product pr ON (pr.M_Product_ID = mo.M_Product_ID)
                           INNER JOIN M_InOutLine ml ON (mo.M_InOutLine_ID = ml.M_InOutLine_ID)
                           INNER JOIN M_InOut mt ON (mt.M_InOut_ID = ml.M_InOut_ID)
-                          INNER JOIN C_InvoiceLine iv ON (iv.C_InvoiceLine_ID = mo.C_InvoiceLine_ID)
-                          INNER JOIN C_Invoice inv ON (inv.C_Invoice_ID = iv.C_Invoice_ID)
+                          LEFT JOIN C_InvoiceLine iv ON (iv.C_InvoiceLine_ID = mo.C_InvoiceLine_ID)
+                          LEFT JOIN C_Invoice inv ON (inv.C_Invoice_ID = iv.C_Invoice_ID)
                           LEFT JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = mo.M_AttributeSetInstance_ID)
                           WHERE mo.C_OrderLine_ID = " + OrderLineId + " Order By matchpono";
 
