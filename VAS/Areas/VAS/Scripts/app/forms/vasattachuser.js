@@ -359,9 +359,9 @@
             if (dGrid == null) {
             arrListColumns = [];
             if (arrListColumns.length == 0) {
-                arrListColumns.push({ field: "recid", caption: "recid", sortable: true, size: '10%', min: 100, hidden: true });
+                arrListColumns.push({ field: "recid", caption: "recid", sortable: false, size: '10%', min: 100, hidden: true });
                 arrListColumns.push({
-                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: true, size: '5%', min: 70, hidden: false,
+                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: false, size: '5%', min: 70, hidden: false,
                     render: function (rec) {
                         var recImage = rec.Image;
                         if (recImage != null) {
@@ -372,11 +372,11 @@
                         }
                     }
                 });
-                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: true, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: true, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: true, size: '9%', min: 110, hidden: false });
-                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: true, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: true, size: '7%', min: 130, hidden: false });
+                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: false, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: false, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: false, size: '9%', min: 110, hidden: false });
+                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: false, size: '9%', min: 130, hidden: false });
+                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: false, size: '7%', min: 130, hidden: false });
 
                 /* encode the tags */
                 w2utils.encodeTags(data);

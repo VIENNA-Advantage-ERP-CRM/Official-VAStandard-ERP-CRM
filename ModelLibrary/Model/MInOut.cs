@@ -4079,6 +4079,12 @@ namespace VAdvantage.Model
             // Set the document number from completede document sequence after completed (if needed)
             SetCompletedDocumentNo();
 
+            // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+            if (GetC_Order_ID() > 0)
+            {
+                MOrder.UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
+            }
+
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
