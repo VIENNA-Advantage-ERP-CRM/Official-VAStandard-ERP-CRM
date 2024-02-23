@@ -126,3 +126,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 .vas-setTaxAmtWidth {
     width: 38%
 }
+.vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
+    height: auto;
+}
+
