@@ -50,8 +50,6 @@
         };
         /*This function is used to get Order tax data*/
         this.getOrderTaxData = function (recordID) {
-            //wrapperDiv.empty();
-            wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetPurchaseOrderTaxData",
                 type: "GET",

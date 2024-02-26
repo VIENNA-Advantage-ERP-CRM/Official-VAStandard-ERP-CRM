@@ -61,7 +61,6 @@
         };
         /*This function is used to get Line History  data*/
         this.getLineHistoryPanel = function (recordID) {
-            //wrapperDiv.empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetLineHistoryData",
                 type: "GET",
@@ -144,11 +143,10 @@
                                 '</div>'+
                                 '</div>'
                                 '</div>';
-
-                                
+                                //Appending design to wrapperDiv
+                                wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).append(TabPaneldesign);
                             }
-                            //Appending design to wrapperDiv
-                            wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).append(TabPaneldesign);
+                           
                         }
                     }
                 },
@@ -176,7 +174,7 @@
         /* This will set width as per window width in dafault case it is 75% */
         VAS.LineHistoryTabPanel.prototype.sizeChanged = function (width) {
             this.panelWidth = width;
-            var size;
+           
 
 
 
