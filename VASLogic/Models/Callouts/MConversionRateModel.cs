@@ -15,39 +15,42 @@ namespace VIS.Models
         /// <param name="ctx"></param>
         /// <param name="fields"></param>
         /// <returns></returns>
-        public Decimal GetRate(Ctx ctx,string fields)
+        public Decimal GetRate(Ctx ctx, string fields)
         {
-           
-                string[] paramValue = fields.Split(',');
-                int CurFrom_ID;
-                int CurTo_ID;
-                DateTime? convDate;
-                int ConversionType_ID;
-                int AD_Client_ID;
-                int AD_Org_ID;
 
-                //Assign parameter value
-                CurFrom_ID = Util.GetValueOfInt(paramValue[0].ToString());
-                CurTo_ID = Util.GetValueOfInt(paramValue[1].ToString());
-            
-                // 18/7/2016 create only try catch block. if problem the get current date time
-                try {
-                    convDate = System.Convert.ToDateTime(paramValue[2].ToString());
-                }
-                catch {
-                    convDate = DateTime.Now;
-                }
-                //end 18/7/2016
-                
+            string[] paramValue = fields.Split(',');
+            int CurFrom_ID;
+            int CurTo_ID;
+            DateTime? convDate;
+            int ConversionType_ID;
+            int AD_Client_ID;
+            int AD_Org_ID;
 
-                ConversionType_ID = Util.GetValueOfInt(paramValue[3].ToString());
-                AD_Client_ID = Util.GetValueOfInt(paramValue[4].ToString());
-                AD_Org_ID = Util.GetValueOfInt(paramValue[5].ToString());
-               //End Assign parameter value
+            //Assign parameter value
+            CurFrom_ID = Util.GetValueOfInt(paramValue[0].ToString());
+            CurTo_ID = Util.GetValueOfInt(paramValue[1].ToString());
 
-                Decimal rate = MConversionRate.GetRate(CurFrom_ID, CurTo_ID, convDate, ConversionType_ID, AD_Client_ID, AD_Org_ID);
-                return rate;
-                
+            // 18/7/2016 create only try catch block. if problem the get current date time
+            try
+            {
+                // VIS_045: 26/02/2024 -> Handle UTC time issue
+                convDate = Util.GetValueOfDateTime(paramValue[2].ToString());
+            }
+            catch
+            {
+                convDate = DateTime.Now;
+            }
+            //end 18/7/2016
+
+
+            ConversionType_ID = Util.GetValueOfInt(paramValue[3].ToString());
+            AD_Client_ID = Util.GetValueOfInt(paramValue[4].ToString());
+            AD_Org_ID = Util.GetValueOfInt(paramValue[5].ToString());
+            //End Assign parameter value
+
+            Decimal rate = MConversionRate.GetRate(CurFrom_ID, CurTo_ID, convDate, ConversionType_ID, AD_Client_ID, AD_Org_ID);
+            return rate;
+
         }
         /// <summary>
         /// Convert
@@ -57,25 +60,25 @@ namespace VIS.Models
         /// <returns></returns>
         public Decimal Convert(Ctx ctx, string fields)
         {
-                string[] paramValue = fields.Split(',');
-                int CurFrom_ID;
-                int CurTo_ID;
-                //DateTime? convDate;
-                //int ConversionType_ID;
-                int AD_Client_ID;
-                int AD_Org_ID;
+            string[] paramValue = fields.Split(',');
+            int CurFrom_ID;
+            int CurTo_ID;
+            //DateTime? convDate;
+            //int ConversionType_ID;
+            int AD_Client_ID;
+            int AD_Org_ID;
 
-                //Assign parameter value
-                Decimal amt = Util.GetValueOfDecimal(paramValue[0].ToString());
-                CurFrom_ID = Util.GetValueOfInt(paramValue[1].ToString());
-                CurTo_ID = Util.GetValueOfInt(paramValue[2].ToString());
-                //CurTo_ID = Util.GetValueOfInt(paramValue[1].ToString());
-                //CurFrom_ID = Util.GetValueOfInt(paramValue[2].ToString());
-                AD_Client_ID = Util.GetValueOfInt(paramValue[3].ToString());
-                AD_Org_ID = Util.GetValueOfInt(paramValue[4].ToString());
-            
-                Decimal convert = MConversionRate.Convert(ctx, amt, CurFrom_ID, CurTo_ID, AD_Client_ID, AD_Org_ID);
-                return convert;
+            //Assign parameter value
+            Decimal amt = Util.GetValueOfDecimal(paramValue[0].ToString());
+            CurFrom_ID = Util.GetValueOfInt(paramValue[1].ToString());
+            CurTo_ID = Util.GetValueOfInt(paramValue[2].ToString());
+            //CurTo_ID = Util.GetValueOfInt(paramValue[1].ToString());
+            //CurFrom_ID = Util.GetValueOfInt(paramValue[2].ToString());
+            AD_Client_ID = Util.GetValueOfInt(paramValue[3].ToString());
+            AD_Org_ID = Util.GetValueOfInt(paramValue[4].ToString());
+
+            Decimal convert = MConversionRate.Convert(ctx, amt, CurFrom_ID, CurTo_ID, AD_Client_ID, AD_Org_ID);
+            return convert;
         }
 
         /// <summary>
@@ -97,10 +100,11 @@ namespace VIS.Models
             //Assign parameter value
             Decimal amt = Util.GetValueOfDecimal(paramValue[0].ToString());
             CurFrom_ID = Util.GetValueOfInt(paramValue[1].ToString());
-            CurTo_ID = Util.GetValueOfInt(paramValue[2].ToString());            
+            CurTo_ID = Util.GetValueOfInt(paramValue[2].ToString());
             try
             {
-                convDate = System.Convert.ToDateTime(paramValue[3].ToString());
+                // VIS_045: 26/02/2024 -> Handle UTC time issue
+                convDate = Util.GetValueOfDateTime(paramValue[3].ToString());
             }
             catch
             {
@@ -110,7 +114,7 @@ namespace VIS.Models
             AD_Client_ID = Util.GetValueOfInt(paramValue[5].ToString());
             AD_Org_ID = Util.GetValueOfInt(paramValue[6].ToString());
 
-            Decimal convert = MConversionRate.Convert(ctx, amt, CurFrom_ID, CurTo_ID, convDate,ConversionType_ID, AD_Client_ID, AD_Org_ID);
+            Decimal convert = MConversionRate.Convert(ctx, amt, CurFrom_ID, CurTo_ID, convDate, ConversionType_ID, AD_Client_ID, AD_Org_ID);
             return convert;
         }
     }
