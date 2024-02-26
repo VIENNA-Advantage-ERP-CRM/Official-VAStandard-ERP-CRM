@@ -11,13 +11,17 @@
 
     VAS.PurchaseOrderTabPanel = function () {
 
+        this.windowNo;
         this.record_ID = 0;
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
-        var lblTitle = null;
+        
         var ctx = this.ctx;
+        var self = this;
 
+        var lblTitle = null;
+       
         var elements = [
             "VAS_OrderTitleTabPanel",
             "VAS_OrderTax",
@@ -40,7 +44,7 @@
         function OrderTaxPanel() {
             wrapperDiv.append(
                 '<div class="vas-aptaxListGroup">' +
-                '<div id="VAS-TaxDetail_' + this.windowNo + '" class= "VAS-TaxDetail mb-2" > ' +
+                '<div id="VAS-TaxDetail_' + self.windowNo+'" class= "VAS-TaxDetail mb-2" > ' +
                 '</div>' +
                 '</div>');
         };
@@ -52,11 +56,17 @@
                 dataType: "json",
                 contentType: "application/json; charset=utf-8",
                 data: { OrderId: recordID },
+                complete: function () {
+                    if ($root.closest('.vis-ad-w-p-actionpanel-b').length > 0) {
+                        $root.closest('.vis-ad-w-p-ap-tp-outerwrap').css('height', '100%');
+                    }
+                },
                 success: function (data) {
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         console.log(data);
                         if (data != null && data.length > 0) {
+                            wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
                             for (i = 0; i < data.length; i++) {
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
                                     '<div class="vas-ap-sglItem mb-2">' +
@@ -79,10 +89,12 @@
                                     '</div>' +
                                     '</div>'
                                 //Appending design to wrapperDiv
-                                wrapperDiv.find('#VAS-TaxDetail_' + this.windowNo).append(TabPaneldesign);
+                                wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).append(TabPaneldesign);
+                               
                             }
 
                         }
+
                     }
                 },
                 error: function (eror) {
@@ -96,9 +108,9 @@
         };
 
         VAS.PurchaseOrderTabPanel.prototype.startPanel = function (windowNo, curTab) {
-            this.windowNo = windowNo;
-            this.curTab = curTab;
-            this.init();
+            self.windowNo = windowNo;
+            self.curTab = curTab;
+            self.init();
         };
         /* This function to update tab panel based on selected record */
         VAS.PurchaseOrderTabPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
@@ -109,6 +121,7 @@
         /* This will set width as per window width in dafault case it is 75% */
         VAS.PurchaseOrderTabPanel.prototype.sizeChanged = function (width) {
             this.panelWidth = width;
+
         };
         /* Disposing all variables from memory */
         VAS.PurchaseOrderTabPanel.prototype.dispose = function () {

@@ -126,6 +126,10 @@ Only index.html and style.css is for your use There is no need to copy any other
     padding: 5px 5px 0 0;
 }
 
+.vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
+    height: auto
+}
+
 .vas-apItem-checkbox input[type="checkbox"] {
     width: 11.5px;
     height: 11.5px;
