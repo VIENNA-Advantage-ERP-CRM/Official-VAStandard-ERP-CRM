@@ -61,5 +61,44 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// 16/2/2024 This function is Used to Get the Order tax data 
+        /// </summary>
+        /// <param name="OrderId">Invoice ID</param>
+        /// <Author> VAI051:- Devops ID: </Author>
+        /// <returns>returns the Order tax data</returns>
+        public JsonResult GetPurchaseOrderTaxData(int OrderId)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<PurchaseOrderTabPanel> result = obj.GetPurchaseOrderTaxData(ctx, OrderId);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// 20/2/2024 This function is Used to Get the Order tax data 
+        /// </summary>
+        /// <param name="OrderLineId">Invoice ID</param>
+        /// <Author> VAI051:- Devops ID: </Author>
+        /// <returns>returns the LineHistory Data</returns>
+        public JsonResult GetLineHistoryData(int OrderLineID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<LineHistoryTabPanel> result = obj.GetLineHistoryTabPanel(ctx, OrderLineID);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

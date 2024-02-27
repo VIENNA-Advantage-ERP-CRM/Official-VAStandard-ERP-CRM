@@ -1,4 +1,5 @@
-﻿/*Version 1.1.2.0*/
+﻿/*version 1.4.0.2*/
+
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -188,7 +189,7 @@
 }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-searchinput-block {
-        margin: 3px 0 4px;
+        margin: 3px 0 0px;
     }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-sort-block {
@@ -206,18 +207,27 @@
         z-index: 9;
     }
 
-    .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
-        top: 2px;
-        background-color: rgba(var(--v-c-on-primary));
+.vas-windowtab.vas-columnval.vas-reduceColValWidth {
+    width: 93%;
+}
+
+    .vas-windowtab.vas-columnval.vas-reduceColValWidth .vas-arrow-down {
+        right: -7%;
+        top: -9px;
     }
 
-    .vis-ad-w-p-actionpanel-r .vas-windowtab select {
-        width: 100%;
-        min-height: 35px;
-        border-radius: 2px;
-        font-size: 14px;
-        border-color: rgba(var(--v-c-secondary),1);
-    }
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
+    top: 2px;
+    background-color: rgba(var(--v-c-on-primary));
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab select {
+    width: 100%;
+    min-height: 35px;
+    border-radius: 2px;
+    font-size: 14px;
+    border-color: rgba(var(--v-c-secondary),1);
+}
 
 .vas-add-label label, .vas-add-filter label {
     width: 100%;
@@ -299,7 +309,6 @@
 }
 
 .vas-sqlgenerator {
-    display: flex;
     height: 100%;
     width: 100%;
 }
@@ -422,6 +431,9 @@
 
     .vas-filters-block div {
         float: left;
+        width: 260px;
+        text-overflow: ellipsis;
+        overflow: hidden;
     }
 
 .vas-filters-editdelete-btns div {
@@ -437,7 +449,7 @@
     float: left;
     margin-bottom: 10px;
     white-space: nowrap;
-    width: 300px;
+    width: 260px;
     text-overflow: ellipsis;
     overflow: hidden;
 }
@@ -729,13 +741,60 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-.vas-checkboxoption-hidden option {
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
     display: none;
 }
 
     .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
         display: block;
     }
+
+    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
+        display: none;
+    }
+
+    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+        display: block;
+    }
+
+.vas-remove-likeoption option:nth-last-child(3), .vas-remove-likeoption option:nth-last-child(4) {
+    display: none;
+}
+
+.vas-indropdown-text-input {
+    width: 100%;
+    margin-bottom: 17px;
+    min-height: 35px;
+    display: inline-block;
+}
+
+.vas-indropdown-block {
+    display: none;
+}
+
+    .vas-indropdown-block.vas-single-input .vas-arrow-down {
+        top: -16px;
+    }
+
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+    display: none;
+}
+
+    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
+    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
+        display: none;
+    }
+
+    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-likeoption option:nth-last-child(4), .vas-likeoption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+        display: block;
+    }
+
+.vas-likeoption option {
+    display: none;
+}
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     float: left;
@@ -797,7 +856,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     margin: 10px 0 0;
 }
 
-/*Read the instructions before start
+/*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
@@ -882,7 +941,14 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+}
+
+.vas-ap-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
     gap: 2.5rem;
+    flex-wrap: wrap;
 }
 
 .vas-apcheckbox-label {
@@ -905,6 +971,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow: hidden;
 }
 
+.vas-singleTaxElementValue1_first {
+    font-size: 14px;
+    display: block;
+    font-weight: normal;
+    width: 150px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .vas-apcheckbox-label {
@@ -917,6 +992,10 @@ Only index.html and style.css is for your use There is no need to copy any other
     height: calc(100vh - 300px);
     overflow-y: auto;
     padding: 5px 5px 0 0;
+}
+
+.vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
+    height: auto
 }
 
 .vas-apItem-checkbox input[type="checkbox"] {
@@ -938,6 +1017,10 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vas-setTaxAmtWidth {
     width: 38%
+}
+
+.vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
+    height: auto;
 }
 
 .vis-pSelectInfo {
@@ -1157,3 +1240,131 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 }
 
+.vas-parent,
+html[dir="rtl"].vas-parent {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    gap: 0.5rem;
+    margin: -11px -12px -2px -12px;
+}
+
+html[dir="rtl"].vas-parent {
+    display: flex;
+    align-items: center;
+    background: rgba(var(--v-c-secondary),1);
+    padding: 0.5rem;
+    gap: 0.5rem;
+    margin: -11px -12px 10px -12px;
+}
+
+.vas-root,
+html[dir="rtl"].vas-root {
+    width: 100%;
+    height: 100%;
+    background-color: #FFF;
+}
+
+.vas-lowerDiv,
+html[dir="rtl"].vas-lowerDiv {
+    height: calc(100% - 102px);
+    overflow: auto;
+}
+
+    .vas-lowerDiv .w2ui-grid-body,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
+        background-color: transparent;
+        height: 100% !important;
+    }
+
+    .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
+    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
+        height: 100% !important;
+    }
+
+    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+        overflow-x: hidden !important;
+    }
+
+.vas-bottom,
+html[dir="rtl"].vas-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px
+}
+
+.vas-actionbtn,
+html[dir="rtl"].vas-actionbtn {
+    background: rgba(var(--v-c-primary), 1);
+    border: none;
+    color: rgba(var(--v-c-on-primary), 1);
+    padding: 0.5rem 1.5rem;
+    border-radius: .25rem;
+    outline: none;
+    margin-left: 10px;
+}
+
+.vas-businessPartnerImg,
+html[dir="rtl"].vas-businessPartnerImg {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.vas-businessPartnerInput,
+html[dir="rtl"].vas-businessPartnerInput {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 0.5rem;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.input-group-text.vas-businessPartnerSearch,
+html[dir="rtl"].vas-businessPartnerSearch {
+    background: rgba(var(--v-c-primary), 1);
+    font-size: 18px !important;
+    color: #fff;
+    cursor: pointer
+}
+
+    .input-group-text.vas-businessPartnerSearch i {
+        color: inherit;
+    }
+
+.vas-noimageicon,
+html[dir="rtl"].vas-noimageicon {
+    font-size: 26px;
+}
+
+.vas-gridImageicon,
+html[dir="rtl"].vas-gridImageicon {
+    font-size: 1.2rem;
+}
+
+.vas-disableBtn,
+html[dir="rtl"].vas-disableBtn {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.vas-errorGridBody,
+html[dir="rtl"].vas-errorGridBody {
+    height: calc(100% - 35px);
+    overflow: auto;
+}
+
+.vas-disablePage,
+html[dir="rtl"].vas-disablePage {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.selected-page {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}

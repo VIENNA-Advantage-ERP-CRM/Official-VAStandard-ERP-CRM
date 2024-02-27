@@ -483,7 +483,8 @@ namespace VAdvantage.Model
                             return false;
                         }
                     }
-                    else if (IsInternalUse())
+                    //VAI050-No need to check if Line created with the reference of material transfer document
+                    else if (IsInternalUse() && _isManualEntry)
                     {
                         if ((OnHandQty - GetQtyInternalUse()) < 0)
                         {

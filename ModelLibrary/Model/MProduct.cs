@@ -644,7 +644,7 @@ namespace VAdvantage.Model
                 _precision = null;
             if (Util.GetValueOfInt(Env.GetCtx().GetContext("#AD_User_ID")) != 100)
             {
-                if (Is_ValueChanged("C_UOM_ID") || Is_ValueChanged("M_AttributeSet_ID"))
+                if (Is_ValueChanged("C_UOM_ID") || Is_ValueChanged("M_AttributeSet_ID") || Is_ValueChanged("M_Product_Category_ID"))//VIS430:Show message Transactions available in System when change Product category field value on Product tab of Product Window.
                 {
                     string uqry = "SELECT SUM(cc) as count FROM  (SELECT COUNT(*) AS cc FROM M_MovementLine WHERE M_Product_ID = " + GetM_Product_ID() + @"  UNION
                 SELECT COUNT(*) AS cc FROM M_InventoryLine WHERE M_Product_ID = " + GetM_Product_ID() + " UNION SELECT COUNT(*) AS cc FROM C_OrderLine WHERE M_Product_ID = " + GetM_Product_ID() +

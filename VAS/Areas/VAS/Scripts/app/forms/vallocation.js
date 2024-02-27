@@ -1609,12 +1609,14 @@
                 clearInvoiceArrays(e);
 
                 if ($allocationFrom.val() == "P") { // In case of Payment Cash Option must be visible
-                    $allocationTo.find("option[value=C]").show();
+                    /*VIS_427 30/01/2024 Devops Id 4680 Hide cash journal if Payment is selected on Allocationfrom field*/
+                    $allocationTo.find("option[value=C]").hide();
                     $allocationTo.find("option[value=P]").show();
                     $allocationTo.find("option[value=G]").show();
                 }
                 else if ($allocationFrom.val() == "C") { // In case of Cash Payment Option must be visible
-                    $allocationTo.find("option[value=P]").show();
+                    /*VIS_427 30/01/2024 Devops Id 4680 Hide Payment if cash journal is selected on Allocationfrom field*/
+                    $allocationTo.find("option[value=P]").hide();
                     $allocationTo.find("option[value=C]").show();// for Cash2Cash
                     $allocationTo.find("option[value=G]").show();
                 }
@@ -6672,6 +6674,8 @@
             //	Currency
             else if (name == "C_Currency_ID") {
                 _C_Currency_ID = parseInt(value);
+                //VIS_427 The function is called in order to get Precision according to currency
+                loadCurrencyPrecision()
                 ////////loadBPartner();
             }
             //	Date for Multi-Currency

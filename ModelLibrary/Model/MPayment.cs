@@ -1220,12 +1220,30 @@ namespace VAdvantage.Model
             return retValue;
         }
 
+        /// <summary>
+        /// 02/02/2024 This Function returns the sum of allocated amount of all alocations OF Charge
+        /// </summary>
+        /// <author> DevopsId 4680 VIS_427</author>
+        /// <returns>Allocated amount</returns>
+        public Decimal? GetAllocatedAmtForCharge()
+        {
+            String sql = "SELECT SUM(currencyConvert(al.Amount,"
+                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                + "FROM C_AllocationLine al"
+                + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
+                + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
+                + "WHERE al.C_Payment_ID=" + GetC_Payment_ID() + ""
+                + " AND ah.IsActive='Y' AND al.IsActive='Y'";
+            decimal AllocatedAmtCharge = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return AllocatedAmtCharge;
+        }
         /**
          * 	Test Allocation (and Set allocated flag)
          *	@return true if updated
          */
         public bool TestAllocation()
         {
+            Decimal? alloc = null;
             //	Cash Trx always allocated
             if (IsCashTrx())
             {
@@ -1237,7 +1255,14 @@ namespace VAdvantage.Model
                 return false;
             }
             //
-            Decimal? alloc = GetAllocatedAmt();
+            if (GetC_Charge_ID() != 0)
+            {
+                alloc = GetAllocatedAmtForCharge();
+            }
+            else
+            {
+                alloc = GetAllocatedAmt();
+            }
             if (alloc == null)
                 alloc = Env.ZERO;
             Decimal total = GetPayAmt() + (Get_ColumnIndex("WithholdingAmt") >= 0 ? (GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
@@ -1246,8 +1271,21 @@ namespace VAdvantage.Model
                 total = Decimal.Negate(total);
             bool test = total.CompareTo((Decimal)alloc) == 0;
             bool change = test != IsAllocated();
-            if (change)
-                SetIsAllocated(test);
+            //VIS_427 DevopsId 4680 get unallocated amount By subtracting allocated amount from total amount
+            decimal unallocatedAmt = Math.Abs(total) - Math.Abs(Util.GetValueOfDecimal(alloc)) - (Get_ColumnIndex("WithholdingAmt") >= 0 ? Math.Abs(GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
+            if (change || unallocatedAmt == 0) 
+            {
+                SetIsAllocated(true);
+                Set_Value("VAS_UnAllocatedAmount", 0);
+            }
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt greater than zero
+             then set Unallocated amount as positive*/
+            else if (!change && GetPayAmt() > 0)
+                Set_Value("VAS_UnAllocatedAmount", unallocatedAmt);
+            /*VIS_427 30/01/2024 DevopsId 4680 Handled if IsAllocated checkbox false and PayAmt less than zero
+             then set Unallocated amount as negative*/
+            else if (!change && GetPayAmt() < 0)
+                Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(unallocatedAmt));
             log.Fine("Allocated=" + test
                 + " (" + alloc + "=" + total + ")");
             return change;
@@ -2937,6 +2975,10 @@ namespace VAdvantage.Model
             {
                 if (!IsPrepayment())
                     SetIsAllocated(true);
+                else
+                {
+                    Set_Value("VAS_UnAllocatedAmount", GetPayAmt());
+                }
             }
             else if (GetReversalDoc_ID() == 0)
             {
@@ -5475,6 +5517,8 @@ namespace VAdvantage.Model
             reversal.SetDocAction(DOCACTION_Complete);
             //
             reversal.SetPayAmt(Decimal.Negate(GetPayAmt()));
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document 
+            reversal.Set_Value("VAS_UnAllocatedAmount", 0);
             reversal.SetDiscountAmt(Decimal.Negate(GetDiscountAmt()));
             reversal.SetWriteOffAmt(Decimal.Negate(GetWriteOffAmt()));
             reversal.SetOverUnderAmt(Decimal.Negate(GetOverUnderAmt()));
@@ -5665,6 +5709,8 @@ namespace VAdvantage.Model
             //	Unlink & De-Allocate
             DeAllocate();
             SetIsReconciled(reconciled);
+            //VIS_427 Devops ID 4680 Set Unallocated amount to zero on reversal of document
+            Set_Value("VAS_UnAllocatedAmount", 0);
             SetIsAllocated(true);	//	the allocation below is overwritten
             //	Set Status 
             AddDescription("(" + reversal.GetDocumentNo() + "<-)");
