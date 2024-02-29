@@ -55,7 +55,7 @@ namespace VASLogic.Models
             DataSet ds = DB.ExecuteDataset(sql1, param, null, pageSize, pageNo);
             sql.Clear();
             UserInfo userInfo = new UserInfo();
-            userInfo.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_User_ID) FROM ("+ sql1 + ")", param,null)); //Set count of records
+            userInfo.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_User_ID) FROM ("+ sql1 + ") t", param,null)); //Set count of records
             List<Userdetail> user = new List<Userdetail>();
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
