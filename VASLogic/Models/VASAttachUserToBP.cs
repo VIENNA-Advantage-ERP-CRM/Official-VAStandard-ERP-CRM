@@ -38,7 +38,7 @@ namespace VASLogic.Models
         {
             SqlParameter[] param = null;
             StringBuilder sql = new StringBuilder();
-            sql.Append("SELECT a.Name||' '||a.LastName as Name,a.Email,a.Mobile,a.Supervisor_ID,a.AD_User_ID," +
+            sql.Append("SELECT  NVL(a.Name,'') || ' ' || NVL(a.LastName,'') AS Name,a.Email,a.Mobile,a.Supervisor_ID,a.AD_User_ID," +
                 "a.AD_Image_ID,a.Value,b.Name as SupervisorName,c.ImageExtension " +
                 "FROM AD_User a LEFT JOIN AD_User b ON a.Supervisor_ID=b.AD_User_ID  " +
                 " LEFT JOIN AD_Image c ON a.AD_Image_ID=c.AD_Image_ID WHERE a.C_BPartner_ID " +
