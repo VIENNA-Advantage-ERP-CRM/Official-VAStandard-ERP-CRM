@@ -224,13 +224,14 @@ namespace VAdvantage.Model
         /// <returns>Allocated amount</returns>
         public Decimal AllocatedAmt(int AllocationLine_ID,int Payment_Id)
         {
+            /*On reverse of Allocation header the document changes to inactive, So 
+             in order to get correct Allocated  amount Removed IsActive check */
             String sql = "SELECT SUM(currencyConvert(al.Amount,"
                     + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
                 + "FROM C_AllocationLine al"
                 + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
                 + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
-                + "WHERE al.C_Payment_ID =" + Payment_Id + " AND al.C_AllocationLine_ID NOT IN ("+ AllocationLine_ID +")"
-                + " AND ah.IsActive='Y' AND al.IsActive='Y'";
+                + "WHERE al.C_Payment_ID =" + Payment_Id + " AND al.C_AllocationLine_ID NOT IN (" + AllocationLine_ID + ")";
             decimal AllocatedAmtValue = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             return AllocatedAmtValue;
         }
