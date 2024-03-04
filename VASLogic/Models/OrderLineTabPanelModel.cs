@@ -25,16 +25,18 @@ namespace VASLogic.Models
         /// <param name="OrderLineId"></param>
         /// <returns></returns>
         public List<RequitionTabPanel> GetRequitionLinesData(Ctx ctx, int OrderLineId)
+        
         {
             List<RequitionTabPanel> RequitionTabPanel = new List<RequitionTabPanel>();
-            String sql = @"SELECT ch.Name AS chargename, req.DocumentNo AS requitiondocument, um.Name AS uomname, pr.Name As productname, re.Line, re.M_Requisition_ID, re.M_Product_ID, re.C_Charge_ID, re.Qty, re.C_UOM_ID, re.PriceActual, re.LineNetAmt, re.Description FROM M_RequisitionLine re 
+            String sql = @"SELECT ch.Name AS chargename, req.DocumentNo AS requitiondocument, um.Name AS uomname, pr.Name As productname, re.Line, re.M_Requisition_ID, re.M_Product_ID, re.C_Charge_ID, re.Qty, re.C_UOM_ID, re.PriceActual, re.LineNetAmt, re.Description, cy.StdPrecision FROM M_RequisitionLine re 
                           INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = re.C_OrderLine_ID) 
                           INNER JOIN C_UOM um ON (um.C_UOM_ID = re.C_UOM_ID)
                           INNER JOIN M_Requisition req ON (req.M_Requisition_ID = re.M_Requisition_ID)
-                          LEFT JOIN M_Product pr ON (pr.M_Product_ID = re.M_Product_ID)
-                          LEFT JOIN C_Charge ch ON (ch.C_Charge_ID = re.C_Charge_ID)
+                          LEFT JOIN M_PriceList pcc ON(pcc.M_PriceList_ID = req.M_PriceList_ID)
+                          LEFT JOIN C_Currency cy ON(cy.C_Currency_ID = pcc.C_Currency_ID)
+                          LEFT JOIN M_Product pr ON(pr.M_Product_ID = re.M_Product_ID)
+                          LEFT JOIN C_Charge ch ON(ch.C_Charge_ID = re.C_Charge_ID)
                           WHERE re.C_OrderLine_ID = " + OrderLineId + " Order By re.Line";
-
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -50,6 +52,7 @@ namespace VASLogic.Models
                     obj.LineNetAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
                     obj.Description = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
                     obj.Qty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Qty"]);
+                    obj.StdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
                     RequitionTabPanel.Add(obj);
                 }
             }
@@ -111,8 +114,8 @@ namespace VASLogic.Models
         public decimal PriceActual { get; set; }
         public decimal LineNetAmt { get; set; }
         public string Description { get; set; }
-
-    }
+        public int StdPrecision { get; set; }
+}
 
     public class MatchingTabPanel
     {

@@ -62,43 +62,47 @@
                         data = JSON.parse(data);
                         if (data != null && data.length > 0) {
                             for (i = 0; i < data.length; i++) {
+                                //VIS430:Handled Duplication of data on Requisition Tab Panel
+                                wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
-                                    '<div class="vas-ap-sglItem mb-2">' +
-                                    '<div class="vas-singleTaxElement vas-setTaxWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_LineNo + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].LineNo + '</span>' +
+                                    '<div class="vas-ap-sglItem d-flex flex-column mb-2">' +
+                                    '<div class="vas-singleItemListWrap mb-2">' +
+                                    '<div class="vas-singleTaxElement vas-setTaxWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold w-100">' + VAS.translatedTexts.VAS_LineNo + '</span>' +
+                                    '<span class="vas-singleRequesitionValue">' + data[i].LineNo + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Requition + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].RequitionDocumentNo +  '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold w-100">' + VAS.translatedTexts.VAS_Requition + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + data[i].RequitionDocumentNo +  '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].ProductName + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setShipWidth vas-setChargeWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold vas-tp-widthpro">' + VAS.translatedTexts.VAS_Product + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + data[i].ProductName + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_QuantityReq + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].Qty + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxProWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold">' + VAS.translatedTexts.VAS_QuantityReq + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + data[i].Qty.toLocaleString() + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Charge + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].ChargeName + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxProWidth vas-setChargeWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold vas-setShipWidth">' + VAS.translatedTexts.VAS_Charge + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + data[i].ChargeName + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Uom + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].UomName + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxProWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold">' + VAS.translatedTexts.VAS_Uom + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + data[i].UomName + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_UnitPrice + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].PriceActual + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxProWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold">' + VAS.translatedTexts.VAS_UnitPrice + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + (data[i].PriceActual).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].StdPrecision, maximumFractionDigits: data[i].StdPrecision }) + '</span>' +//VIS430:Handled Precision unit price on Requisition Tab Panel
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_LineAmount + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].LineNetAmt + '</span>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxProWidth vas-setUomWidth">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold">' + VAS.translatedTexts.VAS_LineAmount + '</span>' +
+                                    '<span class="vas-singleRequesitionValue w-100">' + (data[i].LineNetAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].StdPrecision, maximumFractionDigits: data[i].StdPrecision }) + '</span>' + //VIS430:Handled Precision Line Amount on Requisition Tab Panel
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Description + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].Description + '</span>' +
+                                    '</div>' +
+                                    '<div class="vas-singleTaxElement">' +
+                                    '<span class="vas-singleTaxElementTTl w-100 font-weight-bold vas-setReqAmtWidth">' + VAS.translatedTexts.VAS_Description + '</span>' +
+                                    '<span class="vas-singleTaxDescription">' + data[i].Description + '</span>' +
                                     '</div>' +
                                     '</div >' +
                                     '</div>'
