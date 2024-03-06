@@ -61,9 +61,10 @@
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         if (data != null && data.length > 0) {
+                         wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
                             for (i = 0; i < data.length; i++) {
                                 //VIS430:Handled Duplication of data on Requisition Tab Panel
-                                wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
+                               
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
                                     '<div class="vas-ap-sglItem d-flex flex-column mb-2">' +
                                     '<div class="vas-singleItemListWrap mb-2">' +
