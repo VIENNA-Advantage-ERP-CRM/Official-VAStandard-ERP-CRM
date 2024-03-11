@@ -111,7 +111,7 @@ namespace VASLogic.Models
         public List<PurchaseOrderTabPanel> GetPurchaseOrderTaxData(Ctx ctx, int OrderId)
         {
             List<PurchaseOrderTabPanel> PurchaseOrderTabPanel = new List<PurchaseOrderTabPanel>();
-            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded,cy.StdPrecision FROM C_OrderTax ct 
+            String sql = @"SELECT t.Name,(ci.DocumentNo || '_' || ci.DateOrdered) AS DocumentNo ,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded,cy.StdPrecision FROM C_OrderTax ct 
                           INNER JOIN C_Order ci ON (ci.C_Order_ID = ct.C_Order_ID) 
                           INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
                           INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Order_ID = " + OrderId + " Order By t.Name";
@@ -123,6 +123,7 @@ namespace VASLogic.Models
                 {
                     PurchaseOrderTabPanel obj = new PurchaseOrderTabPanel();
                     obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
                     obj.TaxPaybleAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxBaseAmt"]);
                     obj.TaxAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxAmt"]);
                     obj.IsTaxIncluded = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsTaxIncluded"]);
@@ -143,11 +144,13 @@ namespace VASLogic.Models
         {
             List<LineHistoryTabPanel> LineHistoryTabPanel = new List<LineHistoryTabPanel>();
             String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Product,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
-                          ol.PriceList,t.Name AS Tax,ol.Discount,ol.LineNetAmt,ol.Description FROM C_OrderLineHistory ol
+                          ol.PriceList,t.Name AS Tax,ol.Discount,ol.LineNetAmt,ol.Description,cy.StdPrecision FROM C_OrderLineHistory ol
+                         INNER JOIN C_OrderLine o ON o.C_OrderLine_ID = ol.C_OrderLine_ID 
                           LEFT JOIN M_Product p ON p.M_Product_ID=ol.M_Product_ID
                           LEFT JOIN C_Charge c ON c.C_Charge_ID=ol.C_Charge_ID
                           LEFT JOIN C_UOM u ON u.C_UOM_ID=ol.C_UOM_ID
                           INNER JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
+                            INNER JOIN C_Currency cy ON (cy.C_Currency_ID = o.C_Currency_ID)
                           WHERE ol.C_OrderLine_ID = " + OrderLineID + " Order By t.Name";
              DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -170,6 +173,7 @@ namespace VASLogic.Models
                     obj.Discount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Discount"]);
                     obj.LineAmount= Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
                     obj.Description= Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
 
                     LineHistoryTabPanel.Add(obj);
                 }
@@ -210,6 +214,7 @@ namespace VASLogic.Models
     public class PurchaseOrderTabPanel
     {
         public string TaxName { get; set; }
+        public string DocumentNo { get; set; }
 
         public decimal TaxPaybleAmt { get; set; }
 
@@ -251,6 +256,8 @@ namespace VASLogic.Models
         public decimal LineAmount { get; set; }
 
         public  string Description { get; set; }
+
+        public int stdPrecision { get; set; }
 
     }
 }

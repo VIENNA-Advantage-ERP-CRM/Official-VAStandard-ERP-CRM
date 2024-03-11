@@ -158,6 +158,14 @@ Only index.html and style.css is for your use There is no need to copy any other
 .vas-setTaxWidth {
     width: 24%
 }
+.vas-setTaxWidthCheckbox {
+    align-self: center;
+    width: 11%
+}
+
+.vas-setTaxWidth1 {
+    width: 10%
+}
 .vas-setTaxPaybleAmtWidth {
     width: 38%
 

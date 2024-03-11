@@ -38,7 +38,6 @@
             "VAS_LineAmount",
             "VAS_Description"
         ];
-
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
         var $root = $('<div class = "root"></div>');
@@ -115,15 +114,15 @@
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Price + '</span>'+
-                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Price + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + (data[i].Price).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision })+ '</span>'+
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_ListPrice + '</span>'+
-                                '<span class="vas-singleTaxElementValue1_first">' + data[i].ListPrice + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + (data[i].ListPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>'+
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_UnitPrice + '</span>'+
-                                '<span class="vas-singleTaxElementValue1_first">' + data[i].UnitPrice + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + (data[i].UnitPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>' +
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Tax + '</span>'+
@@ -131,11 +130,11 @@
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Discount + '</span>'+
-                                '<span class="vas-singleTaxElementValue1_first">' + data[i].Discount + '</span>'+
+                                '<span class="vas-singleTaxElementValue1_first">' + (data[i].Discount).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>' +
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_LineAmount + '</span>'+
-                                '<span class="vas-singleTaxElementValue1_first">' + data[i].LineAmount + '</span>'+
+                                    '<span class="vas-singleTaxElementValue1_first">' + (data[i].LineAmount).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>'+
                                 '</div>'+
                                 '<div class="vas-singleTaxElement ">' +
                                 '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Description + '</span>'+
