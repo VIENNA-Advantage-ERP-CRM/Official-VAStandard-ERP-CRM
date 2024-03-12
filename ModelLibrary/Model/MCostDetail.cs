@@ -4044,7 +4044,10 @@ namespace VAdvantage.Model
             {
                 int precision = mas.GetCostingPrecision();
                 bool addition = Env.Signum(qty) > 0;
-                Decimal price = amt;
+                Decimal price= amt;
+                if (Env.Signum(qty) != 0)
+                    price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+
                 if (ce.IsAverageInvoice())
                 {
                     #region Av. invoice
@@ -5243,6 +5246,9 @@ namespace VAdvantage.Model
             int precision = mas.GetCostingPrecision();
             bool addition = Env.Signum(qty) > 0;
             Decimal price = amt;
+            if (Env.Signum(qty) != 0)
+                price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+
             int QueueOrganizationID = cd.GetAD_Org_ID() == 0 ? MWarehouse.Get(GetCtx(), cd.GetM_Warehouse_ID()).GetAD_Org_ID() : cd.GetAD_Org_ID();
             if (ce.IsFifo() || ce.IsLifo())
             {
