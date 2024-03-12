@@ -659,7 +659,7 @@ namespace VAdvantage.Model
                     SetIsPrepayment(GetC_Charge_ID() == 0
                         && GetC_BPartner_ID() != 0
                         && (GetC_Order_ID() != 0
-                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0 && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) ==0)));
+                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0 && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) == 0)));
 
                 // In Case of Advance Charge, set Prepayment as True
                 if (GetC_Charge_ID() != 0)
@@ -1273,7 +1273,7 @@ namespace VAdvantage.Model
             bool change = test != IsAllocated();
             //VIS_427 DevopsId 4680 get unallocated amount By subtracting allocated amount from total amount
             decimal unallocatedAmt = Math.Abs(total) - Math.Abs(Util.GetValueOfDecimal(alloc)) - (Get_ColumnIndex("WithholdingAmt") >= 0 ? Math.Abs(GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
-            if (change || unallocatedAmt == 0) 
+            if (change || unallocatedAmt == 0)
             {
                 SetIsAllocated(true);
                 Set_Value("VAS_UnAllocatedAmount", 0);
@@ -2842,6 +2842,13 @@ namespace VAdvantage.Model
                 }
             }
 
+            // VIS_045: Implement Model Validator after PrepareIT
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             _justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);
@@ -2885,6 +2892,13 @@ namespace VAdvantage.Model
             }
             // Set Document Date based on setting on Document Type
             SetCompletedDocumentDate();
+
+            //	User Validation
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
 
             // Amit for VA009 27-10-2015
             int countPaymentAllocateRecords = 0;
@@ -2962,7 +2976,6 @@ namespace VAdvantage.Model
                     }
                 }
             }
-            //end
 
 
             //	Implicit Approval
@@ -2997,9 +3010,9 @@ namespace VAdvantage.Model
                 //	MProject project = new MProject(GetCtx(), GetC_Project_ID());
             }
             // Update Paid on Provisional Invoice
-            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID"))  > 0 && GetReversalDoc_ID()==0)            
+            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")) > 0 && GetReversalDoc_ID() == 0)
             {
-               //TaskID:1135 When Payment is created with Provisional Invoice reference then  checked isPaid checkbox on Provisional Invoice window
+                //TaskID:1135 When Payment is created with Provisional Invoice reference then  checked isPaid checkbox on Provisional Invoice window
                 UpdatePaymentStatus(Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")));
             }
 
@@ -3010,13 +3023,7 @@ namespace VAdvantage.Model
                 _processMsg += " @CounterDoc@: @C_Payment_ID@=" + counter.GetDocumentNo();
             }
 
-            //	User Validation
-            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-            if (valid != null)
-            {
-                _processMsg = valid;
-                return DocActionVariables.STATUS_INVALID;
-            }
+
 
             // change by Amit 27-5-2016 // Letter Of Credit module
             if (Env.IsModuleInstalled("VA026_"))
@@ -3389,13 +3396,6 @@ namespace VAdvantage.Model
                 }
             }
 
-            //string AllocationMsg = "";
-            //if (!GenerateCostAllocation(GetDocumentNo(), GetAD_Client_ID(), Get_Trx(), GetAD_Org_ID(), out AllocationMsg))
-            //{
-            //    _processMsg = AllocationMsg;
-            //    return DocActionVariables.STATUS_INVALID;
-            //}
-
             // Auto check work-Mohit-7 March 2020
             MBankAccount bnkAct = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -3447,6 +3447,13 @@ namespace VAdvantage.Model
                 GetCtx().SetContext("prepayOrder", "");
             }
 
+            //	User Validation
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             // Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
 
@@ -3457,11 +3464,11 @@ namespace VAdvantage.Model
         /// <summary>
         /// TaskID:1135 Update Payment Status when reverse and  payment the provisional invoice.
         /// </summary>
-        private void UpdatePaymentStatus( int C_ProvisionalInvoice_ID)
+        private void UpdatePaymentStatus(int C_ProvisionalInvoice_ID)
         {
 
             DB.ExecuteQuery("UPDATE C_ProvisionalInvoice SET IsPaid = " + (GetReversalDoc_ID() == 0 ? "'Y'" : "'N'") +
-                   @" WHERE C_ProvisionalInvoice_ID = " + C_ProvisionalInvoice_ID, null, Get_Trx());                   
+                   @" WHERE C_ProvisionalInvoice_ID = " + C_ProvisionalInvoice_ID, null, Get_Trx());
         }
 
         /// <summary>
@@ -5306,9 +5313,6 @@ namespace VAdvantage.Model
         bool ChekVoidIt = false;
         public Boolean VoidIt()
         {
-
-            // if (GetCostAllocationID() == 0 || GetCostAlloactionDocStatus().Equals("CO"))
-            //  {
             ChekVoidIt = true;
             log.Info(ToString());
 
@@ -5331,6 +5335,13 @@ namespace VAdvantage.Model
                 || DOCSTATUS_Approved.Equals(GetDocStatus())
                 || DOCSTATUS_NotApproved.Equals(GetDocStatus()))
             {
+                //	User Validation
+                _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+                if (_processMsg != null)
+                {
+                    return false;
+                }
+
                 AddDescription(Msg.GetMsg(GetCtx(), "Voided") + " (" + GetPayAmt() + ")");
                 SetPayAmt(Env.ZERO);
                 SetDiscountAmt(Env.ZERO);
@@ -5364,6 +5375,7 @@ namespace VAdvantage.Model
                             " AND bsl.C_Payment_ID = " + GetC_Payment_ID(), null, Get_Trx());
                     }
                 }
+
                 // if Payment aginst Claims is voided and payment is drafted remove reference of payment from Claim requisition lines and set Payment Generated to false on Header
                 if (Env.IsModuleInstalled("VA072_") && Get_ColumnIndex("VA072_ClaimSub_ID_1") >= 0 && Get_ColumnIndex("VA072_ClaimSub_ID") >= 0 &&
                     (Util.GetValueOfInt(Get_Value("VA072_ClaimSub_ID")) > 0 || Util.GetValueOfInt(Get_Value("VA072_ClaimSub_ID_1")) > 0))
@@ -5375,61 +5387,28 @@ namespace VAdvantage.Model
                         return false;
                     }
                 }
+
                 //	Unlink & De-Allocate
                 DeAllocate();
             }
             else
+            {
                 return ReverseCorrectIt();
+            }
 
-            //{
-            //    if (ReverseCorrectIt())
-            //    {
-            //        //----------------Neha---------
-
-            //        if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA027_'  AND IsActive = 'Y'")) > 0)
-            //        {
-            //            if (GetVA027_PostDatedCheck_ID() > 0)
-            //            {
-            //                if (GetDocStatus() == "RE")
-            //                {
-            //                    if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA027_ChequeDetails Where C_Payment_ID=" + GetC_Payment_ID())) > 0)
-            //                    {
-            //                        DB.ExecuteQuery("UPDATE VA027_ChequeDetails Set VA027_PaymentStatus='3' Where C_Payment_ID=" + GetC_Payment_ID());
-            //                        int count = Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA027_ChequeDetails Where VA027_PostDatedCheck_ID=" + GetVA027_PostDatedCheck_ID()));
-            //                        if (count > 0)
-            //                        {
-            //                            if (Util.GetValueOfInt(DB.ExecuteScalar("Select Count(*) From VA027_ChequeDetails Where VA027_PostDatedCheck_ID=" + GetVA027_PostDatedCheck_ID() + " And VA027_PAYMENTSTATUS = '3'")) == count)
-            //                            {
-            //                                DB.ExecuteQuery("UPDATE VA027_PostDatedCheck Set VA027_PaymentStatus='3' where VA027_PostDatedCheck_ID=" + GetVA027_PostDatedCheck_ID());
-            //                            }
-            //                        }
-            //                    }
-            //                    else
-            //                        DB.ExecuteQuery("UPDATE VA027_PostDatedCheck Set VA027_PaymentStatus='3' where VA027_PostDatedCheck_ID=" + GetVA027_PostDatedCheck_ID());
-
-            //                }
-            //            }
-
-            //        }
-            //        return true;
-            //    }
-            //    else
-            //    {
-            //        return false;
-            //    }
-            //}
+            //	User Validation
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
 
             //
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
 
             return true;
-            //  }
-            //  else
-            //  {
-            //      _processMsg = "Cost Allocation not Completed.Could not reverse Payment";
-            //       return false;
-            //   }
+
         }
 
         /**
@@ -5439,6 +5418,14 @@ namespace VAdvantage.Model
         public Boolean CloseIt()
         {
             log.Info(ToString());
+
+            //	User Validation
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             SetDocAction(DOCACTION_None);
             return true;
         }
@@ -5453,13 +5440,20 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
 
+            // VIS_045: Implement Model Validator after PrepareIT
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             // (JID_1472) To check payment is reconciled or not
             if (IsReconciled())
             {
                 _processMsg = Msg.GetMsg(GetCtx(), "PaymentAlreadyReconciled");
                 return false;
             }
-            
+
 
             // JID_1276
             if (GetC_Order_ID() > 0 && GetVA009_OrderPaySchedule_ID() > 0)
@@ -5502,7 +5496,8 @@ namespace VAdvantage.Model
                     _processMsg = _msg;
                     return false;
                 }
-            }           
+            }
+
             //	Create Reversal
             MPayment reversal = new MPayment(GetCtx(), 0, Get_Trx());
             CopyValues(this, reversal);
@@ -5714,9 +5709,7 @@ namespace VAdvantage.Model
             SetIsAllocated(true);	//	the allocation below is overwritten
             //	Set Status 
             AddDescription("(" + reversal.GetDocumentNo() + "<-)");
-            SetDocStatus(DOCSTATUS_Reversed);
-            SetDocAction(DOCACTION_None);
-            SetProcessed(true);
+            
 
             if (Env.IsModuleInstalled("VA009_"))
             {
@@ -5761,40 +5754,6 @@ namespace VAdvantage.Model
                 }
             }
 
-            //---------------Anuj----------------------
-            //if (Env.IsModuleInstalled("VA009_"))
-            //{
-            //    if (GetC_InvoicePaySchedule_ID() > 0)
-            //    {
-            //        MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), GetC_InvoicePaySchedule_ID(), Get_Trx());
-            //        paySch.SetVA009_ExecutionStatus("C");
-            //        paySch.SetVA009_IsPaid(false);
-            //        if (!paySch.Save())
-            //            log.SaveInfo("Not Saved", "");
-            //    }
-
-            //    if (GetC_Invoice_ID() > 0)
-            //    {
-            //        MInvoice inv = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_Trx());
-            //        inv.SetIsPaid(false);
-            //        if (!inv.Save())
-            //            log.SaveInfo("Not Saved", "");
-            //    }
-
-            //    // update execution status as Rejecetd when we allocate payment through patyment allocation form or schedule are selected on payment allocate tab
-            //    if (GetC_InvoicePaySchedule_ID() <= 0 && GetC_Invoice_ID() <= 0 && dsSchedule != null && dsSchedule.Tables.Count > 0 && dsSchedule.Tables[0].Rows.Count > 0)
-            //    {
-            //        for (int i = 0; i < dsSchedule.Tables[0].Rows.Count; i++)
-            //        {
-            //            MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), Util.GetValueOfInt(dsSchedule.Tables[0].Rows[i]["C_InvoicePaySchedule_ID"]), Get_Trx());
-            //            paySch.SetVA009_ExecutionStatus("C");
-            //            paySch.SetVA009_IsPaid(false);
-            //            if (!paySch.Save())
-            //                log.SaveInfo("Not Saved Execution status on Invoice schedule : " + paySch.GetC_InvoicePaySchedule_ID(), "");
-            //        }
-            //    }
-            //}
-
             if (Env.IsModuleInstalled("VA027_"))
             {
                 if (GetVA027_PostDatedCheck_ID() > 0)
@@ -5821,26 +5780,19 @@ namespace VAdvantage.Model
 
             }
 
-            //if (GetCostAllocationID() != 0)
-            //{
-            //    MCostAllocation objMcost = new MCostAllocation(GetCtx(), GetCostAllocationID(), Get_Trx());
-            //    objMcost.ReverseCorrectIt();
-            //}
+            // VIS_045: Implement Model Validator after PrepareIT
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                return false;
+            }
 
-            //Arpit--update UnMatched Balance In Case of Invoice Or Order Or Indepent Payment
-            //if (!UpdateUnMatchedBalanceForAccount(true))
-            //{
-            //    return false;
-            //}
             //
+            SetDocStatus(DOCSTATUS_Reversed);
+            SetDocAction(DOCACTION_None);
+            SetProcessed(true);
             _processMsg = Info.ToString();
             return true;
-            //}
-            // else
-            // {
-            //     _processMsg = "Cost Allocation not Completed.Could not reverse Payment";
-            //      return false;
-            //  }
         }
 
         /**
