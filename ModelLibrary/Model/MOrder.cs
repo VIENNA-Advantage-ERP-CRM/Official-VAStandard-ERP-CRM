@@ -2590,7 +2590,7 @@ namespace VAdvantage.Model
                     {
                         log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_VendorBlkSpn"));
                         return false;
-                    }                    
+                    }
                 }
 
                 if (IsReturnTrx())
@@ -4532,7 +4532,7 @@ namespace VAdvantage.Model
                     ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                     if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     {
-                        return  "@VAS_OrigPONotFound@";
+                        return "@VAS_OrigPONotFound@";
                     }
                     decimal amt = 0;//Variation Order GrandTotal/LinenetAmt
                     decimal sumLineAmt = 0;//Origional Order GrandTotal/LinenetAmt
@@ -5903,7 +5903,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         }
                     }
                 }
-                ds.Dispose();
+                if (ds != null)
+                    ds.Dispose();
             }
 
             // When Disallow Negative Inventory is FALSE - then create new line with remainning qty

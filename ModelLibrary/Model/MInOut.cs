@@ -4139,7 +4139,7 @@ namespace VAdvantage.Model
                 DB.ExecuteQuery("UPDATE M_InOutLine SET CurrentCostPrice = " + currentCostPrice +
                                                   @" WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
-                orderLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), null);
+                orderLine = new MOrderLine(GetCtx(), sLine.GetC_OrderLine_ID(), Get_Trx());
                 if (IsSOTrx() && !IsReturnTrx())  // shipment
                 {
                     #region shipment
