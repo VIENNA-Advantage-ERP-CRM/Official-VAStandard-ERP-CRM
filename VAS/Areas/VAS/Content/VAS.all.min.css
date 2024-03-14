@@ -1,4 +1,4 @@
-﻿/*version 1.4.0.2*/
+﻿/*version 1.4.0.4*/
 
 .vis-payment-table {
     width: 100%;
@@ -941,6 +941,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 10px;
 }
 
 .vas-ap-sgl1Item1_First {
@@ -962,9 +963,27 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: block;
 }
 
-.vas-singleTaxElementValue {
+.vas-singleTaxElementValue, .vas-singleRequesitionValue {
     font-weight: normal;
-    width: 120px;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-singleTaxElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/*VIS430:Handled width for Description field of Requisition tab panel*/
+.vas-singleTaxDescription {
+    font-weight: normal;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -1011,6 +1030,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     width: 24%
 }
 
+.vas-setTaxWidthCheckbox {
+    align-self: center;
+    width: 11%
+}
+
+.vas-setTaxWidth1 {
+    width: 10%
+}
+
 .vas-setTaxPaybleAmtWidth {
     width: 38%
 }
@@ -1021,6 +1049,34 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
     height: auto;
+}
+
+.vas-singleItemListWrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.2rem;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.vas-setMatchPo {
+    width: 45%
+}
+
+.vas-setShipWidth {
+    width: 70%
+}
+
+.vas-setTaxProWidth {
+    width: 70%
+}
+
+.vas-setChargeWidth {
+    width: 70%
+}
+
+.vas-setUomWidth {
+    width: 70%
 }
 
 .vis-pSelectInfo {
@@ -1319,7 +1375,7 @@ html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
-    gap: 0.5rem;
+    gap: 15px;
     margin-left: 4px;
     margin-right: 4px;
 }
@@ -1368,3 +1424,13 @@ html[dir="rtl"].vas-disablePage {
     background-color: #f0f0f0;
     font-weight: bold;
 }
+
+
+.vas-inputboxPadding input[type="text"] {
+    padding-left: 10px !important;
+}
+
+.vas-inputboxPaddingRight {
+    padding-right: 10px !important;
+}
+
