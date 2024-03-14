@@ -661,7 +661,7 @@ namespace VAdvantage.Model
 
             SetIsSOTrx(ship.IsSOTrx());
             //vikas 9/16/14 Set cb partner 
-            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());            
+            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());
             MBPartner bp = null;
             if (Util.GetValueOfInt(ship.GetC_Order_ID()) > 0)
             {
@@ -676,7 +676,7 @@ namespace VAdvantage.Model
             //vikas
             //MBPartner bp = new MBPartner(GetCtx(), ship.GetC_BPartner_ID(), null);
             SetBPartner(bp);
-            SetAD_User_ID(ord.GetBill_User_ID());            
+            SetAD_User_ID(ord.GetBill_User_ID());
             //
             SetSendEMail(ship.IsSendEMail());
             //
@@ -1557,7 +1557,7 @@ namespace VAdvantage.Model
             }
             //VIS_427 Bug Id 3717 04/01/2024 Handled the GrandTotalAfterWitholding Amount When user unselect the Witholding id
             if (GetC_Withholding_ID() == 0 && GetBackupWithholdingAmount() != 0)
-            { 
+            {
                 SetGrandTotalAfterWithholding(Decimal.Add(GetGrandTotalAfterWithholding(), GetBackupWithholdingAmount()));
                 SetBackupWithholdingAmount(0);
             }
@@ -1636,7 +1636,7 @@ namespace VAdvantage.Model
 
             // If lines are available and user is changing the pricelist/conversiontype on header than we have to restrict it because
             // those lines are saved as privious pricelist prices or Payment term.. standard sheet issue no : SI_0344 / JID_0564 / JID_1536_1 by Manjot
-            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")|| Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
+            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -2576,6 +2576,12 @@ namespace VAdvantage.Model
                 }
             }
 
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             //	Add up Amounts
             _justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
@@ -2871,6 +2877,12 @@ namespace VAdvantage.Model
                     String status = PrepareIt();
                     if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
                         return status;
+                }
+
+                _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+                if (_processMsg != null)
+                {
+                    return DocActionVariables.STATUS_INVALID;
                 }
 
                 // Set Document Date based on setting on Document Type
@@ -5160,7 +5172,7 @@ namespace VAdvantage.Model
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }   //	project
-                
+
                 try
                 {
                     //	Counter Documents
@@ -5175,7 +5187,7 @@ namespace VAdvantage.Model
                     //Info.Append(" - @CounterDoc@: ").Append(e.Message.ToString());
                     _processMsg = e.Message.ToString();
                     return DocActionVariables.STATUS_INPROGRESS;
-                }                
+                }
 
                 /* Creation of allocation against invoice whose payment is done against order */
                 if (Env.IsModuleInstalled("VA009_") && DocActionVariables.STATUS_COMPLETED == "CO" && GetC_Order_ID() > 0)
@@ -5198,10 +5210,9 @@ namespace VAdvantage.Model
                 SetCompletedDocumentNo();
 
                 //	User Validation
-                String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-                if (valid != null)
+                _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                if (_processMsg != null)
                 {
-                    _processMsg = valid;
                     return DocActionVariables.STATUS_INVALID;
                 }
 
@@ -5222,7 +5233,7 @@ namespace VAdvantage.Model
             {
                 _log.Severe("Error found at Invoice Completion. Invoice Document no = " + GetDocumentNo() + " " + ex.Message);
                 return DocActionVariables.STATUS_INVALID;
-            }            
+            }
             return DocActionVariables.STATUS_COMPLETED;
         }
 
@@ -5258,8 +5269,8 @@ namespace VAdvantage.Model
                     {
                         utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(invoiceAmount) - Util.GetValueOfDecimal(orderTotal));
                     }
-                    
-                   
+
+
                 }
                 else
                 {
@@ -6471,6 +6482,13 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+
             //	Not Processed
             if (DOCSTATUS_Drafted.Equals(GetDocStatus())
                 || DOCSTATUS_Invalid.Equals(GetDocStatus())
@@ -6513,6 +6531,14 @@ namespace VAdvantage.Model
                 return ReverseCorrectIt();
             }
 
+            // VIS_045: Implement Model Validator After Void 
+            valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6525,6 +6551,16 @@ namespace VAdvantage.Model
         public bool CloseIt()
         {
             log.Info(ToString());
+
+            // VIS_045: Implement Model Validator Before Close
+            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+
+
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6536,6 +6572,13 @@ namespace VAdvantage.Model
         /// <returns>return true if success</returns>
         public bool ReverseCorrectIt()
         {
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                log.Severe("Invoice Reversal Model Validator ERROR = " + _processMsg);
+                return false;
+            }
+
             //JID_1501 to check payment shedule or not during void
             if (Env.IsModuleInstalled("VA009_"))
             {
@@ -6549,6 +6592,7 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
+
             //if PDC available against Invoice donot void/reverse the Invoice
             if (Env.IsModuleInstalled("VA027_"))
             {
@@ -6573,6 +6617,7 @@ namespace VAdvantage.Model
                 }
 
             }
+
             log.Info(ToString());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
@@ -6740,56 +6785,8 @@ namespace VAdvantage.Model
             {
                 MInvoiceLine rLine = rLines[i];
                 MInvoiceLine oldline = OldLines[i];
-                //rLine.SetReversal(true);
-                //rLine.SetQtyEntered(Decimal.Negate(rLine.GetQtyEntered()));
-                //rLine.SetQtyInvoiced(Decimal.Negate(rLine.GetQtyInvoiced()));
-                //rLine.SetLineNetAmt(Decimal.Negate(rLine.GetLineNetAmt()));
-                //if (((Decimal)rLine.GetTaxAmt()).CompareTo(Env.ZERO) != 0)
-                //    rLine.SetTaxAmt(Decimal.Negate((Decimal)rLine.GetTaxAmt()));
 
-                //// In Case of Reversal set Surcharge Amount as Negative if available.
-                //if (rLine.Get_ColumnIndex("SurchargeAmt") > 0 && (((Decimal)rLine.GetSurchargeAmt()).CompareTo(Env.ZERO) != 0))
-                //{
-                //    rLine.SetSurchargeAmt(Decimal.Negate((Decimal)rLine.GetSurchargeAmt()));
-                //}
-                //if (((Decimal)rLine.GetLineTotalAmt()).CompareTo(Env.ZERO) != 0)
-                //    rLine.SetLineTotalAmt(Decimal.Negate((Decimal)rLine.GetLineTotalAmt()));
-                //// bcz we set this field value as ZERO in Copy From Process
-                //rLine.SetC_OrderLine_ID(oldline.GetC_OrderLine_ID());
-                //rLine.SetM_InOutLine_ID(oldline.GetM_InOutLine_ID());
-                //try
-                //{
-                //    rLine.SetIsFutureCostCalculated(false);
-                //}
-                //catch (Exception) { }
-                //if (rLine.Get_ColumnIndex("IsCostImmediate") >= 0)
-                //{
-                //    rLine.SetIsCostImmediate(false);
-                //}
-                //if (Get_ColumnIndex("BackupWithholdingAmount") > 0)
-                //{
-                //    rLine.SetC_Withholding_ID(oldline.GetC_Withholding_ID()); //  withholding refernce
-                //    rLine.SetWithholdingAmt(Decimal.Negate(oldline.GetWithholdingAmt())); // withholding amount
-                //}
-                //if (!rLine.Save(Get_TrxName()))
-                //{
-                //    ValueNamePair vp = VLogger.RetrieveError();
-                //    string val = String.Empty;
-                //    if (vp != null)
-                //    {
-                //        val = vp.GetName();
-                //        if (String.IsNullOrEmpty(val))
-                //        {
-                //            val = vp.GetValue();
-                //        }
-                //    }
-                //    _processMsg = "Could not correct Invoice Reversal Line" + val;
-                //    return false;
-                //}
                 #region Calculating Cost on Expenses Arpit
-                //else
-                //{
-
                 if (Env.IsModuleInstalled("VAFAM_") && rLine.Get_ColumnIndex("VAFAM_IsAssetRelated") > 0)
                 {
                     if (!IsSOTrx() && !IsReturnTrx() && Util.GetValueOfBool(rLine.Get_Value("VAFAM_IsAssetRelated")))
@@ -6812,38 +6809,11 @@ namespace VAdvantage.Model
                                     UpdateAssetGrossValue(rLine, po);
                                 }
                             }
-                            //
                         }
                     }
                 }
-                //}
                 #endregion
 
-                //else
-                //{
-                //    CopyLandedCostAllocation(rLine.GetC_InvoiceLine_ID());
-                //}
-                //Amortization Schedule change
-                //int countVA038 = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='VA038_' "));
-                //if (countVA038 > 0)
-                //{
-                //    if (rLine.GetM_InOutLine_ID() > 0)
-                //    {
-                //        int no = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE A_Asset SET IsActive='N' WHERE M_InOutLine_ID=" + rLine.GetM_InOutLine_ID()));
-                //        int no1 = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE VA038_AmortizationSchedule SET IsActive='N' WHERE C_InvoiceLine_ID= " + oldline.GetC_InvoiceLine_ID()));
-                //    }
-                //    if (rLine.GetM_InOutLine_ID() == 0)
-                //    {
-                //        int Asset_ID = Util.GetValueOfInt(DB.ExecuteScalar(" SELECT A_Asset_ID FROM VA038_AmortizationSchedule WHERE C_InvoiceLine_ID= " + rLine.GetC_InvoiceLine_ID()));
-                //        if (Asset_ID > 0)
-                //        {
-                //            int no = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE A_Asset SET IsActive='N' WHERE A_Asset_ID=" + Asset_ID));
-                //            int no1 = Util.GetValueOfInt(DB.ExecuteQuery("UPDATE VA038_AmortizationSchedule SET IsActive='N' WHERE C_InvoiceLine_ID= " + oldline.GetC_InvoiceLine_ID()));
-                //        }
-                //    }
-                //}
-
-                // End
             }
             reversal.SetC_Order_ID(GetC_Order_ID());
             reversal.Save();
@@ -6870,27 +6840,14 @@ namespace VAdvantage.Model
             SetRef_C_Invoice_ID(reversal.GetC_Invoice_ID());
 
             //	Clean up Reversed (this)
-            //MInvoiceLine[] iLines = GetLines(false);
-            //for (int i = 0; i < iLines.Length; i++)
-            //{
-            //MInvoiceLine iLine = iLines[i];
-            //if (iLine.GetM_InOutLine_ID() != 0)
-            //{
-            //MInOutLine ioLine = new MInOutLine(GetCtx(), iLine.GetM_InOutLine_ID(), Get_TrxName());
-            //ioLine.SetIsInvoiced(false);
-            //ioLine.Save(Get_TrxName());
             DB.ExecuteQuery(@"UPDATE M_InOutLine SET IsInvoiced = 'N' WHERE M_InOutLine_ID IN
                     (SELECT M_InOutLine_ID FROM C_InvoiceLine WHERE NVL(M_InOutLine_ID, 0) != 0 AND C_Invoice_ID = " + GetC_Invoice_ID() + ")", null, Get_TrxName());
 
             //	Reconsiliation
-            //iLine.SetM_InOutLine_ID(0);
-            //iLine.Save(Get_TrxName());
             DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET M_InOutLine_ID = null WHERE C_InvoiceLine_ID  IN
                     (SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE NVL(M_InOutLine_ID, 0) != 0 AND C_Invoice_ID = " + GetC_Invoice_ID() + ")", null, Get_TrxName());
-            //}
-            //}
-            SetProcessed(true);
 
+            SetProcessed(true);
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
@@ -6914,7 +6871,6 @@ namespace VAdvantage.Model
 
 
             //delete revenuerecognition run and plan
-
             DB.ExecuteQuery("DELETE FROM C_RevenueRecognition_Run WHERE C_RevenueRecognition_Run_ID IN (SELECT run.C_RevenueRecognition_RUN_ID FROM C_RevenueRecognition_RUN run " +
                            "INNER JOIN c_revenuerecognition_plan plan on run.c_revenuerecognition_plan_id = plan.c_revenuerecognition_plan_ID " +
                            "WHERE plan.C_InvoiceLine_ID IN(SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE C_RevenueRecognition_ID IS NOT NULL AND C_Invoice_ID =" + GetC_Invoice_ID() + "))");
@@ -6923,20 +6879,16 @@ namespace VAdvantage.Model
                 "c_revenuerecognition_plan WHERE C_InvoiceLine_ID IN(SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE C_RevenueRecognition_ID IS NOT NULL AND " +
                 "C_Invoice_ID= " + GetC_Invoice_ID() + "))");
 
-
-
-            // code commented for updating open amount against customer while reversing invoice, code already exist
-            // Done by Vivek on 24/11/2017
-            //	Update BP Balance
-            //MBPartner bp = new MBPartner(GetCtx(), GetC_BPartner_ID(), Get_TrxName());
-            //if (bp.GetCreditStatusSettingOn() == "CH")
-            //{
-            //    bp.SetTotalOpenBalance();
-            //    bp.Save();
-            //}
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                log.Severe("Invoice Reversal Model Validator ERROR = " + _processMsg);
+                return false;
+            }
 
             return true;
         }
+
         //update Description
         private void UpdateDescriptionInOldExpnse(MInvoiceLine oldline, MInvoiceLine rLine)
         {
