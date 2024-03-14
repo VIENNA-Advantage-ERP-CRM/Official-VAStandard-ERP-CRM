@@ -71,13 +71,13 @@
             ulPaging.append(liPage).append(liPrevPage).append(liCurrPage).append(liNextPage);
           
             /* Employee textbox*/
-            $employee = $('<div class="input-group vis-input-wrap mb-0" >');
+            $employee = $('<div class="input-group vis-input-wrap mb-0 vas-inputboxPadding" >');
             $textEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" disabled /><label>' + VIS.Msg.getMsg("Employee") + ' </label></div>');
             $employee.append($textEmployee);
             $textEmployee.find('input').val(VIS.context.getContext(_windowNo, "Value"));
             /* SearchExistingUser textbox*/
-            $searchEmployee = $('<div class="input-group vis-input-wrap mb-0" >');
-            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" data-hasbtn=" " /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
+            $searchEmployee = $('<div class="input-group vis-input-wrap mb-0 vas-inputboxPadding" >');
+            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80"  data-hasbtn=" " /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
             $searchEmployee.append($textSearchEmployee).append($searchButton);
             $inputDiv.append($employee).append($searchEmployee);       
             $parentdiv.append($inputDiv);
@@ -318,7 +318,7 @@
                 contentType: "application/json; charset=utf-8",
                 success: function (result) {
                     result = JSON.parse(result);
-                    recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ':' + result.RecordCount);
+                    recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ': ' + result.RecordCount);
                     totalPages = Math.ceil(result.RecordCount /pageSize);
                     if (result != null && (result.UserList) != null) {
                         countRecords = 0;
@@ -359,9 +359,9 @@
             if (dGrid == null) {
             arrListColumns = [];
             if (arrListColumns.length == 0) {
-                arrListColumns.push({ field: "recid", caption: "recid", sortable: false, size: '10%', min: 100, hidden: true });
+                arrListColumns.push({ field: "recid", caption: "recid", sortable: false, size: '0%', hidden: true });
                 arrListColumns.push({
-                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: false, size: '5%', min: 70, hidden: false,
+                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: false, size: '7%', min: 35, hidden: false,
                     render: function (rec) {
                         var recImage = rec.Image;
                         if (recImage != null) {
@@ -372,11 +372,12 @@
                         }
                     }
                 });
-                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: false, size: '9%', min: 110, hidden: false });
-                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: false, size: '7%', min: 130, hidden: false });
+                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: false, size: '14%', hidden: false });
+                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: false, size: '21%', hidden: false });
+                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: false, size: '24%', hidden: false });
+                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: false, size: '17%',  hidden: false });
+                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: false, size: '17%', hidden: false });
+
 
                 /* encode the tags */
                 w2utils.encodeTags(data);
