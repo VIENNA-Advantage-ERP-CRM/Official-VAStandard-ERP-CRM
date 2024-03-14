@@ -3268,9 +3268,12 @@ namespace VAdvantage.Model
                 //set container reference(not a copy record)
                 rLine.SetM_ProductContainer_ID(oLine.GetM_ProductContainer_ID());
                 //
+                
                 rLine.SetQtyBook(oLine.GetQtyCount());		//	switch
                 rLine.SetQtyCount(oLine.GetQtyBook());
                 rLine.SetQtyInternalUse(Decimal.Negate(oLine.GetQtyInternalUse()));
+                //VAI050-Set qty entered
+                rLine.Set_Value("QtyEntered", Decimal.Negate(Util.GetValueOfDecimal(oLine.Get_Value("QtyEntered"))));
                 rLine.SetOpeningStock(oLine.GetAsOnDateCount());
                 rLine.SetAsOnDateCount(oLine.GetOpeningStock());
                 rLine.SetDifferenceQty(rLine.GetOpeningStock() - rLine.GetAsOnDateCount());
@@ -3284,7 +3287,7 @@ namespace VAdvantage.Model
                 //VIS_0045: Cost
                 rLine.SetCurrentCostPrice(oLine.GetCurrentCostPrice());
                 rLine.SetPostCurrentCostPrice(oLine.GetPostCurrentCostPrice());
-
+              
                 if (!rLine.Save())
                 {
                     pp = VLogger.RetrieveError();
