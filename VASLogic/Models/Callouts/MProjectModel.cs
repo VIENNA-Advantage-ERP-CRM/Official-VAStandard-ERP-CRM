@@ -45,8 +45,10 @@ namespace VIS.Models
                     projID = id;
                 }
             }
-            //Issue ID= SI_0468 Reported by Ankita Work Done by Manjot 
-            //To get the actual value from the right field
+
+            //Issue ID = SI_0468 Reported by Ankita Work Done by Manjot
+            // To get the actual value from the right field
+
             Sql = "SELECT PriceList, PriceStd, PriceLimit,C_UOM_ID FROM M_ProductPrice WHERE M_PriceList_Version_ID = (SELECT c.M_PriceList_Version_ID FROM C_Project c WHERE c.C_Project_ID = "
                 + projID + ")  AND M_Product_ID=" + ProductID + " AND NVL(M_AttributeSetInstance_ID,0)=" + Attribute_ID;
 
@@ -68,7 +70,20 @@ namespace VIS.Models
                 result["PriceLimit"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceLimit"]);
                 result["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
             }
+
             return result;
+        }
+
+        /// <summary>
+        /// (VAI094):Fill Product Type on selection of Product
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>product type</returns>
+        public string GetProductType(Ctx ctx, string fields)
+        {
+            string Sql = "SELECT ProductType FROM M_Product WHERE M_Product_ID = " + Util.GetValueOfInt(fields);
+            string type = Util.GetValueOfString(DB.ExecuteScalar(Sql, null, null));
+            return type;
         }
 
         // Added by Bharat on 23 May 2017
