@@ -10,26 +10,42 @@ using VIS.Models;
 
 namespace VIS.Controllers
 {
-    public class MProjectController:Controller
+    public class MProjectController : Controller
     {
         public ActionResult Index()
         {
             return View();
         }
 
-        public JsonResult GetProjectDetail(string fields)
+        /// <summary>
+        /// (VAI094):Fill Product Type on selection of Product
+        /// </summary>
+        /// <param name="fields">fields</param>
+        /// <returns>product type</returns>
+        public JsonResult GetProductType(string fields)
         {
-           
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MProjectModel objProjectModel = new MProjectModel();
-                retJSON = JsonConvert.SerializeObject(objProjectModel.GetProjectDetail(ctx,fields));              
-            }          
+                retJSON = JsonConvert.SerializeObject(objProjectModel.GetProductType(ctx, fields));
+            }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-     
+        public JsonResult GetProjectDetail(string fields)
+        {
+
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MProjectModel objProjectModel = new MProjectModel();
+                retJSON = JsonConvert.SerializeObject(objProjectModel.GetProjectDetail(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         // Added by Bharat on 23 May 2017
         public JsonResult GetProjectPriceLimit(string fields)
         {
