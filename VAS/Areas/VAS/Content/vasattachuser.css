@@ -124,8 +124,8 @@ html[dir="rtl"].vas-disablePage {
 }
 
 
-.vas-inputboxPadding input[type="text"]{
-    padding-left:10px !important;
+ html[dir="rtl"].vas-inputboxPadding input[type="text"] {
+    padding-left: 10px !important;
 }
 .vas-inputboxPaddingRight {
     padding-right:10px !important;
