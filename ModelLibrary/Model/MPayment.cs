@@ -1031,7 +1031,7 @@ namespace VAdvantage.Model
                 {
                     SetPaymentAmount(GetPayAmt());
                 }
-                if (!IsProcessing() && !_isWithholdingFromPaymentAllocate && !VerifyAndCalculateWithholding(false))
+                if (!IsProcessing() && !IsProcessed() && !_isWithholdingFromPaymentAllocate && !VerifyAndCalculateWithholding(false))
                 {
                     log.SaveError("Error", GetProcessMsg());
                     return false;
