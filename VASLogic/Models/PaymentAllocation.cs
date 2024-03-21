@@ -2371,6 +2371,8 @@ namespace VIS.Models
                                 //    aLine.SetC_BPartner_ID(invPay.GetC_BPartner_ID());
                                 //}
                                 //aLine.SetPaymentInfo(C_Payment_ID, C_CashLine_ID);
+                                //VIS_427 Set value For Inter Business partner
+                                aLine.Set_Value("IsInterBusinessPartner", isInterBPartner);
                                 aLine.SetPaymentInfo(C_Payment_ID, 0);//cashline for payment allocation is zero
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_Payment", C_Payment_ID));
                                 aLine.Set_ValueNoCheck("Description", DsPayment.Tables[0].Select("C_Payment_ID=" + C_Payment_ID)[0]["Description"]);

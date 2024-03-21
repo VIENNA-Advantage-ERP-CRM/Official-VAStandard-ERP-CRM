@@ -250,9 +250,13 @@ namespace VAdvantage.Model
             MPayment payment = null;
             MCashLine cashLine = null;
             MInvoice invoice = GetInvoice();
+            //handled if IsInterBusinessPartner is checked then not to set Business partner id
             if (invoice != null
-                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID())
-                SetC_BPartner_ID(invoice.GetC_BPartner_ID());
+                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID() && 
+                ((Get_ColumnIndex("IsInterBusinessPartner") >= 0 && !Util.GetValueOfBool(Get_Value("IsInterBusinessPartner"))) || Get_ColumnIndex("IsInterBusinessPartner") < 0))
+            {
+                    SetC_BPartner_ID(invoice.GetC_BPartner_ID());
+            }
             //
             int C_Payment_ID = GetC_Payment_ID();
             int C_CashLine_ID = GetC_CashLine_ID();
