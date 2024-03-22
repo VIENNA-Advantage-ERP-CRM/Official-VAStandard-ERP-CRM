@@ -1031,7 +1031,8 @@ namespace VAdvantage.Model
                 {
                     SetPaymentAmount(GetPayAmt());
                 }
-                if (!IsProcessing() && !_isWithholdingFromPaymentAllocate && !VerifyAndCalculateWithholding(false))
+                //VIS_427 The Withoholding will be applied and calculated if document is not processed
+                if (!IsProcessing() && !IsProcessed() && !_isWithholdingFromPaymentAllocate && !VerifyAndCalculateWithholding(false))
                 {
                     log.SaveError("Error", GetProcessMsg());
                     return false;
