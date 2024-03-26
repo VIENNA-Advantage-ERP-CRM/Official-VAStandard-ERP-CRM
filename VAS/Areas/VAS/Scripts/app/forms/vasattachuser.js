@@ -275,6 +275,7 @@
                     selectedRecord.push(recordId);
                     for (i = 0; i < selectedRecord.length; i++) {
                         selectedRecord[i] = parseInt(selectedRecord[i], 10)
+
                     }
                 }
               
