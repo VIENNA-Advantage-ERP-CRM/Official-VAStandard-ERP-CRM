@@ -162,7 +162,7 @@ namespace VIS.Models
         /// <param name="ctx">Parameters</param>
         /// <param name="fields"></param>
         /// <returns>Charge Amount</returns>
-        public int GetChargeAmount(Ctx ctx,string fields)
+        public int GetChargeAmount(Ctx ctx, string fields)
         {
             int chargeAmt = Util.GetValueOfInt(DB.ExecuteScalar("SELECT ChargeAmt FROM C_Charge WHERE C_Charge_ID = " + Util.GetValueOfInt(fields), null, null));
             return chargeAmt;
@@ -174,8 +174,75 @@ namespace VIS.Models
         /// <returns>ProfileType</returns>
         public string GetProfiletype(string fields)
         {
-             return Util.GetValueOfString(DB.ExecuteScalar("SELECT ProfileType from S_Resource WHERE AD_User_ID =  " + Util.GetValueOfInt(fields), null, null));
-           
+            return Util.GetValueOfString(DB.ExecuteScalar("SELECT ProfileType from S_Resource WHERE AD_User_ID =  " + Util.GetValueOfInt(fields), null, null));
+
+        }
+
+        /// <summary>
+        /// VAI094:for fetching customer id from database according to requestid or project id  selected in 
+        /// request field  or project field
+        /// in Report line tab in time and expense report window
+        /// </summary>
+        /// <param name="fields">string fields </param>
+        /// <returns>customer id</returns>
+        public Dictionary<string, object> LoadCustomerData(string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int ID = Util.GetValueOfInt(paramValue[0]);
+            var columnName = paramValue[1];
+            string str = "";
+            Dictionary<string, object> retDic = null;
+            if (columnName == "R_Request_ID")
+            {
+                str = "SELECT R.C_BPartner_ID AS Customer FROM R_Request R INNER JOIN C_BPartner C on R.C_BPartner_ID=C.C_BPartner_ID  WHERE R.R_Request_ID= " + ID + " AND C.IsCustomer = 'Y'";
+            }
+            else if (columnName == "C_Project_ID")
+            {
+                str = "SELECT CASE WHEN p.C_BPartner_ID > 0 THEN p.C_BPartner_ID ELSE b.C_BPartner_ID END AS Customer FROM C_Project p " +
+                      "LEFT JOIN C_BPartner b ON(b.C_BPartner_ID = p.C_BPartnerSR_ID AND b.IsCustomer = 'Y') WHERE p.C_Project_ID = "+ID;
+            }
+            DataSet ds = DB.ExecuteDataset(str.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {  
+                retDic = new Dictionary<string, object>();
+                retDic["Customer"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Customer"]);
+            }
+            return retDic;
+        }
+
+
+        /// <summary>
+        /// VAI094:for fetching M_PRODUCT_ID,C_UOM_ID from database according to Id  selected in 
+        /// projectphase or project task or product field in Report line tab in time and expense report window
+        /// </summary>
+        /// <param name="fields">string fields </param>
+        /// <returns>M_PRODUCT_ID,C_UOM_ID</returns>
+        public Dictionary<string, object> LoadProductData(string fields)
+        {
+            Dictionary<string, object> retDic = null;
+            string[] paramValue = fields.Split(',');
+            int ID = Util.GetValueOfInt(paramValue[0]);
+            var columnName = paramValue[1];
+            StringBuilder str = new StringBuilder();
+            int productId;
+            if (columnName != null && ID > 0)
+            {
+                if (columnName == "C_ProjectPhase_ID")
+                    str.Append("SELECT M_Product_ID FROM C_ProjectPhase WHERE C_ProjectPhase_ID= " + Util.GetValueOfInt(ID));
+                else if (columnName == "C_ProjectTask_ID")
+                    str.Append("SELECT M_Product_ID FROM C_ProjectTask WHERE C_ProjectTask_ID = " + Util.GetValueOfInt(ID));
+
+                productId = Util.GetValueOfInt(DB.ExecuteScalar(str.ToString(), null, null));
+                if (productId > 0)
+                {
+                    retDic = new Dictionary<string, object>();
+                    retDic["M_Product_ID"] = productId;
+                    str.Clear();
+                    str.Append("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID= " + Util.GetValueOfInt(productId));
+                    retDic["C_UOM_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(str.ToString(), null, null));
+                }
+            }
+            return retDic;
         }
     }
 }
