@@ -41,6 +41,7 @@
         var selectedRecord = [];
         var totalPages = null;
         var countRecords = 0;
+        var totalRecords = 0;
         // Initialize UI Elements
 
         function initializeComponent() {
@@ -130,8 +131,7 @@
         /* function used to change the value of option when we click on the values on dropdown*/
             function dropDown() {
                 selectPage.on("change", function () {
-                    pageNo = selectPage.val();
-                  
+                    pageNo = selectPage.val();                 
                     loadGrid(pageNo, pageSize, true);
                     selectPage.find("option[value='" + pageNo + "']").prop("selected", true);
                     if (pageNo >= totalPages) {
@@ -249,6 +249,10 @@
      /* selected row function used to get the selected record data*/
         function onSelectRow(event) {
             if (event.recid == undefined) {
+                if (totalRecords == 0) {
+                    ($okBtn).addClass("vas-disableBtn");
+                    return;
+                }
                 var countRecords = w2ui['GridDiv' + $self.windowNo].records.length;
                 var selectedRecordSet = new Set(selectedRecord);
 
@@ -271,6 +275,7 @@
                     selectedRecord.push(recordId);
                     for (i = 0; i < selectedRecord.length; i++) {
                         selectedRecord[i] = parseInt(selectedRecord[i], 10)
+
                     }
                 }
               
@@ -319,7 +324,12 @@
                 success: function (result) {
                     result = JSON.parse(result);
                     recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ': ' + result.RecordCount);
-                    totalPages = Math.ceil(result.RecordCount /pageSize);
+                    if (result.RecordCount == 0) {
+                        totalPages = 1;
+                    }
+                    else {
+                        totalPages = Math.ceil(result.RecordCount / pageSize);
+                    }
                     if (result != null && (result.UserList) != null) {
                         countRecords = 0;
                         countRecords = countRecords + (result.UserList).length;
