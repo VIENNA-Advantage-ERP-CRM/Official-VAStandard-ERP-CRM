@@ -77,7 +77,7 @@ html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
-    gap: 0.5rem;
+    gap: 15px;
     margin-left: 4px;
     margin-right: 4px;
 }
@@ -123,3 +123,14 @@ html[dir="rtl"].vas-disablePage {
     font-weight: bold; 
 }
 
+
+ .vas-inputboxPadding input[type="text"] {
+    padding-left: 10px !important;
+}
+
+  html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
+    padding-right: 10px !important;
+}
+.vas-inputboxPaddingRight {
+    padding-right:10px !important;
+}

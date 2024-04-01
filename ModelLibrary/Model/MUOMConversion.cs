@@ -857,9 +857,10 @@ namespace VAdvantage.Model
             //	The Product UoM needs to be the smallest UoM - Multiplier  must be > 0
             if (GetM_Product_ID() != 0 && GetDivideRate().CompareTo(Env.ONE) < 0)
             {
-                // JID_0239: Currenly system show message when multiple rate is less than one like below "Product UOM Coversion rate error"
-                log.SaveError("", Msg.GetMsg(GetCtx(), "ProductUOMConversionRateError"));
-                return false;
+                // VIS_045, 01-April-2024, task ID:5553 
+                // System will allow to save the UOM conversion rate from bigger to smaller rate.
+                // log.SaveError("", Msg.GetMsg(GetCtx(), "ProductUOMConversionRateError"));
+                // return false;
             }
             if (!String.IsNullOrEmpty(GetUPC()) &&
                      Util.GetValueOfString(Get_ValueOld("UPC")) != GetUPC())

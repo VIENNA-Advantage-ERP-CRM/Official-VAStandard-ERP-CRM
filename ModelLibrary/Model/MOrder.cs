@@ -6240,7 +6240,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>true if success</returns>
         public bool VoidIt()
         {
-            MOrderLine[] lines = GetLines(true, "M_Product_ID");
+           MOrderLine[] lines = GetLines(true, "M_Product_ID");
             log.Info(ToString());
 
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -6335,6 +6335,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     return false;
                 }
             }
+            //VIS430:Set Quotation field null when the previously generated Sales Order from Sales Quotation tab of Sales quotation Window whose Document Action is Voided on Sales Order window.
+            int no = DB.ExecuteQuery(@"UPDATE C_Order SET Ref_Order_ID=null WHERE Ref_Order_ID = " + GetC_Order_ID(), null, Get_Trx());
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;

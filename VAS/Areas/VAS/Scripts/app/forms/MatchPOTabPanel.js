@@ -60,40 +60,44 @@
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         if (data != null && data.length > 0) {
+                        wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
                             for (i = 0; i < data.length; i++) {
+
+                                //VIS430:Handled Duplication of data on Match PO Tab Panel
+                               
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
                                     '<div class="vas-ap-sglItem mb-2">' +
-                                    '<div class="vas-singleTaxElement vas-setTaxWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_TransactionDate + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + new Date(data[i].TransactionDate).toLocaleDateString() + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_PurchaseOrderNo + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].MatchPoNo + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderLine + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].PoDocumentNo + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_ShipmentLine + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].ShipmentLine + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_InvoiceLineMatch + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].InvoiceDocNo + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setShipWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Product + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].Product + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setShipWidth">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_AttributeSetInstance + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].AttributeSetInstance + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setMatchPo">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_QuantityReq + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + data[i].Quantity + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].Quantity.toLocaleString() + '</span>' + //VIS430:Handled Qty format on Match PO Tab Panel
                                     '</div>' +
                                     '</div >' +
                                     '</div>'

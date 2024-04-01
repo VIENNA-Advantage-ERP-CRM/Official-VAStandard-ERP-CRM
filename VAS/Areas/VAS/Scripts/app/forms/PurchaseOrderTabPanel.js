@@ -7,8 +7,6 @@
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
-
-
     VAS.PurchaseOrderTabPanel = function () {
 
         this.windowNo;
@@ -25,6 +23,7 @@
         var elements = [
             "VAS_OrderTitleTabPanel",
             "VAS_OrderTax",
+            "VAS_DocumentNo",
             "VAS_OrderTaxPaybaleAmt",
             "VAS_OrderTaxAmt",
             "VAS_IsIncludeTax",
@@ -70,23 +69,28 @@
                             for (i = 0; i < data.length; i++) {
                                 var TabPaneldesign = '<div class="vas-apListItem mb-2">' +
                                     '<div class="vas-ap-sglItem mb-2">' +
-                                    '<div class="vas-singleTaxElement vas-setTaxWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setTaxWidth1">' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_DocumentNo + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + data[i].DocumentNo + '</span>' +
+                                    '</div>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxWidth1">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderTax + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + data[i].TaxName + '</span>' +
                                     '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth">' +
-                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderTaxPaybaleAmt + '</span>' +
-                                    '<span class="vas-singleTaxElementValue">' + (data[i].TaxPaybleAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>' +
-                                    '</div>' +
-                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth">' +
+                                    '<div class="vas-singleTaxElement vas-setTaxAmtWidth1">' +
                                     '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderTaxAmt + '</span>' +
                                     '<span class="vas-singleTaxElementValue">' + (data[i].TaxAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>' +
                                     '</div>' +
-                                    '</div >' +
-                                    '<div class="vas-apItem-checkbox d-flex align-items-center">' +
-                                    '<input type="checkbox" id="vas-includeTaxCheckbox" ' + (data[i].IsTaxIncluded == "Y" ? 'checked' : '') + '>' +
+                                    '<div class="vas-singleTaxElement vas-setTaxPaybleAmtWidth1">' +
+                                    '<span class="vas-singleTaxElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_OrderTaxPaybaleAmt + '</span>' +
+                                    '<span class="vas-singleTaxElementValue">' + (data[i].TaxPaybleAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].stdPrecision, maximumFractionDigits: data[i].stdPrecision }) + '</span>' +
+                                    '</div>' +
+                                    '<div class="vas-apItem-checkbox d-flex align-items-center vas-setTaxWidthCheckbox ">' +
+                                    '<input type="checkbox" id="vas-includeTaxCheckbox" ' + (data[i].IsTaxIncluded == "Y" ? 'checked' : '') + ' disabled>' +
                                     '<label class="vas-apcheckbox-label ml-1" for="vas-includeTaxCheckbox">' + VAS.translatedTexts.VAS_IsIncludeTax + '</label>' +
                                     '</div>' +
+                                    '</div >' +
+                                   
                                     '</div>'
                                 //Appending design to wrapperDiv
                                 wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).append(TabPaneldesign);

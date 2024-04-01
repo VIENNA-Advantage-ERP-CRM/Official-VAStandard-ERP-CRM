@@ -41,6 +41,7 @@
         var selectedRecord = [];
         var totalPages = null;
         var countRecords = 0;
+        var totalRecords = 0;
         // Initialize UI Elements
 
         function initializeComponent() {
@@ -71,13 +72,13 @@
             ulPaging.append(liPage).append(liPrevPage).append(liCurrPage).append(liNextPage);
           
             /* Employee textbox*/
-            $employee = $('<div class="input-group vis-input-wrap mb-0" >');
+            $employee = $('<div class="input-group vis-input-wrap mb-0 vas-inputboxPadding" >');
             $textEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" disabled /><label>' + VIS.Msg.getMsg("Employee") + ' </label></div>');
             $employee.append($textEmployee);
             $textEmployee.find('input').val(VIS.context.getContext(_windowNo, "Value"));
             /* SearchExistingUser textbox*/
-            $searchEmployee = $('<div class="input-group vis-input-wrap mb-0" >');
-            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80" data-hasbtn=" " /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
+            $searchEmployee = $('<div class="input-group vis-input-wrap mb-0 vas-inputboxPadding" >');
+            $textSearchEmployee = $('<div class="vis-control-wrap"><input type="text" maxlength="80"  data-hasbtn=" " /><label>' + VIS.Msg.getMsg("VAS_SearchExistingUser") + '</label></div>');
             $searchEmployee.append($textSearchEmployee).append($searchButton);
             $inputDiv.append($employee).append($searchEmployee);       
             $parentdiv.append($inputDiv);
@@ -130,8 +131,7 @@
         /* function used to change the value of option when we click on the values on dropdown*/
             function dropDown() {
                 selectPage.on("change", function () {
-                    pageNo = selectPage.val();
-                  
+                    pageNo = selectPage.val();                 
                     loadGrid(pageNo, pageSize, true);
                     selectPage.find("option[value='" + pageNo + "']").prop("selected", true);
                     if (pageNo >= totalPages) {
@@ -249,6 +249,10 @@
      /* selected row function used to get the selected record data*/
         function onSelectRow(event) {
             if (event.recid == undefined) {
+                if (totalRecords == 0) {
+                    ($okBtn).addClass("vas-disableBtn");
+                    return;
+                }
                 var countRecords = w2ui['GridDiv' + $self.windowNo].records.length;
                 var selectedRecordSet = new Set(selectedRecord);
 
@@ -271,6 +275,7 @@
                     selectedRecord.push(recordId);
                     for (i = 0; i < selectedRecord.length; i++) {
                         selectedRecord[i] = parseInt(selectedRecord[i], 10)
+
                     }
                 }
               
@@ -318,8 +323,13 @@
                 contentType: "application/json; charset=utf-8",
                 success: function (result) {
                     result = JSON.parse(result);
-                    recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ':' + result.RecordCount);
-                    totalPages = Math.ceil(result.RecordCount /pageSize);
+                    recordCount.find('span.vas-recordCount').text(VIS.Msg.getMsg("VAS_totalRecords") + ': ' + result.RecordCount);
+                    if (result.RecordCount == 0) {
+                        totalPages = 1;
+                    }
+                    else {
+                        totalPages = Math.ceil(result.RecordCount / pageSize);
+                    }
                     if (result != null && (result.UserList) != null) {
                         countRecords = 0;
                         countRecords = countRecords + (result.UserList).length;
@@ -359,9 +369,9 @@
             if (dGrid == null) {
             arrListColumns = [];
             if (arrListColumns.length == 0) {
-                arrListColumns.push({ field: "recid", caption: "recid", sortable: false, size: '10%', min: 100, hidden: true });
+                arrListColumns.push({ field: "recid", caption: "recid", sortable: false, size: '0%', hidden: true });
                 arrListColumns.push({
-                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: false, size: '5%', min: 70, hidden: false,
+                    field: "Image", caption: VIS.Msg.getMsg("VAS_Image"), sortable: false, size: '8%', min: 35, hidden: false,
                     render: function (rec) {
                         var recImage = rec.Image;
                         if (recImage != null) {
@@ -372,11 +382,12 @@
                         }
                     }
                 });
-                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: false, size: '9%', min: 110, hidden: false });
-                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: false, size: '9%', min: 130, hidden: false });
-                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: false, size: '7%', min: 130, hidden: false });
+                arrListColumns.push({ field: "User_ID", caption: VIS.Msg.getMsg("VAS_UserID"), sortable: false, size: '14%', hidden: false });
+                arrListColumns.push({ field: "Name", caption: VIS.Msg.getMsg("Name"), sortable: false, size: '19%', hidden: false });
+                arrListColumns.push({ field: "Email", caption: VIS.Msg.getMsg("VAS_Email"), sortable: false, size: '27%', hidden: false });
+                arrListColumns.push({ field: "Mobile", caption: VIS.Msg.getMsg("Mobile"), sortable: false, size: '16%',  hidden: false });
+                arrListColumns.push({ field: "SuperVisor", caption: VIS.Msg.getMsg("VAS_SuperVisor"), sortable: false, size: '16%', hidden: false });
+
 
                 /* encode the tags */
                 w2utils.encodeTags(data);
