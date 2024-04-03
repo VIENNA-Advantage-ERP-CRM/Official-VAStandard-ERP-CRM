@@ -2842,7 +2842,12 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_INVALID;
                 }
             }
-
+            //VIS-383 03/04/2024 User Validation After Prepare
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
             _justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);
@@ -2883,6 +2888,13 @@ namespace VAdvantage.Model
                 String status = PrepareIt();
                 if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
                     return status;
+            }
+
+            //VIS-383 03/04/2024 User Validation Before Complete
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
             }
             // Set Document Date based on setting on Document Type
             SetCompletedDocumentDate();
@@ -3450,6 +3462,13 @@ namespace VAdvantage.Model
 
             // Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
+
+            //VIS-383: 03/04/2024 User Validation After Complete
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
 
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
@@ -5313,6 +5332,13 @@ namespace VAdvantage.Model
             ChekVoidIt = true;
             log.Info(ToString());
 
+            //VIS-383: 03/04/2024 User Validation Before VoidIT
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             if (DOCSTATUS_Closed.Equals(GetDocStatus())
                 || DOCSTATUS_Reversed.Equals(GetDocStatus())
                 || DOCSTATUS_Voided.Equals(GetDocStatus()))
@@ -5424,6 +5450,13 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
 
+            //VIS-383: 03/04/2024 User Validation After VoidIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             return true;
             //  }
             //  else
@@ -5440,7 +5473,22 @@ namespace VAdvantage.Model
         public Boolean CloseIt()
         {
             log.Info(ToString());
+            //VIS-383: 03/04/2024 User Validation Before Close
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             SetDocAction(DOCACTION_None);
+
+            //VIS-383: 03/04/2024 User Validation After Close
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -5453,6 +5501,12 @@ namespace VAdvantage.Model
         public Boolean ReverseCorrectIt()
         {
             log.Info(ToString());
+            //VIS-383: 03/04/2024 User Validation Before ReverseCorrect
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                return false;
+            }
 
             // (JID_1472) To check payment is reconciled or not
             if (IsReconciled())
@@ -5834,6 +5888,14 @@ namespace VAdvantage.Model
             //    return false;
             //}
             //
+
+            //VIS-383: 03/04/2024 User Validation After ReverseCorrect
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             _processMsg = Info.ToString();
             return true;
             //}
