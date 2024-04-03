@@ -2883,13 +2883,6 @@ namespace VAdvantage.Model
          */
         public String CompleteIt()
         {
-
-            //VIS-383 03/04/2024 User Validation Before Complete
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
-            if (_processMsg != null)
-            {
-                return DocActionVariables.STATUS_INVALID;
-            }
             //	Re-Check
             if (!_justPrepared)
             {
@@ -2897,6 +2890,13 @@ namespace VAdvantage.Model
                 if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
                     return status;
             }
+            //VIS-383 03/04/2024 User Validation Before Complete
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             // Set Document Date based on setting on Document Type
             SetCompletedDocumentDate();
 
@@ -3464,7 +3464,7 @@ namespace VAdvantage.Model
             // Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
 
-            //VIS-383: 03/04/2024 User Validation Before Complete
+            //VIS-383: 03/04/2024 User Validation After Complete
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
             if (_processMsg != null)
             {
