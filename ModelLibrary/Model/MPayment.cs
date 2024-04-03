@@ -5333,6 +5333,13 @@ namespace VAdvantage.Model
             ChekVoidIt = true;
             log.Info(ToString());
 
+            //VIS-383: 03/04/2024 User Validation Before VoidIT
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             if (DOCSTATUS_Closed.Equals(GetDocStatus())
                 || DOCSTATUS_Reversed.Equals(GetDocStatus())
                 || DOCSTATUS_Voided.Equals(GetDocStatus()))
@@ -5444,6 +5451,13 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
 
+            //VIS-383: 03/04/2024 User Validation After VoidIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             return true;
             //  }
             //  else
@@ -5460,7 +5474,21 @@ namespace VAdvantage.Model
         public Boolean CloseIt()
         {
             log.Info(ToString());
+            //VIS-383: 03/04/2024 User Validation Before Close
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             SetDocAction(DOCACTION_None);
+
+            //VIS-383: 03/04/2024 User Validation After Close
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
             return true;
         }
 
