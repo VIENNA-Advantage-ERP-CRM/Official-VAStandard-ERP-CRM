@@ -153,6 +153,9 @@
       <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.8\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="VA009">
+      <HintPath>DLL\VA009.dll</HintPath>
+    </Reference>
     <Reference Include="VAModelAD">
       <HintPath>Dll\VAModelAD.dll</HintPath>
     </Reference>
