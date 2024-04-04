@@ -78,7 +78,8 @@ namespace VAdvantage.Model
         protected override bool BeforeSave(bool newRecord)
         {
             //Trxdate cant be greater than acctdate
-            if (GetTRXDATE() > GetDateAcct())
+            //VAI082:04-04-2024-Show error message,when account date is less then transaction date.
+            if (GetTRXDATE().Value.Date > GetDateAcct().Value.Date)
             {
                 log.SaveError("TrxDateGreater", "");
                 return false;
