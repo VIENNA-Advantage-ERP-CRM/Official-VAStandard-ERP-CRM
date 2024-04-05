@@ -1193,7 +1193,7 @@ namespace VAdvantage.Model
                 return GetPayAmt();
             //
             String sql = "SELECT SUM(currencyConvert(al.Amount,"
-                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                    + "ah.C_Currency_ID, p.C_Currency_ID,NVL(ah.DateAcct,ah.DateTrx),NVL(ah.C_ConversionType_ID,p.C_ConversionType_ID), al.AD_Client_ID,al.AD_Org_ID)) "
                 + "FROM C_AllocationLine al"
                 + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
                 + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
@@ -1229,7 +1229,7 @@ namespace VAdvantage.Model
         public Decimal? GetAllocatedAmtForCharge()
         {
             String sql = "SELECT SUM(currencyConvert(al.Amount,"
-                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                    + "ah.C_Currency_ID, p.C_Currency_ID,NVL(ah.DateAcct,ah.DateTrx),NVL(ah.C_ConversionType_ID,p.C_ConversionType_ID), al.AD_Client_ID,al.AD_Org_ID)) "
                 + "FROM C_AllocationLine al"
                 + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
                 + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
