@@ -213,6 +213,7 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoiceController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
     <Compile Include="Areas\VAS\Controllers\VChargeController.cs" />
     <Compile Include="Areas\VAS\Controllers\VCreateFromController.cs" />
@@ -248,6 +249,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceTaxTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
@@ -321,6 +323,7 @@
     <Folder Include="Areas\VAS\Views\AlertRuleSQLGenerate\" />
     <Folder Include="Areas\VAS\Views\OrderLineTabPanel\" />
     <Folder Include="Areas\VAS\Views\Shared\" />
+    <Folder Include="Areas\VAS\Views\VAS_TimeSheetInvoice\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

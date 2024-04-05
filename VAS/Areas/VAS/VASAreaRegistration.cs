@@ -50,6 +50,7 @@ namespace VAS
                   "~/Areas/VAS/Scripts/app/forms/TabAlertRuleSql.js",
                   "~/Areas/VAS/Scripts/app/forms/vasattachuser.js",
                   "~/Areas/VAS/Scripts/app/forms/vasattachusererror.js",
+                  "~/Areas/VAS/Scripts/app/forms/VAS_TimeSheetInvoice.js",
                    "~/Areas/VAS/Scripts/model/Callouts.js",
                    "~/Areas/VAS/Scripts/model/CalloutAssignment.js",
                    "~/Areas/VAS/Scripts/model/calloutbankstatement.js",
