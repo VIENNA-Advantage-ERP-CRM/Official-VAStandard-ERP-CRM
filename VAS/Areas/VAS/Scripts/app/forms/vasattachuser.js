@@ -42,6 +42,7 @@
         var totalPages = null;
         var countRecords = 0;
         var totalRecords = 0;
+        var isSearchClicked = false
         // Initialize UI Elements
 
         function initializeComponent() {
@@ -96,6 +97,7 @@
             });
           /* click function on previous div used to call the previous page record*/
             liPrevPage.on("click", function () {
+               
                 liNextPage.css("opacity", "1");
                 liNextPage.removeClass("vas-disablePage");
             
@@ -114,6 +116,7 @@
             /*click function on nextpage div used to call the next page record */
 
             liNextPage.on("click", function () {
+                
                 liPrevPage.css("opacity", "1");
                 $(liPrevPage).removeClass("vas-disablePage");
                  pageNo = parseInt(selectPage.val()) + 1;
@@ -131,8 +134,11 @@
         /* function used to change the value of option when we click on the values on dropdown*/
             function dropDown() {
                 selectPage.on("change", function () {
+
+                   
                     pageNo = selectPage.val();                 
                     loadGrid(pageNo, pageSize, true);
+                 
                     selectPage.find("option[value='" + pageNo + "']").prop("selected", true);
                     if (pageNo >= totalPages) {
                         liNextPage.css("opacity", "0.6");
@@ -166,12 +172,13 @@
             $searchButton.on(VIS.Events.onTouchStartOrClick, function () {
                 selectedRecord = [];
                 $($okBtn).addClass("vas-disableBtn");
-
+                isSearchClicked = true
                 search = $textSearchEmployee.children('input').val();
                 pageNo = 1;
                 countRecords = 0;
                 arrListColumns = [];
                 busyDiv(true);
+
                 loadGrid(pageNo, pageSize, true);
                 liNextPage.css("opacity", "1");
                 liNextPage.removeClass("vas-disablePage");
@@ -185,11 +192,13 @@
 
             /* keyup used to search the record after pressing enter */
             $parentdiv.on("keyup", function (e) {
-                search = $textSearchEmployee.children('input').val();
+               
                 pageNo = 1;
                 countRecords = 0;
                  arrListColumns = [];
                 if (e.keyCode === 13) {
+                    isSearchClicked = true;
+                    search = $textSearchEmployee.children('input').val();
                     selectedRecord = [];
                     $($okBtn).addClass("vas-disableBtn");
                     busyDiv(true);
@@ -198,6 +207,7 @@
                     liNextPage.removeClass("vas-disablePage");
                     $textSearchEmployee.children('input').val('');
                 }
+               
 
             });
           
