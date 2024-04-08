@@ -178,7 +178,6 @@
                 countRecords = 0;
                 arrListColumns = [];
                 busyDiv(true);
-
                 loadGrid(pageNo, pageSize, true);
                 liNextPage.css("opacity", "1");
                 liNextPage.removeClass("vas-disablePage");
