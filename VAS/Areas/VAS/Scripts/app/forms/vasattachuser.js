@@ -387,7 +387,7 @@
                             return '<div class="vis-grid-row-td-icon-center vis-gridImageicon"><img class="vas-businessPartnerImg" alt=' + rec.Image + ' src="' + VIS.Application.contextUrl + rec.Image + '"></div>';
                         }
                         else {
-                            return '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap">  <i class="fa fa-user"></i><img src="" alt="profile image"> </div></div>';
+                            return '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="profile image"></div></div>';
                         }
                     }
                 });
