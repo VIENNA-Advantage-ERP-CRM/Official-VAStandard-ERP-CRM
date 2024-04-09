@@ -42,7 +42,6 @@
         var totalPages = null;
         var countRecords = 0;
         var totalRecords = 0;
-        var isSearchClicked = false
         // Initialize UI Elements
 
         function initializeComponent() {
@@ -88,6 +87,7 @@
             bottomDiv.append(recordCount).append($btnDiv);
             $root.append($upperDiv).append(lowerDiv).append(bottomDiv)
             $root.append($bsyDiv);
+
             dropDown();
 
             /* ok button use to call the getRecordID function */
@@ -172,7 +172,6 @@
             $searchButton.on(VIS.Events.onTouchStartOrClick, function () {
                 selectedRecord = [];
                 $($okBtn).addClass("vas-disableBtn");
-                isSearchClicked = true
                 search = $textSearchEmployee.children('input').val();
                 pageNo = 1;
                 countRecords = 0;
@@ -196,7 +195,6 @@
                 countRecords = 0;
                  arrListColumns = [];
                 if (e.keyCode === 13) {
-                    isSearchClicked = true;
                     search = $textSearchEmployee.children('input').val();
                     selectedRecord = [];
                     $($okBtn).addClass("vas-disableBtn");
