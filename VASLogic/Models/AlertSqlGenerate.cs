@@ -177,7 +177,7 @@ namespace VIS.Models
                     return null;
                 }
             }
-            return results;
+            return null;
         }
 
         /// <summary>

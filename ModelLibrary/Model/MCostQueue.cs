@@ -6433,11 +6433,13 @@ namespace VAdvantage.Model
                                     {
                                         PriceLifoOrFifo += (ProductInvoicePriceActual * invoiceLine.GetQtyEntered());
                                     }
-                                    PriceLifoOrFifo -= price * invoiceLine.GetQtyEntered();
+                                    //VIS_45: 29-Mar-2024, price is base UOM, so we need to consider with qty invoiced rather than qty entered
+                                    PriceLifoOrFifo -= price * invoiceLine.GetQtyInvoiced();
                                 }
                                 else
                                 {
-                                    PriceLifoOrFifo -= price * invoiceLine.GetQtyEntered();
+                                    //VIS_45: 29-Mar-2024, price is base UOM, so we need to consider with qty invoiced rather than qty entered
+                                    PriceLifoOrFifo -= price * invoiceLine.GetQtyInvoiced();
                                     if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                     {
                                         PriceLifoOrFifo += MConversionRate.Convert(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),

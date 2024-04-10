@@ -224,13 +224,14 @@ namespace VAdvantage.Model
         /// <returns>Allocated amount</returns>
         public Decimal AllocatedAmt(int AllocationLine_ID,int Payment_Id)
         {
+            /*On reverse of Allocation header the document changes to inactive, So 
+             in order to get correct Allocated  amount Removed IsActive check */
             String sql = "SELECT SUM(currencyConvert(al.Amount,"
-                    + "ah.C_Currency_ID, p.C_Currency_ID,ah.DateTrx,p.C_ConversionType_ID, al.AD_Client_ID,al.AD_Org_ID)) "
+                    + "ah.C_Currency_ID, p.C_Currency_ID,NVL(ah.DateAcct,ah.DateTrx),NVL(ah.C_ConversionType_ID,p.C_ConversionType_ID), al.AD_Client_ID,al.AD_Org_ID)) "
                 + "FROM C_AllocationLine al"
                 + " INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID) "
                 + " INNER JOIN C_Payment p ON (al.C_Payment_ID=p.C_Payment_ID) "
-                + "WHERE al.C_Payment_ID =" + Payment_Id + " AND al.C_AllocationLine_ID NOT IN ("+ AllocationLine_ID +")"
-                + " AND ah.IsActive='Y' AND al.IsActive='Y'";
+                + "WHERE al.C_Payment_ID =" + Payment_Id + " AND al.C_AllocationLine_ID NOT IN (" + AllocationLine_ID + ")";
             decimal AllocatedAmtValue = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             return AllocatedAmtValue;
         }
@@ -249,9 +250,13 @@ namespace VAdvantage.Model
             MPayment payment = null;
             MCashLine cashLine = null;
             MInvoice invoice = GetInvoice();
+            //handled if IsInterBusinessPartner is checked then not to set Business partner id
             if (invoice != null
-                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID())
-                SetC_BPartner_ID(invoice.GetC_BPartner_ID());
+                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID() && 
+                ((Get_ColumnIndex("IsInterBusinessPartner") >= 0 && !Util.GetValueOfBool(Get_Value("IsInterBusinessPartner"))) || Get_ColumnIndex("IsInterBusinessPartner") < 0))
+            {
+                    SetC_BPartner_ID(invoice.GetC_BPartner_ID());
+            }
             //
             int C_Payment_ID = GetC_Payment_ID();
             int C_CashLine_ID = GetC_CashLine_ID();
@@ -268,10 +273,21 @@ namespace VAdvantage.Model
                 {
                     if (!payment.IsCashTrx())
                     {
-                        payment.SetIsAllocated(false);
                         //VIS_427 DevopsId 4680 on reverse of Payment/Allocation get unallocated amount by adding Amount on allocation line and Unallocated amount on Payment tab
-                        decimal addAllocatedtoUnallocated = Math.Abs(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount"))) + Math.Abs(GetAmount());
-                        if(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount")) == 0)
+                        MAllocationHdr allocHdr = GetParent();
+                        decimal addAllocatedtoUnallocated = 0;
+                        payment.SetIsAllocated(false);
+                        //VIS_427 If Currency Of payment and allocation header is different then Allocated Amount will be converted into payment's Currency
+                        if (payment.GetC_Currency_ID() != allocHdr.GetC_Currency_ID())
+                        {
+                            addAllocatedtoUnallocated = Math.Abs(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount"))) + MConversionRate.Convert(GetCtx(), Math.Abs(GetAmount()), allocHdr.GetC_Currency_ID(),
+                                                                                                    payment.GetC_Currency_ID(), allocHdr.GetDateAcct(), allocHdr.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                        }
+                        else
+                        {
+                            addAllocatedtoUnallocated = Math.Abs(Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount"))) + Math.Abs(GetAmount());
+                        }
+                        if (Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount")) == 0)
                         {
                             addAllocatedtoUnallocated = Math.Abs(payment.GetPayAmt()) - Math.Abs(AllocatedAmt(GetC_AllocationLine_ID(),payment.GetC_Payment_ID()));
                         }

@@ -792,8 +792,31 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            // VIS430: Get Current next from Serial no Control of Equipment Category selected Asset Components from Parent Asset on Asset Tab.
+            if (newRecord && Util.GetValueOfInt(Get_Value("VAFAM_ParentAsset_ID")) > 0 && Env.IsModuleInstalled("VA075_")
+                && Get_ColumnIndex("VA075_EquipmentCategory_ID") >= 0)
+            {
+                int sernoCtlID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT M_SerNoCtl_ID FROM VA075_EquipmentCategory 
+                                WHERE VA075_EquipmentCategory_ID = (SELECT VA075_EquipmentCategory_ID FROM A_Asset 
+                                WHERE A_Asset_ID = " + Util.GetValueOfInt(Get_Value("VAFAM_ParentAsset_ID")) + ")"));
+                if (sernoCtlID > 0)
+                {
+                    MSerNoCtl ctl = new MSerNoCtl(GetCtx(), sernoCtlID, Get_TrxName());
+                    // if Organization level check box is true on Serila No Control, then Get Current next from Serila No tab.
+                    if (ctl.Get_ColumnIndex("IsOrgLevelSequence") >= 0)
+                    {
+                        name = ctl.CreateDefiniteSerNo(this);
+                    }
+                    else
+                    {
+                        name = ctl.CreateSerNo();
+                    }
+                    SetValue(name);
+                }
+            }
+
             // VIS0060: Get Current next from Serial no Control of Equipment Category selected on Asset.
-            if (newRecord && Env.IsModuleInstalled("VA075_") && Get_ColumnIndex("VA075_EquipmentCategory_ID") >= 0
+            else if (newRecord && Env.IsModuleInstalled("VA075_") && Get_ColumnIndex("VA075_EquipmentCategory_ID") >= 0
                 && Util.GetValueOfInt(Get_Value("VA075_EquipmentCategory_ID")) > 0)
             {
                 int sernoCtlID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_SerNoCtl_ID FROM VA075_EquipmentCategory WHERE VA075_EquipmentCategory_ID = "

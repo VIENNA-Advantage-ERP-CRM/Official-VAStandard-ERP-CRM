@@ -20,6 +20,7 @@ namespace ViennaAdvantageServer.Process
     class RenewContract : SvrProcess
     {
         DateTime today;
+        public decimal Listprice = 0, Stdprice = 0, TotalRate = 0;
 
         protected override void Prepare()
         {
@@ -61,7 +62,6 @@ namespace ViennaAdvantageServer.Process
             // Changed datareader to dataset to resolve issue in postgresql done by Rakesh Kumar(228) on 31/May/2021
             DataSet dsCont = DB.ExecuteDataset(Sql.ToString(), null, Get_TrxName());
             int count = 0;
-            decimal Listprice = 0, Stdprice = 0, TotalRate = 0;
             int cycles = 0, duration = 0, frequency = 0, months = 0;
             DateTime? CDate = null;
             DateTime OldStart, Start, endDate;
@@ -120,31 +120,13 @@ namespace ViennaAdvantageServer.Process
                                 // JID_1124:  System has to pick the Pricelist in Service Contract as defined in Renewal Pricelist. also need to pick Price from Latest Valid From Date Version
                                 New.SetM_PriceList_ID(contact.GetRef_PriceList_ID());
                                 priceList = new MPriceList(GetCtx(), contact.GetRef_PriceList_ID(), Get_TrxName());
-                                Sql.Clear();
-                                Sql.Append("SELECT pp.PriceList, pp.PriceStd FROM M_ProductPrice pp INNER JOIN M_PriceList_Version plv ON pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID"
-                                    + " WHERE pp.M_Product_ID=" + contact.GetM_Product_ID() + " AND plv.IsActive='Y' AND plv.M_PriceList_ID=" + contact.GetRef_PriceList_ID()
-                                    + " AND plv.VALIDFROM <= " + GlobalVariable.TO_DATE(DateTime.Now, true) + " ORDER BY plv.VALIDFROM DESC");
-                                DataSet ds = DB.ExecuteDataset(Sql.ToString(), null, Get_TrxName());
-                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                {
-                                    Listprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
-                                    Stdprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
-                                }
-                                else
+
+                                //VAI050-Check pricelist bind on product or not
+                                if (GetPrices(contact.GetM_Product_ID(), contact.GetRef_PriceList_ID()) == 0)
                                 {
                                     Get_TrxName().Rollback();
                                     return Msg.GetMsg(GetCtx(), "ProductNotOnPriceList");
                                 }
-                                //int Version = Util.GetValueOfInt(DB.ExecuteScalar(Query));
-                                //Query = "SELECT PriceList FROM M_ProductPrice WHERE M_PriceList_Version_ID=" + Version + " AND M_Product_ID=" + contact.GetM_Product_ID();
-                                //decimal Listprice = Util.GetValueOfInt(DB.ExecuteScalar(Query));
-                                //Query = "SELECT PriceStd FROM M_ProductPrice WHERE M_PriceList_Version_ID=" + Version + " AND M_Product_ID=" + contact.GetM_Product_ID();
-                                //decimal Stdprice = Util.GetValueOfInt(DB.ExecuteScalar(Query));
-                                //if (Stdprice == 0 && Listprice == 0)
-                                //{
-                                //    dr.Close();
-                                //    return Msg.GetMsg(GetCtx(), "ProductNotINPriceList");
-                                //}
 
                                 New.SetPriceEntered(Stdprice);
                                 New.SetPriceActual(Stdprice);
@@ -241,7 +223,7 @@ namespace ViennaAdvantageServer.Process
                                 count++;
                                 if (Record_id != 0)
                                 {
-                                    contact.SetRef_Contract_ID(New.GetC_Contract_ID());
+                                    //contact.SetRef_Contract_ID(New.GetC_Contract_ID());VIS430:Not set Updated Document No in Contract Ref field after Renew contract.
                                     contact.SetRenewContract("Y");
                                     if (!contact.Save())
                                     {
@@ -315,22 +297,13 @@ namespace ViennaAdvantageServer.Process
                                 New.SetM_PriceList_ID(contact.GetRef_PriceList_ID());
 
                                 priceList = new MPriceList(GetCtx(), contact.GetRef_PriceList_ID(), Get_TrxName());
-                                Sql.Clear();
-                                Sql.Append("SELECT pp.PriceList, pp.PriceStd FROM M_ProductPrice pp INNER JOIN M_PriceList_Version plv ON pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID"
-                                    + " WHERE pp.M_Product_ID=" + contact.GetM_Product_ID() + " AND plv.IsActive='Y' AND plv.M_PriceList_ID=" + contact.GetRef_PriceList_ID()
-                                    + " AND plv.VALIDFROM <= " + GlobalVariable.TO_DATE(DateTime.Now, true) + " ORDER BY plv.VALIDFROM DESC");
-                                DataSet ds = DB.ExecuteDataset(Sql.ToString(), null, Get_TrxName());
-                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                {
-                                    Listprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
-                                    Stdprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
-                                }
-                                else
+
+                                //VAI050-Check pricelist bind on product or not
+                                if (GetPrices(contact.GetM_Product_ID(), contact.GetRef_PriceList_ID()) == 0)
                                 {
                                     Get_TrxName().Rollback();
                                     return Msg.GetMsg(GetCtx(), "ProductNotOnPriceList");
                                 }
-
                                 //String Query = "Select M_PriceList_Version_id from M_PriceList_Version where IsActive='Y' and M_PriceList_Id=" + contact.GetRef_PriceList_ID();
                                 //int Version = Util.GetValueOfInt(DB.ExecuteScalar(Query));
                                 //Query = "Select PriceList,PriceStd from M_ProductPrice where M_PriceList_Version_id=" + Version + " and M_Product_ID=" + contact.GetM_Product_ID();
@@ -348,12 +321,27 @@ namespace ViennaAdvantageServer.Process
                             }
                             else
                             {
-                                priceList = new MPriceList(GetCtx(), contact.GetM_PriceList_ID(), Get_TrxName());
-                                New.SetM_PriceList_ID(contact.GetM_PriceList_ID());
-                                New.SetPriceActual(contact.GetPriceActual());
-                                New.SetPriceList(contact.GetPriceList());
-                                New.SetPriceEntered(contact.GetPriceEntered());
+                                //VAI050-Give first perference to renewal's pricelist
+                                if (contact.GetRef_PriceList_ID() > 0)
+                                {
+                                    priceList = new MPriceList(GetCtx(), contact.GetRef_PriceList_ID(), Get_TrxName());
+                                    New.SetM_PriceList_ID(contact.GetRef_PriceList_ID());
+                                    if (GetPrices(contact.GetM_Product_ID(), contact.GetRef_PriceList_ID()) == 1)
+                                    {
+                                        New.SetPriceEntered(Stdprice);
+                                        New.SetPriceActual(Stdprice);
+                                        New.SetPriceList(Listprice);
+                                    }
 
+                                }
+                                else
+                                {
+                                    priceList = new MPriceList(GetCtx(), contact.GetM_PriceList_ID(), Get_TrxName());
+                                    New.SetM_PriceList_ID(contact.GetM_PriceList_ID());
+                                    New.SetPriceActual(contact.GetPriceActual());
+                                    New.SetPriceList(contact.GetPriceList());
+                                    New.SetPriceEntered(contact.GetPriceEntered());
+                                }
                             }
                             // Set Contract Type done by Rakesh Kumar(228) date 19/May/2021
                             New.SetContractType(contact.GetContractType());
@@ -429,7 +417,7 @@ namespace ViennaAdvantageServer.Process
                             {
                                 newcon.Append(New.GetDocumentNo() + ",");
                                 count++;
-                                contact.SetRef_Contract_ID(New.GetC_Contract_ID());
+                                //contact.SetRef_Contract_ID(New.GetC_Contract_ID());VIS430:Not set Updated Document No in Contract Ref field after Renew contract.
                                 contact.SetRenewContract("Y");
                                 if (!contact.Save())
                                 {
@@ -551,6 +539,27 @@ namespace ViennaAdvantageServer.Process
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// //VAI050-Get ListPrice and Standard price according to product's pricelist
+        /// </summary>
+        /// <param name="Product_ID"></param>
+        /// <param name="PriceList"></param>
+        /// <returns>returns zero or one</returns>
+        public int GetPrices(int Product_ID, int PriceList)
+        {
+            string sql = "SELECT pp.PriceList, pp.PriceStd FROM M_ProductPrice pp INNER JOIN M_PriceList_Version plv ON pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID"
+                + " WHERE pp.M_Product_ID=" + Product_ID + " AND plv.IsActive='Y' AND plv.M_PriceList_ID=" + PriceList
+                + " AND plv.VALIDFROM <= " + GlobalVariable.TO_DATE(DateTime.Now, true) + " ORDER BY plv.VALIDFROM DESC";
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_TrxName());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                Listprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceList"]);
+                Stdprice = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["PriceStd"]);
+                return 1;
+            }
+            return 0;
         }
     }
 }

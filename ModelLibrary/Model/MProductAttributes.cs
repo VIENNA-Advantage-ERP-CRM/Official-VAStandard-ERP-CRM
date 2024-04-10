@@ -103,6 +103,13 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
+
+            //VAI050-Set UOM value when attribute is created through Product Management Form
+            if (Get_ValueAsInt("C_UOM_ID")==0)
+            {
+                sql.Append("SELECT  C_UOM_ID FROM M_Product WHERE M_Product_ID="+ GetM_Product_ID());
+                Set_Value("C_UOM_ID", Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null))) ;
+            }
             return true;
         }
 

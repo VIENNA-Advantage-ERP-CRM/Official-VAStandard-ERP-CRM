@@ -164,6 +164,10 @@ namespace VAdvantage.Process
             }
             else
             {
+                //VIS430:Set Published Checkbox true when click on Publish and Invite Button on RFQ tab of RFQ Window.
+
+                int no = DB.ExecuteQuery(@"UPDATE C_RfQ SET VA068_IsPublished='Y' WHERE C_RfQ_ID =" + GetRecord_ID(), null, Get_Trx());
+                
                 //VIS0336:for sendinf the mails to the subscribers
                 //	Topic 
                 MRfQTopic topic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());

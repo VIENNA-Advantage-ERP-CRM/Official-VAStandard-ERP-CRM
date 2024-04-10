@@ -131,6 +131,7 @@
     <Compile Include="Models\Callouts\MWarehouseModel.cs" />
     <Compile Include="Models\ForecastFormModel.cs" />
     <Compile Include="Models\MChart.cs" />
+    <Compile Include="Models\OrderLineTabPanelModel.cs" />
     <Compile Include="Models\PaymentAllocation.cs" />
     <Compile Include="Models\PaymentAllocationModel.cs" />
     <Compile Include="Models\PaymentModel.cs" />
@@ -138,6 +139,7 @@
     <Compile Include="Models\PostingModel.cs" />
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
+    <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VBOMDropModel.cs" />
     <Compile Include="Models\VChargeModel.cs" />
     <Compile Include="Models\VCreateFromModel.cs" />
