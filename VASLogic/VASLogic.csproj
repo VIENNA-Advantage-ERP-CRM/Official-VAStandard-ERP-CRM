@@ -124,6 +124,7 @@
     <Compile Include="Models\Callouts\MStorageModel.cs" />
     <Compile Include="Models\Callouts\MTaxModel.cs" />
     <Compile Include="Models\Callouts\MTeamForcastModel.cs" />
+    <Compile Include="Models\Callouts\MTermModel.cs" />
     <Compile Include="Models\Callouts\MUOMConversionModel.cs" />
     <Compile Include="Models\Callouts\MUOMModel.cs" />
     <Compile Include="Models\Callouts\MVASContractModel.cs" />
