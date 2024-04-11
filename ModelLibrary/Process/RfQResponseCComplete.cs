@@ -69,6 +69,35 @@ namespace VAdvantage.Process
             //
             response.Save();
             //Deekshant changes in return Completed Sucessfully
+            //VAI050--Changes to freeze Vendor tabs.
+            return SetProccessedCheck();
+        }
+
+        //VAI050--On Vendor Response tab When user click on Check Complete button than 
+        // RfQ Response Vendor tab,Response Line tab and Response Quantity tab should be freezed.
+        public string SetProccessedCheck()
+        {
+            StringBuilder query = new StringBuilder();
+            query.Append("UPDATE C_RfQResponse SET Processed='Y' WHERE  C_RfQResponse_ID=" + GetRecord_ID());
+            if (DB.ExecuteQuery(query.ToString(), null, Get_Trx()) < 0)
+            {
+                Get_Trx().Rollback();
+                return Msg.GetMsg(GetCtx(), "VAS_ResponseVendorNot");
+            }
+            query.Clear();
+            query.Append("UPDATE C_RfQResponseLine SET Processed='Y' WHERE  C_RfQResponse_ID=" + GetRecord_ID());
+            if (DB.ExecuteQuery(query.ToString(), null, Get_Trx()) < 0)
+            {
+                Get_Trx().Rollback();
+                return Msg.GetMsg(GetCtx(), "VAS_ResponseLineNot");
+            }
+            query.Clear();
+            query.Append("UPDATE C_RfQResponseLineQty SET Processed='Y' WHERE  C_RfQResponseLine_ID IN (SELECT C_RfQResponseLine_ID FROM C_RfQResponseLine WHERE  C_RfQResponse_ID=" + GetRecord_ID() + ")");
+            if (DB.ExecuteQuery(query.ToString(), null, Get_Trx()) < 0)
+            {
+                Get_Trx().Rollback();
+                return Msg.GetMsg(GetCtx(), "VAS_ResponseQuantityNot");
+            }
             return Msg.GetMsg(GetCtx(), "Success", "");
         }
     }

@@ -18,6 +18,7 @@
                 mTab.setValue("Discount", 0)
                 mTab.setValue("PlannedMarginAmt", 0);
                 mTab.setValue("PlannedAmt", 0);
+                mTab.setValue("ProductType", "");
             }
             return "";
         }
@@ -29,6 +30,7 @@
             mTab.setValue("Discount", 0)
             mTab.setValue("PlannedMarginAmt", 0);
             mTab.setValue("PlannedAmt", 0);
+            mTab.setValue("ProductType", "");
             return "";
         }
 
@@ -37,6 +39,7 @@
         var phaseID = Util.getValueOfInt(mTab.getValue("C_ProjectPhase_ID"));
         var projID = Util.getValueOfInt(mTab.getValue("C_Project_ID"));
         var productID = Util.getValueOfInt(mTab.getValue("M_Product_ID"));
+
         var attributeID = 0;
         var uomID = 0;
         //get price on the basis of Attribute and UOM if selected
@@ -46,9 +49,12 @@
         if (mTab.findColumn("C_UOM_ID") > 0) {
             uomID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
         }
-        //
-        var paramString = taskID.toString() + "," + phaseID.toString() + "," + projID.toString() + "," + productID.toString() + "," + attributeID.toString() + "," + uomID.toString();
 
+        //(VAI094): Fill Product Type on selection of Product
+        var type = VIS.dataContext.getJSONRecord("MProject/GetProductType", productID.toString());
+        mTab.setValue("ProductType", type);
+
+        var paramString = taskID.toString() + "," + phaseID.toString() + "," + projID.toString() + "," + productID.toString() + "," + attributeID.toString() + "," + uomID.toString();
         var dr = VIS.dataContext.getJSONRecord("MProject/GetProjectDetail", paramString);
         if (dr != null) {
             var PriceList = Util.getValueOfDecimal(dr["PriceList"]);

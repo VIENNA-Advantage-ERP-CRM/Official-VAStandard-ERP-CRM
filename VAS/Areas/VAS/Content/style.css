@@ -121,7 +121,7 @@
 }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-searchinput-block {
-        margin: 3px 0 4px;
+        margin: 3px 0 0px;
     }
 
     .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-sort-block {
@@ -139,18 +139,27 @@
         z-index: 9;
     }
 
-    .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
-        top: 2px;
-        background-color: rgba(var(--v-c-on-primary));
+.vas-windowtab.vas-columnval.vas-reduceColValWidth {
+    width: 93%;
+}
+
+    .vas-windowtab.vas-columnval.vas-reduceColValWidth .vas-arrow-down {
+        right: -7%;
+        top: -9px;
     }
 
-    .vis-ad-w-p-actionpanel-r .vas-windowtab select {
-        width: 100%;
-        min-height: 35px;
-        border-radius: 2px;
-        font-size: 14px;
-        border-color: rgba(var(--v-c-secondary),1);
-    }
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-join-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-filter-field label, .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-operator label {
+    top: 2px;
+    background-color: rgba(var(--v-c-on-primary));
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab select {
+    width: 100%;
+    min-height: 35px;
+    border-radius: 2px;
+    font-size: 14px;
+    border-color: rgba(var(--v-c-secondary),1);
+}
 
 .vas-add-label label, .vas-add-filter label {
     width: 100%;
@@ -232,7 +241,6 @@
 }
 
 .vas-sqlgenerator {
-    display: flex;
     height: 100%;
     width: 100%;
 }
@@ -355,6 +363,9 @@
 
     .vas-filters-block div {
         float: left;
+        width: 260px;
+        text-overflow: ellipsis;
+        overflow: hidden;
     }
 
 .vas-filters-editdelete-btns div {
@@ -370,7 +381,7 @@
     float: left;
     margin-bottom: 10px;
     white-space: nowrap;
-    width: 300px;
+    width: 260px;
     text-overflow: ellipsis;
     overflow: hidden;
 }
@@ -662,13 +673,60 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-.vas-checkboxoption-hidden option {
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
     display: none;
 }
 
     .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
         display: block;
     }
+
+    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
+        display: none;
+    }
+
+    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+        display: block;
+    }
+
+.vas-remove-likeoption option:nth-last-child(3), .vas-remove-likeoption option:nth-last-child(4) {
+    display: none;
+}
+
+.vas-indropdown-text-input {
+    width: 100%;
+    margin-bottom: 17px;
+    min-height: 35px;
+    display: inline-block;
+}
+
+.vas-indropdown-block {
+    display: none;
+}
+
+    .vas-indropdown-block.vas-single-input .vas-arrow-down {
+        top: -16px;
+    }
+
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+    display: none;
+}
+
+    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
+    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
+        display: none;
+    }
+
+    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-likeoption option:nth-last-child(4), .vas-likeoption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+        display: block;
+    }
+
+.vas-likeoption option {
+    display: none;
+}
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
     float: left;
@@ -727,5 +785,6 @@ html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column.vas-sqlgenera
 }
 
 html[dir="rtl"] .vas-sql-result-msg {
+
     margin: 10px 0 0;
 }

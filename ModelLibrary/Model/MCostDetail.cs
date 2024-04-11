@@ -4307,11 +4307,14 @@ namespace VAdvantage.Model
             }
 
             // Get Cost element of Cost Combination type
-            sql = @"SELECT ce.M_CostElement_ID ,  ce.Name ,  cel.lineno ,  cel.m_ref_costelement , 
-                      (SELECT CASE  WHEN costingmethod IS NOT NULL THEN 1  ELSE 0 END  FROM m_costelement WHERE m_costelement_id = CAST(cel.M_Ref_CostElement AS INTEGER) ) AS iscostMethod 
-                            FROM M_CostElement ce INNER JOIN m_costelementline cel ON ce.M_CostElement_ID = cel.M_CostElement_ID "
-                          + "WHERE ce.AD_Client_ID=" + GetAD_Client_ID()
-                          + " AND ce.IsActive='Y' AND ce.CostElementType='C' AND cel.IsActive='Y' ";
+            sql = $@"SELECT ce.M_CostElement_ID ,  ce.Name ,  cel.lineno ,  cel.m_ref_costelement , 
+                      (SELECT CASE  WHEN costingmethod IS NOT NULL THEN 1  ELSE 0 END  FROM m_costelement 
+                                WHERE m_costelement_id = CAST(cel.M_Ref_CostElement AS INTEGER) ) AS iscostMethod,
+                      (SELECT CASE  WHEN costingmethod IS NOT NULL THEN CostingMethod  ELSE '' END  FROM m_costelement 
+                                WHERE m_costelement_id = CAST(cel.M_Ref_CostElement AS INTEGER) ) AS linkedcostMethod 
+                            FROM M_CostElement ce INNER JOIN m_costelementline cel ON ce.M_CostElement_ID = cel.M_CostElement_ID 
+                          WHERE ce.AD_Client_ID= { GetAD_Client_ID() }
+                           AND ce.IsActive='Y' AND ce.CostElementType='C' AND cel.IsActive='Y' ";
             if (optionalStrcc == "window" && costingMethod == "C")
             {
                 sql += " AND ce.M_CostElement_ID = " + costElementId1;
@@ -4358,9 +4361,23 @@ namespace VAdvantage.Model
                     //        // UpdateFreightWithActualQty(ds, AD_Org_ID, cd, acctSchema, product, M_ASI_ID, windowName, M_Warehouse_ID);
                     //    }
                     //}
-
+                    DataRow[] dr = null;
                     for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
+                        // VIS_045: 01-April-2024, DevOps Task ID: 5552, check Cost combination element linked with FIFO / LIFO costing method 
+                        // if it is linked with LIFO / FIFO then calculate cost combination for during consumption
+                        // Reason: system change the currentcostprice based on cost queue consumption
+                        dr = ds.Tables[0].Select(" M_CostElement_ID =  " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_CostElement_ID"]) +
+                                                  " AND iscostMethod = 1");
+                        if (dr != null && dr.Length > 0)
+                        {
+                            if (Util.GetValueOfString(dr[0]["linkedcostMethod"]).Equals(MProductCategory.COSTINGMETHOD_Fifo) ||
+                                     Util.GetValueOfString(dr[0]["linkedcostMethod"]).Equals(MProductCategory.COSTINGMETHOD_Lifo))
+                            {
+                                isCurrentCostprice = true;
+                            }
+                        }
+
                         costCombination = MCost.Get(product, M_ASI_ID, acctSchema, AD_Org_ID, Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_CostElement_ID"]), M_Warehouse_ID);
 
                         //If cost combination is already calculated on completion, then not to re-calculate through process

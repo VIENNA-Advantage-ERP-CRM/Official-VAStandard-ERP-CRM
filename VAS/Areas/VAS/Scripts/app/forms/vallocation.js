@@ -1609,12 +1609,14 @@
                 clearInvoiceArrays(e);
 
                 if ($allocationFrom.val() == "P") { // In case of Payment Cash Option must be visible
-                    $allocationTo.find("option[value=C]").show();
+                    /*VIS_427 30/01/2024 Devops Id 4680 Hide cash journal if Payment is selected on Allocationfrom field*/
+                    $allocationTo.find("option[value=C]").hide();
                     $allocationTo.find("option[value=P]").show();
                     $allocationTo.find("option[value=G]").show();
                 }
                 else if ($allocationFrom.val() == "C") { // In case of Cash Payment Option must be visible
-                    $allocationTo.find("option[value=P]").show();
+                    /*VIS_427 30/01/2024 Devops Id 4680 Hide Payment if cash journal is selected on Allocationfrom field*/
+                    $allocationTo.find("option[value=P]").hide();
                     $allocationTo.find("option[value=C]").show();// for Cash2Cash
                     $allocationTo.find("option[value=G]").show();
                 }
@@ -6672,6 +6674,8 @@
             //	Currency
             else if (name == "C_Currency_ID") {
                 _C_Currency_ID = parseInt(value);
+                //VIS_427 The function is called in order to get Precision according to currency
+                loadCurrencyPrecision()
                 ////////loadBPartner();
             }
             //	Date for Multi-Currency
@@ -7339,7 +7343,7 @@
                             data: ({
                                 paymentData: JSON.stringify(paymentData), cashData: JSON.stringify(cashData), invoiceData: JSON.stringify(invoiceData), currency: $cmbCurrency.val(), isCash: true,
                                 _C_BPartner_ID: _C_BPartner_ID, _windowNo: self.windowNo, payment: payment, DateTrx: $date.val(), appliedamt: applied
-                                , discount: discount, writeOff: writeOff, open: open, DateAcct: DateAcct, _CurrencyType_ID: C_CurrencyType_ID, isInterBPartner: false, conversionDate: conversionDate, chk: chk
+                                , discount: discount, writeOff: writeOff, open: open, DateAcct: DateAcct, _CurrencyType_ID: C_CurrencyType_ID, isInterBPartner: _isInterBPartner, conversionDate: conversionDate, chk: chk
                             }),
                             success: function (result) {
                                 // Clear Selected invoices array when we de-select the select all checkbox. work done for to hold all the selected invoices

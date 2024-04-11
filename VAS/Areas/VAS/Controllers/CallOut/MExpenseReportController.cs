@@ -90,5 +90,41 @@ namespace VIS.Controllers
             var value = model.GetProfiletype(fields);
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VAI094:for fetching customer id from database according to requestid or project id  selected in 
+        /// request field  or project field
+        /// in Report line tab in time and expense report window
+        /// </summary>
+        /// <param name="fields">string fields </param>
+        /// <returns>customer id</returns>
+        public JsonResult LoadCustomerData(string fields)
+        {
+            MExpenseReportModel obj = new MExpenseReportModel();
+            Dictionary<string, object> _result = null;
+            if (Session["ctx"] != null)
+            {
+                _result = obj.LoadCustomerData(fields);
+            }
+            return Json(JsonConvert.SerializeObject(_result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// VAI094:for fetching M_PRODUCT_ID,C_UOM_ID from database according to Id  selected in 
+        /// projectphase or project task or product field in Report line tab in time and expense report window
+        /// </summary>
+        /// <param name="fields">string fields </param>
+        /// <returns>M_PRODUCT_ID,C_UOM_ID</returns>
+        public JsonResult LoadProductData(string fields)
+        {
+            MExpenseReportModel obj = new MExpenseReportModel();
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                result = obj.LoadProductData(fields);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }

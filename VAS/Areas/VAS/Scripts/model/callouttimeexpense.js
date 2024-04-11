@@ -94,7 +94,9 @@
             mTab.setValue("C_UOM_ID", Util.getValueOfInt(UOM.C_UOM_ID));
             //	Search Pricelist for current version
             uom = mTab.getValue("C_UOM_ID");
-            var paramString = paramStr = M_Product_ID.toString().concat(',').concat(mTab.getValue("S_TimeExpense_ID").toString()).concat(',').concat(mTab.getValue("C_UOM_ID").toString().concat(',').concat(mTab.getValue("DateExpense").toString()));
+            //  var paramString = paramStr = M_Product_ID.toString().concat(',').concat(mTab.getValue("S_TimeExpense_ID").toString()).concat(',').concat(mTab.getValue("C_UOM_ID").toString().concat(',').concat(mTab.getValue("DateExpense").toString()));
+            var paramString = paramStr = M_Product_ID + "," + mTab.getValue("S_TimeExpense_ID") + "," + mTab.getValue("C_UOM_ID") + "," + mTab.getValue("DateExpense");
+
             var price = VIS.dataContext.getJSONRecord("MExpenseReport/GetstandardPrice", paramString);
             //sql = "SELECT pp.PriceStd, "
             //    + "pp.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID "
@@ -278,7 +280,9 @@
         try {
             var paramStr = "";
             var M_Product_ID = ctx.getContextAsInt(windowNo, "M_Product_ID");
-            paramStr = M_Product_ID.toString().concat(',').concat(mTab.getValue("S_TimeExpense_ID").toString()).concat(',').concat(Util.getValueOfString(mTab.getValue("C_UOM_ID")));
+            //  paramStr = M_Product_ID.toString().concat(',').concat(mTab.getValue("S_TimeExpense_ID").toString()).concat(',').concat(Util.getValueOfString(mTab.getValue("C_UOM_ID")));
+            paramStr = M_Product_ID + "," + mTab.getValue("S_TimeExpense_ID") + "," + mTab.getValue("C_UOM_ID");
+
             var prices = VIS.dataContext.getJSONRecord("MExpenseReport/GetPrices", paramStr);
 
             if (prices != null) {
@@ -289,7 +293,7 @@
             }
             // To set UOM when charge is selected
             if (mTab.getValue("C_Charge_ID") > 0) {
-                var c_uom_id = ctx.getContextAsInt("#C_UOM_ID");
+                  var c_uom_id = ctx.getContextAsInt("#C_UOM_ID");
                 if (c_uom_id > 0) {
                     mTab.setValue("C_UOM_ID", c_uom_id);	//	Default UOM from context.
                 }
@@ -309,6 +313,48 @@
             this.setCalloutActive(false);
             this.log.severe(err.toString());
         }
+        this.setCalloutActive(false);
+        return "";
+    };
+
+    //autofills customer in customer field on selection of request field or project field in Report line tab in time and expense report window
+    CalloutTimeExpense.prototype.SetCustomerData = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "" ) {
+            return "";
+        }
+        this.setCalloutActive(true);
+        var fieldStatus = mField.getColumnName(); var columnId = value;
+
+        var paramString = columnId + "," + fieldStatus;
+        var res = VIS.dataContext.getJSONRecord("MExpenseReport/LoadCustomerData", paramString);
+        if (res != null && res.Customer>0) {
+        mTab.setValue("C_BPartner_ID", res.Customer);
+        }
+        else {
+        mTab.setValue("C_BPartner_ID",0);
+        }
+        this.setCalloutActive(false);
+        return "";
+    };
+
+
+    //for fetching M_PRODUCT_ID, C_UOM_ID from database according to Id  selected in
+    // projectphase or project task or product field in in Report line tab in time and expense report window
+    // and set uom field to 'each' on selection of charge field
+    CalloutTimeExpense.prototype.setProductData = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "" || mTab.getValue("C_Charge_ID") > 0 || mTab.getValue("IsTimeReport") == false) {
+            return "";
+        }  
+        this.setCalloutActive(true);
+        var columnName = mField.getColumnName();
+        var paramString = value + "," + columnName;
+        var res = VIS.dataContext.getJSONRecord("MExpenseReport/LoadProductData", paramString);
+
+        if (res != null && res.M_Product_ID > 0 ) {
+            mTab.setValue("M_Product_ID", res.M_Product_ID);
+            mTab.setValue("C_UOM_ID", res.C_UOM_ID);
+        }
+
         this.setCalloutActive(false);
         return "";
     };
