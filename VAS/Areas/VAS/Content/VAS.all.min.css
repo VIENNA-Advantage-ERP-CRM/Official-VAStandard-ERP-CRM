@@ -1,11 +1,9 @@
-﻿/*version 1.4.1.0*/
-
+﻿/*version 1.4.2.0*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
     /*margin-top:2px;*/
 }
-
 
 .vis-payment-td1 {
     /*width: 40%;*/
@@ -37,7 +35,6 @@
 .vis-payment-span {
     /*margin: 5px 0px 5px 1%;*/
 }
-
 
 .vis-payment-inputs {
     /*margin: 10px 1% 5px 2%;
@@ -861,13 +858,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
 */
-
 /*
 
 Only index.html and style.css is for your use There is no need to copy any other file
 
 */
-
 .vas-apInvPoWrapper {
     display: flex;
     flex-direction: column;
@@ -916,7 +911,6 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: block;
 }
 
-
 .vas-apTaxWrapper {
     display: flex;
     flex-direction: column;
@@ -941,6 +935,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 10px;
 }
 
 .vas-ap-sgl1Item1_First {
@@ -962,9 +957,27 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: block;
 }
 
-.vas-singleTaxElementValue {
+.vas-singleTaxElementValue, .vas-singleRequesitionValue {
     font-weight: normal;
-    width: 120px;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-singleTaxElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/*VIS430:Handled width for Description field of Requisition tab panel*/
+.vas-singleTaxDescription {
+    font-weight: normal;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -1011,6 +1024,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     width: 24%
 }
 
+.vas-setTaxWidthCheckbox {
+    align-self: center;
+    width: 11%
+}
+
+.vas-setTaxWidth1 {
+    width: 10%
+}
+
 .vas-setTaxPaybleAmtWidth {
     width: 38%
 }
@@ -1021,6 +1043,34 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
     height: auto;
+}
+
+.vas-singleItemListWrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.2rem;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.vas-setMatchPo {
+    width: 45%
+}
+
+.vas-setShipWidth {
+    width: 70%
+}
+
+.vas-setTaxProWidth {
+    width: 70%
+}
+
+.vas-setChargeWidth {
+    width: 70%
+}
+
+.vas-setUomWidth {
+    width: 70%
 }
 
 .vis-pSelectInfo {
@@ -1100,10 +1150,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     cursor: not-allowed;
 }
 
-.vis-paymentselect-field select,
-.vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]),
-.vis-paymentPrint-field select,
-.vis-paymentPrint-field input:not([type="submit"]) {
+.vis-paymentselect-field select, .vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]), .vis-paymentPrint-field select, .vis-paymentPrint-field input:not([type="submit"]) {
     /*width: 100%;
     float: left;*/
     /* color: rgba(var(--v-c-on-secondary), 1); */
@@ -1208,7 +1255,6 @@ Only index.html and style.css is for your use There is no need to copy any other
     margin-top: 6px;
 }
 
-
 @media (max-width: 1024px) {
     .vis-paymentPrint-field {
         /*width:48.5%;*/
@@ -1224,7 +1270,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 }
 
-@media (max-width:999px) {
+@media (max-width: 999px) {
     .vis-pSelectInfo {
         width: 35%;
     }
@@ -1240,8 +1286,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 }
 
-.vas-parent,
-html[dir="rtl"].vas-parent {
+.vas-parent, html[dir="rtl"].vas-parent {
     display: flex;
     align-items: center;
     padding: 0.5rem;
@@ -1258,45 +1303,38 @@ html[dir="rtl"].vas-parent {
     margin: -11px -12px 10px -12px;
 }
 
-.vas-root,
-html[dir="rtl"].vas-root {
+.vas-root, html[dir="rtl"].vas-root {
     width: 100%;
     height: 100%;
     background-color: #FFF;
 }
 
-.vas-lowerDiv,
-html[dir="rtl"].vas-lowerDiv {
+.vas-lowerDiv, html[dir="rtl"].vas-lowerDiv {
     height: calc(100% - 102px);
     overflow: auto;
 }
 
-    .vas-lowerDiv .w2ui-grid-body,
-    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
+    .vas-lowerDiv .w2ui-grid-body, html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
         background-color: transparent;
         height: 100% !important;
     }
 
-    .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
-    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
+    .vas-lowerDiv.w2ui-reset.w2ui-grid > div, html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
         height: 100% !important;
     }
 
-    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
-    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records, html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
         overflow-x: hidden !important;
     }
 
-.vas-bottom,
-html[dir="rtl"].vas-bottom {
+.vas-bottom, html[dir="rtl"].vas-bottom {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 10px
 }
 
-.vas-actionbtn,
-html[dir="rtl"].vas-actionbtn {
+.vas-actionbtn, html[dir="rtl"].vas-actionbtn {
     background: rgba(var(--v-c-primary), 1);
     border: none;
     color: rgba(var(--v-c-on-primary), 1);
@@ -1306,26 +1344,23 @@ html[dir="rtl"].vas-actionbtn {
     margin-left: 10px;
 }
 
-.vas-businessPartnerImg,
-html[dir="rtl"].vas-businessPartnerImg {
+.vas-businessPartnerImg, html[dir="rtl"].vas-businessPartnerImg {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.vas-businessPartnerInput,
-html[dir="rtl"].vas-businessPartnerInput {
+.vas-businessPartnerInput, html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
-    gap: 0.5rem;
+    gap: 15px;
     margin-left: 4px;
     margin-right: 4px;
 }
 
-.input-group-text.vas-businessPartnerSearch,
-html[dir="rtl"].vas-businessPartnerSearch {
+.input-group-text.vas-businessPartnerSearch, html[dir="rtl"].vas-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
     font-size: 18px !important;
     color: #fff;
@@ -1336,30 +1371,25 @@ html[dir="rtl"].vas-businessPartnerSearch {
         color: inherit;
     }
 
-.vas-noimageicon,
-html[dir="rtl"].vas-noimageicon {
+.vas-noimageicon, html[dir="rtl"].vas-noimageicon {
     font-size: 26px;
 }
 
-.vas-gridImageicon,
-html[dir="rtl"].vas-gridImageicon {
+.vas-gridImageicon, html[dir="rtl"].vas-gridImageicon {
     font-size: 1.2rem;
 }
 
-.vas-disableBtn,
-html[dir="rtl"].vas-disableBtn {
+.vas-disableBtn, html[dir="rtl"].vas-disableBtn {
     pointer-events: none;
     opacity: 0.6;
 }
 
-.vas-errorGridBody,
-html[dir="rtl"].vas-errorGridBody {
+.vas-errorGridBody, html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
 
-.vas-disablePage,
-html[dir="rtl"].vas-disablePage {
+.vas-disablePage, html[dir="rtl"].vas-disablePage {
     pointer-events: none;
     opacity: 0.6;
 }
@@ -1368,3 +1398,16 @@ html[dir="rtl"].vas-disablePage {
     background-color: #f0f0f0;
     font-weight: bold;
 }
+
+.vas-inputboxPadding input[type="text"] {
+    padding-left: 10px !important;
+}
+
+html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
+    padding-right: 10px !important;
+}
+
+.vas-inputboxPaddingRight {
+    padding-right: 10px !important;
+}
+
