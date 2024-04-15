@@ -278,8 +278,8 @@ namespace VAdvantage.Model
             // Calculate Tax on TaxAble Amount
             if (idr == null)
             {
-                sql = "SELECT il.TaxBaseAmt, COALESCE(il.TaxAmt,0), i.IsSOTrx  , i.C_Currency_ID , i.DateAcct , i.C_ConversionType_ID, "
-                   + " il.C_Invoice_ID, il.C_Tax_ID, il.LineNetAmt FROM C_InvoiceLine il"
+                sql = "SELECT il.TaxBaseAmt, COALESCE(il.TaxAmt,0), i.IsSOTrx  , i.C_Currency_ID , i.DateAcct , i.C_ConversionType_ID,"
+                   + " il.C_Invoice_ID, il.C_Tax_ID, il.LineNetAmt, il.C_InvoiceLine_ID FROM C_InvoiceLine il"
                    + " INNER JOIN C_Invoice i ON (il.C_Invoice_ID=i.C_Invoice_ID) "
                    + "WHERE il.C_Invoice_ID=" + GetC_Invoice_ID() + " AND il.C_Tax_ID=" + GetC_Tax_ID();
                 idr = DB.ExecuteDataset(sql, null, Get_TrxName());
@@ -381,6 +381,12 @@ namespace VAdvantage.Model
                         }
                         //
                         taxAmt = Decimal.Add(taxAmt, amt);
+
+                        //VIS383:DevOps TASK 5671-11/04/24:-Update the parent and child tax amount and rate based on GST Tax Type for India Localization Tax(VA106) module
+                        if (Env.IsModuleInstalled("VA106_"))
+                        {
+                            CalculateGstTypeTax(tax, Utility.Util.GetValueOfInt(dr[i]["C_InvoiceLine_ID"]), amt, TaxableAmt);
+                        }
                     }
                 }
             }
@@ -421,6 +427,122 @@ namespace VAdvantage.Model
             //else
             SetTaxBaseAmt(Decimal.Round((Decimal)taxBaseAmt, GetPrecision()));
             return true;
+        }
+        /// <summary>
+        /// VIS383:DevOps TASK 5671-12/04/24:-Calculate and update taxable amount based on gst tax type for parent and child tax
+        /// </summary>
+        /// <author>VIS-383</author>
+        /// <param name="tax">Tax Object</param>
+        /// <param name="invoiceLineID">Invoice Line ID</param>
+        /// <param name="taxAmount">Tax Amount</param>
+        /// <param name="TaxableAmt">Taxable Amount</param>
+        public void CalculateGstTypeTax(MTax tax, int invoiceLineID, decimal taxAmount, decimal TaxableAmt)
+        {
+            //VIS383:DevOps TASK 5671-12/04/24:-When "Summary Lavel" is false then update the parent tax 
+            if (!tax.IsSummary())
+            {
+                //VIS383:-Clear GST Tax Type amount and rate before update CGST,SGST and IGST value when child tax not exist for this line
+                ClearGstTaxTypeAmount(Util.GetValueOfInt(invoiceLineID));
+                if (!string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
+                {
+                    UpdateGstTypeTaxAmount(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType")), tax, taxAmount, Util.GetValueOfInt(invoiceLineID));
+                }
+            }
+            //VIS383:DevOps TASK 5671-12/04/24:-When "Summary Lavel" is ture then update the child tax 
+            else if (tax.IsSummary())
+            {
+                MTax[] cTaxes = tax.GetChildTaxes(false);
+                //VIS383:DevOps TASK 5671-15/04/24:-Get the taxable amount for the child tax When "Tax Included" is ture 
+                if (IsTaxIncluded())
+                {
+                    decimal sumTaxRate = 0;
+                    decimal mulTaxRate = 0;
+                    //When tax rate is not for parent tax then get the sum of tax rate defined for child tax
+                    if (tax.GetRate() == 0)
+                    {   
+                        for (int t = 0; t < cTaxes.Length; t++)
+                        {
+                            sumTaxRate = sumTaxRate + Util.GetValueOfDecimal(cTaxes[t].GetRate());
+                        }
+                    }
+                    else
+                    {
+                        sumTaxRate = tax.GetRate();
+                    }
+                    mulTaxRate = Decimal.Round(Decimal.Divide(sumTaxRate, 100), 12, MidpointRounding.AwayFromZero);
+                    mulTaxRate = Decimal.Add(mulTaxRate, Env.ONE);
+                    TaxableAmt = Decimal.Divide(TaxableAmt, mulTaxRate);
+                }
+
+                for (int j = 0; j < cTaxes.Length; j++)
+                {
+                    MTax cTax = cTaxes[j];
+                    //VIS383:DevOps TASK 5671-15/04/24:-Update the child tax amount and rate based on GST Tax Type for India Localization Tax(VA106) module
+                    Decimal gstTaxAmt = cTax.CalculateTax(TaxableAmt, false, GetPrecision());
+                    //VIS383:DevOps TASK 5671-15/04/24:-Clear the CGST,SGST and IGST column before updated child tax
+                    if (j == 0)
+                    {
+                        ClearGstTaxTypeAmount(Util.GetValueOfInt(invoiceLineID));
+                    }
+                    if (!string.IsNullOrEmpty(Util.GetValueOfString(cTaxes[j].Get_Value("VA106_GSTTaxType"))))
+                    {
+                        UpdateGstTypeTaxAmount(Util.GetValueOfString(cTaxes[j].Get_Value("VA106_GSTTaxType")), cTax, gstTaxAmt, Util.GetValueOfInt(invoiceLineID));
+                    }
+
+                }
+            }
+        }
+
+        /// <summary>
+        /// VIS383:DevOps TASK 5671-11/04/24:-Clear GST Tax Type amount and rate before update CGST,SGST and IGST value for specific line
+        /// </summary>
+        /// <author>VIS-383</author>
+        /// <param name="invoiceLineID">Invoice Line ID</param>
+        public void ClearGstTaxTypeAmount(int invoiceLineID)
+        {
+            string sqlTax = @"UPDATE C_InvoiceLine SET VA106_IGSTRate=NULL,VA106_IGSTAmt=NULL,VA106_CGSTRate=NULL,VA106_CGSTAmt=NULL,
+                              VA106_SGSTUTGSTRate=NULL,VA106_SGSTUTGSTAmt=NULL
+                              WHERE C_InvoiceLine_ID=" + invoiceLineID;
+            int no = DataBase.DB.ExecuteQuery(sqlTax, null, Get_TrxName());
+            if (no != 1)
+            {
+                log.Warning("Db error on clear gst tax" + no + ": " + sqlTax);
+            }
+        }
+
+        /// <summary>
+        /// VIS383:DevOps TASK 5671-11/04/24:-Update the tax amount and rate based on GST Tax Type
+        /// </summary>
+        /// <author>VIS-383</author>
+        /// <param name="gstType">GST Tax Type</param>
+        /// <param name="tax">Tax Object</param>
+        /// <param name="taxAmt">tax amount</param>
+        /// <param name="invoiceLineID">Invoice Line ID</param>
+        public void UpdateGstTypeTaxAmount(string gstType, MTax tax, decimal gstAmt, int invoiceLineID)
+        {
+            String sql = null;
+            decimal taxRate = Util.GetValueOfDecimal(tax.GetRate());
+
+            if (gstType == "01")//CGST
+            {
+                sql = @"UPDATE C_InvoiceLine SET VA106_CGSTRate=" + taxRate + ",VA106_CGSTAmt=" + gstAmt + @"
+                        WHERE C_InvoiceLine_ID=" + invoiceLineID;
+            }
+            else if (gstType == "02") //SGST/UTGST
+            {
+                sql = @"UPDATE C_InvoiceLine SET VA106_SGSTUTGSTRate=" + taxRate + ",VA106_SGSTUTGSTAmt=" + gstAmt + @"
+                       WHERE C_InvoiceLine_ID=" + invoiceLineID;
+            }
+            else if (gstType == "03") // IGST
+            {
+                sql = @"UPDATE C_InvoiceLine SET VA106_IGSTRate=" + taxRate + ",VA106_IGSTAmt=" + gstAmt + @"
+                        WHERE C_InvoiceLine_ID=" + invoiceLineID;
+            }
+            int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
+            if (no != 1)
+            {
+                log.Warning("Db error on update gst tax amount" + no + ": " + sql);
+            }
         }
 
         /// <summary>
