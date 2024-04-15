@@ -192,5 +192,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VAI050-Get Fleet Detail of Shipper
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>return fleet detail</returns>
+        public JsonResult GetFleetDetail(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MInOutModel objInOut = new MInOutModel();
+                retJSON = JsonConvert.SerializeObject(objInOut.GetFleetDetail(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
