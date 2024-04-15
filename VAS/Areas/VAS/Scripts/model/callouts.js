@@ -215,7 +215,6 @@
     VIS.Model.CalloutProfitTax = CalloutProfitTax;
     //********************* Callout Profit Tax Start End ***************************************************************
 
-
     //et multiply rate 1 in case of same UOM in both the columns.
     function CalloutUOMConversion() {
         VIS.CalloutEngine.call(this, "VIS.CalloutUOMConversion");//must call
@@ -392,6 +391,34 @@
             }
         }
         this.setCalloutActive(false);
+        return "";
+    }
+
+     /**
+     * VIS430:System should save Current Date and Future Date in Response Date field on RFQ screen
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutRFQ.prototype.RfqDateResponse = function (ctx, windowNo, mTab, mField, value, oldValue) {
+
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        if (mTab.getValue("DateResponse") != null) {
+            if (new Date(mTab.getValue("DateResponse")).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0)) {
+                mTab.setValue("DateResponse", null);
+                this.setCalloutActive(false);
+                return "VAS_ResponseDateMustGreater";
+            }
+        }
+        this.setCalloutActive(false);
+        /*ctx = windowNo = mTab = mField = value = oldValue = null;*/
         return "";
     }
     /**
