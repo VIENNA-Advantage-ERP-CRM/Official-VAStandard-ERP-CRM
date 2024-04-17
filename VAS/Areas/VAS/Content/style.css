@@ -788,7 +788,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     margin: 10px 0 0;
 }
 
-
+/*CSS of VAS_TimeSheetInvoice.js Form Starts*/
 .vas-icon-circle {
     border: 1px solid rgba(var(--v-c-primary), 1);
     width: 30px;
@@ -1096,3 +1096,4 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-srm-filterIcon {
     font-size: 1.2rem;
 }
+/*CSS of VAS_TimeSheetInvoice.js Form Ends*/
