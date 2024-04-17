@@ -806,17 +806,17 @@ html[dir="rtl"] .vas-sql-result-msg {
     }
 
 .vas-filter-flyout {
-    background-color: #fff;
-    min-width: 450px;
     position: absolute;
-    top: 30px;
-    left: 0;
+    top: 100%;
+    right: 78%;
     z-index: 100;
     border: 1px solid #e4e4e4;
     padding: 10px;
     border-radius: 5px;
     box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
     max-width: 450px;
+    min-width: 450px;
+    background: white;
 }
 
 .vas-flyout-header {
@@ -849,7 +849,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     width: 100%;
 }
 
-.vas-dropdown-lbl {
+.vas-tis-dropdown-lbl {
     display: inline-block;
     align-items: center;
     margin-bottom: 16px;
@@ -875,3 +875,224 @@ html[dir="rtl"] .vas-sql-result-msg {
         cursor: pointer;
         margin-left: 8px;
     }
+.vas-RecordSelection {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+}
+
+.vas-filterIcon {
+    font-size: 30px;
+}
+
+.vas-decoration-style {
+    text-decoration: underline !important;
+    text-align :right !important;
+}
+
+.vas-BottomBtnDiv {
+    display: block;
+}
+
+.vas-tis-arInvLeftSide {
+    width: 330px;
+    border-right: 2px solid rgba(var(--v-c-secondary), 0.9);
+    padding: 0.75rem;
+    height: calc(100% - 0px);
+    overflow: auto;
+}
+
+.vas-tis-arInvlistItem {
+    background-color: rgba(var(--v-c-secondary), 0.9);
+    border: 1px solid rgba(var(--v-c-on-secondary), 0.3);
+    border-radius: 0.15rem;
+    display: flex;
+    padding: 0.65rem 0;
+}
+
+.vas-tis-arInvCompanyLogo span {
+    background-color: brown;
+    padding: 0.5rem;
+    color: #fff;
+    margin: 0 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.vas-tis-arInvDetailsDesc {
+    display: block;
+    width: 100%;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-tis-arInvActive {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+}
+
+.vas-pointdiv {
+    float: left;
+    width: 100%;
+    height: calc(100% - 40px);
+}
+.vas-tis-arInvRightSide {
+    width: calc(100% - 330px);
+    padding: 0.75rem;
+}
+
+.vas-tis-arInvViewer {
+    margin: -15px;
+    height:100%
+}
+
+.vas-tis-arInvLeftSide {
+    background: rgba(var(--v-c-secondary), 0.4);
+}
+
+.vas-taskDesc_feildWrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+}
+
+.vas-taskdescTtl {
+    display: block;
+    font-size: 0.9rem;
+}
+
+.vas-taskDesc_feild {
+    flex: 1;
+}
+
+.vas-taskdescTtl {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgba(var(--v-c-on-secondary),0.65);
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-taskdescValue {
+    font-size: 0.95rem;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-projectTimelineConatainer {
+    width: 100%;
+    height: 150px;
+    background-color: rgba(var(--v-c-secondary),1);
+}
+
+
+.pipeline {
+    display: flex;
+    align-items: center;
+    margin: 20px auto;
+    width: 80%;
+}
+
+.stage {
+    position: relative;
+    flex: 1;
+    text-align: center;
+    z-index: 1; /* Ensure stages are above connectors */
+}
+
+.connector {
+    flex: 1;
+    height: 15px; /* Thickness of the line */
+    background-color: #ccc; /* Color of the line */
+}
+
+.vas-tis-top-fields {
+    width: 100%;
+    height: calc(100% - 90px);
+}
+
+.vas-arinvroot {
+    width: 100%;
+    height: 100%;
+    background-color: white;
+}
+.vas-SelectDiv {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+}
+.vas-SpnSelect {
+    vertical-align: middle;
+    font-size: 28px;
+    color: rgba(var(--v-c-primary), 1);
+}
+.vas-searchbtn {
+    margin-top: 0px;
+    float: right;
+    width: 70px;
+    height: 38px;
+}
+
+.vas-spacediv {
+    width: 310px;
+    height: 45px;
+    padding: 10px 10px 0 10px;
+    background-color: rgba(var(--v-c-secondary), .8);
+}
+.vas-poptis-content{
+    height:100%;
+}
+.vas-tis-filteroverlay {
+    background: rgba(0 0 0 / 2%);
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index:950;
+    display: none;
+}
+.vas-tis-paddingspn {
+    margin-left:10px;
+}
+
+.vas-tis-gridimg {
+    display: flex;
+    /* justify-content: center; */
+    padding: 3px !important;
+    align-items: center;
+    gap: 6px;
+}
+.vas-tis-filterspn {
+    width: 35px;
+    height: 35px;
+    min-width: 35px;
+    min-height: 35px;
+    border: 1px solid rgba(var(--v-c-on-secondary), .2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    font-size: 1.5rem;
+}
+
+.vas-tis-filter .dropdown-toggle::after {
+    display: none
+}
+
+.vas-tis-srm-filterIcon {
+    font-size: 1.2rem;
+}

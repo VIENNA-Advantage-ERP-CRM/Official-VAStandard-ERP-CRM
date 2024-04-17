@@ -6504,6 +6504,7 @@ namespace VAdvantage.Model
                         line.Save(Get_TrxName());
                     }
                 }
+                DeAllocateTimeSheetInvoice();
                 AddDescription(Msg.GetMsg(GetCtx(), "Voided"));
                 SetIsPaid(true);
                 SetC_Payment_ID(0);
@@ -6895,7 +6896,7 @@ namespace VAdvantage.Model
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
             SetIsPaid(true);
-
+            DeAllocateTimeSheetInvoice();
             //	Explicitly Save for balance calc.
             Save();
 
@@ -6936,6 +6937,18 @@ namespace VAdvantage.Model
             //}
 
             return true;
+        }
+        /// <summary>
+        /// This Method is used to set reference of invoice null on tables VA075_WorkOrderOperation and S_TimeExpenseLine
+        /// </summary>
+        /// <author>VIS_427 </author>
+        public void DeAllocateTimeSheetInvoice()
+        {
+            DB.ExecuteQuery("UPDATE S_TimeExpenseLine SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+            if (Env.IsModuleInstalled("VA075_"))
+            {
+                DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+            }
         }
         //update Description
         private void UpdateDescriptionInOldExpnse(MInvoiceLine oldline, MInvoiceLine rLine)

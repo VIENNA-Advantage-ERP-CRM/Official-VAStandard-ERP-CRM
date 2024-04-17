@@ -3681,7 +3681,9 @@
                     event.onComplete = function (event) {
                         id = event.recid;
                         //event.column is a AppliedAmt column sequence No
-                        $('#grid_openformatgrid_' + $self.windowNo + '_edit_' + id + '_12').keydown(function (event) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
+                        $('#grid_openformatgrid_' + $self.windowNo + '_edit_' + id + '_' + event.column).keydown(function (event) {
                             var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
                             if (!isDotSeparator && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
@@ -3924,7 +3926,9 @@
                     event.onComplete = function (event) {
                         id = event.recid;
                         //event.column is a AppliedAmt column sequence No
-                        $('#grid_openformatgridcash_' + $self.windowNo + '_edit_' + id + '_12').keydown(function (event) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
+                        $('#grid_openformatgridcash_' + $self.windowNo + '_edit_' + id + '_' +event.column).keydown(function (event) {
                             var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
                             if (!isDotSeparator && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
@@ -4234,8 +4238,8 @@
                 onEditField: function (event) {
                     event.onComplete = function (event) {
                         id = event.recid;
-                        //event.column 12 for DiscountAmt, 16 for WriteOffAmt and 17 for AppliedAmt column sequence.
-                        if (event.column == 12 || event.column == 16 || event.column == 17) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
                             $('#grid_openformatgridinvoice_' + $self.windowNo + '_edit_' + id + '_' + event.column).keydown(function (event) {
                                 var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
@@ -4258,8 +4262,6 @@
                                     return false;
                                 }
                             });
-
-                        }
                     };
                 }
             });
