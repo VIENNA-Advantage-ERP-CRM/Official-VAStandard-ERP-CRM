@@ -214,6 +214,7 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
     <Compile Include="Areas\VAS\Controllers\VChargeController.cs" />
     <Compile Include="Areas\VAS\Controllers\VCreateFromController.cs" />
@@ -249,6 +250,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceTaxTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />

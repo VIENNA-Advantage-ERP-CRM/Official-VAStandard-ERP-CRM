@@ -140,6 +140,7 @@
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
+    <Compile Include="Models\VAS_TimeSheetInvoice.cs" />
     <Compile Include="Models\VBOMDropModel.cs" />
     <Compile Include="Models\VChargeModel.cs" />
     <Compile Include="Models\VCreateFromModel.cs" />
