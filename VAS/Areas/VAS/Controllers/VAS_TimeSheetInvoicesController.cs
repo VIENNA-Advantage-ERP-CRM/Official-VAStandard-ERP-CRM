@@ -7,6 +7,7 @@ using System.Web;
 using System.Web.Mvc;
 using VAdvantage.Utility;
 using VASLogic.Models;
+using VAdvantage.DataBase;
 
 namespace VAS.Areas.VAS.Controllers
 {
@@ -16,21 +17,38 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// This Method is used to return the column id 
         /// </summary>
-        /// <param name="ColumnName">Name of the Column</param>
+        /// <param name="ColumnData">Data of the Column</param>
         /// <returns>Column ID</returns>
         /// <author>VIS_427 </author>
-        public JsonResult GetColumnID(string ColumnName,string TableName)
+        public JsonResult GetColumnID(string ColumnData)
         {
-            string retJSON = "";
             int Column_ID = 0;
+            List<ColumnInfo> columnInfoList = new List<ColumnInfo>();
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                string sql = @"SELECT AD_Column_ID FROM AD_Column WHERE ColumnName ='" + ColumnName + "' AND AD_Table_ID=(SELECT AD_Table_ID FROM AD_Table WHERE Tablename='"+ TableName +"')";
-                Column_ID = Util.GetValueOfInt(CoreLibrary.DataBase.DB.ExecuteScalar(sql));
-                retJSON = JsonConvert.SerializeObject(Column_ID);
+
+                // Deserialize the JSON string to an array of objects
+                dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
+
+                // Iterate through the array
+                foreach (var item in columnDataArray)
+                {
+                    // Extract column name and table name
+                    string ColumnName = item.ColumnName;
+                    string TableName = item.TableName;
+
+                    // Construct SQL query to retrieve AD_Column_ID
+                    string sql = @"SELECT AD_Column_ID FROM AD_Column 
+                               WHERE ColumnName ='" + ColumnName + @"' 
+                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='" + TableName + @"')";
+                    Column_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                    columnInfoList.Add(new ColumnInfo { ColumnName = ColumnName, ColumnID = Column_ID });
+                }
             }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
+
+            // Return the JSON result
+            return Json(columnInfoList, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -74,5 +92,12 @@ namespace VAS.Areas.VAS.Controllers
             string _Paydata = invoiceTimeSheet.GenerateInvoice(ctx, dataTobeInvoice, AD_Client_ID, AD_Org_ID);
             return Json(JsonConvert.SerializeObject(_Paydata), JsonRequestBehavior.AllowGet);
         }
+
+    }
+    //Defined class with properties to store Column information
+    public class ColumnInfo
+    {
+        public string ColumnName { get; set; }
+        public int ColumnID { get; set; }
     }
 }
