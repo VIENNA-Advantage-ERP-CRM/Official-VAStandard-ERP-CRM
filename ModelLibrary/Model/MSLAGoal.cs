@@ -54,6 +54,16 @@ namespace VAdvantage.Model
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_MaxScoreValidation"));
                 return false;
             }
+
+            // VIS430:
+            string quary = @"SELECT SUM(VA068_WeightagePertage) FROM PA_SLA_Goal WHERE PA_SLA_Criteria_ID= " + GetPA_SLA_Criteria_ID();
+
+            int lineno = Util.GetValueOfInt(DB.ExecuteScalar(quary, null, Get_Trx()));
+            if (lineno > 100)
+            {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_WeightagePercentage"));
+                return false;
+            }
             return true;
         }
 
