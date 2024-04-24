@@ -900,6 +900,36 @@
         return "";
     };
 
+
+    /**
+     *  VAI050:Set VehicleReg.No,Gross Weight and Tare Weight on select Vehicle No
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutInOut.prototype.setFleetDetail = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        //  
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            mTab.setValue("VAS_VehicleRegistrationNo", null);
+            mTab.setValue("VAS_GrossWeight", null);
+            mTab.setValue("VAS_TareWeight", null);
+            return "";
+        }
+        this.setCalloutActive(true);
+        var result = VIS.dataContext.getJSONRecord("MInOut/GetFleetDetail", Util.getValueOfInt(mTab.getValue("VAS_FleetDetail_ID")));
+        if (result != null) {
+            mTab.setValue("VAS_VehicleRegistrationNo", result.VAS_VehicleRegistrationNo);
+            mTab.setValue("VAS_GrossWeight", result.VAS_GrossWeight);
+            mTab.setValue("VAS_TareWeight", result.VAS_TareWeight);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
     VIS.Model.CalloutInOut = CalloutInOut;
 
 

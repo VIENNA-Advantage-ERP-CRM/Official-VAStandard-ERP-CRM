@@ -124,6 +124,7 @@
     <Compile Include="Models\Callouts\MStorageModel.cs" />
     <Compile Include="Models\Callouts\MTaxModel.cs" />
     <Compile Include="Models\Callouts\MTeamForcastModel.cs" />
+    <Compile Include="Models\Callouts\MTermModel.cs" />
     <Compile Include="Models\Callouts\MUOMConversionModel.cs" />
     <Compile Include="Models\Callouts\MUOMModel.cs" />
     <Compile Include="Models\Callouts\MVASContractModel.cs" />
@@ -139,6 +140,7 @@
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
+    <Compile Include="Models\VAS_TimeSheetInvoice.cs" />
     <Compile Include="Models\VBOMDropModel.cs" />
     <Compile Include="Models\VChargeModel.cs" />
     <Compile Include="Models\VCreateFromModel.cs" />

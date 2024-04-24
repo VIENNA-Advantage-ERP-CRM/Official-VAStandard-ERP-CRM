@@ -7,7 +7,6 @@ using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
-using VA075.Model;
 
 namespace VASLogic.Models
 {

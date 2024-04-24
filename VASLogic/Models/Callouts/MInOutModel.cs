@@ -121,7 +121,7 @@ namespace VIS.Models
                 if (C_UOM_ID != 0)
                 {
                     if (C_UOM_ID != uom && uom != 0)
-                    {                        
+                    {
                         retValue["qtyentered"] = MUOMConversion.ConvertProductFrom(ctx, M_Product_ID, uom, QtyEntered);
                         if (retValue["qtyentered"] == null)
                         {
@@ -161,6 +161,30 @@ namespace VIS.Models
                 obj["M_AttributeSetInstance_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]);
             }
             return obj;
+        }
+
+
+        /// <summary>
+        /// VAI050-Get Fleet Detail of Shipper
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="param"></param>
+        /// <returns>return fleet detail</returns>
+        public Dictionary<String, Object> GetFleetDetail(Ctx ctx, string param)
+        {
+
+            Dictionary<string, object> retDic = null;
+            string sql = @"SELECT VAS_VehicleRegistrationNo,VAS_GrossWeight,VAS_TareWeight FROM VAS_FleetDetail" +
+                        " WHERE VAS_FleetDetail_ID=" + Util.GetValueOfInt(param);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+                retDic["VAS_VehicleRegistrationNo"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_VehicleRegistrationNo"]);
+                retDic["VAS_GrossWeight"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_GrossWeight"]);
+                retDic["VAS_TareWeight"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_TareWeight"]);
+            }
+            return retDic;
         }
 
     }
