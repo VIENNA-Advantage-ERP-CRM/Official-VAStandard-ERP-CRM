@@ -45,11 +45,11 @@ namespace VASLogic.Models
             sql.Clear();
             List<TimeRecordingData> timeRecordingDataList = new List<TimeRecordingData>();
             // when Time Expense or Task record is not selected than make value as 0
-            if (string.IsNullOrEmpty(TimExpenSeDoc) && C_Task_ID.Length > 0)
+            if (TimExpenSeDoc.Length==0 && C_Task_ID.Length > 0)
             {
                 TimExpenSeDoc = "0";
             }
-            if (string.IsNullOrEmpty(C_Task_ID) && TimExpenSeDoc.Length > 0)
+            if (C_Task_ID.Length == 0 && TimExpenSeDoc.Length > 0)
             {
                 C_Task_ID = "0";
             }
@@ -626,7 +626,30 @@ namespace VASLogic.Models
                      + Util.GetValueOfInt(sortedData.VA075_WorkOrderOperation_ID), null, null);
             }
         }
+        /// <summary>
+        /// This Method is used to return the column id 
+        /// </summary>
+        /// <param name="ct">context</param>
+        /// <param name="ColumnData">Data of the Column</param>
+        /// <returns>Dictionary with column name and column id</returns>
+        /// <author>VIS_427 </author>
+        public Dictionary<string,int> GetColumnIds(Ctx ct, dynamic columnDataArray)
+        {
+            Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+                foreach (var item in columnDataArray)
+                {
+                    // Extract column name and table name
+                    string ColumnName = item.ColumnName;
+                    string TableName = item.TableName;
 
+                    // Construct SQL query to retrieve AD_Column_ID
+                    string sql = @"SELECT AD_Column_ID FROM AD_Column 
+                               WHERE ColumnName ='" + ColumnName + @"' 
+                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='" + TableName + @"')";
+                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                }
+            return ColumnInfo;
+        }
         public class TimeRecordingData
         {
             public string DocumentNo { get; set; }

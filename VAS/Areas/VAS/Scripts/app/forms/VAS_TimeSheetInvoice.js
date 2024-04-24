@@ -82,7 +82,7 @@
             { ColumnName: "S_Resource_ID", TableName: "S_Resource" },
             { ColumnName: "C_ProjectRef_ID", TableName: "C_Order" },
             { ColumnName: "R_Request_ID", TableName: "S_TimeExpenseLine" },
-            { ColumnName: "S_TimeExpenseLine_ID", TableName: "S_TimeExpenseLine" },
+            { ColumnName: "S_TimeExpense_ID", TableName: "S_TimeExpense" },
             { ColumnName: "VA075_Task_ID", TableName: "VA075_Task" }
         ];
         //It will store value of column ids
@@ -164,7 +164,7 @@
             LeftSideFields = $('<div class="vas-tis-top-fields">');
             //Created organization dropdown control
             $OrgDiv = $('<div class="input-group vis-input-wrap">');
-            var Orglookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[0].ColumnID, VIS.DisplayType.TableDir);
+            var Orglookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.AD_Org_ID, VIS.DisplayType.TableDir);
             $self.cmbOrg = new VIS.Controls.VComboBox("AD_Org_ID", true, false, true, Orglookup, 150, VIS.DisplayType.TableDir);
             $self.cmbOrg.setMandatory(true);
             var $OrgControlWrap = $('<div class="vis-control-wrap">');
@@ -178,7 +178,7 @@
             var CustomerDiv = $('<div class="vas-CustomerDiv">');
             var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y'";
             $CustomerDiv = $('<div class="input-group vis-input-wrap">');
-            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[1].ColumnID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, CustomerValidation);
+            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, CustomerValidation);
             $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, CustomerLookUp);
             var $CustomerControlWrap = $('<div class="vis-control-wrap">');
             var $CustomerButtonWrap = $('<div class="input-group-append">');
@@ -192,7 +192,7 @@
             var ResourceDiv = $('<div class="vas-ResourceDiv">');
             $ResourceDiv = $('<div class="input-group vis-input-wrap">');
             var ResourceValidationCode = "S_Resource.IsActive='Y' AND S_Resource.AD_Org_ID IN(0,@AD_Org_ID@)";
-            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds[2].ColumnID, VIS.DisplayType.Search, "S_Resource_ID", 0, false, ResourceValidationCode);
+            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_Resource_ID, VIS.DisplayType.Search, "S_Resource_ID", 0, false, ResourceValidationCode);
             $self.vSearchResource = new VIS.Controls.VTextBoxButton("S_Resource_ID", true, false, true, VIS.DisplayType.Search, ResuorceLookUp, 0);
             var $ResourceControlWrap = $('<div class="vis-control-wrap">');
             var $ResourceButtonWrap = $('<div class="input-group-append">');
@@ -1014,7 +1014,7 @@
             $RequestSelected = $('<div class="vas-tis-dropdown-lbl">');
             TimeDiv = $('<div class="VAS-Time">');
             $TimeAndExpenseDiv = $('<div class="input-group vis-input-wrap">');
-            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[5].ColumnID, VIS.DisplayType.Search);
+            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.Search);
             $self.vSearchTimeAndExpense = new VIS.Controls.VTextBoxButton("S_TimeExpense_ID", true, false, true, VIS.DisplayType.Search, TimeAndExpenseLookUp);
             var $TimeAndExpenseControlWrap = $('<div class="vis-control-wrap">');
             var $TimeAndExpenseButtonWrap = $('<div class="input-group-append">');
@@ -1028,7 +1028,7 @@
             ProjectDiv = $('<div class="VAS-projectdiv">');
             $ProjectDiv = $('<div class="input-group vis-input-wrap">');
             var validationcode = "C_Project.AD_Org_ID IN(0,@AD_Org_ID@) AND C_Project.IsActive='Y' AND C_Project.IsOpportunity='N' AND C_Project.IsCampaign='N'";
-            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[3].ColumnID, VIS.DisplayType.Search, "C_ProjectRef_ID", 0, false, validationcode);
+            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_ProjectRef_ID, VIS.DisplayType.Search, "C_ProjectRef_ID", 0, false, validationcode);
             $self.vSearchProject = new VIS.Controls.VTextBoxButton("C_Project_ID", true, false, true, VIS.DisplayType.Search, ProjectLookUp);
             var $ProjectControlWrap = $('<div class="vis-control-wrap">');
             var $ProjectButtonWrap = $('<div class="input-group-append">');
@@ -1043,7 +1043,7 @@
             // created the Request control 
             RequestDiv = $('<div class="VAS-RequestDiv">');
             $RequestDiv = $('<div class="input-group vis-input-wrap">');
-            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[4].ColumnID, VIS.DisplayType.Search);
+            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.R_Request_ID, VIS.DisplayType.Search);
             $self.vSearchRequest = new VIS.Controls.VTextBoxButton("R_Request_ID", true, false, true, VIS.DisplayType.Search, RequestLookUp);
             var $RequestControlWrap = $('<div class="vis-control-wrap">');
             var $RequestButtonWrap = $('<div class="input-group-append">');
@@ -1057,7 +1057,7 @@
             if (ModulePrefix["VA075_"]) {
                 TaskDiv = $('<div class="VAS-TaskDiv">');
                 $TaskDiv = $('<div class="input-group vis-input-wrap">');
-                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds[6].ColumnID, VIS.DisplayType.Search);
+                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.VA075_Task_ID, VIS.DisplayType.Search);
                 $self.vSearchTask = new VIS.Controls.VTextBoxButton("VA075_Task_ID", true, false, true, VIS.DisplayType.Search, TaskLookUp);
                 var $TaskControlWrap = $('<div class="vis-control-wrap">');
                 var $TaskButtonWrap = $('<div class="input-group-append">');
