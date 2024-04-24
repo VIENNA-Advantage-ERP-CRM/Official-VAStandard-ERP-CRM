@@ -49,7 +49,7 @@ namespace VASLogic.Models
             {
                 TimExpenSeDoc = "0";
             }
-            if (C_Task_ID.Length == 0 && TimExpenSeDoc.Length > 0)
+            else if (C_Task_ID.Length == 0 && TimExpenSeDoc.Length > 0)
             {
                 C_Task_ID = "0";
             }

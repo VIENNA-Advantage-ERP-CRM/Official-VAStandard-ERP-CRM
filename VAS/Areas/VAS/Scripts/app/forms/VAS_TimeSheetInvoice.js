@@ -12,7 +12,7 @@
         var AD_Org_ID = null;
         var precision = 2;
         var pageNo = 1;
-        var pageSize = 13;
+        var pageSize = 150;
         var TotalRecords = 0;
         var toggleside = false;
         var gridPgnoInvoice = 1;
@@ -63,8 +63,8 @@
         var LeftSideFields = null;
         var IsFilterBtnClicked = false;
         var gridDataArray = [];
-        var LeftGridData = [];
-        var FilteredData = [];
+        var PreviewLeftData = [];
+        var PreviewFilteredGridData = [];
         var TimeExpenseId = [];
         var RequestId = [];
         var ResourceId = [];
@@ -73,6 +73,8 @@
         var ProjectId = [];
         var sideDivWidth = 260;
         var minSideWidth = 50;
+        //assigne variable value true so that onload the width should be correct
+        var IsSizeChangeOnLoad = true;
         var selectDivWidth = $(window).width() - (sideDivWidth + 20 + 5);
         var selectDivFullWidth = $(window).width() - (20 + minSideWidth);
         //VIS_427 Created array to store column name and tablename to get column id at single request
@@ -572,14 +574,14 @@
             if (event.recid == undefined) {
                 // Clear the arrays
                 gridDataArray = [];
-                LeftGridData = [];
+                PreviewLeftData = [];
                 // Loop through all records in the grid
                 for (var i = 0; i < dGrid.records.length; i++) {
                     // Check if records are unselected
                     if (IsRecordUnselected) {
                         // Reset the arrays if records are unselected
                         gridDataArray = [];
-                        LeftGridData = [];
+                        PreviewLeftData = [];
                     } else {
                         // Otherwise, populate gridDataArray with all records
                         gridDataArray.push(dGrid.records[i]);
@@ -627,9 +629,9 @@
 
         // Function to add data for preview based on all selections
         function AddForPreviewDataOnAllSelection(gridDataArray, shouldAdd) {
-            // If gridDataArray is empty, reset LeftGridData and return
+            // If gridDataArray is empty, reset PreviewLeftData and return
             if (gridDataArray.length === 0) {
-                LeftGridData = [];
+                PreviewLeftData = [];
                 return;
             }
 
@@ -638,15 +640,15 @@
                 var record = gridDataArray[i];
                 var isUnique = true;
 
-                // Loop through each record in LeftGridData
-                for (var j = 0; j < LeftGridData.length; j++) {
-                    // Check if the record already exists in LeftGridData based on specific conditions
-                    if (record.C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                        record.C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                        record.VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                        record.M_PriceList_ID === LeftGridData[j].M_PriceList_ID) {
+                // Loop through each record in PreviewLeftData
+                for (var j = 0; j < PreviewLeftData.length; j++) {
+                    // Check if the record already exists in PreviewLeftData based on specific conditions
+                    if (record.C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                        record.C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                        record.VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                        record.M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID) {
                         // If the record exists, increment the record count and mark it as not unique
-                        LeftGridData[j].recordCount = LeftGridData[j].recordCount + 1;
+                        PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount + 1;
                         isUnique = false;
                         break;
                     }
@@ -654,9 +656,9 @@
 
                 // If the record is unique and should be added
                 if (isUnique && shouldAdd) {
-                    // Set the record count to 1 and add it to LeftGridData
+                    // Set the record count to 1 and add it to PreviewLeftData
                     record.recordCount = 1;
-                    LeftGridData.push(record);
+                    PreviewLeftData.push(record);
                 }
             }
         }
@@ -665,28 +667,28 @@
         function AddedDataForPreviewOnSelection(event, dGrid, shouldAdd) {
             var isUnique = true;
 
-            // Loop through each record in LeftGridData
-            for (var j = 0; j < LeftGridData.length; j++) {
+            // Loop through each record in PreviewLeftData
+            for (var j = 0; j < PreviewLeftData.length; j++) {
                 // Check if the record matches specific conditions and if it should be added
-                if (shouldAdd && (dGrid.records[event.index].C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                    dGrid.records[event.index].C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                    dGrid.records[event.index].VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                    dGrid.records[event.index].M_PriceList_ID === LeftGridData[j].M_PriceList_ID)) {
+                if (shouldAdd && (dGrid.records[event.index].C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                    dGrid.records[event.index].C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                    dGrid.records[event.index].VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                    dGrid.records[event.index].M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID)) {
                     // If the record matches and should be added, increment the record count and mark it as not unique
-                    LeftGridData[j].recordCount = LeftGridData[j].recordCount + 1;
+                    PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount + 1;
                     isUnique = false;
                     break;
                 }
                 // Check if the record matches specific conditions and if it should be removed
-                else if (!shouldAdd && (dGrid.records[event.index].C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                    dGrid.records[event.index].C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                    dGrid.records[event.index].VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                    dGrid.records[event.index].M_PriceList_ID === LeftGridData[j].M_PriceList_ID)) {
+                else if (!shouldAdd && (dGrid.records[event.index].C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                    dGrid.records[event.index].C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                    dGrid.records[event.index].VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                    dGrid.records[event.index].M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID)) {
                     // If the record matches and should be removed, decrement the record count
-                    LeftGridData[j].recordCount = LeftGridData[j].recordCount - 1;
-                    // If the record count becomes zero or less, remove the record from LeftGridData
-                    if (LeftGridData[j].recordCount <= 0) {
-                        LeftGridData = jQuery.grep(LeftGridData, function (record) {
+                    PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount - 1;
+                    // If the record count becomes zero or less, remove the record from PreviewLeftData
+                    if (PreviewLeftData[j].recordCount <= 0) {
+                        PreviewLeftData = jQuery.grep(PreviewLeftData, function (record) {
                             return record.recordCount > 0;
                         });
                     }
@@ -695,9 +697,9 @@
 
             // If the record is unique and should be added
             if (isUnique && shouldAdd) {
-                // Set the record count to 1 and add it to LeftGridData
+                // Set the record count to 1 and add it to PreviewLeftData
                 dGrid.records[event.index].recordCount = 1;
-                LeftGridData.push(dGrid.records[event.index]);
+                PreviewLeftData.push(dGrid.records[event.index]);
             }
         }
 
@@ -712,8 +714,8 @@
         function LoadTimeSheetData(pageNo, pageSize,IsOnScroll) {
             var data = [];
             gridDataArray = [];
-            LeftGridData = [];
-            FilteredData = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             if (VIS.Utility.Util.getValueOfInt(AD_Org_ID) == 0) {
                 VIS.ADialog.info('VAS_PlzSelectOrganization');
                 return;
@@ -740,6 +742,7 @@
                 success: function (res) {
                     var gridDataResult = JSON.parse(res);
                     if (gridDataResult && gridDataResult.length > 0) {
+                        //Intialized count variable to maintain the value of recid
                         var count = 0;
                         if (!IsOnScroll) {
                             count = 1;
@@ -877,20 +880,20 @@
             var rightPreviewWrap = $('<div class="vas-tis-arInvRightSide">');
             var PreviewMainDiv = $("<div class='vas-poptis-content vis-formouterwrpdiv'>");
 
-            // Loop through LeftGridData to populate the left side of the dialog
-            for (var i = 0; i < LeftGridData.length; i++) {
+            // Loop through PreviewLeftData to populate the left side of the dialog
+            for (var i = 0; i < PreviewLeftData.length; i++) {
                 PreviLeftWrap.append(
                     '<div class="vas-tis-arInvlistItem mb-2" id="C_BpartnerListDiv_' + $self.windowNo + '">' +
                     '<div class="vas-tis-arInvoiceDetails px-2">' +
-                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + LeftGridData[i].C_BPartner_ID + '" data-paymethodid="' + LeftGridData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + LeftGridData[i].M_PriceList_ID + '"> ' + LeftGridData[i].C_BPartner + '</span > ' +
-                    '<span class="vas-tis-arInvDetailsDesc">' + VAS.translatedTexts.VAS_RecordCount + ":" + LeftGridData[i].recordCount + '</span>' +
-                    '<span class="vas-tis-arInvDetailsDesLoc" id="C_BPartnerLocationDiv_' + $self.windowNo + '" data-bplocationid="' + LeftGridData[i].C_BPartner_Location_ID + '">' + LeftGridData[i].LocationName + '</span>' +
+                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + PreviewLeftData[i].C_BPartner_ID + '" data-paymethodid="' + PreviewLeftData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + PreviewLeftData[i].M_PriceList_ID + '"> ' + PreviewLeftData[i].C_BPartner + '</span > ' +
+                    '<span class="vas-tis-arInvDetailsDesc">' + VAS.translatedTexts.VAS_RecordCount + ":" + PreviewLeftData[i].recordCount + '</span>' +
+                    '<span class="vas-tis-arInvDetailsDesLoc" id="C_BPartnerLocationDiv_' + $self.windowNo + '" data-bplocationid="' + PreviewLeftData[i].C_BPartner_Location_ID + '">' + PreviewLeftData[i].LocationName + '</span>' +
                     '</div>');
             }
 
             // Create HTML elements for the right side of the dialog
             var PreviewId = "gridSelectDiv_" + $self.windowNo;
-            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + LeftGridData[0].C_BPartner + '</h4>')
+            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + PreviewLeftData[0].C_BPartner + '</h4>')
             $self.PreviewGridDiv = $("<div id='" + PreviewId + "' class='vas-pointdiv'>");
             rightPreviewWrap.append(headTagForBPartner).append($self.PreviewGridDiv);
 
@@ -916,7 +919,7 @@
             var bpid = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-bpid');
             var priceListId = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-pricelistid');
             var payMethodId = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-paymethodid');
-            FilteredData = jQuery.grep(gridDataArray, function (value) {
+            PreviewFilteredGridData = jQuery.grep(gridDataArray, function (value) {
                 return VIS.Utility.Util.getValueOfInt(value.C_BPartner_ID) === VIS.Utility.Util.getValueOfInt(bpid)
                     && VIS.Utility.Util.getValueOfInt(value.C_BPartner_Location_ID) === VIS.Utility.Util.getValueOfInt(locid)
                     && VIS.Utility.Util.getValueOfInt(value.VA009_PaymentMethod_ID) === VIS.Utility.Util.getValueOfInt(payMethodId)
@@ -924,7 +927,7 @@
             });
 
             // Initialize the preview grid with filtered data
-            PreviewDyinit(FilteredData);
+            PreviewDyinit(PreviewFilteredGridData);
 
             // Append subtotal span to the right side of the dialog
             var SubTotalSpan = $('<p class="text-right pt-2" style="clear:both;" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '<p>');
@@ -938,7 +941,7 @@
                 payMethodId = $(this).find('.vas-tis-arInvDetailsDesc').attr('data-paymethodid');
                 PreviLeftWrap.find('.vas-tis-arInvlistItem').removeClass('vas-tis-arInvActive');
                 $(this).addClass('vas-tis-arInvActive');
-                FilteredData = jQuery.grep(gridDataArray, function (value) {
+                PreviewFilteredGridData = jQuery.grep(gridDataArray, function (value) {
                     return VIS.Utility.Util.getValueOfInt(value.C_BPartner_ID) === VIS.Utility.Util.getValueOfInt(bpid)
                         && VIS.Utility.Util.getValueOfInt(value.C_BPartner_Location_ID) === VIS.Utility.Util.getValueOfInt(locid)
                         && VIS.Utility.Util.getValueOfInt(value.VA009_PaymentMethod_ID) === VIS.Utility.Util.getValueOfInt(payMethodId)
@@ -946,8 +949,8 @@
                 });
 
                 // Initialize the preview grid with filtered data
-                PreviewDyinit(FilteredData);
-                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(FilteredData[0].C_BPartner);
+                PreviewDyinit(PreviewFilteredGridData);
+                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(PreviewFilteredGridData[0].C_BPartner);
                 rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal)
                 SubTotal = 0;
             });
@@ -1226,7 +1229,7 @@
             //On clcik of Preview button the data will beloaded on Prview data grid
             if (this.PreviewBtn != null) {
                 this.PreviewBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                    if (LeftGridData.length == 0) {
+                    if (PreviewLeftData.length == 0) {
                         VIS.ADialog.info('VAS_PlzSelectRecord');
                         return;
                     }
@@ -1236,7 +1239,7 @@
             //On clcik of Generate invoice button the invoice will be generated
             if (this.GenerateInvBtn != null) {
                 this.GenerateInvBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                    if (LeftGridData.length == 0) {
+                    if (PreviewLeftData.length == 0) {
                         VIS.ADialog.info('VAS_PlzSelectRecord');
                         return;
                     }
@@ -1266,8 +1269,9 @@
                     }, 'linear');
 
                     toggleside = false;
-                    $self.btnSpaceDiv.animate({ width: 310 }, "slow");
+                    $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
                     $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
+                    $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
                     $self.SearchBtn.css("display", "block");
                     $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
@@ -1294,6 +1298,7 @@
                     toggleside = true;
                     $self.btnSpaceDiv.animate({ width: minSideWidth }, "slow");
                     $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
+                    $self.topDiv.find('.vas-RecordSelection').removeClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "none");
                     $self.SearchBtn.css("display", "none");
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
@@ -1303,6 +1308,32 @@
             });
 
         }
+        //This function is use to change the form width on zoom in zoom out
+        this.sizeChanged = function (h, w) {
+            selectDivWidth = w - (sideDivWidth + 20);
+            selectDivFullWidth = w - (20 + minSideWidth);
+            if (toggleside == true) {
+                $self.btnSpaceDiv.animate({ width: minSideWidth }, "slow");
+                $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
+                $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
+                    $self.dGrid.resize();
+                });
+            }
+            else {
+                //If vlue is true then seth width 310
+                if (IsSizeChangeOnLoad) {
+                    $self.btnSpaceDiv.animate({ width: 310 }, "slow");
+                    IsSizeChangeOnLoad = false;
+                }
+                else {
+                    $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
+                }
+                $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
+                 $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
+                    $self.dGrid.resize();
+                });
+            }
+        }
         /* this function is used to remove the div after generating invoice*/
         function removeControlsSelectedDiv() {
             $CustomerSelected.remove();
@@ -1311,8 +1342,8 @@
         /* This function is responsible for clearing the variable*/
         function clearVariables() {
             gridDataArray = [];
-            LeftGridData = [];
-            FilteredData = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             TimeExpenseId = [];
             RequestId = [];
             ResourceId = [];
@@ -1374,8 +1405,8 @@
             ColumnIds = null;
             ColumnData = null;
             gridDataArray = [];
-            LeftGridData = [];
-            FilteredData = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             TimeExpenseId = [];
             RequestId = [];
             ResourceId = [];

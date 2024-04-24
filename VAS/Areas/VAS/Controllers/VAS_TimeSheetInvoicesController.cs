@@ -7,7 +7,6 @@ using System.Web;
 using System.Web.Mvc;
 using VAdvantage.Utility;
 using VASLogic.Models;
-using VAdvantage.DataBase;
 
 namespace VAS.Areas.VAS.Controllers
 {
