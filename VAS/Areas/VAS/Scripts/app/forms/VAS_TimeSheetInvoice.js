@@ -12,7 +12,7 @@
         var AD_Org_ID = null;
         var precision = 2;
         var pageNo = 1;
-        var pageSize = 13;
+        var pageSize = 150;
         var TotalRecords = 0;
         var toggleside = false;
         var gridPgnoInvoice = 1;
@@ -63,8 +63,8 @@
         var LeftSideFields = null;
         var IsFilterBtnClicked = false;
         var gridDataArray = [];
-        var LeftGridData = [];
-        var FilteredData = [];
+        var PreviewLeftData = [];
+        var PreviewFilteredGridData = [];
         var TimeExpenseId = [];
         var RequestId = [];
         var ResourceId = [];
@@ -73,8 +73,22 @@
         var ProjectId = [];
         var sideDivWidth = 260;
         var minSideWidth = 50;
+        //assigne variable value true so that onload the width should be correct
+        var IsSizeChangeOnLoad = true;
         var selectDivWidth = $(window).width() - (sideDivWidth + 20 + 5);
         var selectDivFullWidth = $(window).width() - (20 + minSideWidth);
+        //VIS_427 Created array to store column name and tablename to get column id at single request
+        var ColumnData = [
+            { ColumnName: "AD_Org_ID", TableName: "S_TimeExpense" },
+            { ColumnName: "C_BPartner_ID", TableName: "S_TimeExpenseLine" },
+            { ColumnName: "S_Resource_ID", TableName: "S_Resource" },
+            { ColumnName: "C_ProjectRef_ID", TableName: "C_Order" },
+            { ColumnName: "R_Request_ID", TableName: "S_TimeExpenseLine" },
+            { ColumnName: "S_TimeExpense_ID", TableName: "S_TimeExpense" },
+            { ColumnName: "VA075_Task_ID", TableName: "VA075_Task" }
+        ];
+        //It will store value of column ids
+        var ColumnIds = null;
 
         //Stored messages which is to be translated
         var elements = [
@@ -124,13 +138,23 @@
             "VAS_ProductOrCharge",
             "VAS_CustImage",
             "VAS_RecordCount",
-            "VAS_Start"
+            "VAS_Start",
+            "VA075_Task_ID",
+            "VAS_Apply",
+            "VAS_UomName",
+            "VAS_PreviewDialog",
+            "VAS_RequestInfoDialog",
+            "VAS_SubTotal",
+            "VAS_ISO_Code"
+             
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
         //This function is called when form is loaded
         function initializeComponent() {
             ModulePrefix = VIS.dataContext.getJSONRecord("VIS/ModulePrefix/GetModulePrefix", "VA075_");
+            //this function will get the column id for lookups
+            GetColumnID(ColumnData);
             /*this function is used to create controls on left side pannel div*/
             LeftSideControls();
             /*this function is used to create design of form */
@@ -142,7 +166,7 @@
             LeftSideFields = $('<div class="vas-tis-top-fields">');
             //Created organization dropdown control
             $OrgDiv = $('<div class="input-group vis-input-wrap">');
-            var Orglookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("AD_Org_ID", "S_TimeExpense"), VIS.DisplayType.TableDir);
+            var Orglookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.AD_Org_ID, VIS.DisplayType.TableDir);
             $self.cmbOrg = new VIS.Controls.VComboBox("AD_Org_ID", true, false, true, Orglookup, 150, VIS.DisplayType.TableDir);
             $self.cmbOrg.setMandatory(true);
             var $OrgControlWrap = $('<div class="vis-control-wrap">');
@@ -154,8 +178,9 @@
             $OrgDiv.append($OrgButtonWrap);
             //Created customer search control to filter out data
             var CustomerDiv = $('<div class="vas-CustomerDiv">');
+            var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y'";
             $CustomerDiv = $('<div class="input-group vis-input-wrap">');
-            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("C_BPartner_ID", "S_TimeExpenseLine"), VIS.DisplayType.Search);
+            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, CustomerValidation);
             $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, CustomerLookUp);
             var $CustomerControlWrap = $('<div class="vis-control-wrap">');
             var $CustomerButtonWrap = $('<div class="input-group-append">');
@@ -168,8 +193,8 @@
             //Created Resource control to filter out data
             var ResourceDiv = $('<div class="vas-ResourceDiv">');
             $ResourceDiv = $('<div class="input-group vis-input-wrap">');
-            var ResourceValidationCode = "S_Resource.AD_Org_ID IN(0,@AD_Org_ID@) AND S_Resource.IsActive='Y'";
-            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, GetColumnID("S_Resource_ID", "S_Resource"), VIS.DisplayType.Search, "S_Resource_ID", 0, false, ResourceValidationCode);
+            var ResourceValidationCode = "S_Resource.IsActive='Y' AND S_Resource.AD_Org_ID IN(0,@AD_Org_ID@)";
+            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_Resource_ID, VIS.DisplayType.Search, "S_Resource_ID", 0, false, ResourceValidationCode);
             $self.vSearchResource = new VIS.Controls.VTextBoxButton("S_Resource_ID", true, false, true, VIS.DisplayType.Search, ResuorceLookUp, 0);
             var $ResourceControlWrap = $('<div class="vis-control-wrap">');
             var $ResourceButtonWrap = $('<div class="input-group-append">');
@@ -241,10 +266,10 @@
                         })
                     }
                 }
-                $self.vSearchCustomer.setValue(null);
+                $self.vSearchResource.setValue(null);
             };
             $self.cmbOrg.fireValueChanged = function () {
-                ctx.setContext(self.windowNo, "AD_Org_ID", $self.cmbOrg.getValue());
+                ctx.setContext($self.windowNo, "AD_Org_ID", $self.cmbOrg.getValue());
             }
         }
 
@@ -289,15 +314,15 @@
                 $self.dGrid = null;
             }
             if ($self.arrListColumns.length == 0) {
-                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '3%', min: 50, hidden: false });
+                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '13%', min: 50, hidden: true });
                 $self.arrListColumns.push({
 
-                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '38%', min: 150, hidden: false, render: function (record, index, col_index) {
                         return '<a href="#" class="vas-decoration-style">' + record['DocumentNo'] + '</a>';
                     }, editable: { type: 'text' }
                 });
                 $self.arrListColumns.push({
-                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '16%', min: 150, hidden: false, render: function (record) {
+                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '30%', min: 150, hidden: false, render: function (record) {
                         var div;
                         if (record["ImageUrl"] != null) {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
@@ -312,9 +337,9 @@
                     }
                 });
                 $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '16%', min: 150, hidden: false });
-                $self.arrListColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 150, hidden: false });
+                $self.arrListColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '25%', min: 150, hidden: false });
                 $self.arrListColumns.push({
-                    field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Qty', caption: VAS.translatedTexts.Qty,sortable: true, size: '8%', min: 150, hidden: false, render: function (record, index, col_index) {
                         var val = record["Qty"] + " " + record["UomName"];
                         return val;
                     }
@@ -327,10 +352,10 @@
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 150, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
-                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) +  " " + record["ISO_Code"];
                     }
 
                 });
@@ -356,6 +381,7 @@
                 $self.arrListColumns.push({ field: "EnforcePriceLimit", caption: VAS.translatedTexts.EnforcePriceLimit, sortable: true, size: '16%', min: 150, hidden: true });
                 $self.arrListColumns.push({ field: "VA075_WorkOrderOperation_ID", caption: VAS.translatedTexts.VA075_WorkOrderOperation_ID, sortable: true, size: '16%', min: 150, hidden: true });
                 $self.arrListColumns.push({ field: "S_TimeExpenseLine_ID", caption: VAS.translatedTexts.S_TimeExpenseLine_ID, sortable: true, size: '16%', min: 150, hidden: true });
+                $self.arrListColumns.push({ field: "ISO_Code", caption: VAS.translatedTexts.VAS_ISO_Code, sortable: true, size: '16%', min: 150, hidden: true });
             }
 
             w2utils.encodeTags(data);
@@ -371,7 +397,6 @@
                 onSelect: function (event) {
                     if ($self.dGrid.records.length > 0) {
                         ArrayOfGrid(event, $self.dGrid, false);
-
                     }
                 },
                 onUnselect: OnUnseletRow,
@@ -389,14 +414,15 @@
                         if ($self.dGrid.records[event.index].PhaseName != null) {
                             arry = ($self.dGrid.records[event.index].PhaseName).split(',');
                         }
-
+                        //Converting date to local date format
+                        var recordingDate = new Date(($self.dGrid.records[event.index].RecordedDate))
                         // Initialize HTML elements for displaying task details
                         var htmlmain = $('<div>');
                         var htmlString = '<div class="vas-taskDescDailog">                                                                       ' +
                             ' <div class="vas-taskDesc_feildWrap mb-2 ">                                                                         ' +
                             '   <div class="vas-taskDesc_feild">                                                                                 ' +
                             '     <span class="vas-taskdescTtl">' + VAS.translatedTexts.VAS_RecordingDate + '</span>                                                            ' +
-                            '     <span class="vas-taskdescValue">' + (Globalize.format(new Date($self.dGrid.records[event.index].RecordedDate), "yyyy-MM-dd") || '') + '</span>                                                              ' +
+                            '     <span class="vas-taskdescValue">' + (recordingDate.toLocaleDateString() || '') + '</span>                                                              ' +
                             '   </div>                                                                                                           ' +
                             '   <div class="vas-taskDesc_feild">                                                                                 ' +
                             '     <span class="vas-taskdescTtl text-right">' + VAS.translatedTexts.VAS_RequestOrProject + '</span>                                       ' +
@@ -441,7 +467,7 @@
                         // Create and configure the dialog for displaying task details
                         var RequestInfoDialog = new VIS.ChildDialog();
                         RequestInfoDialog.setContent(htmlmain);
-                        RequestInfoDialog.setTitle(VIS.Msg.getMsg("VAS_RequestInfoDialog"));
+                        RequestInfoDialog.setTitle(VAS.translatedTexts.VAS_RequestInfoDialog);
                         RequestInfoDialog.setWidth("50%");
                         RequestInfoDialog.setEnableResize(true);
                         RequestInfoDialog.setModal(true);
@@ -548,14 +574,14 @@
             if (event.recid == undefined) {
                 // Clear the arrays
                 gridDataArray = [];
-                LeftGridData = [];
+                PreviewLeftData = [];
                 // Loop through all records in the grid
                 for (var i = 0; i < dGrid.records.length; i++) {
                     // Check if records are unselected
                     if (IsRecordUnselected) {
                         // Reset the arrays if records are unselected
                         gridDataArray = [];
-                        LeftGridData = [];
+                        PreviewLeftData = [];
                     } else {
                         // Otherwise, populate gridDataArray with all records
                         gridDataArray.push(dGrid.records[i]);
@@ -584,125 +610,28 @@
         }
 
         //this fucntion is used to get remaining columns  id
-        var GetColumnID = function (ColumnName, TableName) {
-            var Column_ID = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS_TimeSheetInvoices/GetColumnID", { "ColumnName": ColumnName, "TableName": TableName }, null);
-            return Column_ID;
+        var GetColumnID = function (ColumnData) {
+            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS_TimeSheetInvoices/GetColumnID", { "ColumnData": JSON.stringify(ColumnData) }, null);
         }
 
         //This function is called when grid is scrolled to maintain paging
         function enablingscrollEvent() {
 
             if ($(this).scrollTop() + $(this).innerHeight() >= this.scrollHeight) {
-                if (pageNo <= gridPgnoInvoice) {
+                if (pageNo < gridPgnoInvoice) {
                     $self.setBusy(true);
                     pageNo++;
-                    LoadTimeSheetDataOnScroll(pageNo, pageSize);
+                    LoadTimeSheetData(pageNo, pageSize,true);
                 }
             }
         }
 
 
-        /**
-         * This function is called on scroll of grid to maintain data
-         * @param {any} pageNo
-         * @param {any} pageSize
-         */
-        function LoadTimeSheetDataOnScroll(pageNo, pageSize) {
-            var data = [];
-            var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
-            $self.setBusy(true);
-
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_TimeSheetInvoices/LoadGridData",
-                type: 'POST',
-                //async: false,
-                data: {
-                    AD_Client_ID: VIS.Utility.Util.getValueOfInt(AD_Client_ID),
-                    AD_Org_ID: VIS.Utility.Util.getValueOfInt(AD_Org_ID),
-                    C_BPartner_ID: CustomerId.toString(),
-                    S_Resource_ID: ResourceId.toString(),
-                    TimExpenSeDoc: TimeExpenseId.toString(),
-                    C_Project_ID: ProjectId.toString(),
-                    R_Request_ID: RequestId.toString(),
-                    C_Task_ID: TaskId.toString(),
-                    FromDate: $FromDate.getValue(),
-                    toDate: $ToDate.getValue(),
-                    pageNo: pageNo,
-                    pageSize: pageSize
-                },
-                success: function (res) {
-
-                    var gridDataResult = JSON.parse(res);
-                    var count = $self.dGrid.records.length + 1;
-                    if (gridDataResult && gridDataResult.length > 0) {
-                        for (var i = 0; i < gridDataResult.length; i++) {
-
-                            var line = {};
-                            line['DocumentNo'] = gridDataResult[i].DocumentNo;
-                                line['C_BPartner'] = gridDataResult[i].CustomerName;
-                                line['S_Resource_ID'] = gridDataResult[i].ResourceName;
-                                line['M_Product'] = gridDataResult[i].ProductName;
-                                line['Qty'] = gridDataResult[i].Qty;
-                                line['Price'] = gridDataResult[i].PriceList;
-                                line['PriceStd'] = gridDataResult[i].PriceStd;
-                                line['PriceLimit'] = gridDataResult[i].PriceLimit;
-                            line['Amount'] = gridDataResult[i].PriceList * gridDataResult[i].Qty;
-                            line['C_BPartner_ID'] = gridDataResult[i].CustomerId;
-                                line['StdPrecision'] = gridDataResult[i].stdPrecision;
-                                line['VA009_PaymentMethod_ID'] = gridDataResult[i].VA009_PaymentMethod_ID;
-                                line['M_PriceList_ID'] = gridDataResult[i].M_PriceList_ID;
-                                line['C_BPartner_Location_ID'] = gridDataResult[i].C_Location_ID;
-                                line['M_Product_ID'] = gridDataResult[i].M_Product_ID;
-                                line['C_Charge_ID'] = gridDataResult[i].C_Charge_ID;
-                                line['C_Uom_ID'] = gridDataResult[i].C_Uom_ID;
-                                line['C_PaymentTerm_ID'] = gridDataResult[i].C_PaymentTerm_ID;
-                                line['C_Currency_ID'] = gridDataResult[i].C_Currency_ID;
-                                line['UomName'] = gridDataResult[i].UomName;
-                                line['ImageUrl'] = gridDataResult[i].ImageUrl;
-                                line['LocationName'] = gridDataResult[i].LocationName;
-                                line['ProjReq_ID'] = gridDataResult[i].ProjReq_ID;
-                                line['ProjReq_Name'] = gridDataResult[i].ProjReq_Name;
-                                line['RecordedDate'] = gridDataResult[i].RecordedDate;
-                                line['EstimatedTime'] = gridDataResult[i].EstimatedTime;
-                                line['EnforcePriceLimit'] = gridDataResult[i].EnforcePriceLimit
-                            line['S_TimeExpenseLine_ID'] = gridDataResult[i].S_TimeExpenseLine_ID
-                            line['VA075_WorkOrderOperation_ID'] = gridDataResult[i].VA075_WorkOrderOperation_ID
-                            if (gridDataResult[i].PhaseInfo != null) {
-                                line['PhaseName'] = '"'+ VAS.translatedTexts.VAS_Start +'"';
-                                for (var j = 0; j < gridDataResult[i].PhaseInfo.length; j++) {
-                                    line['PhaseName'] = line['PhaseName'] + "," + (gridDataResult[i].PhaseInfo[j].PhaseName);
-                                }
-                            }
-                            else if (gridDataResult[i].RequestSummary != null) {
-                                line['PhaseName'] = gridDataResult[i].RequestSummary;
-                            }
-
-                            line['recordCount'] = 0;
-                            line['recid'] = count;
-                            count++;
-                            data.push(line);
-                        }
-
-                        $self.dGrid.add(data);
-                    }
-                    else {
-                        VIS.ADialog.info("NoDataFound");
-                    }
-                    $self.setBusy(false);
-                },
-                error: function (e) {
-                    $self.setBusy(false);
-                },
-            });
-
-            return data;
-        }
-
         // Function to add data for preview based on all selections
         function AddForPreviewDataOnAllSelection(gridDataArray, shouldAdd) {
-            // If gridDataArray is empty, reset LeftGridData and return
+            // If gridDataArray is empty, reset PreviewLeftData and return
             if (gridDataArray.length === 0) {
-                LeftGridData = [];
+                PreviewLeftData = [];
                 return;
             }
 
@@ -711,15 +640,15 @@
                 var record = gridDataArray[i];
                 var isUnique = true;
 
-                // Loop through each record in LeftGridData
-                for (var j = 0; j < LeftGridData.length; j++) {
-                    // Check if the record already exists in LeftGridData based on specific conditions
-                    if (record.C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                        record.C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                        record.VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                        record.M_PriceList_ID === LeftGridData[j].M_PriceList_ID) {
+                // Loop through each record in PreviewLeftData
+                for (var j = 0; j < PreviewLeftData.length; j++) {
+                    // Check if the record already exists in PreviewLeftData based on specific conditions
+                    if (record.C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                        record.C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                        record.VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                        record.M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID) {
                         // If the record exists, increment the record count and mark it as not unique
-                        LeftGridData[j].recordCount = LeftGridData[j].recordCount + 1;
+                        PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount + 1;
                         isUnique = false;
                         break;
                     }
@@ -727,9 +656,9 @@
 
                 // If the record is unique and should be added
                 if (isUnique && shouldAdd) {
-                    // Set the record count to 1 and add it to LeftGridData
+                    // Set the record count to 1 and add it to PreviewLeftData
                     record.recordCount = 1;
-                    LeftGridData.push(record);
+                    PreviewLeftData.push(record);
                 }
             }
         }
@@ -738,28 +667,28 @@
         function AddedDataForPreviewOnSelection(event, dGrid, shouldAdd) {
             var isUnique = true;
 
-            // Loop through each record in LeftGridData
-            for (var j = 0; j < LeftGridData.length; j++) {
+            // Loop through each record in PreviewLeftData
+            for (var j = 0; j < PreviewLeftData.length; j++) {
                 // Check if the record matches specific conditions and if it should be added
-                if (shouldAdd && (dGrid.records[event.index].C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                    dGrid.records[event.index].C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                    dGrid.records[event.index].VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                    dGrid.records[event.index].M_PriceList_ID === LeftGridData[j].M_PriceList_ID)) {
+                if (shouldAdd && (dGrid.records[event.index].C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                    dGrid.records[event.index].C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                    dGrid.records[event.index].VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                    dGrid.records[event.index].M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID)) {
                     // If the record matches and should be added, increment the record count and mark it as not unique
-                    LeftGridData[j].recordCount = LeftGridData[j].recordCount + 1;
+                    PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount + 1;
                     isUnique = false;
                     break;
                 }
                 // Check if the record matches specific conditions and if it should be removed
-                else if (!shouldAdd && (dGrid.records[event.index].C_BPartner_ID === LeftGridData[j].C_BPartner_ID &&
-                    dGrid.records[event.index].C_BPartner_Location_ID === LeftGridData[j].C_BPartner_Location_ID &&
-                    dGrid.records[event.index].VA009_PaymentMethod_ID === LeftGridData[j].VA009_PaymentMethod_ID &&
-                    dGrid.records[event.index].M_PriceList_ID === LeftGridData[j].M_PriceList_ID)) {
+                else if (!shouldAdd && (dGrid.records[event.index].C_BPartner_ID === PreviewLeftData[j].C_BPartner_ID &&
+                    dGrid.records[event.index].C_BPartner_Location_ID === PreviewLeftData[j].C_BPartner_Location_ID &&
+                    dGrid.records[event.index].VA009_PaymentMethod_ID === PreviewLeftData[j].VA009_PaymentMethod_ID &&
+                    dGrid.records[event.index].M_PriceList_ID === PreviewLeftData[j].M_PriceList_ID)) {
                     // If the record matches and should be removed, decrement the record count
-                    LeftGridData[j].recordCount = LeftGridData[j].recordCount - 1;
-                    // If the record count becomes zero or less, remove the record from LeftGridData
-                    if (LeftGridData[j].recordCount <= 0) {
-                        LeftGridData = jQuery.grep(LeftGridData, function (record) {
+                    PreviewLeftData[j].recordCount = PreviewLeftData[j].recordCount - 1;
+                    // If the record count becomes zero or less, remove the record from PreviewLeftData
+                    if (PreviewLeftData[j].recordCount <= 0) {
+                        PreviewLeftData = jQuery.grep(PreviewLeftData, function (record) {
                             return record.recordCount > 0;
                         });
                     }
@@ -768,9 +697,9 @@
 
             // If the record is unique and should be added
             if (isUnique && shouldAdd) {
-                // Set the record count to 1 and add it to LeftGridData
+                // Set the record count to 1 and add it to PreviewLeftData
                 dGrid.records[event.index].recordCount = 1;
-                LeftGridData.push(dGrid.records[event.index]);
+                PreviewLeftData.push(dGrid.records[event.index]);
             }
         }
 
@@ -780,11 +709,13 @@
         * this function is responsible for loading data into grid
         * @param {any} pageNo
         * @param {any} pageSize
+        * @param {any} IsOnScroll
         */
-        function LoadTimeSheetData(pageNo, pageSize) {
-            var data = []
-
-
+        function LoadTimeSheetData(pageNo, pageSize,IsOnScroll) {
+            var data = [];
+            gridDataArray = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             if (VIS.Utility.Util.getValueOfInt(AD_Org_ID) == 0) {
                 VIS.ADialog.info('VAS_PlzSelectOrganization');
                 return;
@@ -810,9 +741,16 @@
                 },
                 success: function (res) {
                     var gridDataResult = JSON.parse(res);
-                    clearVariables();
                     if (gridDataResult && gridDataResult.length > 0) {
-                        var count = 1;
+                        //Intialized count variable to maintain the value of recid
+                        var count = 0;
+                        if (!IsOnScroll) {
+                            count = 1;
+                        }
+                        else {
+                            count = $self.dGrid.records.length + 1
+                        }
+                        
                         if (pageNo == 1 && gridDataResult.length > 0) {
                             TotalRecords = gridDataResult[0].countRecords
                             gridPgnoInvoice = Math.ceil(TotalRecords / pageSize);
@@ -828,8 +766,8 @@
                                 line['Price'] = gridDataResult[i].PriceList;
                                 line['PriceStd'] = gridDataResult[i].PriceStd;
                                 line['PriceLimit'] = gridDataResult[i].PriceLimit;
-                            line['Amount'] = gridDataResult[i].PriceList * gridDataResult[i].Qty;
-                            line['C_BPartner_ID'] = gridDataResult[i].CustomerId;
+                                line['Amount'] = gridDataResult[i].PriceList * gridDataResult[i].Qty;
+                                line['C_BPartner_ID'] = gridDataResult[i].CustomerId;
                                 line['StdPrecision'] = gridDataResult[i].stdPrecision;
                                 line['VA009_PaymentMethod_ID'] = gridDataResult[i].VA009_PaymentMethod_ID;
                                 line['M_PriceList_ID'] = gridDataResult[i].M_PriceList_ID;
@@ -840,6 +778,7 @@
                                 line['C_PaymentTerm_ID'] = gridDataResult[i].C_PaymentTerm_ID;
                                 line['C_Currency_ID'] = gridDataResult[i].C_Currency_ID;
                                 line['UomName'] = gridDataResult[i].UomName;
+                                line['ISO_Code'] = gridDataResult[i].ISO_Code;
                                 line['ImageUrl'] = gridDataResult[i].ImageUrl;
                                 line['LocationName'] = gridDataResult[i].LocationName;
                                 line['ProjReq_ID'] = gridDataResult[i].ProjReq_ID;
@@ -850,7 +789,7 @@
                             line['S_TimeExpenseLine_ID'] = gridDataResult[i].S_TimeExpenseLine_ID;
                             line['VA075_WorkOrderOperation_ID'] = gridDataResult[i].VA075_WorkOrderOperation_ID;
                             if (gridDataResult[i].PhaseInfo != null) {
-                                line['PhaseName'] = '"' + VAS.translatedTexts.VAS_Start +'"';
+                                line['PhaseName'] = VAS.translatedTexts.VAS_Start;
                                 for (var j = 0; j < gridDataResult[i].PhaseInfo.length; j++) {
                                     line['PhaseName'] = line['PhaseName'] + "," + (gridDataResult[i].PhaseInfo[j].PhaseName);
                                 }
@@ -869,10 +808,13 @@
                     else {
                         VIS.ADialog.info("NoDataFound");
                     }
-                    dynInit(data);
-
-
-
+                    //Handled condition for scroll
+                    if (!IsOnScroll) {
+                        dynInit(data);
+                    }
+                    else {
+                        $self.dGrid.add(data);
+                    }
                     $self.setBusy(false);
                 },
                 error: function (e) {
@@ -894,15 +836,15 @@
                 $self.dGridPreview = null;
             }
             if ($self.PreviewColumns.length == 0) {
-                $self.PreviewColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_Product, sortable: true, size: '16%', min: 150, hidden: false });
+                $self.PreviewColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 150, hidden: false });
                 $self.PreviewColumns.push({
-                    field: 'Price', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Price', caption: VAS.translatedTexts.Price, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
                         var val = record["Price"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                     }
                 });
-                $self.PreviewColumns.push({ field: "UomName", caption: VAS.translatedTexts.C_UOM_ID, sortable: true, size: '16%', min: 150, hidden: false });
+                $self.PreviewColumns.push({ field: "UomName", caption: VAS.translatedTexts.VAS_UomName, sortable: true, size: '16%', min: 150, hidden: false });
                 $self.PreviewColumns.push({
                     field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
                         var val = record["Qty"] + " " + record["UomName"];
@@ -910,11 +852,11 @@
                     }
                 })
                 $self.PreviewColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalAmount, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
                         SubTotal = SubTotal + record["Amount"];
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
-                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
                     }
                 })
             }
@@ -938,20 +880,20 @@
             var rightPreviewWrap = $('<div class="vas-tis-arInvRightSide">');
             var PreviewMainDiv = $("<div class='vas-poptis-content vis-formouterwrpdiv'>");
 
-            // Loop through LeftGridData to populate the left side of the dialog
-            for (var i = 0; i < LeftGridData.length; i++) {
+            // Loop through PreviewLeftData to populate the left side of the dialog
+            for (var i = 0; i < PreviewLeftData.length; i++) {
                 PreviLeftWrap.append(
                     '<div class="vas-tis-arInvlistItem mb-2" id="C_BpartnerListDiv_' + $self.windowNo + '">' +
                     '<div class="vas-tis-arInvoiceDetails px-2">' +
-                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + LeftGridData[i].C_BPartner_ID + '" data-paymethodid="' + LeftGridData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + LeftGridData[i].M_PriceList_ID + '"> ' + LeftGridData[i].C_BPartner + '</span > ' +
-                    '<span class="vas-tis-arInvDetailsDesc">' + VAS.translatedTexts.VAS_RecordCount + ":" + LeftGridData[i].recordCount + '</span>' +
-                    '<span class="vas-tis-arInvDetailsDesLoc" id="C_BPartnerLocationDiv_' + $self.windowNo + '" data-bplocationid="' + LeftGridData[i].C_BPartner_Location_ID + '">' + LeftGridData[i].LocationName + '</span>' +
+                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + PreviewLeftData[i].C_BPartner_ID + '" data-paymethodid="' + PreviewLeftData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + PreviewLeftData[i].M_PriceList_ID + '"> ' + PreviewLeftData[i].C_BPartner + '</span > ' +
+                    '<span class="vas-tis-arInvDetailsDesc">' + VAS.translatedTexts.VAS_RecordCount + ":" + PreviewLeftData[i].recordCount + '</span>' +
+                    '<span class="vas-tis-arInvDetailsDesLoc" id="C_BPartnerLocationDiv_' + $self.windowNo + '" data-bplocationid="' + PreviewLeftData[i].C_BPartner_Location_ID + '">' + PreviewLeftData[i].LocationName + '</span>' +
                     '</div>');
             }
 
             // Create HTML elements for the right side of the dialog
             var PreviewId = "gridSelectDiv_" + $self.windowNo;
-            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + LeftGridData[0].C_BPartner + '</h4>')
+            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + PreviewLeftData[0].C_BPartner + '</h4>')
             $self.PreviewGridDiv = $("<div id='" + PreviewId + "' class='vas-pointdiv'>");
             rightPreviewWrap.append(headTagForBPartner).append($self.PreviewGridDiv);
 
@@ -977,7 +919,7 @@
             var bpid = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-bpid');
             var priceListId = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-pricelistid');
             var payMethodId = BPartnerInfoClickDiv.find("#C_BPartnerDiv_" + $self.windowNo).attr('data-paymethodid');
-            FilteredData = jQuery.grep(gridDataArray, function (value) {
+            PreviewFilteredGridData = jQuery.grep(gridDataArray, function (value) {
                 return VIS.Utility.Util.getValueOfInt(value.C_BPartner_ID) === VIS.Utility.Util.getValueOfInt(bpid)
                     && VIS.Utility.Util.getValueOfInt(value.C_BPartner_Location_ID) === VIS.Utility.Util.getValueOfInt(locid)
                     && VIS.Utility.Util.getValueOfInt(value.VA009_PaymentMethod_ID) === VIS.Utility.Util.getValueOfInt(payMethodId)
@@ -985,7 +927,7 @@
             });
 
             // Initialize the preview grid with filtered data
-            PreviewDyinit(FilteredData);
+            PreviewDyinit(PreviewFilteredGridData);
 
             // Append subtotal span to the right side of the dialog
             var SubTotalSpan = $('<p class="text-right pt-2" style="clear:both;" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '<p>');
@@ -997,9 +939,9 @@
                 bpid = $(this).find('.vas-tis-arInvDetailsDesc').attr('data-bpid');
                 priceListId = $(this).find('.vas-tis-arInvDetailsDesc').attr('data-pricelistid');
                 payMethodId = $(this).find('.vas-tis-arInvDetailsDesc').attr('data-paymethodid');
-                PreviLeftWrap.find('.vas-tis-arInvlistItem').removeClass('vas-tis-arpInvActive');
+                PreviLeftWrap.find('.vas-tis-arInvlistItem').removeClass('vas-tis-arInvActive');
                 $(this).addClass('vas-tis-arInvActive');
-                FilteredData = jQuery.grep(gridDataArray, function (value) {
+                PreviewFilteredGridData = jQuery.grep(gridDataArray, function (value) {
                     return VIS.Utility.Util.getValueOfInt(value.C_BPartner_ID) === VIS.Utility.Util.getValueOfInt(bpid)
                         && VIS.Utility.Util.getValueOfInt(value.C_BPartner_Location_ID) === VIS.Utility.Util.getValueOfInt(locid)
                         && VIS.Utility.Util.getValueOfInt(value.VA009_PaymentMethod_ID) === VIS.Utility.Util.getValueOfInt(payMethodId)
@@ -1007,8 +949,8 @@
                 });
 
                 // Initialize the preview grid with filtered data
-                PreviewDyinit(FilteredData);
-                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(FilteredData[0].C_BPartner);
+                PreviewDyinit(PreviewFilteredGridData);
+                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(PreviewFilteredGridData[0].C_BPartner);
                 rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal)
                 SubTotal = 0;
             });
@@ -1043,6 +985,8 @@
                         //Cleared the value of grid after generating the invoice
                         dynInit(null);
                         clearVariables();
+                        clearControls();
+                        removeControlsSelectedDiv()
                     }
                     else {
                         VIS.ADialog.info("VAS_InvoiceNotGenerated");
@@ -1073,7 +1017,7 @@
             $RequestSelected = $('<div class="vas-tis-dropdown-lbl">');
             TimeDiv = $('<div class="VAS-Time">');
             $TimeAndExpenseDiv = $('<div class="input-group vis-input-wrap">');
-            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("S_TimeExpense_ID", "S_TimeExpenseLine"), VIS.DisplayType.Search);
+            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.Search);
             $self.vSearchTimeAndExpense = new VIS.Controls.VTextBoxButton("S_TimeExpense_ID", true, false, true, VIS.DisplayType.Search, TimeAndExpenseLookUp);
             var $TimeAndExpenseControlWrap = $('<div class="vis-control-wrap">');
             var $TimeAndExpenseButtonWrap = $('<div class="input-group-append">');
@@ -1087,10 +1031,12 @@
             ProjectDiv = $('<div class="VAS-projectdiv">');
             $ProjectDiv = $('<div class="input-group vis-input-wrap">');
             var validationcode = "C_Project.AD_Org_ID IN(0,@AD_Org_ID@) AND C_Project.IsActive='Y' AND C_Project.IsOpportunity='N' AND C_Project.IsCampaign='N'";
-            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("C_ProjectRef_ID", "C_Order"), VIS.DisplayType.Search, "C_ProjectRef_ID", 0, false, validationcode);
+            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_ProjectRef_ID, VIS.DisplayType.Search, "C_ProjectRef_ID", 0, false, validationcode);
             $self.vSearchProject = new VIS.Controls.VTextBoxButton("C_Project_ID", true, false, true, VIS.DisplayType.Search, ProjectLookUp);
             var $ProjectControlWrap = $('<div class="vis-control-wrap">');
             var $ProjectButtonWrap = $('<div class="input-group-append">');
+            //Set the info window As project
+            $self.vSearchProject.setCustomInfo('Project');
             $ProjectDiv.append($ProjectControlWrap);
             $ProjectControlWrap.append($self.vSearchProject.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.C_Project_ID + '</label>');
             $ProjectDiv.append($ProjectButtonWrap);
@@ -1100,7 +1046,7 @@
             // created the Request control 
             RequestDiv = $('<div class="VAS-RequestDiv">');
             $RequestDiv = $('<div class="input-group vis-input-wrap">');
-            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("R_Request_ID", "S_TimeExpenseLine"), VIS.DisplayType.Search);
+            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.R_Request_ID, VIS.DisplayType.Search);
             $self.vSearchRequest = new VIS.Controls.VTextBoxButton("R_Request_ID", true, false, true, VIS.DisplayType.Search, RequestLookUp);
             var $RequestControlWrap = $('<div class="vis-control-wrap">');
             var $RequestButtonWrap = $('<div class="input-group-append">');
@@ -1114,7 +1060,7 @@
             if (ModulePrefix["VA075_"]) {
                 TaskDiv = $('<div class="VAS-TaskDiv">');
                 $TaskDiv = $('<div class="input-group vis-input-wrap">');
-                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, GetColumnID("VA075_Task_ID", "VA075_WorkOrderOperation"), VIS.DisplayType.Search);
+                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.VA075_Task_ID, VIS.DisplayType.Search);
                 $self.vSearchTask = new VIS.Controls.VTextBoxButton("VA075_Task_ID", true, false, true, VIS.DisplayType.Search, TaskLookUp);
                 var $TaskControlWrap = $('<div class="vis-control-wrap">');
                 var $TaskButtonWrap = $('<div class="input-group-append">');
@@ -1143,7 +1089,7 @@
             $ApplyButton.on("click", function () {
                 AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                 gridPgnoInvoice = 1; pageNo = 1;
-                LoadTimeSheetData(pageNo, pageSize);
+                LoadTimeSheetData(pageNo, pageSize,false);
             });
 
             $self.vSearchTimeAndExpense.fireValueChanged = function () {
@@ -1237,6 +1183,12 @@
             });
 
         }
+        //This function is used to clear the controls on generating the invoice
+        function clearControls() {
+            $self.cmbOrg.setValue(null);
+            $FromDate.setValue(null);
+            $ToDate.setValue(null);
+        }
         //This function is used to initialize the design onload and handling various click events
         this.Initialize = function () {
             initializeComponent();
@@ -1271,14 +1223,15 @@
                     }
                     AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                     pageNo = 1;
-                    LoadTimeSheetData(pageNo, pageSize);
+                    LoadTimeSheetData(pageNo, pageSize,false);
 
                 });
             //On clcik of Preview button the data will beloaded on Prview data grid
             if (this.PreviewBtn != null) {
                 this.PreviewBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                    if (LeftGridData.length == 0) {
+                    if (PreviewLeftData.length == 0) {
                         VIS.ADialog.info('VAS_PlzSelectRecord');
+                        return;
                     }
                     LoadPreviewDialog(gridDataArray);
                 });
@@ -1286,8 +1239,9 @@
             //On clcik of Generate invoice button the invoice will be generated
             if (this.GenerateInvBtn != null) {
                 this.GenerateInvBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                    if (LeftGridData.length == 0) {
+                    if (PreviewLeftData.length == 0) {
                         VIS.ADialog.info('VAS_PlzSelectRecord');
+                        return;
                     }
                     GenerateInvoice(gridDataArray);
                 });
@@ -1315,8 +1269,9 @@
                     }, 'linear');
 
                     toggleside = false;
-                    $self.btnSpaceDiv.animate({ width: 310 }, "slow");
+                    $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
                     $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
+                    $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
                     $self.SearchBtn.css("display", "block");
                     $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
@@ -1343,6 +1298,7 @@
                     toggleside = true;
                     $self.btnSpaceDiv.animate({ width: minSideWidth }, "slow");
                     $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
+                    $self.topDiv.find('.vas-RecordSelection').removeClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "none");
                     $self.SearchBtn.css("display", "none");
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
@@ -1352,19 +1308,48 @@
             });
 
         }
+        //This function is use to change the form width on zoom in zoom out
+        this.sizeChanged = function (h, w) {
+            selectDivWidth = w - (sideDivWidth + 20);
+            selectDivFullWidth = w - (20 + minSideWidth);
+            if (toggleside == true) {
+                $self.btnSpaceDiv.animate({ width: minSideWidth }, "slow");
+                $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
+                $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
+                    $self.dGrid.resize();
+                });
+            }
+            else {
+                //If vlue is true then seth width 310
+                if (IsSizeChangeOnLoad) {
+                    $self.btnSpaceDiv.animate({ width: 310 }, "slow");
+                    IsSizeChangeOnLoad = false;
+                }
+                else {
+                    $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
+                }
+                $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
+                 $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
+                    $self.dGrid.resize();
+                });
+            }
+        }
+        /* this function is used to remove the div after generating invoice*/
+        function removeControlsSelectedDiv() {
+            $CustomerSelected.remove();
+            $ResourceSelected.remove();
+        }
         /* This function is responsible for clearing the variable*/
         function clearVariables() {
             gridDataArray = [];
-            LeftGridData = [];
-            FilteredData = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             TimeExpenseId = [];
             RequestId = [];
             ResourceId = [];
             TaskId = [];
             CustomerId = [];
             ProjectId = [];
-            $FromDate.setValue(null);
-            $ToDate.setValue(null);
         }
 
         this.display = function () {
@@ -1417,9 +1402,11 @@
             this.btnToggel = null;
             this.spnSelect = null;
             this.spnGenerate = null;
+            ColumnIds = null;
+            ColumnData = null;
             gridDataArray = [];
-            LeftGridData = [];
-            FilteredData = [];
+            PreviewLeftData = [];
+            PreviewFilteredGridData = [];
             TimeExpenseId = [];
             RequestId = [];
             ResourceId = [];

@@ -16,21 +16,16 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// This Method is used to return the column id 
         /// </summary>
-        /// <param name="ColumnName">Name of the Column</param>
-        /// <returns>Column ID</returns>
-        /// <author>VIS_427 </author>
-        public JsonResult GetColumnID(string ColumnName,string TableName)
+        /// <param name="ColumnData">Data of the Column</param>
+        /// <returns>Dictionary with column name and column id</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetColumnID(string ColumnData)
         {
-            string retJSON = "";
-            int Column_ID = 0;
-            if (Session["ctx"] != null)
-            {
-                Ctx ctx = Session["ctx"] as Ctx;
-                string sql = @"SELECT AD_Column_ID FROM AD_Column WHERE ColumnName ='" + ColumnName + "' AND AD_Table_ID=(SELECT AD_Table_ID FROM AD_Table WHERE Tablename='"+ TableName +"')";
-                Column_ID = Util.GetValueOfInt(CoreLibrary.DataBase.DB.ExecuteScalar(sql));
-                retJSON = JsonConvert.SerializeObject(Column_ID);
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
+            dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
+            Ctx ctx = Session["ctx"] as Ctx;
+            VAS_TimeSheetInvoice invoiceTimeSheet = new VAS_TimeSheetInvoice();
+            Dictionary<string,int> columnData = invoiceTimeSheet.GetColumnIds(ctx, columnDataArray);
+            return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -74,5 +69,6 @@ namespace VAS.Areas.VAS.Controllers
             string _Paydata = invoiceTimeSheet.GenerateInvoice(ctx, dataTobeInvoice, AD_Client_ID, AD_Org_ID);
             return Json(JsonConvert.SerializeObject(_Paydata), JsonRequestBehavior.AllowGet);
         }
+
     }
 }

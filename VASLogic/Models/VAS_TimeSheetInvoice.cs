@@ -43,6 +43,15 @@ namespace VASLogic.Models
             int countRecords = 0;
             sql.Clear();
             List<TimeRecordingData> timeRecordingDataList = new List<TimeRecordingData>();
+            // when Time Expense or Task record is not selected than make value as 0
+            if (TimExpenSeDoc.Length==0 && C_Task_ID.Length > 0)
+            {
+                TimExpenSeDoc = "0";
+            }
+            else if (C_Task_ID.Length == 0 && TimExpenSeDoc.Length > 0)
+            {
+                C_Task_ID = "0";
+            }
 
             sql.Append("SELECT t.*,loc.Name AS LocationName FROM (");
             sql.Append(@"SELECT sc.DocumentNo, sc.C_BPartner_ID AS ResourceID,emp.Name AS ResourceName, 
@@ -54,7 +63,7 @@ namespace VASLogic.Models
                         st.R_Request_ID,st.C_Project_ID,cp.Name AS ProjectName,rq.DocumentNo as RequestName,st.C_ProjectPhase_ID,
                          rq.Summary,cpp.SeqNo,
                         st.Qty, st.C_BPartner_ID AS CustomerId,cust.Name AS CustomerName,st.C_Currency_ID,cy.ISO_Code as CurrencyName,
-                        st.InvoicePrice AS Price,sc.M_PriceList_ID,
+                        st.ConvertedAmt AS Price,sc.M_PriceList_ID,
                         CASE WHEN  st.C_BPartner_Location_ID IS NOT NULL then st.C_BPartner_Location_ID ELSE 
                         (First_VALUE(cbl.C_BPartner_Location_ID) OVER (PARTITION BY st.C_BPartner_ID
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID,cust.VA009_PaymentMethod_ID,0 AS VA075_Task_ID,st.C_Uom_ID,um.Name as UomName, 
@@ -74,7 +83,8 @@ namespace VASLogic.Models
                         INNER JOIN M_PriceList mp ON (mp.M_PriceList_ID = sc.M_PriceList_ID)
                         INNER JOIN C_Currency cy ON (cy.C_Currency_ID = st.C_Currency_ID)
                         INNER JOIN C_Uom um ON (um.C_Uom_ID = st.C_Uom_ID)
-                        WHERE st.IsInvoiced='Y' AND st.C_Invoice_ID IS NULL AND sc.AD_Client_ID = " + AD_Client_ID + " ");
+                        WHERE st.IsInvoiced='Y' AND st.C_Invoice_ID IS NULL AND sc.DocStatus IN ('CO','CL')
+                        AND sc.AD_Client_ID = " + AD_Client_ID + " ");
 
             if (AD_Org_ID != 0)
             {
@@ -195,7 +205,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_ProjectPhase cpp ON(cpp.C_Project_ID = cp.C_Project_ID AND wo.C_ProjectPhase_ID= cpp.C_ProjectPhase_ID)
                         INNER JOIN M_PriceList mp on(mp.M_PriceList_ID = wo.M_PriceList_ID)
                         INNER JOIN M_PriceList_Version mpv ON (mpv.M_PriceList_ID = mp.M_PriceList_ID)
-                        LEFT OUTER JOIN M_ProductPrice pp ON ( pp.M_PriceList_Version_ID = mpv.M_PriceList_Version_ID)
+                        LEFT OUTER JOIN M_ProductPrice pp ON ( pp.M_PriceList_Version_ID = mpv.M_PriceList_Version_ID AND pp.M_Product_ID=wo.M_Product_ID)
                         INNER JOIN C_Currency cy ON(cy.C_Currency_ID = wo.C_Currency_ID)
                         INNER JOIN C_Uom um ON(um.C_Uom_ID = wo.C_Uom_ID)
                         WHERE wo.C_Invoice_ID IS NULL AND wo.AD_Client_ID = " + AD_Client_ID + " AND " +
@@ -271,6 +281,7 @@ namespace VASLogic.Models
                     timeRecordingDataObj.VA009_PaymentMethod_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA009_PaymentMethod_ID"]);
                     timeRecordingDataObj.C_Location_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_BPartner_Location_ID"]);
                     timeRecordingDataObj.C_Uom_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Uom_ID"]);
+                    timeRecordingDataObj.ISO_Code= Util.GetValueOfString(ds.Tables[0].Rows[i]["CurrencyName"]);
                     timeRecordingDataObj.UomName = Util.GetValueOfString(ds.Tables[0].Rows[i]["UomName"]);
                     timeRecordingDataObj.LocationName = Util.GetValueOfString(ds.Tables[0].Rows[i]["LocationName"]);
                     timeRecordingDataObj.C_PaymentTerm_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_PaymentTerm_ID"]);
@@ -518,7 +529,7 @@ namespace VASLogic.Models
         /// <author>VIS_427</author>
         public int GetConversionTypeID(int AD_Client_ID, int AD_Org_ID)
         {
-            C_ConverType_ID = Util.GetValueOfInt(CoreLibrary.DataBase.DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive = 'Y' " +
+            C_ConverType_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive = 'Y' " +
                            " AND AD_Org_ID IN (0," + AD_Org_ID + ") AND AD_Client_ID IN (0," + AD_Client_ID + ") ORDER BY AD_Org_ID DESC,AD_Client_ID DESC,IsDefault DESC", null, null));
             return C_ConverType_ID;
         }
@@ -614,7 +625,30 @@ namespace VASLogic.Models
                      + Util.GetValueOfInt(sortedData.VA075_WorkOrderOperation_ID), null, null);
             }
         }
+        /// <summary>
+        /// This Method is used to return the column id 
+        /// </summary>
+        /// <param name="ct">context</param>
+        /// <param name="ColumnData">Data of the Column</param>
+        /// <returns>Dictionary with column name and column id</returns>
+        /// <author>VIS_427 </author>
+        public Dictionary<string,int> GetColumnIds(Ctx ct, dynamic columnDataArray)
+        {
+            Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+                foreach (var item in columnDataArray)
+                {
+                    // Extract column name and table name
+                    string ColumnName = item.ColumnName;
+                    string TableName = item.TableName;
 
+                    // Construct SQL query to retrieve AD_Column_ID
+                    string sql = @"SELECT AD_Column_ID FROM AD_Column 
+                               WHERE ColumnName ='" + ColumnName + @"' 
+                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='" + TableName + @"')";
+                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                }
+            return ColumnInfo;
+        }
         public class TimeRecordingData
         {
             public string DocumentNo { get; set; }
@@ -657,6 +691,7 @@ namespace VASLogic.Models
             public int VA075_WorkOrderOperation_ID { get; set; }
             public int Pic_ID { get; set; }
             public string ImageUrl { get; set; }
+            public string ISO_Code { get; set; }
             public List<ProjectPhaseInfo> PhaseInfo { get; set; }
 
         }

@@ -808,7 +808,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-filter-flyout {
     position: absolute;
     top: 100%;
-    right: 78%;
+    right: 0%;
     z-index: 100;
     border: 1px solid #e4e4e4;
     padding: 10px;
@@ -876,16 +876,18 @@ html[dir="rtl"] .vas-sql-result-msg {
         margin-left: 8px;
     }
 .vas-RecordSelection {
-    display: inline-flex;
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
+    display: inline-block;
     padding: 0 10px;
+    width:100%;
 }
 
-.vas-filterIcon {
-    font-size: 30px;
-}
+    .vas-RecordSelection.vas-tis-RecordArea {
+        width: calc(100% - 260px);
+    }
+
+    .vas-filterIcon {
+        font-size: 30px;
+    }
 
 .vas-decoration-style {
     text-decoration: underline !important;
@@ -1031,9 +1033,12 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 .vas-SelectDiv {
     display: flex;
-    width: 100%;
     align-items: center;
     justify-content: space-between;
+    float: left;
+}
+.vas-RecordSelection.vas-tis-RecordArea {
+    width: calc(100% - 260px);
 }
 .vas-SpnSelect {
     vertical-align: middle;
@@ -1087,6 +1092,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     justify-content: center;
     color: inherit;
     font-size: 1.5rem;
+    float:right;
 }
 
 .vas-tis-filter .dropdown-toggle::after {
@@ -1095,5 +1101,8 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-srm-filterIcon {
     font-size: 1.2rem;
+}
+.vas-tis-filterPopupWrap{
+    padding-top:40px;
 }
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
