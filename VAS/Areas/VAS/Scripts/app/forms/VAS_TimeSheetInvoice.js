@@ -1,5 +1,4 @@
-﻿
-; (function (VAS, $) {
+﻿; (function (VAS, $) {
     function VAS_TimeSheetInvoice() {
         this.frame;
         this.windowNo;
@@ -7,11 +6,12 @@
         this.arrListColumns = [];
         this.PreviewColumns = [];
         var ctx = VIS.Env.getCtx();
-
+        var timeExp = null;
         this.dGrid = null;
         var AD_Org_ID = null;
         var precision = 2;
         var pageNo = 1;
+        //var pushArr = [];
         var pageSize = 150;
         var TotalRecords = 0;
         var toggleside = false;
@@ -27,6 +27,7 @@
         this.vSearchTask = null;
         this.vSearchTimeAndExpense = null;
         this.vSearchProject = null;
+        var TaskTypeVal = null;
         var culture = new VIS.CultureSeparator();
         var format = VIS.DisplayType.GetNumberFormat(VIS.DisplayType.Amount);
         var dotFormatter = VIS.Env.isDecimalPoint();
@@ -71,7 +72,17 @@
         var TaskId = [];
         var CustomerId = [];
         var ProjectId = [];
+        var TimeExpenseData = [];
+        var ProjectData = [];
+        var RequestData = [];
+        var TaskData = [];
+        var AppliedTimeExpData = [];
+        var AppliedTaskData = [];
+        var AppliedProjectData = [];
+        var AppliedRequestData = [];
+        var $FilterHeader = null;
         var sideDivWidth = 260;
+        // var pushRecords = [];
         var minSideWidth = 50;
         //assigne variable value true so that onload the width should be correct
         var IsSizeChangeOnLoad = true;
@@ -145,8 +156,12 @@
             "VAS_PreviewDialog",
             "VAS_RequestInfoDialog",
             "VAS_SubTotal",
-            "VAS_ISO_Code"
-             
+            "VAS_ISO_Code",
+            "VAS_BindPaymentTerm",
+            "VAS_Refresh",
+            "VAS_ZeroPriceFor",
+            "VAS_TaskType"
+
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
@@ -172,7 +187,7 @@
             var $OrgControlWrap = $('<div class="vis-control-wrap">');
             var $OrgButtonWrap = $('<div class="input-group-append">');
             $OrgDiv.append($OrgControlWrap);
-            $OrgControlWrap.append($self.cmbOrg.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.AD_Org_ID + '</label>');
+            $OrgControlWrap.append($self.cmbOrg.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.AD_Org_ID + '</label>');
             $OrgDiv.append($OrgControlWrap);
             $OrgButtonWrap.append($self.cmbOrg.getBtn(0));
             $OrgDiv.append($OrgButtonWrap);
@@ -180,12 +195,12 @@
             var CustomerDiv = $('<div class="vas-CustomerDiv">');
             var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y'";
             $CustomerDiv = $('<div class="input-group vis-input-wrap">');
-            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, CustomerValidation);
-            $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, CustomerLookUp);
+            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.MultiKey, "C_BPartner_ID", 0, false, CustomerValidation);
+            $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.MultiKey, CustomerLookUp);
             var $CustomerControlWrap = $('<div class="vis-control-wrap">');
             var $CustomerButtonWrap = $('<div class="input-group-append">');
             $CustomerDiv.append($CustomerControlWrap);
-            $CustomerControlWrap.append($self.vSearchCustomer.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.C_BPartner_ID + '</label>');
+            $CustomerControlWrap.append($self.vSearchCustomer.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.VAS_Customer + '</label>');
             $CustomerDiv.append($CustomerControlWrap);
             $CustomerButtonWrap.append($self.vSearchCustomer.getBtn(0));
             $CustomerDiv.append($CustomerButtonWrap);
@@ -194,8 +209,8 @@
             var ResourceDiv = $('<div class="vas-ResourceDiv">');
             $ResourceDiv = $('<div class="input-group vis-input-wrap">');
             var ResourceValidationCode = "S_Resource.IsActive='Y' AND S_Resource.AD_Org_ID IN(0,@AD_Org_ID@)";
-            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_Resource_ID, VIS.DisplayType.Search, "S_Resource_ID", 0, false, ResourceValidationCode);
-            $self.vSearchResource = new VIS.Controls.VTextBoxButton("S_Resource_ID", true, false, true, VIS.DisplayType.Search, ResuorceLookUp, 0);
+            var ResuorceLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_Resource_ID, VIS.DisplayType.MultiKey, "S_Resource_ID", 0, false, ResourceValidationCode);
+            $self.vSearchResource = new VIS.Controls.VTextBoxButton("S_Resource_ID", true, false, true, VIS.DisplayType.MultiKey, ResuorceLookUp, 0);
             var $ResourceControlWrap = $('<div class="vis-control-wrap">');
             var $ResourceButtonWrap = $('<div class="input-group-append">');
             $ResourceDiv.append($ResourceControlWrap);
@@ -210,7 +225,7 @@
             $FromDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
             var $FromDateWrap = $('<div class="vis-control-wrap">');
             $FromDatewrapDiv.append($FromDateWrap);
-            $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label>' + VAS.translatedTexts.VAS_FromDate + '</label>');
+            $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.VAS_FromDate + '</label>');
             FromDatediv.append($FromDatewrapDiv);
 
             var toDatediv = $('<div class="vas-todateDiv">');
@@ -218,7 +233,7 @@
             $ToDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
             var $toDateWrap = $('<div class="vis-control-wrap">');
             $toDatewrapDiv.append($toDateWrap);
-            $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label>' + VAS.translatedTexts.VAS_toDate + '</label>');
+            $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.VAS_toDate + '</label>');
             toDatediv.append($toDatewrapDiv);
             LeftSideFields.append($OrgDiv).append(CustomerDiv).append(ResourceDiv).append(FromDatediv).append(toDatediv);
             $CustomerSelected = $('<div class="vas-tis-dropdown-lbl">');
@@ -226,22 +241,30 @@
             /*when user change the value of customer it will check whether record exsist or not if exist then will not append on div else it will be 
             appneded to div*/
             $self.vSearchCustomer.fireValueChanged = function () {
-                if (CustomerId.indexOf($self.vSearchCustomer.value) == -1) {
-                    if ($self.vSearchCustomer.value != null) {
-                        $CustomerSelected.append('<div class="vas-selected-lbl">' + $self.vSearchCustomer.ctrl.val() + '<span class="vis vis-cross" data-custId="' + $self.vSearchCustomer.value + '"></span></div>');
-                        CustomerDiv.append($CustomerSelected);
-                        CustomerId.push($self.vSearchCustomer.value);
+                //Handling the value when user select multiple values from popup
+                var customerValue = CustomerLookUp;
+                var custIds = $self.vSearchCustomer.value;
+                var custName = "";
+                var custMultiIdArray = custIds.toString().split(',');
+                for (var i = 0; i < custMultiIdArray.length; i++) {
+                    custName = customerValue.getDisplay(custMultiIdArray[i]);
+                    if (CustomerId.indexOf(custMultiIdArray[i]) == -1) {
+                        if (custMultiIdArray[i] != null) {
+                            $CustomerSelected.append('<div class="vas-selected-lbl">' + custName + '<span class="vis vis-cross" data-custId="' + custMultiIdArray[i] + '"></span></div>');
+                            CustomerDiv.append($CustomerSelected);
+                            CustomerId.push(custMultiIdArray[i]);
 
-                        $CustomerSelected.find('.vis-cross').on('click', function () {
-                            var Customer_ID = $(this).attr('data-custId')
-                            CustomerId = jQuery.grep(CustomerId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Customer_ID)
+                            $CustomerSelected.find('.vis-cross').on('click', function () {
+                                var Customer_ID = $(this).attr('data-custId')
+                                CustomerId = jQuery.grep(CustomerId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Customer_ID)
+                                });
+                                $(this).parent().remove();
+                                if ($CustomerSelected.find('.vis-cross').length == 0) {
+                                    $CustomerSelected.remove();
+                                }
                             });
-                            $(this).parent().remove();
-                            if ($CustomerSelected.find('.vis-cross').length == 0) {
-                                $CustomerSelected.remove();
-                            }
-                        });
+                        }
                     }
                 }
                 $self.vSearchCustomer.setValue(null);
@@ -249,21 +272,29 @@
             /*when user change the value of resource it will check whether record exist or not if exsist then will not append on div else it will be
              appneded to div*/
             $self.vSearchResource.fireValueChanged = function () {
-                if (ResourceId.indexOf($self.vSearchResource.value) == -1) {
-                    if ($self.vSearchResource.value != null) {
-                        $ResourceSelected.append('<div class="vas-selected-lbl">' + $self.vSearchResource.ctrl.val() + '<span class="vis vis-cross" data-resourceid="' + $self.vSearchResource.value + '"></span></div>')
-                        ResourceDiv.append($ResourceSelected);
-                        ResourceId.push($self.vSearchResource.value);
-                        $ResourceSelected.find('.vis-cross').on('click', function () {
-                            var Resource_ID = $(this).attr('data-resourceid')
-                            ResourceId = jQuery.grep(ResourceId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Resource_ID)
-                            });
-                            $(this).parent().remove();
-                            if ($ResourceSelected.find('.vis-cross').length == 0) {
-                                $ResourceSelected.remove();
-                            }
-                        })
+                //Handling the value when user select multiple values from popup
+                var ResourceValue = ResuorceLookUp;
+                var resourceIds = $self.vSearchResource.value;
+                var resourceName = "";
+                var resourceMultiIdArray = resourceIds.toString().split(',');
+                for (var i = 0; i < resourceMultiIdArray.length; i++) {
+                    resourceName = ResourceValue.getDisplay(resourceMultiIdArray[i]);
+                    if (ResourceId.indexOf(resourceMultiIdArray[i]) == -1) {
+                        if (resourceMultiIdArray[i] != null) {
+                            $ResourceSelected.append('<div class="vas-selected-lbl">' + resourceName + '<span class="vis vis-cross" data-resourceid="' + resourceMultiIdArray[i] + '"></span></div>')
+                            ResourceDiv.append($ResourceSelected);
+                            ResourceId.push(resourceMultiIdArray[i]);
+                            $ResourceSelected.find('.vis-cross').on('click', function () {
+                                var Resource_ID = $(this).attr('data-resourceid')
+                                ResourceId = jQuery.grep(ResourceId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Resource_ID)
+                                });
+                                $(this).parent().remove();
+                                if ($ResourceSelected.find('.vis-cross').length == 0) {
+                                    $ResourceSelected.remove();
+                                }
+                            })
+                        }
                     }
                 }
                 $self.vSearchResource.setValue(null);
@@ -275,6 +306,7 @@
 
         /*this function is used to create design of form */
         function loadDesign() {
+            var LeftButtonDiv = $('<div class="vas-tis-leftbuttondiv">');
             //this design will have all the controls like arrow btn,filter btn
             $self.topDiv = $("<div id='topDiv_" + $self.windowNo + "' class='vis-archive-l-s-head vis-frm-ls-top' style='padding: 0;'>" +
                 "<div id='btnSpaceDiv_" + $self.windowNo + "' class='vas-spacediv'>" +
@@ -292,13 +324,15 @@
 
             $self.btnSpaceDiv = $self.topDiv.find("#btnSpaceDiv_" + $self.windowNo);
 
-            $self.LeftsideDiv = $("<div id='sideDiv_" + $self.windowNo + "' class='vis-archive-l-s-content vis-leftsidebarouterwrap px-3'>");
+            $self.LeftsideDiv = $("<div id='sideDiv_" + $self.windowNo + "' class='vas-tis-leftsidewrap vis-leftsidebarouterwrap px-3'>");
             $self.LeftsideDiv.css("height", "100%");
             $self.SearchBtn = $("<input id='SearchBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.Search + "'>");
+            $self.RefreshBtn = $("<input id='RefreshBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.VAS_Refresh + "'>");
             $self.bottumDiv = $("<div class='vis-info-btmcnt-wrap vis-p-t-10 vas-BottomBtnDiv'>");
             $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2'>" + VAS.translatedTexts.VAS_Preview + "</button>");
             $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
-            $self.LeftsideDiv.append(LeftSideFields).append($self.SearchBtn);
+            LeftButtonDiv.append($self.SearchBtn).append($self.RefreshBtn);
+            $self.LeftsideDiv.append(LeftSideFields).append(LeftButtonDiv);
             $self.bottumDiv.append($self.GenerateInvBtn).append($self.PreviewBtn);
 
             $self.gridSelectDiv = $("<div id='gridSelectDiv_" + $self.windowNo + "' class='vis-frm-grid-outerwrp'>");
@@ -326,20 +360,34 @@
                         var div;
                         if (record["ImageUrl"] != null) {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
-                                '<img class="vas-businessPartnerImg" alt="' + record["ImageUrl"] + '" src="' + VIS.Application.contextUrl + record["ImageUrl"] + '">' + " " + record["C_BPartner"]
+                                '<img class="vas-businessPartnerImg" alt="' + record["ImageUrl"] + '" src="' + VIS.Application.contextUrl + record["ImageUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["C_BPartner"] + '</div>'
                             '</div>';
                         } else {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
-                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_CustImage + '"></div>' + " " + record["C_BPartner"]
+                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_CustImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["C_BPartner"] + '</div>'
                             '</div>';
                         }
                         return div;
                     }
                 });
                 $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '16%', min: 150, hidden: false });
-                $self.arrListColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '25%', min: 150, hidden: false });
                 $self.arrListColumns.push({
-                    field: 'Qty', caption: VAS.translatedTexts.Qty,sortable: true, size: '8%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '30%', min: 150, hidden: false, render: function (record) {
+                        var div;
+                        if (record["productImgUrl"] != null) {
+                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
+                                '<img class="vas-businessPartnerImg" alt="' + record["productImgUrl"] + '" src="' + VIS.Application.contextUrl + record["productImgUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            '</div>';
+                        } else {
+                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
+                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_ProductImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            '</div>';
+                        }
+                        return div;
+                    }
+                });
+                $self.arrListColumns.push({
+                    field: 'Qty', caption: VAS.translatedTexts.Qty, sortable: true, size: '8%', min: 150, hidden: false, render: function (record, index, col_index) {
                         var val = record["Qty"] + " " + record["UomName"];
                         return val;
                     }
@@ -355,7 +403,7 @@
                     field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 150, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
-                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) +  " " + record["ISO_Code"];
+                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
                     }
 
                 });
@@ -582,6 +630,7 @@
                         // Reset the arrays if records are unselected
                         gridDataArray = [];
                         PreviewLeftData = [];
+                       // pushRecords = [];
                     } else {
                         // Otherwise, populate gridDataArray with all records
                         gridDataArray.push(dGrid.records[i]);
@@ -621,7 +670,7 @@
                 if (pageNo < gridPgnoInvoice) {
                     $self.setBusy(true);
                     pageNo++;
-                    LoadTimeSheetData(pageNo, pageSize,true);
+                    LoadTimeSheetData(pageNo, pageSize, true);
                 }
             }
         }
@@ -711,7 +760,7 @@
         * @param {any} pageSize
         * @param {any} IsOnScroll
         */
-        function LoadTimeSheetData(pageNo, pageSize,IsOnScroll) {
+        function LoadTimeSheetData(pageNo, pageSize, IsOnScroll) {
             var data = [];
             gridDataArray = [];
             PreviewLeftData = [];
@@ -736,6 +785,7 @@
                     C_Task_ID: TaskId.toString(),
                     FromDate: $FromDate.getValue(),
                     toDate: $ToDate.getValue(),
+                    TaskType: TaskTypeVal,
                     pageNo: pageNo,
                     pageSize: pageSize
                 },
@@ -750,7 +800,7 @@
                         else {
                             count = $self.dGrid.records.length + 1
                         }
-                        
+
                         if (pageNo == 1 && gridDataResult.length > 0) {
                             TotalRecords = gridDataResult[0].countRecords
                             gridPgnoInvoice = Math.ceil(TotalRecords / pageSize);
@@ -759,32 +809,33 @@
 
                             var line = {};
                             line['DocumentNo'] = gridDataResult[i].DocumentNo;
-                                line['C_BPartner'] = gridDataResult[i].CustomerName;
-                                line['S_Resource_ID'] = gridDataResult[i].ResourceName;
-                                line['M_Product'] = gridDataResult[i].ProductName;
-                                line['Qty'] = gridDataResult[i].Qty;
-                                line['Price'] = gridDataResult[i].PriceList;
-                                line['PriceStd'] = gridDataResult[i].PriceStd;
-                                line['PriceLimit'] = gridDataResult[i].PriceLimit;
-                                line['Amount'] = gridDataResult[i].PriceList * gridDataResult[i].Qty;
-                                line['C_BPartner_ID'] = gridDataResult[i].CustomerId;
-                                line['StdPrecision'] = gridDataResult[i].stdPrecision;
-                                line['VA009_PaymentMethod_ID'] = gridDataResult[i].VA009_PaymentMethod_ID;
-                                line['M_PriceList_ID'] = gridDataResult[i].M_PriceList_ID;
-                                line['C_BPartner_Location_ID'] = gridDataResult[i].C_Location_ID;
-                                line['M_Product_ID'] = gridDataResult[i].M_Product_ID;
-                                line['C_Charge_ID'] = gridDataResult[i].C_Charge_ID;
-                                line['C_Uom_ID'] = gridDataResult[i].C_Uom_ID;
-                                line['C_PaymentTerm_ID'] = gridDataResult[i].C_PaymentTerm_ID;
-                                line['C_Currency_ID'] = gridDataResult[i].C_Currency_ID;
-                                line['UomName'] = gridDataResult[i].UomName;
-                                line['ISO_Code'] = gridDataResult[i].ISO_Code;
-                                line['ImageUrl'] = gridDataResult[i].ImageUrl;
-                                line['LocationName'] = gridDataResult[i].LocationName;
-                                line['ProjReq_ID'] = gridDataResult[i].ProjReq_ID;
-                                line['ProjReq_Name'] = gridDataResult[i].ProjReq_Name;
-                                line['RecordedDate'] = gridDataResult[i].RecordedDate;
-                                line['EstimatedTime'] = gridDataResult[i].EstimatedTime;
+                            line['C_BPartner'] = gridDataResult[i].CustomerName;
+                            line['S_Resource_ID'] = gridDataResult[i].ResourceName;
+                            line['M_Product'] = gridDataResult[i].ProductName;
+                            line['Qty'] = gridDataResult[i].Qty;
+                            line['Price'] = gridDataResult[i].PriceList;
+                            line['PriceStd'] = gridDataResult[i].PriceStd;
+                            line['PriceLimit'] = gridDataResult[i].PriceLimit;
+                            line['Amount'] = gridDataResult[i].PriceList * gridDataResult[i].Qty;
+                            line['C_BPartner_ID'] = gridDataResult[i].CustomerId;
+                            line['StdPrecision'] = gridDataResult[i].stdPrecision;
+                            line['VA009_PaymentMethod_ID'] = gridDataResult[i].VA009_PaymentMethod_ID;
+                            line['M_PriceList_ID'] = gridDataResult[i].M_PriceList_ID;
+                            line['C_BPartner_Location_ID'] = gridDataResult[i].C_Location_ID;
+                            line['M_Product_ID'] = gridDataResult[i].M_Product_ID;
+                            line['C_Charge_ID'] = gridDataResult[i].C_Charge_ID;
+                            line['C_Uom_ID'] = gridDataResult[i].C_Uom_ID;
+                            line['C_PaymentTerm_ID'] = gridDataResult[i].C_PaymentTerm_ID;
+                            line['C_Currency_ID'] = gridDataResult[i].C_Currency_ID;
+                            line['UomName'] = gridDataResult[i].UomName;
+                            line['ISO_Code'] = gridDataResult[i].ISO_Code;
+                            line['ImageUrl'] = gridDataResult[i].ImageUrl;
+                            line['productImgUrl'] = gridDataResult[i].productImgUrl;
+                            line['LocationName'] = gridDataResult[i].LocationName;
+                            line['ProjReq_ID'] = gridDataResult[i].ProjReq_ID;
+                            line['ProjReq_Name'] = gridDataResult[i].ProjReq_Name;
+                            line['RecordedDate'] = gridDataResult[i].RecordedDate;
+                            line['EstimatedTime'] = gridDataResult[i].EstimatedTime;
                             line['EnforcePriceLimit'] = gridDataResult[i].EnforcePriceLimit;
                             line['S_TimeExpenseLine_ID'] = gridDataResult[i].S_TimeExpenseLine_ID;
                             line['VA075_WorkOrderOperation_ID'] = gridDataResult[i].VA075_WorkOrderOperation_ID;
@@ -836,7 +887,21 @@
                 $self.dGridPreview = null;
             }
             if ($self.PreviewColumns.length == 0) {
-                $self.PreviewColumns.push({ field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 150, hidden: false });
+                $self.PreviewColumns.push({
+                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 150, hidden: false, render: function (record) {
+                        var div;
+                        if (record["productImgUrl"] != null) {
+                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
+                                '<img class="vas-businessPartnerImg" alt="' + record["productImgUrl"] + '" src="' + VIS.Application.contextUrl + record["productImgUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            '</div>';
+                        } else {
+                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
+                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_ProductImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            '</div>';
+                        }
+                        return div;
+                    }
+                });
                 $self.PreviewColumns.push({
                     field: 'Price', caption: VAS.translatedTexts.Price, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
                         var val = record["Price"];
@@ -930,7 +995,7 @@
             PreviewDyinit(PreviewFilteredGridData);
 
             // Append subtotal span to the right side of the dialog
-            var SubTotalSpan = $('<p class="text-right pt-2" style="clear:both;" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '<p>');
+            var SubTotalSpan = $('<div><div class="vas-tis-subtotal" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '</div></div>');
             rightPreviewWrap.append(SubTotalSpan);
 
             // Handle click events on items in the left side of the dialog
@@ -951,7 +1016,7 @@
                 // Initialize the preview grid with filtered data
                 PreviewDyinit(PreviewFilteredGridData);
                 rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(PreviewFilteredGridData[0].C_BPartner);
-                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal)
+                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal);
                 SubTotal = 0;
             });
 
@@ -965,6 +1030,19 @@
         function GenerateInvoice(gridDataArray) {
             if (gridDataArray.length == 0) {
                 VIS.ADialog.info('VAS_PlzSelectRecord');
+                return;
+            }
+            //getting the records whose price is zero
+            var gridDataWithZeroPrice = jQuery.grep(gridDataArray, function (value) {
+                return VIS.Utility.Util.getValueOfInt(value.Price) === 0;
+            });
+            //Restricting to not generate invoice for records whose Price is zero
+            if (gridDataWithZeroPrice.length > 0) {
+                var message = VAS.translatedTexts.VAS_ZeroPriceFor;
+                for (var i = 0; i < gridDataWithZeroPrice.length; i++) {
+                    message += gridDataWithZeroPrice[i].DocumentNo + ', '; // Assuming C_BPartner is a string
+                }
+                VIS.ADialog.info(message);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
@@ -1004,7 +1082,7 @@
         /*this function display the filter popup on click of filter button*/
         function FilterDisplay() {
             var $FilterDiv = $self.$root.find("#vas_tis_FilterPopupWrap_" + $self.windowNo);
-            var $FilterHeader = $(
+            $FilterHeader = $(
                 '  <div class="vas-filter-flyout">                                                              ' +
                 '    <div class="vas-flyout-header">                                                            ' +
                 '      <h1>' + VAS.translatedTexts.VAS_Filter + '</h1><span class="vis vis-cross"></span> ' +
@@ -1017,8 +1095,8 @@
             $RequestSelected = $('<div class="vas-tis-dropdown-lbl">');
             TimeDiv = $('<div class="VAS-Time">');
             $TimeAndExpenseDiv = $('<div class="input-group vis-input-wrap">');
-            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.Search);
-            $self.vSearchTimeAndExpense = new VIS.Controls.VTextBoxButton("S_TimeExpense_ID", true, false, true, VIS.DisplayType.Search, TimeAndExpenseLookUp);
+            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.MultiKey);
+            $self.vSearchTimeAndExpense = new VIS.Controls.VTextBoxButton("S_TimeExpense_ID", true, false, true, VIS.DisplayType.MultiKey, TimeAndExpenseLookUp);
             var $TimeAndExpenseControlWrap = $('<div class="vis-control-wrap">');
             var $TimeAndExpenseButtonWrap = $('<div class="input-group-append">');
             $TimeAndExpenseDiv.append($TimeAndExpenseControlWrap);
@@ -1031,8 +1109,8 @@
             ProjectDiv = $('<div class="VAS-projectdiv">');
             $ProjectDiv = $('<div class="input-group vis-input-wrap">');
             var validationcode = "C_Project.AD_Org_ID IN(0,@AD_Org_ID@) AND C_Project.IsActive='Y' AND C_Project.IsOpportunity='N' AND C_Project.IsCampaign='N'";
-            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_ProjectRef_ID, VIS.DisplayType.Search, "C_ProjectRef_ID", 0, false, validationcode);
-            $self.vSearchProject = new VIS.Controls.VTextBoxButton("C_Project_ID", true, false, true, VIS.DisplayType.Search, ProjectLookUp);
+            var ProjectLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_ProjectRef_ID, VIS.DisplayType.MultiKey, "C_ProjectRef_ID", 0, false, validationcode);
+            $self.vSearchProject = new VIS.Controls.VTextBoxButton("C_Project_ID", true, false, true, VIS.DisplayType.MultiKey, ProjectLookUp);
             var $ProjectControlWrap = $('<div class="vis-control-wrap">');
             var $ProjectButtonWrap = $('<div class="input-group-append">');
             //Set the info window As project
@@ -1046,8 +1124,8 @@
             // created the Request control 
             RequestDiv = $('<div class="VAS-RequestDiv">');
             $RequestDiv = $('<div class="input-group vis-input-wrap">');
-            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.R_Request_ID, VIS.DisplayType.Search);
-            $self.vSearchRequest = new VIS.Controls.VTextBoxButton("R_Request_ID", true, false, true, VIS.DisplayType.Search, RequestLookUp);
+            var RequestLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.R_Request_ID, VIS.DisplayType.MultiKey);
+            $self.vSearchRequest = new VIS.Controls.VTextBoxButton("R_Request_ID", true, false, true, VIS.DisplayType.MultiKey, RequestLookUp);
             var $RequestControlWrap = $('<div class="vis-control-wrap">');
             var $RequestButtonWrap = $('<div class="input-group-append">');
             $RequestDiv.append($RequestControlWrap);
@@ -1060,8 +1138,8 @@
             if (ModulePrefix["VA075_"]) {
                 TaskDiv = $('<div class="VAS-TaskDiv">');
                 $TaskDiv = $('<div class="input-group vis-input-wrap">');
-                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.VA075_Task_ID, VIS.DisplayType.Search);
-                $self.vSearchTask = new VIS.Controls.VTextBoxButton("VA075_Task_ID", true, false, true, VIS.DisplayType.Search, TaskLookUp);
+                var TaskLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.VA075_Task_ID, VIS.DisplayType.MultiKey);
+                $self.vSearchTask = new VIS.Controls.VTextBoxButton("VA075_Task_ID", true, false, true, VIS.DisplayType.MultiKey, TaskLookUp);
                 var $TaskControlWrap = $('<div class="vis-control-wrap">');
                 var $TaskButtonWrap = $('<div class="input-group-append">');
                 $TaskDiv.append($TaskControlWrap);
@@ -1070,8 +1148,23 @@
                 $TaskButtonWrap.append($self.vSearchTask.getBtn(0));
                 $TaskDiv.append($TaskButtonWrap);
                 TaskDiv.append($TaskDiv);
+                //Created LOV control for task which will have billable,non billable and null values
+                TaskTypeDiv = $('<div class="VAS-TaskTypeDiv">');
+                $TaskTypeDiv = $('<div class="input-group vis-input-wrap">');
+                /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
+                $TaskTypeLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_TaskType", ColumnIds.AD_Reference_ID, false);
+                // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
+                $self.vTaskType = new VIS.Controls.VComboBox("VAS_TaskType", false, false, true, $TaskTypeLookUp, 100);
+                var $TaskTypeControlWrap = $('<div class="vis-control-wrap">');
+                var $TaskTypeButtonWrap = $('<div class="input-group-append">');
+                $TaskTypeDiv.append($TaskTypeControlWrap);
+                $TaskTypeControlWrap.append($self.vTaskType.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.VAS_TaskType + '</label>');
+                $TaskTypeDiv.append($TaskTypeControlWrap);
+                $TaskTypeButtonWrap.append($self.vTaskType.getBtn(0));
+                $TaskTypeDiv.append($TaskTypeButtonWrap);
+                TaskTypeDiv.append($TaskTypeDiv);
 
-                $FilterHeader.append(TimeDiv).append(TaskDiv).append(ProjectDiv).append(RequestDiv);
+                $FilterHeader.append(TimeDiv).append(TaskDiv).append(ProjectDiv).append(RequestDiv).append(TaskTypeDiv);;
             }
             else {
                 $FilterHeader.append(TimeDiv).append(ProjectDiv).append(RequestDiv);
@@ -1087,87 +1180,160 @@
             $FilterDiv.append($FilterHeader);
             //On click of apply button The data will be filtered according to selected filters
             $ApplyButton.on("click", function () {
+                AppliedTimeExpData = TimeExpenseData;
+                AppliedTaskData = TaskData;
+                AppliedProjectData = ProjectData;
+                AppliedRequestData = RequestData;
                 AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                 gridPgnoInvoice = 1; pageNo = 1;
-                LoadTimeSheetData(pageNo, pageSize,false);
+                LoadTimeSheetData(pageNo, pageSize, false);
+                $FilterHeader.remove();
             });
+            //Storing value on change of list
+            $self.vTaskType.fireValueChanged = function () {
+                TaskTypeVal = $self.vTaskType.getValue();
 
+            }
             $self.vSearchTimeAndExpense.fireValueChanged = function () {
-                if (TimeExpenseId.indexOf($self.vSearchTimeAndExpense.value) == -1) {
-                    if ($self.vSearchTimeAndExpense.value != null) {
-                        $TimeAndExpenseSelected.append('<div class="vas-selected-lbl">' + $self.vSearchTimeAndExpense.ctrl.val() + '<span class="vis vis-cross" data-timeandexpenceid="' + $self.vSearchTimeAndExpense.value + '"></span></div>');
-                        TimeDiv.append($TimeAndExpenseSelected);
-                        TimeExpenseId.push($self.vSearchTimeAndExpense.value);
-                        $TimeAndExpenseSelected.find('.vis-cross').on('click', function () {
-                            var TimeAndExpense_ID = $(this).attr('data-timeandexpenceid')
-                            TimeExpenseId = jQuery.grep(TimeExpenseId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(TimeAndExpense_ID);
+                //Handling the value when user select multiple values from popup
+                var timeExpValue = TimeAndExpenseLookUp;
+                var timeExpIds = $self.vSearchTimeAndExpense.value;
+                var timeExpName = "";
+                var timeExpMultiIdArray = timeExpIds.toString().split(',');
+                for (var i = 0; i < timeExpMultiIdArray.length; i++) {
+                    timeExpName = timeExpValue.getDisplay(timeExpMultiIdArray[i]);
+                    if (TimeExpenseId.indexOf(timeExpMultiIdArray[i]) == -1) {
+                        if (timeExpMultiIdArray[i] != null) {
+                            $TimeAndExpenseSelected.append('<div class="vas-selected-lbl">' + timeExpName + '<span class="vis vis-cross" data-timeandexpenceid="' + timeExpMultiIdArray[i] + '"></span></div>');
+                            TimeDiv.append($TimeAndExpenseSelected);
+                            TimeExpenseId.push(timeExpMultiIdArray[i]);
+                            timeExp = {
+                                Id: timeExpMultiIdArray[i],
+                                Name: timeExpName
+                            };
+                            TimeExpenseData.push(timeExp);
+                            $TimeAndExpenseSelected.find('.vis-cross').on('click', function () {
+                                var TimeAndExpense_ID = $(this).attr('data-timeandexpenceid')
+                                TimeExpenseId = jQuery.grep(TimeExpenseId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(TimeAndExpense_ID);
+                                });
+                                TimeExpenseData = jQuery.grep(TimeExpenseData, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value.Id) != VIS.Utility.Util.getValueOfInt(TimeAndExpense_ID);
+                                });
+                                $(this).parent().remove();
+                                if ($TimeAndExpenseSelected.find('.vis-cross').length == 0) {
+                                    $TimeAndExpenseSelected.remove();
+                                }
                             });
-                            $(this).parent().remove();
-                            if ($TimeAndExpenseSelected.find('.vis-cross').length == 0) {
-                                $TimeAndExpenseSelected.remove();
-                            }
-                        });
+                        }
                     }
                 }
                 $self.vSearchTimeAndExpense.setValue(null);
-            }
+            };
             $self.vSearchTask.fireValueChanged = function () {
-                if (TaskId.indexOf($self.vSearchTask.value) == -1) {
-                    if ($self.vSearchTask.value != null) {
-                        $TaskSelected.append('<div class="vas-selected-lbl">' + $self.vSearchTask.ctrl.val() + '<span class="vis vis-cross" data-taskid="' + $self.vSearchTask.value + '"></span></div>');
-                        TaskDiv.append($TaskSelected);
-                        TaskId.push($self.vSearchTask.value);
-                        $TaskSelected.find('.vis-cross').on('click', function () {
-                            var Task_ID = $(this).attr('data-taskid')
-                            TaskId = jQuery.grep(TaskId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Task_ID);
+                //Handling the value when user select multiple values from popup
+                var taskValue = TaskLookUp;
+                var taskIds = $self.vSearchTask.value;
+                var taskName = "";
+                var taskMultiIdArray = taskIds.toString().split(',');
+                for (var i = 0; i < taskMultiIdArray.length; i++) {
+                    taskName = taskValue.getDisplay(taskMultiIdArray[i]);
+                    if (TaskId.indexOf(taskMultiIdArray[i]) == -1) {
+                        if (taskMultiIdArray[i] != null) {
+                            $TaskSelected.append('<div class="vas-selected-lbl">' + taskName + '<span class="vis vis-cross" data-taskid="' + taskMultiIdArray[i] + '"></span></div>');
+                            TaskDiv.append($TaskSelected);
+                            TaskId.push(taskMultiIdArray[i]);
+                            var taskDataObj = {
+                                TaskId: taskMultiIdArray[i],
+                                TaskName: taskName
+                            };
+                            TaskData.push(taskDataObj);
+                            $TaskSelected.find('.vis-cross').on('click', function () {
+                                var Task_ID = $(this).attr('data-taskid')
+                                TaskId = jQuery.grep(TaskId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Task_ID);
+                                });
+                                TaskData = jQuery.grep(TaskData, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value.TaskId) != VIS.Utility.Util.getValueOfInt(Task_ID);
+                                });
+                                $(this).parent().remove();
+                                if ($TaskSelected.find('.vis-cross').length == 0) {
+                                    $TaskSelected.remove();
+                                }
                             });
-                            $(this).parent().remove();
-                            if ($TaskSelected.find('.vis-cross').length == 0) {
-                                $TaskSelected.remove();
-                            }
-                        });
+                        }
                     }
                 }
                 $self.vSearchTask.setValue(null);
             }
             $self.vSearchProject.fireValueChanged = function () {
-                if (ProjectId.indexOf($self.vSearchProject.value) == -1) {
-                    if ($self.vSearchProject.value != null) {
-                        $ProjectSelected.append('<div class="vas-selected-lbl">' + $self.vSearchProject.ctrl.val() + '<span class="vis vis-cross" data-projectid="' + $self.vSearchProject.value + '"></span></div>')
-                        ProjectDiv.append($ProjectSelected);
-                        ProjectId.push($self.vSearchProject.value);
-                        $ProjectSelected.find('.vis-cross').on('click', function () {
-                            var Project_ID = $(this).attr('data-projectid')
-                            ProjectId = jQuery.grep(ProjectId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Project_ID);
+                //Handling the value when user select multiple values from popup
+                var projectValue = ProjectLookUp;
+                var projectIds = $self.vSearchProject.value;
+                var projectName = "";
+                var projectMultiIdArray = projectIds.toString().split(',');
+                for (var i = 0; i < projectMultiIdArray.length; i++) {
+                    projectName = projectValue.getDisplay(projectMultiIdArray[i]);
+                    if (ProjectId.indexOf(projectMultiIdArray[i]) == -1) {
+                        if (projectMultiIdArray[i] != null) {
+                            $ProjectSelected.append('<div class="vas-selected-lbl">' + projectName + '<span class="vis vis-cross" data-projectid="' + projectMultiIdArray[i] + '"></span></div>')
+                            ProjectDiv.append($ProjectSelected);
+                            ProjectId.push(projectMultiIdArray[i]);
+                            var projectDataObj = {
+                                ProjectId: projectMultiIdArray[i],
+                                ProjectName: projectName
+                            };
+                            ProjectData.push(projectDataObj);
+                            $ProjectSelected.find('.vis-cross').on('click', function () {
+                                var Project_ID = $(this).attr('data-projectid')
+                                ProjectId = jQuery.grep(ProjectId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Project_ID);
+                                });
+                                ProjectData = jQuery.grep(ProjectData, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value.ProjectId) != VIS.Utility.Util.getValueOfInt(Project_ID);
+                                });
+                                $(this).parent().remove();
+                                if ($ProjectSelected.find('.vis-cross').length == 0) {
+                                    $ProjectSelected.remove();
+                                }
                             });
-                            $(this).parent().remove();
-                            if ($ProjectSelected.find('.vis-cross').length == 0) {
-                                $ProjectSelected.remove();
-                            }
-                        });
+                        }
                     }
                 }
                 $self.vSearchProject.setValue(null);
             }
             $self.vSearchRequest.fireValueChanged = function () {
-                if (RequestId.indexOf($self.vSearchRequest.value) == -1) {
-                    if ($self.vSearchRequest.value != null) {
-                        $RequestSelected.append('<div class="vas-selected-lbl">' + $self.vSearchRequest.ctrl.val() + '<span class="vis vis-cross" data-requestid="' + $self.vSearchRequest.value + '"></span></div>')
-                        RequestDiv.append($RequestSelected);
-                        RequestId.push($self.vSearchRequest.value);
-                        $RequestSelected.find('.vis-cross').on('click', function () {
-                            var Request_ID = $(this).attr('data-requestid')
-                            RequestId = jQuery.grep(RequestId, function (value) {
-                                return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Request_ID);
+                //Handling the value when user select multiple values from popup
+                var requestValue = RequestLookUp;
+                var requestIds = $self.vSearchRequest.value;
+                var requestName = "";
+                var requestMultiIdArray = requestIds.toString().split(',');
+                for (var i = 0; i < requestMultiIdArray.length; i++) {
+                    requestName = requestValue.getDisplay(requestMultiIdArray[i]);
+                    if (RequestId.indexOf(requestMultiIdArray[i]) == -1) {
+                        if (requestMultiIdArray[i] != null) {
+                            $RequestSelected.append('<div class="vas-selected-lbl">' + requestName + '<span class="vis vis-cross" data-requestid="' + requestMultiIdArray[i] + '"></span></div>')
+                            RequestDiv.append($RequestSelected);
+                            RequestId.push(requestMultiIdArray[i]);
+                            var requestDataObj = {
+                                RequestId: requestMultiIdArray[i],
+                                RequestName: requestName
+                            };
+                            RequestData.push(requestDataObj);
+                            $RequestSelected.find('.vis-cross').on('click', function () {
+                                var Request_ID = $(this).attr('data-requestid')
+                                RequestId = jQuery.grep(RequestId, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Request_ID);
+                                });
+                                RequestData = jQuery.grep(RequestData, function (value) {
+                                    return VIS.Utility.Util.getValueOfInt(value.RequestId) != VIS.Utility.Util.getValueOfInt(Request_ID);
+                                });
+                                $(this).parent().remove();
+                                if ($RequestSelected.find('.vis-cross').length == 0) {
+                                    $RequestSelected.remove();
+                                }
                             });
-                            $(this).parent().remove();
-                            if ($RequestSelected.find('.vis-cross').length == 0) {
-                                $RequestSelected.remove();
-                            }
-                        });
+                        }
                     }
                 }
                 $self.vSearchRequest.setValue(null);
@@ -1176,12 +1342,88 @@
             $FilterHeader.find('.vis-cross').on('click', function () {
                 $FilterHeader.remove();
                 IsFilterBtnClicked = false;
-                TaskId = [];
-                TimeExpenseId = [];
-                RequestId = [];
-                ProjectId = [];
             });
 
+        }
+        //This dunction is used to maintain the value at filter section close and open
+        function GetSelectedFilterVal() {
+
+            if (AppliedTimeExpData.length > 0) {
+                for (var i = 0; i < AppliedTimeExpData.length; i++) {
+                    $TimeAndExpenseSelected.append('<div class="vas-selected-lbl">' + AppliedTimeExpData[i].Name + '<span class="vis vis-cross" data-timeandexpenceid="' + AppliedTimeExpData[i].Id + '"></span></div>');
+                    TimeDiv.append($TimeAndExpenseSelected);
+                }
+                $TimeAndExpenseSelected.find('.vis-cross').on('click', function () {
+                    var TimeAndExpense_ID = $(this).attr('data-timeandexpenceid')
+                    TimeExpenseId = jQuery.grep(TimeExpenseId, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(TimeAndExpense_ID);
+                    });
+                    TimeExpenseData = jQuery.grep(TimeExpenseData, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value.Id) != VIS.Utility.Util.getValueOfInt(TimeAndExpense_ID);
+                    });
+                    $(this).parent().remove();
+                    if ($TimeAndExpenseSelected.find('.vis-cross').length == 0) {
+                        $TimeAndExpenseSelected.remove();
+                    }
+                });
+            }
+            if (AppliedTaskData.length > 0) {
+                for (var i = 0; i < TaskData.length; i++) {
+                    $TaskSelected.append('<div class="vas-selected-lbl">' + AppliedTaskData[i].TaskName + '<span class="vis vis-cross" data-taskid="' + AppliedTaskData[i].TaskId + '"></span></div>');
+                    TaskDiv.append($TaskSelected);
+                }
+                $TaskSelected.find('.vis-cross').on('click', function () {
+                    var Task_ID = $(this).attr('data-taskid')
+                    TaskId = jQuery.grep(TaskId, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Task_ID);
+                    });
+                    TaskData = jQuery.grep(TaskData, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value.TaskId) != VIS.Utility.Util.getValueOfInt(Task_ID);
+                    });
+                    $(this).parent().remove();
+                    if ($TaskSelected.find('.vis-cross').length == 0) {
+                        $TaskSelected.remove();
+                    }
+                });
+            }
+            if (AppliedProjectData.length > 0) {
+                for (var i = 0; i < ProjectData.length; i++) {
+                    $ProjectSelected.append('<div class="vas-selected-lbl">' + AppliedProjectData[i].ProjectName + '<span class="vis vis-cross" data-projectid="' + AppliedProjectData[i].ProjectId + '"></span></div>');
+                    ProjectDiv.append($ProjectSelected);
+                }
+                $ProjectSelected.find('.vis-cross').on('click', function () {
+                    var Project_ID = $(this).attr('data-projectid')
+                    ProjectId = jQuery.grep(ProjectId, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Project_ID);
+                    });
+                    ProjectData = jQuery.grep(ProjectData, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value.ProjectId) != VIS.Utility.Util.getValueOfInt(Project_ID);
+                    });
+                    $(this).parent().remove();
+                    if ($ProjectSelected.find('.vis-cross').length == 0) {
+                        $ProjectSelected.remove();
+                    }
+                });
+            }
+            if (AppliedRequestData.length > 0) {
+                for (var i = 0; i < RequestData.length; i++) {
+                    $RequestSelected.append('<div class="vas-selected-lbl">' + AppliedRequestData[i].RequestName + '<span class="vis vis-cross" data-requestid="' + AppliedRequestData[i].RequestId + '"></span></div>');
+                    RequestDiv.append($RequestSelected);
+                }
+                $RequestSelected.find('.vis-cross').on('click', function () {
+                    var Request_ID = $(this).attr('data-requestid')
+                    RequestId = jQuery.grep(RequestId, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value) != VIS.Utility.Util.getValueOfInt(Request_ID);
+                    });
+                    RequestData = jQuery.grep(RequestData, function (value) {
+                        return VIS.Utility.Util.getValueOfInt(value.RequestId) != VIS.Utility.Util.getValueOfInt(Request_ID);
+                    });
+                    $(this).parent().remove();
+                    if ($RequestSelected.find('.vis-cross').length == 0) {
+                        $RequestSelected.remove();
+                    }
+                });
+            }
         }
         //This function is used to clear the controls on generating the invoice
         function clearControls() {
@@ -1200,10 +1442,41 @@
             if (btnFilter != null) {
                 btnFilter.on("click", function () {
                     if (!IsFilterBtnClicked) {
+                        //storing oldvalue on click of filter button
+                        TimeExpenseData = JSON.parse(JSON.stringify(AppliedTimeExpData));
+                        TaskData = JSON.parse(JSON.stringify(AppliedTaskData));
+                        RequestData = JSON.parse(JSON.stringify(AppliedRequestData));
+                        ProjectData = JSON.parse(JSON.stringify(AppliedProjectData));
+                        if (TimeExpenseData.length == 0) {
+                            TimeExpenseId = [];
+                        }
+                        if (TaskData.length == 0) {
+                            TaskId = [];
+                        }
+                        if (RequestData.length == 0) {
+                            RequestId = [];
+                        }
+                        if (ProjectData.length == 0) {
+                            ProjectId = [];
+                        }
                         FilterDisplay();
+                        GetSelectedFilterVal();
+                        IsFilterBtnClicked = true;
                     }
-                    IsFilterBtnClicked = true;
+                    else {
+                        $FilterHeader.remove();
+                        IsFilterBtnClicked = false;
+                    }
 
+                });
+            }
+            if (this.RefreshBtn != null) {
+                this.RefreshBtn.on(VIS.Events.onTouchStartOrClick, function () {
+                    //on refresh clearing the values
+                    dynInit(null);
+                    clearVariables();
+                    clearControls();
+                    removeControlsSelectedDiv()
                 });
             }
             //On clcik of search button the data will beloaded on grid
@@ -1223,7 +1496,7 @@
                     }
                     AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                     pageNo = 1;
-                    LoadTimeSheetData(pageNo, pageSize,false);
+                    LoadTimeSheetData(pageNo, pageSize, false);
 
                 });
             //On clcik of Preview button the data will beloaded on Prview data grid
@@ -1274,6 +1547,7 @@
                     $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
                     $self.SearchBtn.css("display", "block");
+                    $self.RefreshBtn.css("display", "block");
                     $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
                         $self.dGrid.resize();
                     });
@@ -1301,6 +1575,7 @@
                     $self.topDiv.find('.vas-RecordSelection').removeClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "none");
                     $self.SearchBtn.css("display", "none");
+                    $self.RefreshBtn.css("display", "none");
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
                         $self.dGrid.resize();
                     });
@@ -1329,7 +1604,7 @@
                     $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
                 }
                 $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
-                 $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
+                $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
                     $self.dGrid.resize();
                 });
             }
@@ -1350,6 +1625,14 @@
             TaskId = [];
             CustomerId = [];
             ProjectId = [];
+            AppliedProjectData = [];
+            AppliedRequestData = [];
+            AppliedTaskData = [];
+            AppliedTimeExpData = [];
+            TimeExpenseData = [];
+            TaskData = [];
+            RequestData = [];
+            ProjectData = [];
         }
 
         this.display = function () {

@@ -817,6 +817,8 @@ html[dir="rtl"] .vas-sql-result-msg {
     max-width: 450px;
     min-width: 450px;
     background: white;
+    Max-height: 474px;
+    overflow: auto;
 }
 
 .vas-flyout-header {
@@ -853,7 +855,9 @@ html[dir="rtl"] .vas-sql-result-msg {
     display: inline-block;
     align-items: center;
     margin-bottom: 16px;
-    gap: 6px;
+    gap: 0px;
+    height: 56px;
+    overflow: auto;
 }
 
 .vas-selected-lbl {
@@ -875,23 +879,24 @@ html[dir="rtl"] .vas-sql-result-msg {
         cursor: pointer;
         margin-left: 8px;
     }
+
 .vas-RecordSelection {
     display: inline-block;
     padding: 0 10px;
-    width:100%;
+    width: 100%;
 }
 
     .vas-RecordSelection.vas-tis-RecordArea {
         width: calc(100% - 260px);
     }
 
-    .vas-filterIcon {
-        font-size: 30px;
-    }
+.vas-filterIcon {
+    font-size: 30px;
+}
 
 .vas-decoration-style {
     text-decoration: underline !important;
-    text-align :right !important;
+    text-align: right !important;
 }
 
 .vas-BottomBtnDiv {
@@ -944,6 +949,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     width: 100%;
     height: calc(100% - 40px);
 }
+
 .vas-tis-arInvRightSide {
     width: calc(100% - 330px);
     padding: 0.75rem;
@@ -951,7 +957,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-arInvViewer {
     margin: -15px;
-    height:100%
+    height: 100%
 }
 
 .vas-tis-arInvLeftSide {
@@ -1031,25 +1037,28 @@ html[dir="rtl"] .vas-sql-result-msg {
     height: 100%;
     background-color: white;
 }
+
 .vas-SelectDiv {
     display: flex;
     align-items: center;
     justify-content: space-between;
     float: left;
 }
+
 .vas-RecordSelection.vas-tis-RecordArea {
     width: calc(100% - 260px);
 }
+
 .vas-SpnSelect {
     vertical-align: middle;
     font-size: 28px;
     color: rgba(var(--v-c-primary), 1);
 }
+
 .vas-searchbtn {
     margin-top: 0px;
-    float: right;
-    width: 70px;
-    height: 38px;
+    height: 35px;
+    padding: 5px 12px;
 }
 
 .vas-spacediv {
@@ -1057,20 +1066,24 @@ html[dir="rtl"] .vas-sql-result-msg {
     height: 45px;
     padding: 10px 10px 0 10px;
     background-color: rgba(var(--v-c-secondary), .8);
+    background: rgb(235 235 235);
 }
-.vas-poptis-content{
-    height:100%;
+
+.vas-poptis-content {
+    height: 100%;
 }
+
 .vas-tis-filteroverlay {
     background: rgba(0 0 0 / 2%);
     position: absolute;
     width: 100%;
     height: 100%;
-    z-index:950;
+    z-index: 950;
     display: none;
 }
+
 .vas-tis-paddingspn {
-    margin-left:10px;
+    margin-left: 10px;
 }
 
 .vas-tis-gridimg {
@@ -1080,6 +1093,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     align-items: center;
     gap: 6px;
 }
+
 .vas-tis-filterspn {
     width: 35px;
     height: 35px;
@@ -1092,7 +1106,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     justify-content: center;
     color: inherit;
     font-size: 1.5rem;
-    float:right;
+    float: right;
 }
 
 .vas-tis-filter .dropdown-toggle::after {
@@ -1102,7 +1116,42 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-srm-filterIcon {
     font-size: 1.2rem;
 }
-.vas-tis-filterPopupWrap{
-    padding-top:40px;
+
+.vas-tis-filterPopupWrap {
+    padding-top: 40px;
+}
+
+.vas-tis-bpstyling {
+    display: block;
+    white-space: nowrap;
+    max-width: 72%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+.vas-tis-leftsidewrap {
+    float: left;
+    max-width: 260px;
+    height: calc(100% - 100px);
+    padding-bottom: 10px;
+    padding-top: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: rgb(235 235 235);
+}
+.vas-tis-lablels {
+    background: rgb(235 235 235);
+}
+.vas-tis-leftbuttondiv {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.vas-tis-subtotal {
+    width: 157px;
+    float: right;
+}
+.vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
+    background: rgb(235,235,235) !important;
 }
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
