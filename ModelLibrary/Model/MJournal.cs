@@ -896,11 +896,31 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         public String PrepareIt()
         {
             log.Info(ToString());
-            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.PrepareIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (m_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
             }
+
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
 
             //	Std Period open?
@@ -1013,6 +1033,13 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
 
+            //VIS-383 29/04/2024 User Validation After PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (m_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);
             m_justPrepared = true;
@@ -1047,6 +1074,30 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         /// <returns>new status (Complete, In Progress, Invalid, Waiting ..)</returns>
         public String CompleteIt()
         {
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.CompleteIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before Complete
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (m_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             //	Re-Check
             if (!m_justPrepared)
             {
@@ -1056,7 +1107,6 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                     return status;
                 }
             }
-
             // JID_1290: Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
 
@@ -1066,13 +1116,15 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 ApproveIt();
             }
             log.Info(ToString());
-            //	User Validation
-            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+
+            //VIS-383: 29/04/2024 User Validation After Complete
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
             if (valid != null)
             {
                 m_processMsg = valid;
                 return DocActionVariables.STATUS_INVALID;
             }
+
             //
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
@@ -1133,6 +1185,33 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         public Boolean VoidIt()
         {
             log.Info(ToString());
+
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for VoidIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.VoidIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_None);
+                    return true;
+                }
+            }
+
+            //VIS-383: 29/04/2024 User Validation Before VoidIT
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (m_processMsg != null)
+            {
+                return false;
+            }
+
+
             if (DOCSTATUS_Drafted.Equals(GetDocStatus())
                 || DOCSTATUS_Invalid.Equals(GetDocStatus()))
             {
@@ -1149,6 +1228,14 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                                     WHERE GL_JournalLine_ID IN (SELECT GL_JournalLine_ID FROM GL_JournalLine 
                                     WHERE GL_Journal_ID =   " + GetGL_Journal_ID() + ") ", null, Get_Trx());
 
+                //VIS-383: 29/04/2024 User Validation After VoidIt
+                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+                if (valid != null)
+                {
+                    m_processMsg = valid;
+                    return false;
+                }
+
                 SetProcessed(true);
                 SetDocAction(DOCACTION_None);
                 return true;
@@ -1163,6 +1250,36 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         public Boolean CloseIt()
         {
             log.Info(ToString());
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CloseIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.CloseIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    //User can set value for Processed and DocAction field
+                    return true;
+                }
+            }
+            //VIS-383: 29/04/2024 User Validation Before Close
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (m_processMsg != null)
+            {
+                return false;
+            }
+
+            //VIS-383: 29/04/2024 User Validation After Close
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
+            if (valid != null)
+            {
+                m_processMsg = valid;
+                return false;
+            }
             if (DOCSTATUS_Completed.Equals(GetDocStatus()))
             {
                 SetProcessed(true);
@@ -1178,6 +1295,39 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         /// <returns> true if success </returns>
         public Boolean ReverseCorrectIt()
         {
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReverseCorrectIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.ReverseCorrectIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocStatus(DOCSTATUS_Reversed);
+                    SetDocAction(DOCACTION_None);
+                    return true;
+                }
+            }
+            //VIS-383: 29/04/2024 User Validation Before ReverseCorrect
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (m_processMsg != null)
+            {
+                return false;
+            }
+
+            //VIS-383: 29/04/2024 User Validation After ReverseCorrect
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
+            if (valid != null)
+            {
+                m_processMsg = valid;
+                return false;
+            }
+
             return ReverseCorrectIt(GetGL_JournalBatch_ID()) != null;
         }	//	reverseCorrectIt
 
@@ -1396,6 +1546,37 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         public Boolean ReActivateIt()
         {
             log.Info(ToString());
+
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReActivateIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.ReActivateIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    //User can set value for Processed and DocAction field
+                    return true;
+                }
+            }
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
+            if (m_processMsg != null)
+            {
+                return false;
+            }
+
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
+            if (m_processMsg != null)
+            {
+                return false;
+            }
+
             return false;
         }	//	reActivateIt
 
