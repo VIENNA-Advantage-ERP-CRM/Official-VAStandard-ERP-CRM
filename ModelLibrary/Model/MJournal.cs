@@ -896,11 +896,31 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         public String PrepareIt()
         {
             log.Info(ToString());
-            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.PrepareIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (m_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
             }
+
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
 
             //	Std Period open?
@@ -1013,6 +1033,13 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
 
+            //VIS-383 29/04/2024 User Validation After PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (m_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);
             m_justPrepared = true;
@@ -1051,8 +1078,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
-                _processMsg = this.ModelAction.CompleteIt(out skipBase);
-                if (!String.IsNullOrEmpty(_processMsg))
+                m_processMsg = this.ModelAction.CompleteIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
                 {
                     return DocActionVariables.STATUS_INVALID;
                 }
@@ -1065,8 +1092,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
             //VIS-383 29/04/2024 User Validation Before Complete
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (m_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
             }
@@ -1094,7 +1121,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
             if (valid != null)
             {
-                _processMsg = valid;
+                m_processMsg = valid;
                 return DocActionVariables.STATUS_INVALID;
             }
 
@@ -1163,8 +1190,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
-                _processMsg = this.ModelAction.VoidIt(out skipBase);
-                if (!String.IsNullOrEmpty(_processMsg))
+                m_processMsg = this.ModelAction.VoidIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
                 {
                     return false;
                 }
@@ -1178,8 +1205,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             }
 
             //VIS-383: 29/04/2024 User Validation Before VoidIT
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (m_processMsg != null)
             {
                 return false;
             }
@@ -1205,7 +1232,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
                 if (valid != null)
                 {
-                    _processMsg = valid;
+                    m_processMsg = valid;
                     return false;
                 }
 
@@ -1227,8 +1254,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
-                _processMsg = this.ModelAction.CloseIt(out skipBase);
-                if (!String.IsNullOrEmpty(_processMsg))
+                m_processMsg = this.ModelAction.CloseIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
                 {
                     return false;
                 }
@@ -1240,8 +1267,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
             //VIS-383: 29/04/2024 User Validation Before Close
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (m_processMsg != null)
             {
                 return false;
             }
@@ -1250,7 +1277,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
             if (valid != null)
             {
-                _processMsg = valid;
+                m_processMsg = valid;
                 return false;
             }
             if (DOCSTATUS_Completed.Equals(GetDocStatus()))
@@ -1272,8 +1299,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
-                _processMsg = this.ModelAction.ReverseCorrectIt(out skipBase);
-                if (!String.IsNullOrEmpty(_processMsg))
+                m_processMsg = this.ModelAction.ReverseCorrectIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
                 {
                     return false;
                 }
@@ -1287,8 +1314,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
             //VIS-383: 29/04/2024 User Validation Before ReverseCorrect
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (m_processMsg != null)
             {
                 return false;
             }
@@ -1297,7 +1324,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
             if (valid != null)
             {
-                _processMsg = valid;
+                m_processMsg = valid;
                 return false;
             }
 
@@ -1524,8 +1551,8 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
-                _processMsg = this.ModelAction.ReActivateIt(out skipBase);
-                if (!String.IsNullOrEmpty(_processMsg))
+                m_processMsg = this.ModelAction.ReActivateIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
                 {
                     return false;
                 }
@@ -1537,15 +1564,15 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
             //VIS-383: 29/04/2024 User Validation Before ReActivateIt
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
+            if (m_processMsg != null)
             {
                 return false;
             }
 
             //VIS-383: 29/04/2024 User Validation After ReActivateIt
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
-            if (_processMsg != null)
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
+            if (m_processMsg != null)
             {
                 return false;
             }

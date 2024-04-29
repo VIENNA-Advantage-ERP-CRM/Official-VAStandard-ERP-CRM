@@ -1011,9 +1011,29 @@ namespace VAdvantage.Model
         public String PrepareIt()
         {
             log.Info(ToString());
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.PrepareIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before PrepareIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (_processMsg != null)
+            {
                 return DocActionVariables.STATUS_INVALID;
+            }
 
             //	Std Period open?
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), MDocBaseType.DOCBASETYPE_CASHJOURNAL, GetAD_Org_ID()))
@@ -1087,6 +1107,13 @@ namespace VAdvantage.Model
             SetStatementDifference(difference);
             //	setEndingBalance(getBeginningBalance().add(getStatementDifference()));
             //
+            //VIS-383 29/04/2024 User Validation After PrepareIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             _justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);

@@ -2673,7 +2673,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
 
-            //VIS-383 18/04/2024 :-Implement Skip Base functionality for PrepareIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -2685,15 +2685,17 @@ namespace VAdvantage.Model
 
                 if (skipBase)
                 {
-                    if (!DOCACTION_Complete.Equals(GetDocAction()))
-                        SetDocAction(DOCACTION_Complete);
-                    return DocActionVariables.STATUS_INPROGRESS;
-                }  
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
             }
-
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+            //VIS-383 29/04/2024 User Validation Before PrepareIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (_processMsg != null)
+            {
                 return DocActionVariables.STATUS_INVALID;
+            }
 
             //	Std Period open?
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(),
@@ -2868,6 +2870,14 @@ namespace VAdvantage.Model
                 _processMsg = valid;
                 return DocActionVariables.STATUS_INVALID;
             }
+
+            //VIS-383 29/04/2024 User Validation After PrepareIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             _justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
                 SetDocAction(DOCACTION_Complete);

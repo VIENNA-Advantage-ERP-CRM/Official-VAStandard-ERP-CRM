@@ -375,7 +375,25 @@ namespace VAdvantage.Model
         public String PrepareIt()
         {
             log.Info(ToString());
-            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for PrepareIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                m_processMsg = this.ModelAction.PrepareIt(out skipBase);
+                if (!String.IsNullOrEmpty(m_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (m_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
@@ -448,6 +466,12 @@ namespace VAdvantage.Model
                 }
             }
 
+            //VIS-383 29/04/2024 User Validation After PrepareIt
+            m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (m_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
 
             m_justPrepared = true;
             if (!DOCACTION_Complete.Equals(GetDocAction()))
