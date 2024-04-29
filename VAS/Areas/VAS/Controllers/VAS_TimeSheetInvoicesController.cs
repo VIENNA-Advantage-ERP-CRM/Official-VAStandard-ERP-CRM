@@ -24,7 +24,7 @@ namespace VAS.Areas.VAS.Controllers
             dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
             Ctx ctx = Session["ctx"] as Ctx;
             VAS_TimeSheetInvoice invoiceTimeSheet = new VAS_TimeSheetInvoice();
-            Dictionary<string,int> columnData = invoiceTimeSheet.GetColumnIds(ctx, columnDataArray);
+            Dictionary<string, int> columnData = invoiceTimeSheet.GetColumnIds(ctx, columnDataArray);
             return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
         }
 
@@ -46,11 +46,11 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="toDate">toDate</param>
         /// <returns>List of data For time recording of task</returns>
         /// <author>VIS_427</author>
-        public ActionResult LoadGridData(int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID, string R_Request_ID, string C_Task_ID, string FromDate, string toDate,int pageNo,int pageSize)
+        public ActionResult LoadGridData(int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID, string R_Request_ID, string C_Task_ID, string FromDate, string toDate, string TaskType, int pageNo, int pageSize)
         {
             Ctx ctx = Session["ctx"] as Ctx;
             VAS_TimeSheetInvoice invoiceTimeSheet = new VAS_TimeSheetInvoice();
-            return Json(JsonConvert.SerializeObject(invoiceTimeSheet.LoadGridData(ctx, AD_Client_ID, AD_Org_ID, C_BPartner_ID, S_Resource_ID, TimExpenSeDoc, C_Project_ID, R_Request_ID, C_Task_ID, FromDate, toDate, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(invoiceTimeSheet.LoadGridData(ctx, AD_Client_ID, AD_Org_ID, C_BPartner_ID, S_Resource_ID, TimExpenSeDoc, C_Project_ID, R_Request_ID, C_Task_ID, FromDate, toDate, TaskType, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
         }
         /// <summary>
         ///This Functionis used for generating invoice

@@ -34,17 +34,18 @@ namespace VASLogic.Models
         /// <param name="S_Resource_ID">S_Resource_ID</param>
         /// <param name="TimExpenSeDoc">TimExpenSeDoc</param>
         /// <param name="toDate">toDate</param>
+        /// <param name="TaskType">TaskType</param>
         /// <returns>List of data For time recording of task</returns>
         /// <author>VIS_427</author>
         public List<TimeRecordingData> LoadGridData(Ctx ctx, int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID,
-            string R_Request_ID, string C_Task_ID, string FromDate, string toDate, int pageNo, int pageSize)
+            string R_Request_ID, string C_Task_ID, string FromDate, string toDate, string TaskType, int pageNo, int pageSize)
         {
             DataRow[] drPhaseData = null;
             int countRecords = 0;
             sql.Clear();
             List<TimeRecordingData> timeRecordingDataList = new List<TimeRecordingData>();
             // when Time Expense or Task record is not selected than make value as 0
-            if (TimExpenSeDoc.Length==0 && C_Task_ID.Length > 0)
+            if (TimExpenSeDoc.Length == 0 && C_Task_ID.Length > 0)
             {
                 TimExpenSeDoc = "0";
             }
@@ -69,7 +70,8 @@ namespace VASLogic.Models
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID,cust.VA009_PaymentMethod_ID,0 AS VA075_Task_ID,st.C_Uom_ID,um.Name as UomName, 
                         NULL AS ValidFrom,
                         sc.DateReport AS RecordingDate, NULL AS EstimatedTime,cust.C_PaymentTerm_ID,0 as PriceList,
-                        0 as PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,st.S_TimeExpenseLine_ID,0 As VA075_WorkOrderOperation_ID,cust.Pic
+                        0 as PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,st.S_TimeExpenseLine_ID,0 As VA075_WorkOrderOperation_ID,cust.Pic,
+                        img.ImageExtension,p.AD_Image_ID
                         FROM S_TimeExpense sc
                         INNER JOIN S_TimeExpenseLine st ON (st.S_TimeExpense_ID=sc.S_TimeExpense_ID)
                         INNER JOIN C_BPartner emp ON (sc.C_BPartner_ID=emp.C_BPartner_ID AND emp.IsEmployee='Y')
@@ -77,6 +79,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_BPartner_Location cbl ON (cbl.C_BPartner_ID = cust.C_BPartner_ID)
                         LEFT OUTER JOIN C_Charge c ON (st.C_Charge_ID = c.C_Charge_ID)
                         LEFT OUTER JOIN M_Product p ON (st.M_Product_ID = p.M_Product_ID)
+                        LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
                         LEFT OUTER JOIN R_Request rq ON (st.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (st.C_Project_ID = cp.C_Project_ID)
                         LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND st.C_ProjectPhase_ID=cpp.C_ProjectPhase_ID)
@@ -114,7 +117,7 @@ namespace VASLogic.Models
             }
             if (FromDate != string.Empty && toDate != string.Empty)
             {
-                sql.Append(@" and sc.DateReport BETWEEN " +
+                sql.Append(@" AND TRUNC(sc.DateReport) BETWEEN " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(FromDate), true)));
                 sql.Append(@" AND " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
@@ -134,7 +137,8 @@ namespace VASLogic.Models
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID, cust.VA009_PaymentMethod_ID,wo.VA075_Task_ID,wo.C_Uom_ID,
                         um.Name as UomName,NULL AS ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
-                        cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic
+                        cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic,
+                        NULL AS ImageExtension,NULL AS AD_Image_ID
                         FROM VA075_WorkOrderOperation wo
                         INNER JOIN VA075_Task st ON (st.VA075_Task_ID=wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID=wo.S_Resource_ID)
@@ -174,9 +178,15 @@ namespace VASLogic.Models
                 {
                     sql.Append(" AND wo.R_Request_ID IN (" + R_Request_ID + ") ");
                 }
+                /*Here If tasktype is billable then records shown will be billabe else it will show non billable records
+                if task type is null then it will return all records*/
+                if (TaskType.Length > 0)
+                {
+                    sql.Append(TaskType == "BL" ? " AND st.VA075_IsBillable='Y' " : " AND st.VA075_IsBillable='N' ");
+                }
                 if (FromDate != string.Empty && toDate != string.Empty)
                 {
-                    sql.Append(@" and wo.VA075_TaskEndDate BETWEEN " +
+                    sql.Append(@" AND TRUNC(wo.VA075_TaskEndDate) BETWEEN " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(FromDate), true)));
                     sql.Append(@"AND " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
@@ -193,21 +203,23 @@ namespace VASLogic.Models
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID, cb.VA009_PaymentMethod_ID,wo.VA075_Task_ID,wo.C_Uom_ID,
                         um.Name as UomName,mpv.ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
-                        cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic
+                        cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic,
+                        img.ImageExtension,p.AD_Image_ID
                         FROM VA075_WorkOrderOperation wo
-                        INNER JOIN VA075_Task st ON(st.VA075_Task_ID = wo.VA075_Task_ID)
-                        INNER JOIN S_Resource rs ON(rs.S_Resource_ID = wo.S_Resource_ID)
-                        INNER JOIN C_BPartner cb ON(wo.C_BPartner_ID = cb.C_BPartner_ID AND  cb.IsCustomer = 'Y')
+                        INNER JOIN VA075_Task st ON (st.VA075_Task_ID = wo.VA075_Task_ID)
+                        INNER JOIN S_Resource rs ON (rs.S_Resource_ID = wo.S_Resource_ID)
+                        INNER JOIN C_BPartner cb ON (wo.C_BPartner_ID = cb.C_BPartner_ID AND  cb.IsCustomer = 'Y')
                         LEFT OUTER JOIN C_BPartner_Location cbl ON(cbl.C_BPartner_ID = cb.C_BPartner_ID)
-                        INNER JOIN M_Product p ON(wo.M_Product_ID = p.M_Product_ID)
-                        LEFT OUTER JOIN R_Request rq ON(wo.R_Request_ID = rq.R_Request_ID)
-                        LEFT OUTER JOIN C_Project cp ON(wo.C_Project_ID = cp.C_Project_ID)
-                        LEFT OUTER JOIN C_ProjectPhase cpp ON(cpp.C_Project_ID = cp.C_Project_ID AND wo.C_ProjectPhase_ID= cpp.C_ProjectPhase_ID)
-                        INNER JOIN M_PriceList mp on(mp.M_PriceList_ID = wo.M_PriceList_ID)
+                        INNER JOIN M_Product p ON (wo.M_Product_ID = p.M_Product_ID)
+                        LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
+                        LEFT OUTER JOIN R_Request rq ON (wo.R_Request_ID = rq.R_Request_ID)
+                        LEFT OUTER JOIN C_Project cp ON (wo.C_Project_ID = cp.C_Project_ID)
+                        LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND wo.C_ProjectPhase_ID= cpp.C_ProjectPhase_ID)
+                        INNER JOIN M_PriceList mp ON (mp.M_PriceList_ID = wo.M_PriceList_ID)
                         INNER JOIN M_PriceList_Version mpv ON (mpv.M_PriceList_ID = mp.M_PriceList_ID)
                         LEFT OUTER JOIN M_ProductPrice pp ON ( pp.M_PriceList_Version_ID = mpv.M_PriceList_Version_ID AND pp.M_Product_ID=wo.M_Product_ID)
-                        INNER JOIN C_Currency cy ON(cy.C_Currency_ID = wo.C_Currency_ID)
-                        INNER JOIN C_Uom um ON(um.C_Uom_ID = wo.C_Uom_ID)
+                        INNER JOIN C_Currency cy ON (cy.C_Currency_ID = wo.C_Currency_ID)
+                        INNER JOIN C_Uom um ON (um.C_Uom_ID = wo.C_Uom_ID)
                         WHERE wo.C_Invoice_ID IS NULL AND wo.AD_Client_ID = " + AD_Client_ID + " AND " +
                             "mpv.ValidFrom=(SELECT MAX(ValidFrom) AS max_validfrom FROM M_PriceList_Version WHERE M_PriceList_ID=wo.M_PriceList_ID) AND wo.VA075_IsTaskPerformed='Y'");
 
@@ -237,9 +249,15 @@ namespace VASLogic.Models
                 {
                     sql.Append(" AND wo.R_Request_ID IN (" + R_Request_ID + ") ");
                 }
+                /*Here If tasktype is billable then records shown will be billabe else it will show non billable records
+                if task type is null then it will return all records*/
+                if (TaskType.Length > 0)
+                {
+                    sql.Append(TaskType == "BL" ? " AND st.VA075_IsBillable='Y' " : " AND st.VA075_IsBillable='N' ");
+                }
                 if (FromDate != string.Empty && toDate != string.Empty)
                 {
-                    sql.Append(@" and wo.VA075_TaskEndDate BETWEEN " +
+                    sql.Append(@" AND TRUNC(wo.VA075_TaskEndDate) BETWEEN " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(FromDate), true)));
                     sql.Append(@"AND " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
@@ -281,7 +299,7 @@ namespace VASLogic.Models
                     timeRecordingDataObj.VA009_PaymentMethod_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA009_PaymentMethod_ID"]);
                     timeRecordingDataObj.C_Location_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_BPartner_Location_ID"]);
                     timeRecordingDataObj.C_Uom_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Uom_ID"]);
-                    timeRecordingDataObj.ISO_Code= Util.GetValueOfString(ds.Tables[0].Rows[i]["CurrencyName"]);
+                    timeRecordingDataObj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurrencyName"]);
                     timeRecordingDataObj.UomName = Util.GetValueOfString(ds.Tables[0].Rows[i]["UomName"]);
                     timeRecordingDataObj.LocationName = Util.GetValueOfString(ds.Tables[0].Rows[i]["LocationName"]);
                     timeRecordingDataObj.C_PaymentTerm_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_PaymentTerm_ID"]);
@@ -319,10 +337,15 @@ namespace VASLogic.Models
                     }
                     timeRecordingDataObj.RecordedDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["RecordingDate"]);
                     timeRecordingDataObj.EstimatedTime = Util.GetValueOfString(ds.Tables[0].Rows[i]["EstimatedTime"]);
-                    if(Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0){
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    {
                         string extension = ".png";
                         timeRecordingDataObj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + extension;
 
+                    }
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Image_ID"]) > 0)
+                    {
+                        timeRecordingDataObj.productImgUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Image_ID"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
                     }
                     timeRecordingDataObj.countRecords = countRecords;
                     timeRecordingDataList.Add(timeRecordingDataObj);
@@ -513,9 +536,9 @@ namespace VASLogic.Models
         {
             sql.Clear();
             sql.Append("SELECT cd.C_DocType_ID FROM C_DocType cd INNER JOIN C_DocBaseType cbd ON " +
-                             " (cbd.DocBaseType = cd.DocBaseType) WHERE cd.IsActive = 'Y' AND cd.IsSOTrx='Y' AND cd.IsReturnTrx='N' AND cbd.DocBaseType='ARI' " +
-                              " AND cbd.AD_Org_ID IN " +
-                              " (0," + AD_Org_ID + ")  AND cbd.AD_Client_ID IN (0," + AD_Client_ID + ") ORDER BY cbd.AD_Client_ID DESC ,cbd.AD_Org_ID DESC");
+                             " (cbd.DocBaseType = cd.DocBaseType) WHERE cd.IsActive = 'Y' AND cd.IsSOTrx='Y' AND cd.IsReturnTrx='N' AND cd.IsExpenseInvoice = 'N' AND cbd.DocBaseType='ARI' " +
+                              " AND cd.AD_Org_ID IN " +
+                              " (0," + AD_Org_ID + ")  AND cd.AD_Client_ID IN (0," + AD_Client_ID + ") ORDER BY cd.AD_Org_ID DESC, cd.AD_Client_ID DESC ");
 
             C_DocType_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             return C_DocType_ID;
@@ -597,7 +620,6 @@ namespace VASLogic.Models
                     int invDeletedCount = Util.GetValueOfInt(CoreLibrary.DataBase.DB.ExecuteQuery(deleteSql, null));
                     if (invDeletedCount > 0)
                     {
-                        errorMessage.Append(Msg.GetMsg(ctx, "VAS_InvoiceDeleted"));
                         invoiceList.RemoveAll(invoiceDetail => invoicesToDelete.Contains(invoiceDetail.Invoice_ID));
                     }
                 }
@@ -632,21 +654,25 @@ namespace VASLogic.Models
         /// <param name="ColumnData">Data of the Column</param>
         /// <returns>Dictionary with column name and column id</returns>
         /// <author>VIS_427 </author>
-        public Dictionary<string,int> GetColumnIds(Ctx ct, dynamic columnDataArray)
+        public Dictionary<string, int> GetColumnIds(Ctx ct, dynamic columnDataArray)
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
-                foreach (var item in columnDataArray)
-                {
-                    // Extract column name and table name
-                    string ColumnName = item.ColumnName;
-                    string TableName = item.TableName;
+            foreach (var item in columnDataArray)
+            {
+                // Extract column name and table name
+                string ColumnName = item.ColumnName;
+                string TableName = item.TableName;
 
-                    // Construct SQL query to retrieve AD_Column_ID
-                    string sql = @"SELECT AD_Column_ID FROM AD_Column 
+                // Construct SQL query to retrieve AD_Column_ID
+                string sql = @"SELECT AD_Column_ID FROM AD_Column 
                                WHERE ColumnName ='" + ColumnName + @"' 
                                AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='" + TableName + @"')";
-                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-                }
+                ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+            }
+            if (Env.IsModuleInstalled("VA075_"))
+            {
+                ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAS_TaskType'", null,null));
+            }
             return ColumnInfo;
         }
         public class TimeRecordingData
@@ -691,6 +717,8 @@ namespace VASLogic.Models
             public int VA075_WorkOrderOperation_ID { get; set; }
             public int Pic_ID { get; set; }
             public string ImageUrl { get; set; }
+
+            public string productImgUrl { get; set; }
             public string ISO_Code { get; set; }
             public List<ProjectPhaseInfo> PhaseInfo { get; set; }
 
