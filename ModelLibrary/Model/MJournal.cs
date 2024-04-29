@@ -1047,16 +1047,6 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         /// <returns>new status (Complete, In Progress, Invalid, Waiting ..)</returns>
         public String CompleteIt()
         {
-            //	Re-Check
-            if (!m_justPrepared)
-            {
-                String status = PrepareIt();
-                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
-                {
-                    return status;
-                }
-            }
-
             //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
             if (this.ModelAction != null)
             {
@@ -1074,7 +1064,6 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                     return DocActionVariables.STATUS_COMPLETED;
                 }
             }
-
             //VIS-383 29/04/2024 User Validation Before Complete
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
             if (_processMsg != null)
@@ -1082,6 +1071,15 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            //	Re-Check
+            if (!m_justPrepared)
+            {
+                String status = PrepareIt();
+                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
+                {
+                    return status;
+                }
+            }
             // JID_1290: Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
 
@@ -1161,7 +1159,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         {
             log.Info(ToString());
 
-            //VIS-383 25/04/2024 :-Implement Skip Base functionality for VoidIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for VoidIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -1179,7 +1177,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 }
             }
 
-            //VIS-383: 25/04/2024 User Validation Before VoidIT
+            //VIS-383: 29/04/2024 User Validation Before VoidIT
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
             if (_processMsg != null)
             {
@@ -1202,6 +1200,14 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 DB.ExecuteQuery(@"Update GL_LineDimension  SET Amount = 0
                                     WHERE GL_JournalLine_ID IN (SELECT GL_JournalLine_ID FROM GL_JournalLine 
                                     WHERE GL_Journal_ID =   " + GetGL_Journal_ID() + ") ", null, Get_Trx());
+
+                //VIS-383: 29/04/2024 User Validation After VoidIt
+                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+                if (valid != null)
+                {
+                    _processMsg = valid;
+                    return false;
+                }
 
                 SetProcessed(true);
                 SetDocAction(DOCACTION_None);
@@ -1530,14 +1536,14 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                     return true;
                 }
             }
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
             if (_processMsg != null)
             {
                 return false;
             }
 
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
             if (_processMsg != null)
             {

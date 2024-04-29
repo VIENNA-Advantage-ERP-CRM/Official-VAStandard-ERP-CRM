@@ -1122,13 +1122,6 @@ namespace VAdvantage.Model
         public String CompleteIt()
         {
             ValueNamePair pp = null;
-            //	Re-Check
-            if (!_justPrepared)
-            {
-                String status = PrepareIt();
-                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
-                    return status;
-            }
 
             //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
             if (this.ModelAction != null)
@@ -1147,7 +1140,6 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_COMPLETED;
                 }
             }
-
             //VIS-383 29/04/2024 User Validation Before Complete
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
             if (_processMsg != null)
@@ -1155,6 +1147,13 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            //	Re-Check
+            if (!_justPrepared)
+            {
+                String status = PrepareIt();
+                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
+                    return status;
+            }
             //9-6-2016 if ending balance < 0 then not to be completed
             if (GetEndingBalance() < 0)
             {
@@ -2094,7 +2093,6 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-
             //VIS-383: 03/04/2024 User Validation Before VoidIT
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
             if (_processMsg != null)
@@ -2145,6 +2143,14 @@ namespace VAdvantage.Model
                     _processMsg = Msg.GetMsg(GetCtx(), "CashbookNotSaved") + " - " + pp.GetName();
                 else
                     _processMsg = Msg.GetMsg(GetCtx(), "CashbookNotSaved");
+                return false;
+            }
+
+            //VIS-383: 29/04/2024 User Validation After VoidIt
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (valid != null)
+            {
+                _processMsg = valid;
                 return false;
             }
 
@@ -2258,7 +2264,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
 
-            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CloseIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReActivateIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -2274,14 +2280,14 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
             if (_processMsg != null)
             {
                 return false;
             }
 
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
             if (_processMsg != null)
             {

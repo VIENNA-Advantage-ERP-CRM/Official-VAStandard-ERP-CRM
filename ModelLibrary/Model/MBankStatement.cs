@@ -485,25 +485,6 @@ namespace VAdvantage.Model
         /// <returns>new status (Complete, In Progress, Invalid, Waiting ..)</returns>
         public String CompleteIt()
         {
-            //added by shubham (JID_1472) To check payment is complete or close
-            int docStatus = Util.GetValueOfInt(DB.ExecuteScalar("SELECT count(c_payment_id) FROM c_payment WHERE c_payment_id in ((SELECT c_payment_id from c_bankstatementline WHERE c_bankstatement_id =" + GetC_BankStatement_ID() + " AND c_payment_id > 0)) AND docstatus NOT IN ('CO' , 'CL')", null, Get_Trx()));
-            if (docStatus != 0)
-            {
-                m_processMsg = Msg.GetMsg(GetCtx(), "paymentnotcompleted");
-                return DocActionVariables.STATUS_INVALID;
-
-            }
-            //shubham
-            //	Re-Check
-            if (!m_justPrepared)
-            {
-                String status = PrepareIt();
-                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
-                {
-                    return status;
-                }
-            }
-
             //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
             if (this.ModelAction != null)
             {
@@ -526,6 +507,25 @@ namespace VAdvantage.Model
             if (m_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
+            }
+
+            //added by shubham (JID_1472) To check payment is complete or close
+            int docStatus = Util.GetValueOfInt(DB.ExecuteScalar("SELECT count(c_payment_id) FROM c_payment WHERE c_payment_id in ((SELECT c_payment_id from c_bankstatementline WHERE c_bankstatement_id =" + GetC_BankStatement_ID() + " AND c_payment_id > 0)) AND docstatus NOT IN ('CO' , 'CL')", null, Get_Trx()));
+            if (docStatus != 0)
+            {
+                m_processMsg = Msg.GetMsg(GetCtx(), "paymentnotcompleted");
+                return DocActionVariables.STATUS_INVALID;
+
+            }
+            //shubham
+            //	Re-Check
+            if (!m_justPrepared)
+            {
+                String status = PrepareIt();
+                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
+                {
+                    return status;
+                }
             }
 
             //	Implicit Approval
@@ -640,7 +640,6 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-
             //VIS-383: 29/04/2024 User Validation Before VoidIT
             m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
             if (m_processMsg != null)
@@ -784,6 +783,15 @@ namespace VAdvantage.Model
             ba.SetCurrentBalance(Decimal.Subtract(ba.GetCurrentBalance(), voidedDifference));
             ba.SetUnMatchedBalance(Decimal.Add(ba.GetUnMatchedBalance(), transactionAmt));   //Arpit
             ba.Save(Get_TrxName());
+
+            //VIS-383: 29/04/2024 User Validation After VoidIt
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (valid != null)
+            {
+                m_processMsg = valid;
+                return false;
+            }
+
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -840,7 +848,7 @@ namespace VAdvantage.Model
         {
             log.Info("reverseCorrectIt - " + ToString());
 
-            //VIS-383 18/04/2024 :-Implement Skip Base functionality for ReverseCorrectIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReverseCorrectIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -858,14 +866,14 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-            //VIS-383: 03/04/2024 User Validation Before ReverseCorrect
+            //VIS-383: 29/04/2024 User Validation Before ReverseCorrect
             m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
             if (m_processMsg != null)
             {
                 return false;
             }
 
-            //VIS-383: 03/04/2024 User Validation After ReverseCorrect
+            //VIS-383: 29/04/2024 User Validation After ReverseCorrect
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
             if (valid != null)
             {
@@ -894,7 +902,7 @@ namespace VAdvantage.Model
         {
             log.Info("reActivateIt - " + ToString());
 
-            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CloseIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReActivateIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -910,7 +918,7 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
             m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
             if (m_processMsg != null)
             {
@@ -918,7 +926,7 @@ namespace VAdvantage.Model
             }
 
 
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
             m_processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
             if (m_processMsg != null)
             {

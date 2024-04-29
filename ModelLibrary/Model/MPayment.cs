@@ -2902,14 +2902,6 @@ namespace VAdvantage.Model
          */
         public String CompleteIt()
         {
-            //	Re-Check
-            if (!_justPrepared)
-            {
-                String status = PrepareIt();
-                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
-                    return status;
-            }
-
             //VIS-383 18/04/2024 :-Implement Skip Base functionality for CompleteIt
             if (this.ModelAction != null)
             {
@@ -2927,13 +2919,20 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_COMPLETED;
                 }
             }
-
             //VIS-383 03/04/2024 User Validation Before Complete
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
             if (_processMsg != null)
             {
                 return DocActionVariables.STATUS_INVALID;
             }
+            //	Re-Check
+            if (!_justPrepared)
+            {
+                String status = PrepareIt();
+                if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
+                    return status;
+            }
+           
             // Set Document Date based on setting on Document Type
             SetCompletedDocumentDate();
 
@@ -3497,7 +3496,7 @@ namespace VAdvantage.Model
 
             //VIS-383: 03/04/2024 User Validation After Complete
             //	User Validation
-            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+            String valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_COMPLETE);
             if (valid != null)
             {
                 _processMsg = valid;
@@ -5383,7 +5382,6 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-
             //VIS-383: 03/04/2024 User Validation Before VoidIT
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
             if (_processMsg != null)
@@ -5528,6 +5526,22 @@ namespace VAdvantage.Model
         public Boolean CloseIt()
         {
             log.Info(ToString());
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CloseIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.CloseIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    //User can set value for Processed and DocAction field
+                    return true;
+                }
+            }
             //VIS-383: 03/04/2024 User Validation Before Close
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
             if (_processMsg != null)
@@ -5578,7 +5592,6 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-
             //VIS-383: 03/04/2024 User Validation Before ReverseCorrect
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
             if (_processMsg != null)
@@ -6030,6 +6043,19 @@ namespace VAdvantage.Model
                     //User can set value for Processed and DocAction field
                     return true;
                 }
+            }
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
+            if (_processMsg != null)
+            {
+                return false;
             }
 
             if (ReverseCorrectIt())

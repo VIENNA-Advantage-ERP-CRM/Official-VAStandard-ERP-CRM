@@ -2859,6 +2859,31 @@ namespace VAdvantage.Model
         {
             string timeEstimation = " start at  " + DateTime.Now.ToUniversalTime() + " - ";
             log.Warning("TStart time of invoice completion : " + DateTime.Now.ToUniversalTime());
+
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.CompleteIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+            //VIS-383 29/04/2024 User Validation Before Complete
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             try
             {
                 decimal creditLimit = 0;
@@ -2871,32 +2896,6 @@ namespace VAdvantage.Model
                     if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
                         return status;
                 }
-
-                //VIS-383 29/04/2024 :-Implement Skip Base functionality for CompleteIt
-                if (this.ModelAction != null)
-                {
-                    bool skipBase = false;
-                    _processMsg = this.ModelAction.CompleteIt(out skipBase);
-                    if (!String.IsNullOrEmpty(_processMsg))
-                    {
-                        return DocActionVariables.STATUS_INVALID;
-                    }
-
-                    if (skipBase)
-                    {
-                        SetProcessed(true);
-                        SetDocAction(DOCACTION_Close);
-                        return DocActionVariables.STATUS_COMPLETED;
-                    }
-                }
-
-                //VIS-383 29/04/2024 User Validation Before Complete
-                _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
-                if (_processMsg != null)
-                {
-                    return DocActionVariables.STATUS_INVALID;
-                }
-
                 // Set Document Date based on setting on Document Type
                 SetCompletedDocumentDate();
 
@@ -6564,6 +6563,14 @@ namespace VAdvantage.Model
                 return ReverseCorrectIt();
             }
 
+            //VIS-383: 29/04/2024 User Validation After VoidIt
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6618,7 +6625,7 @@ namespace VAdvantage.Model
         /// <returns>return true if success</returns>
         public bool ReverseCorrectIt()
         {
-            //VIS-383 18/04/2024 :-Implement Skip Base functionality for ReverseCorrectIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReverseCorrectIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -6636,7 +6643,6 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-
             //VIS-383: 29/04/2024 User Validation Before ReverseCorrect
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
             if (_processMsg != null)
@@ -7185,7 +7191,7 @@ namespace VAdvantage.Model
         {
             log.Info(ToString());
 
-            //VIS-383 29/04/2024 :-Implement Skip Base functionality for CloseIt
+            //VIS-383 29/04/2024 :-Implement Skip Base functionality for ReActivateIt
             if (this.ModelAction != null)
             {
                 bool skipBase = false;
@@ -7201,14 +7207,14 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation Before ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
             if (_processMsg != null)
             {
                 return false;
             }
 
-            //VIS-383: 29/04/2024 User Validation Before Close
+            //VIS-383: 29/04/2024 User Validation After ReActivateIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
             if (_processMsg != null)
             {
