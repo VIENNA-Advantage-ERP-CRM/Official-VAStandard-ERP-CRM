@@ -123,9 +123,9 @@ namespace ViennaAdvantage.Process
                             string currencySourceName = Util.GetValueOfString(dsSource.Tables[0].Rows[0]["URL"]);
                             string apiKey = Util.GetValueOfString(dsSource.Tables[0].Rows[0]["ApiKey"]);
 
-                            if (!String.IsNullOrEmpty(currencySourceName) && currencySourceName.ToLower().Contains("pwebapps.ezv.admin.ch"))
+                            if (!String.IsNullOrEmpty(currencySourceName) && currencySourceName.ToLower().Contains("rates.bazg.admin.ch"))
                             {
-                                doc = XDocument.Load("http://www.pwebapps.ezv.admin.ch/apps/rates/rate/getxml?activeSearchType=userDefinedDay");
+                                doc = XDocument.Load("https://www.backend-rates.bazg.admin.ch/api/xmldaily");
                             }
                             else if (!String.IsNullOrEmpty(currencySourceName) && currencySourceName.ToLower().Contains("api.bnm.gov.my"))
                             {
@@ -160,7 +160,7 @@ namespace ViennaAdvantage.Process
                                         myCurrency = ds.Tables[0].Rows[i]["ISO_Code"].ToString();
                                         myCurrencyID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Currency_ID"]);
 
-                                        if (!String.IsNullOrEmpty(currencySourceName) && currencySourceName.ToLower().Contains("pwebapps.ezv.admin.ch"))
+                                        if (!String.IsNullOrEmpty(currencySourceName) && currencySourceName.ToLower().Contains("rates.bazg.admin.ch"))
                                         {
                                             currencyQty = "";
                                             exchangeRate = 0;
