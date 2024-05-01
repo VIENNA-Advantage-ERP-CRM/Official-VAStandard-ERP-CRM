@@ -81,6 +81,7 @@ namespace VAdvantage.Model
 
         private String _budgetMessage = String.Empty;
         private string _budgetNotDefined = string.Empty;
+        private string _budgetBreachLineIDs = string.Empty;
 
         #endregion
 
@@ -4618,6 +4619,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             List<BudgetControl> _budgetControl = new List<BudgetControl>();
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
+            _budgetBreachLineIDs = string.Empty;
 
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
@@ -4651,6 +4653,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 dsRecordData = BudgetControlling();
                 if (dsRecordData != null && dsRecordData.Tables.Count > 0 && dsRecordData.Tables[0].Rows.Count > 0)
                 {
+                    //VIS383: Bug ID-5698 31/04/24:-Update or set "Budget Breach" is false for all order line
+                     int cnt = DB.ExecuteQuery("UPDATE C_OrderLine SET IsBudgetBreach ='N' WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx());
+                    
                     // datarows of Debit values which to be controlled
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
@@ -4678,6 +4683,17 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                                     _budgetControl = ReduceAmountFromBudget(drRecordData[i], drBudgetControl[j], drBudgetControlDimension, _budgetControl);
 
                                 }
+                            }
+                        }
+                        //VIS383: Bug ID-5698 30/04/24:-Update or set "Budget Breach" is true only when budget exceed for order line
+                        if (!string.IsNullOrEmpty(_budgetBreachLineIDs))
+                        {
+                            _budgetBreachLineIDs = _budgetBreachLineIDs.TrimEnd(',');
+                            string sqlBudBreach = "UPDATE C_OrderLine SET IsBudgetBreach ='Y' WHERE C_OrderLine_ID IN(" + _budgetBreachLineIDs + ")";
+                            int i = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
+                            if (i < 1)
+                            {
+                                log.Info("Budget breach not found on order complete" + sqlBudBreach.ToString());
                             }
                         }
                     }
@@ -4798,9 +4814,19 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                                               (x.UserElement8_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement8) ? Util.GetValueOfInt(drDataRecord["UserElement8_ID"]) : 0)) &&
                                               (x.UserElement9_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement9) ? Util.GetValueOfInt(drDataRecord["UserElement9_ID"]) : 0))
                                              );
-                _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
-                if (_budgetControl.ControlledAmount < 0)
+
+                //VIS383: Bug ID-5698 30/04/24:-Handle budget breach functionality for order line
+                decimal availableAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                if (availableAmount >= 0)
                 {
+                    _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                }
+                if (availableAmount < 0)
+                {
+                    if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
+                    {
+                        _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
+                    }
                     if (!_budgetMessage.Contains(Util.GetValueOfString(drBUdgetControl["BudgetName"])))
                     {
                         _budgetMessage += Util.GetValueOfString(drBUdgetControl["BudgetName"]) + " - "
@@ -6240,7 +6266,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>true if success</returns>
         public bool VoidIt()
         {
-           MOrderLine[] lines = GetLines(true, "M_Product_ID");
+            MOrderLine[] lines = GetLines(true, "M_Product_ID");
             log.Info(ToString());
 
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -7108,6 +7134,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         public int UserElement9_ID { get; set; }
         public int UserList1_ID { get; set; }
         public int UserList2_ID { get; set; }
+        public string BudgetBreachLine_IDs { get; set; }
         public Decimal ControlledAmount { get; set; }
         public String WhereClause { get; set; }
         public Decimal AvailableBudget { get; set; }
