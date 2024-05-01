@@ -41,6 +41,7 @@ namespace VAdvantage.Model
 
         String _budgetMessage = String.Empty;
         private string _budgetNotDefined = string.Empty;
+        private string _budgetBreachLineIDs = string.Empty;
 
         /**
         * 	Standard Constructor
@@ -638,6 +639,7 @@ namespace VAdvantage.Model
             List<BudgetControl> _budgetControl = new List<BudgetControl>();
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
+            _budgetBreachLineIDs = string.Empty;
 
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
@@ -670,6 +672,9 @@ namespace VAdvantage.Model
                 dsRecordData = BudgetControlling();
                 if (dsRecordData != null && dsRecordData.Tables.Count > 0)
                 {
+                    //VIS383: Bug ID-5698 31/04/24:-Update or set "Budget Breach" is false for all requisition line
+                    int cnt = DB.ExecuteQuery("UPDATE M_RequisitionLine SET IsBudgetBreach ='N' WHERE M_Requisition_ID =" + GetM_Requisition_ID(), null, Get_Trx());
+
                     // datarows of Debit values which to be controlled
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
@@ -697,6 +702,17 @@ namespace VAdvantage.Model
                                     _budgetControl = ReduceAmountFromBudget(drRecordData[i], drBudgetControl[j], drBudgetControlDimension, _budgetControl);
 
                                 }
+                            }
+                        }
+                        //VIS383: Bug ID-5698 30/04/24:-Update or set "Budget Breach" is true only when budget exceed for requisition line
+                        if (!string.IsNullOrEmpty(_budgetBreachLineIDs))
+                        {
+                            _budgetBreachLineIDs = _budgetBreachLineIDs.TrimEnd(',');
+                            string sqlBudBreach = "UPDATE M_RequisitionLine SET IsBudgetBreach ='Y' WHERE M_RequisitionLine_ID IN(" + _budgetBreachLineIDs + ")";
+                            cnt = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
+                            if (cnt < 1)
+                            {
+                                log.Info("Budget breach not found on requisition complete" + sqlBudBreach.ToString());
                             }
                         }
                     }
@@ -816,14 +832,28 @@ namespace VAdvantage.Model
                                               (x.UserElement8_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement8) ? Util.GetValueOfInt(drDataRecord["UserElement8_ID"]) : 0)) &&
                                               (x.UserElement9_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement9) ? Util.GetValueOfInt(drDataRecord["UserElement9_ID"]) : 0))
                                              );
-                _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
-                if (_budgetControl.ControlledAmount < 0)
+
+                //VIS383: Bug ID-5698 30/04/24:-Handle budget breach functionality for requisition line
+                decimal availableAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                if (availableAmount >= 0)
                 {
+                    _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                }
+
+                if (availableAmount < 0)
+                {
+                    //VIS383: Bug ID-5698 01/05/24:-Added Line ID in valiable seprated with comma for set "Budget Breach" is true
+                    if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
+                    {
+                        _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
+                    }
+
                     if (!_budgetMessage.Contains(Util.GetValueOfString(drBUdgetControl["BudgetName"])))
                     {
                         _budgetMessage += Util.GetValueOfString(drBUdgetControl["BudgetName"]) + " - "
                                             + Util.GetValueOfString(drBUdgetControl["ControlName"]) + ", ";
                     }
+
                     log.Info("Budget Exceed - " + Util.GetValueOfString(drBUdgetControl["BudgetName"]) + " - "
                                         + Util.GetValueOfString(drBUdgetControl["ControlName"]) + " - (" + _budgetControl.ControlledAmount + ") - Table ID : " +
                                         Util.GetValueOfInt(drDataRecord["LineTable_ID"]) + " - Record ID : " + Util.GetValueOfInt(drDataRecord["Line_ID"]));
@@ -1308,7 +1338,7 @@ namespace VAdvantage.Model
                     selectedTable = ds.Tables[0].Select("DocStatus='CO'");
                     if (selectedTable.Length > 0)
                     {
-                         SelectedValues = selectedTable.AsEnumerable().Select(s => s.Field<string>("DocumentNo")).ToArray();
+                        SelectedValues = selectedTable.AsEnumerable().Select(s => s.Field<string>("DocumentNo")).ToArray();
                         _processMsg = Msg.GetMsg(GetCtx(), "VA097_ReactivateRfq" + " : " + string.Join(",", SelectedValues));
                         return false;
                     }
