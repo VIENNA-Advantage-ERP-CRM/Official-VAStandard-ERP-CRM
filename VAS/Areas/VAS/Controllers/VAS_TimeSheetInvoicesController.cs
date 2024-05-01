@@ -44,6 +44,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="S_Resource_ID">S_Resource_ID</param>
         /// <param name="TimExpenSeDoc">TimExpenSeDoc</param>
         /// <param name="toDate">toDate</param>
+        /// /// <param name="TaskType">Task Type</param>
         /// <returns>List of data For time recording of task</returns>
         /// <author>VIS_427</author>
         public ActionResult LoadGridData(int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID, string R_Request_ID, string C_Task_ID, string FromDate, string toDate, string TaskType, int pageNo, int pageSize)
@@ -67,7 +68,9 @@ namespace VAS.Areas.VAS.Controllers
             Ctx ctx = Session["ctx"] as Ctx;
             VAS_TimeSheetInvoice invoiceTimeSheet = new VAS_TimeSheetInvoice();
             string _Paydata = invoiceTimeSheet.GenerateInvoice(ctx, dataTobeInvoice, AD_Client_ID, AD_Org_ID);
-            return Json(JsonConvert.SerializeObject(_Paydata), JsonRequestBehavior.AllowGet);
+            var invoiceData = Json(JsonConvert.SerializeObject(_Paydata), JsonRequestBehavior.AllowGet);
+            invoiceData.MaxJsonLength = int.MaxValue;
+            return invoiceData;
         }
 
     }

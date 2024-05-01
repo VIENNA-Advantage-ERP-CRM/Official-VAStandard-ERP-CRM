@@ -55,6 +55,7 @@
         var ProjectDiv = null;
         var RequestDiv = null;
         var TaskDiv = null;
+        var TaskTypeAtApply = null;
         this.btnToggel = null;
         this.spnSelect = null;
         this.btnSpaceDiv = null;
@@ -313,7 +314,7 @@
                 "<button id='btnSpace_" + $self.windowNo + "' class='vis-archive-sb-t-button' ><i class='vis vis-arrow-left'></i></button></div>" +
                 "<div id='spnSelect_" + $self.windowNo + "' class='vas-RecordSelection'>" +
                 "<div class='vas-SelectDiv'>" +
-                "<label id='spnSelect_" + $self.windowNo + "' class='VIS_Pref_Label_Font vas-SpnSelect'>" + VAS.translatedTexts.VAS_RecordSelection + "</label></div>" +
+                "<label id='spnSelectRecord_" + $self.windowNo + "' class='VIS_Pref_Label_Font vas-SpnSelect'>" + VAS.translatedTexts.VAS_RecordSelection + "</label></div>" +
                 "<div class='vas-tis-filter dropdown'>" +
                 "<span class='vas-tis-filterspn btn d-flex position-relative' type='button' id='vas_tis_dropdownMenu_" + $self.windowNo + "'>" +
                 "<i class='fa fa-filter vas-tis-filterIcon'></i>" +
@@ -323,7 +324,7 @@
                 "</div>");
 
             $self.btnSpaceDiv = $self.topDiv.find("#btnSpaceDiv_" + $self.windowNo);
-
+            $self.recordDiv = $self.topDiv.find("#spnSelect_" + $self.windowNo);
             $self.LeftsideDiv = $("<div id='sideDiv_" + $self.windowNo + "' class='vas-tis-leftsidewrap vis-leftsidebarouterwrap px-3'>");
             $self.LeftsideDiv.css("height", "100%");
             $self.SearchBtn = $("<input id='SearchBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.Search + "'>");
@@ -331,7 +332,7 @@
             $self.bottumDiv = $("<div class='vis-info-btmcnt-wrap vis-p-t-10 vas-BottomBtnDiv'>");
             $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2'>" + VAS.translatedTexts.VAS_Preview + "</button>");
             $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
-            LeftButtonDiv.append($self.SearchBtn).append($self.RefreshBtn);
+            LeftButtonDiv.append($self.RefreshBtn).append($self.SearchBtn);
             $self.LeftsideDiv.append(LeftSideFields).append(LeftButtonDiv);
             $self.bottumDiv.append($self.GenerateInvBtn).append($self.PreviewBtn);
 
@@ -342,29 +343,40 @@
 
         /* this function is used to load the column and data on grid*/
         function dynInit(data) {
-
+            //get the color on load of Grid data
+            var hue = Math.floor(Math.random() * (360 - 0)) + 0;
+            var v = Math.floor(Math.random() * (75 - 60 + 1)) + 60;
+            var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
             if ($self.dGrid != null) {
                 $self.dGrid.destroy();
                 $self.dGrid = null;
             }
             if ($self.arrListColumns.length == 0) {
-                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '13%', min: 50, hidden: true });
+                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '5%', min: 50, hidden: true });
                 $self.arrListColumns.push({
 
-                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '38%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '33%', min: 120, hidden: false, render: function (record, index, col_index) {
                         return '<a href="#" class="vas-decoration-style">' + record['DocumentNo'] + '</a>';
                     }, editable: { type: 'text' }
                 });
                 $self.arrListColumns.push({
-                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '30%', min: 150, hidden: false, render: function (record) {
+                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '28%', min: 120, hidden: false, render: function (record) {
                         var div;
+                        //Extarcted the first character of business partner 
+                        var custChar = '';
+                        var custNameArr = record["C_BPartner"].trim().split(' ');
+                        custChar = custNameArr[0].substring(0, 1).toUpper();
+                        if (custNameArr.length > 1) {
+                            custChar += custNameArr[custNameArr.length - 1].substring(0, 1).toUpper();
+                        } else {
+                            custChar = custNameArr[0].substring(0, 2).toUpper();
+                        }
                         if (record["ImageUrl"] != null) {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
                                 '<img class="vas-businessPartnerImg" alt="' + record["ImageUrl"] + '" src="' + VIS.Application.contextUrl + record["ImageUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["C_BPartner"] + '</div>'
                             '</div>';
                         } else {
-                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
-                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_CustImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["C_BPartner"] + '</div>'
+                            div = '<div style="float:left ;background-color:' + pastel + '" class="vis-grid-row-td-icon"><span style="font-size: 16px;">' + custChar + '</span></div>' + '<div class="vas-tis-bpstyling">' + record["C_BPartner"] + '</div>'
                             '</div>';
                         }
                         return div;
@@ -372,35 +384,43 @@
                 });
                 $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '16%', min: 150, hidden: false });
                 $self.arrListColumns.push({
-                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '30%', min: 150, hidden: false, render: function (record) {
+                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '25%', min: 100, hidden: false, render: function (record) {
                         var div;
+                        //Extarcted the first character of Product 
+                        var prodChar = '';
+                        var prodNameArr = record["M_Product"].trim().split(' ');
+                        prodChar = prodNameArr[0].substring(0, 1).toUpper();
+                        if (prodNameArr.length > 1) {
+                            prodChar += prodNameArr[prodNameArr.length - 1].substring(0, 1).toUpper();
+                        } else {
+                            prodChar = prodNameArr[0].substring(0, 2).toUpper();
+                        }
                         if (record["productImgUrl"] != null) {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
                                 '<img class="vas-businessPartnerImg" alt="' + record["productImgUrl"] + '" src="' + VIS.Application.contextUrl + record["productImgUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
                             '</div>';
                         } else {
-                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
-                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_ProductImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            div = '<div style="float:left;background-color:' + pastel + '" class="vis-grid-row-td-icon"><span style="font-size: 16px;">' + prodChar + '</span></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"]  + '</div>'
                             '</div>';
                         }
                         return div;
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Qty', caption: VAS.translatedTexts.Qty, sortable: true, size: '8%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Qty', caption: VAS.translatedTexts.Qty, sortable: true, size: '5%', min: 100, hidden: false, render: function (record, index, col_index) {
                         var val = record["Qty"] + " " + record["UomName"];
                         return val;
                     }
                 })
                 $self.arrListColumns.push({
-                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '16%', min: 150, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
+                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '16%', min: 120, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
                         var val = record["Price"];
                         precision = record["StdPrecision"];
-                        return '<a href="#" class="vas-decoration-style right-align">' + parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + '</a>';
+                        return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 150, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 120, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
@@ -881,6 +901,9 @@
         * @param {any} data
         */
         function PreviewDyinit(data) {
+            var hue = Math.floor(Math.random() * (360 - 0)) + 0;
+            var v = Math.floor(Math.random() * (75 - 60 + 1)) + 60; //Math.floor(Math.random() * 16) + 75;
+            var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
             $self.PreviewColumns = [];
             if ($self.dGridPreview != null) {
                 $self.dGridPreview.destroy();
@@ -890,20 +913,28 @@
                 $self.PreviewColumns.push({
                     field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 150, hidden: false, render: function (record) {
                         var div;
+                        //Extarcted the first character of Product 
+                        var prodChar = '';
+                        var prodNameArr = record["M_Product"].trim().split(' ');
+                        prodChar = prodNameArr[0].substring(0, 1).toUpper();
+                        if (prodNameArr.length > 1) {
+                            prodChar += prodNameArr[prodNameArr.length - 1].substring(0, 1).toUpper();
+                        } else {
+                            prodChar = prodNameArr[0].substring(0, 2).toUpper();
+                        }
                         if (record["productImgUrl"] != null) {
                             div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
                                 '<img class="vas-businessPartnerImg" alt="' + record["productImgUrl"] + '" src="' + VIS.Application.contextUrl + record["productImgUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
                             '</div>';
                         } else {
-                            div = '<div class="vas-tis-gridimg vis-gridImageicon">' +
-                                '<div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="' + VAS.translatedTexts.VAS_ProductImage + '"></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
+                            div = '<div style="float:left;margin:6px;background-color:' + pastel + '" class="vis-grid-row-td-icon"><span style="font-size: 16px;">' + prodChar + '</span></div>' + '<div class="vas-tis-prodicon" style"text-overflow: ellipsis;">' + record["M_Product"] + '</div>'
                             '</div>';
                         }
                         return div;
                     }
                 });
                 $self.PreviewColumns.push({
-                    field: 'Price', caption: VAS.translatedTexts.Price, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Price', caption: VAS.translatedTexts.Price, size: '16%', sortable: true, size: '16%', min: 150, style: 'text-align:right;', hidden: false, render: function (record, index, col_index) {
                         var val = record["Price"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
@@ -911,13 +942,10 @@
                 });
                 $self.PreviewColumns.push({ field: "UomName", caption: VAS.translatedTexts.VAS_UomName, sortable: true, size: '16%', min: 150, hidden: false });
                 $self.PreviewColumns.push({
-                    field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
-                        var val = record["Qty"] + " " + record["UomName"];
-                        return val;
-                    }
+                    field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, 
                 })
                 $self.PreviewColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, style: 'text-align:right;', size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
                         SubTotal = SubTotal + record["Amount"];
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
@@ -1038,11 +1066,7 @@
             });
             //Restricting to not generate invoice for records whose Price is zero
             if (gridDataWithZeroPrice.length > 0) {
-                var message = VAS.translatedTexts.VAS_ZeroPriceFor;
-                for (var i = 0; i < gridDataWithZeroPrice.length; i++) {
-                    message += gridDataWithZeroPrice[i].DocumentNo + ', '; // Assuming C_BPartner is a string
-                }
-                VIS.ADialog.info(message);
+                VIS.ADialog.info(VAS.translatedTexts.VAS_ZeroPriceFor);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
@@ -1164,7 +1188,13 @@
                 $TaskTypeDiv.append($TaskTypeButtonWrap);
                 TaskTypeDiv.append($TaskTypeDiv);
 
-                $FilterHeader.append(TimeDiv).append(TaskDiv).append(ProjectDiv).append(RequestDiv).append(TaskTypeDiv);;
+                $FilterHeader.append(TimeDiv).append(TaskDiv).append(ProjectDiv).append(RequestDiv).append(TaskTypeDiv);
+                if (TaskTypeAtApply != null) {
+                    $self.vTaskType.setValue(TaskTypeAtApply);
+                }
+                else {
+                    $self.vTaskType.setValue(null);
+                }
             }
             else {
                 $FilterHeader.append(TimeDiv).append(ProjectDiv).append(RequestDiv);
@@ -1180,10 +1210,23 @@
             $FilterDiv.append($FilterHeader);
             //On click of apply button The data will be filtered according to selected filters
             $ApplyButton.on("click", function () {
+                if ($FromDate.getValue() == null || $ToDate.getValue() == null) {
+                    VIS.ADialog.info('VAS_DateFieldAreMandatory');
+                    $FromDate.setValue(null);
+                    $ToDate.setValue(null);
+                    return;
+                }
+                if ($FromDate.getValue() > $ToDate.getValue()) {
+                    VIS.ADialog.info('VAS_PlzEnterCorrectDate');
+                    $FromDate.setValue(null);
+                    $ToDate.setValue(null);
+                    return;
+                }
                 AppliedTimeExpData = TimeExpenseData;
                 AppliedTaskData = TaskData;
                 AppliedProjectData = ProjectData;
                 AppliedRequestData = RequestData;
+                TaskTypeAtApply = TaskTypeVal;
                 AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                 gridPgnoInvoice = 1; pageNo = 1;
                 LoadTimeSheetData(pageNo, pageSize, false);
@@ -1427,6 +1470,10 @@
         }
         //This function is used to clear the controls on generating the invoice
         function clearControls() {
+            //if oldvalue of control is same as new/null then set 0
+            if ($self.cmbOrg.oldValue == null) {
+                $self.cmbOrg.setValue(0);
+            }
             $self.cmbOrg.setValue(null);
             $FromDate.setValue(null);
             $ToDate.setValue(null);
@@ -1442,6 +1489,7 @@
             if (btnFilter != null) {
                 btnFilter.on("click", function () {
                     if (!IsFilterBtnClicked) {
+                        $self.setBusy(true);
                         //storing oldvalue on click of filter button
                         TimeExpenseData = JSON.parse(JSON.stringify(AppliedTimeExpData));
                         TaskData = JSON.parse(JSON.stringify(AppliedTaskData));
@@ -1459,9 +1507,11 @@
                         if (ProjectData.length == 0) {
                             ProjectId = [];
                         }
+                      
                         FilterDisplay();
                         GetSelectedFilterVal();
                         IsFilterBtnClicked = true;
+                        $self.setBusy(false);
                     }
                     else {
                         $FilterHeader.remove();
@@ -1472,11 +1522,15 @@
             }
             if (this.RefreshBtn != null) {
                 this.RefreshBtn.on(VIS.Events.onTouchStartOrClick, function () {
+                    $self.setBusy(true);
                     //on refresh clearing the values
                     dynInit(null);
                     clearVariables();
                     clearControls();
                     removeControlsSelectedDiv()
+                    $CustomerSelected = $('<div class="vas-tis-dropdown-lbl">');
+                    $ResourceSelected = $('<div class="vas-tis-dropdown-lbl">');
+                    $self.setBusy(false);
                 });
             }
             //On clcik of search button the data will beloaded on grid
@@ -1543,6 +1597,7 @@
 
                     toggleside = false;
                     $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
+                    $self.recordDiv.animate({ width: selectDivWidth }, "slow")
                     $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
                     $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
@@ -1576,6 +1631,7 @@
                     LeftSideFields.css("display", "none");
                     $self.SearchBtn.css("display", "none");
                     $self.RefreshBtn.css("display", "none");
+                    $self.recordDiv.animate({ width: selectDivFullWidth }, "slow")
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
                         $self.dGrid.resize();
                     });
@@ -1589,21 +1645,16 @@
             selectDivFullWidth = w - (20 + minSideWidth);
             if (toggleside == true) {
                 $self.btnSpaceDiv.animate({ width: minSideWidth }, "slow");
+                $self.recordDiv.animate({ width: selectDivFullWidth }, "slow")
                 $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
                 $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
                     $self.dGrid.resize();
                 });
             }
             else {
-                //If vlue is true then seth width 310
-                if (IsSizeChangeOnLoad) {
-                    $self.btnSpaceDiv.animate({ width: 310 }, "slow");
-                    IsSizeChangeOnLoad = false;
-                }
-                else {
-                    $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
-                }
+                $self.btnSpaceDiv.animate({ width: sideDivWidth }, "slow");
                 $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
+                $self.recordDiv.animate({ width: selectDivWidth }, "slow")
                 $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
                     $self.dGrid.resize();
                 });
@@ -1621,6 +1672,8 @@
             PreviewFilteredGridData = [];
             TimeExpenseId = [];
             RequestId = [];
+            TaskTypeVal = null;
+            TaskTypeAtApply = null;
             ResourceId = [];
             TaskId = [];
             CustomerId = [];
