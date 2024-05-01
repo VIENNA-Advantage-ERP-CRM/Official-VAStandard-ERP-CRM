@@ -352,7 +352,7 @@
                 $self.dGrid = null;
             }
             if ($self.arrListColumns.length == 0) {
-                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '5%', min: 50, hidden: true });
+                $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '1%', min: 50, hidden: true });
                 $self.arrListColumns.push({
 
                     field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '33%', min: 120, hidden: false, render: function (record, index, col_index) {
@@ -1212,13 +1212,10 @@
             $ApplyButton.on("click", function () {
                 if ($FromDate.getValue() == null || $ToDate.getValue() == null) {
                     VIS.ADialog.info('VAS_DateFieldAreMandatory');
-                    $FromDate.setValue(null);
-                    $ToDate.setValue(null);
                     return;
                 }
                 if ($FromDate.getValue() > $ToDate.getValue()) {
                     VIS.ADialog.info('VAS_PlzEnterCorrectDate');
-                    $FromDate.setValue(null);
                     $ToDate.setValue(null);
                     return;
                 }
@@ -1538,13 +1535,10 @@
                 this.SearchBtn.on(VIS.Events.onTouchStartOrClick, function () {
                     if ($FromDate.getValue() == null || $ToDate.getValue() == null) {
                         VIS.ADialog.info('VAS_DateFieldAreMandatory');
-                        $FromDate.setValue(null);
-                        $ToDate.setValue(null);
                         return;
                     }
                     if ($FromDate.getValue() > $ToDate.getValue()) {
                         VIS.ADialog.info('VAS_PlzEnterCorrectDate');
-                        $FromDate.setValue(null);
                         $ToDate.setValue(null);
                         return;
                     }

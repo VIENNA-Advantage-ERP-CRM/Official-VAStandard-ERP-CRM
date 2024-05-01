@@ -45,7 +45,7 @@ namespace VASLogic.Models
             sql.Clear();
             List<TimeRecordingData> timeRecordingDataList = new List<TimeRecordingData>();
             // when Time Expense or Task record is not selected and task type has value than make value as 0
-            if ((TimExpenSeDoc.Length == 0 && C_Task_ID.Length > 0) || (TaskType != null && TaskType != ""))
+            if ((TimExpenSeDoc.Length == 0 && C_Task_ID.Length > 0) || !string.IsNullOrEmpty(TaskType))
             {
                 TimExpenSeDoc = "0";
             }
