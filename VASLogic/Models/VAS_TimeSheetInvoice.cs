@@ -44,8 +44,8 @@ namespace VASLogic.Models
             int countRecords = 0;
             sql.Clear();
             List<TimeRecordingData> timeRecordingDataList = new List<TimeRecordingData>();
-            // when Time Expense or Task record is not selected than make value as 0
-            if (TimExpenSeDoc.Length == 0 && C_Task_ID.Length > 0)
+            // when Time Expense or Task record is not selected and task type has value than make value as 0
+            if ((TimExpenSeDoc.Length == 0 && C_Task_ID.Length > 0) || !string.IsNullOrEmpty(TaskType))
             {
                 TimExpenSeDoc = "0";
             }
@@ -71,7 +71,7 @@ namespace VASLogic.Models
                         NULL AS ValidFrom,
                         sc.DateReport AS RecordingDate, NULL AS EstimatedTime,cust.C_PaymentTerm_ID,0 as PriceList,
                         0 as PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,st.S_TimeExpenseLine_ID,0 As VA075_WorkOrderOperation_ID,cust.Pic,
-                        img.ImageExtension,p.AD_Image_ID
+                        img.ImageExtension,p.AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM S_TimeExpense sc
                         INNER JOIN S_TimeExpenseLine st ON (st.S_TimeExpense_ID=sc.S_TimeExpense_ID)
                         INNER JOIN C_BPartner emp ON (sc.C_BPartner_ID=emp.C_BPartner_ID AND emp.IsEmployee='Y')
@@ -80,6 +80,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_Charge c ON (st.C_Charge_ID = c.C_Charge_ID)
                         LEFT OUTER JOIN M_Product p ON (st.M_Product_ID = p.M_Product_ID)
                         LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cust.Pic)
                         LEFT OUTER JOIN R_Request rq ON (st.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (st.C_Project_ID = cp.C_Project_ID)
                         LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND st.C_ProjectPhase_ID=cpp.C_ProjectPhase_ID)
@@ -138,12 +139,13 @@ namespace VASLogic.Models
                         um.Name as UomName,NULL AS ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
                         cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic,
-                        NULL AS ImageExtension,NULL AS AD_Image_ID
+                        NULL AS ImageExtension,NULL AS AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
                         INNER JOIN VA075_Task st ON (st.VA075_Task_ID=wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID=wo.S_Resource_ID)
                         INNER JOIN C_BPartner cust ON (wo.C_BPartner_ID=cust.C_BPartner_ID AND  cust.IsCustomer='Y')
                         LEFT OUTER JOIN C_BPartner_Location cbl ON (cbl.C_BPartner_ID = cust.C_BPartner_ID)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cust.Pic)
                         INNER JOIN C_Charge c ON (wo.C_Charge_ID = c.C_Charge_ID)
                         LEFT OUTER JOIN R_Request rq ON (wo.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (wo.C_Project_ID = cp.C_Project_ID)
@@ -204,7 +206,7 @@ namespace VASLogic.Models
                         um.Name as UomName,mpv.ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
                         cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic,
-                        img.ImageExtension,p.AD_Image_ID
+                        img.ImageExtension,p.AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
                         INNER JOIN VA075_Task st ON (st.VA075_Task_ID = wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID = wo.S_Resource_ID)
@@ -212,6 +214,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_BPartner_Location cbl ON(cbl.C_BPartner_ID = cb.C_BPartner_ID)
                         INNER JOIN M_Product p ON (wo.M_Product_ID = p.M_Product_ID)
                         LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
                         LEFT OUTER JOIN R_Request rq ON (wo.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (wo.C_Project_ID = cp.C_Project_ID)
                         LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND wo.C_ProjectPhase_ID= cpp.C_ProjectPhase_ID)
@@ -339,8 +342,7 @@ namespace VASLogic.Models
                     timeRecordingDataObj.EstimatedTime = Util.GetValueOfString(ds.Tables[0].Rows[i]["EstimatedTime"]);
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
                     {
-                        string extension = ".png";
-                        timeRecordingDataObj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + extension;
+                        timeRecordingDataObj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["custImgExtension"]);
 
                     }
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Image_ID"]) > 0)

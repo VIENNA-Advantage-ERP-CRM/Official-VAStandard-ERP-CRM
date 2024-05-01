@@ -819,6 +819,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     background: white;
     Max-height: 474px;
     overflow: auto;
+    margin-top: 10px;
 }
 
 .vas-flyout-header {
@@ -856,7 +857,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     align-items: center;
     margin-bottom: 16px;
     gap: 0px;
-    height: 56px;
+    max-height: 56px;
     overflow: auto;
 }
 
@@ -1096,13 +1097,9 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-filterspn {
     width: 35px;
-    height: 35px;
-    min-width: 35px;
-    min-height: 35px;
     border: 1px solid rgba(var(--v-c-on-secondary), .2);
     border-radius: 50%;
     display: flex;
-    align-items: center;
     justify-content: center;
     color: inherit;
     font-size: 1.5rem;
@@ -1110,7 +1107,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-filter .dropdown-toggle::after {
-    display: none
+    display: none ;
+    
+}
+.vas-tis-filter {
+    margin: -9px
 }
 
 .vas-tis-srm-filterIcon {
@@ -1153,5 +1154,15 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 .vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
     background: rgb(235,235,235) !important;
+}
+.vas-tis-iconcolor {
+    display: inline-block;
+    font-size: 16px;
+}
+.vas-tis-prodicon{
+    padding: 15px 0 0 0px!important;
+    white-space: nowrap!important;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
