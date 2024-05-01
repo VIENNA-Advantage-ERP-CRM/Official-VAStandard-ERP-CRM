@@ -4690,8 +4690,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         {
                             _budgetBreachLineIDs = _budgetBreachLineIDs.TrimEnd(',');
                             string sqlBudBreach = "UPDATE C_OrderLine SET IsBudgetBreach ='Y' WHERE C_OrderLine_ID IN(" + _budgetBreachLineIDs + ")";
-                            int i = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
-                            if (i < 1)
+                            cnt = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
+                            if (cnt < 1)
                             {
                                 log.Info("Budget breach not found on order complete" + sqlBudBreach.ToString());
                             }

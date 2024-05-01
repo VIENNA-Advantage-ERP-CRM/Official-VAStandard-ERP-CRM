@@ -709,8 +709,8 @@ namespace VAdvantage.Model
                         {
                             _budgetBreachLineIDs = _budgetBreachLineIDs.TrimEnd(',');
                             string sqlBudBreach = "UPDATE M_RequisitionLine SET IsBudgetBreach ='Y' WHERE M_RequisitionLine_ID IN(" + _budgetBreachLineIDs + ")";
-                            int i = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
-                            if (i < 1)
+                            cnt = DB.ExecuteQuery(sqlBudBreach, null, Get_Trx());
+                            if (cnt < 1)
                             {
                                 log.Info("Budget breach not found on requisition complete" + sqlBudBreach.ToString());
                             }
