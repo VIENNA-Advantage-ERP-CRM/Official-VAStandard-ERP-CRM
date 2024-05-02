@@ -356,12 +356,12 @@
                 $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '1%', min: 50, hidden: true });
                 $self.arrListColumns.push({
 
-                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_RecordId, sortable: true, size: '20%', min: 100, hidden: false, render: function (record, index, col_index) {
+                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_RecordId, sortable: true, size: '30%', min: 100, hidden: false, render: function (record, index, col_index) {
                         return '<a href="#" class="vas-decoration-style">' + record['DocumentNo'] + '</a>';
                     }, editable: { type: 'text' }
                 });
                 $self.arrListColumns.push({
-                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '18%', min: 120, hidden: false, render: function (record) {
+                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '25%', min: 120, hidden: false, render: function (record) {
                         var div;
                         //Extarcted the first character of business partner 
                         var custChar = '';
@@ -385,7 +385,7 @@
                 });
                 $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '14%', min: 150, hidden: false });
                 $self.arrListColumns.push({
-                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 100, hidden: false, render: function (record) {
+                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '25%', min: 100, hidden: false, render: function (record) {
                         var div;
                         //Extarcted the first character of Product 
                         var prodChar = '';
@@ -414,14 +414,14 @@
                     }
                 })
                 $self.arrListColumns.push({
-                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '8%', min: 100, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
+                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '10%', min: 100, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
                         var val = record["Price"];
                         precision = record["StdPrecision"];
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '18%', min: 100, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 100, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
