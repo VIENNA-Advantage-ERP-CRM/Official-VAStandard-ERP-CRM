@@ -1068,7 +1068,7 @@
             });
             //Restricting to not generate invoice for records whose Price is zero
             if (gridDataWithZeroPrice.length > 0) {
-                VIS.ADialog.info("",false,VAS.translatedTexts.VAS_ZeroPriceFor);
+                VIS.ADialog.info("", "",VAS.translatedTexts.VAS_ZeroPriceFor);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
