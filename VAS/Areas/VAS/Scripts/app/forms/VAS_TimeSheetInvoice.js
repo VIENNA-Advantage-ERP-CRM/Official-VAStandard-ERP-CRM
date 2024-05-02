@@ -161,7 +161,8 @@
             "VAS_BindPaymentTerm",
             "VAS_Refresh",
             "VAS_ZeroPriceFor",
-            "VAS_TaskType"
+            "VAS_TaskType",
+            "VAS_RecordId"
 
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
@@ -355,12 +356,12 @@
                 $self.arrListColumns.push({ field: "recid", caption: VAS.translatedTexts.VAS_RecordNo, sortable: true, size: '1%', min: 50, hidden: true });
                 $self.arrListColumns.push({
 
-                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_TimeRecordDoc, sortable: true, size: '33%', min: 120, hidden: false, render: function (record, index, col_index) {
+                    field: "DocumentNo", caption: VAS.translatedTexts.VAS_RecordId, sortable: true, size: '20%', min: 100, hidden: false, render: function (record, index, col_index) {
                         return '<a href="#" class="vas-decoration-style">' + record['DocumentNo'] + '</a>';
                     }, editable: { type: 'text' }
                 });
                 $self.arrListColumns.push({
-                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '28%', min: 120, hidden: false, render: function (record) {
+                    field: "C_BPartner", caption: VAS.translatedTexts.VAS_Customer, sortable: true, size: '18%', min: 120, hidden: false, render: function (record) {
                         var div;
                         //Extarcted the first character of business partner 
                         var custChar = '';
@@ -382,9 +383,9 @@
                         return div;
                     }
                 });
-                $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '16%', min: 150, hidden: false });
+                $self.arrListColumns.push({ field: "S_Resource_ID", caption: VAS.translatedTexts.S_Resource_ID, sortable: true, size: '14%', min: 150, hidden: false });
                 $self.arrListColumns.push({
-                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '25%', min: 100, hidden: false, render: function (record) {
+                    field: "M_Product", caption: VAS.translatedTexts.VAS_ProductOrCharge, sortable: true, size: '16%', min: 100, hidden: false, render: function (record) {
                         var div;
                         //Extarcted the first character of Product 
                         var prodChar = '';
@@ -400,7 +401,7 @@
                                 '<img class="vas-businessPartnerImg" alt="' + record["productImgUrl"] + '" src="' + VIS.Application.contextUrl + record["productImgUrl"] + '">' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
                             '</div>';
                         } else {
-                            div = '<div style="float:left;background-color:' + pastel + '" class="vis-grid-row-td-icon"><span style="font-size: 16px;">' + prodChar + '</span></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"]  + '</div>'
+                            div = '<div style="float:left;background-color:' + pastel + '" class="vis-grid-row-td-icon"><span style="font-size: 16px;">' + prodChar + '</span></div>' + '<div class="vas-tis-bpstyling">' + record["M_Product"] + '</div>'
                             '</div>';
                         }
                         return div;
@@ -413,14 +414,14 @@
                     }
                 })
                 $self.arrListColumns.push({
-                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '16%', min: 120, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
+                    field: "Price", caption: VAS.translatedTexts.Price, sortable: true, size: '8%', min: 100, hidden: false, style: 'text-align:right;', editable: { type: 'number' }, render: function (record, index, col_index) {
                         var val = record["Price"];
                         precision = record["StdPrecision"];
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 120, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '18%', min: 100, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
@@ -953,7 +954,8 @@
                     }
                 })
             }
-            w2utils.encodeTags(data);
+            //Identifed and commented line so that records note encode when it has special character
+           // w2utils.encodeTags(data);
             $self.dGridPreview = $($self.PreviewGridDiv).w2grid({
                 name: "GridPreview_" + $self.windowNo,
                 recordHeight: 29,
@@ -978,7 +980,7 @@
                 PreviLeftWrap.append(
                     '<div class="vas-tis-arInvlistItem mb-2" id="C_BpartnerListDiv_' + $self.windowNo + '">' +
                     '<div class="vas-tis-arInvoiceDetails px-2">' +
-                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + PreviewLeftData[i].C_BPartner_ID + '" data-paymethodid="' + PreviewLeftData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + PreviewLeftData[i].M_PriceList_ID + '"> ' + PreviewLeftData[i].C_BPartner + '</span > ' +
+                    '<span class="vas-tis-arInvDetailsDesc" id="C_BPartnerDiv_' + $self.windowNo + '" data-bpid="' + PreviewLeftData[i].C_BPartner_ID + '" data-paymethodid="' + PreviewLeftData[i].VA009_PaymentMethod_ID + '" data-pricelistid="' + PreviewLeftData[i].M_PriceList_ID + '"> ' + VIS.Utility.decodeText(PreviewLeftData[i].C_BPartner) + '</span > ' +
                     '<span class="vas-tis-arInvDetailsDesc">' + VAS.translatedTexts.VAS_RecordCount + ":" + PreviewLeftData[i].recordCount + '</span>' +
                     '<span class="vas-tis-arInvDetailsDesLoc" id="C_BPartnerLocationDiv_' + $self.windowNo + '" data-bplocationid="' + PreviewLeftData[i].C_BPartner_Location_ID + '">' + PreviewLeftData[i].LocationName + '</span>' +
                     '</div>');
@@ -986,7 +988,7 @@
 
             // Create HTML elements for the right side of the dialog
             var PreviewId = "gridSelectDiv_" + $self.windowNo;
-            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + PreviewLeftData[0].C_BPartner + '</h4>')
+            var headTagForBPartner = $('<h4 id="HeadBPTag_' + $self.windowNo + '">' + VIS.Utility.decodeText(PreviewLeftData[0].C_BPartner) + '</h4>')
             $self.PreviewGridDiv = $("<div id='" + PreviewId + "' class='vas-pointdiv'>");
             rightPreviewWrap.append(headTagForBPartner).append($self.PreviewGridDiv);
 
@@ -1043,7 +1045,7 @@
 
                 // Initialize the preview grid with filtered data
                 PreviewDyinit(PreviewFilteredGridData);
-                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(PreviewFilteredGridData[0].C_BPartner);
+                rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(VIS.Utility.decodeText(PreviewFilteredGridData[0].C_BPartner));
                 rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal);
                 SubTotal = 0;
             });
@@ -1062,11 +1064,11 @@
             }
             //getting the records whose price is zero
             var gridDataWithZeroPrice = jQuery.grep(gridDataArray, function (value) {
-                return VIS.Utility.Util.getValueOfInt(value.Price) === 0;
+                return VIS.Utility.Util.getValueOfDecimal(value.Price) === 0;
             });
             //Restricting to not generate invoice for records whose Price is zero
             if (gridDataWithZeroPrice.length > 0) {
-                VIS.ADialog.info(VAS.translatedTexts.VAS_ZeroPriceFor);
+                VIS.ADialog.info("",false,VAS.translatedTexts.VAS_ZeroPriceFor);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
@@ -1166,6 +1168,7 @@
                 $self.vSearchTask = new VIS.Controls.VTextBoxButton("VA075_Task_ID", true, false, true, VIS.DisplayType.MultiKey, TaskLookUp);
                 var $TaskControlWrap = $('<div class="vis-control-wrap">');
                 var $TaskButtonWrap = $('<div class="input-group-append">');
+                $self.vSearchTask.setCustomInfo('VA075_TaskMaster');
                 $TaskDiv.append($TaskControlWrap);
                 $TaskControlWrap.append($self.vSearchTask.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VAS.translatedTexts.VA075_Task_ID + '</label>');
                 $TaskDiv.append($TaskControlWrap);
@@ -1527,6 +1530,9 @@
                     removeControlsSelectedDiv()
                     $CustomerSelected = $('<div class="vas-tis-dropdown-lbl">');
                     $ResourceSelected = $('<div class="vas-tis-dropdown-lbl">');
+                    if ($FilterHeader != null) {
+                        $FilterHeader.remove();
+                    }
                     $self.setBusy(false);
                 });
             }

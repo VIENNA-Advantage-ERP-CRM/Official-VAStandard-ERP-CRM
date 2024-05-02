@@ -126,7 +126,10 @@ namespace VASLogic.Models
 
             if (Env.IsModuleInstalled("VA075_"))
             {
-                sql.Append(@" UNION (SELECT st.Name AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID,rs.Name AS ResourceName, 
+                sql.Append(@" UNION ( SELECT CASE
+                        WHEN wo.VA075_Task_ID IS NOT NULL THEN st.Name
+                        ELSE wo.Description
+                        END AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID,rs.Name AS ResourceName, 
                         NULL AS M_Product_ID,
                         wo.C_Charge_ID,
                         c.Name AS item_name,
@@ -193,7 +196,11 @@ namespace VASLogic.Models
                     sql.Append(@"AND " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
                 }
-                sql.Append(@"UNION SELECT st.Name AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID, rs.Name AS ResourceName, 
+                sql.Append(@"UNION SELECT 
+                        CASE
+                        WHEN wo.VA075_Task_ID IS NOT NULL THEN st.Name
+                        ELSE wo.Description
+                        END AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID, rs.Name AS ResourceName, 
                         wo.M_Product_ID,
                         NULL AS C_Charge_ID,
                         p.Name AS item_name,
