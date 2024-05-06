@@ -490,7 +490,7 @@
                         ArrayOfGrid(event, $self.dGrid, false);
                     }
                     event.onComplete = function () {
-                        if (BPWithoutPaymentTerm.length > 0 || BPWithoutPaymentMethod.length > 0 || BPWithZeroPrice.length > 0) {
+                        if (BPWithoutPaymentTerm.length > 0 || BPWithoutPaymentMethod.length > 0) {
                             UnselectNotConfiguredRecords($self.dGrid);
                         }
                     }
