@@ -4503,14 +4503,7 @@
 
                             }
                             else {
-
-
                                 val = 0;
-
-
-
-
-
                             }
                         }
                         else {
@@ -4519,17 +4512,13 @@
                                 record.changes.AppliedAmt = checkcommaordot(event, record.OpenAmt, record.OpenAmt);
                                 // val = record.changes.AppliedAmt;
                                 val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
-
-
-
-
                             }
                             else {
-                                record.changes.AppliedAmt = checkcommaordot(event, record.changes.AppliedAmt, record.OpenAmt);
+                                /*VIS383: Bug ID-5667 06/05/24:-Comment this code for handle issue, when user clicking on Applied amount of Cash Journal then 
+                                 system is displaying amount in dot(.) format instead of comma(,) for German and Slovenian culture*/
+                                //record.changes.AppliedAmt = checkcommaordot(event, record.changes.AppliedAmt, record.OpenAmt); 
                                 //val = record.changes.AppliedAmt;
                                 val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
-
-
                             }
                         }
                     }
@@ -4611,9 +4600,11 @@
                         if (record.OpenAmt == record.AppliedAmt && parseFloat(record.changes.AppliedAmt) == record.AppliedAmt) {
                             calculate();
                         }
-
                     }
-
+                    /*VIS383: Bug ID-5667 06/05/24:-Handle issue, when user clicking on Applied amount of Cash Journal then system is displaying "NaN" in in slovenian culture*/
+                    if (val.contains('−')) {
+                        val = val.replace('−', '-');
+                    }
                     return parseFloat(val).toLocaleString(navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
                 }
                 //End
@@ -5472,7 +5463,7 @@
             //calculate();
         };
         //end
-
+       
         function cashCellChanged(event) {
             if (readOnlyCash) {
                 event.preventDefault();
@@ -5559,6 +5550,8 @@
 
             }
         };
+        
+
 
         function invoiceCellChanged(event) {
 
