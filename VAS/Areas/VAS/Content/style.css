@@ -1507,6 +1507,12 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-next-row .vas-tis-steps-col.vas-tis-step-null:first-child::after {
     background-color: #b2b2b2;
 }
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-inprogress:first-child::after {
+    background-color: #BC7C7A;
+}
+.vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
+    background-color: #d9a117a6;
+}
 
 
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
