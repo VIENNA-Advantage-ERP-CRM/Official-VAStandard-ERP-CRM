@@ -354,20 +354,13 @@
                 for (var i = 0; i < BPWithoutPaymentTerm.length; i++) {
                     dGrid.unselect(BPWithoutPaymentTerm[i]);
                 }
-                combinedMessage = VAS.translatedTexts.VAS_PaymentTermNotBinded;
             }
             if (BPWithoutPaymentMethod.length > 0) {
                 for (var i = 0; i < BPWithoutPaymentMethod.length; i++) {
                     dGrid.unselect(BPWithoutPaymentMethod[i]);
                 }
-                combinedMessage += VAS.translatedTexts.VAS_PaymentMethodNotBinded;
             }
-            if (BPWithZeroPrice.length > 0) {
-                for (var i = 0; i < BPWithZeroPrice.length; i++) {
-                    dGrid.unselect(BPWithZeroPrice[i]);
-                }
-                combinedMessage += VAS.translatedTexts.VAS_ZeroPriceFor;
-            }
+            combinedMessage = VAS.translatedTexts.VAS_PaymentTermNotBinded;
             VIS.ADialog.info("", "", combinedMessage);
         }
         /* this function is used to load the column and data on grid*/
@@ -781,9 +774,6 @@
                         if (dGrid.records[i].VA009_PaymentMethod_ID == 0) {
                             BPWithoutPaymentMethod.push(dGrid.records[i].recid);
                         }
-                        if (dGrid.records[i].Price == 0) {
-                            BPWithZeroPrice.push(dGrid.records[i].recid);
-                        }
                         else {
                             // Otherwise, populate gridDataArray with all records
                             gridDataArray.push(dGrid.records[i]);
@@ -812,9 +802,6 @@
                     }
                     if (dGrid.records[event.index].VA009_PaymentMethod_ID == 0 && BPWithoutPaymentMethod.indexOf(dGrid.records[event.index].recid) == -1) {
                         BPWithoutPaymentMethod.push(dGrid.records[event.index].recid);
-                    }
-                    if (dGrid.records[event.index].Price == 0 && BPWithZeroPrice.indexOf(dGrid.records[event.index].recid) == -1) {
-                        BPWithZeroPrice.push(dGrid.records[event.index].recid);
                     }
                     else {
                         // Add the selected record to gridDataArray
@@ -1209,6 +1196,14 @@
         function GenerateInvoice(gridDataArray) {
             if (gridDataArray.length == 0) {
                 VIS.ADialog.info('VAS_PlzSelectRecord');
+                return;
+            }
+            var gridDataWithZeroPrice = jQuery.grep(gridDataArray, function (value) {
+                return VIS.Utility.Util.getValueOfDecimal(value.Price) === 0;
+            });
+            //Restricting to not generate invoice for records whose Price is zero
+            if (gridDataWithZeroPrice.length > 0) {
+                VIS.ADialog.info("", false, VAS.translatedTexts.VAS_ZeroPriceFor);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
