@@ -11,7 +11,9 @@
         var AD_Org_ID = null;
         var precision = 2;
         var pageNo = 1;
-        //var pushArr = [];
+        var BPWithoutPaymentTerm = [];
+        var BPWithoutPaymentMethod = [];
+        var BPWithZeroPrice = [];
         var pageSize = 150;
         var TotalRecords = 0;
         var toggleside = false;
@@ -162,8 +164,9 @@
             "VAS_Refresh",
             "VAS_ZeroPriceFor",
             "VAS_TaskType",
-            "VAS_RecordId"
-
+            "VAS_RecordId",
+            "VAS_PaymentMethodNotBinded",
+            "VAS_PaymentTermNotBinded"
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
@@ -341,7 +344,32 @@
             //appended all the design to root
             $self.$root.append($self.topDiv).append($self.LeftsideDiv).append($self.gridSelectDiv).append($self.bottumDiv);
         }
-
+        /**
+        * this fucntion is used to show unselect those record whose configuration is not correct
+        * @param {any} dGrid
+        */
+        function UnselectNotConfiguredRecords(dGrid) {
+            var combinedMessage = '';
+            if (BPWithoutPaymentTerm.length > 0) {
+                for (var i = 0; i < BPWithoutPaymentTerm.length; i++) {
+                    dGrid.unselect(BPWithoutPaymentTerm[i]);
+                }
+                combinedMessage = VAS.translatedTexts.VAS_PaymentTermNotBinded;
+            }
+            if (BPWithoutPaymentMethod.length > 0) {
+                for (var i = 0; i < BPWithoutPaymentMethod.length; i++) {
+                    dGrid.unselect(BPWithoutPaymentMethod[i]);
+                }
+                combinedMessage += VAS.translatedTexts.VAS_PaymentMethodNotBinded;
+            }
+            if (BPWithZeroPrice.length > 0) {
+                for (var i = 0; i < BPWithZeroPrice.length; i++) {
+                    dGrid.unselect(BPWithZeroPrice[i]);
+                }
+                combinedMessage += VAS.translatedTexts.VAS_ZeroPriceFor;
+            }
+            VIS.ADialog.info("", "", combinedMessage);
+        }
         /* this function is used to load the column and data on grid*/
         function dynInit(data) {
             //get the color on load of Grid data
@@ -421,7 +449,7 @@
                     }
                 });
                 $self.arrListColumns.push({
-                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '25%', min: 100, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
+                    field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, sortable: true, size: '18%', min: 100, hidden: false, style: 'text-align:right;', render: function (record, index, col_index) {
                         var val = record["Amount"];
                         precision = record["StdPrecision"]
                         return parseFloat(val).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + " " + record["ISO_Code"];
@@ -451,6 +479,7 @@
                 $self.arrListColumns.push({ field: "VA075_WorkOrderOperation_ID", caption: VAS.translatedTexts.VA075_WorkOrderOperation_ID, sortable: true, size: '16%', min: 150, hidden: true });
                 $self.arrListColumns.push({ field: "S_TimeExpenseLine_ID", caption: VAS.translatedTexts.S_TimeExpenseLine_ID, sortable: true, size: '16%', min: 150, hidden: true });
                 $self.arrListColumns.push({ field: "ISO_Code", caption: VAS.translatedTexts.VAS_ISO_Code, sortable: true, size: '16%', min: 150, hidden: true });
+                $self.arrListColumns.push({ field: "RequestSummary", caption: VAS.translatedTexts.VAS_RequestSummary, sortable: true, size: '16%', min: 150, hidden: true });
             }
 
             w2utils.encodeTags(data);
@@ -467,6 +496,11 @@
                     if ($self.dGrid.records.length > 0) {
                         ArrayOfGrid(event, $self.dGrid, false);
                     }
+                    event.onComplete = function () {
+                        if (BPWithoutPaymentTerm.length > 0 || BPWithoutPaymentMethod.length > 0 || BPWithZeroPrice.length > 0) {
+                            UnselectNotConfiguredRecords($self.dGrid);
+                        }
+                    }
                 },
                 onUnselect: OnUnseletRow,
                 onEditField: function (event) {
@@ -474,15 +508,6 @@
                         // Prevent the default behavior of the grid's cell click event
                         event.stopPropagation();
                         event.preventDefault();
-
-                        // Open the popup dialog
-                        // Initialize an array to store values
-                        var arry = [];
-
-                        // Split the PhaseName string into an array if it's not null
-                        if ($self.dGrid.records[event.index].PhaseName != null) {
-                            arry = ($self.dGrid.records[event.index].PhaseName).split(',');
-                        }
                         //Converting date to local date format
                         var recordingDate = new Date(($self.dGrid.records[event.index].RecordedDate))
                         // Initialize HTML elements for displaying task details
@@ -499,27 +524,122 @@
                             '   </div>                                                                                                           ' +
                             ' </div>                                                                                                             ' +
                             ' <div class="vas-projectTimeline mb-2">                                                                             ' +
-                            '   <span class="vas-taskdescTtl">' + VAS.translatedTexts.VAS_RequestOrProject + '</span>                                                    ' +
-                            '   <div class="vas-projectTimelineConatainer d-flex align-items-center justify-content-center">                     ' +
-                            '     <div id="pipeline" class="pipeline">';
+                            '   <span class="vas-taskdescTtl">' + VAS.translatedTexts.VAS_RequestOrProject + '</span>' +
+                            '</div>';
 
-                        /* Project Phase*/
                         if ($self.dGrid.records[event.index].PhaseName != null) {
-                            for (var i = 0; i < arry.length; i++) {
-                                htmlString += '<div class="stage" id="stage' + i + '">' + arry[i] + '</div>';
-                                if (i < arry.length - 1) {
-                                    htmlString += '<div class="connector"></div>';
+                            //handled the pipline structure for Project Phases
+                            htmlString += '<div class="vas-tis-roadmap-container"> ' +
+                                '<div class="vas-tis-steps-row">';
+                            var StatusClass = "";
+                            var count = 0;
+                            var phaseInfo = $self.dGrid.records[event.index].PhaseName
+                            var PhaseClass = 'vas-tis-next-row';
+                            var ReversePhaseclass = 'vas-tis-reverse-row';
+                            var AssignedClass = '';
+                            for (var i = 0; i < phaseInfo.length; i++) {
+                                if (i == 2) {
+                                    AssignedClass = ReversePhaseclass;
+                                }
+                                if (i > 2 && count == 0 && AssignedClass == ReversePhaseclass) {
+                                    AssignedClass = PhaseClass;
+                                }
+                                else if (count == 0 && AssignedClass == PhaseClass) {
+                                    AssignedClass = ReversePhaseclass;
+                                }
+                                if (phaseInfo[i].PhaseStatus == "IP") {
+                                    StatusClass = 'vas-tis-step-inprogress';
+                                }
+                                else if (phaseInfo[i].PhaseStatus == "CO") {
+                                    StatusClass = 'vas-tis-step-completed';
+                                }
+                                else if (phaseInfo[i].PhaseStatus == "DR") {
+                                    StatusClass = 'vas-tis-step-drafted';
+                                }
+                                else {
+                                    StatusClass = 'vas-tis-step-null';
+                                }
+                                if (i == 0) {
+                                    htmlString +=
+                                        '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                        '<div class="vas-tis-step-start">' +
+                                        '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                        '<span>' + VAS.translatedTexts.VAS_Start + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-tis-step-content">' +
+                                        '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                        '<span>' + phaseInfo[0].PhaseName + '</span>' +
+                                        '</div>' +
+                                        '</div>'
+                                }
+                                if (i == 1) {
+                                    htmlString +=
+                                        ' <div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                        '<div class="vas-tis-step-content">' +
+                                        '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                        '<span>' + phaseInfo[1].PhaseName + '</span>' +
+                                        '</div>' +
+                                        '</div>'
+
+                                }
+                                if (i > 1) {
+
+                                    if (count == 0 && i == 2) {
+                                        htmlString +=
+                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                            '<div class="vas-tis-step-content">' +
+                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
+                                            '</div>' +
+                                            '</div>' +
+                                            '</div>';
+
+                                    }
+                                    count = count + 1;
+                                    if (count == 1) {
+                                        htmlString += '<div class="vas-tis-steps-row ' + AssignedClass + '">' +
+                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                            '<div class="vas-tis-step-content">' +
+                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
+                                            '</div>' +
+                                            '</div>';
+                                    }
+                                    else {
+                                        htmlString +=
+                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                            '<div class="vas-tis-step-content">' +
+                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
+                                            '</div>' +
+                                            '</div>';
+                                    }
+                                    if (count == 2 && i != (phaseInfo.length-1)) {
+                                        htmlString += '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                                            '<div class="vas-tis-step-content">' +
+                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
+                                            '</div>' +
+                                            '</div>';
+                                        count = 0;
+                                    }
+
+                                }
+                                if (count == 0 && i > 1) {
+                                    htmlString += '</div>';
                                 }
                             }
                         }
+
+
+
                         /* Summary*/
-                        else if ($self.dGrid.records[event.index].Summary != null) {
-                            htmlString += '<div>' + ($self.dGrid.records[event.index].PhaseName || '') + '</div>';
+                        else if ($self.dGrid.records[event.index].RequestSummary != null) {
+                            htmlString += '<div class="vas-tis-requestsummary p-3 mb-3 mt-1">' + ($self.dGrid.records[event.index].RequestSummary || '') + '</div>';
                         }
 
                         htmlString += '</div>' +
                             '   </div>                                                                                                           ' +
-                            ' </div>                                                                                                             ' +
                             ' <div class="vas-taskDesc_feildWrap mb-2 ">                                                                         ' +
                             '   <div class="vas-taskDesc_feild">                                                                                 ' +
                             '     <span class="vas-taskdescTtl">' + VAS.translatedTexts.VAS_EstimatedTime + '</span>                                                            ' +
@@ -651,10 +771,23 @@
                         // Reset the arrays if records are unselected
                         gridDataArray = [];
                         PreviewLeftData = [];
-                       // pushRecords = [];
+                        BPWithZeroPrice = [];
+                        BPWithoutPaymentTerm = [];
+                        BPWithoutPaymentMethod = [];
                     } else {
-                        // Otherwise, populate gridDataArray with all records
-                        gridDataArray.push(dGrid.records[i]);
+                        if (dGrid.records[i].C_PaymentTerm_ID == 0) {
+                            BPWithoutPaymentTerm.push(dGrid.records[i].recid);
+                        }
+                        if (dGrid.records[i].VA009_PaymentMethod_ID == 0) {
+                            BPWithoutPaymentMethod.push(dGrid.records[i].recid);
+                        }
+                        if (dGrid.records[i].Price == 0) {
+                            BPWithZeroPrice.push(dGrid.records[i].recid);
+                        }
+                        else {
+                            // Otherwise, populate gridDataArray with all records
+                            gridDataArray.push(dGrid.records[i]);
+                        }
                     }
                 }
                 // Add data for preview based on the selection
@@ -668,9 +801,25 @@
                         // Filter out the unselected record
                         return VIS.Utility.Util.getValueOfInt(value.recid) != VIS.Utility.Util.getValueOfInt(event.recid)
                     });
+
+
                 } else {
-                    // Add the selected record to gridDataArray
-                    gridDataArray.push(dGrid.records[event.index]);
+                    BPWithZeroPrice = [];
+                    BPWithoutPaymentTerm = [];
+                    BPWithoutPaymentMethod = [];
+                    if (dGrid.records[event.index].C_PaymentTerm_ID == 0 && BPWithoutPaymentTerm.indexOf(dGrid.records[event.index].recid) == -1) {
+                        BPWithoutPaymentTerm.push(dGrid.records[event.index].recid);
+                    }
+                    if (dGrid.records[event.index].VA009_PaymentMethod_ID == 0 && BPWithoutPaymentMethod.indexOf(dGrid.records[event.index].recid) == -1) {
+                        BPWithoutPaymentMethod.push(dGrid.records[event.index].recid);
+                    }
+                    if (dGrid.records[event.index].Price == 0 && BPWithZeroPrice.indexOf(dGrid.records[event.index].recid) == -1) {
+                        BPWithZeroPrice.push(dGrid.records[event.index].recid);
+                    }
+                    else {
+                        // Add the selected record to gridDataArray
+                        gridDataArray.push(dGrid.records[event.index]);
+                    }
                     // Add data for preview with the selected record
                     AddedDataForPreviewOnSelection(event, dGrid, true);
                 }
@@ -786,6 +935,9 @@
             gridDataArray = [];
             PreviewLeftData = [];
             PreviewFilteredGridData = [];
+            BPWithZeroPrice = [];
+            BPWithoutPaymentTerm = [];
+            BPWithoutPaymentMethod = [];
             if (VIS.Utility.Util.getValueOfInt(AD_Org_ID) == 0) {
                 VIS.ADialog.info('VAS_PlzSelectOrganization');
                 return;
@@ -861,13 +1013,10 @@
                             line['S_TimeExpenseLine_ID'] = gridDataResult[i].S_TimeExpenseLine_ID;
                             line['VA075_WorkOrderOperation_ID'] = gridDataResult[i].VA075_WorkOrderOperation_ID;
                             if (gridDataResult[i].PhaseInfo != null) {
-                                line['PhaseName'] = VAS.translatedTexts.VAS_Start;
-                                for (var j = 0; j < gridDataResult[i].PhaseInfo.length; j++) {
-                                    line['PhaseName'] = line['PhaseName'] + "," + (gridDataResult[i].PhaseInfo[j].PhaseName);
-                                }
+                                line['PhaseName'] = gridDataResult[i].PhaseInfo;
                             }
                             else if (gridDataResult[i].RequestSummary != null) {
-                                line['PhaseName'] = gridDataResult[i].RequestSummary;
+                                line['RequestSummary'] = gridDataResult[i].RequestSummary;
                             }
 
                             line['recordCount'] = 0;
@@ -943,7 +1092,7 @@
                 });
                 $self.PreviewColumns.push({ field: "UomName", caption: VAS.translatedTexts.VAS_UomName, sortable: true, size: '16%', min: 150, hidden: false });
                 $self.PreviewColumns.push({
-                    field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false, 
+                    field: 'Qty', caption: VAS.translatedTexts.Qty, size: '16%', sortable: true, size: '16%', min: 150, hidden: false,
                 })
                 $self.PreviewColumns.push({
                     field: 'Amount', caption: VAS.translatedTexts.VAS_TotalBilableAmount, size: '16%', sortable: true, style: 'text-align:right;', size: '16%', min: 150, hidden: false, render: function (record, index, col_index) {
@@ -955,7 +1104,7 @@
                 })
             }
             //Identifed and commented line so that records note encode when it has special character
-           // w2utils.encodeTags(data);
+            // w2utils.encodeTags(data);
             $self.dGridPreview = $($self.PreviewGridDiv).w2grid({
                 name: "GridPreview_" + $self.windowNo,
                 recordHeight: 29,
@@ -1060,15 +1209,6 @@
         function GenerateInvoice(gridDataArray) {
             if (gridDataArray.length == 0) {
                 VIS.ADialog.info('VAS_PlzSelectRecord');
-                return;
-            }
-            //getting the records whose price is zero
-            var gridDataWithZeroPrice = jQuery.grep(gridDataArray, function (value) {
-                return VIS.Utility.Util.getValueOfDecimal(value.Price) === 0;
-            });
-            //Restricting to not generate invoice for records whose Price is zero
-            if (gridDataWithZeroPrice.length > 0) {
-                VIS.ADialog.info("", "",VAS.translatedTexts.VAS_ZeroPriceFor);
                 return;
             }
             var AD_Client_ID = VIS.Env.getCtx().getAD_Client_ID();
@@ -1507,7 +1647,7 @@
                         if (ProjectData.length == 0) {
                             ProjectId = [];
                         }
-                      
+
                         FilterDisplay();
                         GetSelectedFilterVal();
                         IsFilterBtnClicked = true;
@@ -1686,6 +1826,9 @@
             TaskData = [];
             RequestData = [];
             ProjectData = [];
+            BPWithZeroPrice = [];
+            BPWithoutPaymentTerm = [];
+            BPWithoutPaymentMethod = [];
         }
 
         this.display = function () {

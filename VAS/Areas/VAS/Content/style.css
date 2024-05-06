@@ -967,7 +967,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-taskDesc_feildWrap {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 0.85rem;
 }
@@ -1165,4 +1165,348 @@ html[dir="rtl"] .vas-sql-result-msg {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.w-25 {
+    width: 25%;
+}
+
+.w-33 {
+    width: 33.33333333333333%;
+}
+
+.vas-tis-roadmap-container {
+    width: 100%;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: 130px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 5px 10%;
+    background-color: #f1f1f1;
+    min-height: 75px;
+}
+.vas-tis-requestsummary {
+    background-color: #f1f1f1;
+}
+
+.vas-tis-steps-col {
+    position: relative;
+    padding: 2px 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+    .vas-tis-steps-col:nth-child(3)::after {
+        content: " ";
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 4px;
+        background-color: #b2b2b2;
+        height: 50%;
+    }
+
+    .vas-tis-steps-col:nth-child(3) .vas-tis-step-content {
+        opacity: 0;
+    }
+
+    .vas-tis-steps-col.vas-tis-step-inprogress:nth-child(3)::after {
+        background-color: #BC7C7A;
+    }
+
+    .vas-tis-steps-col.vas-tis-step-completed:nth-child(3)::after {
+        background-color: #9FC150;
+    }
+
+.vas-tis-reverse-row .vas-tis-steps-col:nth-child(3)::after {
+    top: 50%;
+    right: inherit;
+    left: 0;
+}
+
+.vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-inprogress::after {
+    background-color: #BC7C7A;
+}
+
+.vas-tis-steps-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.vas-tis-step-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 100%;
+    border: 1px solid #b2b2b2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+}
+
+    .vas-tis-step-circle .vis {
+        font-size: 11px;
+        display: none;
+    }
+
+.vas-tis-step-content {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-direction: column;
+    width: 136px;
+    right: -68px;
+    position: relative;
+    z-index: 3;
+    top: 11px;
+}
+
+    .vas-tis-step-content span {
+        display: block;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        color: #b2b2b2;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+.vas-tis-step-start {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-direction: column;
+    width: 136px;
+    left: -68px;
+    position: absolute;
+    z-index: 3;
+    top: 11px;
+}
+
+    .vas-tis-step-start span {
+        display: block;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        color: #b2b2b2;
+    }
+
+
+.vas-tis-steps-col::before {
+    content: " ";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+    height: 4px;
+    width: 100%;
+    background-color: #b2b2b2;
+}
+
+.vas-tis-reverse-row {
+    flex-direction: row-reverse;
+}
+
+    .vas-tis-reverse-row .vas-tis-steps-col:first-child::after {
+        content: " ";
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 4px;
+        background-color: #b2b2b2;
+        height: 50%;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-inprogress:first-child::after {
+        background-color: #BC7C7A;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-completed:first-child::after {
+        background-color: #9FC150;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col {
+        justify-content: flex-start;
+    }
+
+    .vas-tis-reverse-row .vas-tis-step-content {
+        left: -68px;
+        right: inherit;
+    }
+
+    .vas-tis-reverse-row .vas-tis-step-end .vas-tis-step-content {
+        opacity: 0;
+    }
+
+.vas-tis-step-end::after {
+    content: " ";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 4px;
+    background-color: #b2b2b2;
+    height: 50%;
+}
+
+.vas-tis-step-end .vas-tis-step-content {
+    opacity: 0;
+}
+
+.vas-tis-step-start::after {
+    right: inherit;
+    left: 0;
+}
+
+.vas-tis-step-start .vas-tis-step-content {
+    opacity: 0;
+}
+
+.vas-tis-next-row .vas-tis-steps-col:first-child::after {
+    content: " ";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    background-color: #b2b2b2;
+    height: 50%;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-completed:first-child::after {
+    background-color: #9FC150;
+}
+
+.vas-tis-steps-col.vas-tis-last-line::before {
+    display: none;
+}
+
+.vas-tis-step-inprogress.vas-tis-steps-col::before {
+    background-color: #BC7C7A;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-start span {
+    color: #9FC150;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #BC7C7A;
+}
+
+    .vas-tis-step-inprogress .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-inprogress .vas-tis-step-content span {
+    color: #BC7C7A;
+}
+
+.vas-tis-step-completed .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-start span {
+    color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-completed.vas-tis-steps-col::before {
+    background-color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+    .vas-tis-step-completed .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-completed .vas-tis-step-content span {
+    color: #9FC150;
+}
+/* Styles for drafted steps */
+.vas-tis-step-drafted .vas-tis-step-circle {
+    border-color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-start span {
+    color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-drafted.vas-tis-steps-col::before {
+    background-color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #d9a117a6; /* Yellow color */
+}
+
+    .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-drafted .vas-tis-step-content span {
+    /* Add specific styling for span elements here */
+    color: #d9a117a6; /* Yellow color */
+}
+/* Styles for null status steps */
+.vas-tis-step-null .vas-tis-step-circle {
+    border-color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-start span {
+    color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-null.vas-tis-steps-col::before {
+    background-color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #b2b2b2; /* Grey color */
+}
+
+    .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-null .vas-tis-step-content span {
+    /* Add specific styling for span elements here */
+    color: #b2b2b2; /* Grey color */
+}
+.vas-tis-steps-col.vas-tis-step-drafted:nth-child(3)::after {
+    background-color: #d9a117a6;
+}
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
+    background-color: #d9a117a6;
+}
+.vas-tis-steps-col.vas-tis-step-null:nth-child(3)::after {
+    background-color: #b2b2b2;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-null:first-child::after {
+    background-color: #b2b2b2;
+}
+
+
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/

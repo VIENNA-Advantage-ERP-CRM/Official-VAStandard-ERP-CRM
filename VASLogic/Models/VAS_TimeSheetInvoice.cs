@@ -144,7 +144,7 @@ namespace VASLogic.Models
                         cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic,
                         NULL AS ImageExtension,NULL AS AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
-                        INNER JOIN VA075_Task st ON (st.VA075_Task_ID=wo.VA075_Task_ID)
+                        LEFT OUTER JOIN VA075_Task st ON (st.VA075_Task_ID=wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID=wo.S_Resource_ID)
                         INNER JOIN C_BPartner cust ON (wo.C_BPartner_ID=cust.C_BPartner_ID AND  cust.IsCustomer='Y')
                         LEFT OUTER JOIN C_BPartner_Location cbl ON (cbl.C_BPartner_ID = cust.C_BPartner_ID)
@@ -215,7 +215,7 @@ namespace VASLogic.Models
                         cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic,
                         img.ImageExtension,p.AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
-                        INNER JOIN VA075_Task st ON (st.VA075_Task_ID = wo.VA075_Task_ID)
+                        LEFT OUTER JOIN VA075_Task st ON (st.VA075_Task_ID = wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID = wo.S_Resource_ID)
                         INNER JOIN C_BPartner cb ON (wo.C_BPartner_ID = cb.C_BPartner_ID AND  cb.IsCustomer = 'Y')
                         LEFT OUTER JOIN C_BPartner_Location cbl ON(cbl.C_BPartner_ID = cb.C_BPartner_ID)
@@ -327,6 +327,7 @@ namespace VASLogic.Models
                         {
                             ProjectPhaseInfo phaseInfo = new ProjectPhaseInfo();
                             phaseInfo.PhaseName = Util.GetValueOfString(dr["Name"]);
+                            phaseInfo.PhaseStatus = Util.GetValueOfString(dr["VAS_PhaseStatus"]);
                             timeRecordingDataObj.PhaseInfo.Add(phaseInfo);
                         }
 
@@ -490,7 +491,7 @@ namespace VASLogic.Models
                       .Select(row => Util.GetValueOfInt(row["c_project_id"]))
                       .Distinct()
                       .ToList();
-            string sqlPhase = @"SELECT C_Project_ID,Name,SeqNo FROM C_ProjectPhase WHERE C_Project_ID IN (" + string.Join(",", ProjectIds) + ") ORDER BY C_ProjectPhase_ID";
+            string sqlPhase = @"SELECT C_Project_ID,Name,SeqNo,VAS_PhaseStatus FROM C_ProjectPhase WHERE C_Project_ID IN (" + string.Join(",", ProjectIds) + ") ORDER BY C_ProjectPhase_ID";
             DataSet dsPhase = DB.ExecuteDataset(sqlPhase);
             return dsPhase;
         }
@@ -735,6 +736,7 @@ namespace VASLogic.Models
         public class ProjectPhaseInfo
         {
             public string PhaseName { get; set; }
+            public string PhaseStatus { get; set; }
         }
         public class VAS_InvoiceDetail
         {
