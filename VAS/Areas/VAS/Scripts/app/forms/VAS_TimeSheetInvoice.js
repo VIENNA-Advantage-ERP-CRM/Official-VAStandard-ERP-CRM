@@ -361,25 +361,25 @@
         */
         function UnselectNotConfiguredRecords(dGrid) {
             var combinedMessage = VAS.translatedTexts.VAS_InvoiceCreationFail;
-            var paramMessage = '';
+            //var paramMessage = '';
             if (BPWithoutPaymentTerm.length > 0) {
                 for (var i = 0; i < BPWithoutPaymentTerm.length; i++) {
                     dGrid.unselect(BPWithoutPaymentTerm[i]);
                 }
-                paramMessage = VAS.translatedTexts.VAS_PayTermNotBined
+               // paramMessage = VAS.translatedTexts.VAS_PayTermNotBined
             }
             if (BPWithoutPaymentMethod.length > 0) {
                 for (var i = 0; i < BPWithoutPaymentMethod.length; i++) {
                     dGrid.unselect(BPWithoutPaymentMethod[i]);
                 }
-                if (paramMessage.length > 0) {
-                    paramMessage += VAS.translatedTexts.VAS_And + VAS.translatedTexts.VAS_PayMethod
-                }
-                else {
-                    paramMessage = VAS.translatedTexts.VAS_PayMethod;
-                }
+                //if (paramMessage.length > 0) {
+                //    paramMessage += VAS.translatedTexts.VAS_And + VAS.translatedTexts.VAS_PayMethod
+                //}
+                //else {
+                //    paramMessage = VAS.translatedTexts.VAS_PayMethod;
+                //}
             }
-            combinedMessage += paramMessage;
+          //  combinedMessage += paramMessage;
             VIS.ADialog.info("", "", combinedMessage);
         }
         /* this function is used to load the column and data on grid*/
