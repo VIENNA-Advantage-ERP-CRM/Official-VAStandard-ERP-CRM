@@ -1,4 +1,11 @@
-﻿; (function (VAS, $) {
+﻿/********************************************************************************
+ * Module Name    : VAS
+ * Purpose        : This Form Created to generate AR invoice against Time recording
+ * chronological  : Development
+ * Created Date   : 07 May 2024
+ * Created by     : VIS_427
+ ********************************************************************************/
+; (function (VAS, $) {
     function VAS_TimeSheetInvoice() {
         this.frame;
         this.windowNo;
@@ -166,7 +173,11 @@
             "VAS_TaskType",
             "VAS_RecordId",
             "VAS_PaymentMethodNotBinded",
-            "VAS_PaymentTermNotBinded"
+            "VAS_PaymentTermNotBinded",
+            "VAS_InvoiceCreationFail",
+            "VAS_PayTermNotBined",
+            "VAS_PayMethod",
+            "VAS_And"
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
@@ -349,18 +360,26 @@
         * @param {any} dGrid
         */
         function UnselectNotConfiguredRecords(dGrid) {
-            var combinedMessage = '';
+            var combinedMessage = VAS.translatedTexts.VAS_InvoiceCreationFail;
+            var paramMessage = '';
             if (BPWithoutPaymentTerm.length > 0) {
                 for (var i = 0; i < BPWithoutPaymentTerm.length; i++) {
                     dGrid.unselect(BPWithoutPaymentTerm[i]);
                 }
+                paramMessage = VAS.translatedTexts.VAS_PayTermNotBined
             }
             if (BPWithoutPaymentMethod.length > 0) {
                 for (var i = 0; i < BPWithoutPaymentMethod.length; i++) {
                     dGrid.unselect(BPWithoutPaymentMethod[i]);
                 }
+                if (paramMessage.length > 0) {
+                    paramMessage += VAS.translatedTexts.VAS_And + VAS.translatedTexts.VAS_PayMethod
+                }
+                else {
+                    paramMessage = VAS.translatedTexts.VAS_PayMethod;
+                }
             }
-            combinedMessage = VAS.translatedTexts.VAS_PaymentTermNotBinded;
+            combinedMessage += paramMessage;
             VIS.ADialog.info("", "", combinedMessage);
         }
         /* this function is used to load the column and data on grid*/
@@ -566,54 +585,39 @@
                                         '</div>'
                                 }
                                 if (i == 1) {
-                                    htmlString +=
-                                        ' <div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
-                                        '<div class="vas-tis-step-content">' +
-                                        '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
-                                        '<span>' + phaseInfo[1].PhaseName + '</span>' +
-                                        '</div>' +
-                                        '</div>'
+                                    htmlString += appendPhaseDesign(phaseInfo[1], StatusClass);
 
                                 }
                                 if (i > 1) {
 
                                     if (count == 0 && i == 2) {
-                                        htmlString +=
-                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
-                                            '<div class="vas-tis-step-content">' +
-                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
-                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
-                                            '</div>' +
-                                            '</div>' +
-                                            '</div>';
+                                        htmlString += appendPhaseDesign(phaseInfo[i], StatusClass);
+                                        htmlString +='</div>';
 
                                     }
                                     count = count + 1;
                                     if (count == 1) {
-                                        htmlString += '<div class="vas-tis-steps-row ' + AssignedClass + '">' +
-                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
-                                            '<div class="vas-tis-step-content">' +
-                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
-                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
-                                            '</div>' +
-                                            '</div>';
+                                        htmlString += '<div class="vas-tis-steps-row ' + AssignedClass + '">';
+                                        htmlString += appendPhaseDesign(phaseInfo[i], StatusClass);
                                     }
                                     else {
-                                        htmlString +=
-                                            '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
-                                            '<div class="vas-tis-step-content">' +
-                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
-                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
-                                            '</div>' +
-                                            '</div>';
+                                        htmlString += appendPhaseDesign(phaseInfo[i], StatusClass);
                                     }
-                                    if (count == 2 && i != (phaseInfo.length-1)) {
-                                        htmlString += '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
-                                            '<div class="vas-tis-step-content">' +
-                                            '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
-                                            '<span>' + phaseInfo[i].PhaseName + '</span>' +
-                                            '</div>' +
-                                            '</div>';
+                                    if (count == 2 && i != (phaseInfo.length - 1)) {
+                                        //here we are updating the status of next record if it exist in phaseinfo
+                                        if (phaseInfo[i+1].PhaseStatus == "IP") {
+                                            StatusClass = 'vas-tis-step-inprogress';
+                                        }
+                                        else if (phaseInfo[i+1].PhaseStatus == "CO") {
+                                            StatusClass = 'vas-tis-step-completed';
+                                        }
+                                        else if (phaseInfo[i+1].PhaseStatus == "DR") {
+                                            StatusClass = 'vas-tis-step-drafted';
+                                        }
+                                        else {
+                                            StatusClass = 'vas-tis-step-null';
+                                        }
+                                        htmlString += appendPhaseDesign(phaseInfo[i], StatusClass);
                                         count = 0;
                                     }
 
@@ -717,6 +721,21 @@
             });
             $self.gridSelectDiv.find('#grid_gridGenForm_' + ($self.windowNo) + '_records').off("scroll", enablingscrollEvent);
             $self.gridSelectDiv.find('#grid_gridGenForm_' + ($self.windowNo) + '_records').on("scroll", enablingscrollEvent);
+        }
+        /**
+        * this fucntion is called when user pipline structure for project phases
+        * @param {any} phaseInfo
+        * @param {any} StatusClass
+        */
+        function appendPhaseDesign(phaseInfo, StatusClass) {
+            var phaseDesign=''
+            phaseDesign= '<div class="vas-tis-steps-col ' + StatusClass + ' w-33">' +
+                '<div class="vas-tis-step-content">' +
+                '<div class="vas-tis-step-circle"><span class="vis vis-markx"></span></div>' +
+                '<span>' + phaseInfo.PhaseName + '</span>' +
+                '</div>' +
+                '</div>';
+            return phaseDesign;
         }
         /**
         * this fucntion is called when user unselects records

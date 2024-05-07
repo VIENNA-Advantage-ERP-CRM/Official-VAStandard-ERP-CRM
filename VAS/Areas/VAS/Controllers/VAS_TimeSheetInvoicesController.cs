@@ -1,4 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿/***********************************************************************************
+ * Module Name    : VAS
+ * Purpose        : This class Created to generate AR invoice against Time recording
+ * chronological  : Development
+ * Created Date   : 07 May 2024
+ * Created by     : VIS_427
+***********************************************************************************/
+
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -18,7 +26,7 @@ namespace VAS.Areas.VAS.Controllers
         /// </summary>
         /// <param name="ColumnData">Data of the Column</param>
         /// <returns>Dictionary with column name and column id</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public JsonResult GetColumnID(string ColumnData)
         {
             dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
@@ -46,7 +54,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="toDate">toDate</param>
         /// /// <param name="TaskType">Task Type</param>
         /// <returns>List of data For time recording of task</returns>
-        /// <author>VIS_427</author>
+        /// <author> Devops Id: 5719 VIS_427</author>
         public ActionResult LoadGridData(int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID, string R_Request_ID, string C_Task_ID, string FromDate, string toDate, string TaskType, int pageNo, int pageSize)
         {
             Ctx ctx = Session["ctx"] as Ctx;
@@ -61,7 +69,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <param name="DataTobeInvoice">object of data which is to be invoice</param>
         /// <returns>message</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public ActionResult GenerateInvoice(string DataTobeInvoice, int AD_Client_ID, int AD_Org_ID)
         {
             dynamic dataTobeInvoice = JsonConvert.DeserializeObject<List<ExpandoObject>>(DataTobeInvoice);
