@@ -3681,7 +3681,9 @@
                     event.onComplete = function (event) {
                         id = event.recid;
                         //event.column is a AppliedAmt column sequence No
-                        $('#grid_openformatgrid_' + $self.windowNo + '_edit_' + id + '_12').keydown(function (event) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
+                        $('#grid_openformatgrid_' + $self.windowNo + '_edit_' + id + '_' + event.column).keydown(function (event) {
                             var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
                             if (!isDotSeparator && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
@@ -3924,7 +3926,9 @@
                     event.onComplete = function (event) {
                         id = event.recid;
                         //event.column is a AppliedAmt column sequence No
-                        $('#grid_openformatgridcash_' + $self.windowNo + '_edit_' + id + '_12').keydown(function (event) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
+                        $('#grid_openformatgridcash_' + $self.windowNo + '_edit_' + id + '_' +event.column).keydown(function (event) {
                             var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
                             if (!isDotSeparator && (event.keyCode == 190 || event.keyCode == 110)) {// , separator
@@ -4234,8 +4238,8 @@
                 onEditField: function (event) {
                     event.onComplete = function (event) {
                         id = event.recid;
-                        //event.column 12 for DiscountAmt, 16 for WriteOffAmt and 17 for AppliedAmt column sequence.
-                        if (event.column == 12 || event.column == 16 || event.column == 17) {
+                        /*VIS_427 Bug id - 5667 Handled issue when user enter Dot in german culture it allows user to enter the same
+                        But now user can enter it*/
                             $('#grid_openformatgridinvoice_' + $self.windowNo + '_edit_' + id + '_' + event.column).keydown(function (event) {
                                 var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
@@ -4258,8 +4262,6 @@
                                     return false;
                                 }
                             });
-
-                        }
                     };
                 }
             });
@@ -4501,14 +4503,7 @@
 
                             }
                             else {
-
-
                                 val = 0;
-
-
-
-
-
                             }
                         }
                         else {
@@ -4517,17 +4512,13 @@
                                 record.changes.AppliedAmt = checkcommaordot(event, record.OpenAmt, record.OpenAmt);
                                 // val = record.changes.AppliedAmt;
                                 val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
-
-
-
-
                             }
                             else {
-                                record.changes.AppliedAmt = checkcommaordot(event, record.changes.AppliedAmt, record.OpenAmt);
+                                /*VIS383: Bug ID-5667 06/05/24:-Comment this code for handle issue, when user clicking on Applied amount of Cash Journal then 
+                                 system is displaying amount in dot(.) format instead of comma(,) for German and Slovenian culture*/
+                                //record.changes.AppliedAmt = checkcommaordot(event, record.changes.AppliedAmt, record.OpenAmt); 
                                 //val = record.changes.AppliedAmt;
                                 val = convertAppliedAmtculture(record.changes.AppliedAmt.toString(), dotFormatter);
-
-
                             }
                         }
                     }
@@ -4609,9 +4600,11 @@
                         if (record.OpenAmt == record.AppliedAmt && parseFloat(record.changes.AppliedAmt) == record.AppliedAmt) {
                             calculate();
                         }
-
                     }
-
+                    /*VIS383: Bug ID-5667 06/05/24:-Handle issue, when user clicking on Applied amount of Cash Journal then system is displaying "NaN" in in slovenian culture*/
+                    if (val.contains('−')) {
+                        val = val.replace('−', '-');
+                    }
                     return parseFloat(val).toLocaleString(navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
                 }
                 //End
@@ -5470,7 +5463,7 @@
             //calculate();
         };
         //end
-
+       
         function cashCellChanged(event) {
             if (readOnlyCash) {
                 event.preventDefault();
@@ -5557,6 +5550,8 @@
 
             }
         };
+        
+
 
         function invoiceCellChanged(event) {
 
