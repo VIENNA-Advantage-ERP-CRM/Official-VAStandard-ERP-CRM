@@ -1,4 +1,11 @@
-﻿using System;
+﻿/***********************************************************************************
+ * Module Name    : VAS
+ * Purpose        : This class Created to generate AR invoice against Time recording
+ * chronological  : Development
+ * Created Date   : 07 May 2024
+ * Created by     : VIS_427
+***********************************************************************************/
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -36,7 +43,7 @@ namespace VASLogic.Models
         /// <param name="toDate">toDate</param>
         /// <param name="TaskType">TaskType</param>
         /// <returns>List of data For time recording of task</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public List<TimeRecordingData> LoadGridData(Ctx ctx, int AD_Client_ID, int AD_Org_ID, string C_BPartner_ID, string S_Resource_ID, string TimExpenSeDoc, string C_Project_ID,
             string R_Request_ID, string C_Task_ID, string FromDate, string toDate, string TaskType, int pageNo, int pageSize)
         {
@@ -373,7 +380,7 @@ namespace VASLogic.Models
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <param name="DataTobeInvoice">object of data which is to be invoice</param>
         /// <returns>message</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public string GenerateInvoice(Ctx ct, IEnumerable<dynamic> DataTobeInvoice, int AD_Client_ID, int AD_Org_ID)
         {
             string message = Msg.GetMsg(ct, "VAS_InvoiceSaved");
@@ -437,7 +444,7 @@ namespace VASLogic.Models
         /// <param name="ctx">context</param>
         /// <param name="inv">Object of invoice</param>
         /// <param name="sortedData">Data</param>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public void CreateInvoiceLine(Ctx ctx, MInvoice inv, dynamic sortedData)
         {
             MProduct product = null;
@@ -484,7 +491,7 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="ds">dataset</param>
         /// <returns>the data set of project phase</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public DataSet GetPhaseData(DataSet ds)
         {
             List<int> ProjectIds = ds.Tables[0].AsEnumerable()
@@ -505,7 +512,7 @@ namespace VASLogic.Models
         /// <param name="sortedData">object of data which is to be invoice</param>
         /// <param name="inv">invoice</param>
         /// <returns>object of invoice</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public MInvoice CreateInvoiceHeader(Ctx ct, MInvoice inv, dynamic sortedData, int AD_Client_ID, int AD_Org_ID)
         {
             inv = new MInvoice(ct, 0, null);
@@ -541,7 +548,7 @@ namespace VASLogic.Models
         /// <param name="AD_Client_ID">AD_Client_ID</param>
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <returns>this function returns the Doctype id</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public int GetDocTypeID(int AD_Client_ID, int AD_Org_ID)
         {
             sql.Clear();
@@ -559,7 +566,7 @@ namespace VASLogic.Models
         /// <param name="AD_Client_ID">AD_Client_ID</param>
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <returns>this function returns the ConvertionType id</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public int GetConversionTypeID(int AD_Client_ID, int AD_Org_ID)
         {
             C_ConverType_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive = 'Y' " +
@@ -573,7 +580,7 @@ namespace VASLogic.Models
         /// <param name="message">message</param>
         /// // <param name="ctx">context</param>
         /// <returns>this function returns error messaage</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public void ValueNamePairError(Ctx ctx, ValueNamePair vp, string message)
         {
             if (vp != null)
@@ -598,7 +605,7 @@ namespace VASLogic.Models
         /// <param name="invoiceList">list of invoices saved</param>
         /// // <param name="ctx">context</param>
         /// <returns>this function returns the list of deleted invoices</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
 
         public List<VAS_InvoiceDetail> DeleteInvoices(Ctx ctx, List<VAS_InvoiceDetail> invoiceList)
         {
@@ -643,7 +650,7 @@ namespace VASLogic.Models
         /// <param name="sortedData">Object of data</param>
         /// // <param name="invoice">Object of invoice</param>
         /// <returns>this function returns the list of deleted invoices</returns>
-        /// <author>VIS_427</author>
+        /// <author>Devops Id: 5719 VIS_427</author>
         public void SetInvoiceForTask(Ctx ctx, dynamic sortedData, MInvoice invoice)
         {
             if (sortedData.S_TimeExpenseLine_ID != 0)
@@ -663,7 +670,7 @@ namespace VASLogic.Models
         /// <param name="ct">context</param>
         /// <param name="ColumnData">Data of the Column</param>
         /// <returns>Dictionary with column name and column id</returns>
-        /// <author>VIS_427 </author>
+        /// <author>Devops Id: 5719 VIS_427 </author>
         public Dictionary<string, int> GetColumnIds(Ctx ct, dynamic columnDataArray)
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
