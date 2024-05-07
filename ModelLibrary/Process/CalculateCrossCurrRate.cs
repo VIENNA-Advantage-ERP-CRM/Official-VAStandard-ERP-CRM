@@ -34,20 +34,46 @@ namespace VAdvantage.Process
         /// <returns>message</returns>
         protected override string DoIt()
         {
+
+            return CreateCrossCurrency();
+        }
+
+        protected override void Prepare()
+        {
+        }
+
+        /// <summary>
+        /// Calculate Cross Currency Rate
+        /// </summary>
+        /// <param name="CommonCurrency_ID">Common Currency ID</param>
+        /// <param name="date">Date (the day of which system look record for Cross rate calulation) </param>
+        /// <writer>VIS_045</writer>
+        /// <Date>01-May-2024</Date>
+        /// <Task-ID>FEATURE 5703</Task-ID>
+        /// <returns>Message</returns>
+        public string CreateCrossCurrency(int CommonCurrency_ID = 0, DateTime? date = null)
+        {
             // Getting records from cross rate setting
             query.Append("SELECT * FROM C_CurrCrossRate WHERE IsActive='Y'");
+            if (CommonCurrency_ID != 0)
+            {
+                query.Append($" AND C_Currency_ID = {CommonCurrency_ID}");
+            }
             dsobj = DB.ExecuteDataset(query.ToString());
             query.Clear();
-            
+
             if (dsobj != null && dsobj.Tables.Count > 0 && dsobj.Tables[0].Rows.Count > 0)
             {
-                //for (int i = 0; i < dsobj.Tables[0].Rows.Count; i++)
-                foreach(DataRow dr in dsobj.Tables[0].Rows)
+                foreach (DataRow dr in dsobj.Tables[0].Rows)
                 {
                     Currobj = new MCurrCrossRate(GetCtx(), dr, Get_Trx());
                     // Getting records from currency rate based on conditions
-                    query.Append("SELECT AD_Org_ID,C_Currency_ID,ValidFrom,ValidTo,MultiplyRate FROM C_Conversion_Rate WHERE " + GlobalVariable.TO_DATE(DateTime.Now.Date, true) + 
-                        " BETWEEN ValidFrom AND ValidTo AND IsActive='Y' AND AD_Org_ID=" + Currobj.GetAD_Org_ID() + " AND C_ConversionType_ID=" + Currobj.GetC_ConversionType_ID() + 
+                    if (date == null)
+                    {
+                        date = DateTime.Now.Date;
+                    }
+                    query.Append("SELECT AD_Org_ID,C_Currency_ID,ValidFrom,ValidTo,MultiplyRate FROM C_Conversion_Rate WHERE " + GlobalVariable.TO_DATE(date, true) +
+                        " BETWEEN ValidFrom AND ValidTo AND IsActive='Y' AND AD_Org_ID=" + Currobj.GetAD_Org_ID() + " AND C_ConversionType_ID=" + Currobj.GetC_ConversionType_ID() +
                         " AND C_Currency_To_ID=" + Currobj.GetC_Currency_ID() + " AND C_Currency_ID IN ('" + Currobj.GetC_Currency_From_ID() + "','" + Currobj.GetC_Currency_To_ID() + "')");
                     dsobj = DB.ExecuteDataset(query.ToString());
                     query.Clear();
@@ -55,7 +81,6 @@ namespace VAdvantage.Process
                     {
                         for (int j = 0; j < dsobj.Tables[0].Rows.Count; j++)
                         {
-                            //Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[j]["AD_Org_ID"]);
                             FromCurr1 = Util.GetValueOfInt(dsobj.Tables[0].Rows[j]["C_Currency_ID"]);
                             // Getting multiply rate from both records
                             if (Currobj.GetC_Currency_From_ID() == FromCurr1)
@@ -112,14 +137,6 @@ namespace VAdvantage.Process
                             retmsg.Append(Msg.GetMsg(GetCtx(), "VIS_InvalidDate"));
                         }
                         query.Clear();
-                        //int ID = DB.GetNextID(0, "C_Conversion_Rate", null);
-                        //query.Append("INSERT INTO C_Conversion_Rate (AD_Client_ID,AD_Org_ID,C_Conversion_Rate_ID,C_Currency_ID,C_Currency_To_ID,C_ConversionType_ID,ValidFrom,ValidTo,MultiplyRate,DivideRate,CreatedBy,UpdatedBy) "
-                        //    + "Values (" + Client_ID + ", " + Org_ID + ","+ ID +", " + FromCurr + ", " + ToCurr + ", " + CurrType + ", TO_DATE('" + newValidFrom.ToShortDateString() + "','MM-DD-YYYY'), TO_DATE('" + newValidTo.ToShortDateString() + "','MM-DD-YYYY') , " + newMulRate + ", " + newDivideRate + ", " + Client_ID + ", "+ Client_ID + ") ");
-                        //int _updated = DB.ExecuteQuery(query.ToString(), null);
-                        //if (_updated > 0)
-                        //{
-                        //    Msg.GetMsg("Record Inserted","");
-                        //}
                         // Inserting new conversion in the currency rate
                         conobj = new MConversionRate(GetCtx(), 0, Get_Trx());
                         conobj.SetAD_Client_ID(Currobj.GetAD_Client_ID());
@@ -156,14 +173,9 @@ namespace VAdvantage.Process
             }
             else
             {
-                retmsg.Append(Msg.GetMsg(GetCtx(),"NoRecords"));
+                retmsg.Append(Msg.GetMsg(GetCtx(), "NoRecords"));
             }
             return retmsg.ToString();
         }
-
-        protected override void Prepare()
-        {
-        }
-
     }
 }

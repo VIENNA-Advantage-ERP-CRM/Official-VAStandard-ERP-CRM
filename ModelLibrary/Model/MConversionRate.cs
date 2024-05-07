@@ -698,8 +698,30 @@ namespace VAdvantage.Model
                         return false;
                     }
                 }
+
+                //VIS_045: Update Cross Currency when insert new record
+                CreateCrossCurrency();
             }
             return true;
+        }
+
+        /// <summary>
+        /// Calculate Cross Currency Rate
+        /// </summary>
+        /// <writer>VIS_045</writer>
+        /// <Date>01-May-2024</Date>
+        /// <Task-ID>FEATURE 5703</Task-ID>
+        /// <returns>Message</returns>
+        private string CreateCrossCurrency()
+        {
+            log.Info("CreateCrossCurrency: Start creation of Cross Currency Rate");
+            CalculateCrossCurrRate _objCrossCurrencyRate = new CalculateCrossCurrRate();
+            string Message = _objCrossCurrencyRate.CreateCrossCurrency(GetC_Currency_To_ID(), GetValidFrom());
+            if (!string.IsNullOrEmpty(Message))
+            {
+                log.Info($"CreateCrossCurrency: Message -> {Message} ");
+            }
+            return Message;
         }
 
         protected override bool BeforeDelete()
