@@ -4695,7 +4695,11 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
-
+            //VIS383: Bug ID-5698 07/05/24:-Uncheck the "Budget Breach" field when modify order line
+            if (!newRecord && Util.GetValueOfBool(Get_Value("IsBudgetBreach")) == true)
+            {
+                Set_Value("IsBudgetBreach", "N");
+            }
 
             return true;
         }

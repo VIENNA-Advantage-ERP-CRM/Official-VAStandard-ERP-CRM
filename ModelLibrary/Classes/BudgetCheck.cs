@@ -1435,9 +1435,14 @@ AND EndDate     >= " + GlobalVariable.TO_DATE(ord.GetDateOrdered(), true) + @" A
                                               (x.UserElement8_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement8) ? Util.GetValueOfInt(drDataRecord["UserElement8_ID"]) : 0)) &&
                                               (x.UserElement9_ID == (selectedDimension.Contains(X_C_AcctSchema_Element.ELEMENTTYPE_UserElement9) ? Util.GetValueOfInt(drDataRecord["UserElement9_ID"]) : 0))
                                              );
-
-                _budgetControl.AvailableBudget = Decimal.Subtract(_budgetControl.AvailableBudget, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : 0);
-                _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                //VIS383: Bug ID-5698 07/05/24:-When "Allready Allocated Amount" is subtracted from "Control Amount" then set "IsAllocateAmtSubtracted" value true
+                //Because no need to subtract "Allready Allocated Amount" for all the line
+                if (!_budgetControl.IsAllocateAmtSubtracted)
+                {
+                    _budgetControl.AvailableBudget = Decimal.Subtract(_budgetControl.AvailableBudget, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : 0);
+                    _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, AlreadyAllocatedAmount != 0 ? AlreadyAllocatedAmount : Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                    _budgetControl.IsAllocateAmtSubtracted = true;
+                }
             }
             return _listBudgetControl;
         }

@@ -4619,6 +4619,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             List<BudgetControl> _budgetControl = new List<BudgetControl>();
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
+            BudgetControl budgetControl = new BudgetControl();
             _budgetBreachLineIDs = string.Empty;
 
             sql.Clear();
@@ -4660,6 +4661,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
                     {
+                        //VIS383: Bug ID-5698 07/05/24:-This property use for handle "Allready Allocated Amount" is subract from "Controlled Amount"  
+                        budgetControl.IsAllocateAmtSubtracted = false;
                         // loop on PO record data which is to be debited only 
                         for (int i = 0; i < drRecordData.Length; i++)
                         {
@@ -4816,13 +4819,14 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                                              );
 
                 //VIS383: Bug ID-5698 30/04/24:-Handle budget breach functionality for order line
-                decimal availableAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
-                if (availableAmount >= 0)
+                decimal balanceControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                if (balanceControlledAmount >= 0)
                 {
                     _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
                 }
-                if (availableAmount < 0)
+                if (balanceControlledAmount < 0)
                 {
+                    //VIS383: Bug ID-5698 30/04/24:-Added the "Order LineID" seprated with"," for set "Budget Breach" is true in order line
                     if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
                     {
                         _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
@@ -4844,6 +4848,11 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                                              (x.Account_ID == Util.GetValueOfInt(drDataRecord["Account_ID"]))
                                             ))
                 {
+                    //VIS383: Bug ID-5698 07/05/24:-Added the "Order LineID" seprated with"," for set "Budget Breach" is true in order line
+                    if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
+                    {
+                        _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
+                    }
                     // If budget not defined then add error message in _budgetNotDefined message variable
                     // Done by rakesh on 29/Apr/2021 Messsage Variable changed from _budgetMessage to _budgetNotDefined
                     if (!_budgetNotDefined.Contains(Util.GetValueOfString(drBUdgetControl["BudgetName"])))
@@ -7134,10 +7143,10 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         public int UserElement9_ID { get; set; }
         public int UserList1_ID { get; set; }
         public int UserList2_ID { get; set; }
-        public string BudgetBreachLine_IDs { get; set; }
         public Decimal ControlledAmount { get; set; }
         public String WhereClause { get; set; }
         public Decimal AvailableBudget { get; set; }
+        public bool IsAllocateAmtSubtracted { get; set; }
     }
 
 }
