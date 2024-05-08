@@ -681,8 +681,6 @@ namespace VAdvantage.Model
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
                     {
-                        //VIS383: Bug ID-5698 07/05/24:-This property use for handle "Allready Allocated Amount" is subract from "Controlled Amount" 
-                        budgetControl.IsAllocateAmtSubtracted = false;
                         // loop on PO record data which is to be debited only 
                         for (int i = 0; i < drRecordData.Length; i++)
                         {

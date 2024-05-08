@@ -48,7 +48,6 @@ namespace VAdvantage.Process
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
             MRequisition requisition = new MRequisition(GetCtx(), GetRecord_ID(), Get_Trx());
-            BudgetControl budgetControl = new BudgetControl();
 
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
@@ -85,8 +84,6 @@ namespace VAdvantage.Process
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Line_ID ASC");
                     if (drRecordData != null)
                     {
-                        //VIS383: Bug ID-5698 07/05/24:-This property use for handle "Allready Allocated Amount" is subract from "Controlled Amount" 
-                        budgetControl.IsAllocateAmtSubtracted = false;
                         // loop on PO record data which is to be debited only 
                         for (int i = 0; i < drRecordData.Length; i++)
                         {

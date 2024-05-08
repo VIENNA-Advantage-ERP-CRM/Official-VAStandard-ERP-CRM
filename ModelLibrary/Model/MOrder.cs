@@ -4619,9 +4619,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             List<BudgetControl> _budgetControl = new List<BudgetControl>();
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
-            BudgetControl budgetControl = new BudgetControl();
             _budgetBreachLineIDs = string.Empty;
-
+           
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
                   GL_BudgetControl.C_AcctSchema_ID, GL_BudgetControl.CommitmentType, GL_BudgetControl.BudgetControlScope,  GL_BudgetControl.GL_BudgetControl_ID, GL_BudgetControl.Name AS ControlName,GL_BudgetControl.BudgetBreachPercent
@@ -4660,9 +4659,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     // datarows of Debit values which to be controlled
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
-                    {
-                        //VIS383: Bug ID-5698 07/05/24:-This property use for handle "Allready Allocated Amount" is subract from "Controlled Amount"  
-                        budgetControl.IsAllocateAmtSubtracted = false;
+                    {  
                         // loop on PO record data which is to be debited only 
                         for (int i = 0; i < drRecordData.Length; i++)
                         {
