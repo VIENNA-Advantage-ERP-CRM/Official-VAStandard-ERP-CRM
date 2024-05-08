@@ -81,7 +81,7 @@ namespace VAdvantage.Process
                 if (dsRecordData != null && dsRecordData.Tables.Count > 0)
                 {
                     // datarows of Debit values which to be controlled
-                    drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Line_ID ASC");
+                    drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
                     {
                         // loop on PO record data which is to be debited only 
