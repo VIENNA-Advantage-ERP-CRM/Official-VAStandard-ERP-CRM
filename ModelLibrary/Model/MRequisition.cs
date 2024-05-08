@@ -639,7 +639,6 @@ namespace VAdvantage.Model
             List<BudgetControl> _budgetControl = new List<BudgetControl>();
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
-            BudgetControl budgetControl = new BudgetControl();
             _budgetBreachLineIDs = string.Empty;
             _budgetBreachLineIDs = string.Empty;
 
