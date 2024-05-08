@@ -640,6 +640,7 @@ namespace VAdvantage.Model
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
             _budgetBreachLineIDs = string.Empty;
+            _budgetBreachLineIDs = string.Empty;
 
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
@@ -834,15 +835,15 @@ namespace VAdvantage.Model
                                              );
 
                 //VIS383: Bug ID-5698 30/04/24:-Handle budget breach functionality for requisition line
-                decimal availableAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
-                if (availableAmount >= 0)
+                decimal balanceControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
+                if (balanceControlledAmount >= 0)
                 {
                     _budgetControl.ControlledAmount = Decimal.Subtract(_budgetControl.ControlledAmount, Util.GetValueOfDecimal(drDataRecord["Debit"]));
                 }
 
-                if (availableAmount < 0)
+                if (balanceControlledAmount < 0)
                 {
-                    //VIS383: Bug ID-5698 01/05/24:-Added Line ID in valiable seprated with comma for set "Budget Breach" is true
+                    //VIS383: Bug ID-5698 01/05/24:-Added the "Requisition LineID" seprated with"," for set "Budget Breach" is true in requisition line
                     if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
                     {
                         _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
@@ -866,6 +867,11 @@ namespace VAdvantage.Model
                                              (x.Account_ID == Util.GetValueOfInt(drDataRecord["Account_ID"]))
                                             ))
                 {
+                    //VIS383: Bug ID-5698 07/05/24:-Added Line ID in valiable seprated with comma for set "Budget Breach" is true
+                    if (!_budgetBreachLineIDs.Contains(Util.GetValueOfString(drDataRecord["Line_ID"])))
+                    {
+                        _budgetBreachLineIDs += Util.GetValueOfString(drDataRecord["Line_ID"]) + ",";
+                    }
                     // If budget not defined then add error message in _budgetNotDefined message variable
                     // Done by rakesh on 29/Apr/2021 Messsage Variable changed from _budgetMessage to _budgetNotDefined
                     if (!_budgetNotDefined.Contains(Util.GetValueOfString(drBUdgetControl["BudgetName"])))
