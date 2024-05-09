@@ -30,31 +30,30 @@
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
 }
 
-.vas-test-sql {
-    background-color:white !important;
-}
 .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
     background: none;
     border: 1px solid rgba(var(--v-c-primary));
     border-radius: 3px;
     float: none;
     margin: 0 5px;
-    color: rgba(var(--v-c-on-primary));
+    color: rgba(var(--v-c-primary)) !important;
 }
 
-    .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
-        color: rgba(var(--v-c-primary)) !important;
-        background-color: rgba(var(--v-c-secondary),1);
-    }
+.vis-ad-w-p-actionpanel-r .vas-sql-generator .vas-sql-btn input[type='button']:not(.active) {
+    color: rgba(var(--v-c-primary));
+    background-color: rgba(var(--v-c-secondary),1);
+}
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
             background-color: rgba(var(--v-c-primary)) !important;
             color: rgba(var(--v-c-on-primary)) !important;
         }
 
-        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
-            float: right;
-        }
+.vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
+    float: right;
+    color: white !important;
+    background: linear-gradient(270deg, rgba(var(--v-c-on-secondary)) 0%, rgba(var(--v-c-primary)) 100%) !important;
+}
 
 .vis-ad-w-p-actionpanel-r .vas-content-area {
     float: left;
