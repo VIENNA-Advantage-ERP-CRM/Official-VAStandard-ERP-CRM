@@ -413,33 +413,45 @@ namespace VAdvantage.Model
 
         }
         #endregion
+
+        /// <summary>
+        /// Before Save
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            int AD_AlertProcessor_ID = 0;
             int scheduleId = Util.GetValueOfInt(Get_Value("AD_Schedule_ID"));
-            if (scheduleId > 0) {
-                string sql = @"SELECT AD_AlertProcessor_ID FROM AD_AlertProcessor WHERE IsActive='Y' AND AD_Schedule_ID = "+ scheduleId;
-                AD_AlertProcessor_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-            }
-            if (AD_AlertProcessor_ID == 0) {
-                MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
-                obj.SetAD_Schedule_ID(scheduleId);
-                obj.SetAD_Client_ID(GetAD_Client_ID());
-                obj.SetAD_Org_ID(GetAD_Org_ID());
-                obj.SetName(GetName());
-                obj.SetKeepLogDays(7);
-                obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
-                if (obj.Save())
+            if (scheduleId > 0)
+            {
+                string sql = @"SELECT AD_AlertProcessor_ID FROM AD_AlertProcessor WHERE IsActive='Y' AND AD_Schedule_ID = " + scheduleId;
+                int AD_AlertProcessor_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                if (AD_AlertProcessor_ID == 0)
                 {
-                    AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
+                    MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
+                    obj.SetAD_Schedule_ID(scheduleId);
+                    obj.SetAD_Client_ID(GetAD_Client_ID());
+                    obj.SetAD_Org_ID(GetAD_Org_ID());
+                    obj.SetName(GetName());
+                    obj.SetKeepLogDays(7);
+                    obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
+                    if (obj.Save())
+                    {
+                        AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
+                    }
+                    else
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
+                        return false;
+                    }
                 }
-                else {
-                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
-                    return false;
-                }
+                SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
+                return true;
             }
-            SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
-            return true;
+            else {
+                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SheduleRequired"));
+                return false;
+            } 
         }       
     }
 }
