@@ -61,7 +61,8 @@
         var $windowFieldColumnSelect = $("<div class='vas-windowfieldcol-select vas-windowtab vis-ev-col-mandatory' style='display: none;'></div>");
         var $joinsSelect = $("<div style='display: none;' class='vas-joins-select vas-common-style vas-windowtab'>");
         var $selectQuerySqlText = $("<div class='vas-sqlquery-text'>");
-        var $selectGenQuerySqlText = $("<div class='vas-sqlquery-text'>");
+        var $selectGenQuerySqlText = $("<div class='vas-sqlquery-text'>")
+        var $sqlGenDeleteIcon = $("<i class='vis vis-delete vas-filters-editdelete-btns'></i>");
         var $selectQuery = $("<div class='vas-query-input vas-sql-query-input' id='query-input' contenteditable='true'>");
         var $selectGeneratorQuery = $("<div class='vas-query-input' contenteditable='false'>");
         var $multiSelect = $("<div class='vas-multiselect'>");
@@ -136,6 +137,7 @@
         var $sqlGeneratorQueryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");
         var sqlQuery = VIS.Msg.getMsg("VAS_SQLQuery");
         var testSQL = VIS.Msg.getMsg("VAS_TestSql");
+        var MainTableColumns = null;
         var $root = $("<div class='vas-root'>");
 
         // Initialize UI Elements
@@ -156,8 +158,8 @@
             $filterConditionV2 = $("<select><option>AND</option><option>OR</option></select>");
             $sortElements = $("<select><option>ASC</option><option>DESC</option></select>");
 
-            $sqlBtns.append($sqlBtn)
-                .append($sqlGeneratorBtn)
+            $sqlBtns.append($sqlGeneratorBtn)
+                .append($sqlBtn)
                 .append($sqlResultDiv)
                 .append($testSqlBtn)
                 .append($testSqlGeneratorBtn);
@@ -175,7 +177,7 @@
             $joinFieldColumnLabel.text(VIS.Msg.getMsg("VAS_FieldColumn"));
             $joinsLabel.text(VIS.Msg.getMsg("VAS_Joins"));
             $addJoinsHeading.text(VIS.Msg.getMsg("VAS_AddJoin"));
-            $filterLabel.text(VIS.Msg.getMsg("VAS_Filter"));
+            $filterLabel.text(VIS.Msg.getMsg("VAS_Condition"));
             $sortByLabel.text(VIS.Msg.getMsg("VAS_Sort"));
             $addFilterText.text(VIS.Msg.getMsg("VAS_AddFilter"));
             $addSortByText.text(VIS.Msg.getMsg("VAS_AddSort"));
@@ -233,7 +235,6 @@
                 .append($filterPrice)
                 .append($filterOperatorDiv)
                 .append($filterValueDiv)
-                //.append($inOperatorValues)
                 .append($addFilterSelectButton)
                 .append($filterEditDiv);
             $addFilterSelectButton.append($filterConditionV2).append($addFilterBtn);
@@ -245,7 +246,7 @@
             $joiningTableInputBlock.append($joiningTableColLabel).append($joiningTableInput).append($joiningTableSelectArrow);
             $addSortBySelectWithButton.append($sortElements).append($addSortBtn);
             $sqlContent.append($selectQuerySqlText).append($selectQuery).append($queryResultGrid);
-            $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText).append($selectGeneratorQuery).append(gridDiv2);
+            $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText.append($sqlGenDeleteIcon)).append($selectGeneratorQuery).append(gridDiv2);
 
             /*Multiple column checbox handling*/
 
@@ -728,7 +729,7 @@
                 for (var i = 0; i < filterArray.length; i++) {
                     var dataType = filterArray[i].dataType;
                     data += '<div class=vas-filter-item index=' + i + '>';
-                    data += '<div class=vas-filter-whitebg>';
+                    data += '<div class="vas-filter-whitebg" style="background-color:' + randomColor() +'">';
                     data += '<div class="vas-filters-block">';
                     data += '<div class="vas-filter-andor-value" style=display:none;>' + filterArray[i].filterAndOrValue + '</div>';
                     data += '<div class="vas-filter-whereExit" style=display:none;>' + filterArray[i].whereExist + '</div>';
@@ -1136,20 +1137,26 @@
                on UI when user select the
                dropdowns in Joins Accordion
             */
+            function randomColor() {
+                var hue = Math.floor(Math.random() * 360);
+                var v = Math.floor(Math.random() * 16) + 75;
+                var pastel = 'hsl(' + hue + ', 100%, ' + v + '%)';
+                return pastel;
+            }
 
             joinsArray = [];
             function readJoinsData() {
                 var data = '';
-                for (var i = 0; i < joinsArray.length; i++) {
+                for (var i = 0; i < joinsArray.length; i++) {              
                     data += '<div class=vas-join-item>';
                     data += '<div class="vas-joins-bg">';
                     data += '<div class="vas-joins-block">';
-                    data += '<div class="vas-selecttable join-title">' + joinsArray[i].joinsDropDown + '</div>';
-                    data += '<div class="vas-selecttable join-base-table">' + joinsArray[i].keyColumn1 + '</div>';
-                    data += '<div class="vas-selecttable join-tab">' + joinsArray[i].joinTableName + '</div>';
-                    data += '<div class="vas-selecttable join-jointable">' + joinsArray[i].keyColumn2 + '</div>';
+                    data += '<div class="vas-selecttable join-title" style="background-color:' + randomColor() +'">' + joinsArray[i].joinsDropDown + '</div>';
+                    data += '<div class="vas-selecttable join-base-table" style="background-color:' + randomColor() +'">' + joinsArray[i].keyColumn1 + '</div>';
+                    data += '<div class="vas-selecttable join-tab" style="background-color:' + randomColor() +'">' + joinsArray[i].joinTableName + '</div>';
+                    data += '<div class="vas-selecttable join-jointable" style="background-color:' + randomColor() +'">' + joinsArray[i].keyColumn2 + '</div>';
                     if (joinsArray[i].joinSelectedColumn.length > 0) {
-                        data += '<div class="vas-selecttable join-joinselectedcolumn">' + joinsArray[i].joinSelectedColumn + '</div>';
+                        data += '<div class="vas-selecttable join-joinselectedcolumn" style="background-color:' + randomColor() +'">' + joinsArray[i].joinSelectedColumn + '</div>';
                     }
                     data += '</div>';
                     data += '<div class="vas-delete-join-btn">';
@@ -1172,6 +1179,16 @@
                     var joinsJoinTable = deleteJoin.prev('.vas-joins-block').find('.join-jointable').text();
                     var columnToRemove = ", " + deleteJoin.prev('.vas-joins-block').find('.join-joinselectedcolumn').text();
                     var reqJoinQuery = joinsTitle + " " + joinsTab + " " + 'ON (' + joinsBaseTable + " = " + joinsJoinTable + ")";
+                    if (MainTableColumns.length > 0 && joinsJoinTable.length > 0) {
+                        var joinTableIndex = joinsJoinTable.indexOf('.');
+                        if (joinTableIndex > 0) {
+                            for (var i = MainTableColumns.length - 1; i >= 0; i--) {
+                                if (MainTableColumns[i].TableName === joinsJoinTable.slice(0, joinTableIndex)) {
+                                    MainTableColumns.splice(i, 1);
+                                }
+                            }
+                        }
+                    }
                     $removeJoins = $selectGeneratorQuery.text().replace(reqJoinQuery, '').trim();
                     $selectGeneratorQuery.text($removeJoins);
                     removeColumnJoins = $selectGeneratorQuery.text().replace(columnToRemove, '');
@@ -1255,15 +1272,15 @@
 
                     } else {
                         sql += joinQuery;
-                    }
+                    }                   
                     if (joinData != null) {
                         if (joinData && joinData.length > 0) {
                             joinTableName = joinData[0].TableName;
+                            MainTableColumns = MainTableColumns.concat(joinData);
                             for (var i = 0; i < joinData.length; i++) {
                                 var optionValue = joinTableName + "." + joinData[i].DBColumn;
                                 var optionText = joinTableName + " > " + joinData[i].ColumnName + " (" + joinData[i].DBColumn + ")";
                                 if (!addedOptions.includes(optionValue)) {
-                                    $joinOnFieldColumnMainTable.append(" <div class='vas-column-list-item' title='" + joinTableName + " > " + joinData[i].DBColumn + "' value=" + optionValue + ">" + joinTableName + " > " + joinData[i].DBColumn + "</div>");
                                     $sortByDropdown.append(" <div class='vas-column-list-item' title='" + optionText + "' value=" + optionValue + ">" + optionText + "</div>");
                                     $filterPrice.append(" <div class='vas-column-list-item' title='" + optionText + "' refValId=" + joinData[i].ReferenceValueID + " fieldID=" + joinData[i].FieldID + " tabID=" + tabID + " columnID=" + joinData[i].ColumnID +
                                         " datatype=" + joinData[i].DataType + " value=" + optionValue + ">" + optionText + "</div>");
@@ -1402,6 +1419,50 @@
             /*
                 Function of add/remove active class on SQL & SQL Generator Buttons
             */
+
+            $sqlGenDeleteIcon.on(VIS.Events.onTouchStartOrClick, function () {
+                tableID = 0;
+                tableName = "";
+                tabID = 0;
+                $selectGeneratorQuery.text('');
+                joinsArray = [];
+                $joins.empty();
+                filterArray = [];
+                $filters.empty();
+                $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
+                getColumns(0, 0);
+                getJoinsColumns(0,0)
+                $joinsDiv.css("pointer-events", "none");
+                $filterDiv.css("pointer-events", "none");
+                $sortByDiv.css("pointer-events", "none");
+                $checkBoxes.hide();
+                $sortColumnInput.val('');
+                $filterColumnInput.val('');
+                $windowTabSelect.getControl().addClass("vis-ev-col-mandatory");
+                $filterSelectArrow.css('pointer-events', 'all');
+                $addFilterBtn.val(VIS.Msg.getMsg("VAS_AddFilter"));
+                $sortByDiv.removeClass('active');
+                $joinsDiv.removeClass('active');
+                $filterDiv.removeClass('active');
+                $txtJoinWindow.empty();
+                getJoinWindow(0, 0);
+                $selectGeneratorQuery.show();
+                gridDiv2.hide();
+                $sqlGeneratorQueryResultGrid.hide();
+                $saveGeneratorBtn.hide();
+                $testSqlGeneratorBtn.val(testSQL);
+                $sqlResultDiv.hide();
+                andFlag = true;
+                orderbyFlag = true;
+                $windowTabSelect.setValue(null)
+                addedOptions = [];
+                joinColumnName = [];
+                seletedJoinCloumn = [];
+                joinData = null;
+                $filterPriceValue.attr('type', 'Textbox');
+                $filterPriceValue.val('');
+                MainTableColumns = [];
+            });
 
             function Active(e) {
                 $sqlBtn.removeClass('active');
@@ -1560,9 +1621,7 @@
             $joins.empty();
             filterArray = [];
             $filters.empty();
-            // $inDropdownVal = [];
-            //$inOperatorValues.empty();
-
+            MainTableColumns = [];
             $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
             if (tableID > 0) {
                 getColumns(tableID, tabID);
@@ -1733,6 +1792,7 @@
             $sortByDropdown.empty();
             $filterPrice.empty();
             $joinOnFieldColumnMainTable.empty();
+            MainTableColumns = [];
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/GetColumns",
                 data: { tableID: tableID, tabID: tabID },
@@ -1742,8 +1802,8 @@
                     result = JSON.parse(result);
                     if (result && result.length > 0) {
                         tableName = result[0].TableName;
+                        MainTableColumns = result;
                         for (var i = 0; i < result.length; i++) {
-                            $joinOnFieldColumnMainTable.append(" <div class='vas-column-list-item' title='" + tableName + " > " + result[i].DBColumn + "' value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].DBColumn + "</div>");
                             $sortByDropdown.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
                             $filterPrice.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " columnID="
                                 + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
@@ -1768,7 +1828,6 @@
 
                         if (this.checked) {
                             seletedCloumn.push(desiredResult);
-                            //$(this).parent('.vas-column-list-item').detach().prependTo('.vas-checkboxes');
                         }
                         else {
                             seletedCloumn = seletedCloumn.filter(function (elem) {
@@ -1805,6 +1864,7 @@
             Function to get the columns from Table in Joins Dropdowns
         */
         function getJoinsColumns(TableID2, tabID2) {
+            var joinColumns = [];
             $selectBox.find('select').empty();
             $joinMultiSelect.empty();
             $joinOnFieldColumnJoinTable.empty();
@@ -1820,8 +1880,26 @@
                     if (result && result.length > 0) {
                         joinTable = result[0].TableName;
                         for (var i = 0; i < result.length; i++) {
-                            $joinOnFieldColumnJoinTable.append("<div class='vas-column-list-item' title='" + joinTable + " > " + result[i].DBColumn + "'value=" + joinTable + "." + result[i].DBColumn + ">" + joinTable + " > " + result[i].DBColumn + "</div>");
-                            $joinMultiSelect.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            for (var j = 0; j < MainTableColumns.length; j++) {
+                                var optionMTableValue = MainTableColumns[j].TableName + "." + MainTableColumns[j].DBColumn;
+                                var optionMTableText = MainTableColumns[j].DBColumn + " (" + MainTableColumns[j].TableName + ")";
+                                var optionJTableValue = joinTable + "." + result[i].DBColumn;
+                                var optionJTableText = result[i].DBColumn + " (" + joinTable + ")";
+                                if (MainTableColumns[j].DBColumn == result[i].DBColumn) {
+                                    if (!joinColumns.includes(result[i].DBColumn)) {
+                                        $joinOnFieldColumnJoinTable.append("<div class='vas-column-list-item' title='" + optionJTableText + "'value=" + optionJTableValue + ">" + optionJTableText+ "</div>");
+                                        joinColumns.push(result[i].DBColumn);
+                                    }
+                                    $joinOnFieldColumnMainTable.append(" <div class='vas-column-list-item' title='" + optionMTableText + "' value=" + optionMTableValue + ">" + optionMTableText + "</div>");
+                                }
+                                if (MainTableColumns[j].IsKey=='Y' && $baseTableJoinInput.val()!=null) {
+                                    $baseTableJoinInput.val(optionMTableValue);
+                                }
+                            }
+                            if (result[i].IsKey=='Y' && $joiningTableInput.val()!=null) {
+                                $joiningTableInput.val(optionJTableValue)
+                            }
+                            $joinMultiSelect.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");                           
                         }
                         filterFlag = false;
                         seletedJoinCloumn = [];
@@ -1856,7 +1934,8 @@
             Search functionality for Joins
         */
         function getJoinWindow(tabID, tableID) {
-            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, " AD_Tab.AD_Tab_ID <> " + tabID + " AND AD_Tab.AD_Table_ID<>" + tableID);
+            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false,
+                "AD_Tab.AD_Window_ID IN (SELECT AD_Window_ID FROM AD_Window_Access WHERE AD_Role_ID = " + VIS.Env.getCtx().getAD_Role_ID() + ") AND AD_Tab.AD_Tab_ID <> " + tabID + " AND AD_Tab.AD_Table_ID<>" + tableID);
             $joinsWindowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", true, false, true, VIS.DisplayType.Search, lookups);
             var locDep = $joinsWindowTabSelect.getControl().attr('placeholder', ' Search here').attr("id", "Ad_Tab_ID");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');
@@ -1873,7 +1952,7 @@
             Search functionality for Window/Tab
         */
         function getWindow() {
-            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, "");
+            var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false, "AD_Tab.AD_Window_ID IN (SELECT AD_Window_ID FROM AD_Window_Access WHERE AD_Role_ID = " + VIS.Env.getCtx().getAD_Role_ID() + ")");
             $windowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", true, false, true, VIS.DisplayType.Search, lookups);
             var locDep = $windowTabSelect.getControl().attr('placeholder', ' Search here').attr("id", "Ad_Table_ID");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');

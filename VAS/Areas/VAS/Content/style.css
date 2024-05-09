@@ -30,22 +30,26 @@
     border-bottom: 1px solid rgba(var(--v-c-secondary),1);
 }
 
-    .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
-        background: none;
-        border: 1px solid rgba(var(--v-c-primary));
-        border-radius: 3px;
-        float: none;
-        margin: 0 5px;
-        color: rgba(var(--v-c-on-primary));
+.vas-test-sql {
+    background-color:white !important;
+}
+.vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'] {
+    background: none;
+    border: 1px solid rgba(var(--v-c-primary));
+    border-radius: 3px;
+    float: none;
+    margin: 0 5px;
+    color: rgba(var(--v-c-on-primary));
+}
+
+    .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
+        color: rgba(var(--v-c-primary)) !important;
+        background-color: rgba(var(--v-c-secondary),1);
     }
 
-        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
-            color: rgba(var(--v-c-primary)) !important;
-        }
-
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
-            background-color: rgba(var(--v-c-primary));
-            color: rgba(var(--v-c-on-primary));
+            background-color: rgba(var(--v-c-primary)) !important;
+            color: rgba(var(--v-c-on-primary)) !important;
         }
 
         .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
@@ -298,8 +302,9 @@
 }
 
     .vas-filters .vas-filter-item.vas-filters-row {
-        background: rgba(var(--v-c-secondary),1);
-        padding: 15px 10px;
+        background: rgba(var(--v-c-secondary), .3);
+        padding: 5px;
+        border-radius: 3px;
     }
 
         .vas-filters .vas-filter-item.vas-filters-row:not(:last-child) {
@@ -340,11 +345,11 @@
 }
 
     .vas-joins .vas-join-item {
-        border: 1px solid rgba(var(--v-c-on-secondary),1);
-        padding: 10px 10px 2px;
+        border: 1px solid rgba(var(--v-c-on-secondary), 1);
+        padding: 10px;
         margin-bottom: 10px;
         border-radius: 3px;
-        background: rgba(var(--v-c-secondary),1);
+        background: rgba(var(--v-c-secondary), 0.3);
         transition: all 0.3s ease-in-out;
     }
 
@@ -359,11 +364,13 @@
 .vas-filters-block {
     float: left;
     width: calc(100% - 25%);
+    border-radius: 3px;
+    position: relative;
+    font-size: 83%;
 }
-
     .vas-filters-block div {
+        border-radius: 3px;
         float: left;
-        width: 260px;
         text-overflow: ellipsis;
         overflow: hidden;
     }
@@ -444,16 +451,16 @@
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'], .vas-sqlgenerator-column2 input[type='button'] {
-    background: none;
-    color: rgba(var(--v-c-primary)) !important;
+    background-color: rgba(var(--v-c-primary));
+    color: white !important;
     border: 1px solid rgba(var(--v-c-primary));
 }
 
 .vas-filter-whitebg {
+    border-radius: 3px;
     float: left;
     width: 100%;
-    background-color: rgba(var(--v-c-on-primary));
-    padding: 10px;
+    padding: 7px;
 }
 
 .vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
@@ -467,8 +474,8 @@
 
 .vis-ad-w-p-actionpanel-r .vas-sql-content .vas-save-btn {
     margin: 0px;
-    background: none;
-    color: rgba(var(--v-c-primary)) !important;
+    background-color: rgba(var(--v-c-primary)) !important;
+    color: white !important;
     border: 1px solid rgba(var(--v-c-primary));
 }
 
@@ -574,6 +581,7 @@
 .vas-joins-bg {
     display: flex;
     justify-content: space-between;
+    position: relative;
 }
 
 .vas-join-item .vas-selecttable:first-child {
@@ -581,29 +589,27 @@
 }
 
 .vas-joins-block {
-    width: 85%;
-    display: inline-block;
-    vertical-align: top;
+    width: 100%;
 }
 
 .vas-delete-join-btn {
-    width: 15%;
     display: inline-block;
     text-align: right;
+    position: absolute;
+    right: 0;
 }
 
 .vas-join-item .vas-selecttable {
-    float: left;
-    width: calc(50% - 6px);
+    font-size: 83%;
+    color: black;
+    border-radius: 3px;
+    float: left !important;
+    margin-right: 5px !important;
+    width: fit-content;
     word-wrap: break-word;
-    background-color: rgba(var(--v-c-on-primary));
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     margin-right: 12px;
     padding: 1px 10px;
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
 }
 
     .vas-join-item .vas-selecttable:nth-child(2n+1) {
