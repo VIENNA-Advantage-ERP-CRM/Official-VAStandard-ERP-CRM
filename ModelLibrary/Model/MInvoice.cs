@@ -661,7 +661,7 @@ namespace VAdvantage.Model
 
             SetIsSOTrx(ship.IsSOTrx());
             //vikas 9/16/14 Set cb partner 
-            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());            
+            MOrder ord = new MOrder(GetCtx(), ship.GetC_Order_ID(), Get_Trx());
             MBPartner bp = null;
             if (Util.GetValueOfInt(ship.GetC_Order_ID()) > 0)
             {
@@ -676,7 +676,7 @@ namespace VAdvantage.Model
             //vikas
             //MBPartner bp = new MBPartner(GetCtx(), ship.GetC_BPartner_ID(), null);
             SetBPartner(bp);
-            SetAD_User_ID(ord.GetBill_User_ID());            
+            SetAD_User_ID(ord.GetBill_User_ID());
             //
             SetSendEMail(ship.IsSendEMail());
             //
@@ -1549,15 +1549,20 @@ namespace VAdvantage.Model
             }
 
             //APInvoice Case: invoice Reference can't be same for same financial year and Business Partner and DoCTypeTarget and DateAcct      
-
-            if ((Is_ValueChanged("DateAcct") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_DocTypeTarget_ID") || Is_ValueChanged("InvoiceReference")) && !IsSOTrx() && checkFinancialYear() > 0)
+            
+            if ((Is_ValueChanged("DateAcct") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_DocTypeTarget_ID") || Is_ValueChanged("InvoiceReference")) && !IsSOTrx())
             {
-                log.SaveError("", Msg.GetMsg(GetCtx(), "InvoiceReferenceExist"));
-                return false;
+                //VIS_427 bugid 5739 Handled message if Duplicate period exist or not or duplicacy of invoice refernce
+                 string periodMessage = checkFinancialYear();
+                if (!string.IsNullOrEmpty(periodMessage))
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), periodMessage));
+                    return false;
+                }              
             }
             //VIS_427 Bug Id 3717 04/01/2024 Handled the GrandTotalAfterWitholding Amount When user unselect the Witholding id
             if (GetC_Withholding_ID() == 0 && GetBackupWithholdingAmount() != 0)
-            { 
+            {
                 SetGrandTotalAfterWithholding(Decimal.Add(GetGrandTotalAfterWithholding(), GetBackupWithholdingAmount()));
                 SetBackupWithholdingAmount(0);
             }
@@ -1636,7 +1641,7 @@ namespace VAdvantage.Model
 
             // If lines are available and user is changing the pricelist/conversiontype on header than we have to restrict it because
             // those lines are saved as privious pricelist prices or Payment term.. standard sheet issue no : SI_0344 / JID_0564 / JID_1536_1 by Manjot
-            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID")|| Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
+            if (!newRecord && (Is_ValueChanged("M_PriceList_ID") || Is_ValueChanged("C_ConversionType_ID") || Is_ValueChanged("VAS_ContractMaster_ID")))//VIS430:When transactionline available for Contract refrence on header show error message
             {
                 MInvoiceLine[] lines = GetLines(true);
 
@@ -1871,9 +1876,10 @@ namespace VAdvantage.Model
         /// <summary>
         /// check duplicate record against invoice reference and 
         /// should not check the uniqueness of invoice reference in case of reverse document
+        /// if duplicate period or no period exist will show the message 
         /// </summary>
-        /// <returns>count of Invoice and 0</returns>
-        public int checkFinancialYear()
+        /// <returns>message</returns>
+        public string checkFinancialYear()
         {
             if (!(!String.IsNullOrEmpty(GetDescription()) && GetDescription().Contains("{->")))
             {
@@ -1892,20 +1898,35 @@ namespace VAdvantage.Model
                                     IsActive = 'Y' AND AD_Client_ID=" + GetAD_Client_ID(), null, null));
                 }
 
+                //VIS_427 BugID 5739 This qery is checking if duplicate period exist in multiple year 
+                string sqlPeriodCount = @"SELECT Count(C_Period.C_Period_ID) FROM C_Year INNER JOIN C_Period ON " +
+                "C_Year.C_Year_ID = C_Period.C_Year_ID WHERE  C_Year.C_Calendar_ID =" + calendar_ID + @" and 
+                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_Period.StartDate AND C_Period.EndDate  and C_Period.IsActive='Y' and C_Year.IsActive='Y' ";
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx()));
+                if (count > 1)
+                {
+                    return "VAS_DuplicatePeriodExist";
+                }
+                else if(count == 0)
+                {
+                    return "VAS_PeriodNotExist";
+                }
+
                 ds = DB.ExecuteDataset(@"SELECT MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
-                "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
-                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate) " +
-                    "HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);      // TaskID 2258 Check for not selecting null row
+                     "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
+                     " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate AND C_Period.IsActive='Y' AND C_Year.IsActive='Y') " +
+                     " AND IsActive='Y' HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);       // TaskID 2258 Check for not selecting null row
 
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
-                    startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
-                    endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
+                        startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
+                        endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
                 }
                 else          // TaskID 2258 If start date and end date not found
                 {
+                    //VIS_427 BugID 5739 no period exist then will show the message 
                     log.Info("Check Method checkFinancialYear() if Start Date and End Date not found");
-                    return 1;
+                    return "VAS_PeriodNotExist";
                 }
                 string sql = "SELECT COUNT(C_Invoice_ID) FROM C_Invoice WHERE DocStatus NOT IN('RE','VO') AND IsExpenseInvoice='N' AND IsSoTrx='N'" +
                   " AND C_BPartner_ID = " + GetC_BPartner_ID() + " AND InvoiceReference = '" + Get_Value("InvoiceReference") + "'" +
@@ -1915,10 +1936,14 @@ namespace VAdvantage.Model
                 {
                     sql += " AND C_Invoice_ID != " + GetC_Invoice_ID();
                 }
-                return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+                if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0)
+                {
+                    return "InvoiceReferenceExist";
+                }
+                return "";
             }
             else
-                return 0;
+                return "";
         }
         /**
          * 	Set Price List (and Currency) when valid
@@ -5211,7 +5236,7 @@ namespace VAdvantage.Model
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }   //	project
-                
+
                 try
                 {
                     //	Counter Documents
@@ -5226,7 +5251,7 @@ namespace VAdvantage.Model
                     //Info.Append(" - @CounterDoc@: ").Append(e.Message.ToString());
                     _processMsg = e.Message.ToString();
                     return DocActionVariables.STATUS_INPROGRESS;
-                }                
+                }
 
                 /* Creation of allocation against invoice whose payment is done against order */
                 if (Env.IsModuleInstalled("VA009_") && DocActionVariables.STATUS_COMPLETED == "CO" && GetC_Order_ID() > 0)
@@ -5273,7 +5298,7 @@ namespace VAdvantage.Model
             {
                 _log.Severe("Error found at Invoice Completion. Invoice Document no = " + GetDocumentNo() + " " + ex.Message);
                 return DocActionVariables.STATUS_INVALID;
-            }            
+            }
             return DocActionVariables.STATUS_COMPLETED;
         }
 
@@ -5309,8 +5334,8 @@ namespace VAdvantage.Model
                     {
                         utilizeAmount = Util.GetValueOfDecimal(Util.GetValueOfDecimal(invoiceAmount) - Util.GetValueOfDecimal(orderTotal));
                     }
-                    
-                   
+
+
                 }
                 else
                 {
@@ -7094,10 +7119,10 @@ namespace VAdvantage.Model
         /// <author>VIS_427 </author>
         public void DeAllocateTimeSheetInvoice()
         {
-            DB.ExecuteQuery("UPDATE S_TimeExpenseLine SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+             DB.ExecuteQuery("UPDATE S_TimeExpenseLine SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             if (Env.IsModuleInstalled("VA075_"))
             {
-                DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+              DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }
         }
         //update Description
