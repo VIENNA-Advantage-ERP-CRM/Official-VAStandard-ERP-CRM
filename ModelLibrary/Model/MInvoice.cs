@@ -1554,7 +1554,7 @@ namespace VAdvantage.Model
             {
                 //VIS_427 bugid 5739 Handled message if Duplicate period exist or not or duplicacy of invoice refernce
                  string periodMessage = checkFinancialYear();
-                if (periodMessage != "")
+                if (!string.IsNullOrEmpty(periodMessage))
                 {
                     log.SaveError("", Msg.GetMsg(GetCtx(), periodMessage));
                     return false;
@@ -1897,24 +1897,27 @@ namespace VAdvantage.Model
                     calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Calendar_ID FROM AD_ClientInfo WHERE 
                                     IsActive = 'Y' AND AD_Client_ID=" + GetAD_Client_ID(), null, null));
                 }
-                //VIS_427 BugID 5739 Fixed query and check if duplicate period exist in multiple year 
-                ds = DB.ExecuteDataset(@"SELECT COUNT(C_Period_ID) as PeriodCount,MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id IN (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
-                "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
-                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate) AND IsActive='Y' " +
-                    " AND " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN StartDate AND EndDate HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);      // TaskID 2258 Check for not selecting null row
+                //VIS_427 BugID 5739 This qery is checking if duplicate period exist in multiple year 
+                string sqlPeriodCount = @"SELECT Count(C_Period.C_Period_ID) FROM C_Year INNER JOIN C_Period ON " +
+                "C_Year.C_Year_ID = C_Period.C_Year_ID WHERE  C_Year.C_Calendar_ID =" + calendar_ID + @" and 
+                    " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_Period.StartDate AND C_Period.EndDate  and C_Period.IsActive='Y' and C_Year.IsActive='Y' ";
+                if (Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx())) > 1)
+                {
+                    return "VAS_DuplicatePeriodExist";
+                }
+                else if(Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx())) == 0)
+                {
+                    return "VAS_PeriodNotExist";
+                }
+                ds = DB.ExecuteDataset(@"SELECT MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
+                     "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
+                     " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate AND C_Period.IsActive='Y' AND C_Year.IsActive='Y') " +
+                     " AND IsActive='Y' HAVING MIN(startdate) IS NOT NULL AND MAX(enddate) IS NOT NULL", null, null);       // TaskID 2258 Check for not selecting null row
 
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
-                    //VIS_427 BugID 5739 duplicate period exist then will show the message 
-                    if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["PeriodCount"]) > 1)
-                    {
-                        return "VAS_DuplicatePeriodExist";
-                    }
-                    else
-                    {
                         startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
                         endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
-                    }
                 }
                 else          // TaskID 2258 If start date and end date not found
                 {
