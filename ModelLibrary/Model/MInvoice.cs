@@ -1897,18 +1897,21 @@ namespace VAdvantage.Model
                     calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Calendar_ID FROM AD_ClientInfo WHERE 
                                     IsActive = 'Y' AND AD_Client_ID=" + GetAD_Client_ID(), null, null));
                 }
+
                 //VIS_427 BugID 5739 This qery is checking if duplicate period exist in multiple year 
                 string sqlPeriodCount = @"SELECT Count(C_Period.C_Period_ID) FROM C_Year INNER JOIN C_Period ON " +
                 "C_Year.C_Year_ID = C_Period.C_Year_ID WHERE  C_Year.C_Calendar_ID =" + calendar_ID + @" and 
                     " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_Period.StartDate AND C_Period.EndDate  and C_Period.IsActive='Y' and C_Year.IsActive='Y' ";
-                if (Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx())) > 1)
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx()));
+                if (count > 1)
                 {
                     return "VAS_DuplicatePeriodExist";
                 }
-                else if(Util.GetValueOfInt(DB.ExecuteScalar(sqlPeriodCount, null, Get_Trx())) == 0)
+                else if(count == 0)
                 {
                     return "VAS_PeriodNotExist";
                 }
+
                 ds = DB.ExecuteDataset(@"SELECT MIN(startdate) AS startdate, MAX(enddate) AS enddate FROM c_period WHERE c_year_id = (SELECT c_year.c_year_id FROM c_year INNER JOIN C_period ON " +
                      "c_year.c_year_id = C_period.c_year_id WHERE  c_year.c_calendar_id =" + calendar_ID + @" and 
                      " + GlobalVariable.TO_DATE(GetDateInvoiced(), true) + " BETWEEN C_period.startdate AND C_period.enddate AND C_Period.IsActive='Y' AND C_Year.IsActive='Y') " +
