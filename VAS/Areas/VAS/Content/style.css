@@ -1137,7 +1137,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-leftsidewrap {
     float: left;
     max-width: 260px;
-    height: calc(100% - 100px);
+    height: calc(100% - 42px);
     padding-bottom: 10px;
     padding-top: 10px;
     overflow-y: auto;
@@ -1152,6 +1152,12 @@ html[dir="rtl"] .vas-sql-result-msg {
     align-items: center;
     justify-content: flex-end;
     gap: 10px;
+}
+.vas-tis-leftbtnInvdiv {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 10px;
 }
 .vas-tis-subtotal {
     width: 157px;
