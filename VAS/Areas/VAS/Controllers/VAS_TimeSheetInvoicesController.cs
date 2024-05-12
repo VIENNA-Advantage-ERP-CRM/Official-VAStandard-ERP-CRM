@@ -68,14 +68,15 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="AD_Client_ID">AD_Client_ID</param>
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <param name="DataTobeInvoice">object of data which is to be invoice</param>
+        /// <param name="C_DocType_ID">C_DocType_ID</param>
         /// <returns>message</returns>
         /// <author>Devops Id: 5719 VIS_427</author>
-        public ActionResult GenerateInvoice(string DataTobeInvoice, int AD_Client_ID, int AD_Org_ID)
+        public ActionResult GenerateInvoice(string DataTobeInvoice, int AD_Client_ID, int AD_Org_ID, int C_DocType_ID)
         {
             dynamic dataTobeInvoice = JsonConvert.DeserializeObject<List<ExpandoObject>>(DataTobeInvoice);
             Ctx ctx = Session["ctx"] as Ctx;
             VAS_TimeSheetInvoice invoiceTimeSheet = new VAS_TimeSheetInvoice();
-            string _Paydata = invoiceTimeSheet.GenerateInvoice(ctx, dataTobeInvoice, AD_Client_ID, AD_Org_ID);
+            string _Paydata = invoiceTimeSheet.GenerateInvoice(ctx, dataTobeInvoice, AD_Client_ID, AD_Org_ID, C_DocType_ID);
             var invoiceData = Json(JsonConvert.SerializeObject(_Paydata), JsonRequestBehavior.AllowGet);
             invoiceData.MaxJsonLength = int.MaxValue;
             return invoiceData;
