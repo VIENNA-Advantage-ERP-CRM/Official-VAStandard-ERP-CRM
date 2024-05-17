@@ -345,7 +345,6 @@
         /*this function is used to create design of form */
         function loadDesign() {
             var LeftButtonDiv = $('<div class="vas-tis-leftbuttondiv">');
-            var LeftBtnInvDiv = $('<div class="vas-tis-leftbtnInvdiv">');
             //this design will have all the controls like arrow btn,filter btn
             $self.topDiv = $("<div id='topDiv_" + $self.windowNo + "' class='vis-archive-l-s-head vis-frm-ls-top' style='padding: 0;'>" +
                 "<div id='btnSpaceDiv_" + $self.windowNo + "' class='vas-spacediv'>" +
@@ -354,35 +353,35 @@
                 "<div class='vas-SelectDiv'>" +
                 "<label id='spnSelectRecord_" + $self.windowNo + "' class='VIS_Pref_Label_Font vas-SpnSelect'>" + VAS.translatedTexts.VAS_RecordSelection + "</label></div>" +
                 "<div class='vas-tis-filter dropdown'>" +
+                "<div class='vas-tis-icondiv'>" +
+                "<a class='vas-tis-refreshicon' id='vas-tis-refresh_" + $self.windowNo + "'>" +
+                "<span class='glyphicon glyphicon-refresh'>" + "</span>" +
+                "</a>" +
                 "<span class='vas-tis-filterspn btn d-flex position-relative' type='button' id='vas_tis_dropdownMenu_" + $self.windowNo + "'>" +
                 "<i class='fa fa-filter vas-tis-filterIcon'></i>" +
                 "</span>" +
+                "</div>"+
                 "<div class='vas-tis-filterPopupWrap' id='vas_tis_FilterPopupWrap_" + $self.windowNo + "'>" +
                 "</div>" +
                 "</div>");
             
-            lineDiv = $('<div class="vas-tis-linediv">');
             $self.btnSpaceDiv = $self.topDiv.find("#btnSpaceDiv_" + $self.windowNo);
             $self.recordDiv = $self.topDiv.find("#spnSelect_" + $self.windowNo);
             $self.LeftsideDiv = $("<div id='sideDiv_" + $self.windowNo + "' class='vas-tis-leftsidewrap vis-leftsidebarouterwrap px-3'>");
-            //$self.LeftsideDiv.css("height", "100%");
             $self.SearchBtn = $("<input id='SearchBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.Search + "'>");
-            $self.RefreshBtn = $("<input id='RefreshBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.VAS_Refresh + "'>");
+           // $self.RefreshBtn = $("<input id='RefreshBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.VAS_Refresh + "'>");
             $self.bottumDiv = $("<div class='vis-info-btmcnt-wrap vis-p-t-10 vas-BottomBtnDiv'>");
-            $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2'>" + VAS.translatedTexts.VAS_Preview + "</button>");
-            $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
-            LeftButtonDiv.append($self.RefreshBtn).append($self.SearchBtn);
-            //created tag to seperate controls and buttons
-            SeperationTag = '<hr style="height:1px;border-width:0;background-color:black;">';
-            LeftBtnInvDiv.append($self.PreviewBtn).append($self.GenerateInvBtn);
-            lineDiv.append(SeperationTag);
-            LeftSideFields.append(LeftButtonDiv).append(lineDiv).append(DocTypeDiv).append(LeftBtnInvDiv);
-            $self.LeftsideDiv.append(LeftSideFields);
-            //$self.bottumDiv.append($self.GenerateInvBtn).append($self.PreviewBtn);
+            $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2 vas-tis-btnmargin'>" + VAS.translatedTexts.VAS_Preview + "</button>");
+            $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-tis-btnmargin'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
+            LeftButtonDiv.append($self.SearchBtn);
+            $self.LeftsideDiv.append(LeftSideFields).append(LeftButtonDiv);
+            var rightBottomDiv = $("<div class='vas-tis-rightbottomdiv'>")
+            rightBottomDiv.append($self.GenerateInvBtn).append($self.PreviewBtn)
+            $self.bottumDiv.append(DocTypeDiv).append(rightBottomDiv);
 
             $self.gridSelectDiv = $("<div id='gridSelectDiv_" + $self.windowNo + "' class='vis-frm-grid-outerwrp'>");
             //appended all the design to root
-            $self.$root.append($self.topDiv).append($self.LeftsideDiv).append($self.gridSelectDiv);
+            $self.$root.append($self.topDiv).append($self.LeftsideDiv).append($self.gridSelectDiv).append($self.bottumDiv);
         }
         /**
         * this fucntion is used to show unselect those record whose configuration is not correct
@@ -1209,7 +1208,7 @@
             PreviewDyinit(PreviewFilteredGridData);
 
             // Append subtotal span to the right side of the dialog
-            var SubTotalSpan = $('<div><div class="vas-tis-subtotal" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '</div></div>');
+            var SubTotalSpan = $('<div><div class="vas-tis-subtotal" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + parseFloat(SubTotal).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + '</div></div>');
             rightPreviewWrap.append(SubTotalSpan);
 
             // Handle click events on items in the left side of the dialog
@@ -1230,7 +1229,7 @@
                 // Initialize the preview grid with filtered data
                 PreviewDyinit(PreviewFilteredGridData);
                 rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(VIS.Utility.decodeText(PreviewFilteredGridData[0].C_BPartner));
-                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal);
+                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + parseFloat(SubTotal).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }));
                 SubTotal = 0;
             });
 
@@ -1673,6 +1672,7 @@
             this.spnRecordSelection = this.$root.find("#spnSelect_" + $self.windowNo);
             this.PreviewBtn = this.$root.find("#PreviewBtn_" + $self.windowNo);
             var btnFilter = this.$root.find("#vas_tis_dropdownMenu_" + $self.windowNo);
+            var refreshIcon = this.$root.find("#vas-tis-refresh_" + $self.windowNo);
             //On click of filter button added a popup to filter the data
             if (btnFilter != null) {
                 btnFilter.on("click", function () {
@@ -1708,8 +1708,8 @@
 
                 });
             }
-            if (this.RefreshBtn != null) {
-                this.RefreshBtn.on(VIS.Events.onTouchStartOrClick, function () {
+            if (refreshIcon != null) {
+                refreshIcon.on("click", function () {
                     $self.setBusy(true);
                     //on refresh clearing the values
                     dynInit(null);
@@ -1797,6 +1797,7 @@
                     $self.gridSelectDiv.animate({ width: selectDivWidth }, "slow");
                     $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
+                    $self.SearchBtn.css("display", "block");
                     $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
                         $self.dGrid.resize();
                     });
@@ -1823,6 +1824,7 @@
                     $self.LeftsideDiv.animate({ width: minSideWidth }, "slow");
                     $self.topDiv.find('.vas-RecordSelection').removeClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "none");
+                    $self.SearchBtn.css("display", "none");
                     $self.recordDiv.animate({ width: selectDivFullWidth }, "slow")
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
                         $self.dGrid.resize();

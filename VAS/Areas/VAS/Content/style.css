@@ -906,7 +906,9 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-BottomBtnDiv {
-    display: block;
+    display: inline-block;
+    width: 34rem;
+    float: right;
 }
 
 .vas-tis-arInvLeftSide {
@@ -1035,7 +1037,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-top-fields {
     width: 100%;
-    height: calc(100% - 90px);
+    min-height: calc(100% - 40px);
 }
 
 .vas-arinvroot {
@@ -1116,7 +1118,11 @@ html[dir="rtl"] .vas-sql-result-msg {
     
 }
 .vas-tis-filter {
-    margin: -9px
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
 }
 
 .vas-tis-srm-filterIcon {
@@ -1137,7 +1143,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-leftsidewrap {
     float: left;
     max-width: 260px;
-    height: calc(100% - 42px);
+    height: calc(100% - 52px);
     padding-bottom: 10px;
     padding-top: 10px;
     overflow-y: auto;
@@ -1160,8 +1166,10 @@ html[dir="rtl"] .vas-sql-result-msg {
     padding-bottom: 10px;
 }
 .vas-tis-subtotal {
-    width: 157px;
+    width: calc(100% - 50%);
     float: right;
+    padding: 4px 12px;
+    text-align: right;
 }
 .vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
     background: rgb(235,235,235) !important;
@@ -1525,5 +1533,20 @@ html[dir="rtl"] .vas-sql-result-msg {
     background-color: #d9a117a6;
 }
 
+.vas-DocTyperDiv {
+    display: inline-block;
+    width: 19rem;
+    float: left;
+}
+.vas-tis-btnmargin{
+    margin-top:0;
+}
+.vas-tis-refreshicon {
+    margin: 7px 10px 0 0;
+    display: inline-block;
+}
+.vas-tis-icondiv{
+    float: left;
+}
 
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
