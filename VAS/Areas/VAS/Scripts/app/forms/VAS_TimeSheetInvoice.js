@@ -182,7 +182,8 @@
             "VAS_PayTermNotBined",
             "VAS_PayMethod",
             "VAS_And",
-            "C_DocType_ID"
+            "C_DocType_ID",
+            "VAS_InvoiceType"
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
@@ -223,7 +224,7 @@
             var $DocTypeControlWrap = $('<div class="vis-control-wrap">');
             var $DocTypeButtonWrap = $('<div class="input-group-append">');
             $DocTypeDiv.append($DocTypeControlWrap);
-            $DocTypeControlWrap.append($self.cmbDocType.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.C_DocType_ID + '</label>');
+            $DocTypeControlWrap.append($self.cmbDocType.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.VAS_InvoiceType + '</label>');
             $DocTypeDiv.append($DocTypeControlWrap);
             $DocTypeButtonWrap.append($self.cmbDocType.getBtn(0));
             $DocTypeDiv.append($DocTypeButtonWrap);
