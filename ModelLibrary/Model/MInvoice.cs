@@ -7020,7 +7020,7 @@ namespace VAdvantage.Model
                 _processMsg = "Reversal ERROR: " + reversal.GetProcessMsg();
                 return false;
             }
-
+            reversal.Set_Value("VAS_IsTEMInvoice", "Y");
             reversal.SetC_Payment_ID(0);
             reversal.SetIsPaid(true);
             reversal.CloseIt();
