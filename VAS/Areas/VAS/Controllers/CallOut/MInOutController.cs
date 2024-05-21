@@ -209,5 +209,23 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+
+        /// <summary>
+        /// VAI050-Get Shipper Detail of Freight Carrier
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>returns freight carrier details</returns>
+        public JsonResult GetShipperDetail(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MInOutModel objInOut = new MInOutModel();
+                retJSON = JsonConvert.SerializeObject(objInOut.GetShipperDetail(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
