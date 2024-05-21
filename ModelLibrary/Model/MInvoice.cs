@@ -6725,7 +6725,8 @@ namespace VAdvantage.Model
                 reversal.SetDateAcct(GetDateAcct());
             }
             catch (Exception) { }
-
+           //On Reversal Marked checkbox true to identify that Invoice is generated from this form
+            reversal.Set_Value("VAS_IsTEMInvoice", this.Get_Value("VAS_IsTEMInvoice"));
             if (!reversal.Save(Get_TrxName()))
             {
                 ValueNamePair vp = VLogger.RetrieveError();
@@ -6879,7 +6880,6 @@ namespace VAdvantage.Model
                 _processMsg = "Reversal ERROR: " + reversal.GetProcessMsg();
                 return false;
             }
-            reversal.Set_Value("VAS_IsTEMInvoice", "Y");
             reversal.SetC_Payment_ID(0);
             reversal.SetIsPaid(true);
             reversal.CloseIt();
