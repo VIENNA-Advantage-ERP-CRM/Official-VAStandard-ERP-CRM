@@ -170,7 +170,7 @@ namespace VIS.Models
         /// <param name="ctx"></param>
         /// <param name="param"></param>
         /// <returns>return fleet detail</returns>
-        public Dictionary<String, Object> GetFleetDetail(Ctx ctx, string param)
+        public Dictionary<string, object> GetFleetDetail(Ctx ctx, string param)
         {
 
             Dictionary<string, object> retDic = null;
@@ -183,6 +183,29 @@ namespace VIS.Models
                 retDic["VAS_VehicleRegistrationNo"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_VehicleRegistrationNo"]);
                 retDic["VAS_GrossWeight"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_GrossWeight"]);
                 retDic["VAS_TareWeight"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_TareWeight"]);
+            }
+            return retDic;
+        }
+
+        /// <summary>
+        /// VAI050-Get Shipper Detail of Freight Carrier
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="param"></param>
+        /// <returns>returns freight carrier details</returns>
+        public Dictionary<string, object> GetShipperDetail(Ctx ctx, string param)
+        {
+
+            Dictionary<string, object> retDic = null;
+            string sql = @"SELECT s.C_BPartner_ID,cb.TaxID FROM M_Shipper s
+                           INNER JOIN C_BPartner cb ON cb.C_BPartner_ID=s.C_BPartner_ID
+                           WHERE s.M_Shipper_ID=" + Util.GetValueOfInt(param);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+                retDic["C_BPartner_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_ID"]);
+                retDic["TaxID"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["TaxID"]);
             }
             return retDic;
         }
