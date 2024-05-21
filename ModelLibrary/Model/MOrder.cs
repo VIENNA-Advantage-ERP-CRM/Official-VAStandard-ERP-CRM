@@ -2860,9 +2860,28 @@ namespace VAdvantage.Model
         public String PrepareIt()
         {
             log.Info(ToString());
+
+            //VIS0060: To implement Skip Base functionality for PrepareIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.PrepareIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    return DocActionVariables.STATUS_INPROGRESS;
+                }
+            }
+
+            // User Validation Before PrepareIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (_processMsg != null)
                 return DocActionVariables.STATUS_INVALID;
+
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocTypeTarget_ID());
             SetIsReturnTrx(dt.IsReturnTrx());
             SetIsSOTrx(dt.IsSOTrx());
@@ -2881,7 +2900,6 @@ namespace VAdvantage.Model
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
             }
-
 
             //	Lines
             MOrderLine[] lines = GetLines(true, "M_Product_ID");
@@ -2988,9 +3006,6 @@ namespace VAdvantage.Model
                 }
 
             }
-
-
-
 
             //	Lines
             if (ExplodeBOM())
@@ -3192,6 +3207,14 @@ namespace VAdvantage.Model
                         }
                     }
                 }
+            }
+
+            //VIS0060: User Validation After PrepareIt
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return DocActionVariables.STATUS_INVALID;
             }
 
             _justPrepared = true;
@@ -3672,6 +3695,31 @@ namespace VAdvantage.Model
         {
             // chck pallet Functionality applicable or not
             isContainerApplicable = MTransaction.ProductContainerApplicable(GetCtx());
+
+            //VIS0060: To implement Skip Base functionality for CompleteIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.CompleteIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return DocActionVariables.STATUS_INVALID;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_Close);
+                    return DocActionVariables.STATUS_COMPLETED;
+                }
+            }
+
+            //VIS00060: User Validation Before Complete.
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_COMPLETE);
+            if (_processMsg != null)
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
 
             try
             {
@@ -4159,16 +4207,6 @@ namespace VAdvantage.Model
                 //    return DocActionVariables.STATUS_INVALID;
                 //}
 
-                //User Validation
-                String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
-                if (valid != null)
-                {
-                    if (Info.Length > 0)
-                        Info.Append(" - ");
-                    Info.Append(valid);
-                    _processMsg = Info.ToString();
-                    return DocActionVariables.STATUS_INVALID;
-                }
                 /******************/
                 String Qry = "SELECT * FROM C_OrderLine WHERE C_Order_ID=" + GetC_Order_ID();
                 DataSet orderlines = DB.ExecuteDataset(Qry);
@@ -4256,30 +4294,39 @@ namespace VAdvantage.Model
                     }
                 }
 
-                SetProcessed(true);
-                _processMsg = Info.ToString();
-                //
-                SetDocAction(DOCACTION_Close);
-            }
+                // Set the document number from completed document sequence after completed (if needed)
+                SetCompletedDocumentNo();
 
+                // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+                if (GetC_Order_ID() > 0)
+                {
+                    UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
+                }
+
+                //VIS0060: User Validation After Complete.
+                //User Validation
+                String valid = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_AFTER_COMPLETE);
+                if (valid != null)
+                {
+                    if (Info.Length > 0)
+                        Info.Append(" - ");
+                    Info.Append(valid);
+                    _processMsg = Info.ToString();
+                    return DocActionVariables.STATUS_INVALID;
+                }
+                _processMsg = Info.ToString();
+            }
             catch
             {
-                //ShowMessage.Error("MOrder",null,"CompleteIt");
                 _processMsg = GetProcessMsg();
                 return DocActionVariables.STATUS_INVALID;
             }
 
-            // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
-            if (GetC_Order_ID() > 0)
-            {
-                UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
-            }
-
-            // Set the document number from completed document sequence after completed (if needed)
-            SetCompletedDocumentNo();
-
+            SetProcessed(true);
+            SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
         }
+
         /// <summary>
         /// If Order Type is Variation Order Process it accordingly
         /// </summary>
@@ -4620,7 +4667,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             StringBuilder sql = new StringBuilder();
             BudgetCheck budget = new BudgetCheck();
             _budgetBreachLineIDs = string.Empty;
-           
+
             sql.Clear();
             sql.Append(@"SELECT GL_Budget.GL_Budget_ID , GL_Budget.BudgetControlBasis, GL_Budget.C_Year_ID , GL_Budget.C_Period_ID,GL_Budget.Name As BudgetName, 
                   GL_BudgetControl.C_AcctSchema_ID, GL_BudgetControl.CommitmentType, GL_BudgetControl.BudgetControlScope,  GL_BudgetControl.GL_BudgetControl_ID, GL_BudgetControl.Name AS ControlName,GL_BudgetControl.BudgetBreachPercent
@@ -4654,12 +4701,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 if (dsRecordData != null && dsRecordData.Tables.Count > 0 && dsRecordData.Tables[0].Rows.Count > 0)
                 {
                     //VIS383: Bug ID-5698 31/04/24:-Update or set "Budget Breach" is false for all order line
-                     int cnt = DB.ExecuteQuery("UPDATE C_OrderLine SET IsBudgetBreach ='N' WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx());
-                    
+                    int cnt = DB.ExecuteQuery("UPDATE C_OrderLine SET IsBudgetBreach ='N' WHERE C_Order_ID =" + GetC_Order_ID(), null, Get_Trx());
+
                     // datarows of Debit values which to be controlled
                     drRecordData = dsRecordData.Tables[0].Select("Debit > 0 ", " Account_ID ASC");
                     if (drRecordData != null)
-                    {  
+                    {
                         // loop on PO record data which is to be debited only 
                         for (int i = 0; i < drRecordData.Length; i++)
                         {
@@ -6272,9 +6319,34 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>true if success</returns>
         public bool VoidIt()
         {
-            MOrderLine[] lines = GetLines(true, "M_Product_ID");
             log.Info(ToString());
 
+            //VIS0060: To implement Skip Base functionality for VoidIt.
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.VoidIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_None);
+                    return true;
+                }
+            }
+
+            //VIS0060: User Validation Before VoidIt.
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_VOID);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
+            MOrderLine[] lines = GetLines(true, "M_Product_ID");
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             String DocSubTypeSO = dt.GetDocSubTypeSO();
 
@@ -6369,6 +6441,14 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             }
             //VIS430:Set Quotation field null when the previously generated Sales Order from Sales Quotation tab of Sales quotation Window whose Document Action is Voided on Sales Order window.
             int no = DB.ExecuteQuery(@"UPDATE C_Order SET Ref_Order_ID=null WHERE Ref_Order_ID = " + GetC_Order_ID(), null, Get_Trx());
+
+            //VIS0060: User Validation After VoidIt.
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6550,6 +6630,32 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         public bool CloseIt()
         {
             log.Info(ToString());
+
+            //VIS0060: To implement Skip Base functionality for CloseIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.CloseIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocAction(DOCACTION_None);
+                    return true;
+                }
+            }
+
+            //VIS0060: User Validation Before Close.
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_CLOSE);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
             //	Close Not delivered Qty - SO/PO
             MOrderLine[] lines = GetLines(true, "M_Product_ID");
             for (int i = 0; i < lines.Length; i++)
@@ -6573,6 +6679,15 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 _processMsg = "Cannot unreserve Stock (close)";
                 return false;
             }
+
+            //VIS0060: User Validation After Close.
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
             return true;
@@ -6585,7 +6700,47 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         public bool ReverseCorrectIt()
         {
             log.Info(ToString());
-            return VoidIt();
+            //VIS0060: To implement Skip Base functionality for ReverseCorrectIt
+            if (this.ModelAction != null)
+            {
+                bool skipBase = false;
+                _processMsg = this.ModelAction.ReverseCorrectIt(out skipBase);
+                if (!String.IsNullOrEmpty(_processMsg))
+                {
+                    return false;
+                }
+
+                if (skipBase)
+                {
+                    SetProcessed(true);
+                    SetDocStatus(DOCSTATUS_Reversed);
+                    SetDocAction(DOCACTION_None);
+                    return true;
+                }
+            }
+
+            //VIS0060: User Validation Before ReverseCorrect.
+            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
+            if (_processMsg != null)
+            {
+                return false;
+            }
+
+            // Calling VoidIt funciton, if fails then return.
+            bool isVoided = VoidIt();
+            if (!isVoided)
+            {
+                return isVoided;
+            }
+
+            //VIS0060: User Validation After ReverseCorrect.
+            string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
+            if (valid != null)
+            {
+                _processMsg = valid;
+                return false;
+            }
+            return isVoided;
         }
 
         /// <summary>
@@ -6596,8 +6751,8 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         {
             log.Info(ToString());
             return false;
-
         }
+
         /// <summary>
         /// VIS0336:changes done for updating the amount on CM when record is void/reverse/reactivate
         /// </summary>
@@ -6630,6 +6785,31 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             try
             {
                 log.Info(ToString());
+
+                //VIS0060: To implement Skip Base functionality for RctivateIt.
+                if (this.ModelAction != null)
+                {
+                    bool skipBase = false;
+                    _processMsg = this.ModelAction.ReActivateIt(out skipBase);
+                    if (!String.IsNullOrEmpty(_processMsg))
+                    {
+                        return false;
+                    }
+
+                    if (skipBase)
+                    {
+                        SetDocAction(DOCACTION_Complete);
+                        SetProcessed(false);
+                        return true;
+                    }
+                }
+
+                //VIS0060: User Validation Before ReActivate.
+                _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REACTIVATE);
+                if (_processMsg != null)
+                {
+                    return false;
+                }
 
                 if (GetVAPOS_POSTerminal_ID() > 0 && (GetVA018_VoucherAmount() > 0 || GetVA204_RewardAmt() > 0))
                 {
@@ -6812,8 +6992,6 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     return false;
                 }
 
-                SetDocAction(DOCACTION_Complete);
-                SetProcessed(false);
                 // In case of purchase order reverse budget breach
                 // Done by Rakesh Kumar 18/Feb/2020
                 if (Env.IsModuleInstalled("FRPT_") && !IsSOTrx() && !IsReturnTrx() && !IsSalesQuotation() && !Util.GetValueOfBool(Get_Value("IsBlanketTrx")))
@@ -6822,7 +7000,16 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     SetIsBudgetBreachApproved(false);
                 }
 
+                //VIS0060: User Validation After ReActivate
+                string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REACTIVATE);
+                if (valid != null)
+                {
+                    _processMsg = valid;
+                    return false;
+                }
 
+                SetDocAction(DOCACTION_Complete);
+                SetProcessed(false);
             }
             catch
             {
