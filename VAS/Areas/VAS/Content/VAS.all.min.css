@@ -1,5 +1,4 @@
-﻿/*version 1.4.0.4*/
-
+﻿/*version 1.5.1.3*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -104,21 +103,24 @@
         border-radius: 3px;
         float: none;
         margin: 0 5px;
-        color: rgba(var(--v-c-on-primary));
+        color: rgba(var(--v-c-primary)) !important;
     }
 
-        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button']:not(.active) {
-            color: rgba(var(--v-c-primary)) !important;
-        }
+.vis-ad-w-p-actionpanel-r .vas-sql-generator .vas-sql-btn input[type='button']:not(.active) {
+    color: rgba(var(--v-c-primary));
+    background-color: rgba(var(--v-c-secondary),1);
+}
 
-        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
-            background-color: rgba(var(--v-c-primary));
-            color: rgba(var(--v-c-on-primary));
-        }
+.vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].active {
+    background-color: rgba(var(--v-c-primary)) !important;
+    color: rgba(var(--v-c-on-primary)) !important;
+}
 
-        .vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
-            float: right;
-        }
+.vis-ad-w-p-actionpanel-r .vas-sql-btns input[type='button'].vas-test-sql {
+    float: right;
+    color: white !important;
+    background: linear-gradient(270deg, rgba(var(--v-c-on-secondary)) 0%, rgba(var(--v-c-primary)) 100%) !important;
+}
 
 .vis-ad-w-p-actionpanel-r .vas-content-area {
     float: left;
@@ -366,8 +368,9 @@
 }
 
     .vas-filters .vas-filter-item.vas-filters-row {
-        background: rgba(var(--v-c-secondary),1);
-        padding: 15px 10px;
+        background: rgba(var(--v-c-secondary), .3);
+        padding: 5px;
+        border-radius: 3px;
     }
 
         .vas-filters .vas-filter-item.vas-filters-row:not(:last-child) {
@@ -408,11 +411,11 @@
 }
 
     .vas-joins .vas-join-item {
-        border: 1px solid rgba(var(--v-c-on-secondary),1);
-        padding: 10px 10px 2px;
+        border: 1px solid rgba(var(--v-c-on-secondary), 1);
+        padding: 10px;
         margin-bottom: 10px;
         border-radius: 3px;
-        background: rgba(var(--v-c-secondary),1);
+        background: rgba(var(--v-c-secondary), 0.3);
         transition: all 0.3s ease-in-out;
     }
 
@@ -427,11 +430,14 @@
 .vas-filters-block {
     float: left;
     width: calc(100% - 25%);
+    border-radius: 3px;
+    position: relative;
+    font-size: 83%;
 }
 
     .vas-filters-block div {
+        border-radius: 3px;
         float: left;
-        width: 260px;
         text-overflow: ellipsis;
         overflow: hidden;
     }
@@ -512,16 +518,16 @@
 }
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column1 input[type='button'], .vas-sqlgenerator-column2 input[type='button'] {
-    background: none;
-    color: rgba(var(--v-c-primary)) !important;
+    background-color: rgba(var(--v-c-primary));
+    color: white !important;
     border: 1px solid rgba(var(--v-c-primary));
 }
 
 .vas-filter-whitebg {
+    border-radius: 3px;
     float: left;
     width: 100%;
-    background-color: rgba(var(--v-c-on-primary));
-    padding: 10px;
+    padding: 7px;
 }
 
 .vas-sqlgenerator .VIS-AMTD-formData.VIS-AMTD-InputBtns {
@@ -535,8 +541,8 @@
 
 .vis-ad-w-p-actionpanel-r .vas-sql-content .vas-save-btn {
     margin: 0px;
-    background: none;
-    color: rgba(var(--v-c-primary)) !important;
+    background-color: rgba(var(--v-c-primary)) !important;
+    color: white !important;
     border: 1px solid rgba(var(--v-c-primary));
 }
 
@@ -642,6 +648,7 @@
 .vas-joins-bg {
     display: flex;
     justify-content: space-between;
+    position: relative;
 }
 
 .vas-join-item .vas-selecttable:first-child {
@@ -649,29 +656,27 @@
 }
 
 .vas-joins-block {
-    width: 85%;
-    display: inline-block;
-    vertical-align: top;
+    width: 100%;
 }
 
 .vas-delete-join-btn {
-    width: 15%;
     display: inline-block;
     text-align: right;
+    position: absolute;
+    right: 0;
 }
 
 .vas-join-item .vas-selecttable {
-    float: left;
-    width: calc(50% - 6px);
+    font-size: 83%;
+    color: black;
+    border-radius: 3px;
+    float: left !important;
+    margin-right: 5px !important;
+    width: fit-content;
     word-wrap: break-word;
-    background-color: rgba(var(--v-c-on-primary));
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     margin-right: 12px;
     padding: 1px 10px;
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
 }
 
     .vas-join-item .vas-selecttable:nth-child(2n+1) {
@@ -856,6 +861,781 @@ html[dir="rtl"] .vas-sql-result-msg {
     margin: 10px 0 0;
 }
 
+/*CSS of VAS_TimeSheetInvoice.js Form Starts*/
+.vas-icon-circle {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+    width: 30px;
+    height: 30px;
+    border-radius: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+    .vas-icon-circle i {
+        color: rgba(var(--v-c-primary), 1);
+        font-size: 18px;
+    }
+
+.vas-filter-flyout {
+    position: absolute;
+    top: 100%;
+    right: 0%;
+    z-index: 100;
+    border: 1px solid #e4e4e4;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    max-width: 450px;
+    min-width: 450px;
+    background: white;
+    Max-height: 474px;
+    overflow: auto;
+    margin-top: 10px;
+}
+
+.vas-flyout-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #dddddd;
+    padding-bottom: 8px;
+}
+
+    .vas-flyout-header h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .vas-flyout-header span {
+        color: rgba(var(--v-c-primary), 1);
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+.vas-from-row {
+    margin-top: 16px;
+}
+
+.vas-flyout-footer .btn {
+    margin: 0;
+    width: 100%;
+}
+
+.vas-tis-dropdown-lbl {
+    display: inline-block;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 0px;
+    max-height: 56px;
+    overflow: auto;
+}
+
+.vas-selected-lbl {
+    background-color: #8F8F8F;
+    color: #ffffff;
+    padding: 1px 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    border-radius: 3px;
+    float: left;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+    .vas-selected-lbl .vis-cross {
+        font-size: 8px;
+        color: #ffffff;
+        cursor: pointer;
+        margin-left: 8px;
+    }
+
+.vas-RecordSelection {
+    display: inline-block;
+    padding: 0 10px;
+    width: 100%;
+}
+
+    .vas-RecordSelection.vas-tis-RecordArea {
+        width: calc(100% - 260px);
+    }
+
+.vas-filterIcon {
+    font-size: 30px;
+}
+
+.vas-decoration-style {
+    text-decoration: underline !important;
+    text-align: right !important;
+}
+
+.vas-BottomBtnDiv {
+    display: inline-block;
+    width: 34rem;
+    float: right;
+}
+
+.vas-tis-arInvLeftSide {
+    width: 330px;
+    border-right: 2px solid rgba(var(--v-c-secondary), 0.9);
+    padding: 0.75rem;
+    height: calc(100% - 0px);
+    overflow: auto;
+}
+
+.vas-tis-arInvlistItem {
+    background-color: rgba(var(--v-c-secondary), 0.9);
+    border: 1px solid rgba(var(--v-c-on-secondary), 0.3);
+    border-radius: 0.15rem;
+    display: flex;
+    padding: 0.65rem 0;
+}
+
+.vas-tis-arInvCompanyLogo span {
+    background-color: brown;
+    padding: 0.5rem;
+    color: #fff;
+    margin: 0 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.vas-tis-arInvDetailsDesc {
+    display: block;
+    width: 100%;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-tis-arInvActive {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+}
+
+.vas-pointdiv {
+    float: left;
+    width: 100%;
+    height: calc(100% - 40px);
+}
+
+.vas-tis-arInvRightSide {
+    width: calc(100% - 330px);
+    padding: 0.75rem;
+}
+
+.vas-tis-arInvViewer {
+    margin: -15px;
+    height: 100%
+}
+
+.vas-tis-arInvLeftSide {
+    background: rgba(var(--v-c-secondary), 0.4);
+}
+
+.vas-taskDesc_feildWrap {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem;
+}
+
+.vas-taskdescTtl {
+    display: block;
+    font-size: 0.9rem;
+}
+
+.vas-taskDesc_feild {
+    flex: 1;
+}
+
+.vas-taskdescTtl {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgba(var(--v-c-on-secondary),0.65);
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-taskdescValue {
+    font-size: 0.95rem;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-projectTimelineConatainer {
+    width: 100%;
+    height: 150px;
+    background-color: rgba(var(--v-c-secondary),1);
+}
+
+
+.pipeline {
+    display: flex;
+    align-items: center;
+    margin: 20px auto;
+    width: 80%;
+}
+
+.stage {
+    position: relative;
+    flex: 1;
+    text-align: center;
+    z-index: 1; /* Ensure stages are above connectors */
+}
+
+.connector {
+    flex: 1;
+    height: 15px; /* Thickness of the line */
+    background-color: #ccc; /* Color of the line */
+}
+
+.vas-tis-top-fields {
+    width: 100%;
+    min-height: calc(100% - 40px);
+}
+
+.vas-arinvroot {
+    width: 100%;
+    height: 100%;
+    background-color: white;
+}
+
+.vas-SelectDiv {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    float: left;
+}
+
+.vas-RecordSelection.vas-tis-RecordArea {
+    width: calc(100% - 260px);
+}
+
+.vas-SpnSelect {
+    vertical-align: middle;
+    font-size: 28px;
+    color: rgba(var(--v-c-primary), 1);
+}
+
+.vas-searchbtn {
+    margin-top: 0px;
+    height: 35px;
+    padding: 5px 12px;
+}
+
+.vas-spacediv {
+    width: 310px;
+    height: 45px;
+    padding: 10px 10px 0 10px;
+    background-color: rgba(var(--v-c-secondary), .8);
+    background: rgb(235 235 235);
+}
+
+.vas-poptis-content {
+    height: 100%;
+}
+
+.vas-tis-filteroverlay {
+    background: rgba(0 0 0 / 2%);
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 950;
+    display: none;
+}
+
+.vas-tis-paddingspn {
+    margin-left: 10px;
+}
+
+.vas-tis-gridimg {
+    display: flex;
+    /* justify-content: center; */
+    padding: 3px !important;
+    align-items: center;
+    gap: 6px;
+}
+
+.vas-tis-filterspn {
+    width: 35px;
+    border: 1px solid rgba(var(--v-c-on-secondary), .2);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    color: inherit;
+    font-size: 1.5rem;
+    float: right;
+}
+
+.vas-tis-filter .dropdown-toggle::after {
+    display: none;
+}
+
+.vas-tis-filter {
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
+}
+
+.vas-tis-srm-filterIcon {
+    font-size: 1.2rem;
+}
+
+.vas-tis-filterPopupWrap {
+    padding-top: 40px;
+}
+
+.vas-tis-bpstyling {
+    display: block;
+    white-space: nowrap;
+    max-width: 72%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.vas-tis-leftsidewrap {
+    float: left;
+    max-width: 260px;
+    height: calc(100% - 52px);
+    padding-bottom: 10px;
+    padding-top: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: rgb(235 235 235);
+}
+
+.vas-tis-lablels {
+    background: rgb(235 235 235);
+}
+
+.vas-tis-leftbuttondiv {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.vas-tis-leftbtnInvdiv {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 10px;
+}
+
+.vas-tis-subtotal {
+    width: calc(100% - 50%);
+    float: right;
+    padding: 4px 12px;
+    text-align: right;
+}
+
+.vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
+    background: rgb(235,235,235) !important;
+}
+
+.vas-tis-iconcolor {
+    display: inline-block;
+    font-size: 16px;
+}
+
+.vas-tis-prodicon {
+    padding: 15px 0 0 0px !important;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.w-25 {
+    width: 25%;
+}
+
+.w-33 {
+    width: 33.33333333333333%;
+}
+
+.vas-tis-roadmap-container {
+    width: 100%;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: 130px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 5px 10%;
+    background-color: #f1f1f1;
+    min-height: 75px;
+}
+
+.vas-tis-requestsummary {
+    background-color: #f1f1f1;
+}
+
+.vas-tis-steps-col {
+    position: relative;
+    padding: 2px 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+    .vas-tis-steps-col:nth-child(3)::after {
+        content: " ";
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 4px;
+        background-color: #b2b2b2;
+        height: 50%;
+    }
+
+    .vas-tis-steps-col:nth-child(3) .vas-tis-step-content {
+        opacity: 0;
+    }
+
+    .vas-tis-steps-col.vas-tis-step-inprogress:nth-child(3)::after {
+        background-color: #BC7C7A;
+    }
+
+    .vas-tis-steps-col.vas-tis-step-completed:nth-child(3)::after {
+        background-color: #9FC150;
+    }
+
+.vas-tis-reverse-row .vas-tis-steps-col:nth-child(3)::after {
+    top: 50%;
+    right: inherit;
+    left: 0;
+}
+
+.vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-inprogress::after {
+    background-color: #BC7C7A;
+}
+
+.vas-tis-steps-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.vas-tis-step-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 100%;
+    border: 1px solid #b2b2b2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+}
+
+    .vas-tis-step-circle .vis {
+        font-size: 11px;
+        display: none;
+    }
+
+.vas-tis-step-content {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-direction: column;
+    width: 136px;
+    right: -68px;
+    position: relative;
+    z-index: 3;
+    top: 11px;
+}
+
+    .vas-tis-step-content span {
+        display: block;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        color: #b2b2b2;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+.vas-tis-step-start {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-direction: column;
+    width: 136px;
+    left: -68px;
+    position: absolute;
+    z-index: 3;
+    top: 11px;
+}
+
+    .vas-tis-step-start span {
+        display: block;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        color: #b2b2b2;
+    }
+
+
+.vas-tis-steps-col::before {
+    content: " ";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+    height: 4px;
+    width: 100%;
+    background-color: #b2b2b2;
+}
+
+.vas-tis-reverse-row {
+    flex-direction: row-reverse;
+}
+
+    .vas-tis-reverse-row .vas-tis-steps-col:first-child::after {
+        content: " ";
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 4px;
+        background-color: #b2b2b2;
+        height: 50%;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-inprogress:first-child::after {
+        background-color: #BC7C7A;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-completed:first-child::after {
+        background-color: #9FC150;
+    }
+
+    .vas-tis-reverse-row .vas-tis-steps-col {
+        justify-content: flex-start;
+    }
+
+    .vas-tis-reverse-row .vas-tis-step-content {
+        left: -68px;
+        right: inherit;
+    }
+
+    .vas-tis-reverse-row .vas-tis-step-end .vas-tis-step-content {
+        opacity: 0;
+    }
+
+.vas-tis-step-end::after {
+    content: " ";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 4px;
+    background-color: #b2b2b2;
+    height: 50%;
+}
+
+.vas-tis-step-end .vas-tis-step-content {
+    opacity: 0;
+}
+
+.vas-tis-step-start::after {
+    right: inherit;
+    left: 0;
+}
+
+.vas-tis-step-start .vas-tis-step-content {
+    opacity: 0;
+}
+
+.vas-tis-next-row .vas-tis-steps-col:first-child::after {
+    content: " ";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    background-color: #b2b2b2;
+    height: 50%;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-completed:first-child::after {
+    background-color: #9FC150;
+}
+
+.vas-tis-steps-col.vas-tis-last-line::before {
+    display: none;
+}
+
+.vas-tis-step-inprogress.vas-tis-steps-col::before {
+    background-color: #BC7C7A;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-start span {
+    color: #9FC150;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-inprogress .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #BC7C7A;
+}
+
+    .vas-tis-step-inprogress .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-inprogress .vas-tis-step-content span {
+    color: #BC7C7A;
+}
+
+.vas-tis-step-completed .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-start span {
+    color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-completed.vas-tis-steps-col::before {
+    background-color: #9FC150;
+}
+
+.vas-tis-step-completed .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #9FC150;
+}
+
+    .vas-tis-step-completed .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-completed .vas-tis-step-content span {
+    color: #9FC150;
+}
+/* Styles for drafted steps */
+.vas-tis-step-drafted .vas-tis-step-circle {
+    border-color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-start span {
+    color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-drafted.vas-tis-steps-col::before {
+    background-color: #d9a117a6; /* Yellow color */
+}
+
+.vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #d9a117a6; /* Yellow color */
+}
+
+    .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-drafted .vas-tis-step-content span {
+    /* Add specific styling for span elements here */
+    color: #d9a117a6; /* Yellow color */
+}
+/* Styles for null status steps */
+.vas-tis-step-null .vas-tis-step-circle {
+    border-color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-start span {
+    color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-start .vis {
+    display: block;
+}
+
+.vas-tis-step-null.vas-tis-steps-col::before {
+    background-color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle {
+    border-color: #b2b2b2; /* Grey color */
+}
+
+    .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle .vis {
+        display: block;
+    }
+
+.vas-tis-step-null .vas-tis-step-content span {
+    /* Add specific styling for span elements here */
+    color: #b2b2b2; /* Grey color */
+}
+
+.vas-tis-steps-col.vas-tis-step-drafted:nth-child(3)::after {
+    background-color: #d9a117a6;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
+    background-color: #d9a117a6;
+}
+
+.vas-tis-steps-col.vas-tis-step-null:nth-child(3)::after {
+    background-color: #b2b2b2;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-null:first-child::after {
+    background-color: #b2b2b2;
+}
+
+.vas-tis-next-row .vas-tis-steps-col.vas-tis-step-inprogress:first-child::after {
+    background-color: #BC7C7A;
+}
+
+.vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
+    background-color: #d9a117a6;
+}
+
+.vas-DocTyperDiv {
+    display: inline-block;
+    width: 19rem;
+    float: left;
+}
+
+.vas-tis-btnmargin {
+    margin-top: 0;
+}
+
+.vas-tis-refreshicon {
+    margin: 7px 10px 0 0;
+    display: inline-block;
+}
+
+.vas-tis-icondiv {
+    float: left;
+}
+
+/*CSS of VAS_TimeSheetInvoice.js Form Ends*/
 /*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
 2. Ignore the vis-fonts.css file its already in framework
@@ -1437,4 +2217,3 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 .vas-inputboxPaddingRight {
     padding-right: 10px !important;
 }
-
