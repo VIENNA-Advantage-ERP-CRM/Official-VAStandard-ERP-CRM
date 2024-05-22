@@ -532,6 +532,8 @@ namespace VASLogic.Models
             inv.SetIsSOTrx(true);
             inv.SetIsReturnTrx(false);
             inv.SetIsExpenseInvoice(false);
+            //Marked checkbox true to identify that Invoice is generated from this form
+            inv.Set_Value("VAS_IsTEMInvoice", "Y");
 
             if (C_DocType_ID != 0)
             {
