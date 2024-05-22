@@ -203,7 +203,7 @@
             LeftSideFields = $('<div class="vas-tis-top-fields">');
             //Created organization dropdown control
             $OrgDiv = $('<div class="input-group vis-input-wrap">');
-            var OrgValidation = "AD_Org.IsActive='Y' AND AD_Org.IsSummary='N' AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'";
+            var OrgValidation = "AD_Org.AD_Org_ID <> 0 AND AD_Org.IsActive='Y' AND AD_Org.IsSummary='N' AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'";
             var Orglookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.AD_Org_ID, VIS.DisplayType.TableDir, "AD_Org_ID", 0, false, OrgValidation);
             $self.cmbOrg = new VIS.Controls.VComboBox("AD_Org_ID", true, false, true, Orglookup, 150, VIS.DisplayType.TableDir);
             $self.cmbOrg.setMandatory(true);
