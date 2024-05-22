@@ -194,6 +194,7 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MStorageController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MTaxController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MTeamForcastController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CallOut\MTermController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMConversionController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MVASContractController.cs" />
@@ -213,6 +214,7 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
     <Compile Include="Areas\VAS\Controllers\VChargeController.cs" />
     <Compile Include="Areas\VAS\Controllers\VCreateFromController.cs" />
@@ -248,6 +250,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceTaxTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
@@ -281,6 +284,7 @@
     <Content Include="Areas\VAS\Scripts\model\CalloutSetAttributeCode.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttax.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutteamforecast.js" />
+    <Content Include="Areas\VAS\Scripts\model\calloutTerm.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />

@@ -159,6 +159,9 @@
     <Reference Include="VAModelAD">
       <HintPath>Dll\VAModelAD.dll</HintPath>
     </Reference>
+    <Reference Include="VAWorkflow">
+      <HintPath>Dll\VAWorkflow.dll</HintPath>
+    </Reference>
     <Reference Include="ViennaBase">
       <HintPath>Dll\ViennaBase.dll</HintPath>
     </Reference>
