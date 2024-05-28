@@ -1,9 +1,10 @@
-﻿/*version 1.5.1.0*/
+﻿/*version 1.5.2.0*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
     /*margin-top:2px;*/
 }
+
 
 .vis-payment-td1 {
     /*width: 40%;*/
@@ -35,6 +36,7 @@
 .vis-payment-span {
     /*margin: 5px 0px 5px 1%;*/
 }
+
 
 .vis-payment-inputs {
     /*margin: 10px 1% 5px 2%;
@@ -966,7 +968,9 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-BottomBtnDiv {
-    display: block;
+    display: inline-block;
+    width: 34rem;
+    float: right;
 }
 
 .vas-tis-arInvLeftSide {
@@ -1072,6 +1076,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     background-color: rgba(var(--v-c-secondary),1);
 }
 
+
 .pipeline {
     display: flex;
     align-items: center;
@@ -1083,21 +1088,18 @@ html[dir="rtl"] .vas-sql-result-msg {
     position: relative;
     flex: 1;
     text-align: center;
-    z-index: 1;
-    /* Ensure stages are above connectors */
+    z-index: 1; /* Ensure stages are above connectors */
 }
 
 .connector {
     flex: 1;
-    height: 15px;
-    /* Thickness of the line */
-    background-color: #ccc;
-    /* Color of the line */
+    height: 15px; /* Thickness of the line */
+    background-color: #ccc; /* Color of the line */
 }
 
 .vas-tis-top-fields {
     width: 100%;
-    height: calc(100% - 90px);
+    min-height: calc(100% - 40px);
 }
 
 .vas-arinvroot {
@@ -1178,7 +1180,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-filter {
-    margin: -9px
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
 }
 
 .vas-tis-srm-filterIcon {
@@ -1200,7 +1206,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-leftsidewrap {
     float: left;
     max-width: 260px;
-    height: calc(100% - 100px);
+    height: calc(100% - 52px);
     padding-bottom: 10px;
     padding-top: 10px;
     overflow-y: auto;
@@ -1219,9 +1225,18 @@ html[dir="rtl"] .vas-sql-result-msg {
     gap: 10px;
 }
 
+.vas-tis-leftbtnInvdiv {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 10px;
+}
+
 .vas-tis-subtotal {
-    width: 157px;
+    width: calc(100% - 50%);
     float: right;
+    padding: 4px 12px;
+    text-align: right;
 }
 
 .vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
@@ -1369,6 +1384,7 @@ html[dir="rtl"] .vas-sql-result-msg {
         color: #b2b2b2;
     }
 
+
 .vas-tis-steps-col::before {
     content: " ";
     position: absolute;
@@ -1511,16 +1527,13 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-step-completed .vas-tis-step-content span {
     color: #9FC150;
 }
-
 /* Styles for drafted steps */
 .vas-tis-step-drafted .vas-tis-step-circle {
-    border-color: #d9a117a6;
-    /* Yellow color */
+    border-color: #d9a117a6; /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-start span {
-    color: #d9a117a6;
-    /* Yellow color */
+    color: #d9a117a6; /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-start .vis {
@@ -1528,13 +1541,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-step-drafted.vas-tis-steps-col::before {
-    background-color: #d9a117a6;
-    /* Yellow color */
+    background-color: #d9a117a6; /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle {
-    border-color: #d9a117a6;
-    /* Yellow color */
+    border-color: #d9a117a6; /* Yellow color */
 }
 
     .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle .vis {
@@ -1543,19 +1554,15 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-step-drafted .vas-tis-step-content span {
     /* Add specific styling for span elements here */
-    color: #d9a117a6;
-    /* Yellow color */
+    color: #d9a117a6; /* Yellow color */
 }
-
 /* Styles for null status steps */
 .vas-tis-step-null .vas-tis-step-circle {
-    border-color: #b2b2b2;
-    /* Grey color */
+    border-color: #b2b2b2; /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-start span {
-    color: #b2b2b2;
-    /* Grey color */
+    color: #b2b2b2; /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-start .vis {
@@ -1563,13 +1570,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-step-null.vas-tis-steps-col::before {
-    background-color: #b2b2b2;
-    /* Grey color */
+    background-color: #b2b2b2; /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle {
-    border-color: #b2b2b2;
-    /* Grey color */
+    border-color: #b2b2b2; /* Grey color */
 }
 
     .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle .vis {
@@ -1578,8 +1583,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-step-null .vas-tis-step-content span {
     /* Add specific styling for span elements here */
-    color: #b2b2b2;
-    /* Grey color */
+    color: #b2b2b2; /* Grey color */
 }
 
 .vas-tis-steps-col.vas-tis-step-drafted:nth-child(3)::after {
@@ -1606,17 +1610,38 @@ html[dir="rtl"] .vas-sql-result-msg {
     background-color: #d9a117a6;
 }
 
+.vas-DocTyperDiv {
+    display: inline-block;
+    width: 19rem;
+    float: left;
+}
+
+.vas-tis-btnmargin {
+    margin-top: 0;
+}
+
+.vas-tis-refreshicon {
+    margin: 7px 10px 0 0;
+    display: inline-block;
+}
+
+.vas-tis-icondiv {
+    float: left;
+}
+
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
 /*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
 */
+
 /*
 
 Only index.html and style.css is for your use There is no need to copy any other file
 
 */
+
 .vas-apInvPoWrapper {
     display: flex;
     flex-direction: column;
@@ -1664,6 +1689,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     font-size: 14px;
     display: block;
 }
+
 
 .vas-apTaxWrapper {
     display: flex;
@@ -1904,7 +1930,10 @@ Only index.html and style.css is for your use There is no need to copy any other
     cursor: not-allowed;
 }
 
-.vis-paymentselect-field select, .vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]), .vis-paymentPrint-field select, .vis-paymentPrint-field input:not([type="submit"]) {
+.vis-paymentselect-field select,
+.vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]),
+.vis-paymentPrint-field select,
+.vis-paymentPrint-field input:not([type="submit"]) {
     /*width: 100%;
     float: left;*/
     /* color: rgba(var(--v-c-on-secondary), 1); */
@@ -2009,6 +2038,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     margin-top: 6px;
 }
 
+
 @media (max-width: 1024px) {
     .vis-paymentPrint-field {
         /*width:48.5%;*/
@@ -2024,7 +2054,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 }
 
-@media (max-width: 999px) {
+@media (max-width:999px) {
     .vis-pSelectInfo {
         width: 35%;
     }
@@ -2040,7 +2070,8 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 }
 
-.vas-parent, html[dir="rtl"].vas-parent {
+.vas-parent,
+html[dir="rtl"].vas-parent {
     display: flex;
     align-items: center;
     padding: 0.5rem;
@@ -2057,38 +2088,45 @@ html[dir="rtl"].vas-parent {
     margin: -11px -12px 10px -12px;
 }
 
-.vas-root, html[dir="rtl"].vas-root {
+.vas-root,
+html[dir="rtl"].vas-root {
     width: 100%;
     height: 100%;
     background-color: #FFF;
 }
 
-.vas-lowerDiv, html[dir="rtl"].vas-lowerDiv {
+.vas-lowerDiv,
+html[dir="rtl"].vas-lowerDiv {
     height: calc(100% - 102px);
     overflow: auto;
 }
 
-    .vas-lowerDiv .w2ui-grid-body, html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
+    .vas-lowerDiv .w2ui-grid-body,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
         background-color: transparent;
         height: 100% !important;
     }
 
-    .vas-lowerDiv.w2ui-reset.w2ui-grid > div, html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
+    .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
+    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
         height: 100% !important;
     }
 
-    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records, html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
+    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
         overflow-x: hidden !important;
     }
 
-.vas-bottom, html[dir="rtl"].vas-bottom {
+.vas-bottom,
+html[dir="rtl"].vas-bottom {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 10px
 }
 
-.vas-actionbtn, html[dir="rtl"].vas-actionbtn {
+.vas-actionbtn,
+html[dir="rtl"].vas-actionbtn {
     background: rgba(var(--v-c-primary), 1);
     border: none;
     color: rgba(var(--v-c-on-primary), 1);
@@ -2098,14 +2136,16 @@ html[dir="rtl"].vas-parent {
     margin-left: 10px;
 }
 
-.vas-businessPartnerImg, html[dir="rtl"].vas-businessPartnerImg {
+.vas-businessPartnerImg,
+html[dir="rtl"].vas-businessPartnerImg {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.vas-businessPartnerInput, html[dir="rtl"].vas-businessPartnerInput {
+.vas-businessPartnerInput,
+html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
@@ -2114,7 +2154,8 @@ html[dir="rtl"].vas-parent {
     margin-right: 4px;
 }
 
-.input-group-text.vas-businessPartnerSearch, html[dir="rtl"].vas-businessPartnerSearch {
+.input-group-text.vas-businessPartnerSearch,
+html[dir="rtl"].vas-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
     font-size: 18px !important;
     color: #fff;
@@ -2125,25 +2166,30 @@ html[dir="rtl"].vas-parent {
         color: inherit;
     }
 
-.vas-noimageicon, html[dir="rtl"].vas-noimageicon {
+.vas-noimageicon,
+html[dir="rtl"].vas-noimageicon {
     font-size: 26px;
 }
 
-.vas-gridImageicon, html[dir="rtl"].vas-gridImageicon {
+.vas-gridImageicon,
+html[dir="rtl"].vas-gridImageicon {
     font-size: 1.2rem;
 }
 
-.vas-disableBtn, html[dir="rtl"].vas-disableBtn {
+.vas-disableBtn,
+html[dir="rtl"].vas-disableBtn {
     pointer-events: none;
     opacity: 0.6;
 }
 
-.vas-errorGridBody, html[dir="rtl"].vas-errorGridBody {
+.vas-errorGridBody,
+html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
 
-.vas-disablePage, html[dir="rtl"].vas-disablePage {
+.vas-disablePage,
+html[dir="rtl"].vas-disablePage {
     pointer-events: none;
     opacity: 0.6;
 }
@@ -2152,6 +2198,7 @@ html[dir="rtl"].vas-parent {
     background-color: #f0f0f0;
     font-weight: bold;
 }
+
 
 .vas-inputboxPadding input[type="text"] {
     padding-left: 10px !important;
@@ -2164,3 +2211,4 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 .vas-inputboxPaddingRight {
     padding-right: 10px !important;
 }
+
