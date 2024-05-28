@@ -1549,16 +1549,16 @@ namespace VAdvantage.Model
             }
 
             //APInvoice Case: invoice Reference can't be same for same financial year and Business Partner and DoCTypeTarget and DateAcct      
-            
+
             if ((Is_ValueChanged("DateAcct") || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_DocTypeTarget_ID") || Is_ValueChanged("InvoiceReference")) && !IsSOTrx())
             {
                 //VIS_427 bugid 5739 Handled message if Duplicate period exist or not or duplicacy of invoice refernce
-                 string periodMessage = checkFinancialYear();
+                string periodMessage = checkFinancialYear();
                 if (!string.IsNullOrEmpty(periodMessage))
                 {
                     log.SaveError("", Msg.GetMsg(GetCtx(), periodMessage));
                     return false;
-                }              
+                }
             }
             //VIS_427 Bug Id 3717 04/01/2024 Handled the GrandTotalAfterWitholding Amount When user unselect the Witholding id
             if (GetC_Withholding_ID() == 0 && GetBackupWithholdingAmount() != 0)
@@ -1907,7 +1907,7 @@ namespace VAdvantage.Model
                 {
                     return "VAS_DuplicatePeriodExist";
                 }
-                else if(count == 0)
+                else if (count == 0)
                 {
                     return "VAS_PeriodNotExist";
                 }
@@ -1919,8 +1919,8 @@ namespace VAdvantage.Model
 
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
-                        startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
-                        endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
+                    startDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["startdate"]);
+                    endDate = Convert.ToDateTime(ds.Tables[0].Rows[0]["enddate"]);
                 }
                 else          // TaskID 2258 If start date and end date not found
                 {
@@ -5278,7 +5278,7 @@ namespace VAdvantage.Model
                 if (valid != null)
                 {
                     _processMsg = valid;
-                    return DocActionVariables.STATUS_INVALID; 
+                    return DocActionVariables.STATUS_INVALID;
                 }
 
                 // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
@@ -6696,6 +6696,7 @@ namespace VAdvantage.Model
                     return true;
                 }
             }
+
             //VIS-383: 29/04/2024 User Validation Before ReverseCorrect
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_REVERSECORRECT);
             if (_processMsg != null)
@@ -6716,6 +6717,7 @@ namespace VAdvantage.Model
                     return false;
                 }
             }
+
             //if PDC available against Invoice donot void/reverse the Invoice
             if (Env.IsModuleInstalled("VA027_"))
             {
@@ -6740,6 +6742,22 @@ namespace VAdvantage.Model
                 }
 
             }
+
+            //VIS_045: DevOps Task ID: 5701 - When IRN/E-Way bill exist then user can't be reverse the document.
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                if (!string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA106_EInvoiceIRNumber"))))
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VA106_CancelIRNFirst");
+                    return false;
+                }
+                else if (!string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA106_EWayBillNo"))))
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VA106_CancelIRNFirst");
+                    return false;
+                }
+            }
+
             log.Info(ToString());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
@@ -6866,7 +6884,7 @@ namespace VAdvantage.Model
                 reversal.SetDateAcct(GetDateAcct());
             }
             catch (Exception) { }
-           //On Reversal Marked checkbox true to identify that Invoice is generated from this form
+            //On Reversal Marked checkbox true to identify that Invoice is generated from this form
             reversal.Set_Value("VAS_IsTEMInvoice", this.Get_Value("VAS_IsTEMInvoice"));
             if (!reversal.Save(Get_TrxName()))
             {
@@ -7119,10 +7137,10 @@ namespace VAdvantage.Model
         /// <author>VIS_427 </author>
         public void DeAllocateTimeSheetInvoice()
         {
-             DB.ExecuteQuery("UPDATE S_TimeExpenseLine SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+            DB.ExecuteQuery("UPDATE S_TimeExpenseLine SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             if (Env.IsModuleInstalled("VA075_"))
             {
-              DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
+                DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }
         }
         //update Description
