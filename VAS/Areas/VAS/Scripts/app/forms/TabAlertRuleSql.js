@@ -141,7 +141,7 @@
 
         // Initialize UI Elements
         this.init = function () {
-            $sqlBtn = $("<input class='VIS_Pref_btn-2 active vas-sql-btn' id='vas-sql-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_SQL") + "'>");
+            $sqlBtn = $("<input class='VIS_Pref_btn-2 vas-sql-btn' id='vas-sql-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_SQL") + "'>");
             $sqlGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-sql-generator' id='vas-sql-generatorbtn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_SQLGenerator") + "'>");
             $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' id='vas-testsql-generatorbtn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_TestSql") + "'>");
             $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' id='vas-testsql-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_TestSql") + "'>");
@@ -163,7 +163,7 @@
                 .append($testSqlBtn)
                 .append($testSqlGeneratorBtn);
             $windowTabLabel.text(VIS.Msg.getMsg("VAS_WindowTab"));
-            $joinSearchLabel.text(VIS.Msg.getMsg("VAS_WindowTab"));
+            $joinSearchLabel.text(VIS.Msg.getMsg("VAS_WindowTabAddition"));
             $selectQuerySqlText.text(VIS.Msg.getMsg("VAS_SQL"));
             $selectGenQuerySqlText.text(VIS.Msg.getMsg("VAS_SQLQuery"));
             $windowFieldColumnLabel.text(VIS.Msg.getMsg("VAS_FieldColumn"));
@@ -375,9 +375,9 @@
                         var activeItemDataType = $joinOnFieldColumnMainTable.children('.vas-column-list-item.active').attr('datatype');
                         $(this).parent($joinOnFieldColumnMainTable).prev($baseTableInputBlock).find($baseTableJoinInput).attr('datatype', activeItemDataType);
                         $joinOnFieldColumnMainTable.hide();
-                    });                  
+                    });
+                    //onTopSelCheckbox($joinOnFieldColumnMainTable);
                 }
-
             });
 
             /*searching the column of join table when user start typing*/
@@ -405,6 +405,7 @@
                         $(this).parent($joinOnFieldColumnJoinTable).prev($joiningTableInputBlock).find($joiningTableInput).attr('datatype', activeItemDataType);
                         $joinOnFieldColumnJoinTable.hide();
                     });
+                    //onTopSelCheckbox($joinOnFieldColumnJoinTable);
                 }
             });
 
@@ -442,6 +443,7 @@
                 else {
                     $sqlResultDiv.text(VIS.Msg.getMsg("VAS_WriteQuery"));
                     $sqlResultDiv.addClass('vas-sql-result-error');
+                    $sqlResultDiv.show();
                 }
             });
 
@@ -504,6 +506,7 @@
                     $fieldColDropdown.val('');
                     $checkBoxes.hide();
                 }
+               //onTopSelCheckbox($checkBoxes);
             });
 
             $sortSelectArrow.on(VIS.Events.onTouchStartOrClick, function () {
@@ -594,6 +597,7 @@
                     $fieldJoinColDropdown.val(''); 
                     $joinMultiSelect.hide();
                 }
+                //onTopSelCheckbox($joinMultiSelect);
             });
 
             /*
@@ -849,6 +853,8 @@
                 sqlFlag = false;
             });
 
+            $sqlGeneratorBtn.trigger('click');
+
             /*
                Joins Accordion
             */
@@ -1044,7 +1050,9 @@
                     var joinsTab = deleteJoin.prev('.vas-joins-block').find('.join-tab').text();
                     var joinsBaseTable = deleteJoin.prev('.vas-joins-block').find('.join-base-table').text();
                     var joinsJoinTable = deleteJoin.prev('.vas-joins-block').find('.join-jointable').text();
-                    var columnToRemove = ", " + deleteJoin.prev('.vas-joins-block').find('.join-joinselectedcolumn').text();
+                    var columnToRemove = ", " + deleteJoin.prev('.vas-joins-block').find('.join-jo
+                    
+                    inselectedcolumn').text();
                     var reqJoinQuery = joinsTitle + " " + joinsTab + " " + 'ON (' + joinsBaseTable + " = " + joinsJoinTable + ")";
                     if (joinCommonColumn.length > 0 && joinsJoinTable.length > 0) {
                         var joinTableIndex = joinsJoinTable.indexOf('.');
@@ -1075,12 +1083,6 @@
                     $checkBoxes.hide();
                     $fieldColDropdown.val('');
                 }
-                var $joinMultiSelectItem = $joinMultiSelect.children('.vas-column-list-item');
-                var $joinMultiSelectItemCheckbox = $joinMultiSelect.children('.vas-column-list-item').children('.vas-column-checkbox');
-                if (!target.is($multiSelectJoinArrow) && !target.is($fieldJoinColDropdown) && !target.is($joinMultiSelect) && !target.is($joinMultiSelectItem) && !target.is($joinMultiSelectItemCheckbox)) {
-                    $joinMultiSelect.hide();
-                    $fieldJoinColDropdown.val('');
-                }
                 if (!target.is($filterSelectArrow) && !target.is($filterColumnInput) && !target.is($filterPrice)) {
                     $filterPrice.hide();
                 }
@@ -1089,6 +1091,12 @@
                 }
                 if (!target.is($joiningTableSelectArrow) && !target.is($joiningTableInput) && !target.is($joinOnFieldColumnJoinTable)) {
                     $joinOnFieldColumnJoinTable.hide();
+                }
+                var $joinMultiSelectItem = $joinMultiSelect.children('.vas-column-list-item');
+                var $joinMultiSelectItemCheckbox = $joinMultiSelect.children('.vas-column-list-item').children('.vas-column-checkbox');
+                if (!target.is($multiSelectJoinArrow) && !target.is($fieldJoinColDropdown) && !target.is($joinMultiSelect) && !target.is($joinMultiSelectItem) && !target.is($joinMultiSelectItemCheckbox)) {
+                    $joinMultiSelect.hide();
+                    $fieldJoinColDropdown.val('');
                 }
             });
 
@@ -1586,6 +1594,7 @@
             $filterCondition.val('');
         }
 
+
         /*
             Function to get the columns from Table in Window/Tab
         */
@@ -1612,7 +1621,7 @@
                             $sortByDropdown.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
                             $filterPrice.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " columnID="
                                 + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $checkBoxes.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $checkBoxes.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = "+i+">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                     }
                     seletedCloumn = [];
@@ -1633,7 +1642,6 @@
 
                         if (this.checked) {
                             seletedCloumn.push(desiredResult);
-                            $(this).parent('.vas-column-list-item').detach().prependTo('.vas-checkboxes');
                         }
                         else {
                             seletedCloumn = seletedCloumn.filter(function (elem) {
@@ -1656,6 +1664,21 @@
                             $sortByDiv.css("pointer-events", "none");
                             $selectGeneratorQuery.text('');
                             $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
+                        }
+                    });
+
+
+                    $checkBoxes.on('change', '.vas-column-list-item .vas-column-checkbox', function () {
+                        var $currentItem = $(this).closest('.vas-column-list-item');
+                        var isChecked = this.checked;
+
+                        if (isChecked) {
+                            // Move checked item to top
+                            $currentItem.prependTo($checkBoxes);
+                        } else {
+                            // Get the index of the current item
+                            var currentIndex = $(this).data('oldindex');
+                            $currentItem.insertAfter($checkBoxes.children().eq(currentIndex));
                         }
                     });
 
@@ -1711,7 +1734,7 @@
                             if (result[i].IsKey == 'Y') {
                                 primaryKeyjTable = result[i].DBColumn;
                             }
-                            $joinMultiSelect.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox'>" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");                           
+                            $joinMultiSelect.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i +">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                         if ($joiningTableInput.val() == '' && primaryKeyjTable != null) {
                             $joiningTableInput.val(joinTable + "." + primaryKeyjTable);
@@ -1730,7 +1753,6 @@
                             }
                             if (this.checked) {
                                 seletedJoinCloumn.push(desiredResult);
-                                $(this).parent('.vas-column-list-item').detach().prependTo('.vas-join-multiselect');
                             }
                             else {
                                 seletedJoinCloumn = seletedJoinCloumn.filter(function (elem) {
@@ -1738,6 +1760,21 @@
                                 });
                             }
                         });
+
+                        $joinMultiSelect.on('change', '.vas-column-list-item .vas-column-checkbox', function () {
+                            var $currentItem = $(this).closest('.vas-column-list-item');
+                            var isChecked = this.checked;
+
+                            if (isChecked) {
+                                // Move checked item to top
+                                $currentItem.prependTo($joinMultiSelect);
+                            } else {
+                                // Get the index of the current item
+                                var currentIndex = $(this).data('oldindex');
+                                $currentItem.insertAfter($joinMultiSelect.children().eq(currentIndex));
+                            }
+                        });
+
                     }
                 },
                 error: function (error) {
@@ -1914,6 +1951,25 @@
         }
 
         /*
+          Showing selected checkbox on top position
+        */
+        //function onTopSelCheckbox(checkBoxes) {
+        //    var origOrder = checkBoxes.children();
+        //    checkBoxes.on("click", ":checkbox", function () {
+        //        var i, checked = document.createDocumentFragment(),
+        //            unchecked = document.createDocumentFragment();
+        //        for (i = 0; i < origOrder.length; i++) {
+        //            if (origOrder[i].getElementsByTagName("input")[0].checked) {
+        //                checked.appendChild(origOrder[i]);
+        //            } else {
+        //                unchecked.appendChild(origOrder[i]);
+        //            }
+        //        }
+        //        checkBoxes.append(checked).append(unchecked);
+        //    });
+        //}
+
+        /*
             Function to load the grids with result
             in SQL & SQL Generator Tab
         */
@@ -1940,6 +1996,7 @@
             $query.hide();
             $queryResultGrid.show();
         }
+
 
         /*Grid Generation for SQL generator*/
 
@@ -2074,8 +2131,8 @@
                 $filters.off(VIS.Events.onTouchStartOrClick);
             if ($sqlBtn)
                 $sqlBtn.off(VIS.Events.onTouchStartOrClick);
-            if ($sqlGeneratorBtn)
-                $sqlGeneratorBtn.off(VIS.Events.onTouchStartOrClick);
+            //if ($sqlGeneratorBtn)
+            //    $sqlGeneratorBtn.off(VIS.Events.onTouchStartOrClick);
             if ($joinsDiv)
                 $joinsDiv.off(VIS.Events.onTouchStartOrClick);
             if ($filterDiv)
