@@ -3372,6 +3372,16 @@ namespace VAdvantage.Model
             // is used to check Container applicable into system
             isContainerApplicable = MTransaction.ProductContainerApplicable(GetCtx());
 
+            //VIS_045: DevOps Task ID: 5701 - When E-Way bill exist then user can't be reverse the document.
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                if (!string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VA106_EWayBillNo"))))
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VA106_CancelEwayFirst");
+                    return false;
+                }
+            }
+
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             if (!MPeriod.IsOpen(GetCtx(), GetMovementDate(), dt.GetDocBaseType(), GetAD_Org_ID()))
             {
