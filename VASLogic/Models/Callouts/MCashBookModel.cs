@@ -117,7 +117,7 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             Dictionary<string, object> retValue = new Dictionary<string, object>();
-            DataSet _ds = DB.ExecuteDataset(@"SELECT NVL(ips.DueAmt,0) - NVL(ips.va009_paidamntinvce , 0) AS DueAmt, ips.DiscountDate , ips.DiscountAmt , ips.DiscountDays2 , ips.Discount2, i.IsReturnTrx 
+            DataSet _ds = DB.ExecuteDataset(@"SELECT NVL(ips.DueAmt,0) - NVL(ips.va009_paidamntinvce , 0) AS DueAmt, ips.DiscountDate , ips.DiscountAmt , ips.DiscountDays2 , ips.Discount2, i.IsReturnTrx,i.DateInvoiced 
                 FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID WHERE ips.C_InvoicePaySchedule_ID=" + Util.GetValueOfInt(paramValue[0]), null, null);
             try
             {
@@ -126,7 +126,8 @@ namespace VIS.Models
                     retValue["DueAmt"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["DueAmt"]);
                     retValue["DiscountDate"] = Util.GetValueOfDateTime(_ds.Tables[0].Rows[0]["DiscountDate"]);
                     retValue["DiscountAmt"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["DiscountAmt"]);
-                    retValue["DiscountDays2"] = Util.GetValueOfDateTime(_ds.Tables[0].Rows[0]["DiscountDate"]);
+                    retValue["DiscountDays2"] = Util.GetValueOfDateTime(_ds.Tables[0].Rows[0]["DiscountDays2"]);
+                    retValue["DateInvoiced"] = Util.GetValueOfDateTime(_ds.Tables[0].Rows[0]["DateInvoiced"]);
                     retValue["Discount2"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["Discount2"]);
                     retValue["IsReturnTrx"] = Util.GetValueOfString(_ds.Tables[0].Rows[0]["IsReturnTrx"]);
                 }
@@ -150,9 +151,9 @@ namespace VIS.Models
         /// <returns></returns>
         public Dictionary<string, object> GetInvSchedDueAmount(Ctx ctx,string fields)
         {
-            Dictionary<string, object> retValue = null;
+            Dictionary<string, object> retValue = new Dictionary<string, object>();
             string[] paramValue = fields.Split(',');
-            string qry = @"SELECT NVL(DueAmt , 0) AS DueAmt, i.IsReturnTrx FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID"
+            string qry = @"SELECT NVL(ips.DueAmt , 0) AS DueAmt, i.IsReturnTrx FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID"
                 + " INNER JOIN C_DocType d ON i.C_DocTypeTarget_ID = d.C_DocType_ID WHERE ips.C_InvoicePaySchedule_ID = " + Util.GetValueOfInt(paramValue[0]);
 
             DataSet _ds = DB.ExecuteDataset(qry);

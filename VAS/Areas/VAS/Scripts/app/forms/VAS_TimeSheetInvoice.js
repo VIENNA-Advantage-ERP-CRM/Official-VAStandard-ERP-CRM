@@ -233,7 +233,7 @@
 
             //Created customer search control to filter out data
             var CustomerDiv = $('<div class="vas-CustomerDiv">');
-            var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y' AND C_BPartner.IsEmployee = 'N' AND C_BPartner.IsVendor = 'Y'";
+            var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y' AND C_BPartner.IsEmployee = 'N' AND C_BPartner.IsVendor = 'N'";
             $CustomerDiv = $('<div class="input-group vis-input-wrap">');
             var CustomerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.MultiKey, "C_BPartner_ID", 0, false, CustomerValidation);
             $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.MultiKey, CustomerLookUp);

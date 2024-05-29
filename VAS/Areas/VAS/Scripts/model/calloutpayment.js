@@ -212,12 +212,13 @@
                 if (discountAmt == null) {
                     discountAmt = VIS.Env.ZERO;
                 }
-
-                if (_chk == 0)//Pratap
-                {
+                /*VIS_427 Bug id 5620 identified and commented as their is no need of this check  
+                 as we need to set payment amount after subtracting it from pay amount*/
+                //if (_chk == 0)//Pratap
+                //{
                     mTab.setValue("PayAmt", (invoiceOpen - discountAmt));
                     mTab.setValue("PaymentAmount", (invoiceOpen - discountAmt));
-                }
+                //}
                 mTab.setValue("C_InvoicePaySchedule_ID", C_InvoicePaySchedule_ID);//Pratap
                 mTab.setValue("DiscountAmt", discountAmt);
                 //  reset as dependent fields get reset
@@ -510,6 +511,11 @@
                 && mTab.getValue("C_InvoicePaySchedule_ID") != null) {
                 C_InvoicePaySchedule_ID = mTab.getValue("C_InvoicePaySchedule_ID");
             }
+            /*VIS_427 BugId 5620 when user change value of discount amount than set value of checkbox true
+             so that user can identify that value entered of discount field is from discountAmt field */
+            if (colName == "DiscountAmt") {
+                mTab.setValue("VAS_IsDiscountApplied", true);
+            }
             //	Get Open Amount & Invoice Currency
             var invoiceOpenAmt = VIS.Env.ZERO;
             var discountAmt = VIS.Env.ZERO;
@@ -578,6 +584,10 @@
             //	Get Info from Tab
             if (colName == "PaymentAmount") {
                 mTab.setValue("PayAmt", (mTab.getValue("PaymentAmount")));
+            }
+            //VIS_427 BugId 5620 allowing to set discount amount if value of check box is false
+            if (!mTab.getValue("VAS_IsDiscountApplied")) {
+                mTab.setValue("DiscountAmt", discountAmt);
             }
             var payAmt = Util.getValueOfDecimal(mTab.getValue("PayAmt") == null ? VIS.Env.ZERO : mTab.getValue("PayAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt") == null ? VIS.Env.ZERO : mTab.getValue("WriteOffAmt"));
@@ -1087,9 +1097,9 @@
                     discountAmt = VIS.Env.ZERO;
                 }
                 mTab.setValue("InvoiceAmt", invoiceOpen);
-                if (_chk == 0) {
-                    mTab.setValue("Amount", (invoiceOpen - discountAmt));
-                }
+               // if (_chk == 0) {
+                mTab.setValue("Amount", (invoiceOpen - discountAmt));
+                //}
                 mTab.setValue("DiscountAmt", discountAmt);
                 //  reset as dependent fields get reset
                 // VIS_045: commented due to read only logic not working because on new record this context not clear

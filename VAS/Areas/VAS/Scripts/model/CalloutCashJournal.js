@@ -241,14 +241,48 @@
             var data = VIS.dataContext.getJSONRecord("MCashBook/GetPaySheduleData", paramString);
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
+                    var dateTrx = mTab.getValue("DateTrx");
                     var IsReturnTrx = data["IsReturnTrx"];
+                    //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
                     if (IsReturnTrx == "Y") {
-                        mTab.setValue("PayAmt", Util.getValueOfDecimal(data["DueAmt"]) * -1);
-                        mTab.setValue("PaymentAmount", Util.getValueOfDecimal(data["DueAmt"]) * -1);
+                        Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd")
+                        if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                        }
+                        else if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDays2"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", 0);
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                        }
+                      
                     }
                     else {
-                        mTab.setValue("PayAmt", Util.getValueOfDecimal(data["DueAmt"]));                    // For Payment window
-                        mTab.setValue("PaymentAmount", Util.getValueOfDecimal(data["DueAmt"]));
+                        if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                        }
+                        else if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDays2"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", 0);
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"])));
+                        }
                     }
                 }
                 else {
@@ -260,25 +294,35 @@
                     var accountDate = Util.getValueOfDate(data["accountDate"]);
                     //qry = "SELECT IsSoTrx FROM C_Invoice WHERE C_Invoice_ID = " + mTab.getValue("C_Invoice_ID");
                     var isSoTrx = Util.getValueOfString(data["isSoTrx"]);
+                    //VIS_427 Bug Id 5620 changed sign of amount according to IsSotrx check
                     if (Util.getValueOfDate(data["DiscountDate"]) >= accountDate) {
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
                         }
-                        mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                       
                     }
                     else if (Util.getValueOfDate(data["DiscountDays2"]) >= accountDate) {
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
                         }
-                        mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
                     }
                     else {
+                        if (isSoTrx == "N") {
+                            mTab.setValue("Amount", -1 * Util.getValueOfDecimal(data["DueAmt"]));
+                        }
+                        else {
+                            mTab.setValue("Amount", Util.getValueOfDecimal(data["DueAmt"]));
+                        }
                         mTab.setValue("DiscountAmt", 0);
                     }
                 }
@@ -756,6 +800,10 @@
 
 
     CalloutSetReadOnly.prototype.SetReadnly = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        //VIS_427 Applied check if callout active then return empty string
+        if (this.isCalloutActive()) {
+            return "";
+        }
         if (value == null || value.toString() == "" || value.toString() == "E") {
             this.setCalloutActive(false);
             if (value != null) {
@@ -805,6 +853,10 @@
 
 
     CalloutSetReadOnly.prototype.SetAmountValue = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        //VIS_427 Applied check if callout active then return empty string
+        if (this.isCalloutActive()) {
+            return "";
+        }
 
         if (value == null || value.toString() == "") {
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(false);
