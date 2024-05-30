@@ -212,6 +212,15 @@
                 if (discountAmt == null) {
                     discountAmt = VIS.Env.ZERO;
                 }
+                //VIS_427 negate the value if Return trx check box true
+                if (dr["IsReturnTrx"] == "Y") {
+                    if (invoiceOpen > 0) {
+                        invoiceOpen = invoiceOpen * -1;
+                    }
+                    if (discountAmt > 0) {
+                        discountAmt = discountAmt * -1;
+                    }
+                }
                 /*VIS_427 Bug id 5620 identified and commented as their is no need of this check  
                  as we need to set payment amount after subtracting it from pay amount*/
                 //if (_chk == 0)//Pratap
@@ -1095,6 +1104,15 @@
                 var discountAmt = Util.getValueOfDecimal(dr["invoiceDiscount"]);        		//	Set Discount Amt
                 if (discountAmt == null) {
                     discountAmt = VIS.Env.ZERO;
+                }
+                //VIS_427 negate the value if Return trx check box true
+                if (dr["IsReturnTrx"] == "Y") {
+                    if (invoiceOpen > 0) {
+                        invoiceOpen = invoiceOpen * -1;
+                    }
+                    if (discountAmt > 0) {
+                        discountAmt = discountAmt * -1;
+                    }
                 }
                 mTab.setValue("InvoiceAmt", invoiceOpen);
                // if (_chk == 0) {

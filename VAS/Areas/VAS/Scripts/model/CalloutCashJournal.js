@@ -245,7 +245,6 @@
                     var IsReturnTrx = data["IsReturnTrx"];
                     //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
                     if (IsReturnTrx == "Y") {
-                        Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd")
                         if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
                             (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
