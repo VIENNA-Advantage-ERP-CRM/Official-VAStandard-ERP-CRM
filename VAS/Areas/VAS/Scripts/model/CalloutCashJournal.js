@@ -154,9 +154,9 @@
                 else {
                     mTab.setValue("VSS_PAYMENTTYPE", "R");
                 }
+                mTab.setValue("DiscountAmt", discountAmt);
                 ctx.setContext("InvTotalAmt", payAmt.toString());
                 mTab.setValue("Amount", (payAmt - discountAmt));
-                mTab.setValue("DiscountAmt", discountAmt);
                 mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
 
 
@@ -799,10 +799,6 @@
 
 
     CalloutSetReadOnly.prototype.SetReadnly = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        //VIS_427 Applied check if callout active then return empty string
-        if (this.isCalloutActive()) {
-            return "";
-        }
         if (value == null || value.toString() == "" || value.toString() == "E") {
             this.setCalloutActive(false);
             if (value != null) {
@@ -852,10 +848,6 @@
 
 
     CalloutSetReadOnly.prototype.SetAmountValue = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        //VIS_427 Applied check if callout active then return empty string
-        if (this.isCalloutActive()) {
-            return "";
-        }
 
         if (value == null || value.toString() == "") {
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(false);
