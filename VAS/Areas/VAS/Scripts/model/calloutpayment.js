@@ -704,9 +704,12 @@
                 }
                 //
                 invoiceOpenAmt = Util.getValueOfDecimal((invoiceOpenAmt * currencyRate).toFixed(currency["StdPrecision"]));//, MidpointRounding.AwayFromZero);
-                if (enteredDiscountAmt != 0)
-                    discountAmt = enteredDiscountAmt;
-                discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(currency["StdPrecision"]));
+                //VIS_427 Change enteredDiscount according to currency rate
+                if (enteredDiscountAmt != 0) {
+                    //discountAmt = enteredDiscountAmt;
+                    enteredDiscountAmt = Util.getValueOfDecimal((enteredDiscountAmt * currencyRate).toFixed(currency["StdPrecision"]));
+                }
+                    discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(currency["StdPrecision"]));
                 //currency.GetStdPrecision());//, MidpointRounding.AwayFromZero);
                 this.log.fine("Rate=" + currencyRate + ", InvoiceOpenAmt=" + invoiceOpenAmt + ", DiscountAmt=" + discountAmt);
             }
@@ -714,6 +717,7 @@
             //	Currency Changed - convert all
             if (colName == "C_Currency_ID" || colName == "C_ConversionType_ID") {
 
+                mTab.setValue("VAS_IsDiscountApplied", false);
                 //writeOffAmt = (writeOffAmt * currencyRate).toFixed(currency["StdPrecision"]);
                 writeOffAmt = 0;
                 //  currency.GetStdPrecision());//, MidpointRounding.AwayFromZero);
@@ -727,8 +731,11 @@
                 //enteredDiscountAmt = (enteredDiscountAmt * currencyRate).toFixed(currency["StdPrecision"]);
                 enteredDiscountAmt = 0;
                 //currency.GetStdPrecision());//, MidpointRounding.AwayFromZero);
-                mTab.setValue("DiscountAmt", enteredDiscountAmt);
-                discountAmt = enteredDiscountAmt;
+                //if entered discount is not zero then set discountAmt else set enteredDiscountAmt
+                if (enteredDiscountAmt != 0) {
+                    discountAmt = enteredDiscountAmt;
+                }
+                mTab.setValue("DiscountAmt", discountAmt);
                 payAmt = (((invoiceOpenAmt - discountAmt) - writeOffAmt) - overUnderAmt);
                 mTab.setValue("PayAmt", Util.getValueOfDecimal(payAmt.toFixed(precision)));
                 mTab.setValue("PaymentAmount", Util.getValueOfDecimal(payAmt.toFixed(precision)));

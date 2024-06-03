@@ -298,10 +298,17 @@
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
                             mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            //VIS_427 For Payment allocate set due amount in invoice amount
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["DiscountAmt"]));
                             mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
                         }
                        
                     }
@@ -309,18 +316,30 @@
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["Discount2"]));
                             mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["Discount2"]));
                             mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
                         }
                     }
                     else {
                         if (isSoTrx == "N") {
                             mTab.setValue("Amount", -1 * Util.getValueOfDecimal(data["DueAmt"]));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
                         }
                         else {
                             mTab.setValue("Amount", Util.getValueOfDecimal(data["DueAmt"]));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
                         }
                         mTab.setValue("DiscountAmt", 0);
                     }
