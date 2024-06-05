@@ -18,6 +18,7 @@ using VAdvantage.SqlExec;
 using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.Utility;
+using VAdvantage.ProcessEngine;
 
 namespace VAdvantage.Model
 {
@@ -119,6 +120,20 @@ namespace VAdvantage.Model
             if (ELEMENTTYPE_UserDefined.Equals(elementType) && IsNaturalAccount())
                 SetIsNaturalAccount(false);
             //	Tree validation
+
+            //VIS383:04/06/2024 DevOps TASK ID:5877:- When tree is not define then create new tree id behalf of element name 
+            if (Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
+            {
+                int treeId = 0;
+                string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
+                if (!string.IsNullOrEmpty(msgError))
+                {
+                    log.SaveError(msgError, "");
+                    return false;
+                }
+                SetAD_Tree_ID(treeId);
+            }
+
             X_AD_Tree tree = GetTree();
             if (tree == null)
                 return false;
@@ -139,12 +154,72 @@ namespace VAdvantage.Model
             {
                 if (!X_AD_Tree.TREETYPE_ElementValue.Equals(treeType))
                 {
-                   log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
+                    log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
                     return false;
                 }
             }
             return true;
         }
 
+        /// <summary>
+        /// VIS383:04/06/2024 DevOps TASK ID:5877:-Create new tree and return Tree Id
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="trx">Transaction</param>
+        /// <param name="name">Element Name</param>
+        /// <param name="treeID">Tree ID</param>
+        /// <returns>Return Tree ID</returns>
+        public string CreateNewTree(Ctx ctx, Trx trx, string name, out int treeID)
+        {
+            string output = "";
+            string treeName = name;
+            string sql = "SELECT COUNT(*) FROM AD_Tree WHERE Lower(name) =Lower('" + treeName + "')";
+            sql = MRole.Get(ctx, ctx.GetAD_Role_ID()).AddAccessSQL(sql, "AD_Tree", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            int countRecords = Convert.ToInt32(DB.ExecuteScalar(sql));
+            if (countRecords > 0)
+            {
+                output = "VAS_DuplicateRecord";
+                treeID = 0;
+                return output;
+            }
+
+            MTree newTree = new MTree(ctx, 0, trx);
+            newTree.SetName(treeName);
+            newTree.SetAD_Table_ID(MTable.Get_Table_ID("C_ElementValue"));
+            newTree.SetTreeType("EV");
+            newTree.SetIsAllNodes(true);
+            if (newTree.Save(trx))
+            {
+                MClientInfo cInfo = new MClientInfo(ctx, GetAD_Client_ID(), null);
+                sql = "SELECT AD_Process_ID FROM AD_Process WHERE Name='Verify Tree'";
+                object processID = DB.ExecuteScalar(sql);
+                if (processID == null || processID == DBNull.Value)
+                {
+                    output = "VAS_NodeGenProcessNotFound";
+                    treeID = 0;
+                    return output;
+                }
+
+                MPInstance instance = new MPInstance(ctx, Convert.ToInt32(processID), 0);
+                if (!instance.Save())
+                {
+                    output = "VAS_ProcessNoInstance";
+                    treeID = 0;
+                    return output;
+                }
+
+                VAdvantage.ProcessEngine.ProcessInfo inf =
+                    new VAdvantage.ProcessEngine.ProcessInfo("GenerateTreeNodes", Convert.ToInt32(processID), MTable.Get_Table_ID("AD_Tree"), newTree.GetAD_Tree_ID());
+                inf.SetAD_PInstance_ID(instance.GetAD_PInstance_ID());
+                inf.SetAD_Client_ID(GetAD_Client_ID());
+                inf.SetRecord_ID(newTree.GetAD_Tree_ID());
+                ProcessCtl worker = new ProcessCtl(ctx, null, inf, null);
+                worker.Run();
+                treeID = newTree.GetAD_Tree_ID();
+                return output;
+            }
+            treeID = 0;
+            return output;
+        }
     }
 }

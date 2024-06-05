@@ -92,6 +92,16 @@ namespace ViennaAdvantage.Process
                     return _message;
                 }
             }
+            //VIS383:05/06/2024 DevOps TASK ID:5877:-Get the Element ID when run "COA Import" process from chart of account window
+            if (C_Elememt_ID == 0 && Util.GetValueOfInt(GetRecord_ID()) > 0)
+            {
+                C_Elememt_ID = Util.GetValueOfInt(GetRecord_ID());
+            }
+            if (C_Elememt_ID == 0)
+            {
+                _message = Msg.GetMsg(GetCtx(), "VAS_ElementNotFound");
+                return _message;
+            }
 
             int ind = filename.LastIndexOf(".");
             extension = filename.Substring(ind, filename.Length - ind);
@@ -405,8 +415,6 @@ namespace ViennaAdvantage.Process
                                     ///******************** Commented
                                     //eleValue.SetParentSerachKey(parent_ID.ToString());
                                 }
-
-
 
                                 if (!eleValue.Save())
                                 {
