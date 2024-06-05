@@ -239,6 +239,9 @@
             //var qry = "SELECT DueAmt , DiscountDate , DiscountAmt , DiscountDays2 , Discount2  FROM C_InvoicePaySchedule WHERE C_InvoicePaySchedule_ID=" + C_InvoicePaySchedule_ID;
             var paramString = C_InvoicePaySchedule_ID.toString() + "," + mTab.getValue("C_Cash_ID") + "," + mTab.getValue("C_Invoice_ID");
             var data = VIS.dataContext.getJSONRecord("MCashBook/GetPaySheduleData", paramString);
+            /*VIS_427 Set Currency when user change invoicepayschedule so that can convert value of schedule
+            according to currency*/
+            mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
                     var dateTrx = mTab.getValue("DateTrx");
