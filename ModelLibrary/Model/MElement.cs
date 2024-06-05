@@ -115,16 +115,24 @@ namespace VAdvantage.Model
         {
             if (GetAD_Org_ID() != 0)
                 SetAD_Org_ID(0);
-            int treeId = 0;
             String elementType = GetElementType();
             //	Natural Account
             if (ELEMENTTYPE_UserDefined.Equals(elementType) && IsNaturalAccount())
                 SetIsNaturalAccount(false);
             //	Tree validation
 
-            //VIS383:04/06/2024 DevOps TASK ID:5877:- Create new tree id behalf of element name 
-            CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
-            SetAD_Tree_ID(treeId);
+            //VIS383:04/06/2024 DevOps TASK ID:5877:- When tree is not define then create new tree id behalf of element name 
+            if (Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
+            {
+                int treeId = 0;
+                string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
+                if (!string.IsNullOrEmpty(msgError))
+                {
+                    log.SaveError("FRPT_DuplicateRecord", "");
+                    return false;
+                }
+                SetAD_Tree_ID(treeId);
+            }
 
             X_AD_Tree tree = GetTree();
             if (tree == null)
@@ -146,7 +154,7 @@ namespace VAdvantage.Model
             {
                 if (!X_AD_Tree.TREETYPE_ElementValue.Equals(treeType))
                 {
-                   log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
+                    log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
                     return false;
                 }
             }
@@ -165,7 +173,7 @@ namespace VAdvantage.Model
         {
             string output = "";
             string treeName = name;
-            string sql = "SELECT COUNT(*) FROM AD_Tree WHERE name LIKE'%" + treeName + "%'";
+            string sql = "SELECT COUNT(*) FROM AD_Tree WHERE Lower(name) =Lower('" + treeName + "')";
             sql = MRole.Get(ctx, ctx.GetAD_Role_ID()).AddAccessSQL(sql, "AD_Tree", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             int countRecords = Convert.ToInt32(DB.ExecuteScalar(sql));
             if (countRecords > 0)
