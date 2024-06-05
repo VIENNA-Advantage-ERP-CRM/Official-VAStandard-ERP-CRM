@@ -909,7 +909,7 @@ namespace VAdvantage.Model
                     if (GetDateNextAction() == null && _requestType.GetAutoDueDateDays() > 0)
                         //VIS_427-Bug Id 2105: calculated the according the system time
                         SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
-                    
+
                 }
                 //	Is Status Valid
                 if (GetR_Status_ID() != 0)
@@ -940,6 +940,19 @@ namespace VAdvantage.Model
             //	Close/Open
             if (status != null)
             {
+                // VIS0060: In case of Service & Maintenance module, System will verifies that if all Assigned tasks have been completed.
+                // Then only it will allow to Resolve or Close the Request/Ticket
+                if (Env.IsModuleInstalled("VA075_") && Get_ID() > 0 && status.IsClosed())
+                {
+                    int count = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(VA075_WorkOrderOperation_ID) FROM VA075_WorkOrderOperation
+                        WHERE NVL(R_Request_ID, 0) = " + Get_ID() + " AND Processed = 'N'", null, Get_Trx()));
+                    if (count > 0)
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_OpenTaskExists"));
+                        return false;
+                    }
+                }
+
                 if (status.IsOpen())
                 {
                     if (GetStartDate() == null)
@@ -1030,14 +1043,14 @@ namespace VAdvantage.Model
             //VIS_427-Bug Id 2105: check when role changes for request
             if (CheckChange(ra, "AD_Role_ID"))
             {
-                string oldname="null", newname="null";
+                string oldname = "null", newname = "null";
                 int AD_User_ID = p_ctx.GetAD_User_ID();
                 if (AD_User_ID == 0)
-                AD_User_ID = GetUpdatedBy();
+                    AD_User_ID = GetUpdatedBy();
                 int oldAd_Role_ID = Util.GetValueOfInt(Get_ValueOld("AD_Role_ID"));
                 String sql = "SELECT NAME,AD_Role_ID FROM AD_Role where AD_Role_ID IN " + (oldAd_Role_ID, GetAD_Role_ID());
-               DataSet ds = DB.ExecuteDataset(sql);
-                if( ds !=null && ds.Tables[0].Rows.Count>0)
+                DataSet ds = DB.ExecuteDataset(sql);
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
                     foreach (DataRow dr in ds.Tables[0].Rows)
                     {
