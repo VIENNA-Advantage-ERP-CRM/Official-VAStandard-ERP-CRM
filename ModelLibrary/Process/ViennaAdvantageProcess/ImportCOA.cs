@@ -99,7 +99,7 @@ namespace ViennaAdvantage.Process
             }
             if (C_Elememt_ID == 0)
             {
-                _message = Msg.GetMsg(GetCtx(), "ElementNotFound");
+                _message = Msg.GetMsg(GetCtx(), "VAS_ElementNotFound");
                 return _message;
             }
 

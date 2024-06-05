@@ -164,7 +164,7 @@ namespace VAdvantage.Model
         /// <summary>
         /// VIS383:04/06/2024 DevOps TASK ID:5877:-Create new tree and return Tree Id
         /// </summary>
-        /// <param name="ctx">Contect</param>
+        /// <param name="ctx">Context</param>
         /// <param name="trx">Transaction</param>
         /// <param name="name">Element Name</param>
         /// <param name="treeID">Tree ID</param>
