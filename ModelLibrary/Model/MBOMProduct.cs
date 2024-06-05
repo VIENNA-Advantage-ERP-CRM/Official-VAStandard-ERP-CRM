@@ -198,7 +198,7 @@ namespace VAdvantage.Model
 
             // VIS0060: Check if Manufacturing module is installed and Standard Operation releated data with same operation sequence exists within same BOM.
             // Then systen will copy Operation related data to this BOM Component.
-            if (Env.IsModuleInstalled("VAMFG_") && (newRecord || Is_ValueChanged("VAMFG_M_Operation_ID") || Is_ValueChanged("VAMFG_M_StandardOperation_ID")
+            if (Env.IsModuleInstalled("VAMFG_") && Get_ColumnIndex("VAMFG_M_StandardOperation_ID") >= 0 && (newRecord || Is_ValueChanged("VAMFG_M_Operation_ID") || Is_ValueChanged("VAMFG_M_StandardOperation_ID")
                 || Is_ValueChanged("VAMFG_M_WorkCenter_ID") || Is_ValueChanged("VAMFG_UOM_ID") || Is_ValueChanged("VAMFG_SetupTime") || Is_ValueChanged("VAMFG_UnitRuntime")))
             {
                 DataSet ds = DB.ExecuteDataset(@"SELECT VAMFG_M_Operation_ID, VAMFG_M_StandardOperation_ID, VAMFG_M_WorkCenter_ID, VAMFG_SetupTime,
