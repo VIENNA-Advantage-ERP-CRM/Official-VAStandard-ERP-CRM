@@ -93,9 +93,14 @@ namespace ViennaAdvantage.Process
                 }
             }
             //VIS383:05/06/2024 DevOps TASK ID:5877:-Get the Element ID when run "COA Import" process from chart of account window
-            if (C_Elememt_ID == 0)
+            if (C_Elememt_ID == 0 && Util.GetValueOfInt(GetRecord_ID()) > 0)
             {
                 C_Elememt_ID = Util.GetValueOfInt(GetRecord_ID());
+            }
+            if (C_Elememt_ID == 0)
+            {
+                _message = Msg.GetMsg(GetCtx(), "ElementNotFound");
+                return _message;
             }
 
             int ind = filename.LastIndexOf(".");
