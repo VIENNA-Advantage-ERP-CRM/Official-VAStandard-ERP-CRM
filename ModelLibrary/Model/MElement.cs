@@ -128,7 +128,7 @@ namespace VAdvantage.Model
                 string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
                 if (!string.IsNullOrEmpty(msgError))
                 {
-                    log.SaveError("FRPT_DuplicateRecord", "");
+                    log.SaveError(msgError, "");
                     return false;
                 }
                 SetAD_Tree_ID(treeId);
@@ -178,7 +178,7 @@ namespace VAdvantage.Model
             int countRecords = Convert.ToInt32(DB.ExecuteScalar(sql));
             if (countRecords > 0)
             {
-                output = "FRPT_DuplicateRecord";
+                output = "VAS_DuplicateRecord";
                 treeID = 0;
                 return output;
             }
@@ -195,7 +195,7 @@ namespace VAdvantage.Model
                 object processID = DB.ExecuteScalar(sql);
                 if (processID == null || processID == DBNull.Value)
                 {
-                    output = "FRPT_NodeGenProcessNotFound";
+                    output = "VAS_NodeGenProcessNotFound";
                     treeID = 0;
                     return output;
                 }
@@ -203,7 +203,7 @@ namespace VAdvantage.Model
                 MPInstance instance = new MPInstance(ctx, Convert.ToInt32(processID), 0);
                 if (!instance.Save())
                 {
-                    output = "FRPT_ProcessNoInstance";
+                    output = "VAS_ProcessNoInstance";
                     treeID = 0;
                     return output;
                 }
