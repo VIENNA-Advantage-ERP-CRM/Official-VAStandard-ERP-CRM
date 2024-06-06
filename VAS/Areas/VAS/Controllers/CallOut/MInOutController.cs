@@ -227,5 +227,24 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// This function is use to get the value of Transportation Mode
+        /// on selection of Freight category
+        /// </summary>
+        /// <param name="fields">M_FreightCategory_ID</param>
+        /// <returns>returns Search key of freight category</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetFreightCategory(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MInOutModel objInOut = new MInOutModel();
+                retJSON = JsonConvert.SerializeObject(objInOut.GetFreightCategory(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
