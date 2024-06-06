@@ -132,6 +132,7 @@ namespace VIS.Models
                     retValue["Discount2"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["Discount2"]);
                     retValue["IsReturnTrx"] = Util.GetValueOfString(_ds.Tables[0].Rows[0]["IsReturnTrx"]);
                     retValue["C_Currency_ID"]= Util.GetValueOfInt(_ds.Tables[0].Rows[0]["C_Currency_ID"]);
+                   // retValue["C_ConversionType_ID"] = Util.GetValueOfInt(_ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
                 }
                 
                 retValue["accountDate"] = Util.GetValueOfDateTime(DB.ExecuteScalar("SELECT DateAcct FROM C_Cash WHERE IsActive = 'Y' AND C_Cash_ID = " + Util.GetValueOfInt(paramValue[1])));                

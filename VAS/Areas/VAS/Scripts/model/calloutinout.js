@@ -975,6 +975,35 @@
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
+    /**
+  *  VIS_427:This function is used to Set Transportation Mode when user change freight Category
+  *  and this callout is called from Delivery order and material transfer window
+  * @param {any} ctx
+  * @param {any} windowNo
+  * @param {any} mTab
+  * @param {any} mField
+  * @param {any} value
+  * @param {any} oldValue
+  */
+    CalloutInOut.prototype.setFreightCategory = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        try {
+            var result = VIS.dataContext.getJSONRecord("MInOut/GetFreightCategory", Util.getValueOfInt(mTab.getValue("M_FreightCategory_ID")));
+            if (result != null) {
+                mTab.setValue("VAS_Category", result["VAS_Category"]);
+            }
+        }
+        catch (errx) {
+           this.setCalloutActive(false);
+           this.log.severe(errx.toString());
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
 
     VIS.Model.CalloutInOut = CalloutInOut;
 
