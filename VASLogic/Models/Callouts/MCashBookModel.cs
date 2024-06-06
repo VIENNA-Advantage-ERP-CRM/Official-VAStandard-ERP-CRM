@@ -119,7 +119,7 @@ namespace VIS.Models
             Dictionary<string, object> retValue = new Dictionary<string, object>();
             //VIS_427 Fixed Query to get currency id
             DataSet _ds = DB.ExecuteDataset(@"SELECT NVL(ips.DueAmt,0) - NVL(ips.va009_paidamntinvce , 0) AS DueAmt, ips.DiscountDate , ips.DiscountAmt , ips.DiscountDays2 , ips.Discount2, i.IsReturnTrx,i.DateInvoiced
-               ,ips.C_Currency_ID FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID WHERE ips.C_InvoicePaySchedule_ID=" + Util.GetValueOfInt(paramValue[0]), null, null);
+               ,ips.C_Currency_ID,i.C_ConversionType_ID FROM C_InvoicePaySchedule ips INNER JOIN C_Invoice i ON ips.C_Invoice_ID = i.C_Invoice_ID WHERE ips.C_InvoicePaySchedule_ID=" + Util.GetValueOfInt(paramValue[0]), null, null);
             try
             {
                 if (_ds.Tables[0].Rows.Count > 0 && _ds != null)
@@ -132,6 +132,7 @@ namespace VIS.Models
                     retValue["Discount2"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["Discount2"]);
                     retValue["IsReturnTrx"] = Util.GetValueOfString(_ds.Tables[0].Rows[0]["IsReturnTrx"]);
                     retValue["C_Currency_ID"]= Util.GetValueOfInt(_ds.Tables[0].Rows[0]["C_Currency_ID"]);
+                    retValue["C_ConversionType_ID"] = Util.GetValueOfInt(_ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
                 }
                 
                 retValue["accountDate"] = Util.GetValueOfDateTime(DB.ExecuteScalar("SELECT DateAcct FROM C_Cash WHERE IsActive = 'Y' AND C_Cash_ID = " + Util.GetValueOfInt(paramValue[1])));                

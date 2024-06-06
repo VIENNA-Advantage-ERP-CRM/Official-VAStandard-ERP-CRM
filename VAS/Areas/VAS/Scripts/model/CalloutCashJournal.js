@@ -242,6 +242,7 @@
             /*VIS_427 Set Currency when user change invoicepayschedule so that can convert value of schedule
             according to currency*/
             mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
+            mTab.setValue("C_ConversionType_ID", Util.getValueOfInt(data["C_ConversionType_ID"]));
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
                     var dateTrx = mTab.getValue("DateTrx");

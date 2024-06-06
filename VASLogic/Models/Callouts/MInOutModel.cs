@@ -209,6 +209,26 @@ namespace VIS.Models
             }
             return retDic;
         }
+        /// <summary>
+        /// This function is use to get the value of Transportation Mode
+        /// on selection of Freight category
+        /// </summary>
+        /// <param name="fields">M_FreightCategory_ID</param>
+        /// <returns>returns Search key of freight category</returns>
+        /// <author>VIS_427</author>
+        public Dictionary<string, string> GetFreightCategory(Ctx ctx, string M_FreightCategory_ID)
+        {
+
+            Dictionary<string, string > retDic = null;
+            string sql = @"SELECT VAS_Category FROM M_FreightCategory WHERE M_FreightCategory_ID=" + Util.GetValueOfInt(M_FreightCategory_ID);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, string>();
+                retDic["VAS_Category"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_Category"]);
+            }
+            return retDic;
+        }
 
     }
 }
