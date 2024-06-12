@@ -92,8 +92,11 @@
         var AppliedRequestData = [];
         var $FilterHeader = null;
         var sideDivWidth = 260;
+        var SeperationTag = null;
+        var lineDiv = null;
         // var pushRecords = [];
         var minSideWidth = 50;
+        var DocTypeDiv = null;
         //assigne variable value true so that onload the width should be correct
         var IsSizeChangeOnLoad = true;
         var selectDivWidth = $(window).width() - (sideDivWidth + 20 + 5);
@@ -106,7 +109,8 @@
             { ColumnName: "C_ProjectRef_ID", TableName: "C_Order" },
             { ColumnName: "R_Request_ID", TableName: "S_TimeExpenseLine" },
             { ColumnName: "S_TimeExpense_ID", TableName: "S_TimeExpense" },
-            { ColumnName: "VA075_Task_ID", TableName: "VA075_Task" }
+            { ColumnName: "VA075_Task_ID", TableName: "VA075_Task" },
+            { ColumnName: "C_DocTypeTarget_ID", TableName: "C_Invoice" }
         ];
         //It will store value of column ids
         var ColumnIds = null;
@@ -177,7 +181,9 @@
             "VAS_InvoiceCreationFail",
             "VAS_PayTermNotBined",
             "VAS_PayMethod",
-            "VAS_And"
+            "VAS_And",
+            "C_DocType_ID",
+            "VAS_InvoiceType"
         ];
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
@@ -197,7 +203,8 @@
             LeftSideFields = $('<div class="vas-tis-top-fields">');
             //Created organization dropdown control
             $OrgDiv = $('<div class="input-group vis-input-wrap">');
-            var Orglookup = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.AD_Org_ID, VIS.DisplayType.TableDir);
+            var OrgValidation = "AD_Org.AD_Org_ID <> 0 AND AD_Org.IsActive='Y' AND AD_Org.IsSummary='N' AND AD_Org.IsCostCenter='N' AND AD_Org.IsProfitCenter='N'";
+            var Orglookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.AD_Org_ID, VIS.DisplayType.TableDir, "AD_Org_ID", 0, false, OrgValidation);
             $self.cmbOrg = new VIS.Controls.VComboBox("AD_Org_ID", true, false, true, Orglookup, 150, VIS.DisplayType.TableDir);
             $self.cmbOrg.setMandatory(true);
             var $OrgControlWrap = $('<div class="vis-control-wrap">');
@@ -207,11 +214,28 @@
             $OrgDiv.append($OrgControlWrap);
             $OrgButtonWrap.append($self.cmbOrg.getBtn(0));
             $OrgDiv.append($OrgButtonWrap);
+            //Created DocumentType dropdown control
+            DocTypeDiv = $('<div class="vas-DocTyperDiv">');
+            var $DocTypeDiv = $('<div class="input-group vis-input-wrap">');
+            var DoctypeValidationCode = "C_DocType.IsActive = 'Y' AND C_DocType.DocBaseType = 'ARI' AND C_DocType.IsSOTrx = 'Y' AND " +
+                " C_DocType.IsReturnTrx = 'N' AND C_DocType.IsExpenseInvoice = 'N' " +
+                " AND C_DocType.AD_Org_ID IN (0,@AD_Org_ID@) AND C_DocType.AD_Client_ID IN (0,@AD_Client_ID@)";
+            var DocTypelookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_DocTypeTarget_ID, VIS.DisplayType.TableDir, "C_DocType_ID", 0, false, DoctypeValidationCode);
+            $self.cmbDocType = new VIS.Controls.VComboBox("C_DocType_ID", true, false, true, DocTypelookUp, 50, VIS.DisplayType.TableDir);
+            var $DocTypeControlWrap = $('<div class="vis-control-wrap">');
+            var $DocTypeButtonWrap = $('<div class="input-group-append">');
+            $DocTypeDiv.append($DocTypeControlWrap);
+            $DocTypeControlWrap.append($self.cmbDocType.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VAS.translatedTexts.VAS_InvoiceType + '</label>');
+            $DocTypeDiv.append($DocTypeControlWrap);
+            $DocTypeButtonWrap.append($self.cmbDocType.getBtn(0));
+            $DocTypeDiv.append($DocTypeButtonWrap);
+            DocTypeDiv.append($DocTypeDiv);
+
             //Created customer search control to filter out data
             var CustomerDiv = $('<div class="vas-CustomerDiv">');
-            var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y'";
+            var CustomerValidation = "C_BPartner.IsActive='Y' AND C_BPartner.AD_Org_ID IN (0,@AD_Org_ID@) AND C_BPartner.IsCustomer = 'Y' AND C_BPartner.IsSummary = 'N'";
             $CustomerDiv = $('<div class="input-group vis-input-wrap">');
-            var CustomerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.MultiKey, "C_BPartner_ID", 0, false, CustomerValidation);
+            var CustomerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.MultiKey, "C_BPartner_ID", 0, false, CustomerValidation);
             $self.vSearchCustomer = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.MultiKey, CustomerLookUp);
             var $CustomerControlWrap = $('<div class="vis-control-wrap">');
             var $CustomerButtonWrap = $('<div class="input-group-append">');
@@ -331,25 +355,31 @@
                 "<div class='vas-SelectDiv'>" +
                 "<label id='spnSelectRecord_" + $self.windowNo + "' class='VIS_Pref_Label_Font vas-SpnSelect'>" + VAS.translatedTexts.VAS_RecordSelection + "</label></div>" +
                 "<div class='vas-tis-filter dropdown'>" +
+                "<div class='vas-tis-icondiv'>" +
+                "<a class='vas-tis-refreshicon' id='vas-tis-refresh_" + $self.windowNo + "'>" +
+                "<span class='glyphicon glyphicon-refresh'>" + "</span>" +
+                "</a>" +
                 "<span class='vas-tis-filterspn btn d-flex position-relative' type='button' id='vas_tis_dropdownMenu_" + $self.windowNo + "'>" +
                 "<i class='fa fa-filter vas-tis-filterIcon'></i>" +
                 "</span>" +
+                "</div>"+
                 "<div class='vas-tis-filterPopupWrap' id='vas_tis_FilterPopupWrap_" + $self.windowNo + "'>" +
                 "</div>" +
                 "</div>");
-
+            
             $self.btnSpaceDiv = $self.topDiv.find("#btnSpaceDiv_" + $self.windowNo);
             $self.recordDiv = $self.topDiv.find("#spnSelect_" + $self.windowNo);
             $self.LeftsideDiv = $("<div id='sideDiv_" + $self.windowNo + "' class='vas-tis-leftsidewrap vis-leftsidebarouterwrap px-3'>");
-            $self.LeftsideDiv.css("height", "100%");
             $self.SearchBtn = $("<input id='SearchBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.Search + "'>");
-            $self.RefreshBtn = $("<input id='RefreshBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.VAS_Refresh + "'>");
+           // $self.RefreshBtn = $("<input id='RefreshBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-searchbtn' type='button' value='" + VAS.translatedTexts.VAS_Refresh + "'>");
             $self.bottumDiv = $("<div class='vis-info-btmcnt-wrap vis-p-t-10 vas-BottomBtnDiv'>");
-            $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2'>" + VAS.translatedTexts.VAS_Preview + "</button>");
-            $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
-            LeftButtonDiv.append($self.RefreshBtn).append($self.SearchBtn);
+            $self.PreviewBtn = $("<button id='PreviewBtn_" + $self.windowNo + "' class='VIS_Pref_btn-2 mr-2 vas-tis-btnmargin'>" + VAS.translatedTexts.VAS_Preview + "</button>");
+            $self.GenerateInvBtn = $("<button id='VAS_GenInvoice_" + $self.windowNo + "' class='VIS_Pref_btn-2 vas-tis-btnmargin'>" + VAS.translatedTexts.VAS_GenInvoice + "</button>");
+            LeftButtonDiv.append($self.SearchBtn);
             $self.LeftsideDiv.append(LeftSideFields).append(LeftButtonDiv);
-            $self.bottumDiv.append($self.GenerateInvBtn).append($self.PreviewBtn);
+            var rightBottomDiv = $("<div class='vas-tis-rightbottomdiv'>")
+            rightBottomDiv.append($self.GenerateInvBtn).append($self.PreviewBtn)
+            $self.bottumDiv.append(DocTypeDiv).append(rightBottomDiv);
 
             $self.gridSelectDiv = $("<div id='gridSelectDiv_" + $self.windowNo + "' class='vis-frm-grid-outerwrp'>");
             //appended all the design to root
@@ -1180,7 +1210,7 @@
             PreviewDyinit(PreviewFilteredGridData);
 
             // Append subtotal span to the right side of the dialog
-            var SubTotalSpan = $('<div><div class="vas-tis-subtotal" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal + '</div></div>');
+            var SubTotalSpan = $('<div><div class="vas-tis-subtotal" id="SubTotalSpan_' + $self.windowNo + '">' + VAS.translatedTexts.VAS_SubTotal + ": " + parseFloat(SubTotal).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + '</div></div>');
             rightPreviewWrap.append(SubTotalSpan);
 
             // Handle click events on items in the left side of the dialog
@@ -1201,7 +1231,7 @@
                 // Initialize the preview grid with filtered data
                 PreviewDyinit(PreviewFilteredGridData);
                 rightPreviewWrap.find("#HeadBPTag_" + $self.windowNo).text(VIS.Utility.decodeText(PreviewFilteredGridData[0].C_BPartner));
-                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + SubTotal);
+                rightPreviewWrap.find("#SubTotalSpan_" + $self.windowNo).text(VAS.translatedTexts.VAS_SubTotal + ": " + parseFloat(SubTotal).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }));
                 SubTotal = 0;
             });
 
@@ -1234,7 +1264,8 @@
                 data: {
                     DataTobeInvoice: JSON.stringify(gridDataArray),
                     AD_Client_ID: VIS.Utility.Util.getValueOfInt(AD_Client_ID),
-                    AD_Org_ID: VIS.Utility.Util.getValueOfInt(AD_Org_ID)
+                    AD_Org_ID: VIS.Utility.Util.getValueOfInt(AD_Org_ID),
+                    C_DocType_ID: VIS.Utility.Util.getValueOfInt($self.cmbDocType.getValue())
                 },
                 success: function (result) {
                     if (result != null) {
@@ -1628,6 +1659,10 @@
             if ($self.cmbOrg.oldValue == null) {
                 $self.cmbOrg.setValue(0);
             }
+            if ($self.cmbDocType.oldValue == null) {
+                $self.cmbDocType.setValue(0);
+            }
+            $self.cmbDocType.setValue(null);
             $self.cmbOrg.setValue(null);
             $FromDate.setValue(null);
             $ToDate.setValue(null);
@@ -1639,6 +1674,7 @@
             this.spnRecordSelection = this.$root.find("#spnSelect_" + $self.windowNo);
             this.PreviewBtn = this.$root.find("#PreviewBtn_" + $self.windowNo);
             var btnFilter = this.$root.find("#vas_tis_dropdownMenu_" + $self.windowNo);
+            var refreshIcon = this.$root.find("#vas-tis-refresh_" + $self.windowNo);
             //On click of filter button added a popup to filter the data
             if (btnFilter != null) {
                 btnFilter.on("click", function () {
@@ -1674,8 +1710,8 @@
 
                 });
             }
-            if (this.RefreshBtn != null) {
-                this.RefreshBtn.on(VIS.Events.onTouchStartOrClick, function () {
+            if (refreshIcon != null) {
+                refreshIcon.on("click", function () {
                     $self.setBusy(true);
                     //on refresh clearing the values
                     dynInit(null);
@@ -1693,6 +1729,11 @@
             //On clcik of search button the data will beloaded on grid
             if (this.SearchBtn != null)
                 this.SearchBtn.on(VIS.Events.onTouchStartOrClick, function () {
+                    AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
+                    if (VIS.Utility.Util.getValueOfInt(AD_Org_ID) == 0) {
+                        VIS.ADialog.info('VAS_PlzSelectOrganization');
+                        return;
+                    }
                     if ($FromDate.getValue() == null || $ToDate.getValue() == null) {
                         VIS.ADialog.info('VAS_DateFieldAreMandatory');
                         return;
@@ -1702,7 +1743,6 @@
                         $ToDate.setValue(null);
                         return;
                     }
-                    AD_Org_ID = $self.cmbOrg.getControl().find('option:selected').val();
                     pageNo = 1;
                     LoadTimeSheetData(pageNo, pageSize, false);
 
@@ -1722,6 +1762,10 @@
                 this.GenerateInvBtn.on(VIS.Events.onTouchStartOrClick, function () {
                     if (PreviewLeftData.length == 0) {
                         VIS.ADialog.info('VAS_PlzSelectRecord');
+                        return;
+                    }
+                    if (VIS.Utility.Util.getValueOfInt($self.cmbDocType.getValue()) == 0) {
+                        VIS.ADialog.info('VAS_PlzSelectDocType');
                         return;
                     }
                     GenerateInvoice(gridDataArray);
@@ -1756,7 +1800,6 @@
                     $self.topDiv.find('.vas-RecordSelection').addClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "block");
                     $self.SearchBtn.css("display", "block");
-                    $self.RefreshBtn.css("display", "block");
                     $self.LeftsideDiv.animate({ width: sideDivWidth }, "slow", null, function () {
                         $self.dGrid.resize();
                     });
@@ -1784,7 +1827,6 @@
                     $self.topDiv.find('.vas-RecordSelection').removeClass('vas-tis-RecordArea');
                     LeftSideFields.css("display", "none");
                     $self.SearchBtn.css("display", "none");
-                    $self.RefreshBtn.css("display", "none");
                     $self.recordDiv.animate({ width: selectDivFullWidth }, "slow")
                     $self.gridSelectDiv.animate({ width: selectDivFullWidth }, "slow", null, function () {
                         $self.dGrid.resize();

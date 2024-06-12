@@ -925,6 +925,81 @@
             mTab.setValue("VAS_GrossWeight", result.VAS_GrossWeight);
             mTab.setValue("VAS_TareWeight", result.VAS_TareWeight);
         }
+        else {
+            mTab.setValue("VAS_VehicleRegistrationNo", null);
+            mTab.setValue("VAS_GrossWeight", null);
+            mTab.setValue("VAS_TareWeight", null);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+
+    /**
+     *  VAI050:Set Shipping Business Partner and Transportation ID on select Freight Carrier 
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutInOut.prototype.setShipperDetail = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        //  
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            if (mTab.getAD_Table_ID() == 323)
+                mTab.setValue("C_BPartner_ID", null);
+            else
+                mTab.setValue("C_RefBPartner_ID", null);
+            mTab.setValue("VAS_Transportation", null);
+            return "";
+        }
+        this.setCalloutActive(true);
+        var result = VIS.dataContext.getJSONRecord("MInOut/GetShipperDetail", Util.getValueOfInt(mTab.getValue("M_Shipper_ID")));
+        if (result != null) {
+            if (mTab.getAD_Table_ID() == 323)
+                mTab.setValue("C_BPartner_ID", result.C_BPartner_ID);
+            else
+                mTab.setValue("C_RefBPartner_ID", result.C_BPartner_ID);
+            mTab.setValue("VAS_Transportation", result.TaxID);
+        }
+        else {
+            if (mTab.getAD_Table_ID() == 323)
+                mTab.setValue("C_BPartner_ID", null);
+            else
+                mTab.setValue("C_RefBPartner_ID", null);
+            mTab.setValue("VAS_Transportation", null);
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+    /**
+  *  VIS_427:This function is used to Set Transportation Mode when user change freight Category
+  *  and this callout is called from Delivery order and material transfer window
+  * @param {any} ctx
+  * @param {any} windowNo
+  * @param {any} mTab
+  * @param {any} mField
+  * @param {any} value
+  * @param {any} oldValue
+  */
+    CalloutInOut.prototype.setFreightCategory = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        try {
+            var result = VIS.dataContext.getJSONRecord("MInOut/GetFreightCategory", Util.getValueOfInt(mTab.getValue("M_FreightCategory_ID")));
+            if (result != null) {
+                mTab.setValue("VAS_Category", result["VAS_Category"]);
+            }
+        }
+        catch (errx) {
+            this.setCalloutActive(false);
+            this.log.severe(errx.toString());
+        }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";

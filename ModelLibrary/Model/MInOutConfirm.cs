@@ -237,7 +237,7 @@ namespace VAdvantage.Model
                     _qtyPercentToVerify = 100;
                 }
                 _sql.Clear();
-                _sql.Append(@" SELECT VA010_QualityParameters_ID, VA010_TestPrmtrList_ID FROM va010_AssgndParameters WHERE"
+                _sql.Append(@" SELECT VA010_TestPrmtrList_ID,VA010_TestParameter_ID FROM va010_AssgndParameters WHERE"
                 + " VA010_QualityPlan_ID=" + VA010_QUalityPlan_ID + " AND IsActive='Y'");
                 _ds.Clear();
                 _ds = DB.ExecuteDataset(_sql.ToString(), null, Trx_Name);
@@ -264,13 +264,16 @@ namespace VAdvantage.Model
                                 //Created Table object because not to use Mclass of Quality Control Module in our Base
                                 MTable table = MTable.Get(ctx, "VA010_ShipConfParameters");
                                 PO pos = table.GetPO(ctx, 0, Trx_Name);
-                                pos.Set_ValueNoCheck("M_Product_ID", Util.GetValueOfInt(_ProductList[i]));
-                                pos.Set_ValueNoCheck("VA010_QualityParameters_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_QualityParameters_ID"]));
-                                pos.Set_ValueNoCheck("M_InOutLineConfirm_ID", Util.GetValueOfInt(M_InOutConfirmLine_ID[i]));
-                                pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
-                                pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
                                 pos.Set_ValueNoCheck("AD_Client_ID", ctx.GetAD_Client_ID());
                                 pos.Set_ValueNoCheck("AD_Org_ID", orgid);
+                                pos.Set_ValueNoCheck("M_Product_ID", Util.GetValueOfInt(_ProductList[i]));
+                                pos.Set_ValueNoCheck("M_InOutLineConfirm_ID", Util.GetValueOfInt(M_InOutConfirmLine_ID[i]));
+                                //VAI050-Set Test parameter value 
+                                if (Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestParameter_ID"]) > 0)
+                                    pos.Set_ValueNoCheck("VA010_TestParameter_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestParameter_ID"]));
+                                pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
+                                pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
+
 
                                 if (pos.Save(Trx_Name))
                                 {

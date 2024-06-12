@@ -22,7 +22,7 @@ namespace VASLogic.Models
         StringBuilder errorMessage = new StringBuilder();
         StringBuilder docno = new StringBuilder();
         private int C_ConverType_ID = 0;
-        private int C_DocType_ID = 0;
+       // private int C_DocType_ID = 0;
         StringBuilder sql = new StringBuilder();
 
         /// <summary>
@@ -379,9 +379,10 @@ namespace VASLogic.Models
         /// <param name="AD_Client_ID">AD_Client_ID</param>
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <param name="DataTobeInvoice">object of data which is to be invoice</param>
+        /// <param name="C_DocType_ID">C_DocType_ID</param>
         /// <returns>message</returns>
         /// <author>Devops Id: 5719 VIS_427</author>
-        public string GenerateInvoice(Ctx ct, IEnumerable<dynamic> DataTobeInvoice, int AD_Client_ID, int AD_Org_ID)
+        public string GenerateInvoice(Ctx ct, IEnumerable<dynamic> DataTobeInvoice, int AD_Client_ID, int AD_Org_ID,int C_DocType_ID)
         {
             string message = Msg.GetMsg(ct, "VAS_InvoiceSaved");
             MInvoice inv = null;
@@ -405,7 +406,7 @@ namespace VASLogic.Models
 
                 else
                 {
-                    inv = CreateInvoiceHeader(ct, inv, sortedData[i], AD_Client_ID, AD_Org_ID);
+                    inv = CreateInvoiceHeader(ct, inv, sortedData[i], AD_Client_ID, AD_Org_ID, C_DocType_ID);
                     if (inv.Save())
                     {
                         invoiceList.Add(new VAS_InvoiceDetail
@@ -511,9 +512,10 @@ namespace VASLogic.Models
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <param name="sortedData">object of data which is to be invoice</param>
         /// <param name="inv">invoice</param>
+        /// <param name="C_DocType_ID">C_DocType_ID</param>
         /// <returns>object of invoice</returns>
         /// <author>Devops Id: 5719 VIS_427</author>
-        public MInvoice CreateInvoiceHeader(Ctx ct, MInvoice inv, dynamic sortedData, int AD_Client_ID, int AD_Org_ID)
+        public MInvoice CreateInvoiceHeader(Ctx ct, MInvoice inv, dynamic sortedData, int AD_Client_ID, int AD_Org_ID,int C_DocType_ID)
         {
             inv = new MInvoice(ct, 0, null);
             inv.SetAD_Client_ID(AD_Client_ID);
@@ -530,8 +532,10 @@ namespace VASLogic.Models
             inv.SetIsSOTrx(true);
             inv.SetIsReturnTrx(false);
             inv.SetIsExpenseInvoice(false);
+            //Marked checkbox true to identify that Invoice is generated from this form
+            inv.Set_Value("VAS_IsTEMInvoice", "Y");
 
-            if (GetDocTypeID(AD_Client_ID, AD_Org_ID) != 0)
+            if (C_DocType_ID != 0)
             {
                 inv.SetC_DocTypeTarget_ID(C_DocType_ID);
                 inv.SetC_DocType_ID(C_DocType_ID);
@@ -549,17 +553,17 @@ namespace VASLogic.Models
         /// <param name="AD_Org_ID">AD_Org_ID</param>
         /// <returns>this function returns the Doctype id</returns>
         /// <author>Devops Id: 5719 VIS_427</author>
-        public int GetDocTypeID(int AD_Client_ID, int AD_Org_ID)
-        {
-            sql.Clear();
-            sql.Append("SELECT cd.C_DocType_ID FROM C_DocType cd INNER JOIN C_DocBaseType cbd ON " +
-                             " (cbd.DocBaseType = cd.DocBaseType) WHERE cd.IsActive = 'Y' AND cd.IsSOTrx='Y' AND cd.IsReturnTrx='N' AND cd.IsExpenseInvoice = 'N' AND cbd.DocBaseType='ARI' " +
-                              " AND cd.AD_Org_ID IN " +
-                              " (0," + AD_Org_ID + ")  AND cd.AD_Client_ID IN (0," + AD_Client_ID + ") ORDER BY cd.AD_Org_ID DESC, cd.AD_Client_ID DESC ");
+        //public int GetDocTypeID(int AD_Client_ID, int AD_Org_ID)
+        //{
+        //    sql.Clear();
+        //    sql.Append("SELECT cd.C_DocType_ID FROM C_DocType cd INNER JOIN C_DocBaseType cbd ON " +
+        //                     " (cbd.DocBaseType = cd.DocBaseType) WHERE cd.IsActive = 'Y' AND cd.IsSOTrx='Y' AND cd.IsReturnTrx='N' AND cd.IsExpenseInvoice = 'N' AND cbd.DocBaseType='ARI' " +
+        //                      " AND cd.AD_Org_ID IN " +
+        //                      " (0," + AD_Org_ID + ")  AND cd.AD_Client_ID IN (0," + AD_Client_ID + ") ORDER BY cd.AD_Org_ID DESC, cd.AD_Client_ID DESC ");
 
-            C_DocType_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
-            return C_DocType_ID;
-        }
+        //    C_DocType_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+        //    return C_DocType_ID;
+        //}
         /// <summary>
         ///This Function Used to Get ConvertionType id
         /// </summary>

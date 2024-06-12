@@ -170,7 +170,7 @@ namespace VIS.Models
         /// <param name="ctx"></param>
         /// <param name="param"></param>
         /// <returns>return fleet detail</returns>
-        public Dictionary<String, Object> GetFleetDetail(Ctx ctx, string param)
+        public Dictionary<string, object> GetFleetDetail(Ctx ctx, string param)
         {
 
             Dictionary<string, object> retDic = null;
@@ -187,5 +187,48 @@ namespace VIS.Models
             return retDic;
         }
 
+        /// <summary>
+        /// VAI050-Get Shipper Detail of Freight Carrier
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="param"></param>
+        /// <returns>returns freight carrier details</returns>
+        public Dictionary<string, object> GetShipperDetail(Ctx ctx, string param)
+        {
+
+            Dictionary<string, object> retDic = null;
+            string sql = @"SELECT s.C_BPartner_ID,cb.TaxID FROM M_Shipper s
+                           INNER JOIN C_BPartner cb ON cb.C_BPartner_ID=s.C_BPartner_ID
+                           WHERE s.M_Shipper_ID=" + Util.GetValueOfInt(param);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+                retDic["C_BPartner_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_ID"]);
+                retDic["TaxID"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["TaxID"]);
+            }
+            return retDic;
+        }
+
+        /// <summary>
+        /// This function is use to get the value of Transportation Mode
+        /// on selection of Freight category
+        /// </summary>
+        /// <param name="fields">M_FreightCategory_ID</param>
+        /// <returns>returns Search key of freight category</returns>
+        /// <author>VIS_427</author>
+        public Dictionary<string, string> GetFreightCategory(Ctx ctx, string M_FreightCategory_ID)
+        {
+
+            Dictionary<string, string> retDic = null;
+            string sql = @"SELECT VAS_Category FROM M_FreightCategory WHERE M_FreightCategory_ID=" + Util.GetValueOfInt(M_FreightCategory_ID);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, string>();
+                retDic["VAS_Category"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VAS_Category"]);
+            }
+            return retDic;
+        }
     }
 }
