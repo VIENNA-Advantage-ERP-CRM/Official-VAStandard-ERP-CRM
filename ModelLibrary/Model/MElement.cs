@@ -19,6 +19,9 @@ using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.Utility;
 using VAdvantage.ProcessEngine;
+using System.IO;
+using System.Web.Hosting;
+using ViennaAdvantageWeb.Areas.VIS.Models;
 
 namespace VAdvantage.Model
 {
@@ -220,6 +223,104 @@ namespace VAdvantage.Model
             }
             treeID = 0;
             return output;
+        }
+
+        /// <summary>
+        /// After Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">success</param>
+        /// <returns>success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+            {
+                return success;
+            }
+
+            //VIS_045: 13-June-2024, TASK ID: 5913,  This logic is used to upload AccountingUS1.csv file as attachment from the Application Physical path for COA import.
+            if (IsActive() && !IsRecordAlreadyAttached(GetC_Element_ID(), X_C_Element.Get_Table_ID("C_Element")))
+            {
+                AttachCOAImportFile("AccountingUS1.csv");
+            }
+
+            return base.AfterSave(newRecord, success);
+        }
+
+        /// <summary>
+        /// This function is used to Attach file 
+        /// </summary>
+        /// <param name="fileName">FileName</param>
+        /// <Author>VIS_045, 13-June-2024, TASK ID: 5913</Author>
+        /// <returns>Error Detail (if any)</returns>
+        public string AttachCOAImportFile(string fileName)
+        {
+            // Define the base directory path
+            string baseDirectory = HostingEnvironment.ApplicationPhysicalPath;
+
+            // Combine the base path with the file name
+            string sourceFilePath = Path.Combine(baseDirectory, fileName);
+
+            // Check if the file exists in the specified path
+            if (File.Exists(sourceFilePath))
+            {
+                // Get file information
+                FileInfo fileInfo = new FileInfo(sourceFilePath);
+
+                // Create a list to hold the file details
+                List<AttFileInfo> fileList = new List<AttFileInfo>
+                {
+                    new AttFileInfo
+                    {
+                        Name = fileInfo.Name,
+                        Size = Util.GetValueOfInt(fileInfo.Length)
+                    }
+                };
+
+                #region Copy File into TempDownload Folder
+                // Define the temporary download directory path
+                string tempDownloadDirectory = Path.Combine(baseDirectory, "TempDownload");
+
+                // Ensure the temporary directory exists
+                if (!Directory.Exists(tempDownloadDirectory))
+                {
+                    Directory.CreateDirectory(tempDownloadDirectory);
+                }
+
+                // Define the destination file path
+                string destinationFilePath = Path.Combine(tempDownloadDirectory, fileName);
+
+                // Copy the file to the destination path
+                File.Copy(sourceFilePath, destinationFilePath, true);
+                #endregion
+
+                // Attach the file (Pick file from TemDownload and attach)
+                AttachmentModel attachmentModel = new AttachmentModel();
+                AttachmentInfo attachmentInfo = attachmentModel.CreateAttachmentEntries(
+                    fileList, 0, "", GetCtx(), X_C_Element.Get_Table_ID("C_Element"), GetC_Element_ID(), "", 0, false);
+
+                // Error Detail if not attached
+                if (attachmentInfo != null && !string.IsNullOrEmpty(attachmentInfo.Error))
+                {
+                    log.Severe("File Not Attached For Chart of Account Name - " + GetName() + ", Error : " + attachmentInfo.Error);
+                    return attachmentInfo.Error;
+                }
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// This function is used to check, Attachment is already linked with the record or not
+        /// </summary>
+        /// <param name="Record_ID">Record ID</param>
+        /// <param name="AD_Table_ID">Table ID</param>
+        /// <Author>VIS_045, 13-June-2024, TASK ID: 5913</Author>
+        /// <returns>True, when Exist</returns>
+        public bool IsRecordAlreadyAttached(int Record_ID, int AD_Table_ID)
+        {
+            string sql = $@"SELECT COUNT(AD_Attachment_ID) FROM AD_Attachment WHERE AD_Table_ID = {AD_Table_ID} AND Record_ID = {Record_ID}";
+            return (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0);
         }
     }
 }
