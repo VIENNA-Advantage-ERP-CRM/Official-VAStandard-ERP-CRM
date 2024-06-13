@@ -25,6 +25,9 @@ namespace VAdvantage.Model
         //Account Schema				
         private MAcctSchema _acctSchema = null;
 
+        //New Record
+        private bool _createNew = false;
+
         /// <summary>
         /// Standard Constructor
         /// </summary>
@@ -57,6 +60,20 @@ namespace VAdvantage.Model
             SetClientOrg(org);
             SetDUNS("?");
             SetTaxID("?");
+        }
+
+        /// <summary>
+        /// Organization constructor
+        /// </summary>
+        /// <param name="org">org</param>
+        /// <param name="CreateNew">Create New</param>
+        public MOrgInfo(MOrg org, bool CreateNew)
+           : base(org.GetCtx(), 0, org.Get_TrxName())
+        {
+            SetClientOrg(org);
+            SetDUNS("?");
+            SetTaxID("?");
+            _createNew = CreateNew;
         }
 
         /// <summary>
@@ -129,6 +146,18 @@ namespace VAdvantage.Model
             }
             log.Warning("No Warehouse for AD_Org_ID=" + GetAD_Org_ID());
             return 0;
-        }	
+        }
+
+        /// <summary>
+        /// Overwrite Save
+        /// </summary>
+        /// <returns>true if saved</returns>
+        public override bool Save()
+        {
+            // vis0008 handled case of update on OrgInfo tab
+            if (_createNew)
+                return base.Save();
+            return SaveUpdate();
+        }	//	save
     }
 }
