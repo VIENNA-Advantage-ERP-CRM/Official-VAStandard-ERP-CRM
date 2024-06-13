@@ -118,6 +118,9 @@
     <Reference Include="VAWorkflow">
       <HintPath>..\ViennaAdvantageWeb\Dll\VAWorkflow.dll</HintPath>
     </Reference>
+    <Reference Include="VISLogic">
+      <HintPath>..\ViennaAdvantageWeb\Dll\VISLogic.dll</HintPath>
+    </Reference>
     <Reference Include="WebGrease, Version=1.6.5135.21930, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\WebGrease.1.6.0\lib\WebGrease.dll</HintPath>
     </Reference>
@@ -577,6 +580,7 @@
     <Compile Include="Process\CreateRecurringFromInvoice.cs" />
     <Compile Include="Process\CreateVRHeader.cs" />
     <Compile Include="Process\DocumentEngine.cs" />
+    <Compile Include="Process\EMailTest.cs" />
     <Compile Include="Process\InventoryRevaluation.cs" />
     <Compile Include="Process\MarkExpireContract.cs" />
     <Compile Include="Process\PublishContract.cs" />
