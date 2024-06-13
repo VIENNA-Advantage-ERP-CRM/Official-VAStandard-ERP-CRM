@@ -190,8 +190,9 @@ namespace VAdvantage.Model
                 return success;
             if (newRecord)
             {
+                // vis0008 change done to send flag in case of new record to OrgInfo
                 //	Info
-                info = new MOrgInfo(this);
+                info = new MOrgInfo(this, true);
                 info.Save();
                 //	Access
                 MRoleOrgAccess.CreateForOrg(this);
