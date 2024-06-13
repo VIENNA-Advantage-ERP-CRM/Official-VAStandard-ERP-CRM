@@ -255,20 +255,22 @@ namespace VAdvantage.Model
         /// <returns>Error Detail (if any)</returns>
         public string AttachCOAImportFile(string fileName)
         {
-            // Define the base directory path
-            string baseDirectory = HostingEnvironment.ApplicationPhysicalPath;
-
-            // Combine the base path with the file name
-            string sourceFilePath = Path.Combine(baseDirectory, fileName);
-
-            // Check if the file exists in the specified path
-            if (File.Exists(sourceFilePath))
+            try
             {
-                // Get file information
-                FileInfo fileInfo = new FileInfo(sourceFilePath);
+                // Define the base directory path
+                string baseDirectory = HostingEnvironment.ApplicationPhysicalPath;
 
-                // Create a list to hold the file details
-                List<AttFileInfo> fileList = new List<AttFileInfo>
+                // Combine the base path with the file name
+                string sourceFilePath = Path.Combine(baseDirectory, fileName);
+
+                // Check if the file exists in the specified path
+                if (File.Exists(sourceFilePath))
+                {
+                    // Get file information
+                    FileInfo fileInfo = new FileInfo(sourceFilePath);
+
+                    // Create a list to hold the file details
+                    List<AttFileInfo> fileList = new List<AttFileInfo>
                 {
                     new AttFileInfo
                     {
@@ -277,35 +279,37 @@ namespace VAdvantage.Model
                     }
                 };
 
-                #region Copy File into TempDownload Folder
-                // Define the temporary download directory path
-                string tempDownloadDirectory = Path.Combine(baseDirectory, "TempDownload");
+                    #region Copy File into TempDownload Folder
+                    // Define the temporary download directory path
+                    string tempDownloadDirectory = Path.Combine(baseDirectory, "TempDownload");
 
-                // Ensure the temporary directory exists
-                if (!Directory.Exists(tempDownloadDirectory))
-                {
-                    Directory.CreateDirectory(tempDownloadDirectory);
-                }
+                    // Ensure the temporary directory exists
+                    if (!Directory.Exists(tempDownloadDirectory))
+                    {
+                        Directory.CreateDirectory(tempDownloadDirectory);
+                    }
 
-                // Define the destination file path
-                string destinationFilePath = Path.Combine(tempDownloadDirectory, fileName);
+                    // Define the destination file path
+                    string destinationFilePath = Path.Combine(tempDownloadDirectory, fileName);
 
-                // Copy the file to the destination path
-                File.Copy(sourceFilePath, destinationFilePath, true);
-                #endregion
+                    // Copy the file to the destination path
+                    File.Copy(sourceFilePath, destinationFilePath, true);
+                    #endregion
 
-                // Attach the file (Pick file from TemDownload and attach)
-                AttachmentModel attachmentModel = new AttachmentModel();
-                AttachmentInfo attachmentInfo = attachmentModel.CreateAttachmentEntries(
-                    fileList, 0, "", GetCtx(), X_C_Element.Get_Table_ID("C_Element"), GetC_Element_ID(), "", 0, false);
+                    // Attach the file (Pick file from TemDownload and attach)
+                    AttachmentModel attachmentModel = new AttachmentModel();
+                    AttachmentInfo attachmentInfo = attachmentModel.CreateAttachmentEntries(
+                        fileList, 0, "", GetCtx(), X_C_Element.Get_Table_ID("C_Element"), GetC_Element_ID(), "", 0, false);
 
-                // Error Detail if not attached
-                if (attachmentInfo != null && !string.IsNullOrEmpty(attachmentInfo.Error))
-                {
-                    log.Severe("File Not Attached For Chart of Account Name - " + GetName() + ", Error : " + attachmentInfo.Error);
-                    return attachmentInfo.Error;
+                    // Error Detail if not attached
+                    if (attachmentInfo != null && !string.IsNullOrEmpty(attachmentInfo.Error))
+                    {
+                        log.Severe("File Not Attached For Chart of Account Name - " + GetName() + ", Error : " + attachmentInfo.Error);
+                        return attachmentInfo.Error;
+                    }
                 }
             }
+            catch { }
 
             return "";
         }
