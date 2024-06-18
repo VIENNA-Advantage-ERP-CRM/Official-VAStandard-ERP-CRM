@@ -191,7 +191,7 @@ namespace VAdvantage.Model
                         ProductQty.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["MovementQty"]));
                         CurrentLoopQty = Util.GetValueOfInt(ds.Tables[0].Rows[i]["MovementQty"]);
                         MoveConfirmLine_ID.Add(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_MovementLineConfirm_ID"]));
-                        OrgID=Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                        OrgID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                         //if (i < ds.Tables[0].Rows.Count - 1)
                         //{
                         //    if (_currentPlanQlty_ID == Util.GetValueOfInt(ds.Tables[0].Rows[i + 1]["VA010_QualityPlan_ID"])
@@ -235,7 +235,7 @@ namespace VAdvantage.Model
         }
         //  // Change By Arpit to Create Parameters24th of August,2017
         //On the Basis of User defined % for each quantity of Product to verify
-        public static void CreateParameters(List<int> _ProductList, List<int> _ProductQty, int M_MoveConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_MoveConfirmLine_ID,int OrgID, Ctx ctx, Trx Trx_Name)
+        public static void CreateParameters(List<int> _ProductList, List<int> _ProductQty, int M_MoveConfirm_ID, int VA010_QUalityPlan_ID, int CurrentQty, List<int> M_MoveConfirmLine_ID, int OrgID, Ctx ctx, Trx Trx_Name)
         {
             StringBuilder _sql = new StringBuilder();
             DataSet _ds = null;
@@ -281,7 +281,7 @@ namespace VAdvantage.Model
                     _qtyPercentToVerify = 100;
                 }
                 _sql.Clear();
-                _sql.Append(@"SELECT VA010_QualityParameters_ID, VA010_TestPrmtrList_ID FROM va010_AssgndParameters WHERE"
+                _sql.Append(@"SELECT VA010_TestPrmtrList_ID, VA010_TestParameter_ID FROM va010_AssgndParameters WHERE"
                 + " VA010_QualityPlan_ID=" + VA010_QUalityPlan_ID + " AND IsActive='Y'");
                 _ds.Clear();
                 _ds = DB.ExecuteDataset(_sql.ToString(), null, Trx_Name);
@@ -307,13 +307,16 @@ namespace VAdvantage.Model
                                 //Created Table object because not to use Mclass of Quality Control Module in our Base
                                 MTable table = MTable.Get(ctx, "VA010_MoveConfParameters");
                                 PO pos = table.GetPO(ctx, 0, Trx_Name);
-                                pos.Set_ValueNoCheck("M_Product_ID", Util.GetValueOfInt(_ProductList[i]));
-                                pos.Set_ValueNoCheck("VA010_QualityParameters_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_QualityParameters_ID"]));
-                                pos.Set_ValueNoCheck("M_MovementLineConfirm_ID", Util.GetValueOfInt(M_MoveConfirmLine_ID[i]));
-                                pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
-                                pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
                                 pos.Set_ValueNoCheck("AD_Client_ID", ctx.GetAD_Client_ID());
                                 pos.Set_ValueNoCheck("AD_Org_ID", OrgID);  // VIS336 : set org from header on Quality control tab.
+                                pos.Set_ValueNoCheck("M_Product_ID", Util.GetValueOfInt(_ProductList[i]));
+                                pos.Set_ValueNoCheck("M_MovementLineConfirm_ID", Util.GetValueOfInt(M_MoveConfirmLine_ID[i]));
+                                //VAI050-Set Test parameter value 
+                                if (Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestParameter_ID"]) > 0)
+                                    pos.Set_ValueNoCheck("VA010_TestParameter_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestParameter_ID"]));
+                                pos.Set_ValueNoCheck("VA010_TestPrmtrList_ID", Util.GetValueOfInt(_ds.Tables[0].Rows[j]["VA010_TestPrmtrList_ID"]));
+                                pos.Set_ValueNoCheck("VA010_QuantityToVerify", Util.GetValueOfDecimal(_qty));
+
 
                                 if (pos.Save(Trx_Name))
                                 {

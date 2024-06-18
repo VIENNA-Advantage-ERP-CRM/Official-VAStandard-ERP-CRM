@@ -54,11 +54,11 @@ namespace VAdvantage.Process
                 }
                 else if (name.Equals("C_Order_ID"))
                 {
-                    _C_Order_ID =Util.GetValueOfInt(para[i].GetParameter());//.intValue();
+                    _C_Order_ID = Util.GetValueOfInt(para[i].GetParameter());//.intValue();
                 }
                 else if (name.Equals("C_DocType_ID"))
                 {
-                    _C_DocType_ID =Util.GetValueOfInt(para[i].GetParameter());//.intValue();
+                    _C_DocType_ID = Util.GetValueOfInt(para[i].GetParameter());//.intValue();
                 }
                 else if (name.Equals("DateDoc"))
                 {
@@ -73,7 +73,7 @@ namespace VAdvantage.Process
                     log.Log(Level.SEVERE, "Unknown Parameter: " + name);
                 }
             }
-        }	
+        }
 
         /// <summary>
         /// Perform Process.
@@ -183,6 +183,12 @@ namespace VAdvantage.Process
                 prosp.SetIsCustomer(true);
                 prosp.SetIsProspect(false);
                 prosp.Save();
+                //VAI050-Update Sales Order reference on FSR 
+                if (Env.IsModuleInstalled("VA075_") && newOrder.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
+                {
+                    string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID");
+                    DB.ExecuteQuery(query, null,Get_Trx());
+                }
             }
 
             //

@@ -277,7 +277,8 @@ namespace VAdvantage.Model
         protected override Boolean BeforeSave(Boolean newRecord)
         {
             //  Check Storage
-            if (Is_ValueChanged("IsActive") && IsActive())  // now not active 
+            //VAI050-Check When user try to InActive Record
+            if (Is_ValueChanged("IsActive") && !IsActive())  // now not active 
             {
                 if (checkStock(GetCtx(), Get_ID(), Get_TrxName()))
                 {
@@ -354,7 +355,8 @@ namespace VAdvantage.Model
         /// <returns></returns>
         public static bool checkStock(Ctx ctx, int M_Locator_ID, Trx trx)
         {
-            string sql = "SELECT QtyOnHand, QtyOrdered, QtyReserved FROM M_Storage WHERE M_Locator_ID=" + M_Locator_ID;
+            //VAI050-Check All Storage line Qty against Locator
+            string sql = "SELECT SUM(QtyOnHand) AS QtyOnHand , SUM(QtyOrdered) AS QtyOrdered, SUM(QtyReserved) AS QtyReserved FROM M_Storage WHERE M_Locator_ID=" + M_Locator_ID;
             decimal OnHand = Env.ZERO;
             decimal Ordered = Env.ZERO;
             decimal Reserved = Env.ZERO;
