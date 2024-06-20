@@ -1067,6 +1067,9 @@ namespace VAdvantage.Model
                                     }
                                 }
                                 #endregion
+
+                                // VIS0060: pdate Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                             }
                             #region Asset Work
                             string sql = "SELECT DTD001_ISCONSUMABLE FROM M_Product WHERE M_Product_ID=" + line.GetM_Product_ID();

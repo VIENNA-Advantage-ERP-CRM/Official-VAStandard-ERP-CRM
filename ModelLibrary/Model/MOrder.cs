@@ -4266,6 +4266,23 @@ namespace VAdvantage.Model
                             }
                         }
                     }
+
+                    // VIS0060: pdate Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line
+                    object[] ReqLineIDs = orderlines.Tables[0].AsEnumerable().Select(x => x.Field<object>("M_RequisitionLine_ID")).Distinct().ToArray();
+                    if (ReqLineIDs.Length > 0)
+                    {
+                        DataSet dsReq = DB.ExecuteDataset(@"SELECT DISTINCT M_Requisition_ID FROM M_RequisitionLine WHERE M_RequisitionLine_ID IN ("
+                                        + string.Join(",", ReqLineIDs) + ")", null, Get_Trx());
+                        if (dsReq != null && dsReq.Tables.Count > 0 && dsReq.Tables[0].Rows.Count > 0)
+                        {
+                            int requisitionID = 0;
+                            for (int i = 0; i < dsReq.Tables[0].Rows.Count; i++)
+                            {
+                                requisitionID = Util.GetValueOfInt(dsReq.Tables[0].Rows[i]["M_Requisition_ID"]);
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), requisitionID, Get_Trx());
+                            }
+                        }
+                    }
                 }
 
                 /******************/
@@ -4297,7 +4314,7 @@ namespace VAdvantage.Model
                 // Set the document number from completed document sequence after completed (if needed)
                 SetCompletedDocumentNo();
 
-                // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
+                // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
                 if (GetC_Order_ID() > 0)
                 {
                     UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
