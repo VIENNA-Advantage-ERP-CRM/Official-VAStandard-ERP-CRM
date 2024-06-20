@@ -573,6 +573,9 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            // VIS0060: pdate Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line
+            UpdateRequisitionStatus(GetCtx(), GetM_Requisition_ID(), Get_Trx());
+
             // Set the document number from completed document sequence after completed (if needed)
             SetCompletedDocumentNo();
             SetProcessed(true);
@@ -623,6 +626,36 @@ namespace VAdvantage.Model
                     throw new Exception("@PeriodClosed@");
                 }
             }
+        }
+
+        /// <summary>
+        /// VIS0060
+        /// Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="M_Requisition_ID">Requisition ID</param>
+        /// <param name="trx">Trx</param>
+        public static void UpdateRequisitionStatus(Ctx ctx, int M_Requisition_ID, Trx trx)
+        {
+            string qry = @"UPDATE M_Requisition r SET r.VAS_RequisitionStatus = 
+                            (SELECT CASE WHEN (SUM(t.QtyOrdered) = 0 AND SUM(t.QtyDelivered) = 0) THEN 'OP' 
+                            WHEN (SUM(t.QtyDelivered) = 0 AND SUM(t.QtyOrdered) = SUM(t.Qty)) THEN 'OR' 
+                            WHEN (SUM(t.QtyDelivered) = 0 AND SUM(t.QtyOrdered) < SUM(Qty)) THEN 'PO' 
+                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE'
+                            WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD' END AS Status
+                            FROM (SELECT reqln.Qty, reqln.DTD001_DeliveredQty AS QtyDelivered, 0 AS QtyOrdered                          
+                            FROM M_RequisitionLine reqln WHERE reqln.M_Requisition_ID = r.M_Requisition_ID
+                            AND reqln.IsActive='Y' AND reqln.C_OrderLine_ID IS NULL UNION
+                            SELECT reqln.Qty, reqln.DTD001_DeliveredQty AS QtyDelivered, SUM(cl.QtyOrdered) AS QtyOrdered
+                            FROM M_RequisitionLine reqln INNER JOIN C_OrderLine cl ON reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID 
+                            WHERE reqln.M_Requisition_ID = r.M_Requisition_ID AND reqln.IsActive='Y' AND reqln.C_OrderLine_ID IS NOT NULL 
+                            AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req 
+                            INNER JOIN C_OrderLine oline ON (req.M_RequisitionLine_ID=oline.M_RequisitionLine_ID) 
+                            WHERE req.M_Requisition_ID = r.M_Requisition_ID AND req.C_Orderline_ID IS NOT NULL AND oline.C_Order_ID IN 
+                            (SELECT C_Order_ID FROM C_Order WHERE C_Order_ID IN (oline.C_Order_ID) 
+                            AND DocStatus NOT IN ('RE','VO'))) GROUP BY reqln.M_RequisitionLine_ID, reqln.Qty, reqln.DTD001_DeliveredQty) t
+                            ) WHERE r.M_Requisition_ID = " + M_Requisition_ID;
+            DB.ExecuteQuery(qry, null, trx);
         }
 
         /// <summary>
