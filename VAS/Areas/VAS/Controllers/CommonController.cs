@@ -3081,12 +3081,19 @@ namespace VIS.Controllers
             AccountViewClass obj = new AccountViewClass();
             int col = rm.GetColumnCount();
             var arrList = new List<string>();
+            // VIS:0045 - DevOps ID - 5931, handle Date Issue on Account Viewer form
+            // when checking Date Column index and while Date Column Name in converted according to language
+            var arrListDataTye = new List<string>();
             for (int i = 0; i < col; i++)
             {
                 RColumn rc = rm.GetRColumn(i);
                 arrList.Add(rc.GetColHeader());
+                // Get Data Type of the column
+                arrListDataTye.Add(rc.GetColClass().Name);
             }
             obj.Columns = arrList;
+            // Data Type of the column
+            obj.DataType = arrListDataTye;
             obj.Data = rm._data.rows;
             if (obj.Data != null)
             {
@@ -3692,6 +3699,7 @@ namespace VIS.Controllers
     public class AccountViewClass
     {
         public List<String> Columns { get; set; }
+        public List<String> DataType { get; set; }
         public List<List<object>> Data { get; set; }
         public CommonModel.PageSetting pSetting { get; internal set; }
         public string DebitandCredit { get; set; }
