@@ -1012,7 +1012,9 @@
                         line[dataObj.Columns[j]] = row[j].Name;
                     }
                     else {
-                        if (row[j] != null && dataObj.Columns[j].indexOf("Date") > 0) {
+                        /* VIS:0045 - DevOps ID - 5931, handle Date Issue on Account Viewer form
+                         * Previously, Date column check with its Name rather then DataType */
+                        if (row[j] != null && dataObj.DataType[j].indexOf("Date") >= 0) {
                             if (row[j] != "") {
                                 //var date = new Date(parseInt(row[j].substr(6)));
                                 /**VIS_045: DevOps Task ID: 2075 -> Handle date in UTC */
