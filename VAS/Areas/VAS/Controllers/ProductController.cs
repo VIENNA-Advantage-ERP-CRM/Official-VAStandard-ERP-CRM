@@ -6,6 +6,9 @@ using System.Web;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VIS.Models;
+using static VIS.Models.MProductModel;
+
 namespace ViennaAdvantageWeb.Areas.VIS.Controllers
 {
     public class ProductController : Controller
@@ -87,6 +90,28 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
                 retError = "Session Expired";
             }
             return Json(new { result = retJSON, error = retError }, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// VAI050-To save the UOM conversion 
+        /// </summary>
+        /// <param name="C_UOM_ID"></param>
+        /// <param name="multiplyRateList"></param>
+        /// <param name="Product_ID"></param>
+        /// <param name="VAS_PurchaseUOM_ID"></param>
+        /// <param name="VAS_SalesUOM_ID"></param>
+        /// <param name="VAS_ConsumableUOM_ID"></param>
+        /// <returns></returns>
+        public JsonResult SaveUOMConversion(int C_UOM_ID,string multiplyRateList,int Product_ID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
+        {
+            Dictionary<string,object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.SaveUOMConversion(ctx, C_UOM_ID, JsonConvert.DeserializeObject <List<MultiplyRateItem>>(multiplyRateList), Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
     }
 }

@@ -1,0 +1,40 @@
+﻿
+
+.VAS-input-fields {
+    padding: 10px;
+}
+.firstRow {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+    margin: 0 10px;
+    padding: 10px;
+}
+    .firstRow .vis-input-wrap.VAS-PU {
+        width: calc(100% - 66.7%);
+    }
+.firstRow .vis-control-wrap {
+    padding: 0 10px;
+}
+.firstRow h1 {
+    color: rgba(var(--v-c-primary), 1);
+    font-size: 23px;
+}
+.VAS_SaveCancelButtons {
+    border-top: 1px solid rgba(var(--v-c-primary), 1);
+    padding-top: 25px;
+}
+.VAS_SaveCancelButtons button {
+    margin-right: 25px;
+    display: inline-block;
+    width: 100%;
+    max-width: 250px;
+    border: none;
+    background-color: rgba(var(--v-c-primary), 1);
+    color: #fff;
+    padding: 10px 0;
+    border-radius: 10px;
+}
+.VAS_convertedUnit {
+    margin: 0 10px 20px;
+    border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    color: rgba(var(--v-c-primary), 1);
+}

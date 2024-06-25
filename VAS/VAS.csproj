@@ -239,6 +239,7 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
@@ -250,6 +251,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceTaxTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PoReceiptTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ProductUomSetup.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
