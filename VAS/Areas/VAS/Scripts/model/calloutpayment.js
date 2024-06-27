@@ -704,8 +704,9 @@
                 }
                 //
                 invoiceOpenAmt = Util.getValueOfDecimal((invoiceOpenAmt * currencyRate).toFixed(currency["StdPrecision"]));//, MidpointRounding.AwayFromZero);
-                //VIS_427 Change enteredDiscount according to currency rate
-                if (enteredDiscountAmt != 0) {
+                /*VIS_427 Change enteredDiscount according to currency rate and only if 
+                user change currency or conversion type*/
+                if (enteredDiscountAmt != 0 && (colName == "C_Currency_ID" || colName == "C_ConversionType_ID")) {
                     //discountAmt = enteredDiscountAmt;
                     enteredDiscountAmt = Util.getValueOfDecimal((enteredDiscountAmt * currencyRate).toFixed(currency["StdPrecision"]));
                 }
