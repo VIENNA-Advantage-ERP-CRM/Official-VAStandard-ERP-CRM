@@ -471,6 +471,9 @@ namespace VAdvantage.Model
                         MInvoice invoice = new MInvoice(GetCtx(), line.GetC_Invoice_ID(), Get_Trx());
                         MCurrency currency = MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID());
                         MDocType doctype = MDocType.Get(GetCtx(), invoice.GetC_DocType_ID());
+                        //VIS_427 created object of payment term and schedule to get discount percentage
+                        MPaymentTerm pterm = new MPaymentTerm(GetCtx(), paySch.GetC_PaymentTerm_ID(), Get_Trx());
+                        MPaySchedule psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
                         //not getting DocType while creating payment from POS Order Tyepe because in get method transaction is not passed in parameter
                         if (doctype.GetC_DocType_ID() == 0)
                         {
@@ -575,7 +578,9 @@ namespace VAdvantage.Model
                             paySch.SetVA009_PaidAmnt(Decimal.Round(paySch.GetVA009_PaidAmntInvce(), currency.GetStdPrecision()));
                         }
                         #endregion
-
+                        //get the discount percentage
+                        decimal discountPer = psched.GetC_PaySchedule_ID() != 0 ? psched.GetDiscount() : pterm.GetDiscount();
+                        decimal discountPer2 = pterm.GetDiscount2();
                         // reduce over under amount from the due amount if available
                         if (line.GetOverUnderAmt() > 0)
                         {
@@ -698,11 +703,17 @@ namespace VAdvantage.Model
                             {
                                 //during AR Invoice / AP Credit Memo
                                 newPaySch.SetDueAmt(decimal.Round(decimal.Subtract(decimal.Multiply(line.GetOverUnderAmt(), currencymultiplyRate), varianceAmount), currency.GetStdPrecision()));
+                                //VIS_427 set discount amount after calculating it from due amount
+                                newPaySch.SetDiscountAmt(Math.Round((newPaySch.GetDueAmt() * discountPer) / 100, currency.GetStdPrecision(), MidpointRounding.AwayFromZero));
+                                newPaySch.SetDiscount2(Math.Round((newPaySch.GetDueAmt() * discountPer2) / 100, currency.GetStdPrecision(), MidpointRounding.AwayFromZero));
                             }
                             else if (line.GetOverUnderAmt() < 0)
                             {
                                 // during AR Credit Memo / AP Invoice
                                 newPaySch.SetDueAmt(decimal.Round(decimal.Subtract(decimal.Negate(decimal.Multiply(line.GetOverUnderAmt(), currencymultiplyRate)), varianceAmount), currency.GetStdPrecision()));
+                                //VIS_427 set discount amount after calculating it from due amount
+                                newPaySch.SetDiscountAmt(Math.Round((newPaySch.GetDueAmt() * discountPer) / 100, currency.GetStdPrecision(), MidpointRounding.AwayFromZero));
+                                newPaySch.SetDiscount2(Math.Round((newPaySch.GetDueAmt() * discountPer2) / 100, currency.GetStdPrecision(), MidpointRounding.AwayFromZero));
                             }
 
                             //checking amount is match or not - if not then balance with the same du amount
