@@ -472,8 +472,6 @@ namespace VAdvantage.Model
                         MCurrency currency = MCurrency.Get(GetCtx(), invoice.GetC_Currency_ID());
                         MDocType doctype = MDocType.Get(GetCtx(), invoice.GetC_DocType_ID());
                         //VIS_427 created object of payment term and schedule to get discount percentage
-                        MPaymentTerm pterm = new MPaymentTerm(GetCtx(), paySch.GetC_PaymentTerm_ID(), Get_Trx());
-                        MPaySchedule psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
                         //not getting DocType while creating payment from POS Order Tyepe because in get method transaction is not passed in parameter
                         if (doctype.GetC_DocType_ID() == 0)
                         {
@@ -578,9 +576,6 @@ namespace VAdvantage.Model
                             paySch.SetVA009_PaidAmnt(Decimal.Round(paySch.GetVA009_PaidAmntInvce(), currency.GetStdPrecision()));
                         }
                         #endregion
-                        //get the discount percentage
-                        decimal discountPer = psched.GetC_PaySchedule_ID() != 0 ? psched.GetDiscount() : pterm.GetDiscount();
-                        decimal discountPer2 = pterm.GetDiscount2();
                         // reduce over under amount from the due amount if available
                         if (line.GetOverUnderAmt() > 0)
                         {
@@ -663,6 +658,16 @@ namespace VAdvantage.Model
                             //MInvoicePaySchedule newPaySch = new MInvoicePaySchedule(GetCtx(), 0, Get_Trx());
                             MInvoicePaySchedule newPaySch = backupNewPaySch;
                             newPaySch.Set_TrxName(Get_Trx());
+                            //VIS_427 created object of payment term and schedule to get discount percentage
+                            MPaymentTerm pterm = new MPaymentTerm(GetCtx(), paySch.GetC_PaymentTerm_ID(), Get_Trx());
+                            MPaySchedule psched = null;
+                            if (paySch.GetC_PaySchedule_ID() > 0)
+                            {
+                              psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
+                            }
+                            //get the discount percentage
+                            decimal discountPer = psched !=null ? psched.GetDiscount() : pterm.GetDiscount();
+                            decimal discountPer2 = pterm.GetDiscount2();
                             //PO.CopyValues(paySch, newPaySch, paySch.GetAD_Client_ID(), paySch.GetAD_Org_ID());
 
                             // update payment method and its respective fields
