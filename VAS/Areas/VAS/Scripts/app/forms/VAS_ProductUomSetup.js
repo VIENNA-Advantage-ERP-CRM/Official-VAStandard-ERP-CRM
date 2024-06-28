@@ -17,18 +17,12 @@
         var inputDiv = null;
         var $self = this;
         var inputSave = null;
-
-
-        //
         var VAS_txtPUQtyForPU = null;
         var VAS_txtSUQtyForPU = null;
         var VAS_txtSUQtyForSU = null;
         var VAS_txtPUQtyForSU = null;
         var VAS_txtSUQtyForCU = null;
         var VAS_txtPUQtyForCU = null;
-
-        //
-
         var VAS_Alltxt = null;
         var C_UOM_ID = null;
         var M_Product_ID = null;
@@ -47,73 +41,89 @@
             inputDiv = $('<div class="VAS-flyout-body vis-formouterwrpdiv">' +
 
                 '<div class="firstRow">' +
-                '<h1>' + VIS.Msg.getMsg("VAS_ProductFormHeader") + '</h1>' +
                 '<div class="VAS-input-fields">' +
 
-                '<div class="VAS-input-row">' +
-                '<div class="input-group vis-input-wrap VAS-UOM" id="VAS_ddlUOM' + $self.windowNo + '">' + '</div>' +
+
+                '<div class="VIS_Pref_show">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class="input-group vis-input-wrap VAS-UOM" id="VAS_ddlUOM' + $self.windowNo + '">' + '</div></div></div>' +
                 '<div class="VAS_convertedUnit">' + VIS.Msg.getMsg("VAS_ProductConvertUnit") + '</div>' +
                 '<div id="VAS_ControlDiv">' +
-                '<div class="input-group vis-input-wrap VAS_AdhocField">' +
-                '<div class="vis-control-wrap" id="VAS_ddlPU' + $self.windowNo + '">' + '</div>' +
+                '<div class="VIS_Pref_show">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap" id = "VAS_ddlPU' + $self.windowNo + '" ></div>' +
+                '</div> ' +
+
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
+                '<input type="text"  class="vas-txtbox" value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForPU") + '</label>' +
-                '<input type="text" name="VAS_schedule" class="vas-txtbox" value="" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '">' +
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
 
-                '</div>' +
-                '<div class="vis-control-wrap vas-txtbox">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
+                '<div class="vis-control-wrap">' +
+                '<input type="text"  class="vas-txtbox" value="0" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '">' +
                 '<label for="VAS_txtPUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForPU") + '</label>' +
-                '<input type="text" name="VAS_schedule" class="vas-txtbox" value="" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '">' +
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
+                '</div> ' +
 
-                '</div>' +
-                '</div>' +
+                '<div class="VIS_Pref_show">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap" id = "VAS_ddlSU' + $self.windowNo + '" ></div>' +
+                '</div> ' +
 
-
-                '<div class="VAS-input-row">' +
-
-                '<div class="input-group vis-input-wrap VAS_AdhocField">' +
-                '<div class="vis-control-wrap" id="VAS_ddlSU' + $self.windowNo + '">' +
-                '</div>' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
+                '<input type="text" class="vas-txtbox"  value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForSU") + '</label>' +
-                '<input type="text" class="vas-txtbox" name="VAS_schedule" value="" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '">' +
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
 
-                '</div>' +
-                '<div class="vis-control-wrap">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
+                '<div class="vis-control-wrap">' +            
+                '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
                 '<label for="VAS_txtPUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForSU") + '</label>' +
-                '<input type = "text" class= "vas-txtbox" name = "VAS_schedule1" value = "" placeholder = "" data - placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
+                '</div> ' +
 
-                '</div>' +
-                '</div>' +
-                '</div>' +
 
-
-                '<div class="VAS-input-row">' +
-
-                '<div class="input-group vis-input-wrap VAS_AdhocField">' +
-                '<div class="vis-control-wrap" id="VAS_ddlCU' + $self.windowNo + '">' +
-                '</div>' +
-                '<div class="vis-control-wrap vas-txtbox">' +
+                '<div class="VIS_Pref_show">' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap" id = "VAS_ddlCU' + $self.windowNo + '" ></div>' +
+                '</div> ' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
+                '<div class="vis-control-wrap">' +
+                '<input type="text" class="vas-txtbox" value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForCU") + '</label>' +
-                '<input type="text" name="VAS_schedule" class="vas-txtbox" value="" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '">' +
-
-                '</div>' +
-                '<div class="vis-control-wrap vas-txtbox">' +
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
+                '<div class="VIS_Pref_dd">' +
+                '<div class= "input-group vis-input-wrap vas-txtbox">' +
+                '<div class="vis-control-wrap">' +
+            
+                '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '"> ' +
                 '<label for="VAS_txtPUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForCU") + '</label>' +
-                '<input type = "text" class= "vas-txtbox" name = "VAS_schedule" value = "" placeholder = "" data - placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '" > ' +
-
-                '</div>' +
-                '</div>' +
-
-                '</div>' +
-                '</div>' +
-
+                '</div > ' +
+                '</div> ' +
+                '</div> ' +
+                '</div> ' +
 
                 '<div class="VAS_SaveCancelButtons text-right">' +
-                '<button id="VAS_Save' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_Save") + '</button>' +
                 '<button id="VAS_Cancel' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_Cancel") + '</button>' +
-                '</div>' +
-                '<div class="VAS_Footer">' +
+                '<button id="VAS_Save' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_Save") + '</button>' +
                 '</div>' +
                 '</div>');
 
@@ -149,7 +159,7 @@
             var UOMlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbUOM = new VIS.Controls.VComboBox("C_UOM_ID", true, true, true, UOMlookup, 150, VIS.DisplayType.TableDir);
             $self.cmbUOM.setValue(C_UOM_ID);
-            var $UOMddlControlWrap = $('<div class="vis-control-wrap">');
+            var $UOMddlControlWrap = $('<div class="vis-control-wrap ddlPadding">');
             $inputUOM.append($UOMddlControlWrap);
             $UOMddlControlWrap.append($self.cmbUOM.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlUOM") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
             $inputUOM.append($UOMddlControlWrap);
@@ -157,30 +167,25 @@
 
             var PUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbPU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, PUlookup, 150, VIS.DisplayType.TableDir);
-            var $PurControlWrap = $('<div class="vis-control-wrap">');
-            $PurControlWrap.append('<label>' + VIS.Msg.getMsg("VAS_ddlPUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
+            var $PurControlWrap = $('<div class="vis-control-wrap ddlPadding">');
             $inputPurUnit.append($PurControlWrap);
-            $PurControlWrap.append($self.cmbPU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
+            $PurControlWrap.append($self.cmbPU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlPUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');;
             $inputPurUnit.append($PurControlWrap);
 
             var SUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbSU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, SUlookup, 150, VIS.DisplayType.TableDir);
-            var $SUControlWrap = $('<div class="vis-control-wrap">');
-            $SUControlWrap.append('<label>' + VIS.Msg.getMsg("VAS_ddlSUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>')
-            $inputSuUnit.append($SUControlWrap);
-            $SUControlWrap.append($self.cmbSU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
+            var $SUControlWrap = $('<div class="vis-control-wrap ddlPadding">');
+            $inputSuUnit.prepend($SUControlWrap);
+            $SUControlWrap.append($self.cmbSU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlSUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
             $inputSuUnit.append($SUControlWrap);
 
             var CUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbCU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, CUlookup, 150, VIS.DisplayType.TableDir);
-            var $CUControlWrap = $('<div class="vis-control-wrap">');
-            $CUControlWrap.append('<label>' + VIS.Msg.getMsg("VAS_ddlCUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>')
-            $inputCuUnit.append($CUControlWrap);
-            $CUControlWrap.append($self.cmbCU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
+            var $CUControlWrap = $('<div class="vis-control-wrap ddlPadding">');
+            $inputCuUnit.prepend($CUControlWrap);
+            $CUControlWrap.append($self.cmbCU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlCUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
             $inputCuUnit.append($CUControlWrap);
 
-
-            /*  hide the phase and projecttask fields if we open from a reuqest window*/
 
             $root.append(inputDiv);
             busyDiv(false)
@@ -191,6 +196,7 @@
                 if (evt.keyCode > 31 && (evt.keyCode < 48 || evt.keyCode > 57))
                     return false;
             })
+
             //Function used to  calculate the divide rate
 
             VAS_txtSUQtyForPU.on('focusout', function () {
@@ -318,31 +324,6 @@
                 busyDiv(false);
                 return;
             }
-            //else if (VAS_txtPUQtyForPU.val() == "") {
-            //    VIS.ADialog.info("VAS_txtPUQtyForPUMandatory");
-            //    busyDiv(false);
-            //    return;
-            //}
-            //else if (VAS_txtSUQtyForSU.val() == "") {
-            //    VIS.ADialog.info("VAS_txtSUQtyForSUMandatory");
-            //    busyDiv(false);
-            //    return;
-            //}
-            //else if (VAS_txtPUQtyForSU.val() == "") {
-            //    VIS.ADialog.info("VAS_txtPUQtyForSUMandatory");
-            //    busyDiv(false);
-            //    return;
-            //}
-            //else if (VAS_txtSUQtyForCU.val() == "") {
-            //    VIS.ADialog.info("VAS_txtSUQtyForCUMandatory");
-            //    busyDiv(false);
-            //    return;
-            //}
-            //else if (VAS_txtPUQtyForCU.val() == "") {
-            //    VIS.ADialog.info("VAS_VAS_txtPUQtyForCUMandatory");
-            //    busyDiv(false);
-            //    return;
-            //}
             var multiplyRateList = [
                 {
 
@@ -361,8 +342,6 @@
                     C_UOM_To_ID: $self.cmbCU.getValue(),
                     MultiplyRate: VAS_txtSUQtyForCU.val(),
                     DivideRate: VAS_txtPUQtyForCU.val(),
-
-
                 }
             ];
             var uomConversionData = multiplyRateList;
@@ -449,9 +428,6 @@
         VAS.VAS_ProductUomSetup.prototype.init = function (windowNo, frame) {
             /*Assign to this Variable */
             this.frame = frame;
-            //recordId = frame.getRecord_ID();
-            //tableID = frame.getAD_Table_ID();
-            /*  frame.hideHeader(true);*/
             this.windowNo = windowNo;
             this.initalize();
             this.frame.getContentGrid().append(this.getRoot());
@@ -476,7 +452,7 @@
         VAS.VAS_ProductUomSetup.prototype.setHeight = function () {
 
 
-            return 565;
+            return 480;
         };
         // Load form into VIS
         VAS.VAS_ProductUomSetup = VAS.VAS_ProductUomSetup
