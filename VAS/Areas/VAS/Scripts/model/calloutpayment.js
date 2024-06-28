@@ -25,7 +25,8 @@
     /// <param name="value">New Value</param>
     /// <returns> null or error message</returns>
     CalloutPayment.prototype.Invoice = function (ctx, windowNo, mTab, mField, value, oldValue) {
-
+        /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice*/
+        mTab.setValue("VAS_IsDiscountApplied", false);
         if (value == null || value.toString() == "") {
             return "";
         }

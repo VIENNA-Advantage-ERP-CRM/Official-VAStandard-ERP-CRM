@@ -244,6 +244,8 @@
             mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
+                    /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice schedule*/
+                    mTab.setValue("VAS_IsDiscountApplied", false);
                     var dateTrx = mTab.getValue("DateTrx");
                     var IsReturnTrx = data["IsReturnTrx"];
                     //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
