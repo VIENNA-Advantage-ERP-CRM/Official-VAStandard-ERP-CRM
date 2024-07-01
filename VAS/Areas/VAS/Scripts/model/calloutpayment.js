@@ -31,10 +31,7 @@
             /*VIS_427 Clear references and amounts when we clear invoice*/
             if (mField.getColumnName() == "C_Invoice_ID") {
                 this.setCalloutActive(true);
-                mTab.setValue("C_BPartner_ID", null);
-                mTab.setValue("C_BPartner_Location_ID", null);
                 mTab.setValue("C_InvoicePaySchedule_ID", null);
-                mTab.setValue("C_Currency_ID", null);
                 mTab.setValue("PaymentAmount", VIS.Env.ZERO);
                 mTab.setValue("PayAmt", VIS.Env.ZERO);
                 mTab.setValue("DiscountAmt", VIS.Env.ZERO);
