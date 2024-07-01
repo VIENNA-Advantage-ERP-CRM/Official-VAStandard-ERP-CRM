@@ -35,10 +35,10 @@
                 // JID_0780: Open cash journal line and select the invoice now on clearing the invoice system was giving error message.
                 ctx.setContext("InvTotalAmt", "");
                 mTab.setValue("ConvertedAmt", VIS.Env.ZERO);
-                mTab.setValue("Amount", VIS.Env.ZERO);
                 mTab.setValue("DiscountAmt", VIS.Env.ZERO);
                 mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
                 mTab.setValue("OverUnderAmt", VIS.Env.ZERO);
+                mTab.setValue("Amount", VIS.Env.ZERO);
                 this.setCalloutActive(false);
             }
             return "";
@@ -244,6 +244,8 @@
             mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
+                    /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice schedule*/
+                    mTab.setValue("VAS_IsDiscountApplied", false);
                     var dateTrx = mTab.getValue("DateTrx");
                     var IsReturnTrx = data["IsReturnTrx"];
                     //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
