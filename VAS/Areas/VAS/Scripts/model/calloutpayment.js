@@ -28,6 +28,20 @@
         /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice*/
         mTab.setValue("VAS_IsDiscountApplied", false);
         if (value == null || value.toString() == "") {
+            /*VIS_427 Clear references and amounts when we clear invoice*/
+            if (mField.getColumnName() == "C_Invoice_ID") {
+                this.setCalloutActive(true);
+                mTab.setValue("C_BPartner_ID", null);
+                mTab.setValue("C_BPartner_Location_ID", null);
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+                mTab.setValue("C_Currency_ID", null);
+                mTab.setValue("PaymentAmount", VIS.Env.ZERO);
+                mTab.setValue("PayAmt", VIS.Env.ZERO);
+                mTab.setValue("DiscountAmt", VIS.Env.ZERO);
+                mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
+                mTab.setValue("OverUnderAmt", VIS.Env.ZERO);
+                this.setCalloutActive(false);
+            }
             return "";
         }
         var C_Invoice_ID = Util.getValueOfInt(value.toString());//(int)value;
@@ -705,9 +719,9 @@
                 }
                 //
                 invoiceOpenAmt = Util.getValueOfDecimal((invoiceOpenAmt * currencyRate).toFixed(currency["StdPrecision"]));//, MidpointRounding.AwayFromZero);
-                /*VIS_427 Change enteredDiscount according to currency rate and only if 
-                user change currency or conversion type*/
-                if (enteredDiscountAmt != 0 && (colName == "C_Currency_ID" || colName == "C_ConversionType_ID")) {
+                /*VIS_427 Change enteredDiscount according to currency rate Either when user entered discount manually 
+                  and changed currecny or convertion type or not entered manually*/
+                if (enteredDiscountAmt != 0 && ((mTab.getValue("VAS_IsDiscountApplied") && (colName == "C_Currency_ID" || colName == "C_ConversionType_ID")) || !mTab.getValue("VAS_IsDiscountApplied"))) {
                     //discountAmt = enteredDiscountAmt;
                     enteredDiscountAmt = Util.getValueOfDecimal((enteredDiscountAmt * currencyRate).toFixed(currency["StdPrecision"]));
                 }
@@ -1033,6 +1047,17 @@
     CalloutPaymentAllocate.prototype.Invoice = function (ctx, windowNo, mTab, mField, value, oldValue) {
         // 
         if (value == null || value.toString() == "") {
+            /*VIS_427 Clear references and amounts when we clear invoice*/
+            if (mField.getColumnName() == "C_Invoice_ID") {
+                this.setCalloutActive(true);
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+                mTab.setValue("InvoiceAmt", VIS.Env.ZERO);
+                mTab.setValue("Amount", VIS.Env.ZERO);
+                mTab.setValue("DiscountAmt", VIS.Env.ZERO);
+                mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
+                mTab.setValue("OverUnderAmt", VIS.Env.ZERO);
+                this.setCalloutActive(false);
+            }
             return "";
         }
         var C_Invoice_ID = Util.getValueOfInt(value);
@@ -1100,8 +1125,8 @@
         if (ts == null) {
             ts = new Date();
         }
-
-        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+        //VIS_427 Changed the format of date to get accurate data
+        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + Globalize.format(ts, "yyyy-MM-dd").toString();
         var dr = null;
         try {
             dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
@@ -1199,7 +1224,7 @@
         if (ts == null) {
             ts = new Date();
         }
-        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + Globalize.format(ts, "yyyy-MM-dd").toString();
         var dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
         if (dr != null) {
             C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);
