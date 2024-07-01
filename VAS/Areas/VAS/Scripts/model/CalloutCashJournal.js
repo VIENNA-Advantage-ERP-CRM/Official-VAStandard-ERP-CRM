@@ -35,10 +35,10 @@
                 // JID_0780: Open cash journal line and select the invoice now on clearing the invoice system was giving error message.
                 ctx.setContext("InvTotalAmt", "");
                 mTab.setValue("ConvertedAmt", VIS.Env.ZERO);
-                mTab.setValue("Amount", VIS.Env.ZERO);
                 mTab.setValue("DiscountAmt", VIS.Env.ZERO);
                 mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
                 mTab.setValue("OverUnderAmt", VIS.Env.ZERO);
+                mTab.setValue("Amount", VIS.Env.ZERO);
                 this.setCalloutActive(false);
             }
             return "";
