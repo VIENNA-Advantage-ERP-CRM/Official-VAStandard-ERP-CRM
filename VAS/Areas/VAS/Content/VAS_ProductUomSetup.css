@@ -1,0 +1,36 @@
+﻿
+.firstRow {
+    padding: 15px;
+}
+
+.VAS_SaveCancelButtons {
+    padding-top: 12px;
+}
+
+    .VAS_SaveCancelButtons button {
+        margin-right: 25px;
+        display: inline-block;
+        width: 13%;
+        max-width: 250px;
+        border: none;
+        background-color: rgba(var(--v-c-primary), 1);
+        color: #fff;
+        padding: 10px 0;
+        border-radius: 10px;
+    }
+
+.VAS_convertedUnit {
+    margin: 0 0px 20px;
+    border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    color: rgba(var(--v-c-primary), 1);
+    padding-bottom: 2px;
+}
+
+.VAS-UOM {
+    width: 33%;
+}
+
+.vas-txtbox {
+    text-align: right;
+}
+
