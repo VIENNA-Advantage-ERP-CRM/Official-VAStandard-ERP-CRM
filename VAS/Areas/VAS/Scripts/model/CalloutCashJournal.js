@@ -35,10 +35,10 @@
                 // JID_0780: Open cash journal line and select the invoice now on clearing the invoice system was giving error message.
                 ctx.setContext("InvTotalAmt", "");
                 mTab.setValue("ConvertedAmt", VIS.Env.ZERO);
-                mTab.setValue("Amount", VIS.Env.ZERO);
                 mTab.setValue("DiscountAmt", VIS.Env.ZERO);
                 mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
                 mTab.setValue("OverUnderAmt", VIS.Env.ZERO);
+                mTab.setValue("Amount", VIS.Env.ZERO);
                 this.setCalloutActive(false);
             }
             return "";
@@ -154,9 +154,9 @@
                 else {
                     mTab.setValue("VSS_PAYMENTTYPE", "R");
                 }
+                mTab.setValue("DiscountAmt", discountAmt);
                 ctx.setContext("InvTotalAmt", payAmt.toString());
                 mTab.setValue("Amount", (payAmt - discountAmt));
-                mTab.setValue("DiscountAmt", discountAmt);
                 mTab.setValue("WriteOffAmt", VIS.Env.ZERO);
 
 
@@ -239,16 +239,54 @@
             //var qry = "SELECT DueAmt , DiscountDate , DiscountAmt , DiscountDays2 , Discount2  FROM C_InvoicePaySchedule WHERE C_InvoicePaySchedule_ID=" + C_InvoicePaySchedule_ID;
             var paramString = C_InvoicePaySchedule_ID.toString() + "," + mTab.getValue("C_Cash_ID") + "," + mTab.getValue("C_Invoice_ID");
             var data = VIS.dataContext.getJSONRecord("MCashBook/GetPaySheduleData", paramString);
+            /*VIS_427 Set Currency when user change invoicepayschedule so that can convert value of schedule
+            according to currency*/
+            mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
             if (data != null) {
                 if (mTab.getTableName() == "C_Payment") {
+                    /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice schedule*/
+                    mTab.setValue("VAS_IsDiscountApplied", false);
+                    var dateTrx = mTab.getValue("DateTrx");
                     var IsReturnTrx = data["IsReturnTrx"];
+                    //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
                     if (IsReturnTrx == "Y") {
-                        mTab.setValue("PayAmt", Util.getValueOfDecimal(data["DueAmt"]) * -1);
-                        mTab.setValue("PaymentAmount", Util.getValueOfDecimal(data["DueAmt"]) * -1);
+                        if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                        }
+                        else if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDays2"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", 0);
+                            mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                        }
+                      
                     }
                     else {
-                        mTab.setValue("PayAmt", Util.getValueOfDecimal(data["DueAmt"]));                    // For Payment window
-                        mTab.setValue("PaymentAmount", Util.getValueOfDecimal(data["DueAmt"]));
+                        if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                        }
+                        else if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
+                            (Globalize.format(new Date(data["DiscountDays2"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd"))) {
+                            mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", 0);
+                            mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"])));
+                            mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"])));
+                        }
                     }
                 }
                 else {
@@ -260,25 +298,54 @@
                     var accountDate = Util.getValueOfDate(data["accountDate"]);
                     //qry = "SELECT IsSoTrx FROM C_Invoice WHERE C_Invoice_ID = " + mTab.getValue("C_Invoice_ID");
                     var isSoTrx = Util.getValueOfString(data["isSoTrx"]);
+                    //VIS_427 Bug Id 5620 changed sign of amount according to IsSotrx check
                     if (Util.getValueOfDate(data["DiscountDate"]) >= accountDate) {
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            //VIS_427 For Payment allocate set due amount in invoice amount
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["DiscountAmt"]));
+                            mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
                         }
-                        mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                       
                     }
                     else if (Util.getValueOfDate(data["DiscountDays2"]) >= accountDate) {
                         if (isSoTrx == "N") {
                             mTab.setValue("DiscountAmt", -1 * Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("Amount", -1 * (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
                         }
                         else {
                             mTab.setValue("DiscountAmt", Util.getValueOfDecimal(data["Discount2"]));
+                            mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["DiscountAmt"])));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
                         }
-                        mTab.setValue("Amount", (Util.getValueOfDecimal(data["DueAmt"]) - Util.getValueOfDecimal(data["Discount2"])));
                     }
                     else {
+                        if (isSoTrx == "N") {
+                            mTab.setValue("Amount", -1 * Util.getValueOfDecimal(data["DueAmt"]));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
+                        }
+                        else {
+                            mTab.setValue("Amount", Util.getValueOfDecimal(data["DueAmt"]));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
+                        }
                         mTab.setValue("DiscountAmt", 0);
                     }
                 }

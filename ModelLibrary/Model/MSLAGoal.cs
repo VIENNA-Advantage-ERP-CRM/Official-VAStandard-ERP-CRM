@@ -49,11 +49,25 @@ namespace VAdvantage.Model
                 Set_Value("IsValid", false);
             }
             //warning message on Maximum Permissible Score field if value is not in between 1 to 10 
-             if (Env.IsModuleInstalled("VA068_") && Util.GetValueOfString(Get_Value("VA068_GoalType"))== "MNL" && (GetMeasureTarget() > 10 || GetMeasureTarget() < 1))
+            if (Env.IsModuleInstalled("VA068_") && Util.GetValueOfString(Get_Value("VA068_GoalType")) == "MNL" && (GetMeasureTarget() > 10 || GetMeasureTarget() < 1))
             {
                 log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_MaxScoreValidation"));
                 return false;
             }
+
+            // VIS430:Weightage % should not be greater than 100
+            if (Env.IsModuleInstalled("VA068_") && Is_ValueChanged("VA068_WeightagePertage"))
+            {
+                string quary = @"SELECT SUM(VA068_WeightagePertage) FROM PA_SLA_Goal WHERE IsActive='Y' AND PA_SLA_Criteria_ID= " + GetPA_SLA_Criteria_ID() + " AND PA_SLA_Goal_ID!=" + GetPA_SLA_Goal_ID();
+
+                decimal lineno = Util.GetValueOfDecimal(DB.ExecuteScalar(quary, null, Get_Trx())) + Util.GetValueOfDecimal(Get_Value("VA068_WeightagePertage"));
+                if (lineno > 100)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA068_WeightagePercentage"));
+                    return false;
+                }
+            }
+              
             return true;
         }
 
@@ -75,7 +89,7 @@ namespace VAdvantage.Model
             {
                 int count = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(PA_SLA_Goal_ID) FROM PA_SLA_Goal WHERE IsActive = 'Y' AND VA068_GoalType='MNL'
                           AND PA_SLA_Criteria_ID =  " + GetPA_SLA_Criteria_ID(), null, Get_Trx()));
-                DB.ExecuteQuery(@"UPDATE PA_SLA_Criteria SET VA068_ExceptManual= " + (count > 0 ? "'N'" : "'Y'") 
+                DB.ExecuteQuery(@"UPDATE PA_SLA_Criteria SET VA068_ExceptManual= " + (count > 0 ? "'N'" : "'Y'")
                     + " WHERE IsActive = 'Y' AND PA_SLA_Criteria_ID = " + GetPA_SLA_Criteria_ID(), null, Get_Trx());
             }
 

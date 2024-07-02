@@ -2684,12 +2684,11 @@ namespace VAdvantage.Model
                 }
 
                 if (skipBase)
-                {
-                    SetProcessed(true);
-                    SetDocAction(DOCACTION_Close);
-                    return DocActionVariables.STATUS_COMPLETED;
+                {                    
+                    return DocActionVariables.STATUS_INPROGRESS;
                 }
             }
+
             //VIS-383 29/04/2024 User Validation Before PrepareIt
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (_processMsg != null)
@@ -2863,18 +2862,12 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_INVALID;
                 }
             }
+
             //VIS-383 03/04/2024 User Validation After Prepare
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
             if (valid != null)
             {
                 _processMsg = valid;
-                return DocActionVariables.STATUS_INVALID;
-            }
-
-            //VIS-383 29/04/2024 User Validation After PrepareIt
-            _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_PREPARE);
-            if (_processMsg != null)
-            {
                 return DocActionVariables.STATUS_INVALID;
             }
 
