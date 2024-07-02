@@ -100,5 +100,24 @@ namespace VAS.Areas.VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// VAI050-Get Purchase Order Lines
+        /// </summary>
+        /// <param name="OrderID"></param>
+        /// <returns></returns>
+
+        public JsonResult GetPOLineData(int OrderID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<dynamic> result = obj.GetPOLineData(ctx, OrderID);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

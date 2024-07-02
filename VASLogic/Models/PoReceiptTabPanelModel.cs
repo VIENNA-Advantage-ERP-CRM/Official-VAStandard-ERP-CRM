@@ -9,6 +9,7 @@ using CoreLibrary.DataBase;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -50,7 +51,7 @@ namespace VASLogic.Models
                         WHERE
                             I.DocStatus IN ('CO', 'CL') AND IL.C_InvoiceLine_ID = " + parentID;
 
-            DataSet ds = DB.ExecuteDataset(sql,null,null);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -140,7 +141,7 @@ namespace VASLogic.Models
         /// <param name="OrderLineId">Order ID</param>
         /// <Author>VAI051:- Devops ID:</Author>
         /// <returns>returns the Order tax data</returns>
-        public List<LineHistoryTabPanel>GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
+        public List<LineHistoryTabPanel> GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
         {
             List<LineHistoryTabPanel> LineHistoryTabPanel = new List<LineHistoryTabPanel>();
             String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Product,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
@@ -152,7 +153,7 @@ namespace VASLogic.Models
                           INNER JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID = o.C_Currency_ID)
                           WHERE ol.C_OrderLine_ID = " + OrderLineID + " Order By t.Name";
-             DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -169,16 +170,63 @@ namespace VASLogic.Models
                     obj.Price = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceEntered"]);
                     obj.UnitPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceActual"]);
                     obj.ListPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceList"]);
-                    obj.Tax =    Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
+                    obj.Tax = Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
                     obj.Discount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Discount"]);
-                    obj.LineAmount= Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
-                    obj.Description= Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
+                    obj.LineAmount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
+                    obj.Description = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
                     obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
 
                     LineHistoryTabPanel.Add(obj);
                 }
             }
             return LineHistoryTabPanel;
+        }
+
+        /// <summary>
+        /// VAI050-Get Purchase Order Lines
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="OrderID"></param>
+        /// <returns></returns>
+        public List<dynamic> GetPOLineData(Ctx ctx, int OrderID)
+        {
+            string sql = @"SELECT i.ImageUrl,p.Name AS ProductName,cu.Name AS UOM ,p.UPC,QtyOrdered,
+                           QtyDelivered,QtyInvoiced,st.Name AS OrderStatus,st.value FROM C_OrderLine ol
+                           INNER JOIN C_Order o
+                           ON (ol.C_Order_ID=o.C_Order_ID)
+                           INNER JOIN M_Product p
+                           ON (ol.M_Product_ID=p.M_Product_ID)
+                           INNER JOIN C_UOM cu
+                           ON (cu.C_UOM_ID=ol.C_UOM_ID)
+                           LEFT JOIN AD_Image i
+                           ON i.AD_Image_ID=p.AD_Image_ID
+                            LEFT JOIN(SELECT arl.VALUE, arl.NAME FROM 
+                           AD_Reference ar INNER JOIN AD_REF_LIST arl 
+                           ON arl.AD_REFERENCE_ID = ar.AD_REFERENCE_ID
+                           WHERE ar.NAME = 'VAS_OrderStatus') st
+                           ON st.value = o.VAS_OrderStatus
+                           WHERE ol.C_Order_ID=" + OrderID;
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                List<dynamic> POLines = new List<dynamic>();
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dynamic obj = new ExpandoObject();
+                    obj.ImageUrl = Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageUrl"]);
+                    obj.ProductName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ProductName"]);
+                    obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
+                    obj.UPC = Util.GetValueOfString(ds.Tables[0].Rows[i]["UPC"]);
+                    obj.OrderStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderStatus"]);
+                    obj.StatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["Value"]);
+                    obj.QtyOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
+                    obj.QtyDelivered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyDelivered"]);
+                    obj.QtyInvoiced = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyInvoiced"]);
+                    POLines.Add(obj);
+                }
+                return POLines;
+            }
+            return null;
         }
 
     }
@@ -229,11 +277,11 @@ namespace VASLogic.Models
     {
         public int LineNo { get; set; }
 
-        public DateTime? DateOrdered{ get; set; }
+        public DateTime? DateOrdered { get; set; }
 
         public DateTime? DatePromised { get; set; }
 
-        public string Product {get;set;}
+        public string Product { get; set; }
 
         public string Charge { get; set; }
 
@@ -247,7 +295,7 @@ namespace VASLogic.Models
 
         public decimal ListPrice { get; set; }
 
-        public decimal  UnitPrice { get; set; }
+        public decimal UnitPrice { get; set; }
 
         public string Tax { get; set; }
 
@@ -255,7 +303,7 @@ namespace VASLogic.Models
 
         public decimal LineAmount { get; set; }
 
-        public  string Description { get; set; }
+        public string Description { get; set; }
 
         public int stdPrecision { get; set; }
 
