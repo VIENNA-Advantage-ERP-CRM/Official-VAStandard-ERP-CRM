@@ -93,7 +93,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/RequisitionLinesTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/MatchPOTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_TimeSheetInvoice.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_ProductUomSetup.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ProductUomSetup.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseOrderTabPanel.js"
                    );
 
 
@@ -102,6 +103,7 @@ namespace VAS
                 "~/Areas/VAS/Content/PoReceiptTabPanel.css",
                 "~/Areas/VAS/Content/VPaySelect.css",
                 "~/Areas/VAS/Content/vasattachuser.css",
+                "~/Areas/VAS/Content/VAS_PurchaseOrderTabPanel.css",
                 "~/Areas/VAS/Content/VAS_ProductUomSetup.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
