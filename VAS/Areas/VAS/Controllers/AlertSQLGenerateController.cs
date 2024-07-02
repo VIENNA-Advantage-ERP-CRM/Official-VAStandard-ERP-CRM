@@ -30,18 +30,20 @@ namespace VAS.Areas.VAS.Controllers
         ///  Get Table information From Tab
         /// </summary>
         /// <param name="tabID">AD_Tab_ID</param>
+        /// <param name="windowNo">Window number</param>
         /// <returns>TableName/AD_Table_ID</returns>
-        public JsonResult GetTable(int tabID)
+        public JsonResult GetTable(int tabID,int windowNo)
         {
-            string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                List<Tabs> result= obj.GetTable(ctx, tabID);
-                retJSON = JsonConvert.SerializeObject(result);
+                List<Tabs> result= obj.GetTable(ctx, tabID, windowNo);
+                var jsonResult = Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+                jsonResult.MaxJsonLength = int.MaxValue;
+                return jsonResult;
             }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);          
         }
 
         /// <summary>
@@ -124,6 +126,25 @@ namespace VAS.Areas.VAS.Controllers
                 retJSON = JsonConvert.SerializeObject(obj.GetAlertData(ctx, alertRuleID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }      
+        }
+
+        /// <summary>
+        /// Getting names from table if name column exists 
+        /// </summary>
+        /// <param name="columnName">Column Name</param>
+        /// <param name="tableName">Table Name</param>
+        /// <param name="displayType"> Dispaly type</param>
+        /// <returns>Names</returns>
+        public JsonResult GetIdsName(string columnName,string tableName, int displayType)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
