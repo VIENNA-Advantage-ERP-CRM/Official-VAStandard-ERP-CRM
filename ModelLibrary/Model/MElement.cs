@@ -118,14 +118,19 @@ namespace VAdvantage.Model
         {
             if (GetAD_Org_ID() != 0)
                 SetAD_Org_ID(0);
+
+            // VIS_045: 03-July-2024, Set Element Type as Account, because system was setting Account type based on default tree
+            SetElementType(X_C_Element.ELEMENTTYPE_Account);
             String elementType = GetElementType();
+
             //	Natural Account
             if (ELEMENTTYPE_UserDefined.Equals(elementType) && IsNaturalAccount())
                 SetIsNaturalAccount(false);
             //	Tree validation
 
             //VIS383:04/06/2024 DevOps TASK ID:5877:- When tree is not define then create new tree id behalf of element name 
-            if (Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
+            // when we are saving new record, system will create tree everytime, because for the newrecord, system was setting default tree record automatically.
+            if (newRecord || Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
             {
                 int treeId = 0;
                 string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
