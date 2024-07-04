@@ -190,22 +190,28 @@ namespace VASLogic.Models
         /// <returns></returns>
         public List<dynamic> GetPOLineData(Ctx ctx, int OrderID)
         {
-            string sql = @"SELECT i.ImageUrl,p.Name AS ProductName,cu.Name AS UOM ,p.UPC,QtyOrdered,
-                           QtyDelivered,QtyInvoiced,st.Name AS OrderStatus,st.value FROM C_OrderLine ol
-                           INNER JOIN C_Order o
-                           ON (ol.C_Order_ID=o.C_Order_ID)
-                           INNER JOIN M_Product p
-                           ON (ol.M_Product_ID=p.M_Product_ID)
-                           INNER JOIN C_UOM cu
-                           ON (cu.C_UOM_ID=ol.C_UOM_ID)
-                           LEFT JOIN AD_Image i
-                           ON i.AD_Image_ID=p.AD_Image_ID
-                            LEFT JOIN(SELECT arl.VALUE, arl.NAME FROM 
-                           AD_Reference ar INNER JOIN AD_REF_LIST arl 
-                           ON arl.AD_REFERENCE_ID = ar.AD_REFERENCE_ID
-                           WHERE ar.NAME = 'VAS_OrderStatus') st
-                           ON st.value = o.VAS_OrderStatus
-                           WHERE ol.C_Order_ID=" + OrderID;
+            string sql = @"SELECT DISTINCT i.ImageUrl,cu.Name AS UOM, ol.QtyOrdered,ol.QtyDelivered,ol.QtyInvoiced, arl.Name AS OrderStatus, arl.Value,
+                          CASE WHEN ol.M_AttributeSetInstance_ID IS NOT NULL AND ol.M_AttributeSetInstance_ID > 0 THEN
+                          COALESCE(p.Name || ' ' || ma.Description, p.Name)
+                          ELSE
+                          p.Name
+                         END AS ProductName,
+                         COALESCE(attr.UPC, cuconv.UPC, p.UPC) AS UPC,ol.Line FROM
+                         C_OrderLine ol
+                         INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
+                         INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
+                         INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
+                         LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
+                         LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
+                         LEFT JOIN AD_Ref_List arl ON (arl.AD_Reference_ID = ar.AD_Reference_ID
+                         AND arl.Value = o.VAS_OrderStatus)
+                         LEFT JOIN M_AttributeSetInstance ma ON ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                         LEFT JOIN  M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                         AND attr.M_Product_ID = ol.M_Product_ID
+                         AND attr.C_UOM_ID = ol.C_UOM_ID AND  attr.UPC IS NOT NULL )
+                         LEFT JOIN C_UOM_Conversion cuconv ON(cuconv.C_UOM_ID = p.C_UOM_ID
+                        AND cuconv.C_UOM_To_ID = ol.C_UOM_ID  AND cuconv.UPC IS NOT NULL)
+                        WHERE ol.C_Order_ID=" + OrderID + " ORDER BY Line";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {

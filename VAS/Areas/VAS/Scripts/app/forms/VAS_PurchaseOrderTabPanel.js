@@ -54,14 +54,14 @@
                                 lblTitle.remove();
                             }
                             if (data[0].OrderStatus == 'DE' || data[0].OrderStatus == 'PI' || data[0].OrderStatus == 'PD') {
-                                lblTitle = $('<div class="VAS-delivered-msg"><i class="fa fa-check-circle" aria-hidden="true"></i><span class="">' + ((data[0].OrderStatus == null || data[0].OrderStatus == "") ? "Open" : data[0].OrderStatus) + '</span> </div>');
+                                lblTitle = $('<div class="VAS-delivered-msg"><i class="fa fa-check-circle" aria-hidden="true"></i><span class="">' + data[0].OrderStatus + '</span> </div>');
                             }
                             else if (data[0].StatusValue === 'OP' || data[0].StatusValue === "") {
 
-                                lblTitle = $('<div class="VAS-Open-msg"><span class="">' + ((data[0].OrderStatus == null || data[0].OrderStatus == "") ? "Open" : data[0].OrderStatus) + '</span> </div>');
+                                lblTitle = $('<div class="VAS-Open-msg"><span class="vis vis-info"></span>' + ((data[0].OrderStatus == null || data[0].OrderStatus == "") ? "Open" : data[0].OrderStatus) + '</div>');
                             }
                             else {
-                                lblTitle = $('<div class="VAS-partially-msg"><span class="vis vis-info"></span>' + ((data[0].OrderStatus == null || data[0].OrderStatus == "") ? "Open" : data[0].OrderStatus) + '</div>');
+                                lblTitle = $('<div class="VAS-partially-msg"><span class="vis vis-info"></span>' + data[0].OrderStatus  + '</div>');
 
                             }
                             $root.append(lblTitle).append(headerLabel);
@@ -70,7 +70,8 @@
                                 if (data[0].StatusValue === 'PD') {
                                     productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info"></span></div>';
                                 }
-                                else if (data[0].StatusValue === 'OP' || data[0].StatusValue === "") { }
+                                else if (data[0].StatusValue === 'OP' || data[0].StatusValue === "") {
+                                    productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info vas-openItem"></span></div>';}
                                 else {
                                     productDesign += '<div class="VAS-po-approve-icon"><i class="fa fa-check-circle" aria-hidden="true"></i></div>';
                                 }

@@ -1,7 +1,5 @@
 ﻿
-    .VAS-PO-summary
-
-{
+.VAS-PO-summary {
     padding: 0.625rem;
 }
 
@@ -32,6 +30,7 @@
     gap: 6px;
     border-radius: 6px;
 }
+
     .VAS-delivered-msg .fa {
         font-size: 1rem;
     }
@@ -51,6 +50,7 @@
     .VAS-Open-msg .vis {
         font-size: 1rem;
     }
+
 .VAS-polist-heading {
     font-size: 0.875rem;
     font-weight: 600;
@@ -92,7 +92,7 @@
 
     .VAS-PO-details > h1 {
         font-size: 0.875rem;
-        font-weight: 600;
+        font-weight: 500;
         margin: 0 0 2px;
     }
 
@@ -113,7 +113,7 @@
 }
 
 .VAS-order-values span {
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.875rem;
 }
 
@@ -132,8 +132,11 @@
         font-size: 1.4rem;
         color: #1EA025;
     }
+
 .VAS-product-thumbnail i {
-    font-size:64px;
+    font-size: 64px;
 }
 
-
+span.vis.vis-info.vas-openItem {
+    color: #000;
+}
