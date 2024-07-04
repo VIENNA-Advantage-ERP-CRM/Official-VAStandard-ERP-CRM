@@ -208,6 +208,12 @@ namespace ViennaAdvantage.Process
                     VAdvantage.Model.X_C_BPartner prosp = new VAdvantage.Model.X_C_BPartner(GetCtx(), bp, Get_Trx());
                     prosp.SetIsCustomer(true);
                     prosp.SetIsProspect(false);
+                    //VAI050-Update Sales Order reference on FSR 
+                    if (Env.IsModuleInstalled("VA075_") && newOrder.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
+                    {
+                        string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID");
+                        DB.ExecuteQuery(query, null, Get_Trx());
+                    }
                     if (!prosp.Save())
                     {
 
@@ -357,6 +363,7 @@ namespace ViennaAdvantage.Process
                 VAdvantage.Model.X_C_BPartner prosp = new VAdvantage.Model.X_C_BPartner(GetCtx(), bp, Get_Trx());
                 prosp.SetIsCustomer(true);
                 prosp.SetIsProspect(false);
+               
                 if (!prosp.Save())
                 {
                     Get_Trx().Rollback();
