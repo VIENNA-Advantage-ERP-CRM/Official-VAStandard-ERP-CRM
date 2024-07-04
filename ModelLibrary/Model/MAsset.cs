@@ -205,6 +205,8 @@ namespace VAdvantage.Model
             SetAD_User_ID(shipment.GetAD_User_ID());
             SetM_Locator_ID(shipLine.GetM_Locator_ID());
             SetIsInPosession(true);
+            //VAI050-Set Warehouse value
+            Set_Value("M_Warehouse_ID", shipment.GetM_Warehouse_ID());
 
             // VIS0060: Set Trx Organization on Asset from MR Line.
             if (shipLine.GetAD_OrgTrx_ID() > 0)
@@ -785,8 +787,8 @@ namespace VAdvantage.Model
         {
             GetQty();		//	set to 1
             string name = "";
-
-            if (GetM_Product_ID() == 0 && Util.GetValueOfInt(Get_Value("C_Charge_ID")) == 0) //VIS0336:check placed to restrict select one from product and charge
+            //VAI050-If IsSummary is false than Product or charge mandatory
+            if (GetM_Product_ID() == 0 && Util.GetValueOfInt(Get_Value("C_Charge_ID")) == 0 && (Get_ColumnIndex("IsSummary") < 0 || Util.GetValueOfString(Get_Value("IsSummary")) == "N")) //VIS0336:check placed to restrict select one from product and charge
             {
                 log.SaveError("VIS_NOProductOrCharge", "");
                 return false;
