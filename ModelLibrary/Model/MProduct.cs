@@ -703,9 +703,12 @@ namespace VAdvantage.Model
                     return false;
                 }
                 //VAI050-Set value of Verfication Type when user select Quality Criteria
-                _sql.Clear();
-                _sql.Append("SELECT VA010_VerParameter FROM VA010_QualityPlan WHERE VA010_QualityPlan_ID=" + Get_ValueAsInt("VA010_QualityPlan_ID"));
-                Set_Value("VA010_VerParameter", Util.GetValueOfString(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx())));
+                if (Get_ColumnIndex("VA010_VerParameter") > 0)
+                {
+                    _sql.Clear();
+                    _sql.Append("SELECT VA010_VerParameter FROM VA010_QualityPlan WHERE VA010_QualityPlan_ID=" + Get_ValueAsInt("VA010_QualityPlan_ID"));
+                    Set_Value("VA010_VerParameter", Util.GetValueOfString(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx())));
+                }
             }
 
 
