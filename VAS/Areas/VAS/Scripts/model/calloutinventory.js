@@ -476,8 +476,6 @@
                 return "";
             }
 
-
-
             // Check the source window
             //physical inventory call
             if (mTab.getValue("IsInternalUse") == false || mTab.getValue("IsInternalUse") == null) {
@@ -502,36 +500,16 @@
                     var pc = VIS.dataContext.getJSONRecord("MUOMConversion/ConvertProductFrom", paramStr);
                     QtyOrdered = pc
 
-
                     //handle issue while conversion on Physical Inventory
                     //var conversion = false
 
                     if (QtyOrdered == null) {
                         QtyOrdered = QtyEntered;
                     }
-
-                    //if (QtyOrdered != null) {
-                    //    conversion = QtyEntered != QtyOrdered;
-                    //}
-
-                    //if (QtyOrdered == null) {
-                    //    conversion = false;
-                    //    QtyOrdered = QtyEntered;
-                    //}
-
-                    //if (conversion) {
-                    //    QtyOrdered;
-                    //}
-                    //else {
-
-                    //    QtyOrdered = QtyOrdered * QtyEntered;
-                    //}
-
                 }
-
-                else if (mField.getColumnName() == "QtyEntered") {
+                else {
                     var C_UOM_To_ID = ctx.getContextAsInt(windowNo, "C_UOM_ID");
-                    QtyEntered = Util.getValueOfDecimal(value);
+                    QtyEntered = Util.getValueOfDecimal(mTab.getValue("QtyEntered"));
 
                     //Get precision from server
                     paramStr = C_UOM_To_ID.toString().concat(","); //1
@@ -554,10 +532,7 @@
                     if (QtyOrdered == null)
                         QtyOrdered = QtyEntered;
 
-
                     var conversion = QtyEntered != QtyOrdered;
-
-
 
                     this.log.fine("UOM=" + C_UOM_To_ID
                         + ", QtyEntered=" + QtyEntered
@@ -580,7 +555,6 @@
                     mTab.setValue("AsOnDateCount", QtyOrdered);
                     mTab.setValue("DifferenceQty", diffQty);
                 }
-
             }
             // Internal use inventory call
             else if (mTab.getValue("IsInternalUse") == true) {
@@ -676,7 +650,6 @@
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
-
     };
     VIS.Model.CalloutInventory = CalloutInventory;
 
