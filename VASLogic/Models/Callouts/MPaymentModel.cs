@@ -62,8 +62,8 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             int C_Invoice_ID = Util.GetValueOfInt(paramValue[0]);
-            int C_PaySchedule_ID = Util.GetValueOfInt(paramValue[1]);
-            DateTime? trxDate = Util.GetValueOfDateTime(paramValue[2]);
+            int C_PaySchedule_ID = Util.GetValueOfInt(paramValue[1]); 
+            DateTime? trxDate = DateTime.Parse(paramValue[2]);
             Dictionary<String, Object> retDic = null;
             string sql = "";
             if (Env.IsModuleInstalled("VA009_"))
