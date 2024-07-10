@@ -641,7 +641,7 @@ namespace VAdvantage.Model
                             (SELECT CASE WHEN (SUM(t.QtyOrdered) = 0 AND SUM(t.QtyDelivered) = 0) THEN 'OP' 
                             WHEN (SUM(t.QtyDelivered) = 0 AND SUM(t.QtyOrdered) = SUM(t.Qty)) THEN 'OR' 
                             WHEN (SUM(t.QtyDelivered) = 0 AND SUM(t.QtyOrdered) < SUM(t.Qty)) THEN 'PO' 
-                            WHEN (SUM(QtyDelivered) = SUM(QtyOrdered) OR SUM(QtyDelivered) = SUM(t.Qty)) THEN 'DE'
+                            WHEN (SUM(QtyDelivered) > 0 AND (SUM(QtyDelivered) = SUM(QtyOrdered) OR SUM(QtyDelivered) = SUM(t.Qty))) THEN 'DE'
                             WHEN (SUM(QtyDelivered) > 0 AND (SUM(QtyDelivered) < SUM(QtyOrdered) OR SUM(QtyDelivered) < SUM(t.Qty))) THEN 'PD' END AS Status
                             FROM (SELECT reqln.Qty, reqln.DTD001_DeliveredQty AS QtyDelivered, 0 AS QtyOrdered                          
                             FROM M_RequisitionLine reqln WHERE reqln.M_Requisition_ID = r.M_Requisition_ID
