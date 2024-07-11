@@ -190,28 +190,59 @@ namespace VASLogic.Models
         /// <returns></returns>
         public List<dynamic> GetPOLineData(Ctx ctx, int OrderID)
         {
-            string sql = @"SELECT DISTINCT i.ImageUrl,cu.Name AS UOM, ol.QtyOrdered,ol.QtyDelivered,ol.QtyInvoiced, arl.Name AS OrderStatus, arl.Value,
-                          CASE WHEN ol.M_AttributeSetInstance_ID IS NOT NULL AND ol.M_AttributeSetInstance_ID > 0 THEN
-                          COALESCE(p.Name || ' ' || ma.Description, p.Name)
-                          ELSE
-                          p.Name
-                         END AS ProductName,
-                         COALESCE(attr.UPC, cuconv.UPC, p.UPC) AS UPC,ol.Line FROM
-                         C_OrderLine ol
-                         INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
-                         INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
-                         INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
-                         LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
-                         LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
-                         LEFT JOIN AD_Ref_List arl ON (arl.AD_Reference_ID = ar.AD_Reference_ID
-                         AND arl.Value = o.VAS_OrderStatus)
-                         LEFT JOIN M_AttributeSetInstance ma ON ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
-                         LEFT JOIN  M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
-                         AND attr.M_Product_ID = ol.M_Product_ID
-                         AND attr.C_UOM_ID = ol.C_UOM_ID AND  attr.UPC IS NOT NULL )
-                         LEFT JOIN C_UOM_Conversion cuconv ON(cuconv.C_UOM_ID = p.C_UOM_ID
-                        AND cuconv.C_UOM_To_ID = ol.C_UOM_ID  AND cuconv.UPC IS NOT NULL)
-                        WHERE ol.C_Order_ID=" + OrderID + " ORDER BY Line";
+
+            string sql = @"WITH StatusAndUPCData AS (
+                        SELECT ol.C_OrderLine_ID, i.ImageUrl,  cu.Name AS UOM,
+                         p.Name AS  ProductName,
+                          CASE  WHEN ol.M_AttributeSetInstance_ID IS NOT NULL AND ol.M_AttributeSetInstance_ID > 0 THEN ma.Description
+                          ELSE NULL
+                        END AS AttributeName,
+                          CASE 
+                        WHEN ol.QtyOrdered - ol.QtyDelivered = 0 THEN 'DE'
+                        WHEN ol.QtyDelivered = 0 THEN 'OP'
+                        ELSE 'PD'
+                        END AS OrderLineStatusValue,
+                        CASE 
+                        WHEN SUM(ol.QtyOrdered - ol.QtyDelivered) OVER () = 0 THEN 'DE'
+                        WHEN SUM(ol.QtyDelivered) OVER () = 0 THEN 'OP'
+                        ELSE 'PD'
+                        END AS OrderStatusValue,
+                       COALESCE(attr.UPC, cuconv.UPC, p.UPC) AS PreferredUPC,
+                       ROW_NUMBER() OVER (PARTITION BY ol.C_OrderLine_ID ORDER BY
+                       CASE
+                       WHEN attr.UPC IS NOT NULL THEN 1
+                       WHEN cuconv.UPC IS NOT NULL THEN 2
+                       ELSE 3
+                       END
+                       ) AS rn
+                      FROM
+                      C_OrderLine ol
+                      INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
+                      INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
+                      INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
+                      INNER JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                      LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
+                      LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                      AND attr.M_Product_ID = ol.M_Product_ID
+                      AND attr.C_UOM_ID = ol.C_UOM_ID
+                      AND attr.UPC IS NOT NULL)
+                      LEFT JOIN C_UOM_Conversion cuconv ON (cuconv.C_UOM_ID = p.C_UOM_ID
+                      AND cuconv.C_UOM_To_ID = ol.C_UOM_ID
+                     AND cuconv.UPC IS NOT NULL
+                     AND cuconv.M_Product_ID = ol.M_Product_ID)
+                     WHERE ol.C_Order_ID = " + OrderID + @"
+                    )
+                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyOrdered, ol.QtyDelivered, ol.QtyInvoiced,sod.PreferredUPC AS UPC,
+                   sod.OrderLineStatusValue, arlOrderLine.Name As OrderLineStatus,sod.OrderStatusValue,arlOrder.Name AS OrderStatus ,
+                  sod.ProductName,sod.AttributeName
+                   FROM StatusAndUPCData sod
+                   INNER JOIN C_OrderLine ol ON (sod.C_OrderLine_ID = ol.C_OrderLine_ID)
+                   LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
+                  LEFT JOIN AD_Ref_List arlOrderLine ON (arlOrderLine.AD_Reference_ID = ar.AD_Reference_ID
+                  AND arlOrderLine.Value = sod.OrderLineStatusValue)
+                  LEFT JOIN AD_Ref_List arlOrder ON (arlOrder.AD_Reference_ID = ar.AD_Reference_ID
+                  AND arlOrder.Value = sod.OrderStatusValue)
+                  WHERE sod.rn = 1 ORDER BY ol.Line";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -223,11 +254,13 @@ namespace VASLogic.Models
                     obj.ProductName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ProductName"]);
                     obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
                     obj.UPC = Util.GetValueOfString(ds.Tables[0].Rows[i]["UPC"]);
+                    obj.OrderLineStatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderLineStatusValue"]);
+                    obj.OrderLineStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderLineStatus"]);
+                    obj.OrderStatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderStatusValue"]);
                     obj.OrderStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderStatus"]);
-                    obj.StatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["Value"]);
+                    obj.AttributeName = Util.GetValueOfString(ds.Tables[0].Rows[i]["AttributeName"]);
                     obj.QtyOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
                     obj.QtyDelivered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyDelivered"]);
-                    obj.QtyInvoiced = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyInvoiced"]);
                     POLines.Add(obj);
                 }
                 return POLines;
