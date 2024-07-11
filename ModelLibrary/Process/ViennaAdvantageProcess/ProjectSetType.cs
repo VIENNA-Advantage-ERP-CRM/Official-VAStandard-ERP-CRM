@@ -23,6 +23,7 @@ using System.Data;
 using VAdvantage.Logging;
 
 using VAdvantage.ProcessEngine;
+using ModelLibrary.Model;
 
 namespace ViennaAdvantage.Process
 {
@@ -85,6 +86,79 @@ namespace ViennaAdvantage.Process
             }
             //	Set & Copy if Service
             project.SetProjectType(type);
+
+            
+            //Copy Module and Documents along with Phase n Task on Project from Project Template
+            //Dev Opps ID=5995
+            if (Env.IsModuleInstalled("VA107_"))
+            {
+                PO pm = null;
+               
+                string sql = @"SELECT pm.ad_client_id as pmClientID,pm.ad_org_id as pmOrgID,pm.c_projecttype_id as pmProjectType,pm.description as pmDescription,pm.va107_moduleversion_id as pmModuleVersion , pm.va107_module_id as pmModule,pm.va107_projecttempmodule_id as pmProjecttempModule,pd.ad_client_id as pdClientId,pd.ad_org_id as pdOrgId,pd.va107_documenttype as pdDocumentType,pd.va107_downloadurl as pdDownloadUrl,pd.va107_moduledocument_id as pdModeuleDocument,pd.va107_projecttempdocument_id as pdProjectTempDocument,pd.va107_projecttempmodule_id as pdProjectTempModule
+                            FROM VA107_ProjectTempModule pm LEFT JOIN VA107_ProjectTempDocument pd ON ( pm.VA107_ProjectTempModule_ID = pd.VA107_ProjectTempModule_ID ) WHERE pm.c_projecttype_id = " + _C_ProjectType_ID + "ORDER BY pmProjecttempModule";
+                DataSet ds = DB.ExecuteDataset(sql);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    int SeqNodoc = 0;
+                    int SeqNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT NVL(MAX(Line),0) FROM VA107_ProjectModule WHERE C_Project_ID=" + _C_Project_ID, null, Get_Trx()));
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+
+                        if (i > 0 && (Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmProjecttempModule"]) == Util.GetValueOfInt(ds.Tables[0].Rows[i - 1]["pmProjecttempModule"])))
+                        {
+                            //to not copy project module every time
+                        }
+                        else
+                        {
+                             pm = MTable.GetPO(GetCtx(), "VA107_ProjectModule", 0, Get_Trx());
+                            SeqNodoc = 0;
+                            pm.Set_ValueNoCheck("C_Project_ID", GetRecord_ID());
+                            pm.SetAD_Client_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmClientID"]));
+                            pm.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmOrgID"]));
+                            pm.Set_Value("VA107_Module_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmModule"]));
+                            pm.Set_Value("VA107_ModuleVersion_ID",Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmModuleVersion"]));
+                            pm.Set_Value("Description",Util.GetValueOfString(ds.Tables[0].Rows[0]["pmDescription"]));
+                            SeqNo = SeqNo + 10;
+                            pm.Set_Value("Line", SeqNo);
+                            if (!pm.Save(Get_Trx()))
+                            {
+                                Get_Trx().Rollback();
+                                ValueNamePair v = VLogger.RetrieveError();
+                                if (v != null)
+                                {
+                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectModuleNotSaved") + ":" + v.Name;     
+                                }
+                                return Msg.GetMsg(GetCtx(), "VA107_ProjectModuleNotSaved");
+                            }
+                        }
+
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdProjectTempDocument"]) > 0)
+                        {
+                            //pm.GetValueAsString
+                            PO pd = MTable.GetPO(GetCtx(), "VA107_ProjectDocument", 0, Get_Trx());
+                            pd.Set_ValueNoCheck("VA107_ProjectModule_ID", pm.GetValueAsString("VA107_ProjectModule_ID"));
+                            pd.SetAD_Client_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdClientId"]));
+                            pd.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdOrgId"]));
+                            pd.Set_Value("VA107_ModuleDocument_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdModeuleDocument"]));
+                            pd.Set_Value("VA107_DocumentType", Util.GetValueOfString(ds.Tables[0].Rows[i]["pdDocumentType"]));
+                            pd.Set_Value("VA107_DownloadURL", Util.GetValueOfString(ds.Tables[0].Rows[i]["pdDownloadUrl"]));
+                            //int SeqNodoc = Util.GetValueOfInt(DB.ExecuteScalar("SELECT NVL(MAX(Line),0) FROM VA107_ProjectDocument WHERE VA107_ProjectModule_ID=" + mProjectModule.GetVA107_ProjectModule_ID(), null, Get_Trx())) + 10;
+                            SeqNodoc = SeqNodoc + 10;
+                            pd.Set_Value("Line", SeqNodoc);
+                            if (!pd.Save(Get_Trx()))
+                            {
+                                Get_Trx().Rollback();
+                                ValueNamePair v = VLogger.RetrieveError();
+                                if (v != null)
+                                {
+                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectDocumentNotSaved") + ":" + v.Name;
+                                }
+                                return Msg.GetMsg(GetCtx(), "VA107_ProjectDocumentNotSaved");
+                            }
+                        }
+                    }
+                }
+            }
             if (!project.Save())
             {
                return GetRetrievedError(project, "@Error@");
