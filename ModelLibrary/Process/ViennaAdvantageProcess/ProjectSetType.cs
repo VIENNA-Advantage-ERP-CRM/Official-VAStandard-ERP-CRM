@@ -94,8 +94,8 @@ namespace ViennaAdvantage.Process
             {
                 PO pm = null;
 
-                string sql = @"SELECT pm.AD_Client_ID AS pmClientID,pm.AD_Org_ID AS pmOrgID,pm.C_ProjectType_ID AS pmProjectType,pm.Description AS pmDescription,pm.VA107_ModuleVersion_ID AS pmModuleVersion , pm.VA107_Module_ID AS pmModule,pm.VA107_ProjectTempModule_ID AS pmProjecttempModule,pd.AD_Client_ID AS pdClientId,pd.AD_Org_ID AS pdOrgId,pd.VA107_DocumentType AS pdDocumentType,pd.VA107_DownloadUrl AS pdDownloadUrl,pd.VA107_ModuleDocument_ID AS pdModeuleDocument,pd.VA107_ProjectTempDocument_ID AS pdProjectTempDocument,pd.VA107_ProjectTempModule_ID AS pdProjectTempModule
-                            FROM VA107_ProjectTempModule pm LEFT JOIN VA107_ProjectTempDocument pd ON (pm.VA107_ProjectTempModule_ID = pd.VA107_ProjectTempModule_ID) WHERE pm.c_projecttype_id = " + _C_ProjectType_ID + " ORDER BY pmProjecttempModule";
+                string sql = @"SELECT pm.AD_Client_ID AS pmClientID,pm.AD_Org_ID AS pmOrgID,pm.Description AS pmDescription,pm.VA107_ModuleVersion_ID AS pmModuleVersion , pm.VA107_Module_ID AS pmModule,pm.VA107_ProjectTempModule_ID AS pmProjecttempModule,pd.VA107_DocumentType AS pdDocumentType,pd.VA107_DownloadUrl AS pdDownloadUrl,pd.VA107_ModuleDocument_ID AS pdModeuleDocument,pd.VA107_ProjectTempDocument_ID AS pdProjectTempDocument,pd.VA107_ProjectTempModule_ID AS pdProjectTempModule
+                            FROM VA107_ProjectTempModule pm LEFT JOIN VA107_ProjectTempDocument pd ON (pm.VA107_ProjectTempModule_ID = pd.VA107_ProjectTempModule_ID) WHERE pm.C_ProjectType_ID = " + _C_ProjectType_ID + " ORDER BY pmProjecttempModule";
                 DataSet ds = DB.ExecuteDataset(sql);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -126,7 +126,7 @@ namespace ViennaAdvantage.Process
                                 ValueNamePair v = VLogger.RetrieveError();
                                 if (v != null)
                                 {
-                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectModuleNotSaved") + ":" + v.Name;
+                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectModuleNotSaved") + ":" + v.GetName();
                                 }
                                 return Msg.GetMsg(GetCtx(), "VA107_ProjectModuleNotSaved");
                             }
@@ -136,8 +136,8 @@ namespace ViennaAdvantage.Process
                         {
                             PO pd = MTable.GetPO(GetCtx(), "VA107_ProjectDocument", 0, Get_Trx());
                             pd.Set_ValueNoCheck("VA107_ProjectModule_ID", pm.GetValueAsString("VA107_ProjectModule_ID"));
-                            pd.SetAD_Client_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdClientId"]));
-                            pd.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdOrgId"]));
+                            pd.SetAD_Client_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmClientID"]));
+                            pd.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["pmOrgID"]));
                             pd.Set_Value("VA107_ModuleDocument_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["pdModeuleDocument"]));
                             pd.Set_Value("VA107_DocumentType", Util.GetValueOfString(ds.Tables[0].Rows[i]["pdDocumentType"]));
                             pd.Set_Value("VA107_DownloadURL", Util.GetValueOfString(ds.Tables[0].Rows[i]["pdDownloadUrl"]));
@@ -149,7 +149,7 @@ namespace ViennaAdvantage.Process
                                 ValueNamePair v = VLogger.RetrieveError();
                                 if (v != null)
                                 {
-                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectDocumentNotSaved") + ":" + v.Name;
+                                    return Msg.GetMsg(GetCtx(), "VA107_ProjectDocumentNotSaved") + ":" + v.GetName();
                                 }
                                 return Msg.GetMsg(GetCtx(), "VA107_ProjectDocumentNotSaved");
                             }
