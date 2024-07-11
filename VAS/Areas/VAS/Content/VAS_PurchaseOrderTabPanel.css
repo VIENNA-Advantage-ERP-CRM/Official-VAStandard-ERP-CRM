@@ -78,16 +78,19 @@
 .VAS-product-thumbnail {
     background-color: rgba(var(--v-c-common), 1);
     padding: 6px;
-    height: 80px;
+    width: 80px;
+    display: flex;
+    align-items: center;
 }
 
     .VAS-product-thumbnail img {
         height: 100%;
         object-fit: contain;
+        width: 100%;
     }
 
 .VAS-PO-details {
-    width: 100%;
+    width: 70%;
 }
 
     .VAS-PO-details > h1 {
@@ -139,4 +142,24 @@
 
 span.vis.vis-info.vas-openItem {
     color: #000;
+}
+.VAS-PO-details .VAS-Attrbiute {
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
+}
+.VAS-PO-details > h1 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
 }

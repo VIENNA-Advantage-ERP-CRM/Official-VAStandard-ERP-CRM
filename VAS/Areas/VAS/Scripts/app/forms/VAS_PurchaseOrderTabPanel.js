@@ -53,25 +53,26 @@
                             if (lblTitle != null) {
                                 lblTitle.remove();
                             }
-                            if (data[0].OrderStatus == 'DE' || data[0].OrderStatus == 'PI' || data[0].OrderStatus == 'PD') {
+                            if (data[0].OrderStatusValue == 'DE') {
                                 lblTitle = $('<div class="VAS-delivered-msg"><i class="fa fa-check-circle" aria-hidden="true"></i><span class="">' + data[0].OrderStatus + '</span> </div>');
                             }
-                            else if (data[0].StatusValue === 'OP' || data[0].StatusValue === "") {
+                            else if (data[0].OrderStatusValue === 'OP' || data[0].OrderStatusValue === "") {
 
-                                lblTitle = $('<div class="VAS-Open-msg"><span class="vis vis-info"></span>' + ((data[0].OrderStatus == null || data[0].OrderStatus == "") ? "Open" : data[0].OrderStatus) + '</div>');
+                                lblTitle = $('<div class="VAS-Open-msg"><span class="vis vis-info"></span>' + data[0].OrderStatus + '</div>');
                             }
                             else {
-                                lblTitle = $('<div class="VAS-partially-msg"><span class="vis vis-info"></span>' + data[0].OrderStatus  + '</div>');
+                                lblTitle = $('<div class="VAS-partially-msg"><span class="vis vis-info"></span>' + data[0].OrderStatus + '</div>');
 
                             }
                             $root.append(lblTitle).append(headerLabel);
                             for (i = 0; i < data.length; i++) {
                                 var productDesign = '<div class="VAS-polist-box">';
-                                if (data[0].StatusValue === 'PD') {
+                                if (data[i].OrderLineStatusValue === 'PD') {
                                     productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info"></span></div>';
                                 }
-                                else if (data[0].StatusValue === 'OP' || data[0].StatusValue === "") {
-                                    productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info vas-openItem"></span></div>';}
+                                else if (data[i].OrderLineStatusValue === 'OP' || data[i].StatusValue === "") {
+                                    productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info vas-openItem"></span></div>';
+                                }
                                 else {
                                     productDesign += '<div class="VAS-po-approve-icon"><i class="fa fa-check-circle" aria-hidden="true"></i></div>';
                                 }
@@ -84,20 +85,15 @@
                                 else {
                                     productDesign += '<div class="VAS-product-thumbnail"><i class="vis vis-image"></i></div>';
                                 }
-                                //if (data[i].ImageUrl != null && data[i].ImageUrl != "") {
-                                //    productDesign += '<div class="VAS-product-thumbnail"><img src="' + data[i].ImageUrl + '" alt=""></div>';
-                                //}
-                                //else {
-                                //    productDesign += '<div class="vis-grid-row-td-icon-center vis-gridImageicon" ><div class="vis-app-user-img-wrap"><i class="fa fa-user"></i><img src="" alt="profile image"></div></div>';
-                                //}
-
+                              
                                 productDesign += '<div class="VAS-PO-details">' +
                                     '<h1>' + data[i].ProductName + '</h1>' +
+                                    '<div class="VAS-Attrbiute">' + (data[i].AttributeName == null ? "" : data[i].AttributeName) + '</div>' +
                                     '<div class="VAS-UPC-num">' + ((data[i].UPC == null || data[i].UPC == "") ? "" : data[i].UPC + ' | ') + '<span>' + data[i].UOM + '</span></div>' +
                                     '<div class="VAS-order-description">' +
                                     '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyOrderedPO + '</h6><span>' + data[i].QtyOrdered + '</span></div>' +
                                     '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyDeliveredPO + '</h6><span>' + data[i].QtyDelivered + '</span></div>' +
-                                    '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyInvoicedPO + '</h6><span>' + data[i].QtyInvoiced + '</span></div>' +
+                                   /* '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyInvoicedPO + '</h6><span>' + data[i].QtyInvoiced + '</span></div>' +*/
                                     '</div>' +
                                     '</div>' +
                                     '</div>' +
