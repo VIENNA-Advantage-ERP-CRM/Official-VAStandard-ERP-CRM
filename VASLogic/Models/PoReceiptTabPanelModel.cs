@@ -220,8 +220,6 @@ namespace VASLogic.Models
                       INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
                       INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
                       INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
-                      INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
-                      INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
                       INNER JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                       LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
                       LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
