@@ -1313,6 +1313,9 @@ namespace VAdvantage.Model
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                 }
+
+                                // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                                 #endregion
                             }
 
