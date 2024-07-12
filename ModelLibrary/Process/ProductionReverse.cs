@@ -107,90 +107,96 @@ namespace VAdvantage.Process
                             toProdPlan = new X_M_ProductionPlan(production.GetCtx(), 0, production.Get_Trx());
                             //try
                             //{
-                                toProdPlan.Set_TrxName(production.Get_Trx());
-                                PO.CopyValues(fromProdPlan, toProdPlan, fromProdPlan.GetAD_Client_ID(), fromProdPlan.GetAD_Org_ID());
-                                toProdPlan.SetProductionQty(Decimal.Negate(toProdPlan.GetProductionQty()));
-                                toProdPlan.SetM_Production_ID(productionTo.GetM_Production_ID());
-                                toProdPlan.SetProcessed(false);
-                                if (!toProdPlan.Save(production.Get_Trx()))
+                            toProdPlan.Set_TrxName(production.Get_Trx());
+                            PO.CopyValues(fromProdPlan, toProdPlan, fromProdPlan.GetAD_Client_ID(), fromProdPlan.GetAD_Org_ID());
+                            toProdPlan.SetProductionQty(Decimal.Negate(toProdPlan.GetProductionQty()));
+                            // VIS_45: Set difference value on reversal
+                            decimal differenceValue = Util.GetValueOfDecimal(fromProdPlan.Get_Value("VAS_DifferenceValue"));
+                            if (differenceValue != 0)
+                            {
+                                toProdPlan.Set_Value("VAS_DifferenceValue", decimal.Negate(differenceValue));
+                            }
+                            toProdPlan.SetM_Production_ID(productionTo.GetM_Production_ID());
+                            toProdPlan.SetProcessed(false);
+                            if (!toProdPlan.Save(production.Get_Trx()))
+                            {
+                                production.Get_Trx().Rollback();
+                                ValueNamePair pp = VLogger.RetrieveError();
+                                _log.Log(Level.SEVERE, "Could Not create Production Plan reverse entry. ERRor Value : " + pp.GetValue() + "ERROR NAME : " + pp.GetName());
+                                throw new Exception("Could not create Production Plan reverse entry");
+                            }
+                            else
+                            {
+                                #region check record exist on production line
+                                if (dsProductionLine != null && dsProductionLine.Tables.Count > 0 && dsProductionLine.Tables[0].Rows.Count > 0)
                                 {
-                                    production.Get_Trx().Rollback();
-                                    ValueNamePair pp = VLogger.RetrieveError();
-                                    _log.Log(Level.SEVERE, "Could Not create Production Plan reverse entry. ERRor Value : " + pp.GetValue() + "ERROR NAME : " + pp.GetName());
-                                    throw new Exception("Could not create Production Plan reverse entry");
-                                }
-                                else
-                                {
-                                    #region check record exist on production line
-                                    if (dsProductionLine != null && dsProductionLine.Tables.Count > 0 && dsProductionLine.Tables[0].Rows.Count > 0)
+                                    //check record exist on production line against production plan
+                                    drProductionLine = dsProductionLine.Tables[0].Select("M_ProductionPlan_ID  = " + fromProdPlan.GetM_ProductionPlan_ID());
+                                    if (drProductionLine.Length > 0)
                                     {
-                                        //check record exist on production line against production plan
-                                        drProductionLine = dsProductionLine.Tables[0].Select("M_ProductionPlan_ID  = " + fromProdPlan.GetM_ProductionPlan_ID());
-                                        if (drProductionLine.Length > 0)
+                                        for (int j = 0; j < drProductionLine.Length; j++)
                                         {
-                                            for (int j = 0; j < drProductionLine.Length; j++)
-                                            {
-                                                //Original Line
-                                                fromProdline = new X_M_ProductionLine(GetCtx(), Util.GetValueOfInt(drProductionLine[j]["M_PRODUCTIONLINE_ID"]), Get_Trx());
+                                            //Original Line
+                                            fromProdline = new X_M_ProductionLine(GetCtx(), Util.GetValueOfInt(drProductionLine[j]["M_PRODUCTIONLINE_ID"]), Get_Trx());
 
-                                                // Create New record of Production line with Reverse Entry
-                                                toProdline = new X_M_ProductionLine(production.GetCtx(), 0, production.Get_Trx());
-                                                //try
-                                                //{
-                                                    toProdline.Set_TrxName(production.Get_Trx());
-                                                    PO.CopyValues(fromProdline, toProdline, fromProdPlan.GetAD_Client_ID(), fromProdPlan.GetAD_Org_ID());
-                                                    toProdline.SetMovementQty(Decimal.Negate(toProdline.GetMovementQty()));
-                                                    toProdline.SetPlannedQty(Decimal.Negate(toProdline.GetPlannedQty()));
-                                                    toProdline.SetM_Production_ID(productionTo.GetM_Production_ID());
-                                                    toProdline.SetM_ProductionPlan_ID(toProdPlan.GetM_ProductionPlan_ID());
-                                                    toProdline.SetM_ProductContainer_ID(fromProdline.GetM_ProductContainer_ID()); // bcz not a copy record
-                                                    toProdline.SetReversalDoc_ID(fromProdline.GetM_ProductionLine_ID()); //maintain refernce of Orignal record on reversed record
-                                                    toProdline.SetProcessed(false);
-                                                    if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(), toProdline.GetM_ProductContainer_ID(), toProdline.GetM_Product_ID(), toProdline.GetM_AttributeSetInstance_ID(), toProdline.GetMovementQty(), Get_Trx()))
-                                                    {
-                                                        production.Get_Trx().Rollback();
-                                                        ValueNamePair pp = VLogger.RetrieveError();
-                                                        if (!string.IsNullOrEmpty(pp.GetName()))
-                                                            throw new Exception("Could not create Production line reverse entry, " + pp.GetName());
-                                                        else
-                                                            throw new Exception("Could not create Production line reverse entry");
-                                                    }
-                                                    if (!toProdline.Save(production.Get_Trx()))
-                                                    {
-                                                        production.Get_Trx().Rollback();
-                                                        ValueNamePair pp = VLogger.RetrieveError();
-                                                        _log.Log(Level.SEVERE, "Could Not create Production Line reverse entry. ERRor Value : " + pp.GetValue() + "ERROR NAME : " + pp.GetName());
-                                                        throw new Exception("Could not create Production line reverse entry");
-                                                    }
-                                                    else
-                                                    {
-                                                        // Create New record of Production line Policy (Material Policy) with Reverse Entry
-                                                        sql.Clear();
-                                                        sql.Append(@"INSERT INTO M_ProductionLineMA 
+                                            // Create New record of Production line with Reverse Entry
+                                            toProdline = new X_M_ProductionLine(production.GetCtx(), 0, production.Get_Trx());
+                                            //try
+                                            //{
+                                            toProdline.Set_TrxName(production.Get_Trx());
+                                            PO.CopyValues(fromProdline, toProdline, fromProdPlan.GetAD_Client_ID(), fromProdPlan.GetAD_Org_ID());
+                                            toProdline.SetMovementQty(Decimal.Negate(toProdline.GetMovementQty()));
+                                            toProdline.SetPlannedQty(Decimal.Negate(toProdline.GetPlannedQty()));
+                                            toProdline.SetM_Production_ID(productionTo.GetM_Production_ID());
+                                            toProdline.SetM_ProductionPlan_ID(toProdPlan.GetM_ProductionPlan_ID());
+                                            toProdline.SetM_ProductContainer_ID(fromProdline.GetM_ProductContainer_ID()); // bcz not a copy record
+                                            toProdline.SetReversalDoc_ID(fromProdline.GetM_ProductionLine_ID()); //maintain refernce of Orignal record on reversed record
+                                            toProdline.SetProcessed(false);
+                                            if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(), toProdline.GetM_ProductContainer_ID(), toProdline.GetM_Product_ID(), toProdline.GetM_AttributeSetInstance_ID(), toProdline.GetMovementQty(), Get_Trx()))
+                                            {
+                                                production.Get_Trx().Rollback();
+                                                ValueNamePair pp = VLogger.RetrieveError();
+                                                if (!string.IsNullOrEmpty(pp.GetName()))
+                                                    throw new Exception("Could not create Production line reverse entry, " + pp.GetName());
+                                                else
+                                                    throw new Exception("Could not create Production line reverse entry");
+                                            }
+                                            if (!toProdline.Save(production.Get_Trx()))
+                                            {
+                                                production.Get_Trx().Rollback();
+                                                ValueNamePair pp = VLogger.RetrieveError();
+                                                _log.Log(Level.SEVERE, "Could Not create Production Line reverse entry. ERRor Value : " + pp.GetValue() + "ERROR NAME : " + pp.GetName());
+                                                throw new Exception("Could not create Production line reverse entry");
+                                            }
+                                            else
+                                            {
+                                                // Create New record of Production line Policy (Material Policy) with Reverse Entry
+                                                sql.Clear();
+                                                sql.Append(@"INSERT INTO M_ProductionLineMA 
                                                                   (  AD_CLIENT_ID, AD_ORG_ID , CREATED , CREATEDBY , ISACTIVE , UPDATED , UPDATEDBY ,
                                                                     M_PRODUCTIONLINE_ID , M_ATTRIBUTESETINSTANCE_ID , MMPOLICYDATE , M_PRODUCTCONTAINER_ID, MOVEMENTQTY )
                                                                   (SELECT AD_CLIENT_ID, AD_ORG_ID , sysdate , CREATEDBY , ISACTIVE , sysdate , UPDATEDBY ,
                                                                       " + toProdline.GetM_ProductionLine_ID() + @" , M_ATTRIBUTESETINSTANCE_ID , MMPOLICYDATE , M_PRODUCTCONTAINER_ID,  -1 * MOVEMENTQTY
                                                                     FROM M_ProductionLineMA  WHERE M_ProductionLine_ID = " + fromProdline.GetM_ProductionLine_ID() + @" ) ");
-                                                        int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
-                                                        _log.Info("No of records saved on Meterial Policy against Production line ID : " + toProdline.GetM_ProductionLine_ID() + " are : " + no);
+                                                int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                                                _log.Info("No of records saved on Meterial Policy against Production line ID : " + toProdline.GetM_ProductionLine_ID() + " are : " + no);
 
-                                                    }
-                                                //}
-                                                //catch (Exception ex)
-                                                //{
-                                                //    _log.Info("Error Occured during Production Reverse " + ex.ToString());
-                                                //    if (dsProductionLine != null)
-                                                //        dsProductionLine.Dispose();
-                                                //    if (dsProductionPlan != null)
-                                                //        dsProductionPlan.Dispose();
-                                                //    return Msg.GetMsg(GetCtx(), "DocumentNotReversed" + result);
-                                                //}
                                             }
+                                            //}
+                                            //catch (Exception ex)
+                                            //{
+                                            //    _log.Info("Error Occured during Production Reverse " + ex.ToString());
+                                            //    if (dsProductionLine != null)
+                                            //        dsProductionLine.Dispose();
+                                            //    if (dsProductionPlan != null)
+                                            //        dsProductionPlan.Dispose();
+                                            //    return Msg.GetMsg(GetCtx(), "DocumentNotReversed" + result);
+                                            //}
                                         }
                                     }
-                                    #endregion
                                 }
+                                #endregion
+                            }
                             //}
                             //catch (Exception ex)
                             //{
