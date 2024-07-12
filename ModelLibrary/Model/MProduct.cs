@@ -702,6 +702,13 @@ namespace VAdvantage.Model
                     log.SaveError("", Msg.GetMsg(GetCtx(), "VA010_RecordExist"));
                     return false;
                 }
+                //VAI050-Set value of Verfication Type when user select Quality Criteria
+                if (Get_ColumnIndex("VA010_VerParameter") > 0)
+                {
+                    _sql.Clear();
+                    _sql.Append("SELECT VA010_VerParameter FROM VA010_QualityPlan WHERE VA010_QualityPlan_ID=" + Get_ValueAsInt("VA010_QualityPlan_ID"));
+                    Set_Value("VA010_VerParameter", Util.GetValueOfString(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx())));
+                }
             }
 
 
@@ -892,7 +899,7 @@ namespace VAdvantage.Model
                 _sql.Clear();
                 _sql.Append("SELECT ap.VA010_TestParameter_ID,VA010_TestPrmtrList_ID,ap.VA010_Weightagepercentage,ap.Description as ADescription,s.VA010_AssgndParameters_ID,s.VA010_Score," +
                              " s.Description from VA010_AssgndParameters ap INNER JOIN VA010_QAScore s ON ap.VA010_AssgndParameters_ID=s.VA010_AssgndParameters_ID" +
-                             "  WHERE ap.VA010_QualityPlan_ID=" + Get_Value("VA010_QualityPlan_ID") + " AND ap.AD_Org_ID="+ GetAD_Org_ID());
+                             "  WHERE ap.VA010_QualityPlan_ID=" + Get_Value("VA010_QualityPlan_ID") + " AND ap.AD_Org_ID=" + GetAD_Org_ID());
                 DataSet ds = DB.ExecuteDataset(_sql.ToString(), null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {

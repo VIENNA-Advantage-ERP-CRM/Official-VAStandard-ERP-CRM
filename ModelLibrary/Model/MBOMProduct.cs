@@ -196,6 +196,32 @@ namespace VAdvantage.Model
                     SetLeadTimeOffset(0);
             }
 
+            // VIS0060: Check if Manufacturing module is installed and Standard Operation releated data with same operation sequence exists within same BOM.
+            // Then systen will copy Operation related data to this BOM Component.
+            if (Env.IsModuleInstalled("VAMFG_") && Get_ColumnIndex("VAMFG_M_StandardOperation_ID") >= 0 && (newRecord || Is_ValueChanged("VAMFG_M_Operation_ID") || Is_ValueChanged("VAMFG_M_StandardOperation_ID")
+                || Is_ValueChanged("VAMFG_M_WorkCenter_ID") || Is_ValueChanged("VAMFG_UOM_ID") || Is_ValueChanged("VAMFG_SetupTime") || Is_ValueChanged("VAMFG_UnitRuntime")))
+            {
+                DataSet ds = DB.ExecuteDataset(@"SELECT VAMFG_M_Operation_ID, VAMFG_M_StandardOperation_ID, VAMFG_M_WorkCenter_ID, VAMFG_SetupTime,
+                            VAMFG_UnitRuntime, VAMFG_UOM_ID FROM M_BOMProduct WHERE M_BOM_ID = " + GetM_BOM_ID() + " AND OperationSeqNo = "
+                            + GetOperationSeqNo() + " AND M_BOMProduct_ID != " + Get_ID(), null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAMFG_M_StandardOperation_ID"]) > 0)
+                    {
+                        Set_Value("VAMFG_M_StandardOperation_ID", Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAMFG_M_StandardOperation_ID"]));
+                    }
+                    else
+                    {
+                        Set_Value("VAMFG_M_StandardOperation_ID", null);
+                    }
+                    Set_Value("VAMFG_M_Operation_ID", Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAMFG_M_Operation_ID"]));
+                    Set_Value("VAMFG_M_WorkCenter_ID", Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAMFG_M_WorkCenter_ID"]));
+                    Set_Value("VAMFG_UOM_ID", Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAMFG_UOM_ID"]));
+                    Set_Value("VAMFG_SetupTime", Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAMFG_SetupTime"]));
+                    Set_Value("VAMFG_UnitRuntime", Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAMFG_UnitRuntime"]));
+                }
+            }
+
             //	Set Line Number
             if (GetLine() == 0)
             {

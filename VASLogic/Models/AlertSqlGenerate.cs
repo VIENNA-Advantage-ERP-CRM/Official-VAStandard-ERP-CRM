@@ -63,7 +63,7 @@ namespace VIS.Models
             string sql = @"SELECT DISTINCT t.TableName AS TableName,c.Name AS ColumnName ,f.AD_Field_ID AS FieldID,
                     c.AD_COLUMN_ID AS ColumnID,b.AD_Window_ID AS WindowID,
                     c.AD_Reference_ID AS DataType,f.Name AS FieldName,c.AD_REFERENCE_VALUE_ID AS ReferenceValueID,
-                    c.ColumnName AS DBColumn
+                    c.ColumnName AS DBColumn, c.IsKey AS IsKey
                     FROM AD_Table t 
                     LEFT OUTER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
                     LEFT OUTER JOIN AD_Tab b ON (b.AD_Table_ID=t.AD_Table_ID)
@@ -88,6 +88,7 @@ namespace VIS.Models
                     obj.ColumnID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["ColumnID"]);
                     obj.FieldID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["FieldID"]);
                     obj.WindowID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["WindowID"]);
+                    obj.IsKey = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsKey"]);
                     column.Add(obj);
                 }
             }
@@ -371,6 +372,7 @@ namespace VIS.Models
         public int ColumnID { get; set; }
         public int FieldID { get; set; }
         public int WindowID { get; set; }
+        public string IsKey { get; set; }
     }
 
     public class ASearch

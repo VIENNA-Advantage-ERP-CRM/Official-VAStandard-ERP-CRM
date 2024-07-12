@@ -1218,9 +1218,9 @@ namespace VIS.Models
             DataSet _ds = null;
             string[] paramValue = fields.Split(',');
             Dictionary<string, object> retValue = null;
+            //VIS_427 BugID 5620 changed function in order to get the discount amount directly from schedule
             string sql = "SELECT C_BPartner_ID, C_Currency_ID, C_ConversionType_ID, invoiceOpen(C_Invoice_ID, " + Util.GetValueOfInt(paramValue[3]) + @") as invoiceOpen, IsSOTrx, 
-            paymentTermDiscount(invoiceOpen(C_Invoice_ID, 0),C_Currency_ID,C_PaymentTerm_ID,DateInvoiced, " + paramValue[1] + "," + paramValue[2]
-            + " ) as paymentTermDiscount, C_DocTypeTarget_ID,C_BPartner_Location_ID FROM C_Invoice WHERE C_Invoice_ID=" + Util.GetValueOfInt(paramValue[0]);
+             invoiceDiscount(" + paramValue[0] + "," +paramValue[1]+","+paramValue[2]+"," + paramValue[3] + ") as paymentTermDiscount, C_DocTypeTarget_ID,C_BPartner_Location_ID FROM C_Invoice WHERE C_Invoice_ID=" + Util.GetValueOfInt(paramValue[0]);
             try
             {
                 _ds = DB.ExecuteDataset(sql, null, null);

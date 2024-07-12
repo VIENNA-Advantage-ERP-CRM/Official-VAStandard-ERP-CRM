@@ -18,6 +18,10 @@ using VAdvantage.SqlExec;
 using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.Utility;
+using VAdvantage.ProcessEngine;
+using System.IO;
+using System.Web.Hosting;
+using ViennaAdvantageWeb.Areas.VIS.Models;
 
 namespace VAdvantage.Model
 {
@@ -114,11 +118,30 @@ namespace VAdvantage.Model
         {
             if (GetAD_Org_ID() != 0)
                 SetAD_Org_ID(0);
+
+            // VIS_045: 03-July-2024, Set Element Type as Account, because system was setting Account type based on default tree
+            SetElementType(X_C_Element.ELEMENTTYPE_Account);
             String elementType = GetElementType();
+
             //	Natural Account
             if (ELEMENTTYPE_UserDefined.Equals(elementType) && IsNaturalAccount())
                 SetIsNaturalAccount(false);
             //	Tree validation
+
+            //VIS383:04/06/2024 DevOps TASK ID:5877:- When tree is not define then create new tree id behalf of element name 
+            // when we are saving new record, system will create tree everytime, because for the newrecord, system was setting default tree record automatically.
+            if (newRecord || Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
+            {
+                int treeId = 0;
+                string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
+                if (!string.IsNullOrEmpty(msgError))
+                {
+                    log.SaveError(msgError, "");
+                    return false;
+                }
+                SetAD_Tree_ID(treeId);
+            }
+
             X_AD_Tree tree = GetTree();
             if (tree == null)
                 return false;
@@ -139,12 +162,174 @@ namespace VAdvantage.Model
             {
                 if (!X_AD_Tree.TREETYPE_ElementValue.Equals(treeType))
                 {
-                   log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
+                    log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@TreeType@ <> @ElementType@ (A)"), false);
                     return false;
                 }
             }
             return true;
         }
 
+        /// <summary>
+        /// VIS383:04/06/2024 DevOps TASK ID:5877:-Create new tree and return Tree Id
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="trx">Transaction</param>
+        /// <param name="name">Element Name</param>
+        /// <param name="treeID">Tree ID</param>
+        /// <returns>Return Tree ID</returns>
+        public string CreateNewTree(Ctx ctx, Trx trx, string name, out int treeID)
+        {
+            string output = "";
+            string treeName = name;
+            string sql = "SELECT COUNT(*) FROM AD_Tree WHERE Lower(name) =Lower('" + treeName + "')";
+            sql = MRole.Get(ctx, ctx.GetAD_Role_ID()).AddAccessSQL(sql, "AD_Tree", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            int countRecords = Convert.ToInt32(DB.ExecuteScalar(sql));
+            if (countRecords > 0)
+            {
+                output = "VAS_DuplicateRecord";
+                treeID = 0;
+                return output;
+            }
+
+            MTree newTree = new MTree(ctx, 0, trx);
+            newTree.SetName(treeName);
+            newTree.SetAD_Table_ID(MTable.Get_Table_ID("C_ElementValue"));
+            newTree.SetTreeType("EV");
+            newTree.SetIsAllNodes(true);
+            if (newTree.Save(trx))
+            {
+                MClientInfo cInfo = new MClientInfo(ctx, GetAD_Client_ID(), null);
+                sql = "SELECT AD_Process_ID FROM AD_Process WHERE Name='Verify Tree'";
+                object processID = DB.ExecuteScalar(sql);
+                if (processID == null || processID == DBNull.Value)
+                {
+                    output = "VAS_NodeGenProcessNotFound";
+                    treeID = 0;
+                    return output;
+                }
+
+                MPInstance instance = new MPInstance(ctx, Convert.ToInt32(processID), 0);
+                if (!instance.Save())
+                {
+                    output = "VAS_ProcessNoInstance";
+                    treeID = 0;
+                    return output;
+                }
+
+                VAdvantage.ProcessEngine.ProcessInfo inf =
+                    new VAdvantage.ProcessEngine.ProcessInfo("GenerateTreeNodes", Convert.ToInt32(processID), MTable.Get_Table_ID("AD_Tree"), newTree.GetAD_Tree_ID());
+                inf.SetAD_PInstance_ID(instance.GetAD_PInstance_ID());
+                inf.SetAD_Client_ID(GetAD_Client_ID());
+                inf.SetRecord_ID(newTree.GetAD_Tree_ID());
+                ProcessCtl worker = new ProcessCtl(ctx, null, inf, null);
+                worker.Run();
+                treeID = newTree.GetAD_Tree_ID();
+                return output;
+            }
+            treeID = 0;
+            return output;
+        }
+
+        /// <summary>
+        /// After Save
+        /// </summary>
+        /// <param name="newRecord">new</param>
+        /// <param name="success">success</param>
+        /// <returns>success</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+            {
+                return success;
+            }
+
+            //VIS_045: 13-June-2024, TASK ID: 5913,  This logic is used to upload AccountingUS1.csv file as attachment from the Application Physical path for COA import.
+            if (IsActive() && !IsRecordAlreadyAttached(GetC_Element_ID(), X_C_Element.Get_Table_ID("C_Element")))
+            {
+                AttachCOAImportFile("AccountingUS1.csv");
+            }
+
+            return base.AfterSave(newRecord, success);
+        }
+
+        /// <summary>
+        /// This function is used to Attach file 
+        /// </summary>
+        /// <param name="fileName">FileName</param>
+        /// <Author>VIS_045, 13-June-2024, TASK ID: 5913</Author>
+        /// <returns>Error Detail (if any)</returns>
+        public string AttachCOAImportFile(string fileName)
+        {
+            try
+            {
+                // Define the base directory path
+                string baseDirectory = HostingEnvironment.ApplicationPhysicalPath;
+
+                // Combine the base path with the file name
+                string sourceFilePath = Path.Combine(baseDirectory, fileName);
+
+                // Check if the file exists in the specified path
+                if (File.Exists(sourceFilePath))
+                {
+                    // Get file information
+                    FileInfo fileInfo = new FileInfo(sourceFilePath);
+
+                    // Create a list to hold the file details
+                    List<AttFileInfo> fileList = new List<AttFileInfo>
+                {
+                    new AttFileInfo
+                    {
+                        Name = fileInfo.Name,
+                        Size = Util.GetValueOfInt(fileInfo.Length)
+                    }
+                };
+
+                    #region Copy File into TempDownload Folder
+                    // Define the temporary download directory path
+                    string tempDownloadDirectory = Path.Combine(baseDirectory, "TempDownload");
+
+                    // Ensure the temporary directory exists
+                    if (!Directory.Exists(tempDownloadDirectory))
+                    {
+                        Directory.CreateDirectory(tempDownloadDirectory);
+                    }
+
+                    // Define the destination file path
+                    string destinationFilePath = Path.Combine(tempDownloadDirectory, fileName);
+
+                    // Copy the file to the destination path
+                    File.Copy(sourceFilePath, destinationFilePath, true);
+                    #endregion
+
+                    // Attach the file (Pick file from TemDownload and attach)
+                    AttachmentModel attachmentModel = new AttachmentModel();
+                    AttachmentInfo attachmentInfo = attachmentModel.CreateAttachmentEntries(
+                        fileList, 0, "", GetCtx(), X_C_Element.Get_Table_ID("C_Element"), GetC_Element_ID(), "", 0, false);
+
+                    // Error Detail if not attached
+                    if (attachmentInfo != null && !string.IsNullOrEmpty(attachmentInfo.Error))
+                    {
+                        log.Severe("File Not Attached For Chart of Account Name - " + GetName() + ", Error : " + attachmentInfo.Error);
+                        return attachmentInfo.Error;
+                    }
+                }
+            }
+            catch { }
+
+            return "";
+        }
+
+        /// <summary>
+        /// This function is used to check, Attachment is already linked with the record or not
+        /// </summary>
+        /// <param name="Record_ID">Record ID</param>
+        /// <param name="AD_Table_ID">Table ID</param>
+        /// <Author>VIS_045, 13-June-2024, TASK ID: 5913</Author>
+        /// <returns>True, when Exist</returns>
+        public bool IsRecordAlreadyAttached(int Record_ID, int AD_Table_ID)
+        {
+            string sql = $@"SELECT COUNT(AD_Attachment_ID) FROM AD_Attachment WHERE AD_Table_ID = {AD_Table_ID} AND Record_ID = {Record_ID}";
+            return (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx())) > 0);
+        }
     }
 }
