@@ -170,7 +170,6 @@ namespace VAdvantage.Model
             {
                 return success;
             }
-
             int _client_ID = 0;
             StringBuilder _sql = new StringBuilder();
             //_sql.Append("Select count(*) from  ad_table where tablename like 'FRPT_Charge_Acct'");
@@ -182,6 +181,10 @@ namespace VAdvantage.Model
                 _sql.Clear();
                 _sql.Append("Select L.Value From Ad_Ref_List L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='Charge'");
                 var relatedtoChrge = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
+
+                //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Charge_Acct WHERE C_Charge_ID=" + GetC_Charge_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
 
                 PO chrgact = null;
                 _client_ID = GetAD_Client_ID();
@@ -223,12 +226,16 @@ namespace VAdvantage.Model
                                                     //chrgact = new X_FRPT_Charge_Acct(GetCtx(), 0, null);
                                         if (recordFound == 0)
                                         {
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                            _SeqNo += 10;
                                             chrgact = MTable.GetPO(GetCtx(), "FRPT_Charge_Acct", 0, null);
                                             chrgact.Set_ValueNoCheck("C_Charge_ID", Util.GetValueOfInt(GetC_Charge_ID()));
                                             chrgact.Set_ValueNoCheck("AD_Org_ID", 0);
                                             chrgact.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                             chrgact.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                             chrgact.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                            chrgact.Set_ValueNoCheck("SeqNo", _SeqNo);
                                             if (!chrgact.Save())
                                             {
 
