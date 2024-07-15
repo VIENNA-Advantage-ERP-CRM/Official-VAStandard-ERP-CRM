@@ -1279,6 +1279,8 @@ namespace VAdvantage.Model
             if (!success)
                 return false;
 
+            //VIS383-DevOps BugID:6004 12/07/2024:-Declare variable for sequence no
+            int _SeqNo = 0;
             StringBuilder _sql = new StringBuilder("");
 
             //_sql.Append("Select count(*) from  ad_table where tablename like 'FRPT_BP_Customer_Acct'");
@@ -1289,6 +1291,10 @@ namespace VAdvantage.Model
             {
                 if (IsCustomer())
                 {
+                    //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                    string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_BP_Customer_Acct WHERE C_BPartner_ID=" + GetC_BPartner_ID() + " AND IsActive='Y'";
+                    _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                     PO obj = null;
                     //MFRPTBPCustomerAcct obj = null;
                     int Customer_ID = GetC_BPartner_ID();
@@ -1310,6 +1316,8 @@ namespace VAdvantage.Model
                         {
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                _SeqNo += 10;
                                 //obj = new MFRPTBPCustomerAcct(GetCtx(), 0, null);
                                 obj = MTable.GetPO(GetCtx(), "FRPT_BP_Customer_Acct", 0, null);
                                 obj.Set_ValueNoCheck("C_BPartner_ID", Customer_ID);
@@ -1317,6 +1325,9 @@ namespace VAdvantage.Model
                                 obj.Set_ValueNoCheck("C_AcctSchema_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
                                 obj.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ValidCombination_ID"]));
                                 obj.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                obj.Set_ValueNoCheck("SeqNo", _SeqNo);
+
                                 if (!obj.Save())
                                 {
                                 }
@@ -1334,6 +1345,10 @@ namespace VAdvantage.Model
             {
                 if (IsVendor())
                 {
+                    //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                    string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_BP_Vendor_Acct WHERE C_BPartner_ID=" + GetC_BPartner_ID() + " AND IsActive='Y'";
+                    _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                     PO obj = null;
                     //MFRPTBPVendorAcct obj = null;
                     int Vendor_ID = GetC_BPartner_ID();
@@ -1356,6 +1371,8 @@ namespace VAdvantage.Model
                         {
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                _SeqNo += 10;
                                 //obj = new MFRPTBPVendorAcct(GetCtx(), 0, null);
                                 obj = MTable.GetPO(GetCtx(), "FRPT_BP_Vendor_Acct", 0, null);
                                 obj.Set_ValueNoCheck("C_BPartner_ID", Vendor_ID);
@@ -1363,6 +1380,8 @@ namespace VAdvantage.Model
                                 obj.Set_ValueNoCheck("C_AcctSchema_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
                                 obj.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ValidCombination_ID"]));
                                 obj.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                obj.Set_ValueNoCheck("SeqNo", _SeqNo);
 
                                 if (!obj.Save())
                                 {
@@ -1382,6 +1401,10 @@ namespace VAdvantage.Model
 
                 if (IsEmployee())
                 {
+                    //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                    string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_BP_Employee_Acct WHERE C_BPartner_ID=" + GetC_BPartner_ID() + " AND IsActive='Y'";
+                    _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                     // MFRPTBPEmployeeAcct obj = null;
                     int Employee_ID = GetC_BPartner_ID();
                     int C_BP_Group_ID = GetC_BP_Group_ID();
@@ -1403,6 +1426,8 @@ namespace VAdvantage.Model
                         {
                             for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                             {
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                _SeqNo += 10;
                                 //obj = new MFRPTBPEmployeeAcct(GetCtx(), 0, null);
                                 var obj = MTable.GetPO(GetCtx(), "FRPT_BP_Employee_Acct", 0, null);
                                 obj.Set_ValueNoCheck("C_BPartner_ID", Employee_ID);
@@ -1410,6 +1435,8 @@ namespace VAdvantage.Model
                                 obj.Set_ValueNoCheck("C_AcctSchema_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
                                 obj.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ValidCombination_ID"]));
                                 obj.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
+                                //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                obj.Set_ValueNoCheck("SeqNo", _SeqNo);
                                 if (!obj.Save())
                                 {
                                 }

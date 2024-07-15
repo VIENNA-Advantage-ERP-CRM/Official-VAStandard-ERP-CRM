@@ -146,6 +146,11 @@ namespace VAdvantage.Model
             int count = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString()));
             if (count > 0)
             {
+                //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Product_Category_Acct WHERE M_Product_Category_ID=" + GetM_Product_Category_ID()+" AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
+
                 // Get "Related-to" of "Product"
                 _sql.Clear();
                 _sql.Append(@"SELECT L.Value FROM AD_Ref_List L INNER JOIN AD_Reference r on (R.AD_Reference_ID=L.AD_Reference_ID)
@@ -163,7 +168,6 @@ namespace VAdvantage.Model
                     for (int k = 0; k < ds3.Tables[0].Rows.Count; k++)
                     {
                         int _AcctSchema_ID = Util.GetValueOfInt(ds3.Tables[0].Rows[k]["C_AcctSchema_ID"]);
-
                         // Get Default Account from Accounting Schema
                         _sql.Clear();
                         _sql.Append("Select Frpt_Acctdefault_Id,C_Validcombination_Id,Frpt_Relatedto From Frpt_Acctschema_Default Where ISACTIVE='Y' AND AD_CLIENT_ID=" + _client_ID + " AND C_Acctschema_Id=" + _AcctSchema_ID);
@@ -188,12 +192,16 @@ namespace VAdvantage.Model
                                         int recordFound = Convert.ToInt32(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
                                         if (recordFound == 0)
                                         {
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                            _SeqNo += 10;
                                             prdctact = MTable.GetPO(GetCtx(), "FRPT_Product_Category_Acct", 0, null);
                                             prdctact.Set_ValueNoCheck("AD_Org_ID", 0);
                                             prdctact.Set_ValueNoCheck("M_Product_Category_ID", Util.GetValueOfInt(GetM_Product_Category_ID()));
                                             prdctact.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                             prdctact.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                             prdctact.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                            prdctact.Set_ValueNoCheck("SeqNo", _SeqNo);
                                             if (!prdctact.Save())
                                             {
 
