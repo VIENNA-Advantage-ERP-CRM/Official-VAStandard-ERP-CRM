@@ -742,7 +742,6 @@ namespace VAdvantage.Model
         {
             if (!success)
                 return success;
-
             StringBuilder _sql = new StringBuilder("");
             //_sql.Append("Select count(*) from  ad_table where tablename like 'FRPT_Product_Category_Acct'");
             //_sql.Append("SELECT count(*) FROM all_objects WHERE object_type IN ('TABLE') AND (object_name)  = UPPER('FRPT_Product_Category_Acct')  AND OWNER LIKE '" + DB.GetSchema() + "'");
@@ -751,6 +750,10 @@ namespace VAdvantage.Model
             if (count > 0)
             {
                 PO obj = null;
+                //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no from default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Product_Acct WHERE M_Product_ID=" + GetM_Product_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 //MFRPTProductAcct obj = null;
                 int _MProduct_ID = GetM_Product_ID();
                 int _PCategory_ID = GetM_Product_Category_ID();
@@ -773,6 +776,8 @@ namespace VAdvantage.Model
                     {
                         for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                         {
+                            //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                            _SeqNo += 10;
                             //obj = new MFRPTProductAcct(GetCtx(), 0, null);
                             obj = MTable.GetPO(GetCtx(), "FRPT_Product_Acct", 0, null);
                             obj.Set_ValueNoCheck("AD_Org_ID", 0);
@@ -780,6 +785,8 @@ namespace VAdvantage.Model
                             obj.Set_ValueNoCheck("C_AcctSchema_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
                             obj.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ValidCombination_ID"]));
                             obj.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
+                            //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                            obj.Set_ValueNoCheck("SeqNo", _SeqNo);
                             if (!obj.Save())
                             { }
                         }
