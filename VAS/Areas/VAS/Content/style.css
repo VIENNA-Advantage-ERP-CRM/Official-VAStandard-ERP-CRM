@@ -685,14 +685,6 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
-    display: none;
-}
-
-    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
-        display: block;
-    }
-
     .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
         display: none;
     }
@@ -720,11 +712,17 @@
         top: -16px;
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option, .vas-comparision-opeartor option {
     display: none;
 }
 
     .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
+    .vas-comparision-opeartor option:nth-child(1), .vas-comparision-opeartor option:nth-child(2),
+    .vas-comparision-opeartor option:nth-child(3), .vas-comparision-opeartor option:nth-child(4),
+    .vas-comparision-opeartor option:nth-child(5), .vas-comparision-opeartor option:nth-child(6) {
         display: block;
     }
 

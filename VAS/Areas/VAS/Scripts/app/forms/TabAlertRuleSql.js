@@ -154,7 +154,8 @@
         var sqlQuery = VIS.Msg.getMsg("VAS_SQLQuery");
         var testSQL = VIS.Msg.getMsg("VAS_TestSql");
         var joinCommonColumn = null;
-        var record = null;
+        var record = [];
+        var Joinrecord = [];
         var $root = $("<div class='vas-root'>");
 
         // Initialize UI Elements
@@ -321,12 +322,12 @@
                     if ($filterNewColumn.css('display') != 'none') {
                         $filterValExchangeIconBlock.hide();
                         $filterValueDiv.hide();
-                        $filterCondition.val('=');
-                        $filterCondition.addClass('vas-checkboxoption-hidden');
-                        $filterCondition.addClass('vas-remove-isnulloption');
+                        $filterCondition.val('');
+                        $filterCondition.removeClass('vas-checkboxoption-hidden');
+                        $filterCondition.removeClass('vas-remove-isnulloption');
                         $filterCondition.removeClass('vas-add-isnulloption');
                         $filterCondition.removeClass('vas-remove-likeoption');
-
+                        $filterCondition.addClass('vas-comparision-opeartor');
                     }
                     else {
                         var ctrlDataType = $filterInputBlock.find('input').attr('columnid');
@@ -1227,6 +1228,7 @@
                 var keyColumn1 = $baseTableJoinInput.val();
                 var keyColumn2 = $joiningTableInput.val();
                 var sql = $selectGeneratorQuery.text();
+                record = record.concat(Joinrecord);
                 var joinsDropDown = $joinsDropdown.find('option:selected').val();
                 const joinsObj = { joinsDropDown, joinTableName, keyColumn1, keyColumn2, joinSelectedColumn };
                 if (joinsDropDown && joinTableName && keyColumn1 && keyColumn2 && joinSelectedColumn) {
@@ -1580,6 +1582,7 @@
             tableID = 0;
             var tabID = $windowTabSelect.getValue();
             var whereClause = '';
+            record = [];
             if (tabID > 0) {
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
@@ -1620,6 +1623,7 @@
             var whereClause = '';
             var tabID = $joinsWindowTabSelect.getValue();
             var TableID2 = 0;
+            Joinrecord = [];
             if (tabID > 0) {
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
@@ -1630,7 +1634,8 @@
                         result = JSON.parse(result);
                         if (result && result.length > 0) {
                             TableID2 = result[0].TableID;
-                            whereClause = result[0].WhereClause
+                            whereClause = result[0].WhereClause;
+                            Joinrecord = result[0].dr.Table;
                         }
                     },
                     error: function (error) {
@@ -1940,7 +1945,7 @@
         function getJoinWindow(tabID, tableID) {
             var lookups = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Tab_ID", 0, false,
                 "AD_Tab.AD_Window_ID IN (SELECT AD_Window_ID FROM AD_Window_Access WHERE AD_Role_ID = " + VIS.Env.getCtx().getAD_Role_ID() + ") AND AD_Tab.AD_Tab_ID <> " + tabID + " AND AD_Tab.AD_Table_ID<>" + tableID);
-            $joinsWindowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", true, false, true, VIS.DisplayType.Search, lookups);
+            $joinsWindowTabSelect = new VIS.Controls.VTextBoxButton("AD_Tab_ID", false, false, true, VIS.DisplayType.Search, lookups);
             var locDep = $joinsWindowTabSelect.getControl().attr('placeholder', ' Search here').attr("id", "Ad_Tab_ID");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');
             var DivSearchBtnWrap = $('<div class="input-group-append">');
@@ -2180,6 +2185,8 @@
 
         function filterOnChange(self, $filterSelectedItem) {
             let $filterItemVal = self.attr('value');
+            $filterValBlock.find('input').val('');
+            $filterNewColumnInput.val('');
             self.parent($filterPrice).prev($filterInputBlock).find($filterColumnInput).val($filterItemVal);
             $filterSelectedItem.removeClass('active');
             self.addClass('active');
@@ -2239,6 +2246,7 @@
             $filterCondition.removeClass('vas-remove-isnulloption');
             $filterCondition.removeClass('vas-add-isnulloption');
             $filterCondition.removeClass('vas-remove-likeoption');
+            $filterCondition.removeClass('vas-comparision-opeartor');
             $filterValueDiv.hide();
             $filterValExchangeIconBlock.show();
             if (displayType == VIS.DisplayType.Date || displayType == VIS.DisplayType.DateTime) {
@@ -2246,6 +2254,7 @@
                 $filterPriceValue.prev('label').removeClass('vas-label-space');
                 $filterCondition.addClass('vas-add-isnulloption');
                 $filterCondition.addClass('vas-remove-likeoption');
+                $filterCondition.addClass('vas-comparision-opeartor');
                 $filterValExchangeIconBlock.hide();
                 $filterValueDiv.show();
             }
@@ -2254,10 +2263,10 @@
                 || displayType == VIS.DisplayType.ID ) {
                 $filterPriceValue.attr('type', 'number');
                 $filterPriceValue.prev('label').removeClass('vas-label-space');
-                $filterCondition.addClass('vas-remove-likeoption');
-                $filterValDropdown.empty();
+                $filterCondition.addClass('vas-remove-likeoption');               
                 var data = getIdsName(columnName, tableName, displayType);
                 if (data && data.length > 0) {
+                    $filterValDropdown.empty();
                     for (var i = 0; i < data.length; i++) {
                         if (data[i].Name) {
                             $filterValDropdown.append('<div class="vas-filterValItem"' + "value = " + data[i].Value + " >" + data[i].Name + '</div>');
@@ -2337,6 +2346,8 @@
             joinsArray = [];          
             $joins.empty();
             filterArray = [];
+            Joinrecord = [];
+            record = [];
             $filters.empty();
             $filterCol2Block.empty();
             $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
@@ -2384,8 +2395,9 @@
             $joiningTableInput.val('');
             $joinOnFieldColumnMainTable.empty();
             $joinOnFieldColumnJoinTable.empty();
+            $filterValBlock.find('input').val('');
+            $filterNewColumnInput.val('');
             whereJoinClause = '';
-            record = null;
         }
 
         this.getRoot = function () {
