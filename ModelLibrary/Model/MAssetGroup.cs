@@ -118,6 +118,10 @@ namespace VAdvantage.Model
                 _sql.Append("Select L.Value From Ad_Ref_List L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='Asset'");
                 var relatedtoProduct = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
 
+                //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Asset_Group_Acct WHERE A_Asset_Group_ID=" + GetA_Asset_Group_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 PO assetGroupAcct = null;
                 _sql.Clear();
                 _sql.Append("select C_AcctSchema_ID from C_AcctSchema where IsActive = 'Y' AND AD_CLIENT_ID=" + GetAD_Client_ID());
@@ -149,12 +153,16 @@ namespace VAdvantage.Model
                                     int recordFound = Convert.ToInt32(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
                                     if (recordFound == 0)
                                     {
+                                        //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                        _SeqNo += 10;
                                         assetGroupAcct = MTable.GetPO(GetCtx(), "FRPT_Asset_Group_Acct", 0, null);
                                         assetGroupAcct.Set_ValueNoCheck("AD_Org_ID", 0);
                                         assetGroupAcct.Set_ValueNoCheck("A_Asset_Group_ID", Util.GetValueOfInt(GetA_Asset_Group_ID()));
                                         assetGroupAcct.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                         assetGroupAcct.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                         assetGroupAcct.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                        //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                        assetGroupAcct.Set_ValueNoCheck("SeqNo", _SeqNo);
                                         if (!assetGroupAcct.Save())
                                         {
                                             ValueNamePair pp = VLogger.RetrieveError();
