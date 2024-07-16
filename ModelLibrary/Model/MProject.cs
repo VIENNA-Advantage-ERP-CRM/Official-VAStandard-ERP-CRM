@@ -687,6 +687,11 @@ namespace VAdvantage.Model
                 _sql.Append("Select L.Value From Ad_Ref_List L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='Project'");
                 var relatedtoProject = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
                 _client_ID = GetAD_Client_ID();
+
+                //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Project_Acct WHERE C_Project_ID=" + GetC_Project_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 _sql.Clear();
                 _sql.Append("select C_AcctSchema_ID from C_AcctSchema where AD_CLIENT_ID=" + _client_ID);
                 DataSet ds3 = new DataSet();
@@ -711,12 +716,16 @@ namespace VAdvantage.Model
                                     int recordFound = Convert.ToInt32(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
                                     if (recordFound == 0)
                                     {
+                                        //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                        _SeqNo += 10;
                                         project = MTable.GetPO(GetCtx(), "FRPT_Project_Acct", 0, null);
                                         project.Set_ValueNoCheck("AD_Org_ID", 0);
                                         project.Set_ValueNoCheck("C_Project_ID", Util.GetValueOfInt(GetC_Project_ID()));
                                         project.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                         project.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                         project.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                        //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                        project.Set_ValueNoCheck("SeqNo", _SeqNo);
                                         if (!project.Save())
                                         {
 

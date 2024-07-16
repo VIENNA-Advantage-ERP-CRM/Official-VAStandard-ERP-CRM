@@ -191,6 +191,10 @@ namespace VAdvantage.Model
 
                     var relatedto = Convert.ToString(DB.ExecuteScalar(sql));
 
+                    //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                    string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_BankAccount_Acct WHERE C_BankAccount_ID=" + GetC_BankAccount_ID() + " AND IsActive='Y'";
+                    int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                     PO bnkact = null;
                     //X_FRPT_BankAccount_Acct bnkact = null;
                     //MAcctSchema acschma = new MAcctSchema(GetCtx(), 0, null);
@@ -234,12 +238,16 @@ namespace VAdvantage.Model
                                             //bnkact = new X_FRPT_BankAccount_Acct(GetCtx(), 0, null);
                                             if (recordFound == 0)
                                             {
+                                                //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                                _SeqNo += 10;
                                                 bnkact = MTable.GetPO(GetCtx(), "FRPT_BankAccount_Acct", 0, null);
                                                 bnkact.Set_ValueNoCheck("C_BankAccount_ID", Util.GetValueOfInt(GetC_BankAccount_ID()));
                                                 bnkact.Set_ValueNoCheck("AD_Org_ID", 0);
                                                 bnkact.Set_Value("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                                 bnkact.Set_Value("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                                 bnkact.Set_Value("C_AcctSchema_ID", _AcctSchema_ID);
+                                                //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                                bnkact.Set_ValueNoCheck("SeqNo", _SeqNo);
                                                 if (!bnkact.Save())
                                                 { }
                                             }
