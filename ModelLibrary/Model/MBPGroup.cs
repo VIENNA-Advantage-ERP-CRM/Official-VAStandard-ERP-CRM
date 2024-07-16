@@ -232,6 +232,10 @@ namespace VAdvantage.Model
                 _sql.Append("Select L.Value From Ad_Ref_List L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='Employee'");
                 var relatedtoEmployee = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
 
+                //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_BP_Group_Acct WHERE C_BP_Group_ID=" + GetC_BP_Group_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 PO gpact = null;
                 _client_ID = GetAD_Client_ID();
                 _sql.Clear();
@@ -273,6 +277,8 @@ namespace VAdvantage.Model
                                         //gpact = new X_FRPT_BP_Group_Acct(GetCtx(), 0, null);
                                         if (recordFound == 0)
                                         {
+                                            //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                            _SeqNo += 10;
                                             gpact = MTable.GetPO(GetCtx(), "FRPT_BP_Group_Acct", 0, null);
                                             //gpact.Set_ValueNoCheck("C_BP_Group_ID", Util.GetValueOfInt(ds2.Tables[0].Rows[j]["C_BP_Group_ID"]));
                                             gpact.Set_ValueNoCheck("C_BP_Group_ID", Util.GetValueOfInt(GetC_BP_Group_ID()));
@@ -280,6 +286,8 @@ namespace VAdvantage.Model
                                             gpact.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                             gpact.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                             gpact.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                            //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                            gpact.Set_ValueNoCheck("SeqNo", _SeqNo);
                                             if (!gpact.Save())
                                             {
 

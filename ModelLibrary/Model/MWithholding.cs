@@ -99,6 +99,10 @@ namespace VAdvantage.Model
                                 WHERE r.name='FRPT_RelatedTo' AND l.name='Witholding'");
                 var relatedtoProduct = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
 
+                //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Withholding_Acct WHERE C_Withholding_ID=" + GetC_Withholding_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 // Get Accounting Schema
                 _sql.Clear();
                 _sql.Append("SELECT C_AcctSchema_ID FROM C_AcctSchema WHERE IsActive = 'Y' AND AD_CLIENT_ID=" + GetAD_Client_ID());
@@ -131,12 +135,16 @@ namespace VAdvantage.Model
                                 int recordFound = Convert.ToInt32(DB.ExecuteScalar(_sql.ToString(), null, Get_Trx()));
                                 if (recordFound == 0)
                                 {
+                                    //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                    _SeqNo += 10;
                                     withholdingAcct = MTable.GetPO(GetCtx(), "FRPT_Withholding_Acct", 0, null);
                                     withholdingAcct.Set_ValueNoCheck("AD_Org_ID", 0);
                                     withholdingAcct.Set_ValueNoCheck("C_Withholding_ID", Util.GetValueOfInt(GetC_Withholding_ID()));
                                     withholdingAcct.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(dsDefaultAcct.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                     withholdingAcct.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(dsDefaultAcct.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                     withholdingAcct.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                    //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                    withholdingAcct.Set_ValueNoCheck("SeqNo", _SeqNo);
                                     if (!withholdingAcct.Save())
                                     {
                                         ValueNamePair pp = VLogger.RetrieveError();
