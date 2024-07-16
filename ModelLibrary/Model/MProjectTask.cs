@@ -83,21 +83,21 @@ namespace VAdvantage.Model
             //VAI058-copy task fields from ProjectTemplateTask in ProjectTask
             if (Env.IsModuleInstalled("VA107_"))
             {
-                Set_Value("VA107_EstimatedHours", Util.GetValueOfInt(task.GetValueAsString("VA107_EstimatedHours")));
-                Set_Value("VA107_Task_ID", Util.GetValueOfInt(task.GetValueAsString("VA107_Task_ID")));
-                Set_Value("VA107_TaskType", task.GetValueAsString("VA107_TaskType"));
-                Set_Value("S_ResourceType_ID", Util.GetValueOfInt(task.GetValueAsString("S_ResourceType_ID")));
-                Set_Value("VA107_IndustryType", task.GetValueAsString("VA107_IndustryType"));
-                Set_Value("VA107_ExecutionType", task.GetValueAsString("VA107_ExecutionType"));
-                Set_Value("VA107_LinkType", task.GetValueAsString("VA107_LinkType"));
-                Set_Value("VA107_Activities", task.GetValueAsString("VA107_Activities"));
-                Set_Value("VA107_ExpectedOutput", task.GetValueAsString("VA107_ExpectedOutput"));
-                Set_Value("VA107_GuidelineDocuments", task.GetValueAsString("VA107_GuidelineDocuments"));
-                Set_Value("VA107_Participiants", task.GetValueAsString("VA107_Participiants"));
-                Set_Value("VA107_Prerequisites", task.GetValueAsString("VA107_Prerequisites"));
-                Set_Value("VA107_RecommendedResource", task.GetValueAsString("VA107_RecommendedResource"));
-                Set_Value("VA107_RefTask_ID", Util.GetValueOfInt(task.GetValueAsString("VA107_RefTask_ID")));
-                Set_Value("VA107_Status", task.GetValueAsString("VA107_Status"));
+                Set_Value("VA107_EstimatedHours", task.Get_Value("VA107_EstimatedHours"));
+                Set_Value("VA107_Task_ID", task.Get_Value("VA107_Task_ID"));
+                Set_Value("VA107_TaskType", task.Get_Value("VA107_TaskType"));
+                Set_Value("S_ResourceType_ID",task.Get_Value("S_ResourceType_ID"));
+                Set_Value("VA107_IndustryType", task.Get_Value("VA107_IndustryType"));
+                Set_Value("VA107_ExecutionType", task.Get_Value("VA107_ExecutionType"));
+                Set_Value("VA107_LinkType", task.Get_Value("VA107_LinkType"));
+                Set_Value("VA107_Activities", task.Get_Value("VA107_Activities"));
+                Set_Value("VA107_ExpectedOutput", task.Get_Value("VA107_ExpectedOutput"));
+                Set_Value("VA107_GuidelineDocuments", task.Get_Value("VA107_GuidelineDocuments"));
+                Set_Value("VA107_Participiants", task.Get_Value("VA107_Participiants"));
+                Set_Value("VA107_Prerequisites", task.Get_Value("VA107_Prerequisites"));
+                Set_Value("VA107_RecommendedResource", task.Get_Value("VA107_RecommendedResource"));
+                Set_Value("VA107_RefTask_ID", task.Get_Value("VA107_RefTask_ID"));
+                Set_Value("VA107_Status", task.Get_Value("VA107_Status"));
             }
         }
 
