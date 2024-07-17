@@ -372,7 +372,7 @@ namespace VIS.Models
 
             if (tableName.ToUpper() != newTable.ToUpper() && newTable != "")
             {
-                sql = @"SELECT * FROM " + tableName + " FULL JOIN " + newTable +
+                sql = @"SELECT * FROM " + newTable + " FULL JOIN " + tableName +
                     " ON " + newTable + "." + columnName + " = " + tableName + "." + columnName;
                 getTable = newTable;
             }
