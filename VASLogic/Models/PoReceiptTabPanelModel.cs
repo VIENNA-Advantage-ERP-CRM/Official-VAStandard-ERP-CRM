@@ -214,9 +214,7 @@ namespace VASLogic.Models
                        WHEN cuconv.UPC IS NOT NULL THEN 2
                        ELSE 3
                        END
-                       ) AS rn,
-                       CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID THEN ROUND(ol.QtyOrdered/NULLIF(cuconv.dividerate, 0), 2)
-                       ELSE ol.QtyOrdered END AS QtyOrdered,    
+                       ) AS rn,              
                        CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID  THEN ROUND(ol.QtyDelivered/NULLIF(cuconv.dividerate, 0), 2)
                        ELSE ol.QtyDelivered END AS QtyDelivered
                       FROM
@@ -235,7 +233,7 @@ namespace VASLogic.Models
                      AND cuconv.M_Product_ID = ol.M_Product_ID)
                      WHERE ol.C_Order_ID = " + OrderID + @"
                     )
-                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, sod.QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
+                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyEntered AS QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
                    sod.OrderLineStatusValue, arlOrderLine.Name As OrderLineStatus,sod.OrderStatusValue,arlOrder.Name AS OrderStatus ,
                   sod.ProductName,sod.AttributeName
                    FROM StatusAndUPCData sod
