@@ -207,20 +207,22 @@ namespace VASLogic.Models
                         WHEN SUM(ol.QtyDelivered) OVER () = 0 THEN 'OP'
                         ELSE 'PD'
                         END AS OrderStatusValue,
-                       COALESCE(attr.UPC, cuconv.UPC, p.UPC) AS PreferredUPC,
+                       COALESCE(attr.UPC, cuconv.UPC, p.UPC,p.Value) AS PreferredUPC,
                        ROW_NUMBER() OVER (PARTITION BY ol.C_OrderLine_ID ORDER BY
                        CASE
                        WHEN attr.UPC IS NOT NULL THEN 1
                        WHEN cuconv.UPC IS NOT NULL THEN 2
                        ELSE 3
                        END
-                       ) AS rn
+                       ) AS rn,              
+                       CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID  THEN ROUND(ol.QtyDelivered/NULLIF(cuconv.dividerate, 0), 2)
+                       ELSE ol.QtyDelivered END AS QtyDelivered
                       FROM
                       C_OrderLine ol
                       INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
                       INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
                       INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
-                      INNER JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                      LEFT JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
                       LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
                       LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
                       AND attr.M_Product_ID = ol.M_Product_ID
@@ -228,11 +230,10 @@ namespace VASLogic.Models
                       AND attr.UPC IS NOT NULL)
                       LEFT JOIN C_UOM_Conversion cuconv ON (cuconv.C_UOM_ID = p.C_UOM_ID
                       AND cuconv.C_UOM_To_ID = ol.C_UOM_ID
-                     AND cuconv.UPC IS NOT NULL
                      AND cuconv.M_Product_ID = ol.M_Product_ID)
                      WHERE ol.C_Order_ID = " + OrderID + @"
                     )
-                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyOrdered, ol.QtyDelivered, ol.QtyInvoiced,sod.PreferredUPC AS UPC,
+                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyEntered AS QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
                    sod.OrderLineStatusValue, arlOrderLine.Name As OrderLineStatus,sod.OrderStatusValue,arlOrder.Name AS OrderStatus ,
                   sod.ProductName,sod.AttributeName
                    FROM StatusAndUPCData sod
