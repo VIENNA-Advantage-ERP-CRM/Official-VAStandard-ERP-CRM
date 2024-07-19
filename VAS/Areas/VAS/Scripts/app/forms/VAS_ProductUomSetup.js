@@ -89,7 +89,7 @@
 
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
-                '<div class="vis-control-wrap">' +            
+                '<div class="vis-control-wrap">' +
                 '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
                 '<label for="VAS_txtPUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForSU") + '</label>' +
                 '</div > ' +
@@ -113,7 +113,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-            
+
                 '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '"> ' +
                 '<label for="VAS_txtPUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForCU") + '</label>' +
                 '</div > ' +
@@ -199,7 +199,7 @@
 
             //Function used to  calculate the divide rate
 
-            VAS_txtSUQtyForPU.on('focusout', function () {
+            VAS_txtSUQtyForPU.on('change', function () {
                 rate1 = VAS_txtSUQtyForPU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -213,7 +213,7 @@
             })
 
             //Function used to  calculate the multiply rate
-            VAS_txtPUQtyForPU.on('focusout', function () {
+            VAS_txtPUQtyForPU.on('change', function () {
                 rate1 = VAS_txtPUQtyForPU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -228,7 +228,7 @@
 
             //Function used to  calculate the divide rate
 
-            VAS_txtSUQtyForSU.on('focusout', function () {
+            VAS_txtSUQtyForSU.on('change', function () {
                 rate1 = VAS_txtSUQtyForSU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -243,7 +243,7 @@
 
             //Function used to  calculate the multiply rate
 
-            VAS_txtPUQtyForSU.on('focusout', function () {
+            VAS_txtPUQtyForSU.on('change', function () {
                 rate1 = VAS_txtPUQtyForSU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -257,7 +257,7 @@
             })
 
             //Function used to  calculate the divide rate
-            VAS_txtSUQtyForCU.on('focusout', function () {
+            VAS_txtSUQtyForCU.on('change', function () {
                 rate1 = VAS_txtSUQtyForCU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -271,7 +271,7 @@
             })
 
             //Function used to  calculate the multiply rate
-            VAS_txtPUQtyForCU.on('focusout', function () {
+            VAS_txtPUQtyForCU.on('change', function () {
                 rate1 = VAS_txtPUQtyForCU.val();
                 rate2 = VIS.Env.ZERO;
                 one = 1.0;
@@ -284,8 +284,56 @@
                 }
             })
 
+            //SET qty 1 and disabled textbox when base uom and selected uom same
 
+            $self.cmbPU.fireValueChanged = function () {
+                if (C_UOM_ID == $self.cmbPU.getValue()) {
+                    VAS_txtSUQtyForPU.prop('disabled', true);
+                    VAS_txtPUQtyForPU.prop('disabled', true);
+                    VAS_txtSUQtyForPU.val(1);
+                    VAS_txtPUQtyForPU.val(1);
+                }
+                else {
+                    VAS_txtSUQtyForPU.prop('disabled', false);
+                    VAS_txtPUQtyForPU.prop('disabled', false);
+                    VAS_txtSUQtyForPU.val("");
+                    VAS_txtPUQtyForPU.val("");
+                }
+            }
 
+            //SET qty 1 and disabled textbox when base uom and selected uom same
+
+            $self.cmbSU.fireValueChanged = function () {
+                if (C_UOM_ID == $self.cmbSU.getValue()) {
+                    VAS_txtSUQtyForSU.prop('disabled', true);
+                    VAS_txtPUQtyForSU.prop('disabled', true);
+                    VAS_txtSUQtyForSU.val(1);
+                    VAS_txtPUQtyForSU.val(1);
+                }
+                else {
+                    VAS_txtSUQtyForSU.prop('disabled', false);
+                    VAS_txtPUQtyForSU.prop('disabled', false);
+                    VAS_txtSUQtyForSU.val("");
+                    VAS_txtPUQtyForSU.val("");
+                }
+            }
+
+            //SET qty 1 and disabled textbox when base uom and selected uom same
+
+            $self.cmbCU.fireValueChanged = function () {
+                if (C_UOM_ID == $self.cmbCU.getValue()) {
+                    VAS_txtSUQtyForCU.prop('disabled', true);
+                    VAS_txtPUQtyForCU.prop('disabled', true);
+                    VAS_txtSUQtyForCU.val(1);
+                    VAS_txtPUQtyForCU.val(1);
+                }
+                else {
+                    VAS_txtSUQtyForCU.prop('disabled', false);
+                    VAS_txtPUQtyForCU.prop('disabled', false);
+                    VAS_txtSUQtyForCU.val("");
+                    VAS_txtPUQtyForCU.val("");
+                }
+            }
 
             /*      click function on save button */
             inputSave.on(VIS.Events.onTouchStartOrClick, function () {

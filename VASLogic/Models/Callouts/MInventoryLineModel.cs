@@ -46,6 +46,9 @@ namespace VIS.Models
         public string GetproductUOM(Ctx ctx, string field)
         {
             MProduct Product = new MProduct(ctx, Util.GetValueOfInt(field), null);
+            //VAI050-If Consumable UOM found on Product than return otherwise return Base UOM
+            if (!string.IsNullOrEmpty(Util.GetValueOfString(Product.Get_Value("VAS_ConsumableUOM_ID"))))
+                return Util.GetValueOfString(Product.Get_Value("VAS_ConsumableUOM_ID"));
             return Product.GetC_UOM_ID().ToString();
         }
 

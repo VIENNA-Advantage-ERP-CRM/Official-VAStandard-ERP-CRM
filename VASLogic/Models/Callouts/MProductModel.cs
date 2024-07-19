@@ -83,7 +83,11 @@ namespace VIS.Models
             string[] paramValue = fields.Split(',');
             int M_Product_ID;
             M_Product_ID = Util.GetValueOfInt(paramValue[0].ToString());
-            return MProduct.Get(ctx, M_Product_ID).GetC_UOM_ID();
+            //VAI050-Return Purchase UOM if Product have
+            if (Util.GetValueOfInt(MProduct.Get(ctx, M_Product_ID).Get_Value("VAS_PurchaseUOM_ID")) > 0)
+                return Util.GetValueOfInt(MProduct.Get(ctx, M_Product_ID).Get_Value("VAS_PurchaseUOM_ID"));
+            else
+                return MProduct.Get(ctx, M_Product_ID).GetC_UOM_ID();
 
         }
 
@@ -179,6 +183,11 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             string sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + paramValue[0] + " AND M_Product_ID = " + paramValue[1];
+            //VAI050-Get Purchase UOM form Product if Purchasing not found
+            if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0)
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            else
+                sql = "SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID=" + paramValue[1];
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
         /// <summary>
@@ -189,8 +198,17 @@ namespace VIS.Models
         public int GetUOMID(string fields)
         {
             string[] paramValue = fields.Split(',');
-            string sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + paramValue[0];
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            string sql = "SELECT C_UOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + paramValue[0];
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_SalesUOM_ID"]) > 0)
+                {
+                    return Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
+                }
+                return Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+            }
+            return 0;
         }
         /// <summary>
         /// GetManufacturer
