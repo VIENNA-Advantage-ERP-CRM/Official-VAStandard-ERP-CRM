@@ -115,9 +115,16 @@ namespace VIS.Models
 
             try
             {
+                int uom = 0;
                 retValue = new Dictionary<string, object>();
-                int uom = Util.GetValueOfInt(DB.ExecuteScalar("SELECT vdr.C_UOM_ID FROM M_Product p LEFT JOIN M_Product_Po vdr ON p.M_Product_ID= vdr.M_Product_ID " +
-                                                              "WHERE p.M_Product_ID=" + M_Product_ID + " AND vdr.C_BPartner_ID = " + C_BPartner_ID, null, null));
+                uom = Util.GetValueOfInt(DB.ExecuteScalar("SELECT vdr.C_UOM_ID FROM M_Product p LEFT JOIN M_Product_Po vdr ON p.M_Product_ID= vdr.M_Product_ID " +
+                                                             "WHERE p.M_Product_ID=" + M_Product_ID + " AND vdr.C_BPartner_ID = " + C_BPartner_ID, null, null));
+                //VAI050-If Product have Purchasing unit than give priority Purchasing unit  from Purchasing tab
+                //If not found than give priority to PU uni which is define on Product else set Base UOM of product
+                if (uom == 0) 
+                {
+                    uom = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID =" + M_Product_ID, null, null));
+                }
                 if (C_UOM_ID != 0)
                 {
                     if (C_UOM_ID != uom && uom != 0)

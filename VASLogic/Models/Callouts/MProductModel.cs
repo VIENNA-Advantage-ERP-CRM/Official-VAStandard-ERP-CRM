@@ -179,6 +179,11 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             string sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + paramValue[0] + " AND M_Product_ID = " + paramValue[1];
+            //VAI050-Get Purchase UOM form Product if Purchasing not found
+            if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0)
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            else
+                sql = "SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID=" + paramValue[1];
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
         /// <summary>
@@ -286,6 +291,39 @@ namespace VIS.Models
             return retDic;
         }
 
+        /// <summary>
+        /// VAI050-Get Product's UOM 
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public Dictionary<string, int> GetProductUOMs(string fields)
+        {
+            Dictionary<string, int> retDic = null;
+            string[] paramValue = fields.Split(',');
+            int M_Product_ID = Util.GetValueOfInt(paramValue[1].ToString());
+            int C_BPartner_ID = Util.GetValueOfInt(paramValue[0].ToString());
+            int PurchaseUOM = 0;
+
+            if (C_BPartner_ID > 0)
+            {
+                string query = @"SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + C_BPartner_ID + " " +
+                                 " AND M_Product_ID = " + M_Product_ID;
+                PurchaseUOM = Util.GetValueOfInt(DB.ExecuteScalar(query, null, null));
+            }
+            string sql = "SELECT C_UOM_ID,VAS_SalesUOM_ID,VAS_PurchaseUOM_ID,VAS_ConsumableUOM_ID FROM M_Product WHERE M_Product_ID = " + M_Product_ID;
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, int>();
+                retDic["C_UOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_UOM_ID"]);
+                retDic["VAS_SalesUOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
+                retDic["VAS_PurchaseUOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_PurchaseUOM_ID"]);
+                retDic["VAS_ConsumableUOM_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VAS_ConsumableUOM_ID"]);
+                retDic["PurchaseUOM"] = PurchaseUOM;
+
+            }
+            return retDic;
+        }
         public class MultiplyRateItem
         {
             public int C_UOM_To_ID { get; set; }

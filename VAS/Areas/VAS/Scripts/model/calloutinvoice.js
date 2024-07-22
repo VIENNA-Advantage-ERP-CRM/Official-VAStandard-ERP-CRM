@@ -494,13 +494,22 @@
             var invoiceRecord = VIS.dataContext.getJSONRecord("MInvoice/GetInvoiceProductInfo", paramString);
 
             countEd011 = Util.getValueOfInt(invoiceRecord["countEd011"]);
-            var isSOTrx = Util.getValueOfString(invoiceRecord["IsSOTrx"]) == "Y";
+            var isSOTrx = invoiceRecord["IsSOTrx"];
 
             var purchasingUom = 0;
             if (countEd011 > 0) {
-                purchasingUom = Util.getValueOfInt(invoiceRecord["purchasingUom"]);
+                 //VAI050- If isSoTrx false than Set Purchasing UOM from Product if Purchasing UOM found on Purchasing tab
+                    //If Purchasing UOM not found than give priority to PU unit of Product else set Base UOM of Product
+                if (Util.getValueOfInt(invoiceRecord["purchasingUom"]) > 0 && !isSOTrx)
+                    purchasingUom = Util.getValueOfInt(invoiceRecord["purchasingUom"]);
+                else
+                    purchasingUom = Util.getValueOfInt(invoiceRecord["VAS_PurchaseUOM_ID"]);
                 if (purchasingUom > 0 && isSOTrx == false) {
                     mTab.setValue("C_UOM_ID", purchasingUom);
+                }
+                 //VAI050- If isSoTrx true than Set Sales UOM from Product if found else set Base UOM
+                else if (Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]) > 0 && isSOTrx) {
+                    mTab.setValue("C_UOM_ID", Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]));
                 }
                 else {
                     mTab.setValue("C_UOM_ID", Util.getValueOfInt(invoiceRecord["headerUom"]));
@@ -933,7 +942,7 @@
             //	get values
             //added by bharat Mantis id : 1230
             var orderline_ID = Util.getValueOfInt(mTab.getValue("C_OrderLine_ID"));
-             //VAI082:-DevOps ID:-4092-On Change of quantity, price should be set based on discount schema.  
+            //VAI082:-DevOps ID:-4092-On Change of quantity, price should be set based on discount schema.  
             DiscountApplied = Util.getValueOfBoolean(mTab.getValue("VAS_IsDiscountApplied"));
 
             QtyEntered = mTab.getValue("QtyEntered");
@@ -1060,7 +1069,7 @@
                         if (mField.getColumnName() == "M_Product_ID" ||
                             (Util.getValueOfDecimal(prices["PriceLimit"]) != 0 && mTab.getValue("PriceLimit") == 0)) {
                             mTab.setValue("PriceLimit", prices["PriceLimit"]);
-                        }                       
+                        }
                     }
 
                     //if (PriceEntered == null) {
@@ -1073,13 +1082,13 @@
                     // VIS_0045: Handle zero price issue on quantity change.
                     // if Discount applied with Discount Schema  and price entered not ZERO then change price
                     //VAI082:-DevOps ID:-4092-On change of quantity, price should be set based on discount schema.               
-                    if (mField.getColumnName() == "M_Product_ID" ||                      
+                    if (mField.getColumnName() == "M_Product_ID" ||
                         ((isDiscountApplied.equals("Y") || DiscountApplied)
-                            && PriceEntered != 0) || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0)) {                    
-                        mTab.setValue("VAS_IsDiscountApplied", isDiscountApplied.equals("Y"));                      
+                            && PriceEntered != 0) || (PriceEntered != 0 && mTab.getValue("PriceEntered") == 0)) {
+                        mTab.setValue("VAS_IsDiscountApplied", isDiscountApplied.equals("Y"));
                         mTab.setValue("PriceActual", PriceActual);
                         mTab.setValue("PriceEntered", PriceEntered);
-                    }                                  
+                    }
                 }
                 ctx.setContext(windowNo, "DiscountSchema", DiscountSchema ? "Y" : "N");
             }
@@ -1266,7 +1275,7 @@
             //	UOM Changed - convert from Entered -> Product
             // JID_0540: System should check the Price in price list for selected Attribute set instance and UOM,If price is not there is will multiple the base UOM price with UOM conversion multipy value and set that price.
             else if (mField.getColumnName().toString().equals("C_UOM_ID") || mField.getColumnName().toString().equals("M_AttributeSetInstance_ID") || mField.getColumnName().toString().equals("VAS_ContractLine_ID")) {
-                var C_UOM_To_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID")); 
+                var C_UOM_To_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"));
                 QtyEntered = mTab.getValue("QtyEntered");
 
                 /*** Start Amit ***/
