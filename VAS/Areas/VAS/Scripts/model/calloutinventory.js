@@ -58,6 +58,7 @@
         // Mohit - 21 May 2019.
         if (mField.getColumnName() == "M_Product_ID") {
             var paramString = "" + "," + value.toString();
+            //VAI050-If Internal Use True than set UOM - give priority to Consumable UOM else set Base UOM
             var InternalUse = mTab.getValue("IsInternalUse");
             if (InternalUse) {
                 var result = VIS.dataContext.getJSONRecord("MProduct/GetProductUOMs", paramString);

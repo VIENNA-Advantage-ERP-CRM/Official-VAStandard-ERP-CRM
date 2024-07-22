@@ -498,7 +498,8 @@
 
             var purchasingUom = 0;
             if (countEd011 > 0) {
-                //VAI050-Set Purchasing UOM from Product
+                 //VAI050- If isSoTrx false than Set Purchasing UOM from Product if Purchasing UOM found on Purchasing tab
+                    //If Purchasing UOM not found than give priority to PU unit of Product else set Base UOM of Product
                 if (Util.getValueOfInt(invoiceRecord["purchasingUom"]) > 0 && !isSOTrx)
                     purchasingUom = Util.getValueOfInt(invoiceRecord["purchasingUom"]);
                 else
@@ -506,7 +507,7 @@
                 if (purchasingUom > 0 && isSOTrx == false) {
                     mTab.setValue("C_UOM_ID", purchasingUom);
                 }
-                //VAI050-Set Sales UOM from Product
+                 //VAI050- If isSoTrx true than Set Sales UOM from Product if found else set Base UOM
                 else if (Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]) > 0 && isSOTrx) {
                     mTab.setValue("C_UOM_ID", Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]));
                 }

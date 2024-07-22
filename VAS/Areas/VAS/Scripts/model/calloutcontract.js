@@ -843,9 +843,11 @@
                 // " AND M_Product_ID = " + M_Product_ID;
                 //purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
 
-                //VAI050-Set Product UOM 
+                //VAI050-Get UOM Of Product
                 var result = VIS.dataContext.getJSONRecord("MProduct/GetProductUOMs", paramString);
                 if (result != null) {
+                    //VAI050-If SOtrx false than set UOM --Give priority to pruchase UOM 
+                    //If Purchase UOM not found than set PU unit which is set on Product else set Base UOM of Product
                     if (isSOTrx == false) {
                         purchasingUom = result["PurchaseUOM"] == 0 ?
                             (result["VAS_PurchaseUOM_ID"] == 0 ?
@@ -853,6 +855,7 @@
                             : result["PurchaseUOM"];
                         mTab.setValue("C_UOM_ID", purchasingUom);
                     }
+                     //VAI050-If SOtrx True than set UOM --Give priority to Sales UOM 
                     else {
                         var SalesUOM = result["VAS_SalesUOM_ID"] == 0 ? result["C_UOM_ID"] : result["VAS_SalesUOM_ID"];
                         mTab.setValue("C_UOM_ID", SalesUOM);
