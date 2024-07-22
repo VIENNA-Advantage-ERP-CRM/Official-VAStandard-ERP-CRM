@@ -57,8 +57,21 @@
         // JID_0855 :On change of locator and Attribute set instance sytem is removing the UOM of product.-
         // Mohit - 21 May 2019.
         if (mField.getColumnName() == "M_Product_ID") {
-            Uom = VIS.dataContext.getJSONRecord("MInventoryLine/GetProductUOM", value.toString());
-            mTab.setValue("C_UOM_ID", Util.getValueOfInt(Uom));
+            var paramString = "" + "," + value.toString();
+            var InternalUse = mTab.getValue("IsInternalUse");
+            if (InternalUse) {
+                var result = VIS.dataContext.getJSONRecord("MProduct/GetProductUOMs", paramString);
+                if (result != null) {
+                    if (result["VAS_ConsumableUOM_ID"] > 0)
+                        mTab.setValue("C_UOM_ID", Util.getValueOfInt(result["VAS_ConsumableUOM_ID"]));
+                    else
+                        mTab.setValue("C_UOM_ID", Util.getValueOfInt(result["C_UOM_ID"]));
+                }
+            }
+            else {
+                Uom = VIS.dataContext.getJSONRecord("MInventoryLine/GetProductUOM", value.toString());
+                mTab.setValue("C_UOM_ID", Util.getValueOfInt(Uom));
+            }
         }
 
 
