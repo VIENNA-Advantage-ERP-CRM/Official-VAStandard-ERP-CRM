@@ -5878,9 +5878,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
 
                     // VIS0060: Handle case of Material Policy on Shipment and Order without Attribute.
                     if (productCategory.GetMMPolicy() == X_M_Product_Category.MMPOLICY_LiFo)
-                        sql += " ORDER BY l.PriorityNo DESC, s.M_AttributeSetInstance_ID DESC";
+                        sql += " ORDER BY s.M_AttributeSetInstance_ID DESC";
                     else if (productCategory.GetMMPolicy() == X_M_Product_Category.MMPOLICY_FiFo)
-                        sql += " ORDER BY l.PriorityNo DESC, s.M_AttributeSetInstance_ID ASC";
+                        sql += " ORDER BY s.M_AttributeSetInstance_ID ASC";
                 }
                 DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
