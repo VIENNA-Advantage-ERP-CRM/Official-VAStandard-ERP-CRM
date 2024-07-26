@@ -628,9 +628,12 @@ namespace VAdvantage.Model
             int count = 0;
             int taskCount = 0;
             MProjectTypePhase[] typePhases = type.GetPhases();
+            int seqno = Util.GetValueOfInt(DB.ExecuteScalar("SELECT  NVL(MAX(SeqNo),0) FROM C_ProjectPhase WHERE C_Project_ID=" + this.GetC_Project_ID()));
             for (int i = 0; i < typePhases.Length; i++)
             {
                 MProjectPhase toPhase = new MProjectPhase(this, typePhases[i]);
+                 seqno = seqno + 10;
+                toPhase.SetSeqNo(seqno);
                 if (toPhase.Save())
                 {
                     count++;

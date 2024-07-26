@@ -75,10 +75,13 @@ namespace VAdvantage.Model
         public MProjectPhase(MProject project, MProjectTypePhase phase)
             : this(project)
         {
+           
+
             //
+            
             SetC_Phase_ID(phase.GetC_Phase_ID());			//	FK
             SetName(phase.GetName());
-            SetSeqNo(phase.GetSeqNo());
+            //SetSeqNo(phase.GetSeqNo());
             SetDescription(phase.GetDescription());
             SetHelp(phase.GetHelp());
             if (phase.GetM_Product_ID() != 0)
