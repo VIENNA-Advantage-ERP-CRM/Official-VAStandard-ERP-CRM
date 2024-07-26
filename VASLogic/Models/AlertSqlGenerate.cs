@@ -76,7 +76,7 @@ namespace VIS.Models
             string sql = @"SELECT DISTINCT t.TableName AS TableName,c.Name AS ColumnName ,f.AD_Field_ID AS FieldID,
                     c.AD_COLUMN_ID AS ColumnID,b.AD_Window_ID AS WindowID,
                     c.AD_Reference_ID AS DataType,f.Name AS FieldName,c.AD_REFERENCE_VALUE_ID AS ReferenceValueID,
-                    c.ColumnName AS DBColumn, c.IsKey AS IsKey
+                    c.ColumnName AS DBColumn, c.IsKey AS IsKey, c.IsParent As IsParent 
                     FROM AD_Table t 
                     LEFT OUTER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
                     LEFT OUTER JOIN AD_Tab b ON (b.AD_Table_ID=t.AD_Table_ID)
@@ -102,6 +102,7 @@ namespace VIS.Models
                     obj.FieldID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["FieldID"]);
                     obj.WindowID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["WindowID"]);
                     obj.IsKey = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsKey"]);
+                    obj.IsParent = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsParent"]);
                     column.Add(obj);
                 }
             }
@@ -143,17 +144,12 @@ namespace VIS.Models
         /// <param name="query">Query</param>
         /// <param name="pageNo">Page No</param>
         /// <param name="pageSize">page Size</param>
+        /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public List<Dictionary<string, string>> GetResult(Ctx ctx, string query, int pageNo, int pageSize)
+        public List<Dictionary<string, string>> GetResult(Ctx ctx, string query, int pageNo, int pageSize, string tableName)
         {
-            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
-            string pattern = @"FROM\s+([\w.]+)";
-            Match match = Regex.Match(query, pattern, RegexOptions.IgnoreCase);
-            if (match.Success)
-            {
-                string tableName = match.Groups[1].Value;
-                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            }
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();        
+            query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             query += " FETCH FIRST 100 ROWS ONLY";
             if (ValidateSql(query))
             {
@@ -187,7 +183,8 @@ namespace VIS.Models
                     }
                     return results;
                 }
-                else {
+                else
+                {
                     return null;
                 }
             }
@@ -390,7 +387,7 @@ namespace VIS.Models
                 if (ds.Tables.Contains(getTable) && ds.Tables[getTable].Columns.Contains("Name"))
                 {
                     hasNameColumn = true;
-                    table = ds.Tables[getTable]; 
+                    table = ds.Tables[getTable];
                 }
                 else if (ds.Tables[0].Columns.Contains("Name"))
                 {
@@ -414,9 +411,54 @@ namespace VIS.Models
             }
             return data;
         }
+
+        /// <summary>
+        /// Method to get subquery from loopup  to show names instead of Ids
+        /// </summary>
+        /// <param name="windowNo">Window number</param>
+        /// <param name="columnDatatype">DataType</param>
+        /// <param name="columnID">ad_Column_ID</param>
+        /// <param name="columnName">Column Name</param>
+        /// <param name="refrenceID">AD_Refrence_ID</param>
+        /// <param name="isParent">Is parent link column</param>
+        /// <param name="tableName">Table Name</param>
+        /// <returns>subquery</returns>
+        public string GetLookup(Ctx ctx, int windowNo, int columnDatatype, int columnID, string columnName, int refrenceID, bool isParent, string tableName)
+        {
+            string subquery = "";
+            VLookUpInfo lookup = VLookUpFactory.GetLookUpInfo(ctx, windowNo, columnDatatype, columnID, Env.GetLanguage(ctx),
+                   columnName, refrenceID,
+                   isParent, "");
+            string displayCol = lookup.displayColSubQ;
+            //Remove query which will fetch image.. Only display test in Filter option.
+            if (displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(ImageURL,'')") > 0
+                && displayCol.IndexOf("thing.png^^') ||' '||") > 0)
+            {
+                var displayCol1 = displayCol.Substring(0, displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(Imag"));
+                displayCol = displayCol.Substring(displayCol.IndexOf("othing.png^^') ||' '||") + 22);
+                displayCol = displayCol1 + "||'_'||" + displayCol;
+            }
+            if (displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(ImageURL,'')") > 0)
+            {
+                int startIndex = displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(Imag");
+                int endIndex = displayCol.IndexOf("Images/nothing.png^^')") + "Images/nothing.png^^')".Length;
+                int length = endIndex - startIndex;
+                displayCol = displayCol.Remove(startIndex, length);
+            }
+            else if (displayCol.IndexOf("nothing.png") > -1)
+            {
+                displayCol = displayCol.Replace(displayCol.Substring(displayCol.IndexOf("NVL((SELECT NVL(ImageURL,'')"), displayCol.IndexOf("thing.png^^') ||' '||") + 21), "");
+            }
+            if (lookup.queryDirect.Length > 0 && !string.IsNullOrEmpty(displayCol))
+            {
+                subquery = " (SELECT " + displayCol + lookup.queryDirect.Substring(lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "), lookup.queryDirect.Length - (lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "))) + ") AS " + columnName + "_TXT "; ;
+                subquery = subquery.Replace("@key", tableName + "." + columnName).ToLower();
+            }
+            return subquery;
+        }
     }
 
-        public class Windows
+    public class Windows
     {
         public string TabName { get; set; }
         public string WindowName { get; set; }
@@ -445,6 +487,7 @@ namespace VIS.Models
         public int FieldID { get; set; }
         public int WindowID { get; set; }
         public string IsKey { get; set; }
+        public string IsParent { get; set; }
     }
 
     public class ASearch
