@@ -243,7 +243,7 @@ namespace VIS.Models
                     {
                         trx.Rollback();
                         retDic["Status"] = 0;
-                        retDic["message"] = Msg.GetMsg(ctx, "VAS_UOMConvNotSaved") + " - " + VLogger.RetrieveError()?.GetName();
+                        retDic["message"] = Msg.GetMsg(ctx, "VAS_UOMConvNotSaved");
                         return retDic;
                     }
                 }

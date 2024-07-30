@@ -573,8 +573,8 @@
             if (dr != null) {
                 if (dr["C_UOM_ID"] != dr["uom"] && dr["uom"] != 0) {
                     //mTab.setValue("QtyEntered", Util.getValueOfInt(mTab.getValue("QtyEntered")) * Util.getValueOfDecimal(dr["multiplyrate"]));
-
-                    mTab.setValue("QtyEntered", dr["qtyentered"]);
+                    //VAI050-Set movement quantity when product selected
+                    mTab.setValue("MovementQty", dr["qtyentered"]);
                     mTab.setValue("C_UOM_ID", dr["uom"]);
                 }
                 else {
