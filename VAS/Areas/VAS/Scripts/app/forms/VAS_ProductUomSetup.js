@@ -57,7 +57,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text"  class="vas-txtbox" value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '">' +
+                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForPU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -66,7 +66,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text"  class="vas-txtbox" value="0" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '">' +
+                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '">' +
                 '<label for="VAS_txtPUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForPU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -81,7 +81,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text" class="vas-txtbox"  value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '">' +
+                '<input type="text" class="vas-txtbox"  value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForSU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -90,7 +90,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
+                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
                 '<label for="VAS_txtPUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForSU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -105,7 +105,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text" class="vas-txtbox" value="0" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '">' +
+                '<input type="text" class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '">' +
                 '<label for="VAS_txtSUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForCU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -114,7 +114,7 @@
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
 
-                '<input type = "text" class= "vas-txtbox"  value = "0" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '"> ' +
+                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '"> ' +
                 '<label for="VAS_txtPUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForCU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -167,6 +167,7 @@
 
             var PUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbPU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, PUlookup, 150, VIS.DisplayType.TableDir);
+            $self.cmbPU.setValue(C_UOM_ID);
             var $PurControlWrap = $('<div class="vis-control-wrap ddlPadding">');
             $inputPurUnit.append($PurControlWrap);
             $PurControlWrap.append($self.cmbPU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlPUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');;
@@ -174,6 +175,7 @@
 
             var SUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbSU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, SUlookup, 150, VIS.DisplayType.TableDir);
+            $self.cmbSU.setValue(C_UOM_ID);
             var $SUControlWrap = $('<div class="vis-control-wrap ddlPadding">');
             $inputSuUnit.prepend($SUControlWrap);
             $SUControlWrap.append($self.cmbSU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlSUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
@@ -181,6 +183,7 @@
 
             var CUlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbCU = new VIS.Controls.VComboBox("C_UOM_ID", true, false, true, CUlookup, 150, VIS.DisplayType.TableDir);
+            $self.cmbCU.setValue(C_UOM_ID);
             var $CUControlWrap = $('<div class="vis-control-wrap ddlPadding">');
             $inputCuUnit.prepend($CUControlWrap);
             $CUControlWrap.append($self.cmbCU.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_ddlCUUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
@@ -372,26 +375,105 @@
                 busyDiv(false);
                 return;
             }
-            var multiplyRateList = [
-                {
 
-                    C_UOM_To_ID: $self.cmbPU.getValue(),
-                    MultiplyRate: VAS_txtSUQtyForPU.val(),
-                    DivideRate: VAS_txtPUQtyForPU.val()
-                },
-                {
+            //  Get the values from the dropdowns
+            var puValue = $self.cmbPU.getValue();
+            var suValue = $self.cmbSU.getValue();
+            var cuValue = $self.cmbCU.getValue();
+            var multiplyRateList = [];
 
-                    C_UOM_To_ID: $self.cmbSU.getValue(),
-                    MultiplyRate: VAS_txtSUQtyForSU.val(),
-                    DivideRate: VAS_txtPUQtyForSU.val()
-                },
-                {
+            // Get the values for the quantity fields
+            var qtyForPU = VAS_txtSUQtyForPU.val();
+            var qtyForSU = VAS_txtSUQtyForSU.val();
+            var qtyForCU = VAS_txtSUQtyForCU.val();
 
-                    C_UOM_To_ID: $self.cmbCU.getValue(),
-                    MultiplyRate: VAS_txtSUQtyForCU.val(),
-                    DivideRate: VAS_txtPUQtyForCU.val(),
+            if (puValue === suValue && suValue === cuValue) {
+                // All values are the same
+                if (qtyForPU === qtyForSU && qtyForSU === qtyForCU) {
+                    multiplyRateList.push({
+                        C_UOM_To_ID: puValue,
+                        MultiplyRate: qtyForPU,
+                        DivideRate: VAS_txtPUQtyForPU.val()
+                    });
+                } else {
+
+                    // Quantity values are different for the same dropdown values
+                    VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
+                    busyDiv(false);
+                   
+                    return; 
                 }
-            ];
+            } else if (puValue === suValue || puValue === cuValue || suValue === cuValue) {
+                // Two values are the same
+                if (puValue === suValue) {
+                    if (qtyForPU !== qtyForSU) {
+                        VIS.ADialog.info("VAS_UnitOfPUAndSUButDifferQty");
+                        busyDiv(false);
+                   
+                        return; 
+                    }
+                    multiplyRateList.push({
+                        C_UOM_To_ID: puValue,
+                        MultiplyRate: qtyForPU,
+                        DivideRate: VAS_txtPUQtyForPU.val()
+                    });
+                    multiplyRateList.push({
+                        C_UOM_To_ID: cuValue,
+                        MultiplyRate: VAS_txtSUQtyForCU.val(),
+                        DivideRate: VAS_txtPUQtyForCU.val()
+                    });
+                } else if (puValue === cuValue) {
+                    if (qtyForPU !== qtyForCU) {
+                        VIS.ADialog.info("VAS_UnitOfPUAndCUButDifferQty");
+                        busyDiv(false);
+                        return; 
+                    }
+                    multiplyRateList.push({
+                        C_UOM_To_ID: puValue,
+                        MultiplyRate: qtyForPU,
+                        DivideRate: VAS_txtPUQtyForPU.val()
+                    });
+                    multiplyRateList.push({
+                        C_UOM_To_ID: suValue,
+                        MultiplyRate: VAS_txtSUQtyForSU.val(),
+                        DivideRate: VAS_txtPUQtyForSU.val()
+                    });
+                } else if (suValue === cuValue) {
+                    if (qtyForSU !== qtyForCU) {
+                        VIS.ADialog.info("VAS_UnitOfSUAndCUButDifferQty");
+                        busyDiv(false);
+                        return;
+                    }
+                    multiplyRateList.push({
+                        C_UOM_To_ID: puValue,
+                        MultiplyRate: qtyForPU,
+                        DivideRate: VAS_txtPUQtyForPU.val()
+                    });
+                    multiplyRateList.push({
+                        C_UOM_To_ID: suValue,
+                        MultiplyRate: qtyForSU,
+                        DivideRate: VAS_txtPUQtyForSU.val()
+                    });
+                }
+            } else {
+                // All values are different
+                multiplyRateList.push({
+                    C_UOM_To_ID: puValue,
+                    MultiplyRate: qtyForPU,
+                    DivideRate: VAS_txtPUQtyForPU.val()
+                });
+                multiplyRateList.push({
+                    C_UOM_To_ID: suValue,
+                    MultiplyRate: qtyForSU,
+                    DivideRate: VAS_txtPUQtyForSU.val()
+                });
+                multiplyRateList.push({
+                    C_UOM_To_ID: cuValue,
+                    MultiplyRate: qtyForCU,
+                    DivideRate: VAS_txtPUQtyForCU.val()
+                });
+            }
+
             var uomConversionData = multiplyRateList;
 
             busyDiv(true);
@@ -401,9 +483,9 @@
                     C_UOM_ID: $self.cmbUOM.getValue(),
                     multiplyRateList: JSON.stringify(uomConversionData),
                     Product_ID: M_Product_ID,
-                    VAS_PurchaseUOM_ID: $self.cmbPU.getValue(),
-                    VAS_SalesUOM_ID: $self.cmbSU.getValue(),
-                    VAS_ConsumableUOM_ID: $self.cmbCU.getValue()
+                    VAS_PurchaseUOM_ID: puValue,
+                    VAS_SalesUOM_ID: suValue,
+                    VAS_ConsumableUOM_ID: cuValue
 
                 },
                 contentType: "application/json; charset=utf-8",

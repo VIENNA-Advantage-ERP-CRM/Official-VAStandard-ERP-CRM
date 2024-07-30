@@ -55,7 +55,24 @@
             var orderDate = ctx.getContext(windowNo, "DateDoc");
 
             var paramString;
-            var C_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", M_Product_ID);
+            var C_UOM_ID;
+             //VAI050-If SOtrx false than set UOM --Give priority to pruchase UOM 
+                    //If Purchase UOM not found than set PU unit which is set on Product else set Base UOM of Product
+            if (isSOTrx == false) {
+                var newParam = C_BPartner_ID.toString() + "," + M_Product_ID.toString();
+                var result = VIS.dataContext.getJSONRecord("MProduct/GetProductUOMs", newParam);
+                if (result) {
+                    C_UOM_ID = result["PurchaseUOM"] == 0 ?
+                        (result["VAS_PurchaseUOM_ID"] == 0 ?
+                            result["C_UOM_ID"] : result["VAS_PurchaseUOM_ID"])
+                        : result["PurchaseUOM"];
+                   
+                }
+            }
+            else {
+                 C_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", M_Product_ID);
+
+            }
 
             //** Price List - ValidFrom date validation ** Dt:03/26/2021 ** Modified By: Kumar **//
             //var paramsPrice = Util.getValueOfString(M_PriceList_ID).concat(",", Util.getValueOfString(mTab.getValue("M_Requisition_ID")), ",",
