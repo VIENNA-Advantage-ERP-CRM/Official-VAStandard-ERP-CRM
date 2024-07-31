@@ -57,6 +57,7 @@ namespace VIS.Models
                         query += " WHERE " + where;
                     }
                     query = MRole.GetDefault(ctx).AddAccessSQL(query, Util.GetValueOfString(ds.Tables[0].Rows[i]["TableName"]), MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    query += " FETCH FIRST 100 ROWS ONLY";
                     DataSet dr = DB.ExecuteDataset(query);
                     obj.dr = dr;
                     Tab.Add(obj);
@@ -76,7 +77,7 @@ namespace VIS.Models
             string sql = @"SELECT DISTINCT t.TableName AS TableName,c.Name AS ColumnName ,f.AD_Field_ID AS FieldID,
                     c.AD_COLUMN_ID AS ColumnID,b.AD_Window_ID AS WindowID,
                     c.AD_Reference_ID AS DataType,f.Name AS FieldName,c.AD_REFERENCE_VALUE_ID AS ReferenceValueID,
-                    c.ColumnName AS DBColumn, c.IsKey AS IsKey
+                    c.ColumnName AS DBColumn, c.IsKey AS IsKey, c.IsParent As IsParent 
                     FROM AD_Table t 
                     LEFT OUTER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
                     LEFT OUTER JOIN AD_Tab b ON (b.AD_Table_ID=t.AD_Table_ID)
@@ -102,6 +103,7 @@ namespace VIS.Models
                     obj.FieldID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["FieldID"]);
                     obj.WindowID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["WindowID"]);
                     obj.IsKey = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsKey"]);
+                    obj.IsParent = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsParent"]);
                     column.Add(obj);
                 }
             }
@@ -143,17 +145,12 @@ namespace VIS.Models
         /// <param name="query">Query</param>
         /// <param name="pageNo">Page No</param>
         /// <param name="pageSize">page Size</param>
+        /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public List<Dictionary<string, string>> GetResult(Ctx ctx, string query, int pageNo, int pageSize)
+        public List<Dictionary<string, string>> GetResult(Ctx ctx, string query, int pageNo, int pageSize, string tableName)
         {
-            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
-            string pattern = @"FROM\s+([\w.]+)";
-            Match match = Regex.Match(query, pattern, RegexOptions.IgnoreCase);
-            if (match.Success)
-            {
-                string tableName = match.Groups[1].Value;
-                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            }
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();        
+            query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             query += " FETCH FIRST 100 ROWS ONLY";
             if (ValidateSql(query))
             {
@@ -187,7 +184,8 @@ namespace VIS.Models
                     }
                     return results;
                 }
-                else {
+                else
+                {
                     return null;
                 }
             }
@@ -358,14 +356,15 @@ namespace VIS.Models
             }
             return sql;
         }
-        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType)
+        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType,string whereClause,bool isNameExist)
         {
             List<IDDetails> data = new List<IDDetails>();
             string newTable = "";
             string getTable = "";
             string sql = "";
+            
 
-            if (columnName.EndsWith("_ID"))
+            if (columnName.EndsWith("_ID") && DisplayType.IsLookup(displayType))
             {
                 newTable = columnName.Substring(0, columnName.Length - 3);
             }
@@ -381,7 +380,16 @@ namespace VIS.Models
                 sql = @"SELECT * FROM " + tableName;
                 getTable = tableName;
             }
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            if (!string.IsNullOrEmpty(whereClause))
+            {
+                if (isNameExist) 
+                    sql += " WHERE " + getTable + ".Name LIKE '%" + whereClause + "%'"; 
+                else
+                sql += " WHERE " + getTable + "." + columnName + " LIKE '%" + whereClause + "%'";
+            }
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, getTable, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += " FETCH FIRST 100 ROWS ONLY";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -389,12 +397,15 @@ namespace VIS.Models
                 bool hasNameColumn = false;
                 if (ds.Tables.Contains(getTable) && ds.Tables[getTable].Columns.Contains("Name"))
                 {
+
                     hasNameColumn = true;
-                    table = ds.Tables[getTable]; 
+                    table = ds.Tables[getTable];
+                    isNameExist = true;
                 }
                 else if (ds.Tables[0].Columns.Contains("Name"))
                 {
                     hasNameColumn = true;
+                    isNameExist = true;
                 }
                 for (int i = 0; i < table.Rows.Count; i++)
                 {
@@ -402,21 +413,70 @@ namespace VIS.Models
                     if (hasNameColumn)
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i]["Name"]);
-                        obj.Value = Util.GetValueOfInt(table.Rows[i][columnName]);
+                        obj.Value = Util.GetValueOfString(table.Rows[i][columnName]);
+                        obj.tableName = getTable;
+                        obj.isNameExist = isNameExist;
                     }
                     else
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i][columnName]);
-                        obj.Value = Util.GetValueOfInt(table.Rows[i][columnName]);
+                        obj.isNameExist = isNameExist;
+                        obj.Value = Util.GetValueOfString(table.Rows[i][columnName]);
+                        obj.tableName = getTable;
                     }
                     data.Add(obj);
                 }
             }
             return data;
         }
+
+        /// <summary>
+        /// Method to get subquery from loopup  to show names instead of Ids
+        /// </summary>
+        /// <param name="windowNo">Window number</param>
+        /// <param name="columnDatatype">DataType</param>
+        /// <param name="columnID">ad_Column_ID</param>
+        /// <param name="columnName">Column Name</param>
+        /// <param name="refrenceID">AD_Refrence_ID</param>
+        /// <param name="isParent">Is parent link column</param>
+        /// <param name="tableName">Table Name</param>
+        /// <returns>subquery</returns>
+        public string GetLookup(Ctx ctx, int windowNo, int columnDatatype, int columnID, string columnName, int refrenceID, bool isParent, string tableName)
+        {
+            string subquery = "";
+            VLookUpInfo lookup = VLookUpFactory.GetLookUpInfo(ctx, windowNo, columnDatatype, columnID, Env.GetLanguage(ctx),
+                   columnName, refrenceID,
+                   isParent, "");
+            string displayCol = lookup.displayColSubQ;
+            //Remove query which will fetch image.. Only display test in Filter option.
+            if (displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(ImageURL,'')") > 0
+                && displayCol.IndexOf("thing.png^^') ||' '||") > 0)
+            {
+                var displayCol1 = displayCol.Substring(0, displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(Imag"));
+                displayCol = displayCol.Substring(displayCol.IndexOf("othing.png^^') ||' '||") + 22);
+                displayCol = displayCol1 + "||'_'||" + displayCol;
+            }
+            if (displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(ImageURL,'')") > 0)
+            {
+                int startIndex = displayCol.IndexOf("||'^^'|| NVL((SELECT NVL(Imag");
+                int endIndex = displayCol.IndexOf("Images/nothing.png^^')") + "Images/nothing.png^^')".Length;
+                int length = endIndex - startIndex;
+                displayCol = displayCol.Remove(startIndex, length);
+            }
+            else if (displayCol.IndexOf("nothing.png") > -1)
+            {
+                displayCol = displayCol.Replace(displayCol.Substring(displayCol.IndexOf("NVL((SELECT NVL(ImageURL,'')"), displayCol.IndexOf("thing.png^^') ||' '||") + 21), "");
+            }
+            if (lookup.queryDirect.Length > 0 && !string.IsNullOrEmpty(displayCol))
+            {
+                subquery = " (SELECT " + displayCol + lookup.queryDirect.Substring(lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "), lookup.queryDirect.Length - (lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "))) + ") AS " + columnName + "_TXT "; ;
+                subquery = subquery.Replace("@key", tableName + "." + columnName).ToLower();
+            }
+            return subquery;
+        }
     }
 
-        public class Windows
+    public class Windows
     {
         public string TabName { get; set; }
         public string WindowName { get; set; }
@@ -445,6 +505,7 @@ namespace VIS.Models
         public int FieldID { get; set; }
         public int WindowID { get; set; }
         public string IsKey { get; set; }
+        public string IsParent { get; set; }
     }
 
     public class ASearch
@@ -455,7 +516,9 @@ namespace VIS.Models
     }
     public class IDDetails
     {
-        public int Value { get; set; }
+        public string Value { get; set; }
         public string Name { get; set; }
+        public string tableName { get; set; }
+        public bool isNameExist { get; set; }
     }
 }

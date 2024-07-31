@@ -17,7 +17,7 @@
         var joinColumnName = [];
         var alertID = 0;
         var alertRuleID = 0;
-        var tableName = null;
+        var mainTableName = null;
         var filterArrayIndex = 0;
         var andFlag = true;
         var orderbyFlag = true;
@@ -1593,7 +1593,7 @@
                         result = JSON.parse(result);
                         if (result && result.length > 0) {
                             tableID = result[0].TableID;
-                            tableName = result[0].TableName;
+                            mainTableName = result[0].TableName;
                             tabID = result[0].TabID;
                             whereClause = result[0].WhereClause
                             record = result[0].dr.Table;
@@ -1744,6 +1744,33 @@
         }
 
 
+        function GetLookup(columnDatatype, columnID, columnName, refrenceID, isParent, tableName) {
+            var result = "";
+            $.ajax({
+                url: VIS.Application.contextUrl + "AlertSQLGenerate/GetLookup",
+                type: "POST",
+                data: {
+                    windowNo: $self.windowNo,
+                    columnDatatype: columnDatatype,
+                    columnID: columnID,
+                    columnName: columnName,
+                    refrenceID: refrenceID,
+                    isParent: (isParent === 'Y'),
+                    tableName: tableName
+                },
+                async: false,
+                success: function (data) {
+                    result = JSON.parse(data);
+                   
+                },
+                error: function (error) {
+                    console.log(error);
+                }
+                 
+            });
+            return result;
+        }
+
         /*
             Function to get the columns from Table in Window/Tab
         */
@@ -1765,15 +1792,16 @@
                 success: function (result) {
                     result = JSON.parse(result);
                     if (result && result.length > 0) {
-                        tableName = result[0].TableName;
+                        mainTableName = result[0].TableName;
                         joinCommonColumn = result;
                         for (var i = 0; i < result.length; i++) {
-                            $sortByDropdown.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterPrice.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn  + " TableName=" + tableName +" columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterCol2Block.append("<div class='vas-column-list-item' title='" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + tableName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + tableName + "." + result[i].DBColumn + ">" + tableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $checkBoxes.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $sortByDropdown.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
+                            $filterPrice.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn  + " TableName=" + mainTableName +" columnID="
+                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
+                            $filterCol2Block.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " columnID="
+                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
+                            $checkBoxes.append(" <div class='vas-column-list-item' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " columnID="
+                                + result[i].ColumnID + " datatype=" + result[i].DataType + " isParent=" + result[i].IsParent + " title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                     }
                     seletedCloumn = [];
@@ -1783,13 +1811,24 @@
                             flag = true;
                         }
                         var selectedItem = $(this).parent('.vas-column-list-item').text();
+                        var columnDatatype = $(this).parent('.vas-column-list-item').attr('datatype');           
+                        var desiredResult = "";
                         var fieldName = selectedItem.slice(0, selectedItem.indexOf('-') - 1);
                         fieldName = fieldName.replace(/[^a-zA-Z0-9\s]+/g, '');
-                        if (fieldName != "") {
-                            var desiredResult = tableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + fieldName + '" ';
+                        if (VIS.DisplayType.IsLookup(columnDatatype)) {
+                            desiredResult = GetLookup(columnDatatype, $(this).parent('.vas-column-list-item').attr('columnID'),
+                                $(this).parent('.vas-column-list-item').attr('DBColumnName'),
+                                $(this).parent('.vas-column-list-item').attr('refValId'),
+                                $(this).parent('.vas-column-list-item').attr('isParent'),
+                                $(this).parent('.vas-column-list-item').attr('TableName'));
                         }
-                        else {
-                            var desiredResult = tableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " ";
+                        if (desiredResult == "") {
+                            if (fieldName != "") {
+                                desiredResult = mainTableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + fieldName + '" ';
+                            }
+                            else {
+                                desiredResult = mainTableName + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " ";
+                            }
                         }
 
                         if (this.checked) {
@@ -1890,7 +1929,8 @@
                             if (result[i].IsKey == 'Y') {
                                 primaryKeyjTable = result[i].DBColumn;
                             }
-                            $joinMultiSelect.append(" <div class='vas-column-list-item' title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $joinMultiSelect.append(" <div class='vas-column-list-item' refValId=" + result[i].ReferenceValueID + " DBColumnName=" + result[i].DBColumn + " TableName=" + joinTable + " columnID="
+                                + result[i].ColumnID + " datatype=" + result[i].DataType + " isParent=" + result[i].IsParent + " title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
                         }
                         if ($joiningTableInput.val() == '' && primaryKeyjTable != null) {
                             $joiningTableInput.val(joinTable + "." + primaryKeyjTable);
@@ -1899,13 +1939,24 @@
                         seletedJoinCloumn = [];
                         $(".vas-join-multiselect .vas-column-checkbox").on('click', function (eve) {
                             var selectedItem = $(this).parent('.vas-column-list-item').text();
+                            var columnDatatype = $(this).parent('.vas-column-list-item').attr('datatype');                         
+                            var desiredResult = "";
                             var fieldName = selectedItem.slice(0, selectedItem.indexOf('-') - 1);
                             fieldName = fieldName.replace(/[^a-zA-Z0-9\s]+/g, '');
-                            if (fieldName != "") {
-                                var desiredResult = joinTable + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + fieldName + '" ';
+                            if (VIS.DisplayType.IsLookup(columnDatatype)) {
+                                desiredResult = GetLookup(columnDatatype, $(this).parent('.vas-column-list-item').attr('columnID'),
+                                    $(this).parent('.vas-column-list-item').attr('DBColumnName'),
+                                    $(this).parent('.vas-column-list-item').attr('refValId'),
+                                    $(this).parent('.vas-column-list-item').attr('isParent'),
+                                    $(this).parent('.vas-column-list-item').attr('TableName'));
                             }
-                            else {
-                                var desiredResult = joinTable + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " ";
+                            if (desiredResult == "") {
+                                if (fieldName != "") {
+                                    desiredResult = joinTable + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " AS " + '"' + fieldName + '" ';
+                                }
+                                else {
+                                    desiredResult = joinTable + "." + selectedItem.substring(selectedItem.indexOf('-') + 1).trim() + " ";
+                                }
                             }
                             if (this.checked) {
                                 seletedJoinCloumn.push(desiredResult);
@@ -2018,7 +2069,7 @@
             var whereIndex = currentSql.indexOf('WHERE');
             $selectGeneratorQuery.text('');
             if (fromIndex == -1) {
-                sql = "SELECT " + columnValue + "FROM " + tableName;
+                sql = "SELECT " + columnValue + "FROM " + mainTableName;
             }
             else if (joinIndex != -1 && joinColumnName.length > 0) {
                 sql = "SELECT " + columnValue + ", " + joinColumnName + currentSql.slice(fromIndex);
@@ -2043,7 +2094,7 @@
                 query = query.replace(/\s{2,}/g, ' ').trim();
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetResult",
-                    data: { Query: VIS.secureEngine.encrypt(query), pageNo: pageNo, pageSize: pageSize },
+                    data: { Query: VIS.secureEngine.encrypt(query), pageNo: pageNo, pageSize: pageSize, tableName: mainTableName },
                     type: "POST",
                     async: false,
                     success: function (result) {
@@ -2185,6 +2236,7 @@
 
         function filterOnChange(self, $filterSelectedItem) {
             let $filterItemVal = self.attr('value');
+            var htmlString = '';
             $filterValBlock.find('input').val('');
             $filterNewColumnInput.val('');
             self.parent($filterPrice).prev($filterInputBlock).find($filterColumnInput).val($filterItemVal);
@@ -2199,11 +2251,14 @@
             var displayType = self.attr("datatype");
             var columnName = self.attr("DBColumnName").toUpper();
             var tableName = self.attr("TableName");
-            for (var i = 0; i < record.length; i++) {
-                if (record[i][columnName]) {
-                    $filterValDropdown.append('<div class="vas-filterValItem"' + ' value ="' + record[i][columnName] + '" >' + record[i][columnName] + '</div>');
+            if (!VIS.DisplayType.IsLookup(displayType)) {
+                for (var i = 0; i < record.length; i++) {
+                    if (record[i][columnName]) {
+                        htmlString += '<div class="vas-filterValItem" isNameExist="' +false+'"DBColumnName="' + columnName + '" tableName="' + tableName + '" value="' + record[i][columnName] + '">' + record[i][columnName] + '</div>';
+                    }
                 }
             }
+            $filterValDropdown.append(htmlString);
             $filterofMultipleColumns.find('i').removeClass('vas-showAnotherColControl');
             $filterNewColumn.hide();
 
@@ -2222,9 +2277,38 @@
 
 
             /* Keyup Event for Filter Value Items in Dropdown */
+            $filterValBlock.find('input').off("keyup");
             $filterValBlock.find('input').on("keyup", function () {
-                var $filterValLowerCase = $(this).val().toLowerCase();
+                var $filterValLowerCase = $(this).val();
                 var $filterValSelectItem = $filterValDropdown.children('.vas-filterValItem');
+
+                if ($filterValLowerCase.length > 1) {
+                    var tname = $filterValSelectItem.attr('tablename');
+                    var isNameExist = $filterValSelectItem.attr('isNameExist');
+                    var data = getIdsName(columnName, tname, displayType, $filterValLowerCase, isNameExist);
+
+                    if (data && data.length > 0) {
+                        var htmlString = '';
+                        $filterValDropdown.empty();
+                        for (var k = 0; k < data.length; k++) {
+                            if (data[k].Value) {
+                                htmlString += '<div class="vas-filterValItem" isNameExist="' + data[k].isNameExist + '" DBColumnName="' + columnName + '" tableName="' + data[k].tableName + '" value="' + data[k].Value + '">' + data[k].Name + '</div>';
+                            }
+                        }
+                        $filterValDropdown.append(htmlString);
+                        $filterValSelectItem = $filterValDropdown.children('.vas-filterValItem');
+
+                        $filterValSelectItem.off(VIS.Events.onTouchStartOrClick);
+                        $filterValSelectItem.on(VIS.Events.onTouchStartOrClick, function () {
+                            $filterValDropdown.find('.vas-filterValItem').removeClass('vas-selected-filterVal');
+                            $(this).addClass('vas-selected-filterVal');
+                            var $filterValDropdownText = $(this).attr('value');
+                            $filterValBlock.find('input').val($filterValDropdownText);
+                        });
+                        $filterValDropdown.show();
+                        return;
+                    }
+                }
                 var $filterValSelectItemLength = $filterValSelectItem.length;
                 $filterValSelectItem.removeClass('vas-selected-filterVal');
                 if ($filterValSelectItemLength > 0) {
@@ -2232,8 +2316,7 @@
                     $filterValSelectItem.filter(function () {
                         $(this).toggle($(this).text().toLowerCase().indexOf($filterValLowerCase) > -1);
                     });
-                }
-                else {
+                }else {
                     $filterValDropdown.hide();
                 }
                 if (!$filterValSelectItem.is(':visible')) {
@@ -2264,14 +2347,16 @@
                 $filterPriceValue.attr('type', 'number');
                 $filterPriceValue.prev('label').removeClass('vas-label-space');
                 $filterCondition.addClass('vas-remove-likeoption');               
-                var data = getIdsName(columnName, tableName, displayType);
+                var data = getIdsName(columnName, tableName, displayType, null,false);
                 if (data && data.length > 0) {
                     $filterValDropdown.empty();
+                    htmlString = '';
                     for (var i = 0; i < data.length; i++) {
-                        if (data[i].Name) {
-                            $filterValDropdown.append('<div class="vas-filterValItem"' + "value = " + data[i].Value + " >" + data[i].Name + '</div>');
+                        if (data[i].Value) {
+                            htmlString += '<div class="vas-filterValItem" isNameExist="' + data[i].isNameExist +'" DBColumnName="' + columnName + '" tableName="' + data[i].tableName + '" value="' + data[i].Value + '">' + data[i].Name + '</div>';
                         }
                     }
+                    $filterValDropdown.append(htmlString);
                 }
             }
             else if (displayType == VIS.DisplayType.Integer || displayType == VIS.DisplayType.Amount) {
@@ -2305,26 +2390,23 @@
                 var $filterValDropdownText = $(this).attr('value');
                 $filterValBlock.find('input').val($filterValDropdownText);
             });
-
-            /* Click Event for Filter Value Items in Dropdown */
-            $filterValDropdown.find('.vas-filterValItem').off(VIS.Events.onTouchStartOrClick);
-            $filterValDropdown.find('.vas-filterValItem').on(VIS.Events.onTouchStartOrClick, function () {
-                $filterValDropdown.find('.vas-filterValItem').removeClass('vas-selected-filterVal');
-                $(this).addClass('vas-selected-filterVal');
-                var $filterValDropdownText = $(this).attr('value');
-                $filterValBlock.find('input').val($filterValDropdownText);
-            });
         }
 
 
 
-        function getIdsName(columnName, tableName, displayType) {
+        function getIdsName(columnName, tableName, displayType, whereClause, isNameExist) {
             var results = null;
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/GetIdsName",
                 type: "POST",
                 async: false,
-                data: { columnName: columnName, tableName: tableName, displayType: displayType },
+                data: {
+                    columnName: columnName,
+                    tableName: tableName,
+                    displayType: displayType,
+                    whereClause: whereClause,
+                    isNameExist: isNameExist
+                },
                 success: function (result) {
                     result = JSON.parse(result);
                     if (result && result.length > 0) {
@@ -2340,7 +2422,7 @@
 
         function clear() {
             tableID = 0;
-            tableName = "";
+            mainTableName = "";
             tabID = 0;
             $selectGeneratorQuery.text('');
             joinsArray = [];          

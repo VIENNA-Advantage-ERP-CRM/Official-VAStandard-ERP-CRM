@@ -52,8 +52,9 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="query">Query</param>
         /// <param name="pageNo">Page No</param>
         /// <param name="pageSize">page Size</param>
+        /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public JsonResult GetResult(string query, int pageNo,int pageSize)
+        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName)
         {
             if (Session["Ctx"] != null)
             {
@@ -61,7 +62,7 @@ namespace VAS.Areas.VAS.Controllers
                 AlertSqlGenerate obj = new AlertSqlGenerate();
                 if (!string.IsNullOrEmpty(query))
                     query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
-                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize)), JsonRequestBehavior.AllowGet);
+                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize, tableName)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }
@@ -135,14 +136,37 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tableName">Table Name</param>
         /// <param name="displayType"> Dispaly type</param>
         /// <returns>Names</returns>
-        public JsonResult GetIdsName(string columnName,string tableName, int displayType)
+        public JsonResult GetIdsName(string columnName,string tableName, int displayType,string whereClause,bool isNameExist)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType));
+                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType, whereClause, isNameExist));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        
+        /// <summary>
+        /// Getting subquery from loopup  to show names instead of Ids
+        /// </summary>
+        /// <param name="windowNo">Window number</param>
+        /// <param name="columnDatatype">DataType</param>
+        /// <param name="columnID">ad_Column_ID</param>
+        /// <param name="columnName">Column Name</param>
+        /// <param name="refrenceID">AD_Refrence_ID</param>
+        /// <param name="isParent">Is parent link column</param>
+        /// <param name="tableName">Table Name</param>
+        /// <returns>subquery</returns>
+        public JsonResult GetLookup(int windowNo, int columnDatatype, int columnID, string columnName, int refrenceID,bool isParent,string tableName)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.GetLookup(ctx, windowNo, columnDatatype, columnID, columnName, refrenceID, isParent, tableName));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
