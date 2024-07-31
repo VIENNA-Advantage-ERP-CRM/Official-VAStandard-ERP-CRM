@@ -1,0 +1,194 @@
+﻿@model VAdvantage.Utility.Ctx
+@functions{
+    public string GetText(string msg)
+    {
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(Model, msg, true));
+    }
+
+}
+
+
+<div class="vis-main-two-container" id="@("DivCardStep2_" + ViewBag.WindowNumber)">
+
+    <div class="vis-two-sec-one pl-2" id="@("DivCardFieldSec_" + ViewBag.WindowNumber)" style="display:none">
+        <div class="vis-header-ttl d-flex align-items-center justify-content-between">
+            <span class="vis-font-weight-600 mb-2 d-inline-block">@GetText("CardFeild")</span>
+        </div>
+        <div class="vis-two-sec-content pr-2" id="@("DivCardField_" + ViewBag.WindowNumber)">
+            <span class="displayNone fieldLbl" title="" draggable="true">
+                <a class="vis-grey-icon" href="#"><i class="fa fa-circle" aria-hidden="true"></i></a>
+            </span>
+        </div>
+    </div>
+
+
+    <div class="vis-cardStepTwoContainer" id="@("DivTemplate_" + ViewBag.WindowNumber)">
+        <div class="vis-cardStepTwoHeader d-flex align-items-center justify-content-between mb-2 px-2 py-1">
+            <div class="vis-stepTwoHeaderttlWrap">
+                <span class="vis-stepTwoHeaderttl" style="font-size: 1rem;">
+                    @GetText("SelectTemplateForyourcard")
+                </span>
+            </div>
+            <div class="d-flex align-items-center">
+                <label class="mr-2">@GetText("FilterCategory")</label>
+                <select style="min-height: 25px; height: 25px;" class="mr-2" id="@("CmbTemplateCategory_" + ViewBag.WindowNumber)">
+                    <option>ALL</option>
+                </select>
+                <div class="vis-refreshBtn mr-2" id="@("BtnRefreshTemplate_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-refresh"></i>
+                </div>
+            </div>
+        </div>
+        <div class="vis-cardTemplateContainer py-1 px-2 mb-2">
+            <div class="vis-cardSingleViewTemplate d-flex align-items-center justify-content-center blankTemp vis-active-template" isSystemTemplate="Y" style=" background-color: #f1f1f1">
+                <div class="mainTemplate" name="" templateID="0">
+                    @*<div sectionCount="1" class="section1 vis-wizard-section" style="padding:5px;"></div>*@
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 141">
+                        <g id="Group_1" data-name="Group 1" transform="translate(-272 -213)">
+                            <rect id="Rectangle_1" data-name="Rectangle 1" width="250" height="141" transform="translate(272 213)" fill="#f1f1f1" />
+                            <text id="Blank_Template" data-name="Blank Template" transform="translate(331 292)" fill="#707070" font-size="20" font-family="SegoeUI, Segoe UI"><tspan x="0" y="0">Blank Template</tspan></text>
+                        </g>
+                    </svg>
+
+                </div>
+                <div class="d-flex align-items-center justify-content-center" style="position:absolute;bottom:-25px">@GetText("NewTemplate")</div>
+            </div>
+            <div class="vis-noTemplateIcon">
+                <img src="~/Areas/VIS/Images/icon.png" alt="Alternate Text" />
+            </div>
+        </div>
+        <div class="vis-cardTwoFooterAr py-2 mb-2">
+            <div class="vis-footrButton px-2 d-flex align-items-center justify-content-end">
+                <div class="vis-fttrBtn">
+                    <button class="vis-blue-theme-btn vis-button-width-one vis-font-size-md" style="display:none" id="@("BtnExport_" + ViewBag.WindowNumber)">
+                        @*<i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>*@
+                        <span> @GetText("Export")</span>
+                    </button>
+                    <button class="vis-blue-theme-btn vis-button-width-one vis-font-size-md" id="@("BtnTemplateBack_" + ViewBag.WindowNumber)">
+                        @*<i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>*@
+                        <span> @GetText("Back")</span>
+                    </button>
+                    <button class="vis-blue-theme-btn vis-button-width-one vis-font-size-md" id="@("BtnLayoutSetting_" + ViewBag.WindowNumber)">
+                        <span> @GetText("NextLayout")</span>
+                        @*<i class="fa fa-chevron-right ml-1 mt-1" aria-hidden="true"></i>*@
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="vis-two-sec-two position-relative p-2 vis-bg-light-level-five" style="display:none">
+        <div class="vis-two-sec-header">
+            <div class="vis-header-title vis-cardViewTemplateHead p-2 d-flex justify-content-between align-items-center">
+                <div style="width:70%" class="d-flex">
+                    <div class="input-group vis-input-wrap mb-0">
+                        <div class="vis-control-wrap d-block mt-1">
+                            <input id="@("txtTemplateName_" + ViewBag.WindowNumber)" type="text"
+                                   name="txtTemplateName"
+                                   class="bg-white border-none vis-removeBorder"
+                                   placeholder=" "
+                                   data-placeholder="" />
+                            <label class="m-0" for="Rating" style="left:10px">@GetText("CardViewName")<sub style="top: -0.5em;">*</sub></label>
+                        </div>
+                    </div>
+                    <div class="input-group vis-input-wrap mb-0">
+                        <div class="vis-control-wrap d-block mt-1">
+                            <select class="ml-2" id="@("CmbViwBlockTemplateCategory_" + ViewBag.WindowNumber)">
+                                <option>--Select--</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <span class="mt-auto" id="@("spnLastSaved_" + ViewBag.WindowNumber)"></span>
+            </div>
+            <i class="fa fa fa-pencil-square-o fa-1" id="@("btnEditIcon_" + ViewBag.WindowNumber)" style="display:none;position:absolute;z-index:2;cursor:pointer"></i>
+            <div class="vis-topNavigator" style="display:none">
+                <a href="javascript:;" title="" class="vis-topNavigatorIcon" command="fieldName" style="display:none"></a>
+                <a href="javascript:;" title="@GetText("SelectParent")" class="vis-topNavigatorIcon"><i command="SelectParent" class="fa fa-arrow-up" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowField")" class="vis-topNavigatorIcon" style="display:none"><i command="Show" style="font-size:0.7rem" class="vis vis-label-show" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Hide")" class="vis-topNavigatorIcon" style="display:none"><i command="Hide"  class="fa fa-eye-slash" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Separate")" class="vis-topNavigatorIcon" style="display:none"><i command="Separate" class="fa fa-code-fork" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Unlink")" class="vis-topNavigatorIcon"><i command="Unlink" class="fa fa-chain-broken" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Merge")" class="vis-topNavigatorIcon" style="display:none"><i command="Merge" class="fa fa-compress" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowImg")" class="vis-topNavigatorIcon" style="display:none"><i command="ShowImg" class="fa fa-picture-o" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowValue")" class="vis-topNavigatorIcon" style="display:none"><i command="ShowValue" class="fa fa-text-width" aria-hidden="true"></i></a>
+            </div>
+            <i class="vis-v-rowcol fa fa-plus-circle" id="@("btnVaddrow_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-plus-circle" id="@("btnVaddCol_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-minus-circle" id="@("btnVdelrow_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-minus-circle" id="@("btnVdelCol_" + ViewBag.WindowNumber)"></i>
+
+            <div class="vis-card-tw-disply d-flex align-items-center justify-content-center vis-bg-light-level-four " id="@("DivViewBlock_" + ViewBag.WindowNumber)">
+                <button class="vis-undo" title="Undo" id="@("btnUndo_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-undo"></i>
+                </button>
+                <button class="vis-redo" title="Redo" id="@("btnRedo_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-repeat"></i>
+                </button>
+                <button class="vis-addBlankTemplateBtn" id="@("btnaddBlankTemplate_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-plus"></i>@GetText("BlankTemplate")
+                </button>
+
+                <a href="javascript:;" class="vis-cancelButtonPositionTemp" style="display:none" id="@("Btn_BlockCancel_" + ViewBag.WindowNumber)">@GetText("Resettolastsaved") <i class="fa fa-undo" aria-hidden="true"></i></a>
+                @*<button class=" vis-saveButtonPosition" id="@("btnOnlySave_" + ViewBag.WindowNumber)">
+                        <i class="fa fa-floppy-o" aria-hidden="true"></i>
+                    </button>*@
+                <div class="vis-fieldImgPosition">
+                    <i class="vis vis-add-text vis-meta-dynamicIcon" id="@("BtnAddField_" + ViewBag.WindowNumber)" title="Add Field" aria-hidden="true"></i>
+                    <i title="Add Image" id="@("BtnAddImgField_" + ViewBag.WindowNumber)" class="vis vis-add-image vis-meta-dynamicIcon" aria-hidden="true"></i>
+                    <i title="Add Image & Text" id="@("BtnAddImgTxtField_" + ViewBag.WindowNumber)" class="vis vis-add-text-image vis-meta-dynamicIcon" aria-hidden="true"></i>
+                </div>
+                <div class="canvas">
+                    <div id="@("DivCardHeader2_" + ViewBag.WindowNumber)" class="vis-viewBlock" style="background-color:#fff">
+                        <div sectionCount="1" class="section1 vis-wizard-section"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="vis-footr-sec-two d-flex align-items-center justify-content-between mt-3 mb-1">
+                <div class="vis-footr-sec-left">
+                    @*<div class="vis-slider-action d-flex align-items-center justify-content-center">
+                            <div class="mr-2 mt-2">
+                                <a href="#" class="d-inline-block vis-fc-color-535353">
+                                    <i class="fa fa-minus" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                            <div>
+                                <input id="@("txtZoomInOut_" + ViewBag.WindowNumber)" type="range" min="0.25" step="0.25" max="2" value="1" class="vis-opacity-slider mt-1">
+                            </div>
+                            <div class="ml-2 mt-2">
+                                <a href="#" class="d-inline-block vis-fc-color-535353">
+                                    <i class="fa fa-plus" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>*@
+                </div>
+
+                <div class="vis-footr-sec-rgt">
+                    @*<button class="vis-blue-theme-btn" id="@("BtnBack_" + ViewBag.WindowNumber)">
+                            <i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>
+                            @GetText("BackToCardView")
+                        </button>*@
+
+                    <button class="vis-blue-theme-btn" id="@("BtnChangeTemplate_" + ViewBag.WindowNumber)">
+                        @*<i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>*@
+                        @GetText("ChangeTemplate")
+                    </button>
+
+                    <button class="vis-blue-theme-btn" id="@("BtnFinesh_" + ViewBag.WindowNumber)">
+                        @GetText("SaveCard")
+                        @*<i class="fa fa-chevron-right ml-1 mt-1" aria-hidden="true"></i>*@
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="vis-two-sec-three-cr" id="@("DivStyleSec1_" + ViewBag.WindowNumber)" style="display:none">
+        @{ Html.RenderPartial("HtmlControls"); }
+
+        <!-- Min content -->
+
+    </div>
+</div>
+
+
+

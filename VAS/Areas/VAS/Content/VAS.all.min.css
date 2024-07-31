@@ -1,4 +1,5 @@
-﻿/*version 1.5.1.4*/
+﻿/*version 1.5.1.7*/
+
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -295,14 +296,18 @@
     margin-top: 4px;
 }
 
-    .vas-select-plus-btn select {
-        width: 30%;
-        float: left;
-    }
+.vas-filter-val + .vas-select-plus-btn {
+    margin-top: 15px;
+}
 
-    .vas-select-plus-btn input[type='button'] {
-        margin: 0px;
-    }
+.vas-select-plus-btn select {
+    width: 30%;
+    float: left;
+}
+
+.vas-select-plus-btn input[type='button'] {
+    margin: 0px;
+}
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column2 textarea {
     width: 100%;
@@ -749,21 +754,13 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+.vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
     display: none;
 }
 
-    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
-        display: block;
-    }
-
-    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
-        display: none;
-    }
-
-    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
-        display: block;
-    }
+.vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+    display: block;
+}
 
 .vas-remove-likeoption option:nth-last-child(3), .vas-remove-likeoption option:nth-last-child(4) {
     display: none;
@@ -784,11 +781,17 @@
         top: -16px;
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option, .vas-comparision-opeartor option {
     display: none;
 }
 
     .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
+    .vas-comparision-opeartor option:nth-child(1), .vas-comparision-opeartor option:nth-child(2),
+    .vas-comparision-opeartor option:nth-child(3), .vas-comparision-opeartor option:nth-child(4),
+    .vas-comparision-opeartor option:nth-child(5), .vas-comparision-opeartor option:nth-child(6) {
         display: block;
     }
 
@@ -802,6 +805,87 @@
 
 .vas-likeoption option {
     display: none;
+}
+
+.vas-filter-val {
+    display: none;
+    padding: 10px 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    border-left: 1px solid rgba(var(--v-c-secondary), 1);
+    border-right: 1px solid rgba(var(--v-c-secondary), 1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary), 1);
+    margin-bottom: 10px;
+}
+
+    .vas-filter-val .vas-filterValItem {
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+
+        .vas-filter-val .vas-filterValItem:last-child {
+            margin-bottom: 0px;
+        }
+
+.vas-filterValItem.vas-selected-filterVal, .vas-column-list-item.vas-selected-filterVal {
+    background-color: rgba(var(--v-c-primary));
+    color: #fff;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
+    display: flex;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.vas-filterofMultipleCols {
+    position: relative;
+}
+
+    .vas-filterofMultipleCols i.fa.fa-exchange {
+        transform: rotate(90deg);
+        width: 30px;
+        font-size: 18px;
+        height: 30px;
+        line-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(var(--v-c-primary));
+        cursor: pointer;
+        position: absolute;
+        right: 0;
+        top: 0;
+        margin: auto;
+        z-index: 1;
+    }
+
+.vas-columnval input:not([type='checkbox']) {
+    width: calc(100% - 30px);
+    min-height: 39px;
+    margin-bottom: 0;
+}
+
+.vas-single-input.vas-windowtab.vas-searchinput-block.vas-filterCol2Block {
+    display: none;
+    width: calc(100% - 30px);
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-searchinput-block.vas-filterValBlock {
+    width: calc(100% - 30px);
+}
+
+.vas-filterValExchangeIconBlock {
+    display: flex;
+    align-items: center;
+}
+
+    .vas-filterValExchangeIconBlock i.fa.fa-exchange {
+        position: relative;
+    }
+
+.vas-single-input.vas-windowtab.vas-searchinput-block.vas-filterCol2Block + .vas-filter-val, .vas-filterofMultipleCols .vas-filterNewCol {
+    width: calc(100% - 30px);
 }
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
@@ -1862,6 +1946,27 @@ Only index.html and style.css is for your use There is no need to copy any other
     width: 70%
 }
 
+.vas-apInvWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+}
+
+.VAS-InvDetail {
+    padding: 5px 5px 5px 1px;
+}
+
+.vas-apInvListGroup {
+    height: calc(100vh - 300px);
+    padding: 5px 5px 0 0;
+}
+
+.vis-ad-w-p-actionpanel-b .vas-apInvListGroup {
+    height: auto
+}
+
+
 .vis-pSelectInfo {
     width: 320px;
     float: left;
@@ -2220,3 +2325,4 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 .vas-inputboxPaddingRight {
     padding-right: 10px !important;
 }
+

@@ -1,0 +1,486 @@
+﻿@model VAdvantage.Utility.Ctx
+@functions{
+    public string GetText(string msg)
+    {
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(Model, msg, true));
+    }
+
+}
+
+
+<div class="vis-main-container " id="@("DivCardStep1_" + ViewBag.WindowNumber)">
+    <div class="vis-cr-left pb-2 pt-1 pl-2">
+        <div class="vis-cr-left-header d-flex align-items-center justify-content-between mb-2">
+            <div class="vis-nw-card d-flex align-items-center mb-2">
+                <a href="#" class="vis-clickable-link" id="@("btnNewCard_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-plus-circle vis-font-size-lg vis-second-blue"
+                       aria-hidden="true"></i>
+                    <span class="vis-second-blue vis-font-weight-regular vis-font-size-lg">@GetText("Card")</span>
+                </a>
+            </div>
+            <div class="vis-card-rht mb-2">
+                <span class="mr-2" id="@("btnCopy_" + ViewBag.WindowNumber)">
+                    <a href="#">
+                        <i class="fa fa-files-o vis-font-size-lg vis-change-to-secondary"
+                           aria-hidden="true"></i>
+                    </a>
+                </span>
+                @* <span class="mr-2" id="@("btnEdit_" + ViewBag.WindowNumber)">
+                        <a href="#" class="vis-font-weight-semibold">
+                            <i class="fa fa-pencil-square-o vis-font-size-lg vis-change-to-secondary"
+                               aria-hidden="true"></i>
+                        </a>
+                    </span>*@
+                <span class="mr-2" id="@("btnDelete_" + ViewBag.WindowNumber)">
+                    <a href="#"
+                       class="vis-font-weight-semibold vis-change-to-secondary">
+                        <i class="fa fa-trash-o vis-font-size-lg"
+                           aria-hidden="true"></i>
+                    </a>
+                </span>
+                <span class="mr-2 displayNone" id="@("btnCancle_" + ViewBag.WindowNumber)">
+                    <a href="#"
+                       class="vis-font-weight-semibold vis-change-to-secondary">
+                        <i class="fa fa-times vis-font-size-lg"
+                           aria-hidden="true"></i>
+                    </a>
+                </span>
+            </div>
+        </div>
+        <div class="vis-ce-lft-body pr-2 mr-1" id="@("DivCardList_" + ViewBag.WindowNumber)">
+
+        </div>
+    </div>
+    <div class="vis-cr-right px-2">
+        <div class="vis-sec-2">
+            <div class="vis-sec-2-wrapper mr-2 pr-1">
+                <span class="vis-title-1 d-block  vis-font-weight-600 mb-2 vis-font-size-lg">@GetText("GroupSeq")</span>
+                <div>
+
+                </div>
+                <div class="input-group vis-input-wrap vis-custMarginInputWrap vis-custommt">
+                    <div class="vis-control-wrap">
+                        <select name="cmbGroupField"
+                                class="bg-white"
+                                placeholder=" "
+                                data-placeholder="" id="@("cmbGroupField_" + ViewBag.WindowNumber)">
+                        </select>
+                        <label for="Rating">@GetText("GroupByField")</label>
+                    </div>
+                </div>
+                <div class="vis-sec-2-sub " id="@("GroupSequenceFeilds_" + ViewBag.WindowNumber)">
+                    <div class="vis-sec-2-sub-itm mb-2 vis-bg-light-level-four p-2 d-flex align-items-center justify-content-between vis-bg-light-level-four displayNone">
+                        <span class="vis-sub-itm-title"></span>
+                        <span class="vis-sub-itm-symbol d-flex">
+                            <i class="fa fa-check-square-o mr-1 grpChk" aria-hidden="true"></i>
+                            <i class="fa fa-arrows-v" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!--Right-->
+                <div class="vis-check-cont d-flex align-items-center">
+                    <div class="vis-sec-check mr-2">
+                        <input type="checkbox"
+                               id="@("chkDefault_"+ViewBag.WindowNumber)"
+                               name="Default"
+                               class="vis-xsm-check-box" />
+                        <label for="Default" class="m-0 vis-font-size-sm vis-font-weight-regular"> @GetText("IsDefault")</label>
+                    </div>
+                    <div class="vis-sec-check">
+                        <input type="checkbox"
+                               id="@("chkPublic_"+ViewBag.WindowNumber)"
+                               name="shared"
+                               class="vis-xsm-check-box" />
+                        <label for="shared" class="m-0 vis-font-size-sm vis-font-weight-regular">
+                            @GetText("Shared")
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="vis-sec-2-wrapper vis-sec-2-leftBorder mr-2">
+                <div class="vis-sec-4 mb-2">
+                    <div class="d-flex align-items-baseline">
+                        <span class="vis-font-size-sm d-block vis-font-size-lg vis-font-weight-600">@GetText("FieldSorting")</span>
+                        <span class="ml-1"> @GetText("addMaximum3field")</span>
+                    </div>
+                    <div class="vis-sortOrderContainer vis-sec-sort pt-3 vis-sortTableHight vis-border-none p-0">
+                        <div class="vis-sortOrderData">
+                            <div class="input-group vis-input-wrap">
+                                <div class="vis-control-wrap">
+                                    <select id="@("cmbOrderClause_" + ViewBag.WindowNumber)" name="Rating"
+                                            class="bg-white"
+                                            placeholder=" "
+                                            data-placeholder="">
+                                    </select>
+                                    <label for="Rating">@GetText("SortOrderField")</label>
+                                </div>
+                            </div>
+
+                            <div class="vis-sortButtons vis-zero-border">
+                                <span class="vis-sortBtn vis-sortAsc" title="@GetText("Ascending")" id="@("btnCardAsc_"+ViewBag.WindowNumber)">
+                                    <i class="fa fa-sort-amount-asc"></i>
+                                </span>
+                                <span class="vis-sortBtn vis-sortDesc" title="@GetText("Descending")" id="@("btnCardDesc_"+ViewBag.WindowNumber)">
+                                    <i class="fa fa-sort-amount-asc"></i>
+                                </span>
+                            </div>
+
+                            <button class="vis-primary-btn-one mt-0" id="@("btnAddOrder_"+ViewBag.WindowNumber)">@GetText("Add")</button>
+                        </div>
+
+                        <div class="vis-sortingList mt-1" id="@("sortList_"+ViewBag.WindowNumber)">
+
+                        </div>
+                    </div>
+
+                    <!--Left Here-->
+
+                </div>
+                <span class="vis-font-size-sm d-block mb-1 vis-font-weight-600 vis-font-size-lg">@GetText("ConditionalFormatting") </span>
+                <div class="vis-sec-3">
+                    <div class="vis-grad-des-rht d-flex  justify-content-between pt-1">
+                        <div class="vis-grad-sec mr-2">
+                            <div class="vis-grad-color">
+                                <div for="" class="vis-font-size-sm m-0 d-flex">
+                                    <input id="@("chkGradient_" + ViewBag.WindowNumber)" type="checkbox"
+                                           class="mr-1 mt-1 vis-xsm-check-box bg-white" />
+                                    <span class="d-inline-block mb-1">Gradient</span>
+                                </div>
+
+                                <input type="color" class="vis-inputColorFirstm" id="@("txtBgColor_" + ViewBag.WindowNumber)">
+
+
+                                <div style="display:none;margin-top:-5px" id="@("DivGrdntBlock_" + ViewBag.WindowNumber)">
+                                  
+                                    <div class="d-flex">
+                                        <input type="color" class="p-0 grd-color" id="@("txtGrdntColor1_" + ViewBag.WindowNumber)">
+                                        <input type="number" class="grd-number"  min="0" max="100" value="0" id="@("txtGrdntPrcnt_" + ViewBag.WindowNumber)">
+                                        <input type="color" class="p-0 grd-color" id="@("txtGrdntColor2_" + ViewBag.WindowNumber)">
+                                        <input type="number" class="grd-number" min="0" max="100" value="100" id="@("txtGrdntPrcnt2_" + ViewBag.WindowNumber)">
+                                        <select id="@("cmbGrdntDirection_" + ViewBag.WindowNumber)" style="height: 25px; min-height: 25px !important;">
+                                        <option value="to bottom">↓</option>
+                                        <option value="to top">↑</option>
+                                        <option value="to right">→</option>
+                                        <option value="to left">←</option>
+                                        <option value="to top left">↖</option>
+                                        <option value="to top right">↗</option>
+                                        <option value="to bottom left">↙</option>
+                                        <option value="to bottom right">↘</option>
+                                        </select>
+                                    </div>
+                                    <div style="" class="grd-preview"></div>
+                                      
+                                   
+                                    <!--<div class="vis-grad-selector">
+                                        <div class="vis-main-circular-slider">-->
+                                            <!-- <div class="vis-circular-slider-debug">0deg</div> -->
+                                            <!--<div class="vis-circular-slider-circle vis-conition-slider">
+                                                <div class="vis-circular-slider-dot" deg="90" style="transform: rotate(90deg);"></div>
+                                            </div>
+                                        </div>
+                                    </div>-->
+
+
+                                    @*<div class="vis-deg-circle pull-right">
+                                            <div class="vis-deg-slider"></div>
+                                        </div>*@
+                                </div>
+
+
+                            </div>
+                        </div>
+                        <div class="d-flex vis-splt-main-con mt-2">
+                            <div class="vis-des-rgt-fld">
+                                <div class="input-group vis-input-wrap m-0">
+                                    <div class="vis-control-wrap mt-3">
+                                        <select id="@("cmbColumn_" + ViewBag.WindowNumber)" name="cmbColumn"
+                                                class="vis-zero-right-border"
+                                                placeholder=" bg-white"
+                                                data-placeholder="">
+                                        </select>
+                                        <label for="cmbColumn">@GetText("Column")</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-des-rgt-fld" style="width:20%">
+                                <div class="input-group vis-input-wrap m-0">
+                                    <div class="vis-control-wrap mt-3">
+                                        <select id="@("ddlOperator_" + ViewBag.WindowNumber)" name="ddlOperator"
+                                                class="vis-zero-border bg-white"
+                                                placeholder=" "
+                                                data-placeholder="">
+                                        </select>
+                                        <label for="ddlOperator">@GetText("Operator")</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-des-rgt-fld">
+                                <div class="input-group vis-input-wrap m-0">
+                                    <div class="vis-control-wrap mt-3 d-flex" id="@("valcontainer_"+ ViewBag.WindowNumber)">
+                                        <input type="text" disabled />
+                                        <label for="QueryValue">@GetText("QueryValue")</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="vis-des-rgt-btn">
+                            <button class="vis-primary-btn-one mt-4" id="@("btnAddCondition_"+ ViewBag.WindowNumber)">
+                                @GetText("Add")
+                            </button>
+                        </div>
+                    </div>
+                    <div class="vis-sec3-table d-flex flex-column w-100 mt-3">
+                        <table style="width: 100%" class="vis-contitionalTable">
+                            <thead class="text-center vis-small-font-md vis-bg-light-level-four">
+                                <tr class="">
+                                    <td class="py-1">@GetText("BGColorGrid")</td>
+                                    <td>@GetText("Column")</td>
+                                    <td>@GetText("Operator")</td>
+                                    <td>@GetText("QueryValue")</td>
+                                    <td>@GetText("Action")</td>
+                                </tr>
+                            </thead>
+                            <tbody class="text-center vis-small-font-sz" id="@("conditionTable_" + ViewBag.WindowNumber)">
+                                <tr class="vis-table-border-bottom-color px-2" style="display:none">
+                                    <td class="td_bgColor">
+                                        <i class="fa fa-square"
+                                           aria-hidden="true"
+                                           style="color: brown"></i>
+                                    </td>
+                                    <td class="td_column"></td>
+                                    <td class="td_operator"></td>
+                                    <td class="td_queryValue"></td>
+                                    <td class="td_Action">
+                                        <i class="fa fa-trash-o vis-color-535353 vis-font-size-10"
+                                           aria-hidden="true"></i>
+                                    </td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+                    <!--Right-->
+                    <div class="vis-submit-win-btn d-flex align-items-center justify-content-end">
+                        <button class="vis-save-cont mr-2" id="@("btnApplyStep1_" + ViewBag.WindowNumber)">
+                            @GetText("BtnSaveCard")
+                        </button>
+                        <button class="vis-save-cont mr-2" id="@("btnSaveCloseStep1_" + ViewBag.WindowNumber)">
+                            @GetText("SaveAndApply")
+                        </button>
+                        <button class="vis-save-cont" id="@("btnCardCustomization_" + ViewBag.WindowNumber)">
+                            @GetText("cardCustomization")
+                            <i class="fa fa-chevron-right ml-1" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <div class="vis-sec-5 d-flex align-items-center justify-content-between">
+
+
+        </div>
+    </div>
+</div>
+
+<div class="vis-main-two-container" id="@("DivCardStep2_" + ViewBag.WindowNumber)" style="display:none">
+
+    <div class="vis-two-sec-one pl-2" id="@("DivCardFieldSec_" + ViewBag.WindowNumber)" style="display:none">
+        <div class="vis-header-ttl d-flex align-items-center justify-content-between">
+            <div>
+                <span class="vis-font-weight-600 mb-2 d-inline-block">@GetText("CardFeild")</span>
+
+            </div>
+            <div class="vis-filterInputFeild position-relative">
+                <div class='vis-clearInputFeild'>
+                    <input type="text" id="@("txtFilterField_" + ViewBag.WindowNumber)" placeholder="Filter..." class="vis-filterFeildText" />
+                </div>
+                <div class="vis-clearFilter">
+                    <span class="vis vis-cross" id="@("btnClearFilter_" + ViewBag.WindowNumber)"></span>
+                </div>
+            </div>
+
+        </div>
+        <div class="vis-two-sec-content pr-2" id="@("DivCardField_" + ViewBag.WindowNumber)">
+            <span class="displayNone fieldLbl" title="" draggable="true">
+                <a class="vis-grey-icon" href="#"><i class="fa fa-circle" aria-hidden="true"></i></a>
+            </span>
+        </div>
+        <label class="vis-previewCard">@GetText("SelectedTemplate")</label>
+        <div class="vis-templatePreview vis-previewCard d-flex align-items-center justify-content-center">
+        </div>
+    </div>
+
+    @*<div class="vis-split-sec-two position-relative" id="@("DivTemplate_" + ViewBag.WindowNumber)">
+             <div class="vis-template-zn-c d-flex align-items-center justify-content-between px-2 my-2">
+                <span class="vis-font-weight-600 d-inline-block">@GetText("SelectTemplate") </span>
+             </div>
+            <div class="vis-sec-three pr-2">
+                <div class="vis-template-zone">
+                    <div class="vis-template-single mb-2 d-flex align-items-center justify-content-center blankTemp">
+                        <div class="mainTemplate" name="" templateID="0">
+                            <div sectionCount="1" class="section1 vis-wizard-section" style="padding:5px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>*@
+
+    <div class="vis-cardStepTwoContainer" id="@("DivTemplate_" + ViewBag.WindowNumber)">
+        <div class="vis-cardStepTwoHeader d-flex align-items-center justify-content-between mb-2">
+            <div class="vis-stepTwoHeaderttlWrap">
+                <span class="vis-stepTwoHeaderttl">
+                    @GetText("SelectTemplateForyourcard")
+                </span>
+            </div>
+            <div class="vis-headerDropdownrgh">
+                <div class="d-flex align-items-center">
+                    <label class="mr-2 mb-0">@GetText("FilterCategory")</label>
+                    <select style="min-height: 25px; height: 25px;" class="mr-2" id="@("CmbTemplateCategory_" + ViewBag.WindowNumber)">
+                        <option>ALL</option>
+                    </select>
+                    <div class="vis-refreshBtn mr-2" id="@("BtnRefreshTemplate_" + ViewBag.WindowNumber)">
+                        <i class="fa fa-refresh"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="vis-cardTemplateContainer py-1 px-2 mb-2">
+            <div class="vis-cardSingleViewTemplate d-flex align-items-center justify-content-center blankTemp" isSystemTemplate="Y" style=" background-color: #f1f1f1">
+                <div class="mainTemplate" name="" templateID="0">
+                    @*<div sectionCount="1" class="section1 vis-wizard-section" style="padding:5px;"></div>*@
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 141">
+                        <g id="Group_1" data-name="Group 1" transform="translate(-272 -213)">
+                            <rect id="Rectangle_1" data-name="Rectangle 1" width="250" height="141" transform="translate(272 213)" fill="#f1f1f1" />
+                            <text id="Blank_Template" data-name="Blank Template" transform="translate(331 292)" fill="#707070" font-size="20" font-family="SegoeUI, Segoe UI"><tspan x="0" y="0">Blank Template</tspan></text>
+                        </g>
+                    </svg>
+
+                </div>
+                <div class="d-flex align-items-center justify-content-center" style="position:absolute;bottom:-25px">@GetText("NewTemplate")</div>
+            </div>
+            <div class="vis-noTemplateIcon">
+                <img src="~/Areas/VIS/Images/icon.png" alt="Alternate Text" />
+            </div>
+        </div>
+        <div class="vis-cardTwoFooterAr py-2 mb-2">
+            <div class="vis-footrButton px-2 d-flex align-items-center justify-content-end">
+                <div class="vis-fttrBtn">
+                    <button class="vis-blue-theme-btn vis-button-width-one vis-font-size-md" id="@("BtnTemplateBack_" + ViewBag.WindowNumber)">
+                        @*<i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>*@
+                        <span> @GetText("Back")</span>
+                    </button>
+                    <button class="vis-blue-theme-btn vis-button-width-one vis-font-size-md" id="@("BtnLayoutSetting_" + ViewBag.WindowNumber)">
+                        <span> @GetText("NextLayout")</span>
+                        @*<i class="fa fa-chevron-right ml-1 mt-1" aria-hidden="true"></i>*@
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="vis-two-sec-two position-relative p-2 vis-bg-light-level-five">
+        <div class="vis-two-sec-header">
+            <div class="vis-header-title vis-cardViewTemplateHead p-2 d-flex justify-content-between align-items-center">
+                <div class="input-group vis-input-wrap mb-0" style="width:50%">
+                    <div class="vis-control-wrap d-block mt-1">
+                        <input id="@("txtCardName_" + ViewBag.WindowNumber)" type="text"
+                               name="txtCardName"
+                               class="bg-white border-none vis-removeBorder"
+                               placeholder=" "
+                               data-placeholder="" />
+                        <label class="m-0" for="Rating" style="left:10px">@GetText("CardViewName")<sub style="top: -0.5em;">*</sub></label>
+                    </div>
+                </div>
+                <span class="mt-auto" id="@("spnLastSaved_" + ViewBag.WindowNumber)"></span>
+            </div>
+
+            <div class="vis-topNavigator" style="display:none">
+                <a href="javascript:;" title="" class="vis-topNavigatorIcon" command="fieldName" style="display:none"></a>
+                <a href="javascript:;" title="@GetText("SelectParent")" class="vis-topNavigatorIcon"><i command="SelectParent" class="fa fa-arrow-up" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowField")" class="vis-topNavigatorIcon" style="display:none"><i command="Show" style="font-size:0.7rem" class="vis vis-label-show" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Hide")" class="vis-topNavigatorIcon" style="display:none"><i command="Hide" class="fa fa-eye-slash" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Separate")" class="vis-topNavigatorIcon" style="display:none"><i command="Separate" class="fa fa-code-fork" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Unlink")" class="vis-topNavigatorIcon"><i command="Unlink" class="fa fa-chain-broken" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("Merge")" class="vis-topNavigatorIcon" style="display:none"><i command="Merge" class="fa fa-compress" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowImg")" class="vis-topNavigatorIcon" style="display:none"><i command="ShowImg" class="fa fa-picture-o" aria-hidden="true"></i></a>
+                <a href="javascript:;" title="@GetText("ShowValue")" class="vis-topNavigatorIcon" style="display:none"><i command="ShowValue" class="fa fa-text-width" aria-hidden="true"></i></a>
+            </div>
+            <i class="vis-v-rowcol fa fa-plus-circle" id="@("btnVaddrow_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-plus-circle" id="@("btnVaddCol_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-minus-circle" id="@("btnVdelrow_" + ViewBag.WindowNumber)"></i>
+            <i class="vis-v-rowcol fa fa-minus-circle" id="@("btnVdelCol_" + ViewBag.WindowNumber)"></i>
+            <div class="vis-card-tw-disply d-flex align-items-center justify-content-center vis-bg-light-level-four " id="@("DivViewBlock_" + ViewBag.WindowNumber)">
+                @*<button class="vis-cancel-btn vis-cancelButtonPosition" id="@("Btn_BlockCancel_" + ViewBag.WindowNumber)" style="display:none">
+                        @GetText("Cancel")  <i class="fa fa-times-circle" aria-hidden="true"></i>
+                    </button>*@
+                <a href="javascript:;" class="vis-cancelButtonPosition" style="display:none" id="@("Btn_BlockCancel_" + ViewBag.WindowNumber)">@GetText("Resettolastsaved") <i class="fa fa-undo" aria-hidden="true"></i></a>
+                <button class="vis-undo" title="Undo" id="@("btnUndo_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-undo"></i>
+                </button>
+                <button class="vis-redo" title="Redo" id="@("btnRedo_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-repeat"></i>
+                </button>
+                <button class=" vis-saveButtonPosition" title="@GetText("Save")" id="@("btnOnlySave_" + ViewBag.WindowNumber)">
+                    <i class="fa fa-floppy-o" aria-hidden="true"></i>
+                </button>
+                <div class="canvas">
+                    <div id="@("DivCardHeader2_" + ViewBag.WindowNumber)" class="vis-viewBlock" style="background-color:#fff">
+                        <div sectionCount="1" class="section1 vis-wizard-section"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="vis-footr-sec-two d-flex align-items-center justify-content-between mt-3 mb-1">
+                <div class="vis-footr-sec-left">
+                    @*<div class="vis-slider-action d-flex align-items-center justify-content-center">
+                            <div class="mr-2 mt-2">
+                                <a href="#" class="d-inline-block vis-fc-color-535353">
+                                    <i class="fa fa-minus" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                            <div>
+                                <input id="@("txtZoomInOut_" + ViewBag.WindowNumber)" type="range" min="0.25" step="0.25" max="2" value="1" class="vis-opacity-slider mt-1">
+                            </div>
+                            <div class="ml-2 mt-2">
+                                <a href="#" class="d-inline-block vis-fc-color-535353">
+                                    <i class="fa fa-plus" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>*@
+                </div>
+
+                <div class="vis-footr-sec-rgt">
+                    <button class="vis-blue-theme-btn" id="@("BtnBack_" + ViewBag.WindowNumber)">
+                        <i class="fa fa-chevron-left mr-1 mt-1" aria-hidden="true"></i>
+                        @GetText("BackToCardView")
+                    </button>
+
+                    <button class="vis-blue-theme-btn" id="@("BtnChangeTemplate_" + ViewBag.WindowNumber)">
+                        @GetText("ChangeTemplate")
+                    </button>
+                    @*<button class="vis-blue-theme-btn" id="@("BtnLayoutSetting_" + ViewBag.WindowNumber)">
+                            @GetText("LayoutSettings")
+
+                            <i class="fa fa-chevron-right ml-1 mt-1" aria-hidden="true"></i>
+                        </button>*@
+                    <button class="vis-blue-theme-btn" id="@("BtnFinesh_" + ViewBag.WindowNumber)">
+                        @GetText("SaveAndApply")
+                        <i class="fa fa-chevron-right ml-1 mt-1" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="vis-two-sec-three-cr" id="@("DivStyleSec1_" + ViewBag.WindowNumber)">
+
+        @{ Html.RenderPartial("HtmlControls"); }
+        <!-- Min content -->
+
+    </div>
+</div>
+
+
+

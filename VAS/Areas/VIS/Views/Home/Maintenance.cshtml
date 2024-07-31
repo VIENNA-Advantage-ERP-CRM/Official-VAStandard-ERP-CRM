@@ -1,0 +1,135 @@
+﻿
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Under Maintenance</title>
+
+    <style>
+            .vis-uc-body {
+                margin: 0;
+                background: linear-gradient(0deg, rgb(0 132 196/10%), rgb(9 55 86/10%));
+            }
+
+            .vis-uc-vaLogo {
+                position: absolute;
+                margin: 1rem 0 0 1rem;
+                width: 200px;
+            }
+
+            .vis-uc-illustrationWrap {
+                height: 100vh;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                -webkit-transition: all 0.7s ease;
+                transition: all 0.7s ease;
+            }
+
+            .vis-uc-illustration {
+                max-height: 80%;
+                max-width: 100%;
+                position: relative;
+                z-index: 2;
+            }
+
+            .vis-uc-gearRight,
+            .vis-uc-gearLeft {
+                position: absolute;
+                z-index: 0;
+            }
+
+            .vis-uc-gearRight {
+                right: 23%;
+                top: 20%;
+                -webkit-animation: rotateAnti 4s linear 0s infinite normal;
+                -moz-animation: rotateAnti 4s linear 0s infinite normal;
+                -o-animation: rotateAnti 4s linear 0s infinite normal;
+                -ms-animation: rotateAnti 4s linear 0s infinite normal;
+                animation: rotateAnti 4s linear 0s infinite normal;
+            }
+
+            .vis-uc-gearLeft {
+                left: 27%;
+                bottom: 25%;
+                -webkit-animation: rotate 4s linear 0s infinite normal;
+                -moz-animation: rotate 4s linear 0s infinite normal;
+                -o-animation: rotate 4s linear 0s infinite normal;
+                -ms-animation: rotate 4s linear 0s infinite normal;
+                animation: rotate 4s linear 0s infinite normal;
+            }
+
+            .vis-uc-gearRight img,
+            .vis-uc-gearLeft img {
+                max-width: 100%;
+            }
+
+            @@keyframes rotate {
+                from {
+                    transform: rotate(0deg);
+
+                }
+
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @@keyframes rotateAnti {
+                from {
+                    transform: rotate(360deg);
+
+                }
+
+                to {
+                    transform: rotate(0deg);
+                }
+            }
+
+            @@media (max-width: 1280px) {
+                .vis-uc-gearRight {
+                    right: 9%;
+                    top: 35%;
+                }
+
+                .vis-uc-gearLeft {
+                    left: 13%;
+                    bottom: 35%;
+                }
+            }
+
+            @@media (max-width: 767px) {
+                .vis-uc-gearRight {
+                    width: 50px;
+                }
+
+                .vis-uc-gearLeft {
+                    width: 80px;
+                }
+            }
+    </style>
+</head>
+
+<body class="vis-uc-body">
+    <img src="~/Areas/VIS/Images/login/logo.png" alt="logo" class="vis-uc-vaLogo">
+    <div class="vis-uc-illustrationWrap">
+        <img src="~/Areas/VIS/Images/login/under-maintaince.png" alt="illustration" class="vis-uc-illustration">
+        <div class="vis-uc-gearRight">
+            <img src="~/Areas/VIS/Images/login/gear-right.png" alt="gear">
+        </div>
+        <div class="vis-uc-gearLeft">
+            <img src="~/Areas/VIS/Images/login/gear-left.png" alt="gear">
+        </div>
+    </div>
+</body>
+
+</html>

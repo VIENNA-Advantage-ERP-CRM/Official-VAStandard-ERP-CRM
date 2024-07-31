@@ -14,7 +14,7 @@
     <RootNamespace>ViennaAdvantageWeb</RootNamespace>
     <AssemblyName>ViennaAdvantageWeb</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <UseIISExpress>false</UseIISExpress>
+    <UseIISExpress>true</UseIISExpress>
     <IISExpressSSLPort />
     <IISExpressAnonymousAuthentication />
     <IISExpressWindowsAuthentication />
@@ -56,7 +56,40 @@
       <HintPath>DLL\BaseLibrary.dll</HintPath>
     </Reference>
     <Reference Include="CoreLibrary">
-      <HintPath>Dll\CoreLibrary.dll</HintPath>
+      <HintPath>DLL\CoreLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.CrystalReports.Engine, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>DLL\CrystalDecisions.CrystalReports.Engine.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.ReportSource, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>DLL\CrystalDecisions.ReportSource.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.Shared, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>DLL\CrystalDecisions.Shared.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.Web, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>DLL\CrystalDecisions.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="ExpressionEvaluator">
+      <HintPath>DLL\ExpressionEvaluator.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPT">
+      <HintPath>DLL\FRPT.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPTSvc, Version=1.1.23.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\FRPT-FinancialManagement\ViennaAdvantageSvc\bin\Debug\FRPTSvc.dll</HintPath>
+    </Reference>
+    <Reference Include="Interop.Excel">
+      <HintPath>..\..\FRPT-FinancialManagement\ViennaAdvantageWeb\DLL\Interop.Excel.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="itextsharp">
+      <HintPath>DLL\itextsharp.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.6.0.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
@@ -77,6 +110,10 @@
     </Reference>
     <Reference Include="Oracle.ManagedDataAccess, Version=4.122.21.1, Culture=neutral, PublicKeyToken=89b483f429c47342, processorArchitecture=MSIL">
       <HintPath>..\packages\Oracle.ManagedDataAccess.21.5.0\lib\net462\Oracle.ManagedDataAccess.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp, Version=1.2.1269.0, Culture=neutral, PublicKeyToken=f94615aa0424f9eb, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>DLL\PdfSharp.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -153,26 +190,37 @@
       <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.8\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="VA009">
+      <HintPath>DLL\VA009.dll</HintPath>
+    </Reference>
+    <Reference Include="VA009Svc">
+      <HintPath>DLL\VA009Svc.dll</HintPath>
+    </Reference>
     <Reference Include="VAModelAD">
-      <HintPath>Dll\VAModelAD.dll</HintPath>
+      <HintPath>DLL\VAModelAD.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOM">
+      <HintPath>DLL\VARCOM.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOMSvc">
+      <HintPath>DLL\VARCOMSvc.dll</HintPath>
     </Reference>
     <Reference Include="ViennaBase">
-      <HintPath>Dll\ViennaBase.dll</HintPath>
+      <HintPath>DLL\ViennaBase.dll</HintPath>
     </Reference>
     <Reference Include="VIS">
-      <HintPath>Dll\VIS.dll</HintPath>
+      <HintPath>DLL\VIS.dll</HintPath>
     </Reference>
     <Reference Include="VISLogic, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>Dll\VISLogic.dll</HintPath>
+      <HintPath>DLL\VISLogic.dll</HintPath>
     </Reference>
     <Reference Include="WebGrease, Version=1.5.2.14234, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\WebGrease.1.6.0\lib\WebGrease.dll</HintPath>
     </Reference>
-    <Reference Include="XModel, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Dll\XModel.dll</HintPath>
+    <Reference Include="XModel">
+      <HintPath>DLL\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -275,9 +323,7 @@
           <AutoAssignPort>True</AutoAssignPort>
           <DevelopmentServerPort>3971</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost/VAdvantageHtmlVAS</IISUrl>
-          <OverrideIISAppRootUrl>True</OverrideIISAppRootUrl>
-          <IISAppRootUrl>http://localhost/VAdvantageHtmlVAS</IISAppRootUrl>
+          <IISUrl>http://localhost:3971/</IISUrl>
           <NTLMAuthentication>False</NTLMAuthentication>
           <UseCustomServer>False</UseCustomServer>
           <CustomServerUrl>

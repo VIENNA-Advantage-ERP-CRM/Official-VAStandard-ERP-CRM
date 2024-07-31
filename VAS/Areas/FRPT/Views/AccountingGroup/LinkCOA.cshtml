@@ -1,0 +1,89 @@
+﻿@{
+    var windowNo = ViewBag.WindowNumber;
+}
+
+@functions{
+    public string GetText(string msg, bool isTrans = false, bool isElement = false)
+    {
+        if (isTrans)
+        {
+            return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.Translate(ViewBag.lang, msg));
+        }
+        else if (isElement)
+        {
+            return VAdvantage.Utility.Msg.GetElement(Convert.ToString(ViewBag.lang), msg, false);
+        }
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(ViewBag.lang, msg, true));
+    }
+}
+
+@*// FRPT // change to resolve bootstrap update*@
+    <div style="height: 100%; width: 100%; overflow: hidden" class="vis-forms-container">
+        <div class="vis-info-l-s-wrap vis-leftsidebarouterwrap">
+            <div id="parameterDiv_@windowNo" class="frpt-linkpuleftwrapdiv">
+                <table style="width: 100%;">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="input-group vis-input-wrap">
+                                    <div class="vis-control-wrap">
+                                        <select id="cmbAcctSchema_@windowNo" class="vis-ev-col-mandatory frpt-cmb_accountSchema" data-hasbtn=" "></select>
+                                        <label class="VIS_Pref_Label_Font" style="display: inline-block;">@GetText("FRPT_AcctSchema")</label>
+                                    </div>
+                                    <div class="input-group-append">
+                                        <button id="btnNewAcct_@windowNo" title="@GetText("FRPT_AddAcctSchema")" class="vis-controls-txtbtn-table-td2 input-group-text">
+                                            <i class="fa fa-ellipsis-v"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <div class="input-group vis-input-wrap">
+                                    <div class="vis-control-wrap">
+                                        <select id="cmbElement_@windowNo" class="vis-ev-col-mandatory"></select>
+                                        <label class="VIS_Pref_Label_Font" style="display: inline-block;">@GetText("FRPT_ChartOfAcct")</label>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <div class="input-group vis-input-wrap">
+                                    <div class="vis-control-wrap">
+                                        <select id="cmbAcctLoc_@windowNo" class="vis-ev-col-mandatory"></select>
+                                        <label class="VIS_Pref_Label_Font" style="display: inline-block;">@GetText("FRPT_AcctLoc")</label>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+
+        <div id="acctDefaultDiv_@windowNo" class="vis-info-datasec">
+        </div>
+
+        <div class="vis-info-btnsec">
+            <div class="vis-info-btnleft">
+                <button id="btnRefresh_@windowNo" title="@GetText("Refresh")" style="margin-top:10px;" class="VIS_Pref_btn-2">
+                    <i class="vis vis-refresh"></i>
+                </button>
+                <button id="btnApply_@windowNo" style="margin: 10px;" class="VIS_Pref_btn-2">
+                    @GetText("FRPT_Apply")
+                </button>
+                <button id="btnUndo_@windowNo" title="@GetText("FRPT_Undo")" style="margin-top:10px;" class="VIS_Pref_btn-2">
+                    <i class="vis vis-ignore"></i>
+                </button>
+            </div>
+            <div class="vis-info-btnswrap">
+                <input id="btnCancel_@windowNo" class="VIS_Pref_btn-2" style="margin-top:10px; " type="button" value="@GetText("Cancel")" />
+                <input id="btnOk_@windowNo" class="VIS_Pref_btn-2" style="margin-top:10px;" type="button" value="@GetText("OK")" />
+            </div>
+        </div>
+

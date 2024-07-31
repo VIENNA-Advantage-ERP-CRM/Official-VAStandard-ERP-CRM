@@ -94,17 +94,15 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/MatchPOTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_TimeSheetInvoice.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ProductUomSetup.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseOrderTabPanel.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseOrderTabPanel.js",
+                   "~/Areas/VAS/Scripts/app/forms/InvoiceLineTabPanel.js"
                    );
-
 
             style.Include("~/Areas/VAS/Content/PaymentRule.css",
                 "~/Areas/VAS/Content/style.css",
                 "~/Areas/VAS/Content/PoReceiptTabPanel.css",
                 "~/Areas/VAS/Content/VPaySelect.css",
-                "~/Areas/VAS/Content/vasattachuser.css",
-                "~/Areas/VAS/Content/VAS_PurchaseOrderTabPanel.css",
-                "~/Areas/VAS/Content/VAS_ProductUomSetup.css");
+                "~/Areas/VAS/Content/vasattachuser.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
 

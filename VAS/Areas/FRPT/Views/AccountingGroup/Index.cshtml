@@ -1,0 +1,333 @@
+﻿@{
+    var windowNo = ViewBag.WindowNumber;
+}
+
+@functions{
+    public string GetText(string msg, bool isTrans = false, bool isElement = false)
+    {
+        if (isTrans)
+        {
+            return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.Translate(ViewBag.lang, msg));
+        }
+        else if (isElement)
+        {
+            return VAdvantage.Utility.Msg.GetElement(Convert.ToString(ViewBag.lang), msg, false);
+        }
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(ViewBag.lang, msg, true));
+    }
+}
+
+<div class="frpt-fgf-mainwrapdiv vis-formouterwrpdiv">
+    <!-- Default Account Div -->
+    <div id="accountDiv_@windowNo" class="col-lg-4 col-md-4 col-sm-6 frpt-actleftmainwrap">
+        <div id="accountInnerDiv_@windowNo" class="frpt-actleftmainwrapinner">
+            <div class="frpt-top-divs">
+                <div id="accountCreateDiv_@windowNo"  class="frpt-div-width100"  style=" display:none;">
+                    <input type="text" id="txtAccountCreate_@windowNo"  name="Value" maxlength="40" class="frpt-cmb-height31 vis-gc-vpanel-table-mandatory">
+                    <div class="pull-right">
+                        <input type="button" title="@GetText("OK")" id="btnAccSave_@windowNo" class="frpt-dbbutton" value="@GetText("OK")" />
+                        <input type="button" title="@GetText("Cancel")" id="btnAccCancel_@windowNo"class="frpt-dbbutton" value="@GetText("Cancel")" />
+                    </div>
+                </div>
+
+                <div id="accountSelectDiv_@windowNo" class="frpt-div-width100 frpt-acc-btns">
+                    <select id="cmbC_Element_@windowNo" class="frpt-cmb-Accheight"></select>
+                    <button id="btnAddElement_@windowNo" class="frpt-button" title="@GetText("FRPT_AddChartAcc")">
+                        <i class="vis vis-plus"></i>
+                    </button>
+                    <span id="btnLoadReportGroup_@windowNo" class="frpt-button vis vis-refresh"></span>
+                </div>
+
+                <div class="frpt-div-width100 frpt-acc-btns frpt-topbtnswrapdiv">
+                    <div class="pull-left">
+                        @* <input type="button" id="btnAddNode_@windowNo" class="frpt-actionbutton "  value="@GetText("FRPT_AddNode")" />
+                        <input type="button" id="btnAddAccount_@windowNo" class="frpt-actionbutton " value="@GetText("FRPT_AddAccount")" />*@
+
+                        <button id="btnAddNode_@windowNo" title="@GetText("FRPT_AddNode")"  class="frpt-actionbutton">
+                            <span class="vis vis-plus"></span>
+                            @GetText("FRPT_AddNode")
+                        </button>
+                        <button id="btnAddAccount_@windowNo" title="@GetText("FRPT_AddAccount")"  class="frpt-actionbutton">
+                            <span class="vis vis-plus"></span>
+                            @GetText("FRPT_AddAccount")
+                        </button>
+
+                    </div>
+                    <div class="pull-right frpt-acc-btns">
+                        <span id="btnEditAccount_@windowNo" disabled="disabled" title="@GetText("FRPT_EditAcc")" style="opacity:0.5;" class="frpt-button vis vis-edit frpt-margin-right" ></span>
+                        @* <input type="button" id="btnImportCOA_@windowNo" class="frpt-dbbutton" style="margin: 0px;" value="@GetText("FRPT_SelectCOA")" />*@
+                        <button id="btnImportCOA_@windowNo" title="@GetText("FRPT_SelectCOA")"  style="margin: 0px;" class="frpt-dbbutton">
+                            <span class="vis vis-import"></span>
+                            @GetText("FRPT_SelectCOA")
+                        </button>
+
+                        <button id="btnLinkCOA_@windowNo" title="@GetText("FRPT_LinkCOA")" style="margin-left: 5px; display: block;margin-right: 0px;" class="frpt-dbbutton">
+                            @*@GetText("FRPT_LinkCOA")*@
+                            <span class="vis vis-link"></span>
+                            @GetText("FRPT_SelectCOA")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="clearfix"></div>
+            <div class="demo-section frpt-actleftlistwrap">
+                <div id="treeview-left_@windowNo" style="float: left; overflow:hidden"></div>
+            </div>
+        </div>
+
+        <div class="frpt-actbottomsearchwrp">
+            <input type="text" id="txtSearch_@windowNo" placeholder="@GetText("Search")" maxlength="40" class="frpt-Search-textbox">
+            <span class="vis vis-search frpt-Search-Span"></span>
+        </div>
+    </div>
+
+    <!-- Default Leger Div -->
+    <div id="legerCodeDiv_@windowNo" class="col-lg-4 col-md-4 col-sm-6" style="display:none;  padding-right: 0px;height:100% ">
+        <div class="frpt-content-wrap">
+            <div class="frpt-leger-padding">
+                <div class="frpt-top-divs">
+                    <h4 id="legerHeader_@windowNo">@GetText("FRPT_AddLegerCode")</h4>
+
+                    <div class="frpt-acc-btns">
+                        <span title="@GetText("OK")" class="frpt-button vis vis-markx" id="btnSave_@windowNo"></span>
+                        <span title="@GetText("Delete")" class="frpt-button vis vis-delete" id="btnDelete_@windowNo"></span>
+                        <span title="@GetText("Cancel")" class="frpt-button vis vis-cross" id="btnCancel_@windowNo"></span>
+
+                        @*<span id="btnSave_@windowNo">@GetText("Save")</span>
+                        <span id="btnDelete_@windowNo">@GetText("Delete")</span>
+                        <span id="btnCancel_@windowNo">@GetText("Cancel")</span>*@
+                    </div>
+                </div>
+            </div>
+            <div class="frpt-leger-divScroll">
+                <div class="frpt-form-data" style="display: none">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbAD_Client_ID_@windowNo" disabled="" class="vis-ev-col-readonly" style="display: inline-block;">
+                            </select>
+                            <label>@GetText("Tenant")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data" style="display: none">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbAD_Org_ID_@windowNo" style="display: inline-block;">
+                            </select>
+                            <label>@GetText("Org")</label>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="frpt-form-data">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <input id="txtLedgerCode_@windowNo" type="text" class="vis-ev-col-mandatory" maxlength="40"  placeholder=" " data-placeholder="" >
+                            <label>@GetText("FRPT_LedgerCode")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <input id="txtLedgerName_@windowNo" type="text" class="vis-ev-col-mandatory" maxlength="40" placeholder=" " data-placeholder="" >
+                            <label>@GetText("FRPT_LedgerName")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbAccountType_@windowNo">
+                            </select>
+                            <label>@GetText("AccountType")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbAccountSign_@windowNo">
+                            </select>
+                            <label>@GetText("FRPT_AccountSign")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data" style="display: none">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbC_AccountGroup_ID_@windowNo">
+                            </select>
+                            <label>@GetText("FRPT_AccountGroup")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data" style="display: none">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbC_AccountSubGroup_ID_@windowNo"></select>
+                            <label>@GetText("FRPT_AccountSubGroup")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data" style="display: none">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <select id="cmbMasterAccountType_@windowNo">
+                            </select>
+                            <label>@GetText("FRPT_MasterAccountType")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data">
+                    <div class="input-group vis-input-wrap">
+                        <div class="vis-control-wrap">
+                            <input id="txtdefaultCode_@windowNo" type="text" maxlength="40" placeholder=" " data-placeholder="" >
+                            <label>@GetText("FRPT_Defaultcode")</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frpt-form-data">
+                    <div class="frpt-left-check">
+                        <div class="input-group vis-input-wrap">
+                            <div class="vis-control-wrap">
+                                <label class="vis-ec-col-lblchkbox">
+                                    <input disabled="disabled" type="checkbox" id="isSummary_@windowNo" />
+                                    @GetText("FRPT_SummaryLevel")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="frpt-right-check">
+                        <div class="input-group vis-input-wrap">
+                            <div class="vis-control-wrap">
+                                <label class="vis-ec-col-lblchkbox">
+                                    <input type="checkbox" id="isActive_@windowNo" />
+                                    @GetText("Active", true)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+
+    <!-- add HGB Reporting -->
+    <div id="hgbReportDiv_@windowNo" class="col-lg-8 col-md-8 col-sm-6" style="height:100%; padding-top:15px">
+        @*Header div*@
+        <div class="frpt-top-divs">
+            <div id="rptGroupCreateDiv_@windowNo"  class="frpt-div-width100"  style=" display:none;">
+                <input id="txtrptGroupName_@windowNo" type="text"  name="Value" maxlength="40" class="vis-gc-vpanel-table-mandatory"  style="width: 50%;height: 31px;float: left;   margin-right: 10px;">
+                <input type="button" id="btnrptGroupSave_@windowNo" class="frpt-dbbutton" title="@GetText("OK")" style="width: 50px;" value="@GetText("OK")" />
+                <input type="button" id="btnrptGroupCancel_@windowNo" class="frpt-dbbutton" title="@GetText("Cancel")" style="width: 100px;" value="@GetText("Cancel")" />
+            </div>
+
+            <div id="rptGroupSelectDiv_@windowNo"   class="frpt-div-width100">
+                <table class="vis-gc-vpanel-table" style="width: 100%; height: 100%">
+                    <tbody>
+                        <tr>
+                            <td valign="middel" class="frpt-table-td-level">
+                                <label style="display: inline-block; margin: 0px;">@GetText("FRPT_SelectReportingGroup")</label>
+                            </td>
+                            <td class="vis-gc-vpanel-table-td0"></td>
+                            <td colspan="2" class="frpt-table-td1 ">
+                                <select id="cmbrptGroup_@windowNo" class="frpt-td-cmb-minwidth"></select>
+                            </td>
+                            @*<td class="vis-gc-vpanel-table-td0"></td>*@
+                            <td class="vis-gc-vpanel-table-td2 frpt-table-td-margine">
+                                <button id="btnGroupZoom_@windowNo" title="@GetText("Zoom")" class="frpt-button">
+                                    <i class="vis vis-find"></i></button>
+                            </td>
+                            @*<td class="vis-gc-vpanel-table-td0"></td>*@
+                            <td class="vis-gc-vpanel-table-td2 frpt-table-td-margine">
+                                <button id="btnAddRptGroup_@windowNo" disabled="disabled" title="@GetText("FRPT_AddGroup")" class="frpt-button">
+                                    <i class="vis vis-plus"></i></button>
+                            </td>
+                            @*<td class="vis-gc-vpanel-table-td0"></td>*@
+                            <td class="vis-gc-vpanel-table-td2 frpt-table-td-margine">
+                                <button id="btnAccTypefilter_@windowNo" title="@GetText("FRPT_AccFilter")" class="frpt-button">
+                                    <i class="fa fa-filter"></i></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="divAddSubGroup_@windowNo" style="float: left; width: 100%; margin-top: 10px;">
+                <div class="pull-left">
+                    <button id="btnAddSubGroup_@windowNo" disabled="disabled" title="@GetText("FRPT_AddSubGroup")" class="frpt-actionbutton" style="opacity:0.5;">
+                        <span class="vis vis-plus"></span>
+                        @GetText("FRPT_AddSubGroup")
+                    </button>
+                </div>
+            </div>
+
+            <div id="divrptSubGroup_@windowNo" style=" float: left; width: 100%; display:none">
+                <table class="vis-gc-vpanel-table" style="width: 100%; height: 100%">
+                    <tbody>
+                        <tr>
+                            <td colspan="2" class="vis-gc-vpanel-table-td1">
+                                <label style="display: inline-block; margin: 0px;">@GetText("FRPT_AddSubGroup")</label>
+                                <input id="txtrptSubGroup_@windowNo" type="text" class="vis-gc-vpanel-table-mandatory"  name="Value" maxlength="200"  style="display: inline-block; height: 31px;  border-radius: 0px;" />
+                            </td>
+                            <td class="vis-gc-vpanel-table-td0"></td>
+                            <td colspan="1" class="vis-gc-vpanel-table-td3 ">
+                                <label style="display: inline-block; margin: 0px;">@GetText("AccountType")</label>
+                                <select id="cmbrptAccType_@windowNo" class="frpt-td-cmb-minwidth">
+                                </select>
+                            </td>
+                            <td class="vis-gc-vpanel-table-td0"></td>
+                            <td colspan="1" class="vis-gc-vpanel-table-td3 frpt-table-td-margine">
+                                <button id="btnrptSubGroupSave_@windowNo"  title="@GetText("FRPT_SaveSubGroup")" class="frpt-td-btn-minwidth frpt-button">
+                                    <i class="vis vis-save"></i></button>
+                            </td>
+                            <td class="vis-gc-vpanel-table-td0"></td>
+                            <td colspan="1" class="vis-gc-vpanel-table-td3 frpt-table-td-margine">
+                                <span class="vis vis-cross frpt-button" title="@GetText("Cancel")" id="btnrptSubGroupCancel_@windowNo"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+        </div>
+
+        @*tree Div*@
+        <div class="demo-section frpt-fgf-rightcontentwrap">
+            <div id="treeview-right_@windowNo" style="float: left; overflow: hidden;width:100%"></div>
+        </div>
+
+        @*Footer Div*@
+        <div id="rightbottomDiv_@windowNo" class="frpt-fgf-rightbottomwrap">
+
+            <div id="txtrightTopSearch_@windowNo" class="frpt-bottomRightInputTop" style="float: left; width: 50%;">
+                <input type="text" id="txtrightSearch_@windowNo" placeholder="@GetText("Search")" maxlength="40" class="frpt-Search-textbox">
+                @*<span class="vis-mainMenuIcons vis-icon-search frpt-Search-Span">@GetText("Search")</span>*@
+            </div>
+            <div id="btnRightSaveCancel_@windowNo" style="float:right">
+                <span class="frpt-dbbutton" style="opacity:0.5;" disabled="disabled" title="@GetText("Save")"  id="btnGroupLineSave_@windowNo">@GetText("Save", true)</span>
+                <span class="frpt-dbbutton" style="opacity:0.5;" disabled="disabled" title="@GetText("Cancel")" id="btnGroupLineCancel_@windowNo">@GetText("Cancel")</span>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+
+    <div id="filterDiv_@windowNo" class="vis-dialog vis-auth-dialog frpt-filter-dialog" style="display: none;">
+    </div>
+</div>

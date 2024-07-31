@@ -1,0 +1,75 @@
+﻿@{
+    var windowNo = ViewBag.WindowNumber;
+}
+
+@functions{
+    public string GetText(string msg, bool isTrans = false, bool isElement = false)
+    {
+        if (isTrans)
+        {
+            return VAdvantage.Utility.Msg.Translate(ViewBag.lang, msg);
+        }
+        else if (isElement)
+        {
+            return VAdvantage.Utility.Msg.GetElement(Convert.ToString(ViewBag.lang), msg, false);
+        }
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(ViewBag.lang, msg, true));
+    }
+}
+
+<div style="width: 100%; height: 100%; overflow: hidden">
+    <table class="vis-gc-vpanel-table">
+        <tbody>
+            <tr>
+                <td class="vis-gc-vpanel-table-td0"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td1">
+                    <label style="display: inline-block;">@GetText("Tenant")</label>
+                    <select id="cmbAD_Client_ID_@windowNo" style="display: inline-block;">
+                    </select>
+                </td>
+                <td class="vis-gc-vpanel-table-td2"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td3">
+                    <label style="display: inline-block;">@GetText("Organization")</label>
+                    <select id="cmbAD_Org_ID_@windowNo" style="display: inline-block;">
+                    </select>
+                </td>
+                <td class="vis-gc-vpanel-table-td4"></td>
+            </tr>
+            <tr>
+                <td class="vis-gc-vpanel-table-td0"></td>
+                <td colspan="8" class="vis-gc-vpanel-table-td1" style="width: 100%;">
+                    <label style="display: inline-block;">@GetText("Name")</label>
+                    <input type="text" id="txtName_@windowNo" maxlength="60" class="vis-gc-vpanel-table-mandatory" style="display: inline-block;"></td>
+                <td class="vis-gc-vpanel-table-td4"></td>
+            </tr>
+            <tr>
+                <td class="vis-gc-vpanel-table-td0"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td1">
+                    <label style="display: inline-block;">@GetText("AccountType")</label>
+                    <select id="cmbAccountType_@windowNo" style="display: inline-block;">
+                    </select>
+                </td>
+                <td class="vis-gc-vpanel-table-td2"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td3">
+                    <label style="display: inline-block;">@GetText("Tree")</label>
+                    <select id="cmbAccounttree_@windowNo" class="" style="display: inline-block;">
+                    </select></td>
+                <td class="vis-gc-vpanel-table-td4"></td>
+            </tr>
+
+            <tr>
+                <td class="vis-gc-vpanel-table-td0"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td1"></td>
+                <td class="vis-gc-vpanel-table-td2"></td>
+                <td colspan="2" class="vis-gc-vpanel-table-td3">
+                    <input type="button" id="btnCancel_@windowNo" style="width: 100px; height: 35px; min-width: 0px;" class="VIS_Pref_btn-2" value="@GetText("Cancel")">
+                    <input type="button" id="btnSave_@windowNo" style="width: 135px; height: 35px; float: left; min-width: 0px;" class="VIS_Pref_btn-2" value="@GetText("Save")">
+                </td>
+                <td class="vis-gc-vpanel-table-td4"></td>
+            </tr>
+
+
+
+        </tbody>
+    </table>
+</div>

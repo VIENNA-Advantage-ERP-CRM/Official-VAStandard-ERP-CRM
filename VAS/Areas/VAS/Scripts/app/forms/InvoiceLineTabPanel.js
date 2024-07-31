@@ -88,7 +88,7 @@
         VAS.InvoiceLineTabPanel.prototype.startPanel = function (windowNo, curTab) {
             this.windowNo = windowNo;
             this.curTab = curTab;
-            windowID = curTab.gridWindow.vo.AD_Window_ID;
+            windowID = this.curTab.getAD_Window_ID();
             this.init();
         };
         /* This function will execute when user navigate or refresh a record */

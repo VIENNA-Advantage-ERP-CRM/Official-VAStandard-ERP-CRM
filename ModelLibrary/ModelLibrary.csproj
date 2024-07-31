@@ -52,11 +52,37 @@
     <Reference Include="CoreLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\CoreLibrary.dll</HintPath>
     </Reference>
+    <Reference Include="CrystalDecisions.CrystalReports.Engine, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\CrystalDecisions.CrystalReports.Engine.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.ReportSource, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\CrystalDecisions.ReportSource.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.Shared, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\CrystalDecisions.Shared.dll</HintPath>
+    </Reference>
+    <Reference Include="CrystalDecisions.Web, Version=13.0.4000.0, Culture=neutral, PublicKeyToken=692fbea5521e1304, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\CrystalDecisions.Web.dll</HintPath>
+    </Reference>
     <Reference Include="DocumentFormat.OpenXml, Version=2.7.2.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
       <HintPath>..\packages\DocumentFormat.OpenXml.2.7.2\lib\net46\DocumentFormat.OpenXml.dll</HintPath>
     </Reference>
     <Reference Include="ExcelNumberFormat, Version=1.0.10.0, Culture=neutral, PublicKeyToken=23c6f5d73be07eca, processorArchitecture=MSIL">
       <HintPath>..\packages\ExcelNumberFormat.1.0.10\lib\net20\ExcelNumberFormat.dll</HintPath>
+    </Reference>
+    <Reference Include="ExpressionEvaluator">
+      <HintPath>..\ViennaAdvantageWeb\DLL\ExpressionEvaluator.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPT">
+      <HintPath>..\ViennaAdvantageWeb\DLL\FRPT.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPTSvc, Version=1.1.23.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\FRPT-FinancialManagement\ViennaAdvantageSvc\bin\Debug\FRPTSvc.dll</HintPath>
     </Reference>
     <Reference Include="IKVM.OpenJDK.ClassLibrary">
       <HintPath>..\ViennaAdvantageWeb\Dll\IKVM.OpenJDK.ClassLibrary.dll</HintPath>
@@ -64,6 +90,9 @@
     <Reference Include="Interop.Excel">
       <HintPath>..\ViennaAdvantageWeb\Dll\Interop.Excel.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="itextsharp">
+      <HintPath>..\ViennaAdvantageWeb\DLL\itextsharp.dll</HintPath>
     </Reference>
     <Reference Include="Mail">
       <HintPath>..\ViennaAdvantageWeb\Dll\Mail.dll</HintPath>
@@ -73,6 +102,10 @@
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp, Version=1.2.1269.0, Culture=neutral, PublicKeyToken=f94615aa0424f9eb, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\PdfSharp.dll</HintPath>
     </Reference>
     <Reference Include="SecureEngineUtility">
       <HintPath>..\ViennaAdvantageWeb\Dll\SecureEngineUtility.dll</HintPath>
@@ -93,7 +126,7 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Net.Http.Formatting, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.1.2\lib\net45\System.Net.Http.Formatting.dll</HintPath>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.2.8\lib\net45\System.Net.Http.Formatting.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
@@ -111,9 +144,20 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="VA009">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VA009.dll</HintPath>
+    </Reference>
+    <Reference Include="VA009Svc">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VA009Svc.dll</HintPath>
+    </Reference>
     <Reference Include="VAModelAD">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <HintPath>..\ViennaAdvantageWeb\DLL\VAModelAD.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOM">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VARCOM.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOMSvc">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VARCOMSvc.dll</HintPath>
     </Reference>
     <Reference Include="VAWorkflow">
       <HintPath>..\ViennaAdvantageWeb\Dll\VAWorkflow.dll</HintPath>
@@ -125,9 +169,8 @@
       <HintPath>..\packages\WebGrease.1.6.0\lib\WebGrease.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
-    <Reference Include="XModel, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
+    <Reference Include="XModel">
+      <HintPath>..\ViennaAdvantageWeb\DLL\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

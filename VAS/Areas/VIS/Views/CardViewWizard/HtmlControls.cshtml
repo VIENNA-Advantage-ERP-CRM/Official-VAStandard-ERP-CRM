@@ -1,0 +1,879 @@
+﻿@model VAdvantage.Utility.Ctx
+@functions{
+    public string GetText(string msg)
+    {
+        return VAdvantage.Utility.Util.CleanMnemonic(VAdvantage.Utility.Msg.GetMsg(Model, msg, true));
+    }
+
+}
+<div class="vis-cell-syl-zone">
+    <div class="vis-sec-four-split">
+        <div class="vis-split-4-sec1">
+            <div class="d-flex align-items-center justify-content-between">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item vis-lt-radius vis-lb-radius">
+                        <a class="nav-link vis-font-size-sm active" id="home-tab" data-toggle="tab" href="@("#DivGridSec_" + ViewBag.WindowNumber)" role="tab" aria-controls="home" aria-selected="true">@GetText("Grid") </a>
+                    </li>
+                    <li class="nav-item vis-lt-radius vis-lb-radius">
+                        <a class="nav-link vis-font-size-sm " id="home-tab" data-toggle="tab" href="@("#master001_" + ViewBag.WindowNumber)" role="tab" aria-controls="home" aria-selected="false">@GetText("Style")</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="profile-tab" data-toggle="tab" href="@("#master002_" + ViewBag.WindowNumber)" role="tab" aria-controls="profile" aria-selected="false">@GetText("Custom") </a>
+                    </li>
+                    <li class="nav-item vis-rt-radius vis-rb-radius">
+                        <a class="nav-link" id="home-tab" data-toggle="tab" href="@("#master003_" + ViewBag.WindowNumber)" role="tab" aria-controls="home" aria-selected="false">@GetText("Sql") </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="tab-content vis-scrolltheElement mt-1 pr-1">
+                <div class="tab-pane fade active show" id="@("DivGridSec_" + ViewBag.WindowNumber)" role="tabpanel" aria-labelledby="home-tab">
+
+                    <div class="vis-grid-zone">
+                        <div class="vis-overflowContainer">
+                            <div class="vis-grid-headr d-flex align-items-center justify-content-between position-relative vis-borderBottomH pb-2 mb-2">
+                                <span class="d-block vis-font-size-md vis-font-weight-600">@GetText("Section")</span>
+                                <div class="vis-grid-btn">
+                                    <a href="#" class="vis-blue-theme-btn-sm d-block addGridSection">@GetText("ADD") </a>
+                                </div>
+                            </div>
+                            <div class="vis-sectionAdd mb-2">
+                                <div sectionCount="0" class="vis-grey-disp-gridCont d-flex align-items justify-content-between w-100 mb-2 grid-Section displayNone">
+                                    <div class="vis-grey-disp-el">
+                                        <p class="vis-grey-disp-ttl d-block">@GetText("Section") 1</p>
+                                    </div>
+                                    <div class="vis-grey-disp-el-xross">
+                                        <i class="fa fa-trash-o vis-red-icon vis-font-size-lg" aria-hidden="true"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-grid-prop-one d-flex align-items-center justify-content-between mb-2 vis-borderBottomH mt-3 pb-2">
+                                <span class="vis-font-size-md d-block vis-font-weight-600">@GetText("GridRow")</span>
+                                <a href="#" class="vis-blue-theme-btn-sm addGridRow">@GetText("ADD") </a>
+                            </div>
+                            <div class="vis-single-el-wrapper DivRowBox mb-2">
+                                <div class="vis-grid-single-el rowBox" style="display:none">
+                                    <div class="vis-grid-select-area">
+                                        <div class="vis-grid-select-one vis-m0">
+                                            <input type="number" class="vis-grid-select-one-input vis-lt-radius vis-borderBottomWhite" value="1" />
+                                        </div>
+                                        <div class="vis-grid-select-three">
+                                            <select name="" id="" class="vis-grid-select-one-select vis-rt-radius vis-borderBottomWhite">
+                                                <option value="auto">auto</option>
+                                                <option value="fr">fr</option>
+                                                <option value="rem">rem</option>
+                                                <option value="px">px</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <a href="#" class="vis-grid-area-xross grdRowAdd"> <i class="fa fa-plus-circle" aria-hidden="true"></i> </a>
+                                        <a href="#" class="vis-grid-area-xross grdRowDel ml-1"> <i class="fa fa-times-circle text-danger" aria-hidden="true"></i></a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-grid-zone-elmOne mb-2">
+                                <div class="vis-grid-prop-one d-flex align-items-center justify-content-between mb-2 vis-borderBottomH mt-3 pb-2">
+                                    <span class="vis-font-size-md vis-font-weight-600 d-block">@GetText("GridColumn") </span>
+                                    <a href="#" class="vis-blue-theme-btn-sm addGridCol">@GetText("ADD")</a>
+                                </div>
+                                <div class="vis-single-el-wrapper mb-2 DivColBox">
+                                    <div class="vis-grid-single-el colBox" style="display:none">
+                                        <div class="vis-grid-select-area">
+                                            <div class="vis-grid-select-one">
+                                                <input type="number" class="vis-grid-select-one-input vis-borderBottomWhite vis-lt-radius" value="1" />
+                                            </div>
+                                            <div class="vis-grid-select-three">
+                                                <select name="" id="" class="vis-grid-select-one-select vis-rt-radius vis-borderBottomWhite">
+                                                    <option value="auto">auto</option>
+                                                    <option value="fr">fr</option>
+                                                    <option value="rem">rem</option>
+                                                    <option value="px">px</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <a href="#" class="vis-grid-area-xross grdColAdd"> <i class="fa fa-plus-circle" aria-hidden="true"></i> </a>
+                                            <a href="#" class="vis-grid-area-xross grdColDel ml-2"> <i class="fa fa-times-circle text-danger" aria-hidden="true"></i> </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-split-grid-zone d-flex flex-columm justify-content-between">
+                                <div class="vis-split-grid-one mb-2">
+                                    <span class="mb-2 vis-font-weight-600 vis-font-size-md pb-1 vis-borderBottomH d-block">@GetText("RowGap")</span>
+                                    <div class="vis-split-grid-sec">
+                                        <div class="vis-split-grid-sec-input">
+                                            <input type="number" class="vis-split-grid-sec-input rowGap" value="0" />
+                                        </div>
+                                        <div class="vis-split-grid-sec-value"><span>px</span></div>
+                                    </div>
+                                </div>
+                                <div class="vis-split-grid-one mb-2">
+                                    <span class="vis-font-weight-600 vis-font-size-md vis-borderBottomH mb-2 pb-1 d-block">@GetText("ColumnGap")</span>
+                                    <div class="vis-split-grid-sec">
+                                        <div class="vis-split-grid-sec-input">
+                                            <input type="number" class="vis-split-grid-sec-input vis-lt-radius colGap" value="0" />
+                                        </div>
+                                        <div class="vis-split-grid-sec-value"><span>px</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            @*<div class="vis-grd-dir-flow mt-2">
+                                    <span for="" class=" vis-font-weight-regular vis-font-size-sm d-block mb-1">@GetText("GridFlow") : <span class="text-primary vis-font-weight-regular">@GetText("Row")</span></span>
+                                    <div class="vis-two-way-dir d-flex">
+                                        <a href="#">
+                                            <div class="vis-two-way-dir-1"><i class="fa fa-arrow-down" aria-hidden="true"></i></div>
+                                        </a>
+                                        <a href="#" class="mergeCell">
+                                            <div class="vis-two-way-dir-3"><i class="fa fa-arrows" aria-hidden="true"></i></div>
+                                        </a>
+                                        <a href="#">
+                                            <div class="vis-two-way-dir-2"><i class="fa fa-arrow-right" aria-hidden="true"></i></div>
+                                        </a>
+                                    </div>
+                                </div>*@
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade " id="@("master001_" + ViewBag.WindowNumber)" role="tabpanel" aria-labelledby="home-tab">
+                    <div class="vis-tab-cllstyle">
+                        <div class="vis-sec-one">
+                            <div class="vis-accordionWrapper">
+                                <div class="vis-accordionHeader mb-1 d-flex align-items-center justify-content-between" data-toggle="collapse" data-target="#collapseExampleFirst" aria-expanded="false" aria-controls="collapseExample">
+                                    <span>@GetText("Layout")</span> <span><i class="fa fa-caret-right" aria-hidden="true"></i></span>
+                                </div>
+                                <div class="collapse" id="collapseExampleFirst">
+                                    <div class="p-1">
+                                        <span class="vis-font-size-md vis-font-weight-600 vis-borderBottomH pb-1 d-block">Dimension</span>
+                                        <div class="d-flex align-items-center justify-content-between d-block mb-1">
+                                            <span for="" class="vis-prop-heading">@GetText("Width")  </span>
+                                            <input type="text" data-command="width" class="vis-check-textal-select vis-selectFeild vis-input-under-line" style="width:50px !important" placeholder="0px" />
+                                            <span for="" class="vis-prop-heading">@GetText("Minwidth")  </span>
+                                            <input type="text" data-command="minWidth" class="vis-check-textal-select vis-selectFeild vis-input-under-line" style="width:50px !important" placeholder="0px" />
+                                        </div>
+                                        <div class="d-flex align-items-center justify-content-between d-block mb-1">
+                                            <span for="" class="vis-prop-heading">@GetText("Height")</span>
+                                            <input type="text" data-command="height" class="vis-check-textal-select vis-selectFeild vis-input-under-line" style="width:50px !important" placeholder="0px" />
+                                            <span for="" class="vis-prop-heading">@GetText("MinHeight")  </span>
+                                            <input type="text" data-command="minHeight" class="vis-check-textal-select vis-selectFeild vis-input-under-line" style="width:50px !important" placeholder="0px" />
+                                        </div>
+                                        <div class="vis-prop-pan-border mb-1 vis-font-size-sm">
+                                            <div class="vis-prop-pan-header d-flex align-items-center vis-borderBottomH justify-content-between mt-3 mb-1">
+                                                <div class="vis-head-til ">
+                                                    <span class="d-block vis-font-weight-600 vis-font-size-sm pb-1">@GetText("Padding") </span>
+                                                </div>
+                                                <div class="vis-head-check">
+                                                    <input type="checkbox" checked="checked" id="@("chkAllPadding_" + ViewBag.WindowNumber)" class="vis-input-check-sm" />
+                                                    <span class="vis-font-size-sm vis-font-weight-regular" for="">@GetText("All") </span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between flex-columm">
+                                                <div class="vis-slider-action w-100 d-flex align-items-center justify-content-between">
+                                                    <div class="vis-range-value mr-2 allPadding">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-all-active mr-1"></div>
+                                                            <input type="text" data-command="padding" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singlePadding displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-left-active mr-1"></div>
+                                                            <input type="text" data-command="paddingLeft" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singlePadding displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-top-active mr-1"></div>
+                                                            <input type="text" data-command="paddingTop" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singlePadding displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-right-active mr-1"></div>
+                                                            <input type="text" data-command="paddingRight" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value singlePadding displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-bottom-active mr-1"></div>
+                                                            <input type="text" data-command="paddingBottom" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-prop-pan-border mb-1 vis-font-size-sm">
+                                            <div class="vis-prop-pan-header d-block vis-borderBottomH d-flex align-items-center justify-content-between mt-3 mb-1">
+                                                <div class="vis-head-til ">
+                                                    <span class="d-block vis-font-size-sm vis-font-weight-600 vis-font-size-sm pb-1">@GetText("Margin")</span>
+                                                </div>
+                                                <div class="vis-head-check">
+                                                    <input type="checkbox" class="vis-input-check-sm" checked="checked" id="@("chkAllMargin_" + ViewBag.WindowNumber)" />
+                                                    <span class="vis-font-size-sm vis-font-weight-regular" for="">@GetText("All")</span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between flex-columm">
+                                                <div class="vis-slider-action w-100 d-flex align-items-center justify-content-between">
+                                                    <div class="vis-range-value mr-2 allMargin">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-all-active mr-1"></div>
+                                                            <input type="text" data-command="margin" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singleMargin displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-left-active mr-1"></div>
+                                                            <input type="text" data-command="marginLeft" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singleMargin displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-top-active mr-1"></div>
+                                                            <input type="text" data-command="marginTop" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value mr-2 singleMargin displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-right-active mr-1"></div>
+                                                            <input type="text" data-command="marginRight" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-range-value singleMargin displayNone">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="vis-border-status vis-border-status-bottom-active mr-1"></div>
+                                                            <input type="text" data-command="marginBottom" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-accordionWrapper">
+                                <div class="vis-accordionHeader mb-1 d-flex align-items-center justify-content-between d-block" data-toggle="collapse" data-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample">
+                                    <span>@GetText("Border")</span> <span><i class="fa fa-caret-right" aria-hidden="true"></i></span>
+                                </div>
+                                <div class="collapse" id="collapseExample">
+                                    <div class="p-1">
+                                        <div class="vis-prop-pan-border mb-2">
+                                            <div class="vis-prop-pan-header vis-borderBottomH pb-1 d-flex align-items-center justify-content-between vis-font-size-sm mb-1">
+                                                <div class="vis-head-til">
+                                                    <span class="vis-prop-heading vis-font-weight-600 vis-font-size-sm d-block ">@GetText("Border")</span>
+                                                </div>
+                                                <div class="vis-head-check">
+                                                    <input type="checkbox" checked="checked" id="@("chkAllBorder_" + ViewBag.WindowNumber)" class="vis-input-check-sm vis--under-line" />
+                                                    <span class="m-0 vis-font-size-sm vis-font-weight-regular" for="">@GetText("All")</span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between mb-2 allBorder">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <div class="vis-border-status vis-border-status-all-active mr-1"></div>
+                                                    <input type="text" data-command="border" class="vis-check-select vis-sm-input-feild vis-input-under-line mr-3" placeholder="0px" />
+                                                </div>
+                                                <div class="mr-2">
+                                                    <select name="" data-command="borderType" class="vis-check-select vis-selectFeild vis-input-under-line">
+                                                        <option value="">Border Type...</option>
+                                                        <option value="solid">solid</option>
+                                                        <option value="dotted">dotted</option>
+                                                        <option value="dashed">dashed</option>
+                                                        <option value="double">double</option>
+                                                        <option value="groove">groove</option>
+                                                        <option value="ridge">ridge</option>
+                                                        <option value="inset">inset</option>
+                                                        <option value="outset">outset</option>
+                                                        <option value="none">none</option>
+                                                        <option value="hidden">hidden</option>
+                                                    </select>
+                                                </div>
+                                                <div class="vis-check-input w-25">
+                                                    <div class="vis-back-color03 ml-3">
+                                                        <input type="color" data-command="borderColor" class="vis-opn-clr-plt" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between mb-2 singleBorder displayNone">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <div class="vis-border-status vis-border-status-left-active mr-1"></div>
+                                                    <input type="text" data-command="borderLeft" class="vis-check-select vis-sm-input-feild vis-input-under-line mr-3" placeholder="0px" />
+                                                </div>
+                                                <div class="mr-2">
+                                                    <select name="" id="" data-command="borderLeftStyle" class="vis-check-select vis-selectFeild vis-input-under-line">
+                                                        <option value="">Border Type...</option>
+                                                        <option value="solid">solid</option>
+                                                        <option value="dotted">dotted</option>
+                                                        <option value="dashed">dashed</option>
+                                                        <option value="double">double</option>
+                                                        <option value="groove">groove</option>
+                                                        <option value="ridge">ridge</option>
+                                                        <option value="inset">inset</option>
+                                                        <option value="outset">outset</option>
+                                                        <option value="none">none</option>
+                                                        <option value="hidden">hidden</option>
+                                                    </select>
+                                                </div>
+                                                <div class="vis-check-input w-25">
+                                                    <div class="vis-back-color03 ml-3">
+                                                        <input type="color" class="vis-opn-clr-plt" data-command="borderLeftColor" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between mb-2 singleBorder displayNone">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <div class="vis-border-status vis-border-status-top-active mr-1"></div>
+                                                    <input type="text" data-command="borderTop" class="vis-check-select vis-sm-input-feild vis-input-under-line mr-3" placeholder="0px" />
+                                                </div>
+                                                <div class="mr-2">
+                                                    <select name="" id="" data-command="borderTopStyle" class="vis-check-select vis-selectFeild vis-input-under-line">
+                                                        <option value="">Border Type...</option>
+                                                        <option value="solid">solid</option>
+                                                        <option value="dotted">dotted</option>
+                                                        <option value="dashed">dashed</option>
+                                                        <option value="double">double</option>
+                                                        <option value="groove">groove</option>
+                                                        <option value="ridge">ridge</option>
+                                                        <option value="inset">inset</option>
+                                                        <option value="outset">outset</option>
+                                                        <option value="none">none</option>
+                                                        <option value="hidden">hidden</option>
+                                                    </select>
+                                                </div>
+                                                <div class="vis-check-input w-25">
+                                                    <div class="vis-back-color03 ml-3"><input type="color" data-command="borderTopColor" class="vis-opn-clr-plt" /></div>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between mb-2 singleBorder displayNone">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <div class="vis-border-status vis-border-status-right-active mr-1"></div>
+                                                    <input type="text" class="vis-check-select vis-sm-input-feild vis-input-under-line mr-3" data-command="borderRight" placeholder="0px" />
+                                                </div>
+                                                <div class="mr-2">
+                                                    <select name="" id="" class="vis-check-select vis-selectFeild vis-input-under-line" data-command="borderRightStyle">
+                                                        <option value="">Border Type...</option>
+                                                        <option value="solid">solid</option>
+                                                        <option value="dotted">dotted</option>
+                                                        <option value="dashed">dashed</option>
+                                                        <option value="double">double</option>
+                                                        <option value="groove">groove</option>
+                                                        <option value="ridge">ridge</option>
+                                                        <option value="inset">inset</option>
+                                                        <option value="outset">outset</option>
+                                                        <option value="none">none</option>
+                                                        <option value="hidden">hidden</option>
+                                                    </select>
+                                                </div>
+                                                <div class="vis-check-input w-25">
+                                                    <div class="vis-back-color03 ml-3"><input type="color" class="vis-opn-clr-plt" data-command="borderRightColor" /></div>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between mb-2 singleBorder displayNone">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <div class="vis-border-status vis-border-status-bottom-active mr-1"></div>
+                                                    <input type="text" class="vis-check-select vis-sm-input-feild vis-input-under-line mr-3" data-command="borderBottom" placeholder="0px" />
+                                                </div>
+                                                <div class="mr-2">
+                                                    <select name="" id="" class="vis-check-select vis-selectFeild vis-input-under-line" data-command="borderBottomStyle">
+                                                        <option value="">Border Type...</option>
+                                                        <option value="solid">solid</option>
+                                                        <option value="dotted">dotted</option>
+                                                        <option value="dashed">dashed</option>
+                                                        <option value="double">double</option>
+                                                        <option value="groove">groove</option>
+                                                        <option value="ridge">ridge</option>
+                                                        <option value="inset">inset</option>
+                                                        <option value="outset">outset</option>
+                                                        <option value="none">none</option>
+                                                        <option value="hidden">hidden</option>
+                                                    </select>
+                                                </div>
+                                                <div class="vis-check-input w-25">
+                                                    <div class="vis-back-color03 ml-3"><input type="color" class="vis-opn-clr-plt" data-command="borderBottomColor" /></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-prop-pan-border-ra mb-2">
+                                            <div class="vis-prop-pan-header d-flex align-items-center vis-borderBottomH pb-1 justify-content-between mt-3 vis-font-size-sm">
+                                                <div class="vis-head-til mb-1">
+                                                    <span class="vis-font-weight-600 vis-font-size-sm d-block">@GetText("BorderRadius")</span>
+                                                </div>
+                                                <div class="vis-head-check">
+                                                    <input type="checkbox" checked="checked" id="@("chkAllBorderRadius_" + ViewBag.WindowNumber)" class="vis-input-check-sm" />
+                                                    <span class="vis-font-size-sm vis-font-weight-regular " for="">@GetText("All")</span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between my-1 flex-columm">
+                                                <div class="vis-check-input d-flex align-items-center justify-content-between allBorderRadius">
+                                                    <div class="vis-border-status vis-border-status-all-active mr-1"></div>
+                                                    <input type="text" data-command="borderRadius" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center justify-content-between singleBorderRadius displayNone">
+                                                    <div class="vis-borderRadius-status vis-border-top-left mr-1"></div>
+                                                    <input type="text" data-command="borderTopLeftRadius" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center justify-content-between singleBorderRadius displayNone">
+                                                    <div class="vis-borderRadius-status vis-border-top-right mr-1"></div>
+                                                    <input type="text" data-command="borderTopRightRadius" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center justify-content-between singleBorderRadius displayNone">
+                                                    <div class="vis-borderRadius-status vis-border-bottom-right mr-1"></div>
+                                                    <input type="text" data-command="borderBottomRightRadius" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center justify-content-between singleBorderRadius displayNone">
+                                                    <div class="vis-borderRadius-status vis-border-bottom-left mr-1"></div>
+                                                    <input type="text" data-command="borderBottomLeftRadius" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-accordionWrapper">
+                                <div class="vis-accordionHeader mb-1 d-flex align-items-center justify-content-between" data-toggle="collapse" data-target="#collapseExampleTwo" aria-expanded="false" aria-controls="collapseExample">
+                                    <span>@GetText("Color")</span> <span><i class="fa fa-caret-right" aria-hidden="true"></i></span>
+                                </div>
+                                <div class="collapse" id="collapseExampleTwo">
+                                    <div class="p-1">
+                                        <div class="vis-prop-pan-gradient mb-1">
+                                            <div class="vis-prop-pan-header vis-borderBottomH mb-2 d-flex align-items-center justify-content-between vis-font-size-sm">
+                                                <div class="vis-head-til">
+                                                    <span class="vis-prop-heading mb-1 d-block vis-font-weight-600">@GetText("Gradient")</span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center mt-1 mb-1">
+                                                <div class="vis-grad-styl d-flex align-items-center justify-content-between">
+                                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                                        <div>
+                                                            <input type="color" class="p-0 grd-color gradient1" data-command="gradient">
+                                                        </div>
+                                                        <div>
+                                                            <input type="number" class="grd-number percent1" min="0" max="100" value="0" data-command="gradient">
+                                                        </div>
+                                                        <div>
+                                                            <input type="color" class="p-0 grd-color gradient2" data-command="gradient">
+                                                        </div>
+                                                        <div>
+                                                            <input type="number" class="grd-number percent2" min="0" max="100" value="100" data-command="gradient">
+                                                        </div>
+                                                        <div>
+                                                            <select style="height: 25px; min-height: 25px !important;" class="grdDirection" data-command="gradient">
+                                                                <option value="to bottom">↓</option>
+                                                                <option value="to top">↑</option>
+                                                                <option value="to right">→</option>
+                                                                <option value="to left">←</option>
+                                                                <option value="to top left">↖</option>
+                                                                <option value="to top right">↗</option>
+                                                                <option value="to bottom left">↙</option>
+                                                                <option value="to bottom right">↘</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+                                            </div>
+                                               <div class="vis-gradInputCross">
+                                                <input type="text" style="width: 100%;padding-right:25px !important" data-command="gradientInput" class="vis-color-textbox" placeholder="Color..." />
+                                                <div class="vis-inputGradcross position-relative">
+                                                    <div class="vis-crossIcon" onclick="$(this).closest('.vis-gradInputCross').find('input').val('').change();">
+                                                        <span class="vis vis-cross"></span>
+                                                    </div>
+                                                </div>
+                                                </div>
+                                        </div>
+                                        <div class="vis-prop-pan-box-shadow mb-2">
+                                            <div class="vis-prop-pan-header mt-3 d-flex align-items-center vis-borderBottomH pb-1 justify-content-between vis-font-size-sm">
+                                                <div class="vis-head-til"><span class="vis-prop-heading mb-1 vis-font-weight-600">@GetText("BoxShadow") </span></div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between my-1 flex-columm">
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <span for="" class="vis-font-weight-regular">X</span>
+                                                    <input type="text" data-command="boxShadow" class="boxX vis-border-shadow-prop vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <span for="" class="vis-font-weight-regular vis-font-size-sm mr-1">Y</span>
+                                                    <input type="text" data-command="boxShadow" class="boxY vis-border-shadow-prop vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <span for="" class="vis-font-weight-regular vis-font-size-sm mr-1">B</span>
+                                                    <input type="text" data-command="boxShadow" class="boxB vis-border-shadow-prop vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                <div class="vis-check-input d-flex align-items-center">
+                                                    <span for="" class="vis-font-weight-regular vis-font-size-sm mr-2">C</span>
+                                                    <div class="vis-back-color03">
+                                                        <input type="color" data-command="boxShadow" onchange="$(this).parent().css('background-color',$(this).val())" class="boxC vis-opn-clr-plt p-2" placeholder="Color..." />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-prop-pan-gradient mb-2">
+                                            <div class="vis-prop-pan-header d-flex align-items-center vis-borderBottomH mb-2 mt-3 justify-content-between vis-font-size-sm">
+                                                <div class="vis-head-til">
+                                                    <span class="vis-prop-heading d-block mb-1 vis-font-weight-600">@GetText("Background")</span>
+                                                </div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center flex-columm">
+                                                <input type="text" data-command="backgroundColor" class="vis-color-textbox" placeholder="Background..." />
+                                                <div class="vis-back-color04 mr-2 vis-zero-BTopLeftBLeft">
+                                                    <input type="color" data-command="backgroundColor" class="vis-opn-clr-plt" />
+                                                </div>
+                                                <div>
+                                                    <i class="fa fa-paint-brush vis-change-to-blue" aria-hidden="true"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-prop-pan-opacity mt-3 mb-2">
+                                            <div class="vis-prop-pan-header vis-borderBottomH pb-1 d-flex align-items-center justify-content-between vis-font-size-sm">
+                                                <div class="vis-head-til"><span class="vis-prop-heading vis-font-weight-600">@GetText("Opacity")</span></div>
+                                            </div>
+                                            <div class="vis-prop-pan-cont d-flex align-items-center justify-content-between flex-columm">
+                                                <div class="vis-slider-action d-flex justify-content-between w-100">
+                                                    <div class="vis-range-value vis-font-size-sm mr-2">
+                                                        <input type="text" data-command="opacity" class="vis-check-select vis-sm-input-feild vis-input-under-line" placeholder="0px" />
+                                                    </div>
+                                                    @*<div class="mt-1 ml-3">
+                                                            <input type="range" data-command="opacity" min="0" max="100" value="0" class="vis-slider-fontsz-ran-input w-100" />
+                                                        </div>*@
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-accordionWrapper">
+                                <div class="vis-accordionHeader mb-1 d-flex align-items-center justify-content-between" data-toggle="collapse" data-target="#collapseExampleThree" aria-expanded="false" aria-controls="collapseExample">
+                                    <span>@GetText("TextStyling")</span> <span><i class="fa fa-caret-right" aria-hidden="true"></i></span>
+                                </div>
+                                <div class="collapse" id="collapseExampleThree">
+                                    <div class="p-1">
+                                        <div class="vis-txt-syl-cont-p2 mb-2">
+                                            <span class="vis-font-size-sm mb-1 d-block vis-font-weight-600 vis-borderBottomH pb-1" for="FZ">@GetText("FontSize")</span>
+                                            <div class="vis-slider-action d-flex mb-2">
+                                                <div class="vis-range-font-value mr-2">
+                                                    <input type="text" data-command="fontSize" class="vis-check-select vis-sm-input-feild vis-smInputWidth mr-3 vis-input-under-line" placeholder="0px" />
+                                                </div>
+                                                @*<div><input type="range" data-command="fontSize" min="0" max="100" class="vis-slider-fontsz-ran-input w-100" /></div>*@
+                                            </div>
+                                        </div>
+                                        <div class="vis-txt-syl-cont-p3 mb-1">
+                                            <span class="vis-font-size-sm mb-1 d-block vis-font-weight-600 vis-borderBottomH pb-1" for="FZ">@GetText("FontFamily")</span>
+                                            <div class="vis-slider-action d-flex mb-2">
+                                                <div class="vis-range-font-value mr-2">
+                                                    <select class="vis-check-select vis-selectFeild vis-input-under-line" data-command="fontFamily">
+                                                        <option value="">--Select--</option>
+                                                        <option value="Arial, sans-serif">Arial (sans-serif)</option>
+                                                        <option value="Verdana, sans-serif">Verdana (sans-serif)</option>
+                                                        <option value="Helvetica, sans-serif">Helvetica (sans-serif)</option>
+                                                        <option value="Tahoma, sans-serif">Tahoma (sans-serif)</option>
+                                                        <option value="Trebuchet MS, sans-serif">Trebuchet MS (sans-serif)</option>
+                                                        <option value="Times New Roman, serif">Times New Roman (serif)</option>
+                                                        <option value="Georgia, serif">Georgia (serif)</option>
+                                                        <option value="Garamond, serif">Garamond (serif)</option>
+                                                        <option value="Courier New, monospace">Courier New (monospace)</option>
+                                                        <option value="Brush Script MT, cursive">Brush Script MT (cursive)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-txt-syl-cont-p3 mb-1">
+                                            <span class="vis-font-size-sm mb-1 d-block vis-font-weight-600 vis-borderBottomH pb-1" for="FZ">@GetText("MaxTextmultiline")</span>
+                                            <div class="vis-slider-action d-flex mb-2">
+                                                <div class="vis-range-font-value mr-2">
+                                                    <input type="text" data-command="maxTextmultiline" class="vis-check-select vis-sm-input-feild vis-smInputWidth mr-3 vis-input-under-line" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-txt-syl-cont-p3 d-flex mb-1">
+                                            <div class="vis-tx-clr-1 w-100">
+                                                <span class="vis-font-size-sm d-block pb-1 vis-borderBottomH vis-font-weight-600 mb-2 mt-2" for="FZ">@GetText("TextColor") </span>
+
+                                                <div class="vis-prop-pan-cont d-flex align-items-center my-1 flex-columm">
+                                                    <input type="text" data-command="color" placeholder="Text-Color..." class="vis-color-textbox d-block p-2">
+                                                    <div class="vis-back-color04 mr-2 vis-zero-BTopLeftBLeft ">
+                                                        <input type="color" data-command="color" class="vis-opn-clr-plt">
+                                                    </div>
+                                                    <div>
+                                                        <i class="fa fa-paint-brush vis-change-to-blue" aria-hidden="true"></i>
+                                                    </div>
+                                                </div>
+
+
+                                                @*<div class="vis-background-fld-ctrl d-flex align-items-center">
+                                                        <div class="vis-background-grad-clr">
+                                                            <input type="color" data-command="color" class="vis-opn-clr-plt" />
+                                                        </div>
+                                                        <div class="vis-background-grad-clr-icn"><i class="fa fa-paint-brush vis-change-to-blue vis-change-to-pointer" aria-hidden="true"></i></div>
+                                                    </div>*@
+                                            </div>
+                                        </div>
+                                        <div class="vis-txt-stl-cont-p4 mb-1">
+                                            <span for="" class="vis-font-size-sm mb-2 vis-font-weight-600 vis-borderBottomH pb-1 mb-2 d-block mt-2">Text Formats</span>
+                                            <div class="vis-text-format-wrp d-flex align-items-center justify-content-between mb-2">
+                                                <div class="vis-font-weight-sectf d-flex mb-1 d-block">
+                                                    <div class="vis-font-weight-sectf-emt vis-font-weight-sectf-emt-fst">
+                                                        <i class="fa fa-bold" data-command1="bold" aria-hidden="true"></i>
+                                                    </div>
+                                                    <div class="vis-font-weight-sectf">
+                                                        <div class="vis-font-weight-sectf-emt"><i class="fa fa-italic" data-command1="italic" aria-hidden="true"></i></div>
+                                                    </div>
+                                                    <div class="vis-font-weight-sectf">
+                                                        <div class="vis-font-weight-sectf-emt"><i class="fa fa-underline" data-command1="underline" aria-hidden="true"></i></div>
+                                                    </div>
+                                                </div>
+                                                <div class="vis-horz-align-d vis-font-weight-sectf d-flex mb-1 d-block">
+                                                    <div class="vis-font-weight-sectf-emt vis-font-weight-sectf-emt-fst">
+                                                        <i class="fa fa-align-left" data-command1="textLeft" aria-hidden="true"></i>
+                                                    </div>
+                                                    <div class="vis-font-weight-sectf">
+                                                        <div class="vis-font-weight-sectf-emt"><i class="fa fa-align-center" data-command1="textCenter" aria-hidden="true"></i></div>
+                                                    </div>
+                                                    <div class="vis-font-weight-sectf">
+                                                        <div class="vis-font-weight-sectf-emt"><i class="fa fa-align-justify" data-command1="textJustify" aria-hidden="true"></i></div>
+                                                    </div>
+                                                    <div class="vis-font-weight-sectf">
+                                                        <div class="vis-font-weight-sectf-emt"><i class="fa fa-align-right" data-command1="textRight" aria-hidden="true"></i></div>
+                                                    </div>
+                                                </div>
+                                                <div class="vis-horz-align-d vis-letter-case-sectf d-flex mb-1">
+                                                    <div class="vis-letter-case-sectf-emt vis-font-weight-sectf-emt-fst">
+                                                        <span class="vis-font-weight-600 vis-font-size-sm" data-command1="upperCase">TT</span>
+                                                    </div>
+                                                    <div class="vis-letter-case-sectf">
+                                                        <div class="vis-letter-case-sectf-emt">
+                                                            <span class="vis-font-weight-semibold vis-font-size-sm" data-command1="capitalize">Tt</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="vis-letter-case-sectf">
+                                                        <div class="vis-letter-case-sectf-emt vis-text-align-sectf-last">
+                                                            <span class="vis-font-weight-semibold vis-font-size-sm" data-command1="lowerCase">tt</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @*<div class="vis-rad-box">
+                                                <span class="vis-cll-sy-p2-title vis-font-size-sm d-block m">@GetText("TextOverflow") </span>
+                                                <div class="vis-rad-blo9ck d-flex">
+                                                    <div class="vis-rad-sgl-elm mr-2 d-flex align-items-center">
+                                                        <input type="radio" id="Ellipsis" name="Ellipsis" value="Ellipsis" />
+                                                        <label for="Ellipsis" class="vis-font-size-sm mb-0 ml-1">@GetText("Ellipsis") </label><br />
+                                                    </div>
+                                                    <div class="vis-rad-sgl-el mr-2 d-flex align-items-center">
+                                                        <input type="radio" id="scroll" name="scroll" value="scroll" />
+                                                        <label for="scroll" class="vis-font-size-sm m-0 ml-1">@GetText("Scroll") </label><br />
+                                                    </div>
+                                                    <div class="vis-rad-sgl-el mr-2 d-flex align-items-center">
+                                                        <input type="radio" id="auto" name="auto" value="auto" />
+                                                        <label for="auto" class="vis-font-size-sm m-0 ml-1">@GetText("Auto")</label>
+                                                    </div>
+                                                </div>
+                                            </div>*@
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vis-accordionWrapper">
+                                <div class="vis-accordionHeader mb-1 d-flex align-items-center justify-content-between" data-toggle="collapse" data-target="#collapseExampleFour" aria-expanded="false" aria-controls="collapseExample">
+                                    <span>@GetText("FlexAlignment") </span> <span><i class="fa fa-caret-right" aria-hidden="true"></i></span>
+                                </div>
+                                <div class="collapse" id="collapseExampleFour">
+                                    <div class="p-1">
+                                        @*<div class="d-flex align-items-center justify-content-between d-block mb-1">
+                                                <label for="" class="m-0 vis-font-size-sm vis-font-weight-semibold">Display </label>
+                                                <div class="">
+                                                    <select name="" id="" class="vis-check-textal-select vis-selectFeild vis-input-under-line">
+                                                        <option value="">Flex</option>
+                                                        <option value="">Center</option>
+                                                        <option value="">Bottom</option>
+                                                    </select>
+                                                </div>
+                                            </div>*@
+                                        <div class="d-flex align-items-center justify-content-between d-block mb-1">
+                                            <span for="" class="m-0 vis-font-size-sm vis-font-weight-600">@GetText("FlexDirection")</span>
+                                            <div class="">
+                                                <select name="" id="" data-command="flexDirection" class="vis-check-textal-select vis-selectFeild vis-input-under-line">
+                                                    <option value="">Select...</option>
+                                                    <option value="row">Row</option>
+                                                    <option value="column">Column</option>
+                                                    <option value="row-reverse">R-Reverse</option>
+                                                    <option value="column-reverse">C-Reverse</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="vis-hor-align-sectf mb-1">
+                                            <div class="vis-hor-align-sy-p2">
+                                                <span class="vis-cll-sy-p2-title vis-font-size-sm d-block pb-1 mt-3 vis-font-weight-600 vis-borderBottomH mb-2">@GetText("JustifyContent")</span>
+                                                <div class="vis-horz-align-d d-flex">
+                                                    <div class="vis-hr-elm vis-hr-elm-fst">
+                                                        <div class="vis-cllsty2-single-el" data-command1="flexJustifyStart">
+                                                            <div class="vis-box-sin0colr-wrap d-flex">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-hr-elm">
+                                                        <div class="vis-cllsty2-single-el" data-command1="flexJustifyCenter">
+                                                            <div class="vis-box-sin0colr-wrap d-flex align-items-center justify-content-center">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-hr-elm">
+                                                        <div class="vis-cllsty2-single-el d-flex justify-content-end" data-command1="flexJustifyEnd">
+                                                            <div class="vis-box-sin0colr-wrap d-flex">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-hr-elm">
+                                                        <div class="vis-cllsty2-single-el" data-command1="flexJustifySpaceBetween">
+                                                            <div class="vis-box-sin0colr-wrap d-flex align-items-center justify-content-between">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-hr-elm vis-hr-elm-lst">
+                                                        <div class="vis-cllsty2-single-el" data-command1="flexJustifySpaceAround">
+                                                            <div class="vis-box-sin0colr-wrap d-flex align-items-center justify-content-around">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-ver-align-sect mb-1">
+                                            <div class="vis-vertical-slide mr-3">
+                                                <span class="vis-cll-sy-p2-title mb-2 mt-3 vis-font-size-sm vis-borderBottomH pb-1 vis-font-weight-600 d-block">@GetText("AlignItems") </span>
+                                                <div class="vis-horz-align-d d-flex mb-2">
+                                                    <div class="vis-vl-elm vis-vl-elm-fst">
+                                                        <div class="vis-cllsty2-single-elTwo" data-command1="flexAlignStart">
+                                                            <div class="vis-box-sin0colr-vl-wrap d-flex justify-content-between">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-vl-elm">
+                                                        <div class="vis-cllsty2-single-elTwo" data-command1="flexAlignCenter">
+                                                            <div class="vis-box-sin0colr-vl-wrap d-flex align-items-center justify-content-between">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="vis-vl-elm vis-hr-elm-lst">
+                                                        <div class="vis-cllsty2-single-elTwo" data-command1="flexAlignEnd">
+                                                            <div class="vis-box-sin0colr-vl-wrap d-flex align-items-end justify-content-between">
+                                                                <div class="vis-box-sin0colr"></div>
+                                                                <div class="vis-box-sin0colr"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vis-ver-align-sect mb-1">
+                                            <div class="vis-vertical-slide mr-3">
+                                                <span class="vis-cll-sy-p2-title mb-2 mt-3 vis-font-size-sm vis-borderBottomH pb-1 vis-font-weight-600 d-block">@GetText("AlignImageWithText") </span>
+
+                                                <div class="imgTextCont d-flex  vis-disable-event">
+                                                    <div class="horizontalComp d-flex flex-column mr-2">
+                                                        <button class="addImgBtnV d-flex align-items-center justify-content-center mb-2" data-command2="SwapImgTxt">
+                                                            <div>
+                                                                <span class="text-fontSz">Tt</span>
+                                                            </div>
+                                                            <div class="mx-1">
+                                                                <i class="fa fa-plus d-block addSymbone" aria-hidden="true"></i>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-picture-o img-szFt" aria-hidden="true"></i>
+                                                            </div>
+                                                        </button>
+                                                        <button class="addImgBtnV d-flex flex-row-reverse align-items-center justify-content-center" data-command2="SwapTxtImg">
+                                                            <div>
+                                                                <span class="text-fontSz">Tt</span>
+                                                            </div>
+                                                            <div class="mx-1">
+                                                                <i class="fa fa-plus d-block addSymbone" aria-hidden="true"></i>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-picture-o img-szFt" aria-hidden="true"></i>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                    <div class="horizontalComp d-flex">
+                                                        <button class="addImgBtnH d-flex flex-column align-items-center justify-content-center mr-2" data-command2="SwapImgTxtBr">
+                                                            <div>
+                                                                <span>Tt</span>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-plus d-block addSymb" aria-hidden="true"></i>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-picture-o d-block my-1" aria-hidden="true"></i>
+                                                            </div>
+                                                        </button>
+                                                        <button class="addImgBtnH d-flex flex-column-reverse align-items-center justify-content-center mr-2" data-command2="SwapTxtImgBr">
+                                                            <div>
+                                                                <span class="d-block ">Tt</span>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-plus d-block addSymb" aria-hidden="true"></i>
+                                                            </div>
+                                                            <div>
+                                                                <i class="fa fa-picture-o d-block my-1" aria-hidden="true"></i>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center justify-content-between d-block mt-3">
+                                            <span for="" class="m-0 vis-font-size-sm vis-font-weight-600">@GetText("ImageFit")</span>
+                                            <div class="">
+                                                <select name="" id="" data-command="objectFit" class="vis-check-textal-select vis-selectFeild vis-input-under-line">
+                                                    <option value="">Select...</option>
+                                                    <option value="contain">contain</option>
+                                                    <option value="cover">cover</option>
+                                                    <option value="fill">fill</option>
+                                                    <option value="none">none</option>
+                                                    <option value="scale-down">scale-down</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="@("master002_" + ViewBag.WindowNumber)" role="tabpanel" aria-labelledby="home-tab">
+                    <div class="vis-cust-text-stl">
+                        <textarea name="" id="@("txtCustomStyle_" + ViewBag.WindowNumber)" cols="30" rows="15 " class="w-100 form-control vis-customWidthControl" placeholder="@GetText("EnterYourCustomProperty")"></textarea>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="@("master003_" + ViewBag.WindowNumber)" role="tabpanel" aria-labelledby="home-tab">
+                    <textarea name="" id="@("txtSQLQuery_" + ViewBag.WindowNumber)" cols="30" rows="15 " class="w-100 form-control vis-customWidthControl" placeholder="@GetText("WriteyourQueryHere") "></textarea>
+                </div>
+
+            </div>
+            <div class="vis-split-sec-two position-relative" style="display:none">
+                <a href="#" class="vis-closeTabButton mb-2">&times; </a>
+            </div>
+
+        </div>
+    </div>
+
+</div>

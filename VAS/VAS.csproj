@@ -64,9 +64,29 @@
     <Reference Include="ExcelNumberFormat, Version=1.0.10.0, Culture=neutral, PublicKeyToken=23c6f5d73be07eca, processorArchitecture=MSIL">
       <HintPath>..\packages\ExcelNumberFormat.1.0.10\lib\net20\ExcelNumberFormat.dll</HintPath>
     </Reference>
+    <Reference Include="ExpressionEvaluator">
+      <HintPath>..\ViennaAdvantageWeb\DLL\ExpressionEvaluator.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPT">
+      <HintPath>..\ViennaAdvantageWeb\DLL\FRPT.dll</HintPath>
+    </Reference>
+    <Reference Include="FRPTSvc">
+      <HintPath>..\ViennaAdvantageWeb\DLL\FRPTSvc.dll</HintPath>
+    </Reference>
+    <Reference Include="Interop.Excel">
+      <HintPath>..\..\FRPT-FinancialManagement\ViennaAdvantageWeb\DLL\Interop.Excel.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="itextsharp">
+      <HintPath>..\ViennaAdvantageWeb\DLL\itextsharp.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp, Version=1.2.1269.0, Culture=neutral, PublicKeyToken=f94615aa0424f9eb, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\PdfSharp.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -122,11 +142,23 @@
       <HintPath>..\packages\Microsoft.AspNet.Web.Optimization.1.1.3\lib\net40\System.Web.Optimization.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="VA009">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VA009.dll</HintPath>
+    </Reference>
+    <Reference Include="VA009Svc">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VA009Svc.dll</HintPath>
+    </Reference>
     <Reference Include="VAModelAD">
-      <HintPath>..\ViennaAdvantageWeb\Dll\VAModelAD.dll</HintPath>
+      <HintPath>..\ViennaAdvantageWeb\DLL\VAModelAD.dll</HintPath>
     </Reference>
     <Reference Include="VAPrintLib">
       <HintPath>..\ViennaAdvantageWeb\Dll\VAPrintLib.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOM">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VARCOM.dll</HintPath>
+    </Reference>
+    <Reference Include="VARCOMSvc">
+      <HintPath>..\ViennaAdvantageWeb\DLL\VARCOMSvc.dll</HintPath>
     </Reference>
     <Reference Include="ViennaBase">
       <HintPath>..\ViennaAdvantageWeb\Dll\ViennaBase.dll</HintPath>
@@ -146,8 +178,9 @@
       <HintPath>..\packages\Antlr.3.5.0.2\lib\Antlr3.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
-    <Reference Include="XModel">
-      <HintPath>..\ViennaAdvantageWeb\Dll\XModel.dll</HintPath>
+    <Reference Include="XModel, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ViennaAdvantageWeb\DLL\XModel.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -242,6 +275,7 @@
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PurchaseOrderTabPanel.js" />
