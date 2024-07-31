@@ -1,4 +1,4 @@
-﻿/*version 1.5.1.4*/
+﻿/*version 1.5.6.3*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -295,14 +295,18 @@
     margin-top: 4px;
 }
 
-    .vas-select-plus-btn select {
-        width: 30%;
-        float: left;
-    }
+.vas-filter-val + .vas-select-plus-btn {
+    margin-top: 15px;
+}
 
-    .vas-select-plus-btn input[type='button'] {
-        margin: 0px;
-    }
+.vas-select-plus-btn select {
+    width: 30%;
+    float: left;
+}
+
+.vas-select-plus-btn input[type='button'] {
+    margin: 0px;
+}
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column2 textarea {
     width: 100%;
@@ -749,21 +753,13 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+.vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
     display: none;
 }
 
-    .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
-        display: block;
-    }
-
-    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
-        display: none;
-    }
-
-    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
-        display: block;
-    }
+.vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+    display: block;
+}
 
 .vas-remove-likeoption option:nth-last-child(3), .vas-remove-likeoption option:nth-last-child(4) {
     display: none;
@@ -784,11 +780,17 @@
         top: -16px;
     }
 
-.vas-checkboxoption-hidden option, .vas-add-isnulloption option {
+.vas-checkboxoption-hidden option, .vas-add-isnulloption option, .vas-comparision-opeartor option {
     display: none;
 }
 
     .vas-checkboxoption-hidden option:nth-child(1), .vas-checkboxoption-hidden option:nth-child(2) {
+        display: block;
+    }
+
+    .vas-comparision-opeartor option:nth-child(1), .vas-comparision-opeartor option:nth-child(2),
+    .vas-comparision-opeartor option:nth-child(3), .vas-comparision-opeartor option:nth-child(4),
+    .vas-comparision-opeartor option:nth-child(5), .vas-comparision-opeartor option:nth-child(6) {
         display: block;
     }
 
@@ -802,6 +804,87 @@
 
 .vas-likeoption option {
     display: none;
+}
+
+.vas-filter-val {
+    display: none;
+    padding: 10px 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    border-left: 1px solid rgba(var(--v-c-secondary), 1);
+    border-right: 1px solid rgba(var(--v-c-secondary), 1);
+    border-bottom: 1px solid rgba(var(--v-c-secondary), 1);
+    margin-bottom: 10px;
+}
+
+    .vas-filter-val .vas-filterValItem {
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+
+        .vas-filter-val .vas-filterValItem:last-child {
+            margin-bottom: 0px;
+        }
+
+.vas-filterValItem.vas-selected-filterVal, .vas-column-list-item.vas-selected-filterVal {
+    background-color: rgba(var(--v-c-primary));
+    color: #fff;
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
+    display: flex;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.vas-filterofMultipleCols {
+    position: relative;
+}
+
+    .vas-filterofMultipleCols i.fa.fa-exchange {
+        transform: rotate(90deg);
+        width: 30px;
+        font-size: 18px;
+        height: 30px;
+        line-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(var(--v-c-primary));
+        cursor: pointer;
+        position: absolute;
+        right: 0;
+        top: 0;
+        margin: auto;
+        z-index: 1;
+    }
+
+.vas-columnval input:not([type='checkbox']) {
+    width: calc(100% - 30px);
+    min-height: 39px;
+    margin-bottom: 0;
+}
+
+.vas-single-input.vas-windowtab.vas-searchinput-block.vas-filterCol2Block {
+    display: none;
+    width: calc(100% - 30px);
+}
+
+.vis-ad-w-p-actionpanel-r .vas-windowtab.vas-searchinput-block.vas-filterValBlock {
+    width: calc(100% - 30px);
+}
+
+.vas-filterValExchangeIconBlock {
+    display: flex;
+    align-items: center;
+}
+
+    .vas-filterValExchangeIconBlock i.fa.fa-exchange {
+        position: relative;
+    }
+
+.vas-single-input.vas-windowtab.vas-searchinput-block.vas-filterCol2Block + .vas-filter-val, .vas-filterofMultipleCols .vas-filterNewCol {
+    width: calc(100% - 30px);
 }
 
 html[dir="rtl"] .vis-ad-w-p-actionpanel-r .vas-sql-btns {
@@ -2219,4 +2302,207 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 
 .vas-inputboxPaddingRight {
     padding-right: 10px !important;
+}
+
+
+.VAS-PO-summary {
+    padding: 0.625rem;
+}
+
+.VAS-partially-msg {
+    background-color: #FAEED2;
+    color: #DE9900;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-partially-msg .vis {
+        font-size: 1rem;
+    }
+
+.VAS-delivered-msg {
+    background-color: #c9e0ca;
+    color: #1EA025;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-delivered-msg .fa {
+        font-size: 1rem;
+    }
+
+.VAS-Open-msg {
+    background-color: rgba(var(--v-c-secondary), 1);
+    color: black;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-Open-msg .vis {
+        font-size: 1rem;
+    }
+
+.VAS-polist-heading {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 10px 0 4px;
+}
+
+.VAS-PO-list-col {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: calc(100% - 68px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.VAS-polist-box {
+    background-color: #EDF5FA;
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.625rem;
+    position: relative;
+}
+
+.VAS-product-thumbnail {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 6px;
+    width: 80px;
+    display: flex;
+    align-items: center;
+}
+
+    .VAS-product-thumbnail img {
+        height: 100%;
+        object-fit: contain;
+        width: 100%;
+    }
+
+.VAS-PO-details {
+    width: 70%;
+}
+
+    .VAS-PO-details > h1 {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0 0 2px;
+    }
+
+.VAS-UPC-num {
+    font-size: .75rem;
+}
+
+.VAS-order-description {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-top: 10px;
+}
+
+.VAS-order-values h6 {
+    margin: 0;
+    font-size: 0.75rem;
+}
+
+.VAS-order-values span {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.VAS-po-info-icon, .VAS-po-approve-icon {
+    position: absolute;
+    right: 0.625rem;
+    top: 0.625rem;
+}
+
+    .VAS-po-info-icon .vis {
+        font-size: 1.2rem;
+        color: #DE9900;
+    }
+
+    .VAS-po-approve-icon .fa {
+        font-size: 1.4rem;
+        color: #1EA025;
+    }
+
+.VAS-product-thumbnail i {
+    font-size: 64px;
+}
+
+span.vis.vis-info.vas-openItem {
+    color: #000;
+}
+
+.VAS-PO-details .VAS-Attrbiute {
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
+}
+
+.VAS-PO-details > h1 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
+}
+
+.firstRow {
+    padding: 15px;
+}
+
+.VAS_SaveCancelButtons {
+    padding-top: 12px;
+}
+
+    .VAS_SaveCancelButtons button {
+        margin-right: 25px;
+        display: inline-block;
+        width: 13%;
+        max-width: 250px;
+        border: none;
+        background-color: rgba(var(--v-c-primary), 1);
+        color: #fff;
+        padding: 10px 0;
+        border-radius: 10px;
+    }
+
+.VAS_convertedUnit {
+    margin: 0 0px 20px;
+    border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    color: rgba(var(--v-c-primary), 1);
+    padding-bottom: 2px;
+}
+
+.VAS-UOM {
+    width: 33%;
+}
+
+.vas-txtbox {
+    text-align: right;
 }
