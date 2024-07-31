@@ -2251,9 +2251,11 @@
             var displayType = self.attr("datatype");
             var columnName = self.attr("DBColumnName").toUpper();
             var tableName = self.attr("TableName");
-            for (var i = 0; i < record.length && i <= 3000; i++) {
-                if (record[i][columnName]) {
-                    htmlString += '<div class="vas-filterValItem" value="' + record[i][columnName] + '">' + record[i][columnName] + '</div>';
+            if (!VIS.DisplayType.IsLookup(displayType)) {
+                for (var i = 0; i < record.length; i++) {
+                    if (record[i][columnName]) {
+                        htmlString += '<div class="vas-filterValItem" isNameExist="' +false+'"DBColumnName="' + columnName + '" tableName="' + tableName + '" value="' + record[i][columnName] + '">' + record[i][columnName] + '</div>';
+                    }
                 }
             }
             $filterValDropdown.append(htmlString);
@@ -2277,8 +2279,36 @@
             /* Keyup Event for Filter Value Items in Dropdown */
             $filterValBlock.find('input').off("keyup");
             $filterValBlock.find('input').on("keyup", function () {
-                var $filterValLowerCase = $(this).val().toLowerCase();
+                var $filterValLowerCase = $(this).val();
                 var $filterValSelectItem = $filterValDropdown.children('.vas-filterValItem');
+
+                if ($filterValLowerCase.length > 1) {
+                    var tname = $filterValSelectItem.attr('tablename');
+                    var isNameExist = $filterValSelectItem.attr('isNameExist');
+                    var data = getIdsName(columnName, tname, displayType, $filterValLowerCase, isNameExist);
+
+                    if (data && data.length > 0) {
+                        var htmlString = '';
+                        $filterValDropdown.empty();
+                        for (var k = 0; k < data.length; k++) {
+                            if (data[k].Value) {
+                                htmlString += '<div class="vas-filterValItem" isNameExist="' + data[k].isNameExist + '" DBColumnName="' + columnName + '" tableName="' + data[k].tableName + '" value="' + data[k].Value + '">' + data[k].Name + '</div>';
+                            }
+                        }
+                        $filterValDropdown.append(htmlString);
+                        $filterValSelectItem = $filterValDropdown.children('.vas-filterValItem');
+
+                        $filterValSelectItem.off(VIS.Events.onTouchStartOrClick);
+                        $filterValSelectItem.on(VIS.Events.onTouchStartOrClick, function () {
+                            $filterValDropdown.find('.vas-filterValItem').removeClass('vas-selected-filterVal');
+                            $(this).addClass('vas-selected-filterVal');
+                            var $filterValDropdownText = $(this).attr('value');
+                            $filterValBlock.find('input').val($filterValDropdownText);
+                        });
+                        $filterValDropdown.show();
+                        return;
+                    }
+                }
                 var $filterValSelectItemLength = $filterValSelectItem.length;
                 $filterValSelectItem.removeClass('vas-selected-filterVal');
                 if ($filterValSelectItemLength > 0) {
@@ -2286,8 +2316,7 @@
                     $filterValSelectItem.filter(function () {
                         $(this).toggle($(this).text().toLowerCase().indexOf($filterValLowerCase) > -1);
                     });
-                }
-                else {
+                }else {
                     $filterValDropdown.hide();
                 }
                 if (!$filterValSelectItem.is(':visible')) {
@@ -2318,12 +2347,13 @@
                 $filterPriceValue.attr('type', 'number');
                 $filterPriceValue.prev('label').removeClass('vas-label-space');
                 $filterCondition.addClass('vas-remove-likeoption');               
-                var data = getIdsName(columnName, tableName, displayType);
+                var data = getIdsName(columnName, tableName, displayType, null,false);
                 if (data && data.length > 0) {
-                    $filterValDropdown.empty();                  
-                    for (var i = 0; i < data.length && i<=3000 ; i++) {
-                        if (data[i][columnName]) {
-                            htmlString += '<div class="vas-filterValItem" value="' + data[i][columnName] + '">' + data[i][columnName] + '</div>';
+                    $filterValDropdown.empty();
+                    htmlString = '';
+                    for (var i = 0; i < data.length; i++) {
+                        if (data[i].Value) {
+                            htmlString += '<div class="vas-filterValItem" isNameExist="' + data[i].isNameExist +'" DBColumnName="' + columnName + '" tableName="' + data[i].tableName + '" value="' + data[i].Value + '">' + data[i].Name + '</div>';
                         }
                     }
                     $filterValDropdown.append(htmlString);
@@ -2364,13 +2394,19 @@
 
 
 
-        function getIdsName(columnName, tableName, displayType) {
+        function getIdsName(columnName, tableName, displayType, whereClause, isNameExist) {
             var results = null;
             $.ajax({
                 url: VIS.Application.contextUrl + "AlertSQLGenerate/GetIdsName",
                 type: "POST",
                 async: false,
-                data: { columnName: columnName, tableName: tableName, displayType: displayType },
+                data: {
+                    columnName: columnName,
+                    tableName: tableName,
+                    displayType: displayType,
+                    whereClause: whereClause,
+                    isNameExist: isNameExist
+                },
                 success: function (result) {
                     result = JSON.parse(result);
                     if (result && result.length > 0) {

@@ -136,14 +136,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tableName">Table Name</param>
         /// <param name="displayType"> Dispaly type</param>
         /// <returns>Names</returns>
-        public JsonResult GetIdsName(string columnName,string tableName, int displayType)
+        public JsonResult GetIdsName(string columnName,string tableName, int displayType,string whereClause,bool isNameExist)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType));
+                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType, whereClause, isNameExist));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

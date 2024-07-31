@@ -57,6 +57,7 @@ namespace VIS.Models
                         query += " WHERE " + where;
                     }
                     query = MRole.GetDefault(ctx).AddAccessSQL(query, Util.GetValueOfString(ds.Tables[0].Rows[i]["TableName"]), MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                    query += " FETCH FIRST 100 ROWS ONLY";
                     DataSet dr = DB.ExecuteDataset(query);
                     obj.dr = dr;
                     Tab.Add(obj);
@@ -355,14 +356,15 @@ namespace VIS.Models
             }
             return sql;
         }
-        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType)
+        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType,string whereClause,bool isNameExist)
         {
             List<IDDetails> data = new List<IDDetails>();
             string newTable = "";
             string getTable = "";
             string sql = "";
+            
 
-            if (columnName.EndsWith("_ID"))
+            if (columnName.EndsWith("_ID") && DisplayType.IsLookup(displayType))
             {
                 newTable = columnName.Substring(0, columnName.Length - 3);
             }
@@ -378,7 +380,16 @@ namespace VIS.Models
                 sql = @"SELECT * FROM " + tableName;
                 getTable = tableName;
             }
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            if (!string.IsNullOrEmpty(whereClause))
+            {
+                if (isNameExist) 
+                    sql += " WHERE " + getTable + ".Name LIKE '%" + whereClause + "%'"; 
+                else
+                sql += " WHERE " + getTable + "." + columnName + " LIKE '%" + whereClause + "%'";
+            }
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, getTable, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += " FETCH FIRST 100 ROWS ONLY";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -386,12 +397,15 @@ namespace VIS.Models
                 bool hasNameColumn = false;
                 if (ds.Tables.Contains(getTable) && ds.Tables[getTable].Columns.Contains("Name"))
                 {
+
                     hasNameColumn = true;
                     table = ds.Tables[getTable];
+                    isNameExist = true;
                 }
                 else if (ds.Tables[0].Columns.Contains("Name"))
                 {
                     hasNameColumn = true;
+                    isNameExist = true;
                 }
                 for (int i = 0; i < table.Rows.Count; i++)
                 {
@@ -399,12 +413,16 @@ namespace VIS.Models
                     if (hasNameColumn)
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i]["Name"]);
-                        obj.Value = Util.GetValueOfInt(table.Rows[i][columnName]);
+                        obj.Value = Util.GetValueOfString(table.Rows[i][columnName]);
+                        obj.tableName = getTable;
+                        obj.isNameExist = isNameExist;
                     }
                     else
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i][columnName]);
-                        obj.Value = Util.GetValueOfInt(table.Rows[i][columnName]);
+                        obj.isNameExist = isNameExist;
+                        obj.Value = Util.GetValueOfString(table.Rows[i][columnName]);
+                        obj.tableName = getTable;
                     }
                     data.Add(obj);
                 }
@@ -498,7 +516,9 @@ namespace VIS.Models
     }
     public class IDDetails
     {
-        public int Value { get; set; }
+        public string Value { get; set; }
         public string Name { get; set; }
+        public string tableName { get; set; }
+        public bool isNameExist { get; set; }
     }
 }
