@@ -874,11 +874,34 @@ namespace VIS.Models
                             + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
                             + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
-                    }
-                    if (C_Tax_ID > 0)
-                    {
-                        return C_Tax_ID;
-                    }
+                        if (C_Tax_ID > 0)
+                        {
+                            return C_Tax_ID;
+                        }
+                        else
+                        {
+                            // VIS0060: Changes done to get Tax Rate when not available with Postal code.
+                            sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                                " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
+                                " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                            if (C_Tax_ID > 0)
+                            {
+                                return C_Tax_ID;
+                            }
+                            else
+                            {
+                                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                                    " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
+                                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                                if (C_Tax_ID > 0)
+                                {
+                                    return C_Tax_ID;
+                                }
+                            }
+                        }
+                    }                    
                 }
             }
             return C_Tax_ID;
@@ -937,6 +960,29 @@ namespace VIS.Models
                         if (C_Tax_ID > 0)
                         {
                             return C_Tax_ID;
+                        }
+                        else
+                        {
+                            // VIS0060: Changes done to get Tax Rate when not available with Postal code.
+                            sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                            + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
+                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                            if (C_Tax_ID > 0)
+                            {
+                                return C_Tax_ID;
+                            }
+                            else
+                            {
+                                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                                + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','"
+                                + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                                if (C_Tax_ID > 0)
+                                {
+                                    return C_Tax_ID;
+                                }
+                            }
                         }
                     }
                 }
