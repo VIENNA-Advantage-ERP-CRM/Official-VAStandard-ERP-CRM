@@ -57,7 +57,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '">' +
+                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForPU' + $self.windowNo + '" disabled>' +
                 '<label for="VAS_txtSUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForPU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -66,7 +66,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '">' +
+                '<input type="text"  class="vas-txtbox" value="1" placeholder="" data-placeholder="" id="VAS_txtPUQtyForPU' + $self.windowNo + '"  disabled>' +
                 '<label for="VAS_txtPUQtyForPU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForPU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -81,7 +81,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text" class="vas-txtbox"  value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '">' +
+                '<input type="text" class="vas-txtbox"  value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForSU' + $self.windowNo + '" disabled>' +
                 '<label for="VAS_txtSUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForSU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -90,7 +90,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" > ' +
+                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForSU' + $self.windowNo + '" disabled > ' +
                 '<label for="VAS_txtPUQtyForSU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForSU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -105,7 +105,7 @@
                 '<div class="VIS_Pref_dd">' +
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
-                '<input type="text" class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '">' +
+                '<input type="text" class="vas-txtbox" value="1" placeholder="" data-placeholder=""  id ="VAS_txtSUQtyForCU' + $self.windowNo + '" disabled>' +
                 '<label for="VAS_txtSUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtSUQtyForCU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -114,7 +114,7 @@
                 '<div class= "input-group vis-input-wrap vas-txtbox">' +
                 '<div class="vis-control-wrap">' +
 
-                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '"> ' +
+                '<input type = "text" class= "vas-txtbox"  value = "1" placeholder = "" data-placeholder="" id = "VAS_txtPUQtyForCU' + $self.windowNo + '" disabled> ' +
                 '<label for="VAS_txtPUQtyForCU' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_txtPUQtyForCU") + '</label>' +
                 '</div > ' +
                 '</div> ' +
@@ -290,6 +290,7 @@
             //SET qty 1 and disabled textbox when base uom and selected uom same
 
             $self.cmbPU.fireValueChanged = function () {
+                $self.cmbPU.oldValue = null;
                 if (C_UOM_ID == $self.cmbPU.getValue()) {
                     VAS_txtSUQtyForPU.prop('disabled', true);
                     VAS_txtPUQtyForPU.prop('disabled', true);
@@ -297,6 +298,7 @@
                     VAS_txtPUQtyForPU.val(1);
                 }
                 else {
+                  
                     VAS_txtSUQtyForPU.prop('disabled', false);
                     VAS_txtPUQtyForPU.prop('disabled', false);
                     VAS_txtSUQtyForPU.val("");
@@ -307,6 +309,7 @@
             //SET qty 1 and disabled textbox when base uom and selected uom same
 
             $self.cmbSU.fireValueChanged = function () {
+                $self.cmbSU.oldValue = null;
                 if (C_UOM_ID == $self.cmbSU.getValue()) {
                     VAS_txtSUQtyForSU.prop('disabled', true);
                     VAS_txtPUQtyForSU.prop('disabled', true);
@@ -314,6 +317,7 @@
                     VAS_txtPUQtyForSU.val(1);
                 }
                 else {
+                  
                     VAS_txtSUQtyForSU.prop('disabled', false);
                     VAS_txtPUQtyForSU.prop('disabled', false);
                     VAS_txtSUQtyForSU.val("");
@@ -324,6 +328,7 @@
             //SET qty 1 and disabled textbox when base uom and selected uom same
 
             $self.cmbCU.fireValueChanged = function () {
+                $self.cmbCU.oldValue = null;
                 if (C_UOM_ID == $self.cmbCU.getValue()) {
                     VAS_txtSUQtyForCU.prop('disabled', true);
                     VAS_txtPUQtyForCU.prop('disabled', true);
@@ -331,6 +336,7 @@
                     VAS_txtPUQtyForCU.val(1);
                 }
                 else {
+                   
                     VAS_txtSUQtyForCU.prop('disabled', false);
                     VAS_txtPUQtyForCU.prop('disabled', false);
                     VAS_txtSUQtyForCU.val("");
