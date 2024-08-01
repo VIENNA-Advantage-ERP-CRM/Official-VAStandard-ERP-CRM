@@ -200,3 +200,21 @@ Only index.html and style.css is for your use There is no need to copy any other
 .vas-setUomWidth {
     width: 70%
 }
+.vas-apInvWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+}
+.VAS-InvDetail {
+    padding: 5px 5px 5px 1px;
+}
+.vas-apInvListGroup {
+    height: calc(100vh - 300px);
+    padding: 5px 5px 0 0;
+}
+
+.vis-ad-w-p-actionpanel-b .vas-apInvListGroup {
+    height: auto
+}
+
