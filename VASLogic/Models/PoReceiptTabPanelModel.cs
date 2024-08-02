@@ -9,10 +9,12 @@ using CoreLibrary.DataBase;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using VAdvantage.Utility;
+using VAdvantage.Common;
 
 namespace VASLogic.Models
 {
@@ -50,7 +52,7 @@ namespace VASLogic.Models
                         WHERE
                             I.DocStatus IN ('CO', 'CL') AND IL.C_InvoiceLine_ID = " + parentID;
 
-            DataSet ds = DB.ExecuteDataset(sql,null,null);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -140,7 +142,7 @@ namespace VASLogic.Models
         /// <param name="OrderLineId">Order ID</param>
         /// <Author>VAI051:- Devops ID:</Author>
         /// <returns>returns the Order tax data</returns>
-        public List<LineHistoryTabPanel>GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
+        public List<LineHistoryTabPanel> GetLineHistoryTabPanel(Ctx ctx, int OrderLineID)
         {
             List<LineHistoryTabPanel> LineHistoryTabPanel = new List<LineHistoryTabPanel>();
             String sql = @"SELECT ol.DateOrdered,ol.DatePromised,ol.Line,p.Name AS Product,c.Name AS Charge,u.Name AS UOM,ol.QtyEntered,ol.QtyOrdered,ol.PriceEntered,ol.PriceActual,
@@ -152,7 +154,7 @@ namespace VASLogic.Models
                           INNER JOIN C_Tax t ON t.C_Tax_ID=ol.C_Tax_ID
                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID = o.C_Currency_ID)
                           WHERE ol.C_OrderLine_ID = " + OrderLineID + " Order By t.Name";
-             DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -169,10 +171,10 @@ namespace VASLogic.Models
                     obj.Price = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceEntered"]);
                     obj.UnitPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceActual"]);
                     obj.ListPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceList"]);
-                    obj.Tax =    Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
+                    obj.Tax = Util.GetValueOfString(ds.Tables[0].Rows[i]["Tax"]);
                     obj.Discount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["Discount"]);
-                    obj.LineAmount= Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
-                    obj.Description= Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
+                    obj.LineAmount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["LineNetAmt"]);
+                    obj.Description = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
                     obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
 
                     LineHistoryTabPanel.Add(obj);
@@ -181,6 +183,131 @@ namespace VASLogic.Models
             return LineHistoryTabPanel;
         }
 
+        /// <summary>
+        /// VAI050-Get Purchase Order Lines
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="OrderID"></param>
+        /// <returns></returns>
+        public List<dynamic> GetPOLineData(Ctx ctx, int OrderID)
+        {
+
+            string sql = @"WITH StatusAndUPCData AS (
+                        SELECT ol.C_OrderLine_ID, i.ImageUrl,  cu.Name AS UOM,
+                         p.Name AS  ProductName,
+                          CASE  WHEN ol.M_AttributeSetInstance_ID IS NOT NULL AND ol.M_AttributeSetInstance_ID > 0 THEN ma.Description
+                          ELSE NULL
+                        END AS AttributeName,
+                          CASE 
+                        WHEN ol.QtyOrdered - ol.QtyDelivered = 0 THEN 'DE'
+                        WHEN ol.QtyDelivered = 0 THEN 'OP'
+                        ELSE 'PD'
+                        END AS OrderLineStatusValue,
+                        CASE 
+                        WHEN SUM(ol.QtyOrdered - ol.QtyDelivered) OVER () = 0 THEN 'DE'
+                        WHEN SUM(ol.QtyDelivered) OVER () = 0 THEN 'OP'
+                        ELSE 'PD'
+                        END AS OrderStatusValue,
+                       COALESCE(attr.UPC, cuconv.UPC, p.UPC,p.Value) AS PreferredUPC,
+                       ROW_NUMBER() OVER (PARTITION BY ol.C_OrderLine_ID ORDER BY
+                       CASE
+                       WHEN attr.UPC IS NOT NULL THEN 1
+                       WHEN cuconv.UPC IS NOT NULL THEN 2
+                       ELSE 3
+                       END
+                       ) AS rn,              
+                       CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID  THEN ROUND(ol.QtyDelivered/NULLIF(cuconv.dividerate, 0), 2)
+                       ELSE ol.QtyDelivered END AS QtyDelivered
+                      FROM
+                      C_OrderLine ol
+                      INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
+                      INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
+                      INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
+                      LEFT JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                      LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
+                      LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                      AND attr.M_Product_ID = ol.M_Product_ID
+                      AND attr.C_UOM_ID = ol.C_UOM_ID
+                      AND attr.UPC IS NOT NULL)
+                      LEFT JOIN C_UOM_Conversion cuconv ON (cuconv.C_UOM_ID = p.C_UOM_ID
+                      AND cuconv.C_UOM_To_ID = ol.C_UOM_ID
+                     AND cuconv.M_Product_ID = ol.M_Product_ID)
+                     WHERE ol.C_Order_ID = " + OrderID + @"
+                    )
+                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyEntered AS QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
+                   sod.OrderLineStatusValue, arlOrderLine.Name As OrderLineStatus,sod.OrderStatusValue,arlOrder.Name AS OrderStatus ,
+                  sod.ProductName,sod.AttributeName
+                   FROM StatusAndUPCData sod
+                   INNER JOIN C_OrderLine ol ON (sod.C_OrderLine_ID = ol.C_OrderLine_ID)
+                   LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
+                  LEFT JOIN AD_Ref_List arlOrderLine ON (arlOrderLine.AD_Reference_ID = ar.AD_Reference_ID
+                  AND arlOrderLine.Value = sod.OrderLineStatusValue)
+                  LEFT JOIN AD_Ref_List arlOrder ON (arlOrder.AD_Reference_ID = ar.AD_Reference_ID
+                  AND arlOrder.Value = sod.OrderStatusValue)
+                  WHERE sod.rn = 1 ORDER BY ol.Line";
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                List<dynamic> POLines = new List<dynamic>();
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dynamic obj = new ExpandoObject();
+                    obj.ImageUrl = Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageUrl"]);
+                    obj.ProductName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ProductName"]);
+                    obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
+                    obj.UPC = Util.GetValueOfString(ds.Tables[0].Rows[i]["UPC"]);
+                    obj.OrderLineStatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderLineStatusValue"]);
+                    obj.OrderLineStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderLineStatus"]);
+                    obj.OrderStatusValue = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderStatusValue"]);
+                    obj.OrderStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["OrderStatus"]);
+                    obj.AttributeName = Util.GetValueOfString(ds.Tables[0].Rows[i]["AttributeName"]);
+                    obj.QtyOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
+                    obj.QtyDelivered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyDelivered"]);
+                    POLines.Add(obj);
+                }
+                return POLines;
+            }
+            return null;
+        }
+        /// <summary>
+        /// VIS-383: 26/07/24:- Get invoice detail based on invoice line
+        /// </summary>
+        /// <author>VIS-383</author>
+        /// <param name="ctx">Context</param>
+        /// <param name="InvoiceLineId">Invoice Line ID</param>
+        /// <param name="AdWindowID">Window ID</param>
+        /// <returns>Invoice details</returns>
+        public string GetInvoiceLineReport(Ctx ctx, int InvoiceLineId, int AD_WindowID)
+        {
+            string path = "";
+            //Get invoice table id based on table name
+            int AD_Table_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT ad_table_id FROM  ad_table WHERE tablename = 'C_Invoice'"));
+            //Get invoice id based on invoice line id
+            int InvoiceId = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Invoice_ID FROM C_InvoiceLine WHERE C_InvoiceLine_ID=" + InvoiceLineId));
+            string sql = @"SELECT ad_tab.ad_process_id, ad_process.value FROM ad_tab
+                            INNER JOIN ad_process ON(ad_tab.ad_process_id = ad_process.ad_process_id)
+                            WHERE ad_tab.name = 'Invoice'
+                            AND ad_tab.ad_window_id =" + AD_WindowID;
+            DataSet ds = DB.ExecuteDataset(sql);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                int ReportProcess_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["ad_process_id"]);
+                if (ReportProcess_ID > 0)
+                {
+                    Common Com = new Common();
+                    Dictionary<string, object> d = new Dictionary<string, object>();
+                    byte[] pdfReport;
+                    string reportPath = "";
+                    d = Com.GetReport(ctx, ReportProcess_ID, Util.GetValueOfString(ds.Tables[0].Rows[0]["value"]), AD_Table_ID, InvoiceId, 0, "", "P", out pdfReport, out reportPath);
+
+                    if (pdfReport != null)
+                    {
+                        path = reportPath.Substring(reportPath.IndexOf("TempDownload"));
+                    }
+                }
+            }
+            return path;
+        }
     }
     public class TabPanel
     {
@@ -229,11 +356,11 @@ namespace VASLogic.Models
     {
         public int LineNo { get; set; }
 
-        public DateTime? DateOrdered{ get; set; }
+        public DateTime? DateOrdered { get; set; }
 
         public DateTime? DatePromised { get; set; }
 
-        public string Product {get;set;}
+        public string Product { get; set; }
 
         public string Charge { get; set; }
 
@@ -247,7 +374,7 @@ namespace VASLogic.Models
 
         public decimal ListPrice { get; set; }
 
-        public decimal  UnitPrice { get; set; }
+        public decimal UnitPrice { get; set; }
 
         public string Tax { get; set; }
 
@@ -255,7 +382,7 @@ namespace VASLogic.Models
 
         public decimal LineAmount { get; set; }
 
-        public  string Description { get; set; }
+        public string Description { get; set; }
 
         public int stdPrecision { get; set; }
 

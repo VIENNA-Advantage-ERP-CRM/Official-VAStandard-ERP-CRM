@@ -152,6 +152,10 @@ namespace VAdvantage.Model
                 _sql.Append("SELECT L.VALUE FROM AD_REF_LIST L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='CashBook'");
                 var relatedtoCashbook = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
 
+                //VIS383-DevOps BugID:6004 15/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Cashbook_Acct WHERE C_CashBook_ID=" + GetC_CashBook_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 PO cshbkact = null;
                 _client_ID = GetAD_Client_ID();
                 _sql.Clear();
@@ -192,12 +196,16 @@ namespace VAdvantage.Model
                                         //cshbkact = new X_FRPT_Cashbook_Acct(GetCtx(), 0, null);
                                         if (recordFound == 0)
                                         {
+                                            //VIS383-DevOps BugID:6004 15/07/2024:-Increase sequence no with 10 for new line
+                                            _SeqNo += 10;
                                             cshbkact = MTable.GetPO(GetCtx(), "FRPT_Cashbook_Acct", 0, null);
                                             cshbkact.Set_ValueNoCheck("AD_Org_ID", 0);
                                             cshbkact.Set_ValueNoCheck("C_CashBook_ID", Util.GetValueOfInt(GetC_CashBook_ID()));
                                             cshbkact.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                             cshbkact.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                             cshbkact.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                            //VIS383-DevOps BugID:6004 15/07/2024:-Set the new sequence no when create new line
+                                            cshbkact.Set_ValueNoCheck("SeqNo", _SeqNo);
 
                                             if (!cshbkact.Save())
                                             {

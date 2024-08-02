@@ -842,17 +842,26 @@
                 //sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) +
                 // " AND M_Product_ID = " + M_Product_ID;
                 //purchasingUom = Util.getValueOfInt(VIS.DB.executeScalar(sql));
-                purchasingUom = VIS.dataContext.getJSONRecord("MProduct/GetPOUOM", paramString);
-                if (purchasingUom > 0 && isSOTrx == false) {
-                    mTab.setValue("C_UOM_ID", purchasingUom);
+
+                //VAI050-Get UOM Of Product
+                var result = VIS.dataContext.getJSONRecord("MProduct/GetProductUOMs", paramString);
+                if (result != null) {
+                    //VAI050-If SOtrx false than set UOM --Give priority to pruchase UOM 
+                    //If Purchase UOM not found than set PU unit which is set on Product else set Base UOM of Product
+                    if (isSOTrx == false) {
+                        purchasingUom = result["PurchaseUOM"] == 0 ?
+                            (result["VAS_PurchaseUOM_ID"] == 0 ?
+                                result["C_UOM_ID"] : result["VAS_PurchaseUOM_ID"])
+                            : result["PurchaseUOM"];
+                        mTab.setValue("C_UOM_ID", purchasingUom);
+                    }
+                     //VAI050-If SOtrx True than set UOM --Give priority to Sales UOM 
+                    else {
+                        var SalesUOM = result["VAS_SalesUOM_ID"] == 0 ? result["C_UOM_ID"] : result["VAS_SalesUOM_ID"];
+                        mTab.setValue("C_UOM_ID", SalesUOM);
+                    }
                 }
-                else {
-                    var paramString = M_Product_ID.toString();
-                    var c_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetUOMID", paramString);
-                    //sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
-                    //mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
-                    mTab.setValue("C_UOM_ID", c_UOM_ID);
-                }
+
             }
             var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"))
 
@@ -1078,11 +1087,11 @@
                         mTab.setValue("C_UOM_ID", purchasingUom);
                     }
                     else {
-                        var paramString =  M_Product_ID.toString();
+                        var paramString = M_Product_ID.toString();
                         var c_UOM_ID = VIS.dataContext.getJSONRecord("MProduct/GetUOMID", paramString);
-                       // sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
+                        // sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + M_Product_ID;
                         //mTab.setValue("C_UOM_ID", Util.getValueOfInt(VIS.DB.executeScalar(sql)));
-                        mTab.setValue("C_UOM_ID", c_UOM_ID );
+                        mTab.setValue("C_UOM_ID", c_UOM_ID);
                     }
                 }
                 var C_UOM_ID = Util.getValueOfInt(mTab.getValue("C_UOM_ID"))

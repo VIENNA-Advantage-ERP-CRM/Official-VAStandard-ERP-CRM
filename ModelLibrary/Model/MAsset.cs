@@ -922,7 +922,7 @@ namespace VAdvantage.Model
             //{
             //    UpdateAssetCost();
             //}
-
+            
             // create default Account
             StringBuilder _sql = new StringBuilder("");
             // check table exist or not
@@ -932,6 +932,10 @@ namespace VAdvantage.Model
             if (count > 0)
             {
                 PO obj = null;
+                //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Asset_Acct WHERE A_Asset_ID=" + GetA_Asset_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 int assetId = GetA_Asset_ID();
                 int assetGroupId = GetA_Asset_Group_ID();
                 // get related to value agaisnt asset = 75
@@ -956,12 +960,16 @@ namespace VAdvantage.Model
                     {
                         for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                         {
+                            //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                            _SeqNo += 10;
                             obj = MTable.GetPO(GetCtx(), "FRPT_Asset_Acct", 0, null);
                             obj.Set_ValueNoCheck("AD_Org_ID", 0);
                             obj.Set_ValueNoCheck("A_Asset_ID", assetId);
                             obj.Set_ValueNoCheck("C_AcctSchema_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_AcctSchema_ID"]));
                             obj.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ValidCombination_ID"]));
                             obj.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
+                            //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                            obj.Set_ValueNoCheck("SeqNo", _SeqNo);
                             if (!obj.Save())
                             {
                                 ValueNamePair pp = VLogger.RetrieveError();

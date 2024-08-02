@@ -56,11 +56,25 @@ namespace VIS.Models
             {
                 Sql += " AND C_UOM_ID=" + UOM_ID;
             }
-            //baseUOM
-            else
+
+            //VAI050-Give priority to Sales UOM  On Product
+
+            string query = "SELECT C_UOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE M_Product_ID= " + ProductID;
+            DataSet ds1 = DB.ExecuteDataset(query, null, null);
+
+            if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
             {
-                Sql += " AND C_UOM_ID = (SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + ProductID + ")";
+                if (Util.GetValueOfInt(ds1.Tables[0].Rows[0]["VAS_SalesUOM_ID"]) > 0)
+                {
+                    Sql += " AND C_UOM_ID =" + Util.GetValueOfInt(ds1.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
+                }
+                else
+                {
+                    Sql += " AND C_UOM_ID =" + Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_UOM_ID"]);
+
+                }
             }
+
             DataSet ds = DB.ExecuteDataset(Sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {

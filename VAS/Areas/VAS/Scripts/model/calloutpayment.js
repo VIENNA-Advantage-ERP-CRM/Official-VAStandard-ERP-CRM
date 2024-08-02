@@ -204,7 +204,7 @@
         }
 
         // Added by Bharat on 02 June 2017 to remove client side queries
-        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+        var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + Globalize.format(Util.getValueOfDate(ts), "yyyy-MM-dd").toString();
         var dr = null;
         try {
             dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
@@ -551,7 +551,7 @@
                 }
 
                 // Added by Bharat on 18 May 2017 to remove client side queries
-                var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + ts.toString();
+                var paramString = C_Invoice_ID.toString() + "," + C_InvoicePaySchedule_ID.toString() + "," + Globalize.format(Util.getValueOfDate(ts), "yyyy-MM-dd").toString();
                 var dr = VIS.dataContext.getJSONRecord("MPayment/GetInvoiceData", paramString);
                 if (dr != null) {
                     C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);

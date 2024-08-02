@@ -61,7 +61,7 @@ namespace VIS.Models
 
             MInvoice inv = new MInvoice(ctx, C_Invoice_ID, null);
             Dictionary<string, object> result = new Dictionary<string, object>();
-            result["IsSOTrx"] = inv.IsSOTrx().ToString();
+            result["IsSOTrx"] = inv.IsSOTrx();
             result["IsReturnTrx"] = inv.IsReturnTrx().ToString();
             result["C_BPartner_ID"] = inv.GetC_BPartner_ID().ToString();
             result["M_PriceList_ID"] = inv.GetM_PriceList_ID().ToString();
@@ -85,7 +85,8 @@ namespace VIS.Models
 
                 // Get Product Detail
                 sql.Clear();
-                sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote, C_RevenueRecognition_ID FROM M_Product WHERE
+                //VAI050-Get Purchase and Sales UOM from product
+                sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote, C_RevenueRecognition_ID,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE
                     IsActive = 'Y' AND M_Product_ID = " + _m_Product_Id);
                 dsProductInfo = DB.ExecuteDataset(sql.ToString());
                 if (dsProductInfo != null && dsProductInfo.Tables[0].Rows.Count > 0)
@@ -95,12 +96,23 @@ namespace VIS.Models
                     result["IsDropShip"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["IsDropShip"]);
                     result["DocumentNote"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["DocumentNote"]);
                     result["C_RevenueRecognition_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["C_RevenueRecognition_ID"]);
+                    result["VAS_PurchaseUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_PurchaseUOM_ID"]);
+                    result["VAS_SalesUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
                 }
 
                 // Get Purchasing or Base UOM
                 if (Util.GetValueOfInt(result["purchasingUom"]) > 0 && !inv.IsSOTrx())
                 {
                     C_UOM_ID = Util.GetValueOfInt(result["purchasingUom"]);
+                }
+
+                else if (Util.GetValueOfInt(result["VAS_PurchaseUOM_ID"]) > 0 && !inv.IsSOTrx())
+                {
+                    C_UOM_ID = Util.GetValueOfInt(result["VAS_PurchaseUOM_ID"]);
+                }
+                else if (Util.GetValueOfInt(result["VAS_SalesUOM_ID"]) > 0 && inv.IsSOTrx())
+                {
+                    C_UOM_ID = Util.GetValueOfInt(result["VAS_SalesUOM_ID"]);
                 }
                 else
                 {
@@ -1220,7 +1232,7 @@ namespace VIS.Models
             Dictionary<string, object> retValue = null;
             //VIS_427 BugID 5620 changed function in order to get the discount amount directly from schedule
             string sql = "SELECT C_BPartner_ID, C_Currency_ID, C_ConversionType_ID, invoiceOpen(C_Invoice_ID, " + Util.GetValueOfInt(paramValue[3]) + @") as invoiceOpen, IsSOTrx, 
-             invoiceDiscount(" + paramValue[0] + "," +paramValue[1]+","+paramValue[2]+"," + paramValue[3] + ") as paymentTermDiscount, C_DocTypeTarget_ID,C_BPartner_Location_ID FROM C_Invoice WHERE C_Invoice_ID=" + Util.GetValueOfInt(paramValue[0]);
+             invoiceDiscount(" + paramValue[0] + "," + paramValue[1] + "," + paramValue[2] + "," + paramValue[3] + ") as paymentTermDiscount, C_DocTypeTarget_ID,C_BPartner_Location_ID FROM C_Invoice WHERE C_Invoice_ID=" + Util.GetValueOfInt(paramValue[0]);
             try
             {
                 _ds = DB.ExecuteDataset(sql, null, null);
@@ -1583,7 +1595,7 @@ namespace VIS.Models
             {
                 return null;
             }
-            
+
         }
 
         /// <summary>

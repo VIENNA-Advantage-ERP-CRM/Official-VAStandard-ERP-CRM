@@ -1,0 +1,165 @@
+﻿
+.VAS-PO-summary {
+    padding: 0.625rem;
+}
+
+.VAS-partially-msg {
+    background-color: #FAEED2;
+    color: #DE9900;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-partially-msg .vis {
+        font-size: 1rem;
+    }
+
+.VAS-delivered-msg {
+    background-color: #c9e0ca;
+    color: #1EA025;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-delivered-msg .fa {
+        font-size: 1rem;
+    }
+
+.VAS-Open-msg {
+    background-color: rgba(var(--v-c-secondary), 1);
+    color: black;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+}
+
+    .VAS-Open-msg .vis {
+        font-size: 1rem;
+    }
+
+.VAS-polist-heading {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 10px 0 4px;
+}
+
+.VAS-PO-list-col {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: calc(100% - 68px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.VAS-polist-box {
+    background-color: #EDF5FA;
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.625rem;
+    position: relative;
+}
+
+.VAS-product-thumbnail {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 6px;
+    width: 80px;
+    display: flex;
+    align-items: center;
+}
+
+    .VAS-product-thumbnail img {
+        height: 100%;
+        object-fit: contain;
+        width: 100%;
+    }
+
+.VAS-PO-details {
+    width: 70%;
+}
+
+    .VAS-PO-details > h1 {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0 0 2px;
+    }
+
+.VAS-UPC-num {
+    font-size: .75rem;
+}
+
+.VAS-order-description {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-top: 10px;
+}
+
+.VAS-order-values h6 {
+    margin: 0;
+    font-size: 0.75rem;
+}
+
+.VAS-order-values span {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.VAS-po-info-icon, .VAS-po-approve-icon {
+    position: absolute;
+    right: 0.625rem;
+    top: 0.625rem;
+}
+
+    .VAS-po-info-icon .vis {
+        font-size: 1.2rem;
+        color: #DE9900;
+    }
+
+    .VAS-po-approve-icon .fa {
+        font-size: 1.4rem;
+        color: #1EA025;
+    }
+
+.VAS-product-thumbnail i {
+    font-size: 64px;
+}
+
+span.vis.vis-info.vas-openItem {
+    color: #000;
+}
+.VAS-PO-details .VAS-Attrbiute {
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
+}
+.VAS-PO-details > h1 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 0 0 2px;
+    max-width: 180px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: auto;
+}
