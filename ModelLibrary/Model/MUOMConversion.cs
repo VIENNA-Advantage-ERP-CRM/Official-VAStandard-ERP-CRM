@@ -684,11 +684,18 @@ namespace VAdvantage.Model
             List<MUOMConversion> list = new List<MUOMConversion>();
 
             //
-            String sql = "SELECT * FROM C_UOM_Conversion c "
-                + "WHERE c.M_Product_ID=" + M_Product_ID
-                + " AND EXISTS (SELECT * FROM M_Product p "
-                    + "WHERE c.M_Product_ID=p.M_Product_ID AND c.C_UOM_ID=p.C_UOM_ID)"
-                + " AND c.IsActive='Y' AND c.AD_Client_ID IN (0 , " + ctx.GetAD_Client_ID() + ")";
+            //String sql = "SELECT * FROM C_UOM_Conversion c "
+            //    + "WHERE c.M_Product_ID=" + M_Product_ID
+            //    + " AND EXISTS (SELECT * FROM M_Product p "
+            //        + "WHERE c.M_Product_ID=p.M_Product_ID AND c.C_UOM_ID=p.C_UOM_ID)"
+            //    + " AND c.IsActive='Y' AND c.AD_Client_ID IN (0 , " + ctx.GetAD_Client_ID() + ")";
+
+            // VIS0060: Get UOM conversion exists with Product.
+            string sql = @"SELECT c.* FROM M_Product p 
+                    INNER JOIN C_UOM_Conversion c ON (p.C_UOM_ID = c.C_UOM_ID AND c.M_Product_ID = p.M_Product_ID) 
+                    WHERE c.IsActive = 'Y' AND p.M_Product_ID = " + M_Product_ID +
+                    " AND c.AD_Client_ID IN (0 , " + ctx.GetAD_Client_ID() + ")";
+
             DataTable dt = null;
             IDataReader idr = null;
             DataTable dt1 = null;
@@ -705,22 +712,28 @@ namespace VAdvantage.Model
                     list.Add(new MUOMConversion(ctx, dr, null));
                 }
 
-                if (list.Count == 0)
-                {
-                    sql = "SELECT * FROM C_UOM_Conversion c "
-                + "WHERE EXISTS (SELECT * FROM M_Product p "
-                    + "WHERE c.C_UOM_ID=p.C_UOM_ID AND p.M_Product_ID=" + M_Product_ID + ")"
-                + " AND c.IsActive='Y' AND c.AD_Client_ID IN ( 0 , " + ctx.GetAD_Client_ID() + ")";
+                //if (list.Count == 0)
+                //{
+                //sql = "SELECT * FROM C_UOM_Conversion c "
+                //+ "WHERE EXISTS (SELECT * FROM M_Product p "
+                //+ "WHERE c.C_UOM_ID=p.C_UOM_ID AND p.M_Product_ID=" + M_Product_ID + ")"
+                //+ " AND c.IsActive='Y' AND c.AD_Client_ID IN ( 0 , " + ctx.GetAD_Client_ID() + ")";
 
-                    idr1 = DB.ExecuteReader(sql, null, null);
-                    dt1 = new DataTable();
-                    dt1.Load(idr1);
-                    idr1.Close();
-                    foreach (DataRow dr1 in dt1.Rows)
-                    {
-                        list.Add(new MUOMConversion(ctx, dr1, null));
-                    }
+                // VIS0060: if UOM conversion not exists with Product then System will check conversion from without product record.
+                sql = @"SELECT c.* FROM M_Product p 
+                    INNER JOIN C_UOM_Conversion c ON (p.C_UOM_ID = c.C_UOM_ID AND c.M_Product_ID IS NULL) 
+                    WHERE c.IsActive = 'Y' AND p.M_Product_ID = " + M_Product_ID +
+                " AND c.AD_Client_ID IN (0 , " + ctx.GetAD_Client_ID() + ")";
+
+                idr1 = DB.ExecuteReader(sql, null, null);
+                dt1 = new DataTable();
+                dt1.Load(idr1);
+                idr1.Close();
+                foreach (DataRow dr1 in dt1.Rows)
+                {
+                    list.Add(new MUOMConversion(ctx, dr1, null));
                 }
+                //}
 
             }
             catch (Exception e)
