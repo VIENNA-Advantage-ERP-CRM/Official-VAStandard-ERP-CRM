@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Text;
 using System.Web;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -223,57 +224,53 @@ namespace VIS.Models
         {
             Dictionary<string, object> retDic = new Dictionary<string, object>
                     { { "Status", 1 } };
-            Trx trx = null;
+            Trx trx = Trx.Get("VAS_ProductUOMSetup" + DateTime.Now.Ticks);
+
             try
             {
-                trx = Trx.Get("VAS_ProductUOMSetup" + DateTime.Now.Ticks);
+                // Check if UOM conversions already exist
+                List<string> existingUomNames = GetExistingUomNames(ctx, trx, Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+                if (existingUomNames.Count > 0)
+                {
+                    retDic["Status"] = 0;
+                    retDic["message"] = Msg.GetMsg(ctx, "VAS_ConversionAlreadyExist") + " " + string.Join(",", existingUomNames);
+                    return retDic;
+                }
+
 
                 foreach (var item in multiplyRateItems)
                 {
-                    MUOMConversion obj = new MUOMConversion(ctx, 0, trx);
-                    obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
-                    obj.SetAD_Org_ID(ctx.GetAD_Org_ID());
-                    obj.SetC_UOM_ID(C_UOM_ID);
-                    obj.SetC_UOM_To_ID(item.C_UOM_To_ID);
-                    obj.SetMultiplyRate(item.DivideRate); // Dividing rate is saved in MultiplyRate column
-                    obj.SetDivideRate(item.MultiplyRate); // Multiplying rate is saved in DivideRate column
-                    obj.SetM_Product_ID(Product_ID);
 
-                    if (!obj.Save())
+                    if (C_UOM_ID != item.C_UOM_To_ID)
                     {
-                        trx.Rollback();
-                        retDic["Status"] = 0;
-                        retDic["message"] = Msg.GetMsg(ctx, "VAS_UOMConvNotSaved");
-                        return retDic;
+                        MUOMConversion obj = new MUOMConversion(ctx, 0, trx);
+                        obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                        obj.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                        obj.SetC_UOM_ID(C_UOM_ID);
+                        obj.SetC_UOM_To_ID(item.C_UOM_To_ID);
+                        obj.SetMultiplyRate(item.DivideRate); // Dividing rate is saved in MultiplyRate column
+                        obj.SetDivideRate(item.MultiplyRate); // Multiplying rate is saved in DivideRate column
+                        obj.SetM_Product_ID(Product_ID);
+
+                        if (!obj.Save())
+                        {
+                            trx.Rollback();
+                            retDic["Status"] = 0;
+                            retDic["message"] = Msg.GetMsg(ctx, "VAS_UOMConvNotSaved");
+                            return retDic;
+                        }
                     }
                 }
-
-                // Update M_Product with new UOM IDs
-                if (multiplyRateItems.Count > 0)
+                // Update product with new UOM IDs
+                bool updateResult = UpdateProductUOMs(ctx, trx, VAS_PurchaseUOM_ID, VAS_ConsumableUOM_ID, VAS_SalesUOM_ID, Product_ID);
+                if (!updateResult)
                 {
-                    // Define the parameters
-                    SqlParameter[] param = new SqlParameter[]
-                    {
-                      new SqlParameter("@PurchaseUOMID", VAS_PurchaseUOM_ID),
-                      new SqlParameter("@ConsumableUOMID", VAS_ConsumableUOM_ID),
-                      new SqlParameter("@SalesUOMID", VAS_SalesUOM_ID),
-                      new SqlParameter("@ProductID", Product_ID)
-                    };
-
-                    //use parameterized query
-                    string query = @"UPDATE M_Product SET VAS_PurchaseUOM_ID = @PurchaseUOMID, VAS_ConsumableUOM_ID = @ConsumableUOMID, 
-                                     VAS_SalesUOM_ID = @SalesUOMID WHERE M_Product_ID = @ProductID";
-                    if (DB.ExecuteQuery(query, param, trx) <= 0)
-                    {
-                        trx.Rollback();
-                        retDic["Status"] = 0;
-                        retDic["message"] = Msg.GetMsg(ctx, "VAS_ProductNotUpdated");
-                        return retDic;
-                    }
-
-                    trx.Commit();
+                    trx.Rollback();
+                    retDic["Status"] = 0;
+                    retDic["message"] = Msg.GetMsg(ctx, "VAS_ProductNotUpdated");
+                    return retDic;
                 }
-
+                trx.Commit();
             }
             catch (Exception ex)
             {
@@ -290,6 +287,65 @@ namespace VIS.Models
             retDic["message"] = Msg.GetMsg(ctx, "VAS_UOMConvSaved");
             return retDic;
         }
+        /// <summary>
+        /// VAI050-This method used to update UOM value on Product tab
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+        /// <param name="purchaseUOMID"></param>
+        /// <param name="consumableUOMID"></param>
+        /// <param name="salesUOMID"></param>
+        /// <param name="productID"></param>
+        /// <returns></returns>
+        private bool UpdateProductUOMs(Ctx ctx, Trx trx, int purchaseUOMID, int consumableUOMID, int salesUOMID, int productID)
+        {
+            string sql = @"UPDATE M_Product SET VAS_PurchaseUOM_ID = @PurchaseUOMID,
+                                    VAS_ConsumableUOM_ID = @ConsumableUOMID,
+                                    VAS_SalesUOM_ID = @SalesUOMID
+                                 WHERE M_Product_ID = @ProductID";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                  new SqlParameter("@PurchaseUOMID", purchaseUOMID),
+                  new SqlParameter("@ConsumableUOMID", consumableUOMID),
+                  new SqlParameter("@SalesUOMID", salesUOMID),
+                  new SqlParameter("@ProductID", productID)
+            };
+
+            int rowsAffected = DB.ExecuteQuery(sql, parameters, trx);
+            return rowsAffected > 0;
+        }
+        /// <summary>
+        /// VAI050-This method used to check conversion uom already exist or not
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+        /// <param name="productID"></param>
+        /// <param name="VAS_PurchaseUOM_ID"></param>
+        /// <param name="VAS_SalesUOM_ID"></param>
+        /// <param name="VAS_ConsumableUOM_ID"></param>
+        /// <returns></returns>
+        private List<string> GetExistingUomNames(Ctx ctx, Trx trx, int productID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
+        {
+            List<string> uomNames = new List<string>();
+            string uomIDs = string.Join(",", new int[] { VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID });
+            string sql = @"SELECT conv.C_UOM_ID,u.Name  FROM C_UOM_Conversion conv
+                           INNER JOIN C_UOM u ON(conv.C_UOM_To_ID = u.C_UOM_ID) 
+                           WHERE M_Product_ID=" + productID + " " +
+                            "AND C_UOM_To_ID IN(" + uomIDs + ")";
+            DataSet ds = DB.ExecuteDataset(sql, null, trx);
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow row in ds.Tables[0].Rows)
+                {
+                    string uomName = Util.GetValueOfString(row["Name"]);
+                    uomNames.Add(uomName);
+                }
+            }
+
+            return uomNames;
+        }
+
 
         /// <summary>
         /// VAI050-Get Product's UOM 
