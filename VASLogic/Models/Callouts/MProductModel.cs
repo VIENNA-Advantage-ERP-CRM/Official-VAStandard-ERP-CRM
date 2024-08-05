@@ -225,22 +225,10 @@ namespace VIS.Models
             Dictionary<string, object> retDic = new Dictionary<string, object>
                     { { "Status", 1 } };
             Trx trx = Trx.Get("VAS_ProductUOMSetup" + DateTime.Now.Ticks);
-
             try
             {
-                // Check if UOM conversions already exist
-                List<string> existingUomNames = GetExistingUomNames(ctx, trx, Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
-                if (existingUomNames.Count > 0)
-                {
-                    retDic["Status"] = 0;
-                    retDic["message"] = Msg.GetMsg(ctx, "VAS_ConversionAlreadyExist") + " " + string.Join(",", existingUomNames);
-                    return retDic;
-                }
-
-
                 foreach (var item in multiplyRateItems)
                 {
-
                     if (C_UOM_ID != item.C_UOM_To_ID)
                     {
                         MUOMConversion obj = new MUOMConversion(ctx, 0, trx);
@@ -251,7 +239,6 @@ namespace VIS.Models
                         obj.SetMultiplyRate(item.DivideRate); // Dividing rate is saved in MultiplyRate column
                         obj.SetDivideRate(item.MultiplyRate); // Multiplying rate is saved in DivideRate column
                         obj.SetM_Product_ID(Product_ID);
-
                         if (!obj.Save())
                         {
                             trx.Rollback();
@@ -314,36 +301,6 @@ namespace VIS.Models
 
             int rowsAffected = DB.ExecuteQuery(sql, parameters, trx);
             return rowsAffected > 0;
-        }
-        /// <summary>
-        /// VAI050-This method used to check conversion uom already exist or not
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="trx"></param>
-        /// <param name="productID"></param>
-        /// <param name="VAS_PurchaseUOM_ID"></param>
-        /// <param name="VAS_SalesUOM_ID"></param>
-        /// <param name="VAS_ConsumableUOM_ID"></param>
-        /// <returns></returns>
-        private List<string> GetExistingUomNames(Ctx ctx, Trx trx, int productID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
-        {
-            List<string> uomNames = new List<string>();
-            string uomIDs = string.Join(",", new int[] { VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID });
-            string sql = @"SELECT conv.C_UOM_ID,u.Name  FROM C_UOM_Conversion conv
-                           INNER JOIN C_UOM u ON(conv.C_UOM_To_ID = u.C_UOM_ID) 
-                           WHERE M_Product_ID=" + productID + " " +
-                            "AND C_UOM_To_ID IN(" + uomIDs + ")";
-            DataSet ds = DB.ExecuteDataset(sql, null, trx);
-            if (ds != null && ds.Tables.Count > 0)
-            {
-                foreach (DataRow row in ds.Tables[0].Rows)
-                {
-                    string uomName = Util.GetValueOfString(row["Name"]);
-                    uomNames.Add(uomName);
-                }
-            }
-
-            return uomNames;
         }
 
 
