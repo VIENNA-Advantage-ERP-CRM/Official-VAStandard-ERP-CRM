@@ -368,6 +368,9 @@ namespace VIS.Models
             {
                 newTable = columnName.Substring(0, columnName.Length - 3);
             }
+            if (columnName.Equals("CREATEDBY") || columnName.Equals("UPDATEDBY")) {
+                newTable = "AD_User";
+            }
 
             if (tableName.ToUpper() != newTable.ToUpper() && newTable != "")
             {
