@@ -413,7 +413,7 @@
                 // Two values are the same
                 if (puValue === suValue) {
                     if (qtyForPU !== qtyForSU) {
-                        VIS.ADialog.info("VAS_UnitOfPUAndSUButDifferQty");
+                        VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                         busyDiv(false);
                    
                         return; 
@@ -430,7 +430,7 @@
                     });
                 } else if (puValue === cuValue) {
                     if (qtyForPU !== qtyForCU) {
-                        VIS.ADialog.info("VAS_UnitOfPUAndCUButDifferQty");
+                        VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                         busyDiv(false);
                         return; 
                     }
@@ -446,7 +446,7 @@
                     });
                 } else if (suValue === cuValue) {
                     if (qtyForSU !== qtyForCU) {
-                        VIS.ADialog.info("VAS_UnitOfSUAndCUButDifferQty");
+                        VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                         busyDiv(false);
                         return;
                     }
