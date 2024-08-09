@@ -30,7 +30,6 @@ using com.sun.xml.@internal.bind.v2.schemagen.xmlschema;
 using VAdvantage.ProcessEngine;
 using ModelLibrary.Classes;
 using QRCoder;
-using System.Net;
 
 namespace VAdvantage.Model
 {
