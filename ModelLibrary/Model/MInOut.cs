@@ -1747,7 +1747,9 @@ namespace VAdvantage.Model
                 Msg.GetMsg(GetCtx(), "VAS_PromiseDate") + Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DatePromised"]).Value.ToShortDateString() + "\n" +
                 Msg.GetMsg(GetCtx(), "VAS_CustomerName") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]) + "\n" +
                 Msg.GetMsg(GetCtx(), "VAS_CustomerAddress") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Address"]) + "\n" +
-                Msg.GetMsg(GetCtx(), "VAS_GrandTotal") + Util.GetValueOfString(ds.Tables[0].Rows[0]["ISO_Code"]) + " " + Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]).ToString("f2");
+                Msg.GetMsg(GetCtx(), "VAS_GrandTotal") + Util.GetValueOfString(ds.Tables[0].Rows[0]["ISO_Code"]) + " " +
+                DisplayType.GetNumberFormat(DisplayType.Amount).GetFormatAmount(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]), GetCtx().GetContext("#ClientLanguage"));
+                
 
                 // Generate QR code                
                 QRCodeGenerator qrGenerator = new QRCodeGenerator();
