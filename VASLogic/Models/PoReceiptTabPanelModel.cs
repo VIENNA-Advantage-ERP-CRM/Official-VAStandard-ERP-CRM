@@ -308,6 +308,40 @@ namespace VASLogic.Models
             }
             return path;
         }
+
+        /// <summary>
+        /// This function is Used to Get the Order Total Summary data 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="OrderId">Order ID</param>
+        /// <returns>returns the Order Total Summary data</returns>
+        public List<dynamic> GetOrderSummary(Ctx ctx, int OrderId)
+        {
+            List<dynamic> retData = new List<dynamic>();
+            String sql = @"SELECT t.Name, ci.DocumentNo, ct.TaxAmt, ci.TotalLines, ci.GrandTotal, cy.CurSymbol, cy.StdPrecision
+                          FROM C_OrderTax ct 
+                          INNER JOIN C_Order ci ON (ci.C_Order_ID = ct.C_Order_ID) 
+                          INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Order_ID = " + OrderId + " Order By t.Name";
+
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                   dynamic obj = new ExpandoObject();
+                    obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.TotalLines = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalLines"]);
+                    obj.TaxAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxAmt"]);
+                    obj.GrandTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["GrandTotal"]);
+                    obj.CurSymbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
+                    obj.StdPrecision = Util.GetValueOfString(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    retData.Add(obj);
+                }
+            }
+            return retData;
+        }
     }
     public class TabPanel
     {
