@@ -94,7 +94,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/MatchPOTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_TimeSheetInvoice.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ProductUomSetup.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseOrderTabPanel.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseOrderTabPanel.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_OrderSummary.js"
                    );
 
 

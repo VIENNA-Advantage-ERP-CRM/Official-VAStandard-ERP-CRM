@@ -143,6 +143,7 @@
 span.vis.vis-info.vas-openItem {
     color: #000;
 }
+
 .VAS-PO-details .VAS-Attrbiute {
     font-size: 12px;
     font-weight: 500;
@@ -153,6 +154,7 @@ span.vis.vis-info.vas-openItem {
     overflow: hidden;
     min-width: auto;
 }
+
 .VAS-PO-details > h1 {
     font-size: 0.875rem;
     font-weight: 500;
@@ -162,4 +164,36 @@ span.vis.vis-info.vas-openItem {
     text-overflow: ellipsis;
     overflow: hidden;
     min-width: auto;
+}
+
+.VAS-summary-details {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.VAS-summary-header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+    .VAS-summary-header span {
+        height: 22px;
+    }
+
+.VAS-summary-info {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+.VAS-summary-amount {
+    height: 22px;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    text-align: right;
 }

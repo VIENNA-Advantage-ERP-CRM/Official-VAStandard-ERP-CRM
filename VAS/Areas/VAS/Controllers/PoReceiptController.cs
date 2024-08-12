@@ -136,5 +136,22 @@ namespace VAS.Areas.VAS.Controllers
             return Json(JsonConvert.SerializeObject(retJSON), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// This function is Used to Get the Order Total Summary data 
+        /// </summary>
+        /// <param name="OrderId">Order ID</param>
+        /// <returns>returns the Order tax data</returns>
+        public JsonResult GetOrderSummary(int OrderId)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<dynamic> result = obj.GetOrderSummary(ctx, OrderId);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
