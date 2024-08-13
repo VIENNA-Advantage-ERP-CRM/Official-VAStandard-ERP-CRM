@@ -319,7 +319,7 @@ namespace VASLogic.Models
         /// <param name="IsSoTrx">IsSoTrx</param>
         /// <Author>VIS_427</Author>
         /// <returns>returns UnAllocated Payment data for particular business partner</returns>
-        public List<UnAllocatedPayTabPanel> GetUnAllocatedPayData(Ctx ctx, int C_BPartner_ID, string IsSoTrx,int AD_Org_ID)
+        public List<UnAllocatedPayTabPanel> GetUnAllocatedPayData(Ctx ctx, int C_BPartner_ID, string IsSoTrx, int AD_Org_ID)
         {
             StringBuilder sql = new StringBuilder();
             List<UnAllocatedPayTabPanel> UnAllocatedTabPanel = new List<UnAllocatedPayTabPanel>();
@@ -334,7 +334,7 @@ namespace VASLogic.Models
                           LEFT JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID AND ah.DocStatus IN ('CO','CL'))
                           WHERE p.IsAllocated='N'
                           AND p.Processed='Y' AND p.Processing ='N' AND p.DocStatus IN ('CO','CL')
-                          AND p.C_BPartner_ID=" + C_BPartner_ID +" AND p.AD_Org_ID="+ AD_Org_ID);
+                          AND p.C_BPartner_ID=" + C_BPartner_ID + " AND p.AD_Org_ID=" + AD_Org_ID);
             if (IsSoTrx == "true")
             {
                 sql.Append(" AND doc.DocBaseType='ARR'");
@@ -357,13 +357,13 @@ namespace VASLogic.Models
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                int AD_Window_ID=Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='Payment'",null,null));
+                int AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='Payment'", null, null));
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     UnAllocatedPayTabPanel obj = new UnAllocatedPayTabPanel();
                     obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                     obj.C_Payment_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Payment_ID"]);
-                    obj.PayAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PayAmt"])- Math.Abs(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["AllocatedAmt"]));
+                    obj.PayAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PayAmt"]) - Math.Abs(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["AllocatedAmt"]));
                     obj.DateTrx = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateTrx"]);
                     obj.DateAcct = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateAcct"]);
                     obj.StdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
@@ -375,6 +375,7 @@ namespace VASLogic.Models
                 }
             }
             return UnAllocatedTabPanel;
+        }
 
         /// <summary>
         /// This function is Used to Get the Order Total Summary data 
