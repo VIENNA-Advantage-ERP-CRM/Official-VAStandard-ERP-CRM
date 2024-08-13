@@ -22,7 +22,7 @@
             "DateTrx",
             "DateAcct",
             "VAS_PayNo",
-            "VAS_UnAllocatedAmount",
+            "VAS_Amount",
             "C_Payment_ID",
             "AD_Org_ID",
             "VAS_UnaAllocatedPayTabPanel",
@@ -82,21 +82,21 @@
                             '<div class="VAS-paymentDetail">' +
                             '<div class="VAS-payment-val">' +
                             '<label for="" title="' + VAS.translatedTexts.VAS_PayNo +'">' + VAS.translatedTexts.VAS_PayNo + '</label>' +
-                            '<span>' + gridDataResult[i].DocumentNo+'</span>' +
+                            '<span class="vas-ualdocno" title="' + gridDataResult[i].DocumentNo +'">' + gridDataResult[i].DocumentNo+'</span>' +
                             '</div>' +
                             '<div class="VAS-payment-val">' +
                             '<label for="" title="' + VAS.translatedTexts.DateAcct +'">' + VAS.translatedTexts.DateAcct + '</label>' +
                             '<span>' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DateAcct).toLocaleDateString() +'</span>' +
                             '</div>' +
-                            '<div class="VAS-payment-val">' +
-                            '<label for="" title="' + VAS.translatedTexts.DateTrx +'">' + VAS.translatedTexts.DateTrx + '</label>' +
-                            '<span>' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DateTrx).toLocaleDateString() +'</span>' +
-                            '</div>' +
-                            '</div>' +
+                            //'<div class="VAS-payment-val">' +
+                            //'<label for="" title="' + VAS.translatedTexts.DateTrx +'">' + VAS.translatedTexts.DateTrx + '</label>' +
+                            //'<span>' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DateTrx).toLocaleDateString() +'</span>' +
+                            //'</div>' +
                             '<div class="VAS-paymentDetail VAS-grid-col1">' +
                             '<div class="VAS-payment-val">' +
-                            '<label for="" title="' + VAS.translatedTexts.VAS_UnAllocatedAmount +'">' + VAS.translatedTexts.VAS_UnAllocatedAmount + '</label>' +
+                            '<label for="" title="' + VAS.translatedTexts.VAS_Amount + '">' + VAS.translatedTexts.VAS_Amount + '</label>' +
                             '<span class="VAS-totalPrice">' + (gridDataResult[i].PayAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].StdPrecision, maximumFractionDigits: gridDataResult[i].StdPrecision }) + ' ' + gridDataResult[i].CurrencyName+'</span>' +
+                            '</div>' +
                             '</div>' +
                             '</div>' +
                             '</div>' +

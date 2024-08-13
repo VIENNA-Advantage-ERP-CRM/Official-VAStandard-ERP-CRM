@@ -289,7 +289,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .VAS-paymentDetail {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 27% 28% auto;
     gap: 0.3rem;
     margin: 0 0 5px;
 }
@@ -318,8 +318,8 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
 .VAS-totalPrice {
-    font-weight: 600;
-    font-size: 1rem !important;
+    /*font-weight: 600;*/
+    font-size: 0.875rem !important;
 }
 
 .VAS-search-link {
@@ -345,5 +345,13 @@ Only index.html and style.css is for your use There is no need to copy any other
     right: auto;
     top: 7px;
     left: 4px;
+}
+.vas-ualdocno {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+    width: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
