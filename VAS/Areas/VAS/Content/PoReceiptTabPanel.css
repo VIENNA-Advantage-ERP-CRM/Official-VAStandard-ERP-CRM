@@ -10,46 +10,52 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 */
 
-.vas-apInvPoWrapper{
-  display: flex;
-  flex-direction: column;
-  /*border: 1px solid #eee;*/
-  width: 100%;
-  /* calculate height Dynamically */
- /* height: 600px;*/
-  padding: 1rem;
+.vas-apInvPoWrapper {
+    display: flex;
+    flex-direction: column;
+    /*border: 1px solid #eee;*/
+    width: 100%;
+    /* calculate height Dynamically */
+    /* height: 600px;*/
+    padding: 1rem;
 }
-.vas-apInvPoTtl{
-  font-size: 16px;
-  color: rgba(var(--v-c-primary), 1);
-  font-weight: 600;
-  margin-bottom: 12px;
+
+.vas-apInvPoTtl {
+    font-size: 16px;
+    color: rgba(var(--v-c-primary), 1);
+    font-weight: 600;
+    margin-bottom: 12px;
 }
-.vas-apInvPoListItem{
-  padding: 1rem;
-  box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
-  border: 1px solid #eee;
-  border-radius: 0.2rem;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+
+.vas-apInvPoListItem {
+    padding: 1rem;
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border: 1px solid #eee;
+    border-radius: 0.2rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
 }
-.vas-apInvPoListItem:hover{
-  border: 1px solid rgba(var(--v-c-primary), .5);
-}
+
+    .vas-apInvPoListItem:hover {
+        border: 1px solid rgba(var(--v-c-primary), .5);
+    }
+
 .vas-apInvPoListGroup {
-  /*height: 535px;*/
-  overflow-y: auto;
-  padding: 4px 4px 4px 1px;
+    /*height: 535px;*/
+    overflow-y: auto;
+    padding: 4px 4px 4px 1px;
 }
-.vas-apInvPoTitle{
-  font-size: 14px;
-  font-weight: 600;
-  display: block;
+
+.vas-apInvPoTitle {
+    font-size: 14px;
+    font-weight: 600;
+    display: block;
 }
-.vas-apInvPoValue{
-  font-size: 14px;
-  display: block;
+
+.vas-apInvPoValue {
+    font-size: 14px;
+    display: block;
 }
 
 
@@ -64,21 +70,22 @@ Only index.html and style.css is for your use There is no need to copy any other
     color: rgba(var(--v-c-primary),1);
     font-weight: 600;
     font-size: 1rem;
-    margin-bottom:0;
+    margin-bottom: 0;
 }
 
 .vas-apListItem {
     box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
     border-radius: 0.15rem;
-    padding:0.85rem;
+    padding: 0.85rem;
 }
 
 .vas-ap-sglItem {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap:10px;
+    gap: 10px;
 }
+
 .vas-ap-sgl1Item1_First {
     display: flex;
     align-items: flex-start;
@@ -92,10 +99,12 @@ Only index.html and style.css is for your use There is no need to copy any other
     font-size: 12px;
     margin-bottom: 0;
 }
+
 .vas-singleTaxElementTTl, .vas-singleTaxElementValue {
     font-size: 14px;
     display: block;
 }
+
 .vas-singleTaxElementValue, .vas-singleRequesitionValue {
     font-weight: normal;
     width: 100%;
@@ -104,6 +113,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
 .vas-singleTaxElementTTl {
     font-weight: normal;
     width: 100%;
@@ -121,6 +131,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
 .vas-singleTaxElementValue1_first {
     font-size: 14px;
     display: block;
@@ -152,12 +163,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     width: 11.5px;
     height: 11.5px;
 }
-.VAS-TaxDetail{
+
+.VAS-TaxDetail {
     padding: 5px 5px 5px 1px;
 }
+
 .vas-setTaxWidth {
     width: 24%
 }
+
 .vas-setTaxWidthCheckbox {
     align-self: center;
     width: 11%
@@ -166,16 +180,19 @@ Only index.html and style.css is for your use There is no need to copy any other
 .vas-setTaxWidth1 {
     width: 10%
 }
+
 .vas-setTaxPaybleAmtWidth {
     width: 38%
-
 }
+
 .vas-setTaxAmtWidth {
     width: 38%
 }
+
 .vis-ad-w-p-actionpanel-b .vas-aptaxListGroup {
     height: auto;
 }
+
 .vas-singleItemListWrap {
     display: flex;
     align-items: flex-start;
@@ -184,31 +201,37 @@ Only index.html and style.css is for your use There is no need to copy any other
     width: 100%;
 }
 
-.vas-setMatchPo{
-    width:45%
+.vas-setMatchPo {
+    width: 45%
 }
-.vas-setShipWidth{
-    width:70%
+
+.vas-setShipWidth {
+    width: 70%
 }
 
 .vas-setTaxProWidth {
     width: 70%
 }
+
 .vas-setChargeWidth {
     width: 70%
 }
+
 .vas-setUomWidth {
     width: 70%
 }
+
 .vas-apInvWrapper {
     display: flex;
     flex-direction: column;
     width: 100%;
     padding: 0.5rem;
 }
+
 .VAS-InvDetail {
     padding: 5px 5px 5px 1px;
 }
+
 .vas-apInvListGroup {
     height: calc(100vh - 300px);
     padding: 5px 5px 0 0;
@@ -216,5 +239,111 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vis-ad-w-p-actionpanel-b .vas-apInvListGroup {
     height: auto
+}
+
+.VAS-unallocated-flyout {
+    /*box-shadow: 0 0 5px #cccccc;
+    position: absolute;*/
+    right: 0;
+    top: 0;
+}
+
+.VAS-flyout-header {
+    background-color: rgba(var(--v-c-primary), 1);
+    font-size: 1rem;
+    color: rgba(var(--v-c-common), 1);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+    .VAS-flyout-header .vis {
+        cursor: pointer;
+    }
+
+.VAS-payment-details {
+    margin: 0.5rem;
+    height: calc(100% - 6px);
+    overflow-y: auto;
+}
+
+.VAS-payment-details ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.VAS-payment-details ul li {
+    border-radius: 6px;
+    background-color: rgba(var(--v-c-secondary), 1);
+    display: flex;
+    width: 100%;
+    gap: 0.5rem;
+    padding: 0.875rem;
+    position: relative;
+}
+
+.VAS-paymentDetail {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.3rem;
+    margin: 0 0 5px;
+}
+    .VAS-paymentDetail.VAS-grid-col1 {
+        margin-bottom: 0;
+        line-height: 19px;
+    }
+
+.VAS-grid-col1 {
+    grid-template-columns: repeat(1, 1fr) !important;
+}
+
+.VAS-payment-val label {
+    font-size: 0.75rem;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 70px;
+    overflow: hidden;
+}
+
+.VAS-payment-val span {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+}
+
+.VAS-totalPrice {
+    font-weight: 600;
+    font-size: 1rem !important;
+}
+
+.VAS-search-link {
+    position: absolute;
+    right: 6px;
+    top: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    padding-right:7px;
+}
+
+.VAS-payment-details ul li .form-check {
+    position: relative;
+    top: 2px;
+}
+
+.VAS-payment-details ul li.active {
+    background-color: rgba(var(--v-c-primary), 0.1);
+}
+
+.VAS-payment-details input[type="checkbox"]:checked:before {
+    bottom: auto;
+    right: auto;
+    top: 7px;
+    left: 4px;
 }
 

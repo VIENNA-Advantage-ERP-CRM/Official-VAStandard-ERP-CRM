@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading.Tasks;
 using VAdvantage.Utility;
 using VAdvantage.Common;
+using VAdvantage.Model;
 
 namespace VASLogic.Models
 {
@@ -308,6 +309,72 @@ namespace VASLogic.Models
             }
             return path;
         }
+        /// <summary>
+        /// 08/08/2024 This function is Used to Get the UnAllocated Payment data for particular business partner
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="C_BPartner_ID">Business Partner ID</param>
+        /// <param name="AD_Org_ID">AD_Org_ID</param>
+        /// <param name="IsSoTrx">IsSoTrx</param>
+        /// <Author>VIS_427</Author>
+        /// <returns>returns UnAllocated Payment data for particular business partner</returns>
+        public List<UnAllocatedPayTabPanel> GetUnAllocatedPayData(Ctx ctx, int C_BPartner_ID, string IsSoTrx,int AD_Org_ID)
+        {
+            StringBuilder sql = new StringBuilder();
+            List<UnAllocatedPayTabPanel> UnAllocatedTabPanel = new List<UnAllocatedPayTabPanel>();
+            sql.Append(@"SELECT p.DateTrx,p.DateAcct, p.PayAmt,p.C_Payment_ID,p.AD_Org_ID,cy.StdPrecision,cy.ISO_Code,
+                          p.DocumentNo,p.C_ConversionType_ID, SUM(currencyConvert(al.Amount,
+                          ah.C_Currency_ID, p.C_Currency_ID,NVL(ah.DateAcct,ah.DateTrx),NVL(ah.C_ConversionType_ID,
+                          p.C_ConversionType_ID), al.AD_Client_ID,al.AD_Org_ID)) AS AllocatedAmt
+                          FROM C_Payment p
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = p.C_Currency_ID) 
+                          INNER JOIN C_Doctype doc ON (doc.C_DocType_ID=p.C_DocType_ID)
+                          LEFT JOIN C_AllocationLine al ON (al.C_Payment_ID=p.C_Payment_ID)
+                          LEFT JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID AND ah.DocStatus IN ('CO','CL'))
+                          WHERE p.IsAllocated='N'
+                          AND p.Processed='Y' AND p.Processing ='N' AND p.DocStatus IN ('CO','CL')
+                          AND p.C_BPartner_ID=" + C_BPartner_ID +" AND p.AD_Org_ID="+ AD_Org_ID);
+            if (IsSoTrx == "true")
+            {
+                sql.Append(" AND doc.DocBaseType='ARR'");
+            }
+            else
+            {
+                sql.Append(" AND doc.DocBaseType='APP'");
+            }
+            sql.Append(@" GROUP BY p.DateTrx,
+                         p.DateAcct,
+                         p.PayAmt,
+                         p.C_Payment_ID,
+                         p.AD_Org_ID,
+                         cy.StdPrecision,
+                         cy.ISO_Code,
+                         p.DocumentNo,
+                         p.C_ConversionType_ID");
+            sql.Append(" ORDER BY DateTrx ASC");
+            string datasql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                int AD_Window_ID=Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='Payment'",null,null));
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    UnAllocatedPayTabPanel obj = new UnAllocatedPayTabPanel();
+                    obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                    obj.C_Payment_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Payment_ID"]);
+                    obj.PayAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PayAmt"])- Math.Abs(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["AllocatedAmt"]));
+                    obj.DateTrx = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateTrx"]);
+                    obj.DateAcct = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateAcct"]);
+                    obj.StdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    obj.UomName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.AD_Window_ID = AD_Window_ID;
+                    obj.C_ConversionType_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ConversionType_ID"]);
+                    UnAllocatedTabPanel.Add(obj);
+                }
+            }
+            return UnAllocatedTabPanel;
+        }
     }
     public class TabPanel
     {
@@ -386,5 +453,18 @@ namespace VASLogic.Models
 
         public int stdPrecision { get; set; }
 
+    }
+    public class UnAllocatedPayTabPanel
+    {
+        public DateTime? DateTrx { get; set; }
+        public DateTime? DateAcct { get; set; }
+        public string DocumentNo { get; set; }
+        public decimal PayAmt { get; set; }
+        public int C_Payment_ID { get; set; }
+        public int AD_Org_ID { get; set; }
+        public int StdPrecision { get; set; }
+        public string UomName { get; set; }
+        public int AD_Window_ID { get; set; }
+        public int C_ConversionType_ID { get; set; }
     }
 }
