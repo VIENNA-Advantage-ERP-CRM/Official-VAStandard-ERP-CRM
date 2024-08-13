@@ -29,6 +29,7 @@ using System.Net.Http.Headers;
 using com.sun.xml.@internal.bind.v2.schemagen.xmlschema;
 using VAdvantage.ProcessEngine;
 using ModelLibrary.Classes;
+using QRCoder;
 
 namespace VAdvantage.Model
 {
@@ -1706,7 +1707,72 @@ namespace VAdvantage.Model
                 }
             }
 
+            // VIS0060: Work done to save QR code information on Delivery Order header for Delivery Order Print.
+            if (newRecord && IsSOTrx() && GetC_Order_ID() > 0)
+            {
+                int ImageID = GenerateQRImage();
+                if (ImageID > 0)
+                {
+                    if (DB.ExecuteQuery("UPDATE M_InOut SET AD_Image_ID = " + ImageID + " WHERE M_InOut_ID = " + GetM_InOut_ID()) < 0)
+                    {
+                        log.Info(Msg.GetMsg(GetCtx(), "VAS_QRImageNotUpdated"));
+                    }
+                }
+            }
             return success;
+        }
+
+        /// <summary>
+        /// Genarate QR Code Image from Sales Order Information.
+        /// </summary>
+        /// <returns>Image ID</returns>
+        private int GenerateQRImage()
+        {
+            string sql = @"SELECT o.DocumentNo, o.DateOrdered, o.DatePromised, cb.Name, cl.Name AS Location, o.GrandTotal, cy.ISO_Code,
+                    (CASE WHEN l.Address1 IS NOT NULL THEN l.Address1 ||', ' END || CASE WHEN l.Address2 IS NOT NULL THEN l.Address2 ||', ' END 
+                    || CASE WHEN l.City IS NOT NULL THEN l.City || ', ' END || CASE WHEN l.Postal IS NOT NULL THEN l.Postal ||', ' END
+                    || CASE WHEN l.RegionName IS NOT NULL THEN l.RegionName || ', ' END || c.Name) AS Address
+                    FROM C_Order o INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
+                    INNER JOIN C_BPartner_Location cl ON (o.C_BPartner_Location_ID = cl.C_BPartner_Location_ID)
+                    INNER JOIN C_Location l ON (cl.C_Location_ID = l.C_Location_ID)
+                    INNER JOIN C_Country c ON (l.C_Country_ID = c.C_Country_ID)
+                    INNER JOIN C_Currency cy ON (cy.C_Currency_ID = o.C_Currency_ID)
+                    WHERE o.C_Order_ID = " + GetC_Order_ID();
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                string Value = Msg.GetMsg(GetCtx(), "VAS_OrderDetails") + "\n\n" +
+                Msg.GetMsg(GetCtx(), "VAS_OrderNO") + Util.GetValueOfString(ds.Tables[0].Rows[0]["DocumentNo"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_OrderDate") + Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateOrdered"]).Value.ToShortDateString() + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_PromiseDate") + Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DatePromised"]).Value.ToShortDateString() + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_CustomerName") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_CustomerAddress") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Address"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_GrandTotal") + Util.GetValueOfString(ds.Tables[0].Rows[0]["ISO_Code"]) + " " +
+                DisplayType.GetNumberFormat(DisplayType.Amount).GetFormatAmount(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]), GetCtx().GetContext("#ClientLanguage"));
+                
+
+                // Generate QR code                
+                QRCodeGenerator qrGenerator = new QRCodeGenerator();
+                QRCodeData qrCodeData = qrGenerator.CreateQrCode(Value, QRCodeGenerator.ECCLevel.Q);
+                PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
+                byte[] qrCodeImage = qrCode.GetGraphic(20);
+                if (qrCodeImage != null)
+                {
+                    MImage img = new MImage(GetCtx(), 0, Get_Trx());
+                    img.SetClientOrg(this);
+                    img.ByteArray = qrCodeImage;
+                    img.ImageFormat = ".png";
+                    img.SetBinaryData(qrCodeImage);
+                    img.SetName(GetDocumentNo());
+                    img.SetImageURL(string.Empty);
+                    if (!img.Save())
+                    {
+                        return 0;
+                    }
+                    return img.GetAD_Image_ID();
+                }
+            }
+            return 0;
         }
 
         /****
