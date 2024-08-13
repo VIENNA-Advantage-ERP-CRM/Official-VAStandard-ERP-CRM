@@ -257,6 +257,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ProductUomSetup.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PurchaseOrderTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
