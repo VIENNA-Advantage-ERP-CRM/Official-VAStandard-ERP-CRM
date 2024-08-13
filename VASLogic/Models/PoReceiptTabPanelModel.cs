@@ -366,7 +366,7 @@ namespace VASLogic.Models
                     obj.DateTrx = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateTrx"]);
                     obj.DateAcct = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateAcct"]);
                     obj.StdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
-                    obj.UomName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
+                    obj.CurrencyName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
                     obj.AD_Window_ID = AD_Window_ID;
                     obj.C_ConversionType_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ConversionType_ID"]);
@@ -463,7 +463,7 @@ namespace VASLogic.Models
         public int C_Payment_ID { get; set; }
         public int AD_Org_ID { get; set; }
         public int StdPrecision { get; set; }
-        public string UomName { get; set; }
+        public string CurrencyName { get; set; }
         public int AD_Window_ID { get; set; }
         public int C_ConversionType_ID { get; set; }
     }

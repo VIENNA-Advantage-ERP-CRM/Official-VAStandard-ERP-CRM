@@ -96,7 +96,7 @@
                             '<div class="VAS-paymentDetail VAS-grid-col1">' +
                             '<div class="VAS-payment-val">' +
                             '<label for="" title="' + VAS.translatedTexts.VAS_UnAllocatedAmount +'">' + VAS.translatedTexts.VAS_UnAllocatedAmount + '</label>' +
-                            '<span class="VAS-totalPrice">' + (gridDataResult[i].PayAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].StdPrecision, maximumFractionDigits: gridDataResult[i].StdPrecision }) + ' ' + gridDataResult[i].UomName+'</span>' +
+                            '<span class="VAS-totalPrice">' + (gridDataResult[i].PayAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].StdPrecision, maximumFractionDigits: gridDataResult[i].StdPrecision }) + ' ' + gridDataResult[i].CurrencyName+'</span>' +
                             '</div>' +
                             '</div>' +
                             '</div>' +
