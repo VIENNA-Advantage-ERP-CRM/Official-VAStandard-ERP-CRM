@@ -61,7 +61,8 @@
        * @param {any} IsSoTrx
        * @param {any} AD_Org_ID
        */
-        this.getUnAllocatedPayData = function (C_BPartner_ID,IsSoTrx,AD_Org_ID) {
+        this.getUnAllocatedPayData = function (C_BPartner_ID, IsSoTrx, AD_Org_ID) {
+            wrapperDiv.find('#VAS-unallocated_' + windowNoInv).empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetUnAllocatedPayData",
                 type: "GET",
