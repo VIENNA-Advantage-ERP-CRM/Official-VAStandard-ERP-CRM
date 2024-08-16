@@ -100,7 +100,7 @@ namespace ViennaAdvantage.Process
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     int SeqNodoc = 0;
-                    int SeqNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT NVL(MAX(Line),0) FROM VA107_ProjectModule WHERE C_Project_ID=" + _C_Project_ID, null, Get_Trx()));
+                    int SeqNo = Util.GetValueOfInt(DB.ExecuteScalar("SELECT NVL(MAX(Line),'') FROM VA107_ProjectModule WHERE C_Project_ID=" + _C_Project_ID, null, Get_Trx()));
                     for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
 
