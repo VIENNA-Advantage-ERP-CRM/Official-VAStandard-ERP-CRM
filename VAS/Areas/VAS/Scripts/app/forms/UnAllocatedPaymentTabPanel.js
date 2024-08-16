@@ -15,8 +15,8 @@
         this.curTab = null;
         this.selectedRow = null;
         this.panelWidth;
+        var $self = this;
         var ctx = this.ctx;
-        var windowNoInv = 0;
         /*Stored messages which is to be translated*/
         var elements = [
             "DateTrx",
@@ -38,7 +38,7 @@
         var wrapperDiv = $('<div class="VAS-payment-details">');
         /*this is init fucntion to create design*/
         this.init = function () {
-            var UnAllocatedPaymentList = $('<ul id="VAS-unallocated_' + windowNoInv + '"></ul></div>');
+            var UnAllocatedPaymentList = $('<ul id="VAS-unallocated_' + $self.windowNo + '"></ul></div>');
             wrapperDiv.append(UnAllocatedPaymentList);
             $root.append(wrapperDiv);
         };
@@ -62,7 +62,7 @@
        * @param {any} AD_Org_ID
        */
         this.getUnAllocatedPayData = function (C_BPartner_ID, IsSoTrx, AD_Org_ID) {
-            wrapperDiv.find('#VAS-unallocated_' + windowNoInv).empty();
+            wrapperDiv.find('#VAS-unallocated_' + $self.windowNo).empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetUnAllocatedPayData",
                 type: "GET",
@@ -74,7 +74,7 @@
                     for (var i = 0; i < gridDataResult.length; i++) {
                         var TabPaneldesign = '<li>' +
                             '<span class="VAS-search-link">' +
-                            '<i class="glyphicon glyphicon-zoom-in" data-PaymentId="' + gridDataResult[i].C_Payment_ID + '" data-windowId="' + gridDataResult[i].AD_Window_ID + '" id="VAS-unAllocatedZoom_' + windowNoInv + '"></i>' +
+                            '<i class="glyphicon glyphicon-zoom-in" data-PaymentId="' + gridDataResult[i].C_Payment_ID + '" data-windowId="' + gridDataResult[i].AD_Window_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
                             '</span>' +
                             //'<div class="form-check">' +
                             //'<input class="form-check-input position-static" type="checkbox" id="blankCheckbox" value="option1" aria-label="..."> ' +
@@ -103,7 +103,7 @@
                             '</div>' +
                             '</li>';
                         //Appending design to wrapperDiv
-                        wrapperDiv.find('#VAS-unallocated_' + windowNoInv).append(TabPaneldesign);
+                        wrapperDiv.find('#VAS-unallocated_' + $self.windowNo).append(TabPaneldesign);
                     }
                     //Applied click event fro zoom window
                     wrapperDiv.find('.glyphicon-zoom-in').on("click", function () {
@@ -126,7 +126,7 @@
         VAS.UnAllocatedPaymentTabPanel.prototype.startPanel = function (windowNo, curTab) {
             this.windowNo = windowNo;
             this.curTab = curTab;
-            windowNoInv = windowNo;
+            $self.windowNo = windowNo;
             this.init();
         };
         /* This function to update tab panel based on selected record */
@@ -147,9 +147,6 @@
             this.panelWidth;
             lblTitle = null;
             ctx = this.ctx;
-            windowNoInv = 0;
-            PaymentPreviewColumns = [];
-            PayPreviewGridDiv = null;
         }
     }
 })(VAS, jQuery);

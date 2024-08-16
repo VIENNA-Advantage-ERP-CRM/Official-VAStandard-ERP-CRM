@@ -278,13 +278,11 @@ namespace VASLogic.Models
         /// <param name="InvoiceLineId">Invoice Line ID</param>
         /// <param name="AdWindowID">Window ID</param>
         /// <returns>Invoice details</returns>
-        public string GetInvoiceLineReport(Ctx ctx, int InvoiceLineId, int AD_WindowID)
+        public string GetInvoiceLineReport(Ctx ctx, int InvoiceId, int AD_WindowID)
         {
             string path = "";
             //Get invoice table id based on table name
             int AD_Table_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT ad_table_id FROM  ad_table WHERE tablename = 'C_Invoice'"));
-            //Get invoice id based on invoice line id
-            int InvoiceId = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Invoice_ID FROM C_InvoiceLine WHERE C_InvoiceLine_ID=" + InvoiceLineId));
             string sql = @"SELECT ad_tab.ad_process_id, ad_process.value FROM ad_tab
                             INNER JOIN ad_process ON(ad_tab.ad_process_id = ad_process.ad_process_id)
                             WHERE ad_tab.name = 'Invoice'
