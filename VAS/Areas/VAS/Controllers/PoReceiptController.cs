@@ -124,14 +124,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="InvoiceLineId">Invoice LineID</param>
         /// <param name="AD_WindowID">Window ID</param>
         /// <returns>Invoice details</returns>
-        public JsonResult GetInvoiceLineReport(int InvoiceLineId, int AD_WindowID)
+        public JsonResult GetInvoiceLineReport(int InvoiceId, int AD_WindowID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
-                retJSON = obj.GetInvoiceLineReport(ctx, InvoiceLineId, AD_WindowID);
+                retJSON = obj.GetInvoiceLineReport(ctx, InvoiceId, AD_WindowID);
             }
             return Json(JsonConvert.SerializeObject(retJSON), JsonRequestBehavior.AllowGet);
         }

@@ -15,7 +15,7 @@
         this.panelWidth;
        // var $bsyDiv = null;
         var ctx = this.ctx;
-        var windowNo = 0;
+        $self = this;
         var windowID = 0;
         var $iFrameDiv = null;
         var $root = $('<div class = "root h-100"></div>');
@@ -25,8 +25,8 @@
         
 
         this.init = function () {
-            windowNo = this.windowNo;
-            InvoiceLinePanel(windowNo);
+            //windowNo = this.windowNo;
+            InvoiceLinePanel($self.windowNo);
             $root.append(wrapperDiv).append($bsyDiv);
         };
         /*Function defined to append design*/
@@ -41,25 +41,25 @@
         };
 
         /*VIS-383: 27/07/24:-This function is used to get invoice data for pdf*/
-        this.getInvoiceLineData = function (recordID) {
+        this.getInvoiceLineData = function (invoiceId) {
             busyDiv(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetInvoiceLineReport",
                 type: "GET",
                 dataType: "json",
                 contentType: "application/json; charset=utf-8",
-                data: { InvoiceLineId: recordID, AD_WindowID: windowID },
+                data: { InvoiceId: invoiceId, AD_WindowID: windowID },
                 success: function (data) {
                     //var urlPath = null;
                     /*Clear iFrame when select new invoice*/
-                    document.getElementById('iframeinv' + windowNo).src = '';
+                    document.getElementById('iframeinv' + $self.windowNo).src = '';
                     if (data != "") {
                         var data = JSON.parse(data);
                         console.log(data);
                         if (data != "" && data.length > 0) {
                             var urlPath = VIS.Application.contextFullUrl + "" + data;
                             /*Create iFrame to view invoice report using report path*/
-                            document.getElementById('iframeinv'+ windowNo).src = urlPath;
+                            document.getElementById('iframeinv' + $self.windowNo).src = urlPath;
                             busyDiv(false);
                         }
                     }
@@ -88,15 +88,16 @@
         VAS.InvoiceLineTabPanel.prototype.startPanel = function (windowNo, curTab) {
             this.windowNo = windowNo;
             this.curTab = curTab;
+            $self.windowNo = windowNo;
             windowID = this.curTab.getAD_Window_ID();
             this.init();
         };
         /* This function will execute when user navigate or refresh a record */
         VAS.InvoiceLineTabPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
-            this.windowNo = windowNo;
             this.record_ID = recordID;
             this.selectedRow = selectedRow;
-            this.getInvoiceLineData(recordID);
+            var invoiceId = selectedRow.c_invoice_id;
+            this.getInvoiceLineData(invoiceId);
         };
         /* Set width as per window width in dafault case it is 75% */
         VAS.InvoiceLineTabPanel.prototype.sizeChanged = function (width) {
@@ -108,8 +109,6 @@
             this.windowNo = 0;
             this.curTab = null;
             this.panelWidth = null;
-            windowNo = 0;
-            windowID = 0;
         }
     }
 })(VAS, jQuery);
