@@ -124,17 +124,55 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="InvoiceLineId">Invoice LineID</param>
         /// <param name="AD_WindowID">Window ID</param>
         /// <returns>Invoice details</returns>
-        public JsonResult GetInvoiceLineReport(int InvoiceLineId, int AD_WindowID)
+        public JsonResult GetInvoiceLineReport(int InvoiceId, int AD_WindowID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
-                retJSON = obj.GetInvoiceLineReport(ctx, InvoiceLineId, AD_WindowID);
+                retJSON = obj.GetInvoiceLineReport(ctx, InvoiceId, AD_WindowID);
             }
             return Json(JsonConvert.SerializeObject(retJSON), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// 08/08/2024 This function is Used to Get the UnAllocated Payment data for particular business partner
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="C_BPartner_ID">Business Partner ID</param>
+        /// <param name="AD_Org_ID">AD_Org_ID</param>
+        /// <param name="IsSoTrx">IsSoTrx</param>
+        /// <Author>VIS_427</Author>
+        /// <returns>returns UnAllocated Payment data for particular business partner</returns>
+        public JsonResult GetUnAllocatedPayData(int C_BPartner_ID,string IsSoTrx,int AD_Org_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<UnAllocatedPayTabPanel> result = obj.GetUnAllocatedPayData(ctx, C_BPartner_ID, IsSoTrx, AD_Org_ID);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
 
+        /// <summary>
+        /// This function is Used to Get the Order Total Summary data 
+        /// </summary>
+        /// <param name="OrderId">Order ID</param>
+        /// <returns>returns the Order tax data</returns>
+        public JsonResult GetOrderSummary(int OrderId)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<dynamic> result = obj.GetOrderSummary(ctx, OrderId);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
