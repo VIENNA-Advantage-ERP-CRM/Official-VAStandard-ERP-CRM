@@ -100,5 +100,41 @@ namespace VAS.Areas.VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// VAI050-Get Purchase Order Lines
+        /// </summary>
+        /// <param name="OrderID"></param>
+        /// <returns></returns>
+
+        public JsonResult GetPOLineData(int OrderID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<dynamic> result = obj.GetPOLineData(ctx, OrderID);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// VIS-383: 27/07/24:- Get invoice detail based on invoice line
+        /// </summary>
+        /// <param name="InvoiceLineId">Invoice LineID</param>
+        /// <param name="AD_WindowID">Window ID</param>
+        /// <returns>Invoice details</returns>
+        public JsonResult GetInvoiceLineReport(int InvoiceLineId, int AD_WindowID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                retJSON = obj.GetInvoiceLineReport(ctx, InvoiceLineId, AD_WindowID);
+            }
+            return Json(JsonConvert.SerializeObject(retJSON), JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

@@ -1073,6 +1073,9 @@ namespace VAdvantage.Model
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                 }
+
+                                // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                                 #endregion
                             }
 
@@ -1310,6 +1313,9 @@ namespace VAdvantage.Model
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                 }
+
+                                // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                                 #endregion
                             }
 
@@ -1448,8 +1454,8 @@ namespace VAdvantage.Model
                                         _processMsg = Msg.GetMsg(GetCtx(), "ReqLineNotSaved");
                                         return DocActionVariables.STATUS_INVALID;
                                     }
-                                    #endregion
-                                }
+                                }                                
+                                #endregion
                             }
 
                             MStorage storage = MStorage.GetCreate(GetCtx(), line.GetM_Locator_ID(),
@@ -1506,6 +1512,9 @@ namespace VAdvantage.Model
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                 }
+
+                                // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                                MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                                 #endregion
                             }
 
@@ -1704,6 +1713,9 @@ namespace VAdvantage.Model
                                 return DocActionVariables.STATUS_INVALID;
                             }
                         }
+
+                        // VIS0060: Update Requisition Status on Requisition Header tab based on delivered and Ordered qty on Requisition Line.
+                        MRequisition.UpdateRequisitionStatus(GetCtx(), reqLine.GetM_Requisition_ID(), Get_Trx());
                         #endregion
                     }
 
@@ -3268,7 +3280,7 @@ namespace VAdvantage.Model
                 //set container reference(not a copy record)
                 rLine.SetM_ProductContainer_ID(oLine.GetM_ProductContainer_ID());
                 //
-                
+
                 rLine.SetQtyBook(oLine.GetQtyCount());		//	switch
                 rLine.SetQtyCount(oLine.GetQtyBook());
                 rLine.SetQtyInternalUse(Decimal.Negate(oLine.GetQtyInternalUse()));
@@ -3287,7 +3299,7 @@ namespace VAdvantage.Model
                 //VIS_0045: Cost
                 rLine.SetCurrentCostPrice(oLine.GetCurrentCostPrice());
                 rLine.SetPostCurrentCostPrice(oLine.GetPostCurrentCostPrice());
-              
+
                 if (!rLine.Save())
                 {
                     pp = VLogger.RetrieveError();

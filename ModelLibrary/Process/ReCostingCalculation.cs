@@ -4389,9 +4389,12 @@ namespace VAdvantage.Process
                             #endregion
 
                             quantity = Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]));
+                            //VIS:045: 12-Aug-2024, DevOps Task ID - 6102, Provide Cost from the inventory line if defined
                             // Change by mohit - Client id and organization was passed from context but neede to be passed from document itself as done in several other documents.-27/06/2017
                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inventory.GetAD_Client_ID(), inventory.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
-                           "Internal Use Inventory", inventoryLine, null, null, null, null, 0, quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
+                           "Internal Use Inventory", inventoryLine, null, null, null, null,
+                           ((quantity < 0 && !inventory.IsReversal()) || (quantity > 0 && inventory.IsReversal())) ? Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) : 0,
+                           quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
                             {
                                 if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                                 {
@@ -4488,8 +4491,9 @@ namespace VAdvantage.Process
                             }
                             #endregion
 
+                            //VIS:045: 12-Aug-2024, DevOps Task ID - 6102, Provide Cost from the inventory line if defined
                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inventory.GetAD_Client_ID(), inventory.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
-                           "Physical Inventory", inventoryLine, null, null, null, null, 0, quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
+                           "Physical Inventory", inventoryLine, null, null, null, null, Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")), quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
                             {
                                 if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                                 {

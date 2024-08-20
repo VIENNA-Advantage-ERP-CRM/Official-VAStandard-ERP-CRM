@@ -236,6 +236,10 @@ namespace VAdvantage.Model
             int count = Util.GetValueOfInt(DB.ExecuteScalar(_sql.ToString()));
             if (count > 0)
             {
+                //VIS383-DevOps BugID:6004 12/07/2024:-Get max of sequence no for default accounting tab
+                string _sqlSeq = "SELECT NVL(MAX(SeqNo),0) FROM FRPT_Warehouse_Acct WHERE M_Warehouse_ID=" + GetM_Warehouse_ID() + " AND IsActive='Y'";
+                int _SeqNo = Convert.ToInt32(DB.ExecuteScalar(_sqlSeq.ToString(), null, Get_Trx()));
+
                 _sql.Clear();
                 _sql.Append("Select L.Value From Ad_Ref_List L inner join AD_Reference r on R.AD_REFERENCE_ID=L.AD_REFERENCE_ID where r.name='FRPT_RelatedTo' and l.name='Warehouse'");
                 var relatedtoWarehouse = Convert.ToString(DB.ExecuteScalar(_sql.ToString()));
@@ -278,12 +282,16 @@ namespace VAdvantage.Model
                                         //wrhus = new X_FRPT_Warehouse_Acct(GetCtx(), 0, null);
                                         if (recordFound == 0)
                                         {
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
+                                            _SeqNo += 10;
                                             wrhus = MTable.GetPO(GetCtx(), "FRPT_Warehouse_Acct", 0, null);
                                             wrhus.Set_ValueNoCheck("AD_Org_ID", 0);
                                             wrhus.Set_ValueNoCheck("M_Warehouse_ID", Util.GetValueOfInt(GetM_Warehouse_ID()));
                                             wrhus.Set_ValueNoCheck("FRPT_AcctDefault_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["FRPT_AcctDefault_ID"]));
                                             wrhus.Set_ValueNoCheck("C_ValidCombination_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Validcombination_Id"]));
                                             wrhus.Set_ValueNoCheck("C_AcctSchema_ID", _AcctSchema_ID);
+                                            //VIS383-DevOps BugID:6004 12/07/2024:-Set the new sequence no when create new line
+                                            wrhus.Set_ValueNoCheck("SeqNo", _SeqNo);
 
                                             if (!wrhus.Save())
                                             {

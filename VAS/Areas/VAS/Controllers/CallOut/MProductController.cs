@@ -196,5 +196,17 @@ namespace VIS.Controllers
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// VAI050-Get Product's UOM 
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public JsonResult GetProductUOMs(string fields)
+        {
+            Dictionary<string ,int> obj= new Dictionary<string, int>();
+            MProductModel model = new MProductModel();
+            obj = model.GetProductUOMs(fields);
+            return Json(JsonConvert.SerializeObject(obj), JsonRequestBehavior.AllowGet);
+        }
     }
 }
