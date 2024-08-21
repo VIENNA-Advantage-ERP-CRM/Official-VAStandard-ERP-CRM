@@ -174,5 +174,23 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is Used to Get the AR Invoice Data for widget
+        /// </summary>
+        /// <param name="WidgetId">WidgetId</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar invoice data</returns>
+        public JsonResult GetARInvSchData(string WidgetId)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<ARInvWidgData> result = obj.GetARInvSchData(ctx, WidgetId);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
