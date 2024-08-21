@@ -408,6 +408,105 @@ namespace VASLogic.Models
             }
             return retData;
         }
+
+        /// <summary>
+        /// This function is Used to Get the AR Invoice Data for widget
+        /// </summary>
+        /// <param name="WidgetId">WidgetId</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar invoice data</returns>
+        public List<ARInvWidgData> GetARInvSchData(Ctx ctx, string WidgetId)
+        {
+            ARInvWidgData obj = new ARInvWidgData(); ;
+            StringBuilder sql = new StringBuilder();
+            List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
+
+            sql.Append($@"WITH InvoiceData AS (
+                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                             ci.AD_Client_ID,
+                             cs.C_InvoicePaySchedule_ID,
+                             ci.DateInvoiced,
+                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,CAST(cs.VA009_BseCurrncy AS INTEGER),ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
+                         FROM
+                             C_Invoice ci
+                             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                     )})
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         SUM(DueAmt) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                         DateInvoiced > Current_Date - 30
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         SUM(DueAmt) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                         DateInvoiced <= Current_Date - 30 AND DateInvoiced > Current_Date - 60
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         SUM(DueAmt) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                        DateInvoiced <= Current_Date - 60 AND  DateInvoiced > Current_Date - 90
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         SUM(DueAmt) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                        DateInvoiced <= Current_Date - 90 AND  DateInvoiced > Current_Date - 120
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         SUM(DueAmt) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE DateInvoiced <= Current_Date - 120");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+
+                sql.Clear();
+               sql.Append(@"SELECT cy.StdPrecision,CASE WHEN Cy.Cursymbol IS NOT NULL THEN Cy.Cursymbol ELSE Cy.ISO_Code END AS Symbol
+                     FROM AD_Client ac
+                     INNER JOIN AD_ClientInfo aci ON (ac.AD_Client_ID=aci.AD_Client_ID)
+                     INNER JOIN C_AcctSchema ca ON (ca.C_AcctSchema_ID=aci.C_AcctSchema1_ID)
+                     INNER JOIN C_Currency cy ON (cy.C_Currency_ID=ca.C_Currency_ID)
+                     WHERE ac.AD_Client_ID IN (" + ctx.GetAD_Client_ID() +")");
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+                decimal TotalAmt = 0;
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    TotalAmt = TotalAmt+ Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total_dueamt"]);
+                    obj = new ARInvWidgData();
+                    obj.daysAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total_dueamt"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    ARInvWidgData.Add(obj);
+                }
+                if (TotalAmt > 0)
+                {
+                    obj = new ARInvWidgData();
+                    obj.arTotalAmtWidget=new List<ArTotalAmtWidget>();
+                    ArTotalAmtWidget objAmt = new ArTotalAmtWidget();
+                    objAmt.totalAmt = TotalAmt;
+                    obj.arTotalAmtWidget.Add(objAmt);
+                }
+                ARInvWidgData.Add(obj);
+            }
+            return ARInvWidgData;
+        }
     }
     public class TabPanel
     {
@@ -499,5 +598,18 @@ namespace VASLogic.Models
         public string CurrencyName { get; set; }
         public int AD_Window_ID { get; set; }
         public int C_ConversionType_ID { get; set; }
+    }
+    public class ARInvWidgData
+    {
+        public List<ArTotalAmtWidget> arTotalAmtWidget { get; set; }
+        public decimal daysAmt { get; set; }
+        public string Symbol { get; set; }
+        public int stdPrecision { get; set; }
+
+    }
+
+    public class ArTotalAmtWidget
+    {
+        public decimal totalAmt { get; set; }
     }
 }

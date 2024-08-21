@@ -354,4 +354,215 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.vas-arwid-root {
+    --width-100: calc(1366px/3);
+    --width-70: calc(768px*0.7/6);
+}
 
+.vas-arwidg-receivable-container {
+    background: rgb(251,251,251);
+    background: linear-gradient(160deg, rgba(251,251,251,1) 0%, rgba(223,223,223,1) 100%);
+    height: 100%;
+    width: 100%;
+    padding: 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.vas-arwidg-totalAmt-box {
+    background: rgb(79,217,150);
+    background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);
+    padding: 1.8em 0.75em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 15px 0 0;
+}
+
+.vas-arwidg-totalRec-amount h1 {
+    color: rgba(var(--v-c-common),1);
+    font-weight: 600;
+    display: flex;
+    align-items: flex-end;
+    margin: 0;
+    font-size: 2em;
+}
+
+.vas-arwidg-cur-symbol {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    font-size: 0.5em;
+    line-height: 1.3000em;
+    position: relative;
+    top: -0.5em;
+}
+
+    .vas-arwidg-cur-symbol span {
+        font-size: 1.6em;
+    }
+
+.vas-arwidg-totalRecTxt {
+    font-size: 0.875em;
+    text-align: center;
+    color: rgba(var(--v-c-common),1);
+}
+
+.vas-arwidg-rec-listing {
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    grid-row-gap: 0.75em;
+}
+
+.vas-arwidg-receiveTxt-box {
+    background-color: rgba(var(--v-c-common),1);
+    padding: 0.75em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-arwidg-recBox-amt {
+    font-weight: 600;
+    font-size: 1.2em;
+}
+
+    .vas-arwidg-recBox-amt span {
+        color: #2ABEBC;
+    }
+@media screen and (max-width: 1920px) {
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-arwidg-receivable-container {
+        font-size: 13px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1200px) {
+    .vas-arwidg-totalRec-amount h1{
+        font-size: 20px;
+    }
+    .vas-arwidg-recBox-amt {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-arwidg-receivable-container {
+        font-size: 12px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 10px;
+    }
+
+    .vas-arwidg-totalAmt-box {
+        padding: 0.75em 0.875em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-arwidg-totalRec-amount {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-arwidg-receivable-container {
+        font-size: 11px;
+    }
+
+    .vas-arwidg-totalRecTxt {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-arwidg-receivable-container {
+        font-size: 16px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 15px;
+    }
+        .vas-arwidg-totalRec-amount h1 {
+            font-size: 13px;
+        }
+    .vas-arwidg-totalRecTxt {
+        font-size: 13px;
+    }
+    .vas-arwidg-recBox-amt {
+        font-weight: 600;
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-arwidg-receivable-container {
+        font-size: 14px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width: 375px) {
+    .vas-arwidg-receivable-container {
+        font-size: 13px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-arwidg-receivable-container {
+        font-size: 10px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 10px;
+    }
+}
+span.vas-arwidg-cur-symbol {
+    display: flex;
+    gap: 4px;
+    margin-left: 5px;
+}
