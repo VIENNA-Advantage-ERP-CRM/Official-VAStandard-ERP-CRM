@@ -86,14 +86,10 @@
             //Get decimal seperator
             var isDotSeparator = culture.isDecimalSeparatorDot(window.navigator.language);
 
-            //format should not be dot format
-            if (AmtVal != '' && !isDotSeparator) {
-                if (!AmtVal.contains("=")) {
-                    if (AmtVal.contains(",")) {
-                        //replace , with .
-                        TotalAmtArray = AmtVal.split(",")
-                        TotalAmtArray[3] = ",";
-                    }
+            if (!isDotSeparator) {
+                if (AmtVal.contains(",")) {
+                    TotalAmtArray = AmtVal.split(",")
+                    TotalAmtArray[3] = ",";
                 }
             }
             else {
