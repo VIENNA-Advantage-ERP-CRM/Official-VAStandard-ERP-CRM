@@ -245,6 +245,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_OrderSummary.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PurchaseOrderTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\RequisitionLinesTabPanel.js" />
