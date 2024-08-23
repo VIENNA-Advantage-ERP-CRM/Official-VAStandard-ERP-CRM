@@ -504,19 +504,19 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
 
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetUpdated(), MDocBaseType.DOCBASETYPE_MATERIALMOVEMENT, GetAD_Org_ID()))
-            {
-                _processMsg = "@PeriodClosed@";
-                return DocActionVariables.STATUS_INVALID;
-            }
+            //if (!MPeriod.IsOpen(GetCtx(), GetUpdated(), MDocBaseType.DOCBASETYPE_MATERIALMOVEMENT, GetAD_Org_ID()))
+            //{
+            //    _processMsg = "@PeriodClosed@";
+            //    return DocActionVariables.STATUS_INVALID;
+            //}
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetUpdated(), GetAD_Org_ID()))
-            {
-                _processMsg = Common.Common.NONBUSINESSDAY;
-                return DocActionVariables.STATUS_INVALID;
-            }
+            //if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetUpdated(), GetAD_Org_ID()))
+            //{
+            //    _processMsg = Common.Common.NONBUSINESSDAY;
+            //    return DocActionVariables.STATUS_INVALID;
+            //}
 
 
             MMovementLineConfirm[] lines = GetLines(true);
