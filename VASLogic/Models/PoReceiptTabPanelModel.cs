@@ -440,7 +440,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                         DateInvoiced > Current_Date - 30
+                         DateInvoiced >= Current_Date - 30
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -448,7 +448,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                         DateInvoiced <= Current_Date - 30 AND DateInvoiced > Current_Date - 60
+                         DateInvoiced <= Current_Date - 31 AND DateInvoiced >= Current_Date - 60
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -456,7 +456,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                        DateInvoiced <= Current_Date - 60 AND  DateInvoiced > Current_Date - 90
+                        DateInvoiced <= Current_Date - 61 AND  DateInvoiced >= Current_Date - 90
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -464,7 +464,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                        DateInvoiced <= Current_Date - 90 AND  DateInvoiced > Current_Date - 120
+                        DateInvoiced <= Current_Date - 91 AND  DateInvoiced >= Current_Date - 120
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,

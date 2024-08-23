@@ -371,8 +371,9 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
 .vas-arwidg-totalAmt-box {
-    background: rgb(79,217,150);
-    background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);
+    /*background: rgb(79,217,150);
+    background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);*/
+    background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
     padding: 1.8em 0.75em;
     display: flex;
     align-items: center;
@@ -400,7 +401,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
     .vas-arwidg-cur-symbol span {
-        font-size: 1.6em;
+        font-size: 1.4em;
     }
 
 .vas-arwidg-totalRecTxt {
@@ -434,9 +435,15 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 
 @media screen and (max-width: 1920px) {
-
-    .vis-editModeWidget .vas-arwidg-receivable-container {
+    .vas-arwidg-receivable-container {
         font-size: 12px;
+    }
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 9px;
     }
 }
 
