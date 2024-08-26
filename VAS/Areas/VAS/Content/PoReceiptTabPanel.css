@@ -579,3 +579,214 @@ span.vas-arwidg-cur-symbol {
     gap: 4px;
     margin-left: 5px;
 }
+
+:root {
+    --width-100: calc(1920px/9);
+    --width-70: calc(1366px*0.7/9);
+}
+
+.vas-igtwidg-vendors-heading {
+    font-size: 0.875em;
+    margin-bottom: 0.5em;
+}
+
+.vas-igtwidg-top-vendors-col {
+    background-color: rgba(var(--v-c-readonly), 1);
+    padding: 0.5em;
+   /* height: 100%;*/
+}
+
+.vas-igtwidg-vendors-listing {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.6em;
+    height: calc(100% - 1.75em);
+    overflow: hidden;
+}
+
+.vas-igtwidg-invoices-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.6em;
+}
+
+.vas-igtwidg-invoices-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-igtwidg-thumb-w-txt img {
+    width: 3.125em;
+    height: 3.125em;
+    border-radius: 100%;
+}
+
+.vas-igtwidg-thumb-w-txt {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+}
+
+.vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-secondary), 0.5);
+}
+
+.vas-igtwidg-cur-symbol {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    font-size: 0.875em;
+    line-height: 1.3000em;
+    position: relative;
+    top: -0.78em;
+    /* // font-weight: 600;*/
+    color: #093756;
+}
+
+    .vas-igtwidg-cur-symbol span {
+        font-size: 1.4em;
+        color: #093756;
+        /*font-weight: 600;*/
+    }
+
+
+.vas-igtwidg-invoiceTotalAmt {
+    display: flex;
+    align-items: center;
+    gap: 0.2em;
+}
+
+.vas-igtwidg-amt-val {
+    font-size: 1em;
+    color: #093756;
+}
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-igtwidg-top-vendors-col {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendors-listing {
+        gap: 0.1em;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-top-vendors-col {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+        font-size: 1.2em;
+    }
+
+    .vas-igtwidg-vendors-heading {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendors-listing {
+        height: calc(100% - 2.4em);
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-igtwidg-vendors-listing {
+        gap: 0.1em;
+    }
+
+    .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+        font-size: 0.75em;
+    }
+
+    .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+        font-size: 0.75em;
+    }
+
+    .vas-igtwidg-thumb-w-txt img {
+        width: 2.125em;
+        height: 2.125em;
+    }
+
+    .vas-igtwidg-invoiceTotalAmt {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 12px;
+    }
+
+    .vas-igtwidg-cur-symbol {
+        font-size: 1.1em;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 17px;
+    }
+
+    .vas-igtwidg-amt-val {
+        font-size: 2.5em;
+    }
+
+    .vas-igtwidg-cur-symbol {
+        font-size: 1.6em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 15px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 10px;
+    }
+
+    .vas-igtwidg-invoiceTotalAmt {
+        font-size: 5px;
+    }
+}
+.vas-igtwiginvmillion {
+    font-size: 1em;
+    color: #093756;
+}

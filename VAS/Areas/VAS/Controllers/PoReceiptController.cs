@@ -192,5 +192,23 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is Used to Get the ar/ap invoice data of top five business partners
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar/ap invoice data of top five business partners</returns>
+        public JsonResult GetInvTotalGrandData(bool ISOtrx)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<InvGrandTotalData> result = obj.GetInvTotalGrandData(ctx, ISOtrx);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
