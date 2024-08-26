@@ -98,7 +98,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_OrderSummary.js",
                    "~/Areas/VAS/Scripts/app/forms/UnAllocatedPaymentTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/InvoiceLineTabPanel.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_ARInvoiceWidget.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ARInvoiceWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_InvGrandTotalWidget.js"
                    );
 
 

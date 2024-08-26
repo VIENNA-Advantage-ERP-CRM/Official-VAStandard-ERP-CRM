@@ -395,7 +395,7 @@ namespace VASLogic.Models
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
-                   dynamic obj = new ExpandoObject();
+                    dynamic obj = new ExpandoObject();
                     obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
                     obj.TotalLines = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalLines"]);
@@ -507,6 +507,83 @@ namespace VASLogic.Models
             }
             return ARInvWidgData;
         }
+
+        /// <summary>
+        /// This function is Used to Get the ar/ap invoice data of top five business partners
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar/ap invoice data of top five business partners</returns>
+        public List<InvGrandTotalData> GetInvTotalGrandData(Ctx ctx, bool ISOtrx)
+        {
+            InvGrandTotalData obj = new InvGrandTotalData(); ;
+            StringBuilder sql = new StringBuilder();
+            List<InvGrandTotalData> invGrandTotalData = new List<InvGrandTotalData>();
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+
+            sql.Append($@"WITH InvoiceData AS (
+                        {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                             cb.Name,
+                             cd.DocBaseType,
+                             cb.Pic,
+                             custimg.ImageExtension AS custImgExtension,
+                             ci.AD_Client_ID,
+                             ci.DateInvoiced,
+                             currencyConvert(ci.grandtotalafterwithholding ,ci.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,ci.AD_Client_ID ,ci.AD_Org_ID ) AS DueAmt
+                         FROM
+                             C_Invoice ci
+                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID AND cb.IsVendor='Y')
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL')", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                     )})
+                     SELECT
+                         Name,
+                         Pic,
+                         custImgExtension,
+                         min(DateInvoiced) AS minDateInvoiced,");
+            if (ISOtrx==true)
+            {
+                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'ARI' THEN DueAmt ELSE 0 END) -
+                             SUM(CASE WHEN DocBaseType = 'ARC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+            }
+            else
+            {
+                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'API' THEN DueAmt ELSE 0 END) -
+                          SUM(CASE WHEN DocBaseType = 'APC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+            }
+            sql.Append(@" FROM
+                         InvoiceData
+                     Group by Name,Pic,custImgExtension
+                     Order by SumAmount desc 
+                     FETCH FIRST 5 ROWS ONLY");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+
+                sql.Clear();
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new InvGrandTotalData();
+                    obj.GrandTotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmount"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.SinceDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["minDateInvoiced"]).Value;
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    {
+                        obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["custImgExtension"]);
+
+                    }
+                    invGrandTotalData.Add(obj);
+                }
+            }
+            return invGrandTotalData;
+        }
     }
     public class TabPanel
     {
@@ -611,5 +688,16 @@ namespace VASLogic.Models
     public class ArTotalAmtWidget
     {
         public decimal totalAmt { get; set; }
+    }
+
+    public class InvGrandTotalData
+    {
+        public decimal GrandTotalAmt { get; set; }
+        public string Symbol { get; set; }
+        public int stdPrecision { get; set; }
+        public string ImageUrl { get; set; }
+        public string Name { get; set; }
+        public DateTime SinceDate { get; set; }
+
     }
 }
