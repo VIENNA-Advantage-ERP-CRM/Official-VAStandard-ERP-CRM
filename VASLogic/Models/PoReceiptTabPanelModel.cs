@@ -543,7 +543,7 @@ namespace VASLogic.Models
                          Pic,
                          custImgExtension,
                          min(DateInvoiced) AS minDateInvoiced,");
-            if (ISOtrx==true)
+            if (ISOtrx)
             {
                 sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'ARI' THEN DueAmt ELSE 0 END) -
                              SUM(CASE WHEN DocBaseType = 'ARC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");

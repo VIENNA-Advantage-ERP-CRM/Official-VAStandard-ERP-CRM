@@ -43,7 +43,7 @@
             var hue = Math.floor(Math.random() * (360 - 0)) + 0;
             var v = Math.floor(Math.random() * (75 - 60 + 1)) + 60;
             var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
-            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetInvTotalGrandData", { "ISOtrx": $self.frame.ctx.isSOTrx($self.windowNo)}, function (dr) {
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetInvTotalGrandData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo)}, function (dr) {
                 var gridDataResult = dr;
                 if (gridDataResult != null) {
                     // Create the container for the list
@@ -120,19 +120,19 @@
          * @param {any} stdPrecision
          */
         function formatLargeNumber(number, stdPrecision) {
-            if (number >= 1_000_000_000_000) { /* Trillion*/
+            if (number >= 1000000000000) { /* Trillion*/
                 unit = VAS.translatedTexts.VAS_Trillion;
-                return (number / 1_000_000_000_000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            } else if (number >= 1_000_000_000) { /* Billion*/
+                return (number / 1000000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else if (number >= 1000000000) { /* Billion*/
                 unit = VAS.translatedTexts.VAS_Billion;;
-                return (number / 1_000_000_000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            } else if (number >= 1_000_000) { /* Million*/
+                return (number / 1000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else if (number >= 1000000) { /* Million*/
                 unit = VAS.translatedTexts.VAS_Million;
-                return (number / 1_000_000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return (number / 1000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
-            else if (number >= 1_000) { /* Thousand*/
+            else if (number >= 1000) { /* Thousand*/
                 unit = VAS.translatedTexts.VAS_Thousand;
-                return (number / 1_000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return (number / 1000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             else {
                 unit = null;
