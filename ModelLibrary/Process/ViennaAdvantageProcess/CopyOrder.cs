@@ -212,7 +212,7 @@ namespace ViennaAdvantage.Process
                     //VAI050-Update Sales Order reference on FSR 
                     if (Env.IsModuleInstalled("VA075_") && newOrder.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && from.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
                     {
-                        string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + GetRecord_ID();
+                        string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + from.Get_ValueAsInt("VA075_FieldServiceReq_ID");
                         DB.ExecuteQuery(query, null, Get_Trx());
                     }
                     if (!prosp.Save())
