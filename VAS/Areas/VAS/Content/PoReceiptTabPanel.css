@@ -843,7 +843,9 @@ span.vas-arwidg-cur-symbol {
         }
 
 @media screen and (max-width: 1920px) {
-    .vis-editModeWidget {
+    .vis-editModeWidget .vas-psdwidg-salesYear {
+        color: #083959;
+        font-size: 0.5em;
     }
 }
 

@@ -620,8 +620,7 @@ namespace VASLogic.Models
                  WHERE CURRENT_DATE BETWEEN cp.StartDate AND cp.EndDate
                    AND cy.C_Calendar_ID =" + calendar_ID+")");
 
-            sql.Append(
-             @"SELECT 'DueAmt' AS Type,
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@" SELECT 'DueAmt' AS Type,
                     NVL(
                         (
                             SUM(
@@ -644,13 +643,11 @@ namespace VASLogic.Models
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              WHERE CURRENT_DATE > cs.DueDate
                AND cs.VA009_IsPaid = 'N'
-               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'
-             ");
+               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
             // Query for 'DueSoon'
-            sql.Append(@"
-             UNION ALL
-             SELECT 'DueSoon',
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'DueSoon',
                     NVL(
                         (
                             SUM(
@@ -673,12 +670,10 @@ namespace VASLogic.Models
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              WHERE CURRENT_DATE < cs.DueDate
                AND cs.VA009_IsPaid = 'N'
-               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'
-             ");
+               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'","ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             // Query for 'Disputed'
-            sql.Append(@"
-             UNION ALL
-             SELECT 'Disputed',
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Disputed',
                     NVL(
                         (
                             SUM(
@@ -699,12 +694,11 @@ namespace VASLogic.Models
              FROM C_Invoice ci
              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N' AND ci.IsInDispute = 'Y'");
+             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N' AND ci.IsInDispute = 'Y'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW)); ;
 
             // Query for 'Hold'
-            sql.Append(@"
-             UNION ALL
-                 SELECT
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
                  'Hold',
                  nvl(
                      SUM(
@@ -757,15 +751,12 @@ namespace VASLogic.Models
                  c_invoice ci
                  INNER JOIN c_invoicepayschedule cs ON ( cs.c_invoice_id = ci.c_invoice_id )
                  INNER JOIN c_doctype            cd ON ( cd.c_doctype_id = ci.c_doctypetarget_id )
-             WHERE
-                 cs.va009_ispaid = 'N'
-                 AND ci.docstatus IN ( 'CO', 'CL' )
-             ");
+             WHERE ci.docstatus IN ( 'CO', 'CL' ) AND cs.va009_ispaid = 'N'
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
             // Query for 'InProgress'
-            sql.Append(@"
-             UNION ALL
-             SELECT 'InProgress',
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'InProgress',
                     NVL(
                         (
                             SUM(
@@ -786,11 +777,10 @@ namespace VASLogic.Models
              FROM C_Invoice ci
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              WHERE ci.DocStatus = 'IP'
-             ");
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             // Query for 'New'
-            sql.Append(@"
-             UNION ALL
-             SELECT 'New',
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'New',
                     NVL(
                         (
                             SUM(
@@ -812,12 +802,11 @@ namespace VASLogic.Models
              INNER JOIN C_DocType cd ON cd.C_DocType_ID = ci.C_DocTypeTarget_ID
              INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=ci.AD_Client_ID)
              WHERE ci.DocStatus IN ('CO', 'CL') AND ci.DateInvoiced BETWEEN pd.StartDate AND pd.EndDate
-             ");
+            ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
             // Query for 'Drafted'
-            sql.Append(@"
-             UNION ALL
-             SELECT 'Drafted',
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Drafted',
                     NVL(
                         (
                             SUM(
@@ -838,7 +827,7 @@ namespace VASLogic.Models
              FROM C_Invoice ci
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              WHERE ci.DocStatus = 'DR'
-             ");
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
