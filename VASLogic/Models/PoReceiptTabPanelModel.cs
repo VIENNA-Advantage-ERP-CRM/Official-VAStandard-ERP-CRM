@@ -603,7 +603,7 @@ namespace VASLogic.Models
 
 
             // Organization Calendar
-            calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Calendar_ID FROM AD_OrgInfo WHERE AD_Org_ID =" + ctx.GetAD_Org_ID(), null, null));
+            calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Calendar_ID FROM AD_OrgInfo WHERE IsActive = 'Y' AND AD_Org_ID =" + ctx.GetAD_Org_ID(), null, null));
             if (calendar_ID == 0)
             {
                 // Primary Calendar 
@@ -618,7 +618,7 @@ namespace VASLogic.Models
                  FROM C_Period cp
                  INNER JOIN C_Year cy ON (cy.C_Year_ID = cp.C_Year_ID)
                  WHERE CURRENT_DATE BETWEEN cp.StartDate AND cp.EndDate
-                   AND cy.C_Calendar_ID =" + calendar_ID+")");
+                 AND cp.IsActive='Y' AND cy.IsActive='Y' AND cy.C_Calendar_ID =" + calendar_ID+")");
 
             sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@" SELECT 'DueAmt' AS Type,
                     NVL(
@@ -707,7 +707,7 @@ namespace VASLogic.Models
                              CASE
                              WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
                              currencyconvert(
-                                 cs.dueamt, ci.c_currency_id, 100, ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                                 cs.dueamt, ci.c_currency_id,"+ C_Currency_ID +@", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
                              )
                              ELSE
                              0
@@ -717,7 +717,7 @@ namespace VASLogic.Models
                          WHEN cd.docbasetype = " + docBaseTypeARI_APT + @"
                               AND cs.isholdpayment = 'Y' THEN
                              currencyconvert(
-                                 cs.dueamt, ci.c_currency_id, 100, ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
                              )
                          ELSE
                          0
@@ -729,7 +729,7 @@ namespace VASLogic.Models
                              CASE
                              WHEN cd.docbasetype =" + docBaseTypeARC_APC + @"THEN
                              currencyconvert(
-                                 cs.dueamt, ci.c_currency_id, 100, ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
                              )
                              ELSE
                              0
@@ -739,7 +739,7 @@ namespace VASLogic.Models
                          WHEN cd.docbasetype = " + docBaseTypeARC_APC + @"
                               AND cs.isholdpayment = 'Y' THEN
                              currencyconvert(
-                                 cs.dueamt, ci.c_currency_id, 100, ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
                              )
                          ELSE
                          0
