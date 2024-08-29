@@ -790,3 +790,148 @@ span.vas-arwidg-cur-symbol {
     font-size: 1em;
     color: #093756;
 }
+:root {
+    --width-100: calc(1920px/9);
+    --width-70: calc(1920px*0.7/9);
+}
+
+.vas-psdwidg-purchase-state-col {
+    background: rgb(9,55,86);
+    background: linear-gradient(145deg, rgba(9,55,86,1) 0%, rgba(0,132,196,1) 100%);
+    height: 100%;
+    display: grid;
+/*    grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);*/
+    gap: 0.4em;
+    padding: 0.4em;
+}
+
+.vas-psdwidg-whiteBox {
+    background-color: rgba(var(--v-c-common), 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.vas-psdwidg-totalSale {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #083959;
+    line-height: 1.2em;
+}
+
+.vas-psdwidg-salesYear {
+    color: #083959;
+    font-size: 0.8em;
+}
+
+.vas-psdwidg-tile-heading {
+    background-color: transparent !important;
+}
+
+    .vas-psdwidg-tile-heading h1 {
+        margin: 0;
+        font-size: 1.4em;
+        color: rgba(var(--v-c-common), 1);
+        line-height: 1.1em;
+    }
+
+        .vas-psdwidg-tile-heading h1 span {
+            display: block;
+            text-align: right;
+        }
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-psdwidg-salesYear {
+        color: #083959;
+        font-size: 0.5em;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 12px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-psdwidg-tile-heading {
+        font-size: 8px;
+    }
+
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 12px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 11px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 15px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 13px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 9px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 7px;
+    }
+}
+.vas-psdwidg-heading-item {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+}
+.vas-psdwidg-itme2 {
+    grid-column: 3;
+}

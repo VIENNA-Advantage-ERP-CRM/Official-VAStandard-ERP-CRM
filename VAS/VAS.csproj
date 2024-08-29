@@ -258,6 +258,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\TabAlertRuleSql.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ProductUomSetup.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PurchaseOrderTabPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PurchaseStateDetailWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
