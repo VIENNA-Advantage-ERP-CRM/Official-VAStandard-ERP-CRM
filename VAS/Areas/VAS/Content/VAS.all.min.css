@@ -1,4 +1,4 @@
-﻿/*version 1.5.4.0*/
+﻿/*version 1.5.5.0*/
 
 .vis-payment-table {
     width: 100%;
@@ -1966,6 +1966,122 @@ Only index.html and style.css is for your use There is no need to copy any other
     height: auto
 }
 
+.VAS-unallocated-flyout {
+    /*box-shadow: 0 0 5px #cccccc;
+    position: absolute;*/
+    right: 0;
+    top: 0;
+}
+
+.VAS-flyout-header {
+    background-color: rgba(var(--v-c-primary), 1);
+    font-size: 1rem;
+    color: rgba(var(--v-c-common), 1);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+    .VAS-flyout-header .vis {
+        cursor: pointer;
+    }
+
+.VAS-payment-details {
+    margin: 0.5rem;
+    height: calc(100% - 6px);
+    overflow-y: auto;
+}
+
+    .VAS-payment-details ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+        .VAS-payment-details ul li {
+            border-radius: 6px;
+            background-color: rgba(var(--v-c-secondary), 1);
+            display: flex;
+            width: 100%;
+            gap: 0.5rem;
+            padding: 0.875rem;
+            position: relative;
+        }
+
+.VAS-paymentDetail {
+    display: grid;
+    grid-template-columns: 27% 28% auto;
+    gap: 0.3rem;
+    margin: 0 0 5px;
+}
+
+    .VAS-paymentDetail.VAS-grid-col1 {
+        margin-bottom: 0;
+        line-height: 19px;
+    }
+
+.VAS-grid-col1 {
+    grid-template-columns: repeat(1, 1fr) !important;
+}
+
+.VAS-payment-val label {
+    font-size: 0.75rem;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 70px;
+    overflow: hidden;
+}
+
+.VAS-payment-val span {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+}
+
+.VAS-totalPrice {
+    /*font-weight: 600;*/
+    font-size: 0.875rem !important;
+}
+
+.VAS-search-link {
+    position: absolute;
+    right: 6px;
+    top: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    padding-right: 7px;
+}
+
+.VAS-payment-details ul li .form-check {
+    position: relative;
+    top: 2px;
+}
+
+.VAS-payment-details ul li.active {
+    background-color: rgba(var(--v-c-primary), 0.1);
+}
+
+.VAS-payment-details input[type="checkbox"]:checked:before {
+    bottom: auto;
+    right: auto;
+    top: 7px;
+    left: 4px;
+}
+
+.vas-ualdocno {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+    width: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 
 .vis-pSelectInfo {
     width: 320px;
@@ -2493,6 +2609,39 @@ span.vis.vis-info.vas-openItem {
     overflow: hidden;
     min-width: auto;
 }
+
+.VAS-summary-details {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.VAS-summary-header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+    .VAS-summary-header span {
+        height: 22px;
+    }
+
+.VAS-summary-info {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+.VAS-summary-amount {
+    height: 22px;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    text-align: right;
+}
+
 
 .firstRow {
     padding: 15px;
