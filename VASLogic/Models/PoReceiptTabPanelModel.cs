@@ -416,27 +416,46 @@ namespace VASLogic.Models
         /// <param name="ctx">Context</param>
         /// <author>VIS_427</author>
         /// <returns>List of ar invoice data</returns>
-        public List<ARInvWidgData> GetARInvSchData(Ctx ctx, string WidgetId)
+        public List<ARInvWidgData> GetARInvSchData(Ctx ctx, bool ISOtrx)
         {
-            ARInvWidgData obj = new ARInvWidgData(); ;
+            ARInvWidgData obj = new ARInvWidgData();
             StringBuilder sql = new StringBuilder();
             List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
+            string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
+            string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
 
             sql.Append($@"WITH InvoiceData AS (
                          {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
                              ci.AD_Client_ID,
                              cs.C_InvoicePaySchedule_ID,
+                             cd.DocBaseType,
                              ci.DateInvoiced,
                              currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,CAST(cs.VA009_BseCurrncy AS INTEGER),ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
-                         SUM(DueAmt) AS total_dueamt
+                                     NVL(
+                                        (
+                                            SUM(
+                                                CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                                DueAmt
+                                                ELSE 0
+                                                END
+                                            ) -
+                                            SUM(
+                                                CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                                DueAmt
+                                                ELSE 0
+                                                END
+                                            )
+                                        ),
+                                        0
+                                    ) AS total_dueamt
                      FROM
                          InvoiceData
                      WHERE
@@ -444,7 +463,23 @@ namespace VASLogic.Models
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
-                         SUM(DueAmt) AS total_dueamt
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
                      FROM
                          InvoiceData
                      WHERE
@@ -452,7 +487,23 @@ namespace VASLogic.Models
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
-                         SUM(DueAmt) AS total_dueamt
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
                      FROM
                          InvoiceData
                      WHERE
@@ -460,7 +511,23 @@ namespace VASLogic.Models
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
-                         SUM(DueAmt) AS total_dueamt
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
                      FROM
                          InvoiceData
                      WHERE
@@ -468,7 +535,23 @@ namespace VASLogic.Models
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
-                         SUM(DueAmt) AS total_dueamt
+                         NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
                      FROM
                          InvoiceData
                      WHERE DateInvoiced <= Current_Date - 120");
@@ -533,7 +616,7 @@ namespace VASLogic.Models
                              currencyConvert(ci.grandtotalafterwithholding ,ci.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,ci.AD_Client_ID ,ci.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
-                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID AND cb.IsVendor='Y')
+                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
                              WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL')", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
@@ -618,7 +701,7 @@ namespace VASLogic.Models
                  FROM C_Period cp
                  INNER JOIN C_Year cy ON (cy.C_Year_ID = cp.C_Year_ID)
                  WHERE CURRENT_DATE BETWEEN cp.StartDate AND cp.EndDate
-                 AND cp.IsActive='Y' AND cy.IsActive='Y' AND cy.C_Calendar_ID =" + calendar_ID+")");
+                 AND cp.IsActive='Y' AND cy.IsActive='Y' AND cy.C_Calendar_ID =" + calendar_ID + ")");
 
             sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@" SELECT 'DueAmt' AS Type,
                     NVL(
@@ -670,7 +753,7 @@ namespace VASLogic.Models
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              WHERE CURRENT_DATE < cs.DueDate
                AND cs.VA009_IsPaid = 'N'
-               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'","ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             // Query for 'Disputed'
             sql.Append(" UNION ALL ");
             sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Disputed',
@@ -707,7 +790,7 @@ namespace VASLogic.Models
                              CASE
                              WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
                              currencyconvert(
-                                 cs.dueamt, ci.c_currency_id,"+ C_Currency_ID +@", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
                              )
                              ELSE
                              0

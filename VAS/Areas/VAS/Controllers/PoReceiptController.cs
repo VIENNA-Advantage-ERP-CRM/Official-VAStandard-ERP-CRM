@@ -180,14 +180,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="WidgetId">WidgetId</param>
         /// <author>VIS_427</author>
         /// <returns>List of ar invoice data</returns>
-        public JsonResult GetARInvSchData(string WidgetId)
+        public JsonResult GetARInvSchData(bool ISOtrx)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
-                List<ARInvWidgData> result = obj.GetARInvSchData(ctx, WidgetId);
+                List<ARInvWidgData> result = obj.GetARInvSchData(ctx, ISOtrx);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);

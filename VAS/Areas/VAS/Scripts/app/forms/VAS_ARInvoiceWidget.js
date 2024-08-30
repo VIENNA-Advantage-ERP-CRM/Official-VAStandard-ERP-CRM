@@ -18,39 +18,29 @@
         var ctx = this.ctx;
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
-        /*Inisalised Element for array*/
-        var elements = [
-            "VAS_30",
-            "VAS_30to60",
-            "VAS_60to90",
-            "VAS_90to120",
-            "VAS_Older",
-            "VAS_TotalRec"
-        ];
-
-        VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
+        var msgArray = null;
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
 
-        var msgArray = [VAS.translatedTexts.VAS_30, VAS.translatedTexts.VAS_30to60, VAS.translatedTexts.VAS_60to90, VAS.translatedTexts.VAS_90to120, VAS.translatedTexts.VAS_Older];
-
         /*This function will load data in widget */
         this.intialLoad = function () {
-            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetARInvSchData", "", function (dr) {
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetARInvSchData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo) }, function (dr) {
                 var gridDataResult = dr;
                 if (gridDataResult != null) {
+                    /* This function used to intialize the image*/
+                    InitailizeMessage();
                     //Seprating the value
                     convertAmountToDotFormat((gridDataResult[5].arTotalAmtWidget[0].totalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[0].stdPrecision, maximumFractionDigits: gridDataResult[0].stdPrecision }))
                     $maindiv.append(
                         '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + $self.windowNo + '">' +
                         '    <div class="vas-arwidg-totalRec-amount">' +
                         '      <h1>' + TotalAmtArray[0] +
-                        '<span class="vas-arwidg-cur-symbol">' + TotalAmtArray[3] + '' + TotalAmtArray[1] + '<span>' +
+                        '<span class="vas-arwidg-cur-symbol">' +TotalAmtArray[1] + '<span>' +
                         '<span>' + gridDataResult[4].Symbol + '</span></h1>' +
-                        '      <div class="vas-arwidg-totalRecTxt">' + VAS.translatedTexts.VAS_TotalRec + '</div>' +
+                        '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase)+ '</div>' +
                         '    </div>' +
                         '  </div>');
                     var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + $self.windowNo + '">');
@@ -71,7 +61,7 @@
         };
         /*This function will show busy indicator in widget */
         function createBusyIndicator() {
-            $bsyDiv = $("<div class='vis-apanel-busy'>");
+            $bsyDiv = $('<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $bsyDiv.css({
                 "position": "absolute", "width": "98%", "height": "97%", 'text-align': 'center', 'z-index': '999'
             });
@@ -96,6 +86,27 @@
                 TotalAmtArray = AmtVal.split(".")
                 TotalAmtArray[3] = ".";
             }
+            //If decimal separator is zero then not to consider its value
+            if (VIS.Utility.Util.getValueOfDecimal(TotalAmtArray[1]) == 0) {
+                TotalAmtArray[1] = "";
+            }
+        }
+        /*This function used translate message*/
+        function InitailizeMessage() {
+            /*Inisalised Element for array*/
+            var elements = [
+                "VAS_30",
+                "VAS_30to60",
+                "VAS_60to90",
+                "VAS_90to120",
+                "VAS_Older",
+                "VAS_TotalRec",
+                "VAS_TotalPurchase"
+            ];
+
+            VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
+            msgArray = [VAS.translatedTexts.VAS_30, VAS.translatedTexts.VAS_30to60, VAS.translatedTexts.VAS_60to90, VAS.translatedTexts.VAS_90to120, VAS.translatedTexts.VAS_Older];
+
         }
         /*This function used to get root*/
         this.getRoot = function () {
