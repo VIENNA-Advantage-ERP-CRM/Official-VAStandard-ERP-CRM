@@ -14,21 +14,11 @@
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var ctx = this.ctx;
+        var ctx = VIS.Env.getCtx();
         var unit = null;
-        var elements = [
-            "VAS_Since",
-            "VAS_Top5",
-            "VAS_Million",
-            "VAS_Trillion",
-            "VAS_Billion",
-            "VAS_Thousand"
-        ];
-
-        VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = $('<div class="vas-igtwidg-top-vendors-col">' +
-            '<div class= "vas-igtwidg-vendors-heading">' + VAS.translatedTexts.VAS_Top5 + '</div>');
+            '<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5"))+ '</div>');
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
 
@@ -46,6 +36,7 @@
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetInvTotalGrandData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo)}, function (dr) {
                 var gridDataResult = dr;
                 if (gridDataResult != null) {
+                    InitailizeMessage();
                     // Create the container for the list
                     var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + $self.windowNo + '">');
 
@@ -75,7 +66,7 @@
 
                             // Append initial if image is not available
                             widgetDataDesign +=
-                                '<div style="float:left; background-color:' + pastel + '" class="vis-grid-row-td-icon">' +
+                                '<div style="float:left; background-color:' + pastel + '" class="vas-igtwidg-img-icon">' +
                                 '<span style="font-size: 16px;">' + custChar + '</span>' +
                                 '</div>';
                         }
@@ -87,7 +78,7 @@
                             '</div >' +
                             '<div class="vas-igtwidg-invoiceTotalAmt"><span class="vas-igtwidg-amt-val">' + (gridDataResult[i].Symbol.length != 3 ? '<span>' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + TotalAmtArray[0] + '</span>';
                         if (unit != null || unit == undefined) {
-                            widgetDataDesign += '<div class="vas-igtwiginvmillion">' + TotalAmtArray[2] + '' + TotalAmtArray[1] + '<span style="font-weight: 600;">' + unit + '</span>'
+                            widgetDataDesign += '<div class="vas-igtwiginvmillion">' + TotalAmtArray[2] + '' + TotalAmtArray[1] + '<span style="font-weight: 600;padding-left:1px;">' + unit + '</span>'
                                 + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>'
                         }
                         else {
@@ -107,13 +98,29 @@
         };
         /*This function will show busy indicator in widget */
         function createBusyIndicator() {
-            $bsyDiv = $("<div class='vis-apanel-busy'>");
+            $bsyDiv = $('<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $bsyDiv.css({
                 "position": "absolute", "width": "98%", "height": "97%", 'text-align': 'center', 'z-index': '999'
             });
             $bsyDiv[0].style.visibility = "visible";
             $root.append($bsyDiv);
         };
+        /*This function used translate message*/
+        function InitailizeMessage() {
+            /*Inisalised Element for array*/
+            var elements = [
+                "VAS_Since",
+                "VAS_Top5",
+                "VAS_Million",
+                "VAS_Trillion",
+                "VAS_Billion",
+                "VAS_Thousand",
+                "VAS_TopPurchase5"
+            ];
+
+            VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
+
+        }
         /**
          * This Function is responsible converting the value into million
          * @param {any} number
