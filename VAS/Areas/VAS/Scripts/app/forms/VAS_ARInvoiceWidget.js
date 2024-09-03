@@ -29,7 +29,7 @@
         this.intialLoad = function () {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetARInvSchData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo) }, function (dr) {
                 var gridDataResult = dr;
-                if (gridDataResult != null) {
+                if (gridDataResult != null && gridDataResult.length > 0) {
                     /* This function used to intialize the image*/
                     InitailizeMessage();
                     //Seprating the value
