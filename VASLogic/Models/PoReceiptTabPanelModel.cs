@@ -578,7 +578,7 @@ namespace VASLogic.Models
                     obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
                     ARInvWidgData.Add(obj);
                 }
-                if (TotalAmt > 0)
+                if (TotalAmt != 0)
                 {
                     obj = new ARInvWidgData();
                     obj.arTotalAmtWidget = new List<ArTotalAmtWidget>();
@@ -603,6 +603,7 @@ namespace VASLogic.Models
             InvGrandTotalData obj = new InvGrandTotalData(); ;
             StringBuilder sql = new StringBuilder();
             List<InvGrandTotalData> invGrandTotalData = new List<InvGrandTotalData>();
+            string BPCheck = (ISOtrx == true ? "cb.IsCustomer='Y'" : "cb.IsVendor='Y'");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
 
             sql.Append($@"WITH InvoiceData AS (
@@ -619,7 +620,7 @@ namespace VASLogic.Models
                              INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL')", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND "+BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})
                      SELECT
                          Name,

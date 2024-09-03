@@ -33,7 +33,7 @@
         this.intialLoad = function () {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetPurchaseStateDetail", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo) }, function (dr) {
                 var gridDataResult = dr;
-                if (gridDataResult != null) {
+                if (gridDataResult.length > 0) {
                     InitailizeMessage();
                     var HeadingDesign = '<div class="vas-psdwidg-whiteBox vas-psdwidg-tile-heading vas-psdwidg-heading-item">';
                     //If isSotrx tru means sale transaction then will show sale as label else will be purchase
@@ -49,7 +49,7 @@
                         '<div class="vas-psdwidg-whiteBox vas-psdwidg-itme2">' +
                         '<div class="vas-psdwidg-totalSale">'  + (gridDataResult[0].Symbol.length != 3 ? ' ' + gridDataResult[0].Symbol : '') + ' ' +
                         formatLargeNumber(gridDataResult[0].TotalAmt, gridDataResult[0].stdPrecision) + '<span class="vas-psdwidg-unit">'+unit+'</span>' + (gridDataResult[0].Symbol.length == 3 ? ' ' + gridDataResult[0].Symbol : '')+ '</div>' +
-                        '<div class="vas-psdwidg-salesYear">' + icon[0] +' ' + msgArray[i] + '</div>')
+                        '<div class="vas-psdwidg-salesYear">' + icon[0] +' ' + msgArray[0] + '</div>')
                     for (var i = 1; i < gridDataResult.length; i++) {
                         $maindiv.append(
                             '<div class="vas-psdwidg-whiteBox">' +

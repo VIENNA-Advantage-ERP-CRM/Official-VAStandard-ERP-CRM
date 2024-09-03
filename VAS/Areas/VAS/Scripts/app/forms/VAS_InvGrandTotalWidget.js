@@ -17,13 +17,14 @@
         var ctx = VIS.Env.getCtx();
         var unit = null;
         var $root = $('<div class="h-100 w-100">');
-        var $maindiv = $('<div class="vas-igtwidg-top-vendors-col">' +
-            '<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5"))+ '</div>');
+        var $maindiv = null;
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
 
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
+            $maindiv = $('<div class="vas-igtwidg-top-vendors-col">' +
+                '<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5")) + '</div>');
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
@@ -35,7 +36,7 @@
             var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetInvTotalGrandData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo)}, function (dr) {
                 var gridDataResult = dr;
-                if (gridDataResult != null) {
+                if (gridDataResult.length>0) {
                     InitailizeMessage();
                     // Create the container for the list
                     var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + $self.windowNo + '">');
