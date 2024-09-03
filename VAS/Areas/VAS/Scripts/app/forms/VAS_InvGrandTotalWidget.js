@@ -36,7 +36,7 @@
             var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetInvTotalGrandData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo)}, function (dr) {
                 var gridDataResult = dr;
-                if (gridDataResult.length>0) {
+                if (gridDataResult != null && gridDataResult.length > 0) {
                     InitailizeMessage();
                     // Create the container for the list
                     var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + $self.windowNo + '">');

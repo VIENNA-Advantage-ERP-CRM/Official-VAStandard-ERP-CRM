@@ -33,7 +33,7 @@
         this.intialLoad = function () {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetPurchaseStateDetail", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo) }, function (dr) {
                 var gridDataResult = dr;
-                if (gridDataResult.length > 0) {
+                if (gridDataResult != null && gridDataResult.length > 0) {
                     InitailizeMessage();
                     var HeadingDesign = '<div class="vas-psdwidg-whiteBox vas-psdwidg-tile-heading vas-psdwidg-heading-item">';
                     //If isSotrx tru means sale transaction then will show sale as label else will be purchase
