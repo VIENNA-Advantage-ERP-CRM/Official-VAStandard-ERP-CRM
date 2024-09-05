@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -337,17 +338,190 @@ namespace VIS.Models
             }
             return retDic;
         }
+
+        /// <summary>
+        /// Get Top 10 Highest selling product data.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <returns>List of Product data</returns>
+        public List<dynamic> GetTopProductData(Ctx ctx)
+        {
+            List<dynamic> retDic = null;
+            dynamic obj;
+            StringBuilder sb = new StringBuilder();
+            string startdate, enddate;
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+
+            if (DB.IsPostgreSQL())
+            {
+                startdate = "date_trunc('YEAR', CURRENT_DATE)";
+                enddate = "date_trunc('YEAR', CURRENT_DATE) + INTERVAL '1' YEAR";
+            }
+            else
+            {
+                startdate = "TRUNC(SYSDATE, 'YEAR')";
+                enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
+            }
+            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineTotalAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
+                    SUM(ol.QtyInvoiced) AS CurrentQty, ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355) AS UOM, img.ImageUrl 
+                    FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
+                    INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
+                    INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
+                    LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
+                    WHERE o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
+                    ORDER BY LineTotalAmt DESC FETCH FIRST 10 ROWS ONLY)");
+
+            if (DB.IsPostgreSQL())
+            {
+                startdate = "date_trunc('YEAR', CURRENT_DATE) - INTERVAL '1' YEAR";
+                enddate = "date_trunc('YEAR', CURRENT_DATE)";
+            }
+            else
+            {
+                startdate = "TRUNC(SYSDATE, 'YEAR') - INTERVAL '1' YEAR";
+                enddate = "TRUNC(SYSDATE, 'YEAR')";
+            }
+            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
+                    SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
+                    WHERE o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID)
+                    SELECT cy.M_Product_ID, cy.Name, cy.ImageUrl, NVL(py.LineTotalAmt, 0) AS PreviousTotal, cy.LineTotalAmt AS CurrentTotal,
+                    cy.UOM, cy.CurrentQty, py.PreviousQty
+                    FROM current_year cy LEFT JOIN previous_year py ON (cy.M_Product_ID = py.M_Product_ID)");
+            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new List<dynamic>();
+                string Symbol = "$";
+                int StdPrecision = 2;
+                sb.Clear();
+                sb.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol, StdPrecision 
+                FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sb.ToString(), null, null);
+                if (dsCurrency != null && dsCurrency.Tables.Count > 0 && dsCurrency.Tables[0].Rows.Count > 0)
+                {
+                    Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    StdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                }
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new ExpandoObject();
+                    obj.M_Product_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]);
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
+                    obj.ImageUrl = Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageUrl"]);
+                    obj.CurrentTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["CurrentTotal"]);
+                    obj.PreviousTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PreviousTotal"]);
+                    obj.CurrentQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["CurrentQty"]);
+                    obj.PreviousQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PreviousQty"]);
+                    obj.Symbol = Symbol;
+                    obj.StdPrecision = StdPrecision;
+                    retDic.Add(obj);
+                }
+            }
+            return retDic;
+        }
+
+        /// <summary>
+        /// Get 10 Lowest selling product data.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <returns>List of Product data</returns>
+        public List<dynamic> GetLowestProductData(Ctx ctx)
+        {
+            List<dynamic> retDic = null;
+            dynamic obj;
+            StringBuilder sb = new StringBuilder();
+            string startdate, enddate;
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+
+            if (DB.IsPostgreSQL())
+            {
+                startdate = "date_trunc('YEAR', CURRENT_DATE)";
+                enddate = "date_trunc('YEAR', CURRENT_DATE) + INTERVAL '1' YEAR";
+            }
+            else
+            {
+                startdate = "TRUNC(SYSDATE, 'YEAR')";
+                enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
+            }
+            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineTotalAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt,
+                    SUM(ol.QtyInvoiced) AS CurrentQty, ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355) AS UOM, img.ImageUrl 
+                    FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
+                    INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID) 
+                    INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
+                    LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
+                    WHERE o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
+                    HAVING SUM(ol.LineTotalAmt) > 0 ORDER BY LineTotalAmt ASC FETCH FIRST 10 ROWS ONLY)");
+
+            if (DB.IsPostgreSQL())
+            {
+                startdate = "date_trunc('YEAR', CURRENT_DATE) - INTERVAL '1' YEAR";
+                enddate = "date_trunc('YEAR', CURRENT_DATE)";
+            }
+            else
+            {
+                startdate = "TRUNC(SYSDATE, 'YEAR') - INTERVAL '1' YEAR";
+                enddate = "TRUNC(SYSDATE, 'YEAR')";
+            }
+            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt,
+                    SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
+                    WHERE o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID)
+                    SELECT cy.M_Product_ID, cy.Name, cy.ImageUrl, NVL(py.LineTotalAmt, 0) AS PreviousTotal, cy.LineTotalAmt AS CurrentTotal,
+                    cy.UOM, cy.CurrentQty, py.PreviousQty
+                    FROM current_year cy LEFT JOIN previous_year py ON (cy.M_Product_ID = py.M_Product_ID)");
+            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new List<dynamic>();
+                string Symbol = "$";
+                int StdPrecision = 2;
+                sb.Clear();
+                sb.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol, StdPrecision 
+                FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sb.ToString(), null, null);
+                if (dsCurrency != null && dsCurrency.Tables.Count > 0 && dsCurrency.Tables[0].Rows.Count > 0)
+                {
+                    Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    StdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                }
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new ExpandoObject();
+                    obj.M_Product_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]);
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.UOM = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOM"]);
+                    obj.ImageUrl = Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageUrl"]);
+                    obj.CurrentTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["CurrentTotal"]);
+                    obj.PreviousTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PreviousTotal"]);
+                    obj.CurrentQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["CurrentQty"]);
+                    obj.PreviousQty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PreviousQty"]);
+                    obj.Symbol = Symbol;
+                    obj.StdPrecision = StdPrecision;
+                    retDic.Add(obj);
+                }
+            }
+            return retDic;
+        }
+
         public class MultiplyRateItem
         {
             public int C_UOM_To_ID { get; set; }
             public decimal MultiplyRate { get; set; }
             public decimal DivideRate { get; set; }
         }
-
-
-
-
-
-
     }
 }
