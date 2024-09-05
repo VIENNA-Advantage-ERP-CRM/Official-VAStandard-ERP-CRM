@@ -203,7 +203,7 @@ namespace VAdvantage.Process
 
                 sql.Clear();
                 sql.Append("SELECT r.VA068_Email,r.VA068_VendorRegistration_ID,(SELECT AD_Table_ID FROM AD_Table WHERE " +
-                    " TableName = 'VA068_VendorRegistration') AS TableId ,u.VA068_FirstName,rg.VA068_Status,u.VA068_RegisteredUser_ID FROM VA068_VendorRecomend  r " +
+                    " TableName = 'VA068_VendorRegistration') AS TableId ,r.VA068_ContactName,rg.VA068_Status,u.VA068_RegisteredUser_ID FROM VA068_VendorRecomend  r " +
                     " LEFT JOIN VA068_RegisteredUser u on u.VA068_VendorRegistration_ID=r.VA068_VendorRegistration_ID" +
                     " LEFT JOIN VA068_VendorRegistration rg ON rg.VA068_VendorRegistration_ID=r.VA068_VendorRegistration_ID" +
                     "  WHERE r.C_RfQLine_ID IN (SELECT C_RfQLine_ID  FROM C_RfQLine WHERE C_RfQ_ID=" + rfq.GetC_RfQ_ID() + ") AND " +
@@ -248,7 +248,7 @@ namespace VAdvantage.Process
             string MailText2 = null;
             string MailText3 = null;
             string Mailaddress = string.Empty;
-            string VendorName = "Vendor", OrgName = string.Empty;
+            string  OrgName = string.Empty;
             DataRow[] selectedTable = null;
 
             VA068_RegistedUser ret = new VA068_RegistedUser();
@@ -283,11 +283,7 @@ namespace VAdvantage.Process
                 //{
                 foreach (DataRow rows in selectedTable)
                 {
-                    if (Util.GetValueOfString(rows["VA068_FirstName"]) != "")
-                    {
-                        VendorName = Util.GetValueOfString(rows["VA068_FirstName"]);
-                    }
-
+                    
                     DateTime t = DateTime.Now.ToUniversalTime();
                     string queryString = "?inviteID=" + SecureEngine.Encrypt(OrgID.ToString()) + "&lang=" + GetCtx().GetAD_Language() + "&RecordID=" + SecureEngine.Encrypt(Util.GetValueOfInt(Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"])).ToString())
                         + "&SchemaID=" + SecureEngine.Encrypt(Util.GetValueOfInt(rows["TableId"]).ToString()) + "&session=" + SecureEngine.Encrypt(t.ToString());
@@ -296,7 +292,7 @@ namespace VAdvantage.Process
 
                     EMail objMail = new EMail(GetCtx(), "", "", "", "", "", "", true, false);
                     objMail.SetSubject(MailHeader);
-                    objMail.SetMessageHTML(MailText.Replace("@VendorContactName@", VendorName + " " + MailText2)
+                    objMail.SetMessageHTML(MailText.Replace("@VendorContactName@", Util.GetValueOfString(rows["VA068_ContactName"]) + " " + MailText2)
                                           + MailText3.Replace("@Organisation@", OrgName)
                                     .Replace("@VA068Link@", url + queryString.Replace("&registerID", "&amp;registerID")));
 
