@@ -127,10 +127,6 @@
                 '</div>' +
                 '</div>');
 
-
-
-
-
             /* find the varibales from html*/
             $inputUOM = inputDiv.find('#VAS_ddlUOM' + $self.windowNo);
             $inputPurUnit = inputDiv.find('#VAS_ddlPU' + $self.windowNo);
@@ -152,9 +148,9 @@
 
             inputSave = inputDiv.find('#VAS_Save' + $self.windowNo);
             inputCancel = inputDiv.find('#VAS_Cancel' + $self.windowNo);
+        };
 
-
-
+        this.initLoad = function () {
             /**/
             var UOMlookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_UOM_ID", 0, false);
             $self.cmbUOM = new VIS.Controls.VComboBox("C_UOM_ID", true, true, true, UOMlookup, 150, VIS.DisplayType.TableDir);
@@ -190,8 +186,7 @@
             $inputCuUnit.append($CUControlWrap);
 
 
-            $root.append(inputDiv);
-            busyDiv(false)
+            $root.append(inputDiv);            
 
             // This function used to restrict the alphabet in textbox
             VAS_Alltxt.on('keypress', function (evt) {
@@ -298,7 +293,7 @@
                     VAS_txtPUQtyForPU.val(1);
                 }
                 else {
-                  
+
                     VAS_txtSUQtyForPU.prop('disabled', false);
                     VAS_txtPUQtyForPU.prop('disabled', false);
                     VAS_txtSUQtyForPU.val("");
@@ -317,7 +312,7 @@
                     VAS_txtPUQtyForSU.val(1);
                 }
                 else {
-                  
+
                     VAS_txtSUQtyForSU.prop('disabled', false);
                     VAS_txtPUQtyForSU.prop('disabled', false);
                     VAS_txtSUQtyForSU.val("");
@@ -336,7 +331,7 @@
                     VAS_txtPUQtyForCU.val(1);
                 }
                 else {
-                   
+
                     VAS_txtSUQtyForCU.prop('disabled', false);
                     VAS_txtPUQtyForCU.prop('disabled', false);
                     VAS_txtSUQtyForCU.val("");
@@ -353,9 +348,8 @@
             inputCancel.on(VIS.Events.onTouchStartOrClick, function () {
                 $self.frame.close();
             });
+            busyDiv(false)
         }
-
-
 
         /* save task functionality to send the data to server for save the UOM conversion data*/
         function saveTask() {
@@ -406,8 +400,8 @@
                     // Quantity values are different for the same dropdown values
                     VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                     busyDiv(false);
-                   
-                    return; 
+
+                    return;
                 }
             } else if (puValue === suValue || puValue === cuValue || suValue === cuValue) {
                 // Two values are the same
@@ -415,8 +409,8 @@
                     if (qtyForPU !== qtyForSU) {
                         VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                         busyDiv(false);
-                   
-                        return; 
+
+                        return;
                     }
                     multiplyRateList.push({
                         C_UOM_To_ID: puValue,
@@ -432,7 +426,7 @@
                     if (qtyForPU !== qtyForCU) {
                         VIS.ADialog.info("VAS_AllUnitSameButDifferQty");
                         busyDiv(false);
-                        return; 
+                        return;
                     }
                     multiplyRateList.push({
                         C_UOM_To_ID: puValue,
@@ -567,6 +561,10 @@
             this.windowNo = windowNo;
             this.initalize();
             this.frame.getContentGrid().append(this.getRoot());
+            var ssef = this;
+            window.setTimeout(function () {
+                ssef.initLoad();
+            }, 50);
         };
 
         /*Must implement dispose*/

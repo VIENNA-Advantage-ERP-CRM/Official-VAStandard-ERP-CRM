@@ -102,14 +102,46 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
         /// <param name="VAS_SalesUOM_ID"></param>
         /// <param name="VAS_ConsumableUOM_ID"></param>
         /// <returns></returns>
-        public JsonResult SaveUOMConversion(int C_UOM_ID,string multiplyRateList,int Product_ID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
+        public JsonResult SaveUOMConversion(int C_UOM_ID, string multiplyRateList, int Product_ID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
         {
-            Dictionary<string,object> result = null;
+            Dictionary<string, object> result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
                 MProductModel obj = new MProductModel();
-                result = obj.SaveUOMConversion(ctx, C_UOM_ID, JsonConvert.DeserializeObject <List<MultiplyRateItem>>(multiplyRateList), Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+                result = obj.SaveUOMConversion(ctx, C_UOM_ID, JsonConvert.DeserializeObject<List<MultiplyRateItem>>(multiplyRateList), Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Get Top 10 Highest selling product data.
+        /// </summary>
+        /// <returns>List of Product data</returns>
+        public JsonResult GetTopProductData()
+        {
+            List<dynamic> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetTopProductData(ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Get 10 Lowest selling product data.
+        /// </summary>
+        /// <returns>List of Product data</returns>
+        public JsonResult GetLowestProductData()
+        {
+            List<dynamic> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetLowestProductData(ctx);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }

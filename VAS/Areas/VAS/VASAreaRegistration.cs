@@ -100,6 +100,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/InvoiceLineTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ARInvoiceWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_InvGrandTotalWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_HighestSellProduct.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_LowestSellProduct.js"
                     "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js"
                    );
 
@@ -110,7 +112,8 @@ namespace VAS
                 "~/Areas/VAS/Content/VPaySelect.css",
                 "~/Areas/VAS/Content/vasattachuser.css",
                 "~/Areas/VAS/Content/VAS_PurchaseOrderTabPanel.css",
-                "~/Areas/VAS/Content/VAS_ProductUomSetup.css");
+                "~/Areas/VAS/Content/VAS_ProductUomSetup.css",
+                "~/Areas/VAS/Content/VAS_ProductWidgets.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
 
