@@ -176,7 +176,7 @@ namespace VAdvantage.Model
                     list.Add(new MRfQResponse(GetCtx(), dr, Get_TrxName()));
                 }
             }
-            catch 
+            catch
             {
                 //log.log(Level.SEVERE, sql, e);
             }
@@ -250,7 +250,7 @@ namespace VAdvantage.Model
                 if (qtys.Length > 1)
                 {
                     log.Warning("isQuoteTotalAmtOnlyValid - #" + qtys.Length + " - " + line);
-                   
+
                     String msg = "@Line@ " + line.GetLine()
                         + ": #@C_RfQLineQty@=" + qtys.Length + " - @IsQuoteTotalAmt@";
                     return msg;
@@ -301,7 +301,7 @@ namespace VAdvantage.Model
 
             log.Fine(processed + " - Lines=" + noLine + ", Qty=" + noQty);
         }
-        
+
         /// <summary>
         /// Process document
         /// </summary>
@@ -370,7 +370,7 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
-            _justPrepared = true;            
+            _justPrepared = true;
             return DocActionVariables.STATUS_INPROGRESS;
         }
 
@@ -405,7 +405,7 @@ namespace VAdvantage.Model
         public string CompleteIt()
         {
             log.Info(ToString());
-            StringBuilder Info = new StringBuilder();            
+            StringBuilder Info = new StringBuilder();
             SetProcessed(true);
 
             //User Validation
@@ -419,7 +419,7 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
-            _processMsg = Info.ToString();            
+            _processMsg = Info.ToString();
             SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
         }
@@ -476,6 +476,36 @@ namespace VAdvantage.Model
         public bool ReActivateIt()
         {
             log.Info(ToString());
+            int no = 1;
+            //VIS0336:changes done for deleting the Responses when RFQ is reactivated
+            StringBuilder Sql = new StringBuilder();
+            Sql.Append("DELETE FROM C_RfQResponseLineQty WHERE C_RfQResponseLineQty_ID IN (SELECT C_RfQResponseLineQty_ID FROM C_RfQResponseLineQty WHERE C_RfQResponseLine_ID IN( SELECT C_RfQResponseLine_ID FROM " +
+                " C_RfQResponseLine WHERE C_RfQResponse_ID IN (SELECT C_RfQResponse_ID FROM C_RfQResponse WHERE VAS_Response_ID=(SELECT VAS_Response_ID " +
+                " FROM VAS_Response WHERE C_RfQ_ID=" + GetC_RfQ_ID() + "))))");
+            no = DB.ExecuteQuery(Sql.ToString(), null, Get_Trx());
+            if (no < 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_ReslineQtyNotDeleted");
+                return false;
+            }
+            Sql.Clear();
+            Sql.Append("DELETE FROM C_RfQResponseLine WHERE C_RfQResponseLine_ID IN (SELECT C_RfQResponseLine_ID FROM C_RfQResponseLine WHERE C_RfQResponse_ID IN (SELECT C_RfQResponse_ID FROM C_RfQResponse WHERE " +
+                " VAS_Response_ID=(SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + GetC_RfQ_ID() + ")))");
+            no = DB.ExecuteQuery(Sql.ToString(), null, Get_Trx());
+            if (no < 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_ReslineNotDeleted");
+                return false;
+            }
+            Sql.Clear();
+            Sql.Append("DELETE FROM C_RfQResponse WHERE VAS_Response_ID =(SELECT VAS_Response_ID FROM VAS_Response WHERE C_RfQ_ID=" + GetC_RfQ_ID() + ")");
+            no = DB.ExecuteQuery(Sql.ToString(), null, Get_Trx());
+            if (no < 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_ResNotDeleted");
+                return false;
+            }
+
             SetDocAction(DOCACTION_Complete);
             SetProcessed(false);
             return true;
@@ -488,9 +518,9 @@ namespace VAdvantage.Model
         public String GetSummary()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append(GetDocumentNo());           
+            sb.Append(GetDocumentNo());
             sb.Append(": ").
-                Append(Msg.Translate(GetCtx(), "Total Amount")).Append("=").Append(GetTotalAmt());            
+                Append(Msg.Translate(GetCtx(), "Total Amount")).Append("=").Append(GetTotalAmt());
             //	 - Description
             if (GetDescription() != null && GetDescription().Length > 0)
                 sb.Append(" - ").Append(GetDescription());

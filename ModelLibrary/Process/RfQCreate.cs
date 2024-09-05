@@ -167,7 +167,7 @@ namespace VAdvantage.Process
                 //VIS430:Set Published Checkbox true when click on Publish and Invite Button on RFQ tab of RFQ Window.
 
                 int no = DB.ExecuteQuery(@"UPDATE C_RfQ SET VA068_IsPublished='Y' WHERE C_RfQ_ID =" + GetRecord_ID(), null, Get_Trx());
-                
+
                 //VIS0336:for sendinf the mails to the subscribers
                 //	Topic 
                 MRfQTopic topic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());
@@ -203,14 +203,23 @@ namespace VAdvantage.Process
 
                 sql.Clear();
                 sql.Append("SELECT r.VA068_Email,r.VA068_VendorRegistration_ID,(SELECT AD_Table_ID FROM AD_Table WHERE " +
-                    " TableName = 'VA068_VendorRegistration') AS TableId ,u.VA068_FirstName FROM VA068_VendorRecomend  r " +
-                    " LEFT JOIN VA068_RegisteredUser u on u.VA068_VendorRegistration_ID=r.VA068_VendorRegistration_ID " +
+                    " TableName = 'VA068_VendorRegistration') AS TableId ,r.VA068_ContactName,rg.VA068_Status,u.VA068_RegisteredUser_ID FROM VA068_VendorRecomend  r " +
+                    " LEFT JOIN VA068_RegisteredUser u on u.VA068_VendorRegistration_ID=r.VA068_VendorRegistration_ID" +
+                    " LEFT JOIN VA068_VendorRegistration rg ON rg.VA068_VendorRegistration_ID=r.VA068_VendorRegistration_ID" +
                     "  WHERE r.C_RfQLine_ID IN (SELECT C_RfQLine_ID  FROM C_RfQLine WHERE C_RfQ_ID=" + rfq.GetC_RfQ_ID() + ") AND " +
                     "  r.VA068_VendorRegistration_ID > 0");
                 DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
+                    //VIS0336:chnages done for seding the mail to recommend vendor and others 
                     TotalRecepients = ds.Tables[0].Rows.Count;
+                    DataRow[] selectedTable = null;
+                    selectedTable = ds.Tables[0].Select(" VA068_Status<>'RS'");
+                    foreach (DataRow rows in selectedTable)
+                    {
+                        SendRfqToVendors(Util.GetValueOfInt(rows["VA068_RegisteredUser_ID"]));
+
+                    }
                     Thread thread = new Thread(new ThreadStart(() => SendMail(ds)));
                     thread.Start();
                 }
@@ -239,7 +248,8 @@ namespace VAdvantage.Process
             string MailText2 = null;
             string MailText3 = null;
             string Mailaddress = string.Empty;
-            string VendorName = "Vendor", OrgName = string.Empty;
+            string  OrgName = string.Empty;
+            DataRow[] selectedTable = null;
 
             VA068_RegistedUser ret = new VA068_RegistedUser();
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -266,27 +276,28 @@ namespace VAdvantage.Process
 
                 }
 
-                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                {
-                    if (Util.GetValueOfString(ds.Tables[0].Rows[i]["VA068_FirstName"]) != "")
-                    {
-                        VendorName = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA068_FirstName"]);
-                    }
 
+                selectedTable = ds.Tables[0].Select(" VA068_Status='RS'");
+
+                //for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                //{
+                foreach (DataRow rows in selectedTable)
+                {
+                    
                     DateTime t = DateTime.Now.ToUniversalTime();
-                    string queryString = "?inviteID=" + SecureEngine.Encrypt(OrgID.ToString()) + "&lang=" + GetCtx().GetAD_Language() + "&RecordID=" + SecureEngine.Encrypt(Util.GetValueOfInt(Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA068_VendorRegistration_ID"])).ToString())
-                        + "&SchemaID=" + SecureEngine.Encrypt(Util.GetValueOfInt(ds.Tables[0].Rows[i]["TableId"]).ToString()) + "&session=" + SecureEngine.Encrypt(t.ToString());
+                    string queryString = "?inviteID=" + SecureEngine.Encrypt(OrgID.ToString()) + "&lang=" + GetCtx().GetAD_Language() + "&RecordID=" + SecureEngine.Encrypt(Util.GetValueOfInt(Util.GetValueOfInt(rows["VA068_VendorRegistration_ID"])).ToString())
+                        + "&SchemaID=" + SecureEngine.Encrypt(Util.GetValueOfInt(rows["TableId"]).ToString()) + "&session=" + SecureEngine.Encrypt(t.ToString());
                     ret.Message = "";
                     ret.Url = url + queryString;
 
                     EMail objMail = new EMail(GetCtx(), "", "", "", "", "", "", true, false);
                     objMail.SetSubject(MailHeader);
-                    objMail.SetMessageHTML(MailText.Replace("@VendorContactName@", VendorName + " " + MailText2)
+                    objMail.SetMessageHTML(MailText.Replace("@VendorContactName@", Util.GetValueOfString(rows["VA068_ContactName"]) + " " + MailText2)
                                           + MailText3.Replace("@Organisation@", OrgName)
                                     .Replace("@VA068Link@", url + queryString.Replace("&registerID", "&amp;registerID")));
 
 
-                    objMail.AddTo(Util.GetValueOfString(ds.Tables[0].Rows[i]["VA068_Email"]), "");
+                    objMail.AddTo(Util.GetValueOfString(rows["VA068_Email"]), "");
                     string res1 = objMail.Send();
 
                     StringBuilder res = new StringBuilder();
@@ -442,7 +453,7 @@ namespace VAdvantage.Process
                 mtext.SetPO(rfq, true);
                 message.Append(mtext.GetMailText(true).Equals(string.Empty) ? "** No Email Body" : mtext.GetMailText(true));
 
-                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader(); ;
+                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader();
 
                 EMail email = client.CreateEMail(mail, name, subject, message.ToString());
                 if (email == null)

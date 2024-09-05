@@ -387,7 +387,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     display: flex;
     align-items: flex-end;
     margin: 0;
-    font-size: 2em;
+    font-size: 1.5em;
 }
 
 .vas-arwidg-cur-symbol {
@@ -397,7 +397,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     font-size: 0.5em;
     line-height: 1.3000em;
     position: relative;
-    top: -0.5em;
+    top: 0.1em;
 }
 
     .vas-arwidg-cur-symbol span {
@@ -431,12 +431,12 @@ Only index.html and style.css is for your use There is no need to copy any other
 }
 
     .vas-arwidg-recBox-amt span {
-        color: #2ABEBC;
+        color: rgba(var(--v-c-primary));
     }
 
 @media screen and (max-width: 1920px) {
     .vas-arwidg-receivable-container {
-        font-size: 12px;
+        font-size: 15px;
     }
     .vis-editModeWidget .vas-arwidg-receivable-container {
         font-size: 9px;
@@ -453,7 +453,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 10px;
+        font-size: 9px;
     }
 }
 
@@ -463,7 +463,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 
     .vas-arwidg-recBox-amt {
-        font-size: 12px;
+        font-size: 10px;
     }
 }
 
@@ -576,7 +576,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 span.vas-arwidg-cur-symbol {
     display: flex;
-    gap: 4px;
+    /*gap: 4px;*/
     margin-left: 5px;
 }
 
@@ -587,26 +587,27 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-vendors-heading {
     font-size: 0.875em;
+    font-weight:600;
     margin-bottom: 0.5em;
 }
 
 .vas-igtwidg-top-vendors-col {
     background-color: rgba(var(--v-c-readonly), 1);
     padding: 0.5em;
-   /* height: 100%;*/
+    height: 100%;
 }
 
 .vas-igtwidg-vendors-listing {
     display: grid;
     grid-template-columns: repeat(1, 1fr);
-    gap: 0.6em;
+    gap: 0.5em;
     height: calc(100% - 1.75em);
     overflow: hidden;
 }
 
 .vas-igtwidg-invoices-box {
     background-color: rgba(var(--v-c-common), 1);
-    padding: 0.6em;
+    padding: 0.5em;
 }
 
 .vas-igtwidg-invoices-detail {
@@ -664,13 +665,14 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-amt-val {
     font-size: 1em;
+    font-weight:600;
     color: #093756;
 }
 
 
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
-        font-size: 12px;
+        font-size: 11px;
     }
 
     .vis-editModeWidget .vas-igtwidg-vendors-listing {
@@ -678,7 +680,7 @@ span.vas-arwidg-cur-symbol {
     }
 
     .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
-        font-size: 11px;
+        font-size: 10px;
     }
 }
 
@@ -789,4 +791,177 @@ span.vas-arwidg-cur-symbol {
 .vas-igtwiginvmillion {
     font-size: 1em;
     color: #093756;
+    font-weight:600;
+}
+:root {
+    --width-100: calc(1920px/9);
+    --width-70: calc(1920px*0.7/9);
+}
+
+.vas-psdwidg-purchase-state-col {
+   /* background: rgb(9,55,86);*/
+    /*background: linear-gradient(145deg, rgba(9,55,86,1) 0%, rgba(0,132,196,1) 100%);*/
+    background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
+    height: 100%;
+    display: grid;
+    /*grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);*/
+    gap: 0.4em;
+    padding: 0.4em;
+}
+
+.vas-psdwidg-whiteBox {
+    background-color: rgba(var(--v-c-common), 1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.vas-psdwidg-totalSale {
+    font-size: 1em;
+    font-weight: 600;
+    color: #083959;
+    line-height: 1.2em;
+}
+
+.vas-psdwidg-salesYear {
+    color: #083959;
+    font-size: 1em;
+}
+
+.vas-psdwidg-tile-heading {
+    background-color: transparent !important;
+}
+
+    .vas-psdwidg-tile-heading h1 {
+        margin: 0;
+        font-size: 3.0em;
+        color: rgba(var(--v-c-common), 1);
+        line-height: 1.1em;
+    }
+
+        .vas-psdwidg-tile-heading h1 span {
+            display: block;
+            /*text-align: right;*/
+        }
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-psdwidg-salesYear {
+        color: #083959;
+        font-size: 0.5em;
+    }
+    .vis-editModeWidget .vas-psdwidg-totalSale {
+        font-size: 0.5em;
+    }
+    .vis-editModeWidget .vas-psdwidg-tile-heading h1 {
+        font-size: 2.0em;
+    }
+    }
+
+@media screen and (max-width: 1366px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 12px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-psdwidg-tile-heading {
+        font-size: 8px;
+    }
+
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 12px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 11px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 15px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 13px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 9px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 7px;
+    }
+}
+.vas-psdwidg-heading-item {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+}
+.vas-psdwidg-itme2 {
+    grid-column: 3;
+}
+.vas-psdwidg-stateheading{
+    position:absolute;
+}
+.vas-psdwidg-unit{
+    padding-left:1px;
+}
+.vas-igtwidg-img-icon {
+    align-items: center;
+    background-color: rgba(var(--v-c-primary), .4);
+    border-radius: 100%;
+    display: inline-flex;
+    height: 41px;
+    justify-content: center;
+    /* margin: 0 .4rem; */
+    min-height: 32px;
+    min-width: 32px;
+    overflow: hidden;
+    width: 41px;
 }

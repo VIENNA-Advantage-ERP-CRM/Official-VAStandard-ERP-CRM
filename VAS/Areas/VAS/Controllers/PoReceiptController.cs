@@ -180,14 +180,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="WidgetId">WidgetId</param>
         /// <author>VIS_427</author>
         /// <returns>List of ar invoice data</returns>
-        public JsonResult GetARInvSchData(string WidgetId)
+        public JsonResult GetARInvSchData(bool ISOtrx)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
-                List<ARInvWidgData> result = obj.GetARInvSchData(ctx, WidgetId);
+                List<ARInvWidgData> result = obj.GetARInvSchData(ctx, ISOtrx);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -206,6 +206,25 @@ namespace VAS.Areas.VAS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
                 List<InvGrandTotalData> result = obj.GetInvTotalGrandData(ctx, ISOtrx);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        // <summary>
+        /// This function is Used to Amount which are in diffenernt states from AP/AR Screens
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of Amount which are in diffenernt states from AP/AR Screens</returns>
+        public JsonResult GetPurchaseStateDetail(bool ISOtrx)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<PurchaseStateDetail> result = obj.GetPurchaseStateDetail(ctx, ISOtrx);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
