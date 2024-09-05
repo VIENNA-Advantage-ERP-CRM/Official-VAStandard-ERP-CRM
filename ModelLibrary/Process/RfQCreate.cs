@@ -167,7 +167,7 @@ namespace VAdvantage.Process
                 //VIS430:Set Published Checkbox true when click on Publish and Invite Button on RFQ tab of RFQ Window.
 
                 int no = DB.ExecuteQuery(@"UPDATE C_RfQ SET VA068_IsPublished='Y' WHERE C_RfQ_ID =" + GetRecord_ID(), null, Get_Trx());
-                
+
                 //VIS0336:for sendinf the mails to the subscribers
                 //	Topic 
                 MRfQTopic topic = new MRfQTopic(GetCtx(), rfq.GetC_RfQ_Topic_ID(), Get_TrxName());
@@ -177,9 +177,9 @@ namespace VAdvantage.Process
                     MRfQTopicSubscriber subscriber = subscribers[i];
 
                     if (_IsSendRfQ)//send mail check
-                    {
+                    {//VIS0336:for publich and create process process , for sedning mails to subscriber with contact is not bind
                         if (subscriber.Get_ValueAsInt("VA068_VendorRegistration_ID") > 0
-                            && SendRfqToVendors(Util.GetValueOfInt(subscriber.Get_Value("VA068_RegisteredUser_ID"))))
+                            && SendRfqToVendors(Util.GetValueOfInt(subscriber.Get_Value("VA068_RegisteredUser_ID")), Util.GetValueOfInt(subscriber.Get_Value("VA068_VendorRegistration_ID"))))
                         {
                             sent++;
                         }
@@ -400,28 +400,44 @@ namespace VAdvantage.Process
         /// </summary>
         /// <param name="RegisterUserID"></param>
         /// <returns></returns>
-        public bool SendRfqToVendors(int RegisterUserID)
+        public bool SendRfqToVendors(int RegisterUserID, int VendorRegId)
         {
             string mail = "", name = "", notificationType = "";
             int ad_user_ID = 0;
             bool mailSent = false;
             try
             {
-                DataSet ds = DB.ExecuteDataset(@"SELECT ru.VA068_Email, ru.VA068_FirstName, au.AD_User_ID, au.NotificationType
+                DataSet ds = new DataSet();
+                // VIS0336:for publich and create process process, for sedning mails to subscriber with contact is not bind
+                if (RegisterUserID > 0)
+                {
+                    ds = DB.ExecuteDataset(@"SELECT ru.VA068_Email, ru.VA068_FirstName, au.AD_User_ID, au.NotificationType
                     FROM VA068_RegisteredUser ru LEFT JOIN AD_User au ON (ru.AD_User_ID = au.AD_User_ID) 
                     WHERE ru.VA068_RegisteredUser_ID = " + RegisterUserID, null, Get_Trx());
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
-                    name = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
-                    ad_user_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
-                    notificationType = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
+                        name = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+                        ad_user_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
+                        notificationType = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_FirstName"]);
+
+                    }
                 }
+                else
+                {
+                    ds = DB.ExecuteDataset(@"SELECT VA068_Email,CompanyName FROM VA068_VendorRegistration WHERE VA068_VendorRegistration_ID= " + VendorRegId, null, Get_Trx());
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        mail = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA068_Email"]);
+                        name = Util.GetValueOfString(ds.Tables[0].Rows[0]["CompanyName"]);
+                    }
+                }
+
 
                 MClient client = MClient.Get(GetCtx());
                 MMailText mtext = new MMailText(GetCtx(), rfq.GetR_MailText_ID(), Get_TrxName());
 
-                if (RegisterUserID == 0 || string.IsNullOrEmpty(mail))
+                if ((RegisterUserID == 0 && VendorRegId == 0) || string.IsNullOrEmpty(mail))
                 {
                     log.Log(Level.SEVERE, "No User or no EMail - " + GetName());
                     return false;
@@ -442,7 +458,7 @@ namespace VAdvantage.Process
                 mtext.SetPO(rfq, true);
                 message.Append(mtext.GetMailText(true).Equals(string.Empty) ? "** No Email Body" : mtext.GetMailText(true));
 
-                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader(); ;
+                String subject = String.IsNullOrEmpty(mtext.GetMailHeader()) ? "** No Subject" : mtext.GetMailHeader();
 
                 EMail email = client.CreateEMail(mail, name, subject, message.ToString());
                 if (email == null)

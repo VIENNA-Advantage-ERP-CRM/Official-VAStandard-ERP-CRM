@@ -75,6 +75,11 @@ namespace VAdvantage.Process
         protected override String DoIt()
         {
             MRfQ rfq = new MRfQ(GetCtx(), _C_RfQ_ID, Get_TrxName());
+
+            if (rfq.GetQuoteType()=="T")//VIS0336:restrict the user to create PO in case of lum sum , it will be done from award recommendation
+            {
+                throw new ArgumentException("VAS_AwardRecommendation");
+            }
             if (rfq.Get_ID() == 0)
             {
                 throw new ArgumentException("No RfQ found");
