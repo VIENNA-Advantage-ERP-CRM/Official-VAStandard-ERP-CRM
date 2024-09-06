@@ -85,7 +85,7 @@
             ];
 
             VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
-            msgArray = [VAS.translatedTexts.VAS_DueAmt, VAS.translatedTexts.VAS_DueSoon, VAS.translatedTexts.VAS_Disputed, VAS.translatedTexts.VAS_IsHold, VAS.translatedTexts.VAS_IPAmt,
+            msgArray = [VAS.translatedTexts.VAS_DueAmt, VAS.translatedTexts.VAS_DueSoon, VAS.translatedTexts.VAS_Disputed, (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_UnAllocatedReceipt : VAS.translatedTexts.VAS_IsHold), VAS.translatedTexts.VAS_IPAmt,
             VAS.translatedTexts.VAS_New, VAS.translatedTexts.VAS_Drafted];
 
         }
