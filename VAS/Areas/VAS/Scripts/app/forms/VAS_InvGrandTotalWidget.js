@@ -15,6 +15,7 @@
         var $bsyDiv;
         var $self = this;
         var ctx = VIS.Env.getCtx();
+        var widgetID = null;
         var unit = null;
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = null;
@@ -23,7 +24,9 @@
 
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
-            $maindiv = $('<div class="vas-igtwidg-top-vendors-col">' +
+            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            var classTop5 = (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? 'vas-igtwidg-customer-bgColor' : 'vas-igtwidg-vendor-bgColor');
+            $maindiv = $('<div class="vas-igtwidg-top-vendors-col ' + classTop5+'">' +
                 '<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5")) + '</div>');
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
@@ -39,7 +42,7 @@
                 if (gridDataResult != null && gridDataResult.length > 0) {
                     InitailizeMessage();
                     // Create the container for the list
-                    var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + $self.windowNo + '">');
+                    var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + widgetID + '">');
 
                     // Iterate through each item in the gridDataResult
                     for (var i = 0; i < gridDataResult.length; i++) {
@@ -173,7 +176,7 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             $bsyDiv[0].style.visibility = "visible";
-            $maindiv.find('#vas_listContainer_' + $self.windowNo).remove();
+            $maindiv.find('#vas_listContainer_' + widgetID).remove();
             $self.intialLoad();
         };
     };

@@ -56,6 +56,22 @@ namespace VAdvantage.Model
                 
             return true;
         }
+        /// <summary>
+        /// This function is used to delete dimension when gl journal is drafted
+        /// </summary>
+        /// <author>VIS_427</author>
+        /// <returns>boolean value</returns>
+        protected override bool BeforeDelete()
+        {
+            string sql = @"SELECT j.DocStatus FROM GL_Journal j INNER JOIN GL_JournalLine jl 
+                         ON (j.GL_Journal_ID = jl.GL_Journal_ID) WHERE jl.GL_JournalLine_ID=" + GetGL_JournalLine_ID();
+            string DocStatus = Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()));
+            if (DocStatus != "DR")
+            {
+                    return false;
+            }
+            return true;
+        }
 
         /// setter property for checking data to be manual creation of through process
         /// </summary>
