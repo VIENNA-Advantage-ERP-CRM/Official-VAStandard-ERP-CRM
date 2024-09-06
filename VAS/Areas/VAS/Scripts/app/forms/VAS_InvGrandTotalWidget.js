@@ -146,7 +146,7 @@
                 return (number / 1000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             else {
-                unit = null;
+                unit = '';
                 return (number).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
             }
         }
