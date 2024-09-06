@@ -76,6 +76,7 @@
                 "VAS_Disputed",
                 "VAS_Million",
                 "VAS_Trillion",
+                "VAS_UnAllocatedReceipt",
                 "VAS_Billion",
                 "VAS_Thousand",
                 "VAS_Purchase",
