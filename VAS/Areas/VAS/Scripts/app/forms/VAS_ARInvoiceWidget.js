@@ -19,8 +19,10 @@
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
         var msgArray = null;
+        var widgetID = null;
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
+            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
@@ -35,7 +37,7 @@
                     //Seprating the value
                     convertAmountToDotFormat((gridDataResult[5].arTotalAmtWidget[0].totalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[0].stdPrecision, maximumFractionDigits: gridDataResult[0].stdPrecision }))
                     $maindiv.append(
-                        '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + $self.windowNo + '">' +
+                        '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + widgetID + '">' +
                         '    <div class="vas-arwidg-totalRec-amount">' +
                         '      <h1>' + TotalAmtArray[0] +
                         '<span class="vas-arwidg-cur-symbol">' +TotalAmtArray[1] + '<span>' +
@@ -43,7 +45,7 @@
                         '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase)+ '</div>' +
                         '    </div>' +
                         '  </div>');
-                    var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + $self.windowNo + '">');
+                    var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + widgetID + '">');
                     for (var i = 0; i < gridDataResult.length - 1; i++) {
                         var widgetDataDesign = '<div class="vas-arwidg-receiveTxt-box">' +
                             '<div class="vas-arwidg-orderTxt">' + msgArray[i] + '</div>' +
@@ -115,8 +117,8 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             $bsyDiv[0].style.visibility = "visible";
-            $maindiv.find('#vas_arwidtotaamtContainer_' + $self.windowNo).remove();
-            $maindiv.find('#vas_listContainer_' + $self.windowNo).remove();
+            $maindiv.find('#vas_arwidtotaamtContainer_' + widgetID).remove();
+            $maindiv.find('#vas_listContainer_' + widgetID).remove();
             $self.intialLoad();
         };
     };

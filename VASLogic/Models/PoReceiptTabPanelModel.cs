@@ -578,14 +578,11 @@ namespace VASLogic.Models
                     obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
                     ARInvWidgData.Add(obj);
                 }
-                if (TotalAmt != 0)
-                {
-                    obj = new ARInvWidgData();
-                    obj.arTotalAmtWidget = new List<ArTotalAmtWidget>();
-                    ArTotalAmtWidget objAmt = new ArTotalAmtWidget();
-                    objAmt.totalAmt = TotalAmt;
-                    obj.arTotalAmtWidget.Add(objAmt);
-                }
+                obj = new ARInvWidgData();
+                obj.arTotalAmtWidget = new List<ArTotalAmtWidget>();
+                ArTotalAmtWidget objAmt = new ArTotalAmtWidget();
+                objAmt.totalAmt = TotalAmt;
+                obj.arTotalAmtWidget.Add(objAmt);
                 ARInvWidgData.Add(obj);
             }
             return ARInvWidgData;
@@ -620,7 +617,7 @@ namespace VASLogic.Models
                              INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND "+BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})
                      SELECT
                          Name,
@@ -778,11 +775,39 @@ namespace VASLogic.Models
              FROM C_Invoice ci
              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N' AND ci.IsInDispute = 'Y'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW)); ;
+             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N' AND ci.IsInDispute = 'Y'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
-            // Query for 'Hold'
+            // Query for 'Unallocated Amount on AR Invoice'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+            if (ISOtrx)
+            {
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'UnAllocated',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            }
+            // Query for 'Hold' ON AP invoice
+            else
+            {
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
                  'Hold',
                  nvl(
                      SUM(
@@ -837,6 +862,7 @@ namespace VASLogic.Models
                  INNER JOIN c_doctype            cd ON ( cd.c_doctype_id = ci.c_doctypetarget_id )
              WHERE ci.docstatus IN ( 'CO', 'CL' ) AND cs.va009_ispaid = 'N'
              ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            }
 
             // Query for 'InProgress'
             sql.Append(" UNION ALL ");

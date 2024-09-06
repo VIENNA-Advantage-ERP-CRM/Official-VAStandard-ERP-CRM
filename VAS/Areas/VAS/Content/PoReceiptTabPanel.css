@@ -965,3 +965,10 @@ span.vas-arwidg-cur-symbol {
     overflow: hidden;
     width: 41px;
 }
+.vas-igtwidg-vendor-bgColor {
+    background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);
+}
+.vas-igtwidg-customer-bgColor {
+    background: rgb(249,253,169);
+    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%)
+}
