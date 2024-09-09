@@ -235,7 +235,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Areas\VAS\Content\Images\selling-img.png" />
+    <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
