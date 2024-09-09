@@ -98,7 +98,7 @@
                 '<div class="VAS-org-name"><span>' + TopProductData[count].Name + '</span></div>' +
                 '</div>' +
                 '<img src="' + (TopProductData[count].ImageUrl != "" ? VIS.Application.contextUrl + TopProductData[count].ImageUrl :
-                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/selling-img.png') + '" alt="">');
+                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/cube-icon.png') + '" alt="">');
 
             $divLastRevenue.append('<h1><span style="margin-right:0.2em;">' + TopProductData[count].Symbol + '</span>' + formatLargeNumber(TopProductData[count].PreviousTotal, TopProductData[count].StdPrecision) +
                 ((unit != null) ? '<span>' + unit + '</span>' : '') + '<span class="VAS-sale-Qty">(' + TopProductData[count].PreviousQty + ' ' +

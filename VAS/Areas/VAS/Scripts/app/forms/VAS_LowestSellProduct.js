@@ -29,7 +29,7 @@
             createBusyIndicator();
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             $root.append('<div class="VAS-selling-container VAS-lowest-selling-prod">' +
-                '<div class="VAS-container-heading">' + VIS.Msg.getMsg("VAS_LowestSellProduct") +'</div>' +
+                '<div class="VAS-container-heading">' + VIS.Msg.getMsg("VAS_LowestSellProduct") + '</div>' +
                 '<div class="VAS-org-col" id="VAS_divProduct_' + widgetID + '">' +
                 '</div>' +
                 '<div class="VAS-yearly-revenue">' +
@@ -98,7 +98,7 @@
                 '<div class="VAS-org-name"><span>' + ProductData[count].Name + '</span></div>' +
                 '</div>' +
                 '<img src="' + (ProductData[count].ImageUrl != "" ? VIS.Application.contextUrl + ProductData[count].ImageUrl :
-                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/selling-img.png') + '" alt="">');
+                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/cube-icon.png') + '" alt="">');
 
             $divLastRevenue.append('<h1><span style="margin-right:0.2em;">' + ProductData[count].Symbol + '</span>' + formatLargeNumber(ProductData[count].PreviousTotal, ProductData[count].StdPrecision) +
                 ((unit != null) ? '<span>' + unit + '</span>' : '') + '<span class="VAS-sale-Qty">(' + ProductData[count].PreviousQty + ' ' +
