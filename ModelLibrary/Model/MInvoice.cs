@@ -7153,6 +7153,22 @@ namespace VAdvantage.Model
         {
             if (Env.IsModuleInstalled("VA075_"))
             {
+                //VIS_427 Bug id 6154 Set field request status to open on invoice reverse
+                string sql = "SELECT VA075_FieldServiceReq_ID FROM VA075_WorkOrderOperation WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                int VA075_FieldServiceReq_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                if (VA075_FieldServiceReq_ID == 0)
+                {
+                    sql = @"SELECT wop.VA075_FieldServiceReq_ID
+                                   FROM VA075_WorkOrderComponent woc
+                                   INNER JOIN VA075_WorkOrderOperation wop ON (woc.VA075_WorkOrderOperation_ID = wop.VA075_WorkOrderOperation_ID)
+                                   WHERE woc.C_Invoice_ID = " + GetC_Invoice_ID();
+                    VA075_FieldServiceReq_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                }
+                if (VA075_FieldServiceReq_ID > 0)
+                {
+                    sql = "UPDATE VA075_FieldServiceReq SET VA075_SRStatus= '01' WHERE VA075_FieldServiceReq_ID = " + VA075_FieldServiceReq_ID;
+                    int count = DB.ExecuteQuery(sql, null, Get_Trx());
+                }
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }

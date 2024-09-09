@@ -203,15 +203,16 @@ namespace ViennaAdvantage.Process
                     {
                         from.SetRef_Order_ID(newOrder.GetC_Order_ID());
                     }
+
                     from.Save();
                     int bp = newOrder.GetC_BPartner_ID();
                     VAdvantage.Model.X_C_BPartner prosp = new VAdvantage.Model.X_C_BPartner(GetCtx(), bp, Get_Trx());
                     prosp.SetIsCustomer(true);
                     prosp.SetIsProspect(false);
                     //VAI050-Update Sales Order reference on FSR 
-                    if (Env.IsModuleInstalled("VA075_") && newOrder.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
+                    if (Env.IsModuleInstalled("VA075_") && newOrder.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && from.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
                     {
-                        string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + newOrder.Get_ValueAsInt("VA075_FieldServiceReq_ID");
+                        string query = "UPDATE VA075_FieldServiceReq SET C_Order_ID=" + newOrder.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID=" + from.Get_ValueAsInt("VA075_FieldServiceReq_ID");
                         DB.ExecuteQuery(query, null, Get_Trx());
                     }
                     if (!prosp.Save())
@@ -363,7 +364,7 @@ namespace ViennaAdvantage.Process
                 VAdvantage.Model.X_C_BPartner prosp = new VAdvantage.Model.X_C_BPartner(GetCtx(), bp, Get_Trx());
                 prosp.SetIsCustomer(true);
                 prosp.SetIsProspect(false);
-               
+
                 if (!prosp.Save())
                 {
                     Get_Trx().Rollback();
@@ -427,7 +428,7 @@ namespace ViennaAdvantage.Process
                     {
                         orderLine.SetAD_Org_ID(org);
                     }
-                    
+
                     orderLine.SetAD_Client_ID(GetAD_Client_ID());
                     orderLine.SetC_Order_ID(newid);
                     orderLine.SetDescription(mOrderLine.GetDescription());
@@ -487,9 +488,9 @@ namespace ViennaAdvantage.Process
                     // Added by Bharat on 06 Jan 2018 to set Values on Sales Order from Sales Quotation.
                     if (orderLine.Get_ColumnIndex("C_Order_Quotation") >= 0)
                         orderLine.Set_Value("C_Order_Quotation", mOrderLine.GetC_Order_ID());
-                                        
+
                     orderLine.SetLine((i + 1) * 10);
-                    
+
                     if (!orderLine.Save())
                     {
                         Get_Trx().Rollback();

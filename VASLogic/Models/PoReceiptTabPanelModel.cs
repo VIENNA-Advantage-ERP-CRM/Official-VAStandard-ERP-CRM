@@ -395,7 +395,7 @@ namespace VASLogic.Models
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
-                   dynamic obj = new ExpandoObject();
+                    dynamic obj = new ExpandoObject();
                     obj.TaxName = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
                     obj.TotalLines = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalLines"]);
@@ -407,6 +407,556 @@ namespace VASLogic.Models
                 }
             }
             return retData;
+        }
+
+        /// <summary>
+        /// This function is Used to Get the AR Invoice Data for widget
+        /// </summary>
+        /// <param name="WidgetId">WidgetId</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar invoice data</returns>
+        public List<ARInvWidgData> GetARInvSchData(Ctx ctx, bool ISOtrx)
+        {
+            ARInvWidgData obj = new ARInvWidgData();
+            StringBuilder sql = new StringBuilder();
+            List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
+            string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
+            string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
+
+            sql.Append($@"WITH InvoiceData AS (
+                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                             ci.AD_Client_ID,
+                             cs.C_InvoicePaySchedule_ID,
+                             cd.DocBaseType,
+                             ci.DateInvoiced,
+                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,CAST(cs.VA009_BseCurrncy AS INTEGER),ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
+                         FROM
+                             C_Invoice ci
+                             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                     )})
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                                     NVL(
+                                        (
+                                            SUM(
+                                                CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                                DueAmt
+                                                ELSE 0
+                                                END
+                                            ) -
+                                            SUM(
+                                                CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                                DueAmt
+                                                ELSE 0
+                                                END
+                                            )
+                                        ),
+                                        0
+                                    ) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                         DateInvoiced >= Current_Date - 30
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                         DateInvoiced <= Current_Date - 31 AND DateInvoiced >= Current_Date - 60
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                        DateInvoiced <= Current_Date - 61 AND  DateInvoiced >= Current_Date - 90
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                          NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE
+                        DateInvoiced <= Current_Date - 91 AND  DateInvoiced >= Current_Date - 120
+                     UNION ALL
+                     SELECT
+                         COUNT(C_InvoicePaySchedule_ID) AS countrec,
+                         NVL(
+                            (
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARI_APT + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                ) -
+                                SUM(
+                                    CASE WHEN DocBaseType = " + docBaseTypeARC_APC + @" THEN
+                                    DueAmt
+                                    ELSE 0
+                                    END
+                                )
+                            ),
+                            0
+                        ) AS total_dueamt
+                     FROM
+                         InvoiceData
+                     WHERE DateInvoiced <= Current_Date - 120");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+
+                sql.Clear();
+                sql.Append(@"SELECT cy.StdPrecision,CASE WHEN Cy.Cursymbol IS NOT NULL THEN Cy.Cursymbol ELSE Cy.ISO_Code END AS Symbol
+                     FROM AD_Client ac
+                     INNER JOIN AD_ClientInfo aci ON (ac.AD_Client_ID=aci.AD_Client_ID)
+                     INNER JOIN C_AcctSchema ca ON (ca.C_AcctSchema_ID=aci.C_AcctSchema1_ID)
+                     INNER JOIN C_Currency cy ON (cy.C_Currency_ID=ca.C_Currency_ID)
+                     WHERE ac.AD_Client_ID IN (" + ctx.GetAD_Client_ID() + ")");
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+                decimal TotalAmt = 0;
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    TotalAmt = TotalAmt + Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total_dueamt"]);
+                    obj = new ARInvWidgData();
+                    obj.daysAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["total_dueamt"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    ARInvWidgData.Add(obj);
+                }
+                obj = new ARInvWidgData();
+                obj.arTotalAmtWidget = new List<ArTotalAmtWidget>();
+                ArTotalAmtWidget objAmt = new ArTotalAmtWidget();
+                objAmt.totalAmt = TotalAmt;
+                obj.arTotalAmtWidget.Add(objAmt);
+                ARInvWidgData.Add(obj);
+            }
+            return ARInvWidgData;
+        }
+
+        /// <summary>
+        /// This function is Used to Get the ar/ap invoice data of top five business partners
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of ar/ap invoice data of top five business partners</returns>
+        public List<InvGrandTotalData> GetInvTotalGrandData(Ctx ctx, bool ISOtrx)
+        {
+            InvGrandTotalData obj = new InvGrandTotalData(); ;
+            StringBuilder sql = new StringBuilder();
+            List<InvGrandTotalData> invGrandTotalData = new List<InvGrandTotalData>();
+            string BPCheck = (ISOtrx == true ? "cb.IsCustomer='Y'" : "cb.IsVendor='Y'");
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+
+            sql.Append($@"WITH InvoiceData AS (
+                        {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                             cb.Name,
+                             cd.DocBaseType,
+                             cb.Pic,
+                             custimg.ImageExtension AS custImgExtension,
+                             ci.AD_Client_ID,
+                             ci.DateInvoiced,
+                             currencyConvert(ci.grandtotalafterwithholding ,ci.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,ci.AD_Client_ID ,ci.AD_Org_ID ) AS DueAmt
+                         FROM
+                             C_Invoice ci
+                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                     )})
+                     SELECT
+                         Name,
+                         Pic,
+                         custImgExtension,
+                         min(DateInvoiced) AS minDateInvoiced,");
+            if (ISOtrx)
+            {
+                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'ARI' THEN DueAmt ELSE 0 END) -
+                             SUM(CASE WHEN DocBaseType = 'ARC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+            }
+            else
+            {
+                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'API' THEN DueAmt ELSE 0 END) -
+                          SUM(CASE WHEN DocBaseType = 'APC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+            }
+            sql.Append(@" FROM
+                         InvoiceData
+                     Group by Name,Pic,custImgExtension
+                     Order by SumAmount desc 
+                     FETCH FIRST 5 ROWS ONLY");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+
+                sql.Clear();
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new InvGrandTotalData();
+                    obj.GrandTotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmount"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.SinceDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["minDateInvoiced"]).Value;
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    {
+                        obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["custImgExtension"]);
+
+                    }
+                    invGrandTotalData.Add(obj);
+                }
+            }
+            return invGrandTotalData;
+        }
+        /// <summary>
+        /// This function is Used to Amount which are in diffenernt states from AP/AR Screens
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of Amount which are in diffenernt states from AP/AR Screens</returns>
+        public List<PurchaseStateDetail> GetPurchaseStateDetail(Ctx ctx, bool ISOtrx)
+        {
+            PurchaseStateDetail obj = new PurchaseStateDetail(); ;
+            StringBuilder sql = new StringBuilder();
+            List<PurchaseStateDetail> invData = new List<PurchaseStateDetail>();
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            int calendar_ID = 0;
+            string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
+            string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
+
+
+            // Organization Calendar
+            calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Calendar_ID FROM AD_OrgInfo WHERE IsActive = 'Y' AND AD_Org_ID =" + ctx.GetAD_Org_ID(), null, null));
+            if (calendar_ID == 0)
+            {
+                // Primary Calendar 
+                calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Calendar_ID FROM AD_ClientInfo WHERE 
+                                    IsActive = 'Y' AND AD_Client_ID=" + ctx.GetAD_Client_ID(), null, null));
+            }
+
+            // Query for 'DueAmt'
+            sql.Append(@"
+             WITH PeriodDetail AS (
+                 SELECT cp.StartDate, cp.EndDate, cp.AD_Client_ID
+                 FROM C_Period cp
+                 INNER JOIN C_Year cy ON (cy.C_Year_ID = cp.C_Year_ID)
+                 WHERE CURRENT_DATE BETWEEN cp.StartDate AND cp.EndDate
+                 AND cp.IsActive='Y' AND cy.IsActive='Y' AND cy.C_Calendar_ID =" + calendar_ID + ")");
+
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@" SELECT 'DueAmt' AS Type,
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE CURRENT_DATE > cs.DueDate
+               AND cs.VA009_IsPaid = 'N'
+               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+
+            // Query for 'DueSoon'
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'DueSoon',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE CURRENT_DATE < cs.DueDate
+               AND cs.VA009_IsPaid = 'N'
+               AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            // Query for 'Disputed'
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Disputed',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N' AND ci.IsInDispute = 'Y'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+
+            // Query for 'Unallocated Amount on AR Invoice'
+            sql.Append(" UNION ALL ");
+            if (ISOtrx)
+            {
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'UnAllocated',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(cs.DueAmt, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE ci.DocStatus IN ('CO', 'CL') AND cs.VA009_IsPaid='N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            }
+            // Query for 'Hold' ON AP invoice
+            else
+            {
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                 'Hold',
+                 nvl(
+                     SUM(
+                         CASE
+                         WHEN ci.isholdpayment = 'Y' THEN
+                             CASE
+                             WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
+                             currencyconvert(
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                             )
+                             ELSE
+                             0
+                             END
+                         ELSE
+                         CASE
+                         WHEN cd.docbasetype = " + docBaseTypeARI_APT + @"
+                              AND cs.isholdpayment = 'Y' THEN
+                             currencyconvert(
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                             )
+                         ELSE
+                         0
+                         END
+                         END
+                     ) - SUM(
+                         CASE
+                         WHEN ci.isholdpayment = 'Y' THEN
+                             CASE
+                             WHEN cd.docbasetype =" + docBaseTypeARC_APC + @"THEN
+                             currencyconvert(
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                             )
+                             ELSE
+                             0
+                             END
+                         ELSE
+                         CASE
+                         WHEN cd.docbasetype = " + docBaseTypeARC_APC + @"
+                              AND cs.isholdpayment = 'Y' THEN
+                             currencyconvert(
+                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
+                             )
+                         ELSE
+                         0
+                         END
+                         END
+                     ), 0
+                 )      AS sumamount
+             FROM
+                 c_invoice ci
+                 INNER JOIN c_invoicepayschedule cs ON ( cs.c_invoice_id = ci.c_invoice_id )
+                 INNER JOIN c_doctype            cd ON ( cd.c_doctype_id = ci.c_doctypetarget_id )
+             WHERE ci.docstatus IN ( 'CO', 'CL' ) AND cs.va009_ispaid = 'N'
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            }
+
+            // Query for 'InProgress'
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'InProgress',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE ci.DocStatus = 'IP'
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            // Query for 'New'
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'New',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_DocType cd ON cd.C_DocType_ID = ci.C_DocTypeTarget_ID
+             INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=ci.AD_Client_ID)
+             WHERE ci.DocStatus IN ('CO', 'CL') AND ci.DateInvoiced BETWEEN pd.StartDate AND pd.EndDate
+            ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+
+            // Query for 'Drafted'
+            sql.Append(" UNION ALL ");
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Drafted',
+                    NVL(
+                        (
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARI_APT + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            ) - 
+                            SUM(
+                                CASE WHEN cd.DocBaseType = " + docBaseTypeARC_APC + @"
+                                THEN currencyConvert(ci.grandtotalafterwithholding, ci.C_Currency_ID, " + C_Currency_ID + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID)
+                                ELSE 0
+                                END
+                            )
+                        ), 
+                        0
+                    ) AS SumAmount
+             FROM C_Invoice ci
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+             WHERE ci.DocStatus = 'DR'
+             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                sql.Clear();
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new PurchaseStateDetail();
+                    obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmount"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    invData.Add(obj);
+                }
+            }
+            return invData;
         }
     }
     public class TabPanel
@@ -499,5 +1049,35 @@ namespace VASLogic.Models
         public string CurrencyName { get; set; }
         public int AD_Window_ID { get; set; }
         public int C_ConversionType_ID { get; set; }
+    }
+    public class ARInvWidgData
+    {
+        public List<ArTotalAmtWidget> arTotalAmtWidget { get; set; }
+        public decimal daysAmt { get; set; }
+        public string Symbol { get; set; }
+        public int stdPrecision { get; set; }
+
+    }
+
+    public class ArTotalAmtWidget
+    {
+        public decimal totalAmt { get; set; }
+    }
+
+    public class InvGrandTotalData
+    {
+        public decimal GrandTotalAmt { get; set; }
+        public string Symbol { get; set; }
+        public int stdPrecision { get; set; }
+        public string ImageUrl { get; set; }
+        public string Name { get; set; }
+        public DateTime SinceDate { get; set; }
+
+    }
+    public class PurchaseStateDetail
+    {
+        public decimal TotalAmt { get; set; }
+        public string Symbol { get; set; }
+        public int stdPrecision { get; set; }
     }
 }
