@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -114,7 +114,38 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// Get Top 10 Highest selling product data.
+        /// </summary>
+        /// <returns>List of Product data</returns>
+        public JsonResult GetTopProductData()
+        {
+            List<dynamic> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetTopProductData(ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
 
+        /// <summary>
+        /// Get 10 Lowest selling product data.
+        /// </summary>
+        /// <returns>List of Product data</returns>
+        public JsonResult GetLowestProductData()
+        {
+            List<dynamic> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetLowestProductData(ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+        
         /// <summary>
         /// VAI050-Get top 10 Highest selling products
         /// </summary>
@@ -132,7 +163,7 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
-
+ 
         /// <summary>
         /// VAI050-Get the monthly selling details of product
         /// </summary>
