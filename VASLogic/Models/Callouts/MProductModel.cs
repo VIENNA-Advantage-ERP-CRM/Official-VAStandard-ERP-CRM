@@ -15,6 +15,7 @@ namespace VIS.Models
 {
     public class MProductModel
     {
+        string sqlWhereForLookup = "";
         public Dictionary<string, string> GetProduct(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');

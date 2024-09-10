@@ -25,7 +25,7 @@
         var symbol = "";
 
         function createStructure(widgetID) {
-            var $contentContainer = $('<div class="VAS-org-lowest-unitsales-col VAS-content-container">' +
+            var $contentContainer = $('<div class="VAS-org-lowest-unitsales-col VAS-content-container vis-formouterwrpdiv">' +
                 '<div class="VAS-sales-heading">' + VIS.Msg.getMsg("VAS_LowestSellingProduct") + '</div>' +
                 '<div class="VAS-organization-block">' +
                 '<div id="VAS_Org_' + widgetID + '" class="VAS_OrgUnitControl"></div>' +
