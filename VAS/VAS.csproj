@@ -239,6 +239,7 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
@@ -246,6 +247,8 @@
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_LowestPrMonthlySalesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvGrandTotalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_OrderSummary.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\PurchaseOrderTabPanel.js" />

@@ -99,7 +99,9 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/UnAllocatedPaymentTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/InvoiceLineTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ARInvoiceWidget.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_InvGrandTotalWidget.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_InvGrandTotalWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PrMonthlySalesWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_LowestPrMonthlySalesWidget.js"
                    );
 
 
@@ -112,6 +114,7 @@ namespace VAS
                 "~/Areas/VAS/Content/VAS_ProductUomSetup.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
+            style.Include("~/Areas/VAS/Content/VAS_HighestSellingWidget.css");
 
             //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
             //modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");

@@ -102,14 +102,51 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
         /// <param name="VAS_SalesUOM_ID"></param>
         /// <param name="VAS_ConsumableUOM_ID"></param>
         /// <returns></returns>
-        public JsonResult SaveUOMConversion(int C_UOM_ID,string multiplyRateList,int Product_ID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
+        public JsonResult SaveUOMConversion(int C_UOM_ID, string multiplyRateList, int Product_ID, int VAS_PurchaseUOM_ID, int VAS_SalesUOM_ID, int VAS_ConsumableUOM_ID)
         {
-            Dictionary<string,object> result = null;
+            Dictionary<string, object> result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
                 MProductModel obj = new MProductModel();
-                result = obj.SaveUOMConversion(ctx, C_UOM_ID, JsonConvert.DeserializeObject <List<MultiplyRateItem>>(multiplyRateList), Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+                result = obj.SaveUOMConversion(ctx, C_UOM_ID, JsonConvert.DeserializeObject<List<MultiplyRateItem>>(multiplyRateList), Product_ID, VAS_PurchaseUOM_ID, VAS_SalesUOM_ID, VAS_ConsumableUOM_ID);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+
+        /// <summary>
+        /// VAI050-Get top 10 Highest selling products
+        /// </summary>
+        /// <param name="OrganizationUnit"></param>
+        /// <param name="Type"></param>
+        /// <returns></returns>
+        public JsonResult GetProductSalesAndDetails(int OrganizationUnit,string Type)
+        {
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetProductSalesAndDetails(ctx, OrganizationUnit,Type);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// VAI050-Get the monthly selling details of product
+        /// </summary>
+        /// <param name="ProductID"></param>
+        /// <param name="OrganizationUnit"></param>
+        /// <returns></returns>
+        public JsonResult GetProductMonthlySalesData(int ProductID, int OrganizationUnit)
+        {
+            List<Dictionary<string, object>> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetMonthlyDataOfProduct(ctx, ProductID, OrganizationUnit);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
