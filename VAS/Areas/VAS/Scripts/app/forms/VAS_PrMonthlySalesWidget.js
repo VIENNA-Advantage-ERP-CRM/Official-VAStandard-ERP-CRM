@@ -66,17 +66,18 @@
             $lookupOrg = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Org_ID", 0, false, sqlWHERE);
             $vOrg = new VIS.Controls.VTextBoxButton("AD_Org_ID", false, false, true, VIS.DisplayType.Search, $lookupOrg, 150);
 
-            $orgButtonWrap = $('<div class="input-group-append">');
+        /*    $orgButtonWrap = $('<div class="input-group-append">');*/
             $orgControlWrap = $('<div class="vis-control-wrap">');
             orgDivInputWrap.append($orgControlWrap);
             $orgControlWrap.append($vOrg.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_OrgUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
 
-            $orgButtonWrap.append($vOrg.getBtn(0));
-            orgDivInputWrap.append($orgButtonWrap);
+            /*    $orgButtonWrap.append($vOrg.getBtn(0));*/
+           /* orgDivInputWrap.append($orgButtonWrap);*/
             orgControlDiv.append(orgDivInputWrap);
 
             $vOrg.fireValueChanged = function () {
                 OrganizationUnit = $vOrg.getValue() == null ? 0 : $vOrg.getValue();
+               
                 $self.intialLoad();
             }
         }
@@ -210,6 +211,9 @@
                 resultIcon.removeClass('vis-trending-up').addClass('vis-trending-down');
             } else {
                 resultIcon.removeClass('vis-trending-down').addClass('vis-trending-up');
+            }
+            if (OrganizationUnit > 0) {
+                $vOrg.setValue(OrganizationUnit);
             }
         }
         /* This function loads data for a given product page */

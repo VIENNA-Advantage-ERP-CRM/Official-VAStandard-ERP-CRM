@@ -370,7 +370,7 @@ namespace VIS.Models
                     INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
                     INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
                     LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
-                    WHERE o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
                     MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
                     ORDER BY LineTotalAmt DESC FETCH FIRST 10 ROWS ONLY)");
@@ -388,7 +388,7 @@ namespace VIS.Models
             sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
                     o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
                     SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
-                    WHERE o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
                     MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID)
                     SELECT cy.M_Product_ID, cy.Name, cy.ImageUrl, NVL(py.LineTotalAmt, 0) AS PreviousTotal, cy.LineTotalAmt AS CurrentTotal,
@@ -459,7 +459,7 @@ namespace VIS.Models
                     INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID) 
                     INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID)
                     LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
-                    WHERE o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
                     MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
                     HAVING SUM(ol.LineTotalAmt) > 0 ORDER BY LineTotalAmt ASC FETCH FIRST 10 ROWS ONLY)");
@@ -477,7 +477,7 @@ namespace VIS.Models
             sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
                     o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt,
                     SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
-                    WHERE o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
+                    WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
                     MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID)
                     SELECT cy.M_Product_ID, cy.Name, cy.ImageUrl, NVL(py.LineTotalAmt, 0) AS PreviousTotal, cy.LineTotalAmt AS CurrentTotal,
@@ -569,7 +569,7 @@ namespace VIS.Models
                                  INNER JOIN C_Invoice l ON(il.C_Invoice_ID = l.C_Invoice_ID)
                                  INNER JOIN m_product p ON(il.m_product_id = p.m_product_id)
                                  LEFT JOIN ad_image img ON(p.ad_image_id = img.ad_image_id)", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                                  AND
+                                  AND l.IsSOTrx='Y' AND l.IsReturnTrx='N' AND
                                  l.docstatus IN('CO', 'CL') " + WhereCondition + @"
                                  AND l.DateInvoiced >= ").Append(startdate).Append(@"
                                  AND l.DateInvoiced <= ").Append(enddate).Append(@"
@@ -593,7 +593,7 @@ namespace VIS.Models
                                  l.C_Currency_ID, " + C_Currency_ID + @", l.DateAcct, l.C_ConversionType_ID, l.AD_Client_ID, l.AD_Org_ID), 0)) AS LineTotalAmt
                                  FROM  C_InvoiceLine il
                                  INNER JOIN C_Invoice l ON(il.C_Invoice_ID = l.C_Invoice_ID)", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"   
-                                   AND
+                                   AND l.IsSOTrx='Y' AND l.IsReturnTrx='N' AND
                                  l.docstatus IN ('CO', 'CL') " + WhereCondition + @"
                                  AND l.DateInvoiced >= ").Append(startdate).Append(@"
                                  AND l.DateInvoiced <= ").Append(enddate).Append(@"
@@ -681,7 +681,7 @@ namespace VIS.Models
                                 FROM
                                 C_InvoiceLine il
                                 INNER JOIN C_Invoice i ON il.C_Invoice_ID = i.C_Invoice_ID", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"                               
-                                 AND
+                                 AND i.IsSOTrx='Y' AND i.IsReturnTrx='N' AND
                                 i.DocStatus IN ('CO', 'CL') {0}
                                 AND i.DateInvoiced >= TRUNC(SYSDATE, 'YEAR')
                                 AND i.DateInvoiced < TRUNC(SYSDATE, 'MONTH') + INTERVAL '1' MONTH
@@ -694,7 +694,7 @@ namespace VIS.Models
                                 FROM
                                 C_InvoiceLine il
                                 INNER JOIN C_Invoice i ON il.C_Invoice_ID = i.C_Invoice_ID", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"                              
-                                 AND
+                                 AND i.IsSOTrx='Y' AND i.IsReturnTrx='N' AND
                                 i.DocStatus IN ('CO', 'CL') {0}
                                 AND i.DateInvoiced >= TRUNC(SYSDATE, 'YEAR') - INTERVAL '1' YEAR
                                 AND i.DateInvoiced < TRUNC(SYSDATE, 'YEAR')
@@ -725,7 +725,7 @@ namespace VIS.Models
                                FROM
                                C_InvoiceLine il
                                 INNER JOIN C_Invoice i ON il.C_Invoice_ID = i.C_Invoice_ID", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"          
-                               AND
+                               AND i.IsSOTrx='Y' AND i.IsReturnTrx='N' AND
                                i.DocStatus IN ('CO', 'CL') {0}  AND i.DateInvoiced >= date_trunc('year', CURRENT_DATE)
                                AND i.DateInvoiced < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
                                AND il.M_Product_ID = {1}
@@ -738,7 +738,7 @@ namespace VIS.Models
                                 FROM
                                 C_InvoiceLine il
                                 INNER JOIN C_Invoice i ON il.C_Invoice_ID = i.C_Invoice_ID", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"           
-                                AND   i.DocStatus IN ('CO', 'CL') {0}
+                                AND i.IsSOTrx='Y' AND i.IsReturnTrx='N'  AND   i.DocStatus IN ('CO', 'CL') {0}  
                                 AND i.DateInvoiced >= date_trunc('year', CURRENT_DATE) - INTERVAL '1 year'
                                 AND i.DateInvoiced < date_trunc('year', CURRENT_DATE)
                                 AND il.M_Product_ID = {1}
