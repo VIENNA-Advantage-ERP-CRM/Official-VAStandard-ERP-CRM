@@ -356,70 +356,83 @@ namespace VIS.Models
             }
             return sql;
         }
-        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType,string whereClause,bool isNameExist)
+        /// <summary>
+        /// Getting idetifier value 
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="columnName">Column name</param>
+        /// <param name="tableName">Table Name</param>
+        /// <param name="displayType">AD_Refrence_ID</param>
+        /// <param name="whereClause">SQL Where</param>
+        /// <param name="isNameExist">Is nameExist</param>
+        /// <param name="columnID">AD_Column_ID</param>
+        /// <param name="refrenceValueID">AD_RefrenceValue_ID</param>
+        /// <param name="windowNo">windowNo</param>
+        /// <returns>idetifier and ID</returns>
+        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType, string whereClause,bool isNameExist,
+            int columnID, int refrenceValueID, int windowNo)
         {
             List<IDDetails> data = new List<IDDetails>();
-            string newTable = "";
             string getTable = "";
             string sql = "";
-            
+            bool isDisplayed = false;
+            MLookup res = VLookUpFactory.Get(ctx, windowNo, columnID, displayType, columnName, refrenceValueID, false, "");
 
-            if (columnName.EndsWith("_ID") && DisplayType.IsLookup(displayType))
+            if (res == null)
+                return null;
+            VLookUpInfo lInfo = res._vInfo;
+            string pColumnName = res.GetColumnName();
+            string keyCol = lInfo.keyColumn;
+            if (pColumnName.IndexOf(".") > -1)
             {
-                newTable = columnName.Substring(0, columnName.Length - 3);
+                pColumnName = pColumnName.Substring(pColumnName.IndexOf(".") + 1);
             }
-            if (columnName.Equals("CREATEDBY") || columnName.Equals("UPDATEDBY")) {
-                newTable = "AD_User";
-            }
+            string displayCol = lInfo.displayColSubQ;
+            string newTable = lInfo.tableName;
+           
 
             if (tableName.ToUpper() != newTable.ToUpper() && newTable != "")
             {
-                sql = @"SELECT * FROM " + newTable + " FULL JOIN " + tableName +
-                    " ON " + newTable + "." + columnName + " = " + tableName + "." + columnName;
+                sql = "SELECT ";
+                if (!string.IsNullOrEmpty(displayCol)) {
+                    sql += displayCol+", "+keyCol;
+                    isDisplayed = true;
+                } else {
+                    sql += "*";
+                }
+                sql += @" FROM " + newTable + " WHERE " + newTable + "." + pColumnName + " IS NOT NULL ";
                 getTable = newTable;
             }
             else
             {
-                sql = @"SELECT * FROM " + tableName;
+                sql = @"SELECT "+columnName +" FROM " + tableName+" WHERE " + tableName + "." + columnName+" IS NOT NULL ";
                 getTable = tableName;
+                isDisplayed = false;
             }
 
             if (!string.IsNullOrEmpty(whereClause))
             {
-                if (isNameExist) 
-                    sql += " WHERE " + getTable + ".Name LIKE '%" + whereClause + "%'"; 
+                if (isNameExist)
+                    sql += " AND " + getTable + ".Name LIKE '%" + whereClause + "%'";
                 else
-                sql += " WHERE " + getTable + "." + columnName + " LIKE '%" + whereClause + "%'";
+                    sql += " AND " + getTable + "." + columnName + " LIKE '%" + whereClause + "%'";
             }
+
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, getTable, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += " FETCH FIRST 100 ROWS ONLY";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                DataTable table = ds.Tables[0];
-                bool hasNameColumn = false;
-                if (ds.Tables.Contains(getTable) && ds.Tables[getTable].Columns.Contains("Name"))
-                {
-
-                    hasNameColumn = true;
-                    table = ds.Tables[getTable];
-                    isNameExist = true;
-                }
-                else if (ds.Tables[0].Columns.Contains("Name"))
-                {
-                    hasNameColumn = true;
-                    isNameExist = true;
-                }
+                DataTable table = ds.Tables[0];               
                 for (int i = 0; i < table.Rows.Count; i++)
                 {
                     IDDetails obj = new IDDetails();
-                    if (hasNameColumn)
-                    {
-                        obj.Name = Util.GetValueOfString(table.Rows[i]["Name"]);
-                        obj.Value = Util.GetValueOfString(table.Rows[i][columnName]);
+                    if (isDisplayed) {
+                        obj.Name = Util.GetValueOfString(table.Rows[i][0]);
+                        obj.Value = Util.GetValueOfString(table.Rows[i][1]);
                         obj.tableName = getTable;
-                        obj.isNameExist = isNameExist;
-                    }
+                        obj.isNameExist = true;
+                    }                 
                     else
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i][columnName]);
@@ -469,11 +482,11 @@ namespace VIS.Models
             else if (displayCol.IndexOf("nothing.png") > -1)
             {
                 displayCol = displayCol.Replace(displayCol.Substring(displayCol.IndexOf("NVL((SELECT NVL(ImageURL,'')"), displayCol.IndexOf("thing.png^^') ||' '||") + 21), "");
-            }
+            }         
             if (lookup.queryDirect.Length > 0 && !string.IsNullOrEmpty(displayCol))
             {
-                subquery = " (SELECT " + displayCol + lookup.queryDirect.Substring(lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "), lookup.queryDirect.Length - (lookup.queryDirect.LastIndexOf(" FROM " + lookup.tableName + " "))) + ") AS " + columnName + "_TXT "; ;
-                subquery = subquery.Replace("@key", tableName + "." + columnName).ToLower();
+                subquery = " (SELECT " + displayCol + " FROM " + lookup.tableName +" WHERE " + lookup.keyColumn + " = " + tableName + "." + columnName+ ") AS " + columnName + "_TXT "; 
+                subquery = subquery.ToLower();
             }
             return subquery;
         }
