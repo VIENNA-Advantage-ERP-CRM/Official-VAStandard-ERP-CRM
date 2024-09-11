@@ -23,6 +23,7 @@
         var OrganizationUnit = 0;
         var stdPrecision = 0;
         var symbol = "";
+        var $vOrg;
 
         function createStructure(widgetID) {
             var $contentContainer = $('<div class="VAS-org-unitsales-col VAS-content-container vis-formouterwrpdiv">' +
@@ -204,7 +205,7 @@
             $root.find('.repfix-resultTxt').text(percentageDifference);
 
             // Adjust the result icon based on the percentage difference
-            var resultIcon = $root.find('.vis');
+            var resultIcon = $root.find('.VAS-graph-result .vis');
             if (percentageDifference.startsWith('-')) {
                 resultIcon.removeClass('vis-trending-up').addClass('vis-trending-down');
             } else {
@@ -363,10 +364,6 @@
 
         /* This function is used to refresh the widget data */
         this.refreshWidget = function () {
-            // Reset the dropdown list value
-            if ($vOrg) {
-                $vOrg.setValue(0);
-            }
             chartInstance = null;
             $self.currentPage = 1;
             $self.totalPages = 0;
