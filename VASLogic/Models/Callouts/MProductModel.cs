@@ -517,7 +517,7 @@ namespace VIS.Models
             }
             return retDic;
         }
-      
+
         /// <summary>
         ///  VAI050-Get the top 10 Highest selling products and lowest selling products
         /// </summary>
@@ -543,7 +543,7 @@ namespace VIS.Models
                 enddate = "date_trunc('YEAR', CURRENT_DATE) + INTERVAL '1' YEAR";
                 sqlWhereForLookup = @" AD_Org.IsActive = 'Y' AND (AD_Org.IsProfitCenter = 'Y') AND CAST(AD_Org.LegalEntityOrg AS INTEGER) =" + ctx.GetAD_Org_ID() + " AND AD_Org_ID IN ( " +
                                     MRole.GetDefault(ctx).AddAccessSQL("SELECT AD_OrgTrx_ID FROM C_Invoice", "C_Invoice", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                                     AND AD_OrgTrx_ID IS NOT NULL
+                                     AND AD_OrgTrx_ID IS NOT NULL AND  IsSOTrx='Y' AND IsReturnTrx='N' 
                                      AND DateInvoiced >= " + startdate + @"
                                      AND DateInvoiced <=" + enddate + ")";
             }
@@ -553,7 +553,7 @@ namespace VIS.Models
                 enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
                 sqlWhereForLookup = @" AD_Org.IsActive = 'Y' AND (AD_Org.IsProfitCenter = 'Y') AND AD_Org.LegalEntityOrg = " + ctx.GetAD_Org_ID() + " AND AD_Org_ID IN ( " +
                                      MRole.GetDefault(ctx).AddAccessSQL("SELECT AD_OrgTrx_ID FROM C_Invoice", "C_Invoice", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                                     AND AD_OrgTrx_ID IS NOT NULL
+                                       AND AD_OrgTrx_ID IS NOT NULL AND  IsSOTrx='Y' AND IsReturnTrx='N'
                                      AND DateInvoiced >= " + startdate + @"
                                      AND DateInvoiced <=" + enddate + ")";
 
@@ -661,7 +661,7 @@ namespace VIS.Models
             result["StdPrecision"] = StdPrecision;
             return result;
         }
-      
+
         /// <summary>
         /// VAI050-Get the montly details of product
         /// </summary>
