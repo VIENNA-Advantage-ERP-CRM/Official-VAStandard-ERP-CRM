@@ -993,15 +993,14 @@ namespace VASLogic.Models
                              SUM(COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0) - COALESCE(l.QtyDelivered, 0)) AS RemainingQuantity,
                              SUM(
                                 currencyConvert(ROUND((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0) - COALESCE(l.QtyDelivered, 0)) 
-                                 * (l.QtyEntered * l.PriceActual)/ NULLIF(l.qtyordered, 0),cy.StdPrecision), o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
-                                 
+                                 * (l.QtyEntered * l.PriceActual)/ NULLIF(l.qtyordered, 0),cy.StdPrecision), o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)    
                              ) AS TotalValue
                          FROM
                              c_order o
                              INNER JOIN C_OrderLine l ON (o.c_order_id = l.c_order_id)
                              INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
                              LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
-                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(OrderCheck + BPCheck);
                 sqlmain.Append(@"GROUP BY
                              cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered, custimg.ImageExtension, cb.Name,o.AD_Client_ID
@@ -1043,7 +1042,7 @@ namespace VASLogic.Models
                              LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
                              LEFT JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
                              LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
-                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
                          WHERE
                               min.DocStatus IN ('CO', 'CL')
                              AND NOT EXISTS (
