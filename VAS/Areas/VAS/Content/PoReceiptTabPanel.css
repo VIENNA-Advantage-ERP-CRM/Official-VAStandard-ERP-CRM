@@ -1108,6 +1108,12 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
             margin: 7px 4px 10px;
     }
+    .vis-editModeWidget .vas-exinvd-slider-arrows {
+        margin-top: 4px;
+    }
+        .vis-editModeWidget .vas-exinvd-slider-arrows i.fa {
+            font-size: 13px;
+        }
 }
 
 @media screen and (max-width: 1366px) {
@@ -1246,7 +1252,7 @@ span.vas-arwidg-cur-symbol {
     }
 }
 .vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
-    margin: 14px 0 10px;
+    margin: 0 20px 10px 0;
 }
 .vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
     flex-basis: 35%;
@@ -1256,7 +1262,7 @@ span.vas-arwidg-cur-symbol {
     flex-basis: 33%;
 }
 .vas-exinvd-expected-invoice .vas-exinvd-slider-arrows {
-    margin-top: 5px;
+    margin-top: 13px;
     font-size: 8px;
 }
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {

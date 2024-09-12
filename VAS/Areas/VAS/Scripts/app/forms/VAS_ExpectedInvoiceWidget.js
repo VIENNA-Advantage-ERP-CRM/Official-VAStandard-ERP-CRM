@@ -33,15 +33,16 @@
         var totalRecordCount = null;
 
         /*Intialize function will intialize busy indiactor*/
-        this.initalize = function () {
+        this.initalize = function ()
+        {
             GetColumnID();
-            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             $maindiv = $('<div class="vas-exinvd-expected-invoice">')
             var headingDiv = $('<div class="vas-exinvd-expected-heading">');
             var filterDiv = $('<h6>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</h6 >' +
                 '<div class="vas-exinvd-filterby-col">' +
                 '<i class="fa fa-filter" aria-hidden="true"></i>' +
-                '<div class="vas-exinvd-filter-label">Filter by:</div>');
+                '<div class="vas-exinvd-filter-label">'+ VIS.Msg.getMsg("VAS_FilterBy") +'</div>');
             headingDiv.append(filterDiv);
             //Created LOV control for task which will have billable,non billable and null values
             var lookUpData = (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? "AD_Ref_List.Value IN ('AL','SO','DO')" : "AD_Ref_List.Value IN ('AL','PO','GR')");
@@ -53,12 +54,9 @@
             $self.vExpectedList = new VIS.Controls.VComboBox("VAS_ExpectedInvoiceList", true, false, true, $ExpectedListLookUp, 20);
             $self.vExpectedList.setValue("AL");
             var $ExpectedListControlWrap = $('<div class="vis-control-wrap">');
-            //var $ExpectedListButtonWrap = $('<div class="input-group-append">');
             $ExpectedListDiv.append($ExpectedListControlWrap);
             $ExpectedListControlWrap.append($self.vExpectedList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
             $ExpectedListDiv.append($ExpectedListControlWrap);
-            //$ExpectedListButtonWrap.append($self.vExpectedList.getBtn(0));
-            //$ExpectedListDiv.append($ExpectedListButtonWrap);
             ExpectedListDiv.append($ExpectedListDiv);
             headingDiv.append(ExpectedListDiv);
             $maindiv.append(headingDiv);
@@ -80,18 +78,19 @@
         /*This function will load data in widget */
         this.intialLoad = function () {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetExpectedInvoiceData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo), "pageNo": pageNo, "pageSize": pageSize, "ListValue": $self.vExpectedList.getValue() }, function (dr) {
-                // var gridDataResult = dr;
                 TotalAmtArray = dr;
                 if (TotalAmtArray != null && TotalAmtArray.length > 0) {
                     
                     InitailizeMessage();
+                    /*if on reverse arrow click pageNoarray is zero 
+                     then initailzed page number to get previous record*/
                     if (pageNoarray == 0) {
                         pageNoarray = Math.ceil(TotalAmtArray.length / arrayPageSize);
                     }
+                    /*this function is use to get records based on start and end index*/
                     gridDataResult = getRecordsForPage(TotalAmtArray, pageNoarray, arrayPageSize);
-                    //countRecord = countRecord + arrayPageSize;
+                    //this function creating the design
                     CreateListDesign();
-                    // Create the container for the list
                 }
                 $bsyDiv[0].style.visibility = "hidden";
             });
@@ -121,13 +120,13 @@
 
                 // Determine the correct text based on conditions
                 if (gridDataResult[i].RecordType === "GRN") {
-                    if (VIS.Env.getCtx().isSOTrx($self.windowNo)) {
+                    if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true) {
                         headingText = VAS.translatedTexts.VAS_DeliveryOrder;
                     } else {
                         headingText = VAS.translatedTexts.VAS_GRN;
                     }
                 } else if (gridDataResult[i].RecordType === "Order") {
-                    if (VIS.Env.getCtx().isSOTrx($self.windowNo)) {
+                    if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true) {
                         headingText = VAS.translatedTexts.VAS_SO;
                     } else {
                         headingText = VAS.translatedTexts.VAS_PO;
@@ -248,13 +247,14 @@
                 "VAS_GRN",
                 "VAS_PO",
                 "VAS_SO",
-                "VAS_Thousand",
-                "VAS_TopPurchase5"
             ];
 
             VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
 
         }
+        /**
+        * This function is used to get the refernce id of list
+        */
         var GetColumnID = function () {
             ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "ColumnData": '' }, null);
         }

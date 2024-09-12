@@ -959,7 +959,7 @@ namespace VASLogic.Models
             return invData;
         }
         /// <summary>
-        /// This function is Used to Expected invoices against order and GRN
+        /// This function is Used to show Expected invoices against orders and GRN/Delivery Order
         /// </summary>
         /// <param name="ISOtrx">ISOtrx</param>
         /// <param name="ctx">Context</param>
@@ -999,7 +999,7 @@ namespace VASLogic.Models
                              c_order o
                              INNER JOIN C_OrderLine l ON (o.c_order_id = l.c_order_id)
                              INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
-                             LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
+                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(OrderCheck + BPCheck);
                 sqlmain.Append(@"GROUP BY
@@ -1031,7 +1031,7 @@ namespace VASLogic.Models
                                          * (ol.QtyEntered * ol.PriceActual) / NULLIF(ol.qtyordered, 0)
                                          ,cy.StdPrecision),o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
                                      ELSE 
-                                         l.CurrentCostPrice
+                                         (COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
                                  END
                              ) AS TotalValue
                          FROM
@@ -1062,8 +1062,10 @@ namespace VASLogic.Models
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
+                //fetching the record count to use it for pagination
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
                 sql.Clear();
+                //this query is returning the field of base currency
                 sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
                 DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
 

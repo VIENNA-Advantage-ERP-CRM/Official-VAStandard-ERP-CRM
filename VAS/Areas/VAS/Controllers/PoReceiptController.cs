@@ -229,13 +229,16 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-        // <summary>
-        /// This function is Used to Amount which are in diffenernt states from AP/AR Screens
+        /// <summary>
+        /// This function is Used to show Expected invoices against orders and GRN/Delivery Order
         /// </summary>
         /// <param name="ISOtrx">ISOtrx</param>
         /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
         /// <author>VIS_427</author>
-        /// <returns>List of Amount which are in diffenernt states from AP/AR Screens</returns>
+        /// <returns>List of data of Expected invoices against order and GRN</returns>
         public JsonResult GetExpectedInvoiceData(bool ISOtrx,int pageNo,int pageSize,string ListValue)
         {
             string retJSON = "";
@@ -249,11 +252,11 @@ namespace VAS.Areas.VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
         /// <summary>
-        /// This Method is used to return the column id 
+        /// This Method is used to return the refrence id 
         /// </summary>
-        /// <param name="ColumnData">Data of the Column</param>
-        /// <returns>Dictionary with column name and column id</returns>
-        /// <author> VIS_427</author>
+        /// <param name="ColumnData"></param>
+        /// <returns>Dictionary with column name and refrence id</returns>
+        /// <author>VIS_427 </author>
         public JsonResult GetColumnID(string ColumnData)
         {
             dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
