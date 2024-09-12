@@ -248,6 +248,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_HighestSellProduct.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvGrandTotalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_LowestSellProduct.js" />

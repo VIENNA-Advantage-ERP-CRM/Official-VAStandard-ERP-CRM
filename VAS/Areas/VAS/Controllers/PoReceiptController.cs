@@ -229,5 +229,38 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        // <summary>
+        /// This function is Used to Amount which are in diffenernt states from AP/AR Screens
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of Amount which are in diffenernt states from AP/AR Screens</returns>
+        public JsonResult GetExpectedInvoiceData(bool ISOtrx,int pageNo,int pageSize,string ListValue)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<ExpectedInvoice> result = obj.GetExpectedInvoiceData(ctx, ISOtrx, pageNo, pageSize, ListValue);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// This Method is used to return the column id 
+        /// </summary>
+        /// <param name="ColumnData">Data of the Column</param>
+        /// <returns>Dictionary with column name and column id</returns>
+        /// <author> VIS_427</author>
+        public JsonResult GetColumnID(string ColumnData)
+        {
+            dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel refernceId = new PoReceiptTabPanelModel();
+            Dictionary<string, int> columnData = refernceId.GetColumnIds(ctx, columnDataArray);
+            return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
+        }
     }
 }
