@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -142,6 +142,42 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
                 var ctx = Session["ctx"] as Ctx;
                 MProductModel obj = new MProductModel();
                 result = obj.GetLowestProductData(ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+        
+        /// <summary>
+        /// VAI050-Get top 10 Highest selling products
+        /// </summary>
+        /// <param name="OrganizationUnit"></param>
+        /// <param name="Type"></param>
+        /// <returns></returns>
+        public JsonResult GetProductSalesAndDetails(int OrganizationUnit,string Type)
+        {
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetProductSalesAndDetails(ctx, OrganizationUnit,Type);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+ 
+        /// <summary>
+        /// VAI050-Get the monthly selling details of product
+        /// </summary>
+        /// <param name="ProductID"></param>
+        /// <param name="OrganizationUnit"></param>
+        /// <returns></returns>
+        public JsonResult GetProductMonthlySalesData(int ProductID, int OrganizationUnit)
+        {
+            List<Dictionary<string, object>> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetMonthlyDataOfProduct(ctx, ProductID, OrganizationUnit);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
