@@ -37,7 +37,7 @@
                 '</div>' +
                 '<div class="VAS-currentRevenue" id="VAS_divCurrentYear_' + widgetID + '">' +
                 '</div>' +
-                '<div class="VAS-pagination-col">' +
+                '<div class="VAS-pagination-sell">' +
                 '<div class= "VAS-arrow-col">' +
                 '<a href="javascript:void(0);"><span class="fa fa-arrow-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
                 '<a href="javascript:void(0);"><span class="fa fa-arrow-right" id="VAS_Next_' + widgetID + '"></span></a>' +
