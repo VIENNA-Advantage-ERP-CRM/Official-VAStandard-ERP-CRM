@@ -85,7 +85,7 @@
                                 else {
                                     productDesign += '<div class="VAS-product-thumbnail"><i class="vis vis-image"></i></div>';
                                 }
-                              
+
                                 productDesign += '<div class="VAS-PO-details">' +
                                     '<h1>' + data[i].ProductName + '</h1>' +
                                     '<div class="VAS-Attrbiute">' + (data[i].AttributeName == null ? "" : data[i].AttributeName) + '</div>' +
@@ -93,11 +93,11 @@
                                     '<div class="VAS-order-description">' +
                                     '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyOrderedPO + '</h6><span>' + data[i].QtyOrdered + '</span></div>' +
                                     '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyDeliveredPO + '</h6><span>' + data[i].QtyDelivered + '</span></div>' +
-                                   /* '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyInvoicedPO + '</h6><span>' + data[i].QtyInvoiced + '</span></div>' +*/
+                                    /* '<div class="VAS-order-values"><h6>' + VAS.translatedTexts.VAS_QtyInvoicedPO + '</h6><span>' + data[i].QtyInvoiced + '</span></div>' +*/
                                     '</div>' +
                                     '</div>' +
-                                    '</div>' +
-                                    '<div>';
+                                    '</div>';
+
                                 //Appending design to wrapperDiv
                                 wrapperDiv.append(productDesign);
                             }
