@@ -61,12 +61,12 @@
     width: 100%;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    /*display: flex;
-    flex-direction: column;*/
     gap: 0.4rem;
+    /*display: flex;
+    flex-direction: column;
     max-height: calc(100% - 68px);
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: hidden;*/
 }
 
 .VAS-polist-box {
