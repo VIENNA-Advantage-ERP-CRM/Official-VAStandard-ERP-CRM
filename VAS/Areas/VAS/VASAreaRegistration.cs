@@ -105,7 +105,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_HighestSellProduct.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_LowestSellProduct.js",
                     "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js",
-                     "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js"
+                     "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",
+                      "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceSummary.js"
                    );
 
 
