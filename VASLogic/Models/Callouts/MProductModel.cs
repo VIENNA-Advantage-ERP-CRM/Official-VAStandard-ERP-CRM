@@ -835,7 +835,7 @@ namespace VIS.Models
                 if (pageNo == 1)
                 {
                     result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_Order_ID) FROM (" + sb.ToString() + ")", null, null));
-                    result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='Shipment (Customer)'", null, null));
+                    result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
 
                 }
                 // Get the list of order IDs from the retrieved parent records
