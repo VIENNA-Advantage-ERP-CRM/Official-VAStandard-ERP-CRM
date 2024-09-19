@@ -64,7 +64,7 @@
             orgControlDiv.empty();
             orgDivInputWrap = $('<div class="input-group vis-input-wrap">');
             $lookupOrg = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Org_ID", 0, false, sqlWHERE);
-            $vOrg = new VIS.Controls.VTextBoxButton("AD_Org_ID", false, false, true, VIS.DisplayType.Search, $lookupOrg, 150);
+            $vOrg = new VIS.Controls.VTextBoxButton("AD_Org_ID", false, false, true, VIS.DisplayType.Search, $lookupOrg);
 
         /*    $orgButtonWrap = $('<div class="input-group-append">');*/
             $orgControlWrap = $('<div class="vis-control-wrap">');

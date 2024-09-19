@@ -145,25 +145,26 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
-        
+
         /// <summary>
         /// VAI050-Get top 10 Highest selling products
         /// </summary>
         /// <param name="OrganizationUnit"></param>
         /// <param name="Type"></param>
         /// <returns></returns>
-        public JsonResult GetProductSalesAndDetails(int OrganizationUnit,string Type)
+        public JsonResult GetProductSalesAndDetails(int OrganizationUnit, string Type)
         {
+
             Dictionary<string, object> result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
                 MProductModel obj = new MProductModel();
-                result = obj.GetProductSalesAndDetails(ctx, OrganizationUnit,Type);
+                result = obj.GetProductSalesAndDetails(ctx, OrganizationUnit, Type);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
- 
+
         /// <summary>
         /// VAI050-Get the monthly selling details of product
         /// </summary>
@@ -181,5 +182,43 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VAI050-Get the list of expected sales order
+        /// </summary>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public JsonResult GetExpectedDelivery(int pageNo, int pageSize,string Type)
+        {
+            DeliveryResult result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetExpectedDelivery(ctx, pageNo, pageSize,Type);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// VAI050-this method used to create delivery order
+        /// </summary>
+        /// <param name="C_Order_ID"></param>
+        /// <param name="C_OrderLines_IDs"></param>
+        /// <returns></returns>
+        public JsonResult CreateShipment(int C_Order_ID, string C_OrderLines_IDs)
+        {
+            Dictionary <string,object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.CreateShipment(ctx, C_Order_ID, C_OrderLines_IDs);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+       
     }
 }
