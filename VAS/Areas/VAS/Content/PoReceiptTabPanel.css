@@ -268,24 +268,24 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow-y: auto;
 }
 
-.VAS-payment-details ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
+    .VAS-payment-details ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
 
-.VAS-payment-details ul li {
-    border-radius: 6px;
-    background-color: rgba(var(--v-c-secondary), 1);
-    display: flex;
-    width: 100%;
-    gap: 0.5rem;
-    padding: 0.875rem;
-    position: relative;
-}
+        .VAS-payment-details ul li {
+            border-radius: 6px;
+            background-color: rgba(var(--v-c-secondary), 1);
+            display: flex;
+            width: 100%;
+            gap: 0.5rem;
+            padding: 0.875rem;
+            position: relative;
+        }
 
 .VAS-paymentDetail {
     display: grid;
@@ -293,6 +293,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     gap: 0.3rem;
     margin: 0 0 5px;
 }
+
     .VAS-paymentDetail.VAS-grid-col1 {
         margin-bottom: 0;
         line-height: 19px;
@@ -328,7 +329,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     top: 14px;
     cursor: pointer;
     font-size: 14px;
-    padding-right:7px;
+    padding-right: 7px;
 }
 
 .VAS-payment-details ul li .form-check {
@@ -346,6 +347,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     top: 7px;
     left: 4px;
 }
+
 .vas-ualdocno {
     font-size: 0.875rem;
     display: block;
@@ -354,6 +356,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 :root {
     --width-100: calc(1366px/3);
     --width-70: calc(768px*0.7/6);
@@ -438,6 +441,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     .vas-arwidg-receivable-container {
         font-size: 15px;
     }
+
     .vis-editModeWidget .vas-arwidg-receivable-container {
         font-size: 9px;
     }
@@ -587,7 +591,7 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-vendors-heading {
     font-size: 0.875em;
-    font-weight:600;
+    font-weight: 600;
     margin-bottom: 0.5em;
 }
 
@@ -665,7 +669,7 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-amt-val {
     font-size: 1em;
-    font-weight:600;
+    font-weight: 600;
     color: #093756;
 }
 
@@ -788,18 +792,20 @@ span.vas-arwidg-cur-symbol {
         font-size: 5px;
     }
 }
+
 .vas-igtwiginvmillion {
     font-size: 1em;
     color: #093756;
-    font-weight:600;
+    font-weight: 600;
 }
+
 :root {
     --width-100: calc(1920px/9);
     --width-70: calc(1920px*0.7/9);
 }
 
 .vas-psdwidg-purchase-state-col {
-   /* background: rgb(9,55,86);*/
+    /* background: rgb(9,55,86);*/
     /*background: linear-gradient(145deg, rgba(9,55,86,1) 0%, rgba(0,132,196,1) 100%);*/
     background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
     height: 100%;
@@ -852,13 +858,15 @@ span.vas-arwidg-cur-symbol {
         color: #083959;
         font-size: 0.5em;
     }
+
     .vis-editModeWidget .vas-psdwidg-totalSale {
         font-size: 0.5em;
     }
+
     .vis-editModeWidget .vas-psdwidg-tile-heading h1 {
         font-size: 2.0em;
     }
-    }
+}
 
 @media screen and (max-width: 1366px) {
     .vas-psdwidg-sales-comparison-col {
@@ -939,19 +947,24 @@ span.vas-arwidg-cur-symbol {
         font-size: 7px;
     }
 }
+
 .vas-psdwidg-heading-item {
     grid-column: 1 / span 2;
     grid-row: 1;
 }
+
 .vas-psdwidg-itme2 {
     grid-column: 3;
 }
-.vas-psdwidg-stateheading{
-    position:absolute;
+
+.vas-psdwidg-stateheading {
+    position: absolute;
 }
-.vas-psdwidg-unit{
-    padding-left:1px;
+
+.vas-psdwidg-unit {
+    padding-left: 1px;
 }
+
 .vas-igtwidg-img-icon {
     align-items: center;
     background-color: rgba(var(--v-c-primary), .4);
@@ -965,10 +978,345 @@ span.vas-arwidg-cur-symbol {
     overflow: hidden;
     width: 41px;
 }
+
 .vas-igtwidg-vendor-bgColor {
     background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);
 }
+
 .vas-igtwidg-customer-bgColor {
     background: rgb(249,253,169);
     background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%)
+}
+
+.vas-exinvd-expected-invoice {
+    background-color: rgba(var(--v-c-primary), .1);
+    padding: 0.5em;
+    height: 100%;
+}
+
+.vas-exinvd-expected-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .4em;
+}
+
+    .vas-exinvd-expected-heading h6 {
+        margin: 0;
+        font-size: 0.875em;
+        font-weight:600;
+    }
+
+.vas-exinvd-filterby-col {
+    display: flex;
+    align-items: center;
+    border-radius: 0.375em;
+    padding: 0.125em 0px 0.125em 0.5em;
+    gap: 0.375em;
+}
+
+    .vas-exinvd-filterby-col .fa {
+        font-size: 0.875em;
+    }
+
+.vas-exinvd-filter-label {
+    font-size: .75em;
+    font-weight: 600;
+}
+
+.vas-exinvd-filterby-col select {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    width: 4em;
+    font-size: 0.875em;
+}
+
+.vas-exinvd-invoicesListing {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.6em;
+    height: calc(100% - 5.3125em);
+    overflow: hidden;
+}
+
+.vas-exinvd-invoices-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.3em;
+}
+
+    .vas-exinvd-invoices-box > h6 {
+        font-size: 0.875em;
+        font-weight: 600;
+        margin: 0 0 .4em 0;
+    }
+
+.vas-exinvd-invoices-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-exinvd-thumb-w-txt {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+}
+
+    .vas-exinvd-thumb-w-txt img {
+        width: 3.125em;
+        height: 3.125em;
+        border-radius: 100%;
+    }
+
+.vas-exinvd-company-w-date .vas-exinvd-com-name {
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-exinvd-company-w-date .vas-exinvd-invoiceDate {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-secondary), 0.5);
+}
+
+.vas-exinvd-invoice-w-amount {
+    text-align: right;
+}
+
+.vas-exinvd-invoice-lbl {
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-exinvd-invoiceTotalAmt {
+    font-size: 0.75em;
+}
+
+    .vas-exinvd-invoiceTotalAmt span {
+        color: #EEB645;
+        font-weight: 600;
+    }
+
+.vas-exinvd-slider-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    padding: 0 0.875em;
+}
+
+    .vas-exinvd-slider-arrows .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+        color: rgba(var(--v-c-on-common), 0.9);
+    }
+
+/* .vas-exinvd-slider-arrows span {
+        font-size: 1.1em;
+    }*/
+
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 12px;
+    }
+
+        .vis-editModeWidget.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+            margin: 7px 4px 10px;
+        }
+
+    .vis-editModeWidget .vas-exinvd-slider-arrows {
+        margin-top: 4px;
+    }
+
+        .vis-editModeWidget .vas-exinvd-slider-arrows i.fa {
+            font-size: 13px;
+        }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 10px;
+    }
+
+    .vas-exinvd-invoicesListing {
+        height: calc(100% - 6em);
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 12px;
+    }
+
+    .vas-exinvd-expected-heading h6 {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vas-exinvd-expected-heading h6 {
+        font-size: 1.1em;
+    }
+
+    .vas-exinvd-filter-label {
+        font-size: 1em;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 12px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 9px;
+    }
+
+    .vas-exinvd-expected-heading {
+        font-size: 11px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-heading {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-heading {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-exinvd-invoices-box {
+        font-size: 14px;
+    }
+
+    .vas-exinvd-expected-heading {
+        font-size: 12px;
+    }
+
+    .vas-exinvd-invoicesListing {
+        height: calc(100% - 7em);
+    }
+
+    .vas-exinvd-slider-arrows span {
+        font-size: 1.4em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-exinvd-invoices-box {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-exinvd-expected-heading {
+        font-size: 10px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+}
+
+.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+    margin: 0 20px 10px 0;
+}
+
+    .vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
+        flex-basis: 35%;
+        justify-content: flex-end;
+    }
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv {
+    flex-basis: 33%;
+}
+
+.vas-exinvd-expected-invoice .vas-exinvd-slider-arrows {
+    margin-top: 13px;
+    font-size: 8px;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    height: auto;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    padding: 0;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .vis-input-wrap {
+    margin: 0;
+}
+
+.vas-disableArrow {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.vas-exinvd-pagespan {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.vas-exinvd-lablecolor {
+    background-color: rgba(var(--v-c-primary), .1)
+}
+
+.vas-exinvd-expected-invoice .vis-input-wrap select ~ label {
+    background: transparent;
+    top: -9px;
+}
 }
