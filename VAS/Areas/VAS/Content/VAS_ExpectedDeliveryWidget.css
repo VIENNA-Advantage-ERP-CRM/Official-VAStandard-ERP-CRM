@@ -1,0 +1,325 @@
+﻿
+.VAS-deliveries-container {
+    background: rgb(177,167,198);
+    background: linear-gradient(145deg, rgba(177,167,198,1) 0%, rgba(70,26,81,1) 100%);
+    padding: 0.5em;
+    height: 100%;
+}
+
+.VAS-deliveries-container-pending {
+    background: #FDC3C3;
+    background: #F76464;
+    padding: 0.5em;
+    height: 100%;
+}
+
+
+.VAS-deliveries-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .4em;
+}
+
+    .VAS-deliveries-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        color: rgba(var(--v-c-common), 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+    }
+
+        .VAS-deliveries-heading h6 .vis {
+            font-size: 0.875em;
+        }
+
+.VAS-deliveries-listing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.VAS-delivery-count {
+    width: 100%;
+    display: flex;
+    margin-bottom: 0.75em;
+}
+
+.VAS-count-lbl {
+    background-color: #4A1F55;
+    border-radius: 6px;
+    font-size: 0.875em;
+    display: flex;
+    padding: 2px 6px;
+    color: rgba(var(--v-c-common), 1);
+    gap: 0.5em;
+}
+
+    .VAS-count-lbl span {
+        display: flex;
+        background-color: rgba(var(--v-c-common), 1);
+        border-radius: 4px;
+        color: rgba(var(--v-c-on-common), 1);
+        height: 18px;
+        margin: auto;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2px;
+        font-size: 0.875em;
+    }
+
+.VAS-height-container {
+    height: calc(100% - 8em);
+    overflow: hidden;
+}
+
+.VAS-delivery-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.5em 0.75em 0.5em 0.75em; /* top right bottom left */
+    width: 100%;
+    /* font-family: verdana;*/
+}
+
+.VAS-box-heading {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.2em;
+}
+
+.VAS-icon-w-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+    .VAS-icon-w-name .fa {
+        color: #491954;
+        font-size: 1.1em;
+    }
+
+    .VAS-icon-w-name .VAS-doc-no {
+        font-size: 0.875em;
+        font-weight: 600;
+        color: rgba(var(--v-c-on-common), 1);
+    }
+
+.VAS-total-items-count {
+    font-weight: 600;
+    color: rgba(var(--v-c-on-common), 1);
+    font-size: 0.875em;
+    text-align: right;
+}
+
+.VAS-spaceBetween-col {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+}
+
+
+.VAS-lbl-text {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-common), 0.6);
+}
+
+.VAS-spaceBetween-col .VAS-lbl-text {
+    flex: 1; /* Makes each div take equal space */
+    width: 50%; /* Ensures each div takes up 50% width */
+    overflow: hidden; /* Hides overflow content */
+    white-space: nowrap; /* Prevents content from wrapping to the next line */
+    text-overflow: ellipsis; /* Adds the ellipsis (...) */
+    box-sizing: border-box; /* Includes padding and border in the width */
+}
+
+.VAS-lbl-text span {
+    font-weight: 600;
+    color: #491954;
+}
+
+.grid-3-col {
+    display: grid;
+    align-items: center;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.VAS-delivery-detail .VAS-icon-w-name .fa, .VAS-delivery-detail .VAS-icon-w-name .VAS-doc-no, .VAS-delivery-detail .VAS-total-items-count {
+    color: rgba(var(--v-c-common), 1);
+}
+
+.VAS-qtyProd-text {
+    font-weight: 600;
+    color: rgba(var(--v-c-common), 1);
+    font-size: 0.875em;
+}
+
+.VAS-expectedTxt {
+    color: rgba(var(--v-c-common), 0.8);
+    font-size: 0.875em;
+}
+
+
+.VAS-arrow-col {
+    width: 100%;
+}
+
+.arrow-line {
+    width: 100%;
+    border-top: 1px dashed #88719A;
+    position: relative;
+}
+
+    .arrow-line::after {
+        content: " ";
+        position: absolute;
+        border: solid #88719A;
+        border-width: 0 1px 1px 0;
+        display: inline-block;
+        padding: 3px;
+        transform: rotate(-45deg);
+        -webkit-transform: rotate(-45deg);
+        right: 0;
+        top: -4px;
+    }
+
+.VAS-slider-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    padding: 0.6em 0.875em 0;
+    border-top: 1px solid #846291;
+}
+
+    .VAS-slider-arrows .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+        color: rgba(var(--v-c-common), 0.9);
+    }
+
+    .VAS-slider-arrows span {
+        font-size: 1.1em;
+        color: rgba(var(--v-c-common), 1);
+    }
+
+.VAS-slider-arrows-order-details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    /* padding: 0.6em 0.875em 0; */
+    border-top: 1px solid #846291;
+}
+
+    .VAS-slider-arrows-order-details .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+        color: rgba(var(--v-c-common), 0.9);
+    }
+
+    .VAS-slider-arrows-order-details span {
+        font-size: 1.1em;
+        color: rgba(var(--v-c-common), 1);
+    }
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-endService-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+}
+
+@media screen and (max-width: 1024px) {
+}
+
+@media screen and (max-width:900px) {
+}
+
+@media screen and (max-width: 768px) {
+}
+
+@media screen and (max-width: 680px) {
+}
+
+@media screen and (max-width: 600px) {
+}
+
+@media screen and (max-width: 480px) {
+}
+
+@media screen and (max-width: 320px) {
+}
+
+.VAS-info-span {
+    font-weight: bold;
+    font-style: italic;
+    position: absolute;
+    /* width: 100%; */
+    height: calc(100% - 5.375em);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, .8);
+    border-radius: 6px;
+    font-size: 1rem;
+    left: 0.5em;
+    top: 2.625em;
+    right: 0.5em;
+    z-index: 2;
+}
+
+
+
+.VAS-pointer-cursor {
+    cursor: pointer;
+}
+
+.VAS-delivery-box.no-stock {
+    background-color: #f8d7da; /* Light red background for no stock */
+    border: 1px solid #f5c6cb; /* Light red border */
+}
+
+.VAS-selection-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.6; /* Make disabled checkboxes appear grayed out */
+}
+
+
+/*.VAS-deliveries-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}*/
+
+.VAS-generate-delivery-btn {
+    padding-right: 20px;
+    color: white;
+    cursor: pointer;
+    font-size: 1.75rem;
+    /* top: -1px; */
+    display: inline-block;
+    right: 5px;
+    position: absolute;
+}
+
+
+.VAS-data-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #888;
+    font-size: 16px;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+    background-color: rgba(255, 255, 255, 0.8); /* Optional: background color with transparency */
+    border-radius: 5px; /* Optional: rounded corners */
+}
