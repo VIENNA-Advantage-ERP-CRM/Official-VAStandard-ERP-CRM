@@ -216,70 +216,72 @@
         //VIS0336-method for loading the cart names and on click of arrow lines will load
         function LoadCartData() {
             $self.setBusy(true);
-            var data = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData", { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo });
-            $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
-            $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
-            $root.find("#InventoryCart_" + $self.windowNo).empty();
-            $root.find("#VAS-Availcarts_" + $self.windowNo).text('(' + 0 + ')');
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData",
+                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo }, function (data) {
 
-            if (data && data.length > 0) {
-                for (var i = 0; i < data.length; i++) {
-                    $root.find("#VAS-Availcarts_" + $self.windowNo).text('(' + data.length + ')');
-                    $root.find("#InventoryCart_" + $self.windowNo).append('<div class= "VAS-cart-box">'
-                        + '<div class="VAS-cartName-w-des">'
-                        + '<h1>' + data[i].CartName + '</h1>'
-                        + '<div class="VAS-cart-type">Type: ' + data[i].TransactionType + '</div>'
-                        + '<div class="VAS-cart-created">Created by: ' + data[i].CreatedBy + '</div>'
-                        + '</div>'
-                        + '<div class="VAS-linesdetail-col">'
-                        + '<div class="VAS-total-lines">'
-                        + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
-                        + '<span class="VAS-line-lbl">Line</span>'
-                        + '</div>'
-                        + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" aria-hidden="true" ></i></a> '
-                        + '</div>'
-                        + '</div>');
+                    $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
+                    $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
+                    $root.find("#InventoryCart_" + $self.windowNo).empty();
+                    $root.find("#VAS-Availcarts_" + $self.windowNo).text('(' + 0 + ')');
 
-                }
-                $root.find("#VAS-CartId_" + $self.windowNo).off('click');
-                $root.on('click', "#VAS-CartId_" + $self.windowNo, function () {
-                    $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "block");
-                    $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "none");
-
-                    var CartId = $(this).attr('vas-cart-id');
-                    var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId });
-
-                    if (result && result.length > 0) {
-                        $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));
-                        $root.find("#VAS-TransactionType_" + $self.windowNo).text($(this).attr('vas-transactiontype') + " | Created by:" + $(this).attr('vas-createdby'));
-                        $root.find("#VAS-LineCount_" + $self.windowNo).text(0);
-                        $root.find("#VAS-CartLinesDetails_" + $self.windowNo).empty();
-                        for (var i = 0; i < result.length; i++) {
-                            $root.find("#VAS-LineCount_" + $self.windowNo).text(result.length);
-
-                            $root.find("#VAS-CartLinesDetails_" + $self.windowNo).append('<tr cart-code="' + result[i].Code + '" product-id="' + result[i].ProductId +
-                                '" attr-id="' + result[i].AttrId + '"uom-id="' + result[i].UomId + '" inventorycount-id="' + result[i].InventoryCountId + '" qty="' + result[i].Quantity + '">'
-                                + '<td>'
-                                + '<div>'
-                                //+ '<input class="form-check-input position-static lineCheckbox" type="checkbox" id="blankCheckbox" value="option1" aria-label="...">'
-                                +'<input class="lineCheckbox "type="checkbox"  value="option1" aria-label="...">'
+                    if (data && data.length > 0) {
+                        for (var i = 0; i < data.length; i++) {
+                            $root.find("#VAS-Availcarts_" + $self.windowNo).text('(' + data.length + ')');
+                            $root.find("#InventoryCart_" + $self.windowNo).append('<div class= "VAS-cart-box">'
+                                + '<div class="VAS-cartName-w-des">'
+                                + '<h1>' + data[i].CartName + '</h1>'
+                                + '<div class="VAS-cart-type">Type: ' + data[i].TransactionType + '</div>'
+                                + '<div class="VAS-cart-created">Created by: ' + data[i].CreatedBy + '</div>'
                                 + '</div>'
-                                + '</td>'
-                                + '<td>' + result[i].Code + '</td>'
-                                + '<td>' + result[i].ProductName + '</td>'
-                                + '<td>' + result[i].AttrName + '</td>'
-                                + '<td>' + result[i].UomName + '</td>'
-                                + '<td class="text-right">' + result[i].Quantity + '</td>'
-                                + '</tr>');
-                        }
+                                + '<div class="VAS-linesdetail-col">'
+                                + '<div class="VAS-total-lines">'
+                                + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
+                                + '<span class="VAS-line-lbl">Line</span>'
+                                + '</div>'
+                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" aria-hidden="true" ></i></a> '
+                                + '</div>'
+                                + '</div>');
 
-                        $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
-                            Fetchdata();
+                        }
+                        $root.find("#VAS-CartId_" + $self.windowNo).off('click');
+                        $root.on('click', "#VAS-CartId_" + $self.windowNo, function () {
+                            $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "block");
+                            $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "none");
+
+                            var CartId = $(this).attr('vas-cart-id');
+                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId });
+
+                            if (result && result.length > 0) {
+                                $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));
+                                $root.find("#VAS-TransactionType_" + $self.windowNo).text($(this).attr('vas-transactiontype') + " | Created by:" + $(this).attr('vas-createdby'));
+                                $root.find("#VAS-LineCount_" + $self.windowNo).text(0);
+                                $root.find("#VAS-CartLinesDetails_" + $self.windowNo).empty();
+                                for (var i = 0; i < result.length; i++) {
+                                    $root.find("#VAS-LineCount_" + $self.windowNo).text(result.length);
+
+                                    $root.find("#VAS-CartLinesDetails_" + $self.windowNo).append('<tr cart-code="' + result[i].Code + '" product-id="' + result[i].ProductId +
+                                        '" attr-id="' + result[i].AttrId + '"uom-id="' + result[i].UomId + '" inventorycount-id="' + result[i].InventoryCountId + '" qty="' + result[i].Quantity + '">'
+                                        + '<td>'
+                                        + '<div>'
+                                        + '<input class="lineCheckbox "type="checkbox"  value="option1" aria-label="...">'
+                                        + '</div>'
+                                        + '</td>'
+                                        + '<td>' + result[i].Code + '</td>'
+                                        + '<td>' + result[i].ProductName + '</td>'
+                                        + '<td>' + result[i].AttrName + '</td>'
+                                        + '<td>' + result[i].UomName + '</td>'
+                                        + '<td class="text-right">' + result[i].Quantity + '</td>'
+                                        + '</tr>');
+                                }
+
+                                $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
+                                    Fetchdata();
+                                });
+                            }
                         });
                     }
+                    $self.setBusy(false);
                 });
-            }
-            $self.setBusy(false);
         }
         //VIS0336-for verifying is user alredy selected on user filter
         function isProductTagExist(pTagid) {
