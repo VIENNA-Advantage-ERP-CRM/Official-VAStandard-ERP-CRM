@@ -81,11 +81,14 @@ namespace VASLogic.Models
         /// <returns>returns the Invoice tax data</returns>
         public List<TaxTabPanel> GetInvoiceTaxData(Ctx ctx, int InvoiceId)
         {
+            //Fixed query to get data for subtotal and grandtotal
             List<TaxTabPanel> InvocieTaxTabPanel = new List<TaxTabPanel>();
-            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded,cy.StdPrecision FROM C_InvoiceTax ct 
+            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,SUM(cl.TaxBaseAmt) AS SumAmt, cy.CurSymbol,cy.StdPrecision FROM C_InvoiceTax ct 
                           INNER JOIN C_Invoice ci ON (ci.C_Invoice_ID = ct.C_Invoice_ID) 
+                          INNER JOIN C_InvoiceLine cl ON (cl.C_Invoice_ID=ci.C_Invoice_ID)
                           INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
-                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Invoice_ID = " + InvoiceId + " Order By t.Name";
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Invoice_ID = " + InvoiceId + " " +
+                          " GROUP BY t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,cy.CurSymbol,cy.StdPrecision Order By t.Name";
 
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
@@ -98,6 +101,9 @@ namespace VASLogic.Models
                     obj.TaxAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TaxAmt"]);
                     obj.IsTaxIncluded = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsTaxIncluded"]);
                     obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    obj.CurSymbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
+                    obj.TotalLines = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmt"]); ;
+                    obj.GrandTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["GrandTotal"]);
                     InvocieTaxTabPanel.Add(obj);
                 }
             }
@@ -958,6 +964,225 @@ namespace VASLogic.Models
             }
             return invData;
         }
+        /// <summary>
+        /// This function is Used to show Expected invoices against orders and GRN/Delivery Order
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of data of Expected invoices against order and GRN</returns>
+        public List<ExpectedInvoice> GetExpectedInvoiceData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string ListValue)
+        {
+            ExpectedInvoice obj = new ExpectedInvoice();
+            StringBuilder sql = new StringBuilder();
+            StringBuilder sqlmain = new StringBuilder();
+            List<ExpectedInvoice> invGrandTotalData = new List<ExpectedInvoice>();
+            string OrderCheck = (ISOtrx == true ? " AND o.IsSOTrx='Y' " : " AND o.IsSOTrx='N' ");
+            string DeliveryCheck = (ISOtrx == true ? "min.IsSOTrx='Y'" : "min.IsSOTrx='N'");
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
+            sql.Append($@"SELECT * FROM  (");
+            if (ListValue == "AL" || ListValue == "PO" || ListValue == "SO")
+            {
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                            'Order' AS Type,
+                             cb.Pic,
+                             o.DocumentNo,
+                             o.DateOrdered,
+                             o.DateOrdered AS FilterDate,
+                             custimg.ImageExtension,
+                             cb.Name,
+                             o.AD_Client_ID,
+                             SUM( CASE
+                                    WHEN mil.C_OrderLine_ID IS NOT NULL
+                                          AND l.qtydelivered > l.qtyinvoiced THEN
+                                             coalesce(
+                                                 l.QtyOrdered, 0
+                                             ) - coalesce(
+                                                 l.QtyDelivered, 0)
+                                             
+                                     WHEN ci.C_OrderLine_ID IS NOT NULL
+                                          AND l.QtyDelivered < l.qtyinvoiced THEN
+                                     COALESCE(
+                                                 l.QtyOrdered, 0
+                                             ) - coalesce(
+                                                 l.qtyinvoiced, 0)
+                                     ELSE COALESCE(
+                                                 l.qtyordered, 0)
+                                     END)            AS remainingquantity,
+                                      SUM(
+                                     CASE
+                                     WHEN mil.C_OrderLine_ID IS NOT NULL
+                                          AND l.qtydelivered >= l.qtyinvoiced THEN
+                                     currencyconvert(
+                                         round(
+                                             (COALESCE(
+                                                 l.qtyordered, 0
+                                             ) - COALESCE(
+                                                 l.qtydelivered, 0
+                                             )) *(l.linetotalamt) / nullif(
+                                                 l.qtyentered, 0
+                                             ), cy.stdprecision
+                                         ), o.c_currency_id," +C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                     WHEN ci.c_orderline_id IS NOT NULL
+                                          AND l.qtydelivered < l.qtyinvoiced THEN
+                                     currencyconvert(
+                                         round(
+                                             (COALESCE(
+                                                 l.qtyordered, 0
+                                             ) - COALESCE(
+                                                 l.qtyinvoiced, 0
+                                             )) *(l.linetotalamt) / nullif(
+                                                 l.qtyentered, 0
+                                             ), cy.stdprecision
+                                         ), o.c_currency_id, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                     ELSE
+                                     currencyconvert(
+                                         round(
+                                             COALESCE(
+                                                 l.qtyordered, 0
+                                             ) * (l.linetotalamt) / nullif(
+                                                 l.qtyentered, 0
+                                             ), cy.stdprecision
+                                         ), o.c_currency_id, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                     END
+                                 )             AS totalvalue
+                         FROM
+                             c_order o
+                             INNER JOIN C_OrderLine l ON (o.c_order_id = l.c_order_id)
+                             INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
+                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
+                             LEFT JOIN C_InvoiceLine ci ON ( ci.C_OrderLine_ID = l.C_OrderLine_ID )
+                             LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO','CL') ");
+                sqlmain.Append(@"GROUP BY
+                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered, custimg.ImageExtension, cb.Name,o.AD_Client_ID
+                             HAVING SUM(
+                                        CASE
+                                        WHEN mil.c_orderline_id IS NOT NULL
+                                             AND l.qtydelivered > l.qtyinvoiced THEN
+                                                coalesce(
+                                                    l.qtyordered, 0
+                                                ) - coalesce(
+                                                    l.qtydelivered, 0)
+                                                
+                                        WHEN ci.c_orderline_id IS NOT NULL
+                                             AND l.qtydelivered < l.qtyinvoiced THEN
+                                        coalesce(
+                                                    l.qtyordered, 0
+                                                ) - coalesce(
+                                                    l.qtyinvoiced, 0)
+                                        ELSe                        coalesce(
+                                                    l.qtyordered, 0)
+                                        END)  > 0 ");
+            }
+            if (ListValue == "AL")
+            {
+                sqlmain.Append(" UNION ALL ");
+            }
+            if (ListValue == "AL" || ListValue == "GR" || ListValue == "DO")
+            {
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                             'GRN' AS Type,
+                             cb.Pic,
+                             min.DocumentNo,
+                             min.MovementDate AS DateOrdered,
+                             CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
+                             ELSE min.MovementDate
+                             END AS FilterDate,
+                             custimg.ImageExtension,
+                             cb.Name,
+                             min.AD_Client_ID,
+                             SUM(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) AS RemainingQuantity,
+                             SUM(
+                                 CASE 
+                                     WHEN l.C_OrderLine_ID IS NOT NULL THEN 
+                                         currencyConvert(ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
+                                         * (ol.LineTotalAmt) / NULLIF(ol.QtyEntered, 0)
+                                         ,cy.StdPrecision),o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                     ELSE 
+                                         (COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
+                                 END
+                             ) AS TotalValue
+                         FROM
+                             M_InOut min
+                             INNER JOIN M_InOutLine l ON (l.M_InOut_ID = min.M_InOut_ID)
+                             INNER JOIN C_BPartner cb ON (min.C_BPartner_ID = cb.C_BPartner_ID)
+                             LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID = l.m_inoutline_ID)
+                             LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
+                             LEFT JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                             LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
+                         WHERE
+                              min.DocStatus IN ('CO', 'CL')
+                             AND NOT EXISTS (
+                                 SELECT 1
+                                 FROM c_orderline ol2
+                                 WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
+                                 AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0)
+                             )
+                             AND " + DeliveryCheck + BPCheck + " AND ol.qtyordered IS NOT NULL", "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(@" GROUP BY
+                             cb.Pic, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
+                             ELSE min.MovementDate
+                             END, custimg.ImageExtension, cb.Name,min.AD_Client_ID 
+                              HAVING
+                              SUM(coalesce(
+                                  l.movementqty, 0
+                              ) - coalesce(
+                                  ci.qtyinvoiced, 0
+                              )) > 0");
+            }
+            sql.Append(sqlmain);
+            sql.Append(")T ORDER BY T.FilterDate");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                //fetching the record count to use it for pagination
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
+                sql.Clear();
+                //this query is returning the field of base currency
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new ExpectedInvoice();
+                    obj.recordCount = RecordCount;
+                    obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    {
+                        obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
+
+                    }
+                    invGrandTotalData.Add(obj);
+                }
+            }
+            return invGrandTotalData;
+        }
+        /// <summary>
+        /// This Method is used to return the refrence id 
+        /// </summary>
+        /// <param name="ct">context</param>
+        /// <param name="ColumnData"></param>
+        /// <returns>Dictionary with column name and refrence id</returns>
+        /// <author>VIS_427 </author>
+        public Dictionary<string, int> GetColumnIds(Ctx ct, dynamic columnDataArray)
+        {
+            Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+            ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAS_ExpectedInvoiceList'", null, null));
+            return ColumnInfo;
+        }
     }
     public class TabPanel
     {
@@ -986,6 +1211,9 @@ namespace VASLogic.Models
         public string IsTaxIncluded { get; set; }
 
         public int stdPrecision { get; set; }
+        public string CurSymbol { get; set; }
+        public decimal TotalLines { get; set; }
+        public decimal GrandTotal { get; set; }
 
     }
     public class PurchaseOrderTabPanel
@@ -1079,5 +1307,18 @@ namespace VASLogic.Models
         public decimal TotalAmt { get; set; }
         public string Symbol { get; set; }
         public int stdPrecision { get; set; }
+    }
+    public class ExpectedInvoice
+    {
+        public decimal TotalAmt { get; set; }
+        public string Symbol { get; set; }
+        public string RecordType { get; set; }
+        public int stdPrecision { get; set; }
+        public string ImageUrl { get; set; }
+        public string Name { get; set; }
+        public DateTime OrderdDate { get; set; }
+        public string DocumentNo { get; set; }
+        public int recordCount { get; set; }
+
     }
 }

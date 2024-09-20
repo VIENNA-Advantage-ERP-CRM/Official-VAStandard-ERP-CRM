@@ -241,6 +241,7 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
@@ -252,7 +253,11 @@
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedInvoiceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvoiceSummary.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_LowestPrMonthlySalesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedDeliveryWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_HighestSellProduct.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvGrandTotalWidget.js" />

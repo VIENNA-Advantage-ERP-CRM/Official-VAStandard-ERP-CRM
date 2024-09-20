@@ -59,12 +59,14 @@
 
 .VAS-PO-list-col {
     width: 100%;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.4rem;
+    /*display: flex;
+    flex-direction: column;
     max-height: calc(100% - 68px);
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;*/
 }
 
 .VAS-polist-box {
