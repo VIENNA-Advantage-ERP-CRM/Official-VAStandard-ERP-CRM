@@ -99,6 +99,8 @@ namespace VAdvantage.Model
                 Set_Value("VA107_RefTask_ID", task.Get_Value("VA107_RefTask_ID"));
                 Set_Value("VA107_Status", task.Get_Value("VA107_Status"));
                 Set_Value("VA107_RequestType", task.Get_Value("VA107_RequestType"));
+                Set_Value("VA107_Status", "D");
+
 
             }
         }
