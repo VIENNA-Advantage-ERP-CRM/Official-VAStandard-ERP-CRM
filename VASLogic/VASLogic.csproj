@@ -130,6 +130,7 @@
     <Compile Include="Models\Callouts\MVASContractModel.cs" />
     <Compile Include="Models\Callouts\MWarehouseModel.cs" />
     <Compile Include="Models\ForecastFormModel.cs" />
+    <Compile Include="Models\InventoryLinesModel.cs" />
     <Compile Include="Models\MChart.cs" />
     <Compile Include="Models\OrderLineTabPanelModel.cs" />
     <Compile Include="Models\PaymentAllocation.cs" />
