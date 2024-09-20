@@ -104,15 +104,15 @@
                         });
                         /* Add Pagination div on first tym data load*/
                         if (pageNo == 1) {
-                            $('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
+                            $root.find('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
                             buildPagination(response.RecordCount);
                             AD_Window_ID = response.AD_Window_ID;
                         }
-                        $('#VAS_PaginationText_' + widgetID).text($self.currentPage + ' of ' + $self.totalPages);
+                        $root.find('#VAS_PaginationText_' + widgetID).text($self.currentPage + ' of ' + $self.totalPages);
                         // Attach click event listener to delivery boxes
                         $root.off('click', '#VAS_DocumentNo_' + widgetID);
                         $root.on('click', '#VAS_DocumentNo_' + widgetID, function () {
-                            var docNo = $(this).data('doc-no');
+                            var docNo = $root.find(this).data('doc-no');
                             var customerName = $(this).data('customer-name');
                             var orderid = $(this).data('orderid');
                             displayOrderDetails(docNo, customerName, orderid);
@@ -202,8 +202,7 @@
                 for (var i = startIndex; i < endIndex; i++) {
                     var line = childRecords[i];
                     var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
-                    //var hasStock = line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered;
-                    var hasStock = line.OnHandQty > 0;
+                    var hasStock = line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered;
                     var boxClass = hasStock ? 'VAS-delivery-box' : 'VAS-delivery-box no-stock';
 
                     $root.find('#VAS_OrderLine_' + widgetID).append(
