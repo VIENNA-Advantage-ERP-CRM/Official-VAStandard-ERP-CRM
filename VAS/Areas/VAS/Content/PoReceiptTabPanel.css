@@ -1370,3 +1370,51 @@ span.vas-arwidg-cur-symbol {
 .vas-arwidg-Symbol {
     font-family: Gill Sans MT;
 }
+.VAS-YearBasedDataListDiv {
+    margin-right: 9px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) select {
+    font-size: 10px;
+}
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-vendors-heading {
+    font-size: 9px;
+    letter-spacing: -0.8px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon span {
+    font-size: 10px !important;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon {
+    height: auto;
+    width: auto;
+    min-height: 22px;
+    min-width: 22px;
+}
+
+
+@media (max-width: 1300px) {
+    .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+        font-size: 12px;
+    }
+    .vas-vaswidg-Symbol {
+        font-size: 12px;
+    }
+}
+
+/*@media (max-width: 1024px) {
+    .vas-igtwidg-vendors-heading {
+        font-size: 8px;
+    }
+    .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+}
+
+@media(max-width: 1600px){
+    .vas-igtwidg-vendors-listing{
+        height: calc(100% - 25px);
+        overflow-y: auto;
+    }
+}*/

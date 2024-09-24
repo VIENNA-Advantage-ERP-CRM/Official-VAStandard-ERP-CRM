@@ -28,7 +28,7 @@
             //This function will get the reference id of list
             GetColumnID();
             createBusyIndicator();
-            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             var classTop5 = (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? 'vas-igtwidg-customer-bgColor' : 'vas-igtwidg-vendor-bgColor');
             $maindiv = $('<div class="vas-igtwidg-top-vendors-col ' + classTop5 + '">');
             //Getting list to fiter the data base on year

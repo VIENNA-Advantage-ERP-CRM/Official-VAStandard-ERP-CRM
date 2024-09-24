@@ -22,7 +22,7 @@
         var widgetID = null;
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
-            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
