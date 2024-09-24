@@ -849,7 +849,7 @@ namespace VIS.Models
             {
                 if (pageNo == 1)
                 {
-                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_Order_ID) FROM (" + sb.ToString() + ")", null, null));
+                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_Order_ID) FROM (" + sb.ToString() + ") t ", null, null));
                     if (Type == "EG" || Type == "PG")
                     {
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_MaterialReceipt'", null, null));
@@ -1691,24 +1691,9 @@ namespace VIS.Models
                         return ret;
                     }
                     query.Clear();
-                    if (DB.IsOracle())
-                    {
-                        FetchSingleRecord = " FETCH FIRST 1 ROW ONLY";
-
-                    }
-                    else
-                    {
-                        FetchSingleRecord = " LIMIT 1";
-                    }
-                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " AND IsDefault='Y' " + FetchSingleRecord + " ");
-                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
-                    if (M_Locator_ID == 0)
-                    {
-                        query.Clear();
-                        query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + FetchSingleRecord + "");
-                        M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
-
-                    }
+                   
+                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault  DESC");
+                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));                   
 
                     MInOutLine objLine = null;
                     int LineNo = 10;
