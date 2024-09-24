@@ -75,6 +75,8 @@
     display: flex;
     gap: 0.625rem;
     position: relative;
+    border: 1px solid rgba(var(--v-c-secondary), .8);
+    border-radius: 6px;
 }
 
 .VAS-product-thumbnail {
