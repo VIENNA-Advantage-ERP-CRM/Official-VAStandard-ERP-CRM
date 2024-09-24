@@ -105,7 +105,9 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_HighestSellProduct.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_LowestSellProduct.js",
                     "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js",
-                     "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js"
+                     "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",
+                     "~/Areas/VAS/Scripts/app/forms/VAS_BankBalanceWidget.js",
+                     "~/Areas/VAS/Scripts/app/forms/VAS_CashBalanceWidget.js"
                    );
 
 
@@ -117,7 +119,9 @@ namespace VAS
                 "~/Areas/VAS/Content/VAS_PurchaseOrderTabPanel.css",
                 "~/Areas/VAS/Content/VAS_ProductUomSetup.css",
                 "~/Areas/VAS/Content/VAS_ProductWidgets.css",
-                "~/Areas/VAS/Content/VAS_HighestSellingWidget.css");
+                "~/Areas/VAS/Content/VAS_HighestSellingWidget.css",
+                "~/Areas/VAS/Content/VAS_BankBalance.css",
+                "~/Areas/VAS/Content/VAS_CashBalance.css");
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
             
