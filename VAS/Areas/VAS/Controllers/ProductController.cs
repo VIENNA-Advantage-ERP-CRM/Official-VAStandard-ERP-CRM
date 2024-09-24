@@ -189,27 +189,27 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
         /// <param name="pageNo"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        public JsonResult GetExpectedDelivery(int pageNo, int pageSize,string Type)
+        public JsonResult GetExpectedDelivery(int pageNo, int pageSize, string Type)
         {
             DeliveryResult result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
                 MProductModel obj = new MProductModel();
-                result = obj.GetExpectedDelivery(ctx, pageNo, pageSize,Type);
+                result = obj.GetExpectedDelivery(ctx, pageNo, pageSize, Type);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// VAI050-this method used to create delivery order
+        /// VAI050-this method used to create delivery order and vendor return
         /// </summary>
         /// <param name="C_Order_ID"></param>
         /// <param name="C_OrderLines_IDs"></param>
         /// <returns></returns>
         public JsonResult CreateShipment(int C_Order_ID, string C_OrderLines_IDs)
         {
-            Dictionary <string,object> result = null;
+            Dictionary<string, object> result = null;
             if (Session["ctx"] != null)
             {
                 var ctx = Session["ctx"] as Ctx;
@@ -219,6 +219,25 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
-       
+        /// <summary>
+        /// VAI050-This method used to create grn and customer return
+        /// </summary>
+        /// <param name="C_Order_ID"></param>
+        /// <param name="C_OrderLines_IDs"></param>
+        /// <param name="Type"></param>
+        /// <returns></returns>
+        public JsonResult CreateGRN(int C_Order_ID, string C_OrderLines_IDs, string Type)
+        {
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.CreateGRN(C_Order_ID, C_OrderLines_IDs, Type, ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+
     }
 }

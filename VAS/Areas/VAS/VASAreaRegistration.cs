@@ -109,6 +109,10 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedDeliveryWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_PendingDeliveryWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedGRNWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PendingGRNWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_CustomerRMAWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_VendorReturnWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceSummary.js"
                   );
 
