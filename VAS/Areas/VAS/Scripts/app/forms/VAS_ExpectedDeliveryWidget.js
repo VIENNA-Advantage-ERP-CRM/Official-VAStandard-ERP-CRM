@@ -205,6 +205,15 @@
                     var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
                     var hasStock = line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered;
                     var boxClass = hasStock ? 'VAS-delivery-box' : 'VAS-delivery-box no-stock';
+                    var badgeClass;
+                    if (line.OnHandQty >= line.QtyOrdered) {
+                        badgeClass = 'badge-green'; //  stock available
+                    } else if (line.OnHandQty < line.QtyOrdered && line.OnHandQty > 0) {
+                        badgeClass = 'badge-orange'; //stock less tham order 
+                    } else {
+                        badgeClass = 'badge-red'; // Insufficient stock
+
+                    }
 
                     $root.find('#VAS_OrderLine_' + widgetID).append(
                         '            <div class="' + boxClass + '">' +
@@ -214,8 +223,9 @@
                         '                        <i class="fa fa-file-text" aria-hidden="true"></i>' +
                         '                        <div class="VAS-doc-no" title="' + VIS.Msg.getMsg("VAS_Product") + '">' + line.ProductName + '</div>' +
                         '                    </div>' +
-                        '                    <div class="VAS-total-items-count"><span title="' + VIS.Msg.getMsg("VAS_RemianingQty") + '">' + line.QtyOrdered + '</span>' + '/' + '<span title="' + VIS.Msg.getMsg("VAS_OnHandQty") + '">' + line.OnHandQty + '</span></div>' +
-                        '                </div>' +
+                        '                    <div class="VAS-total-items-count">' +
+                        '                    <span title = "' + VIS.Msg.getMsg("VAS_RemianingQty") + '" class="badge badge-light ' + badgeClass + '"> ' + line.QtyEntered + '</span ></div > ' +
+                        '                      </div>' +
                         '                <div class="VAS-spaceBetween-col">' +
                         '                    <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Attribute") + '">' + line.AttributeName + '</div>' +
                         '                    <div class="vas-lbl-text" title="' + VIS.Msg.getMsg("VAS_Uom") + '"> ' + line.UOM + '</div>' +

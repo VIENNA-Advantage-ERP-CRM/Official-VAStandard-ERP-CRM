@@ -104,13 +104,17 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_LowestPrMonthlySalesWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_HighestSellProduct.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_LowestSellProduct.js",
-                    "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js",
-                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedDeliveryWidget.js",
-                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedDeliveryWidget.js",
-                    "~/Areas/VAS/Scripts/app/forms/VAS_PendingDeliveryWidget.js",
-                     "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",
-                      "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceSummary.js"
-                   );
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_CreateInventoryLines.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedDeliveryWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PendingDeliveryWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedGRNWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PendingGRNWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_CustomerRMAWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_VendorReturnWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceSummary.js"
+                  );
 
 
             style.Include("~/Areas/VAS/Content/PaymentRule.css",
@@ -121,6 +125,7 @@ namespace VAS
                 "~/Areas/VAS/Content/VAS_PurchaseOrderTabPanel.css",
                 "~/Areas/VAS/Content/VAS_ProductUomSetup.css",
                 "~/Areas/VAS/Content/VAS_ProductWidgets.css",
+                "~/Areas/VAS/Content/VAS_InventoryLines.css",
                 "~/Areas/VAS/Content/VAS_HighestSellingWidget.css",
                 "~/Areas/VAS/Content/VAS_ExpectedDeliveryWidget.css"
                 );

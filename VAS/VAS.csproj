@@ -203,6 +203,7 @@
     <Compile Include="Areas\VAS\Controllers\ForecastFormController.cs" />
     <Compile Include="Areas\VAS\Controllers\GlJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
+    <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
@@ -242,6 +243,7 @@
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
@@ -250,11 +252,16 @@
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvoiceSummary.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_LowestPrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedDeliveryWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_HighestSellProduct.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvGrandTotalWidget.js" />
