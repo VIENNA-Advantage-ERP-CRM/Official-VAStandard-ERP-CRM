@@ -617,7 +617,7 @@ namespace VASLogic.Models
                          DISTINCT cy.CalendarYears,CASE WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
                          else ci.C_Calendar_ID END AS C_Calendar_ID
                          FROM C_Calendar cc
-                         LEFT JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
                          LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
                          INNER JOIN C_Year cy ON (cy.C_Calendar_ID=cc.C_Calendar_ID)
                          INNER JOIN C_Period cp  ON (cy.C_Year_ID = cp.C_Year_ID)
