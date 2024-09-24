@@ -598,17 +598,43 @@ namespace VASLogic.Models
         /// This function is Used to Get the ar/ap invoice data of top five business partners
         /// </summary>
         /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ListValue">ListValue</param>
         /// <param name="ctx">Context</param>
         /// <author>VIS_427</author>
         /// <returns>List of ar/ap invoice data of top five business partners</returns>
-        public List<InvGrandTotalData> GetInvTotalGrandData(Ctx ctx, bool ISOtrx)
+        public List<InvGrandTotalData> GetInvTotalGrandData(Ctx ctx, bool ISOtrx, string ListValue)
         {
             InvGrandTotalData obj = new InvGrandTotalData(); ;
             StringBuilder sql = new StringBuilder();
             List<InvGrandTotalData> invGrandTotalData = new List<InvGrandTotalData>();
             string BPCheck = (ISOtrx == true ? "cb.IsCustomer='Y'" : "cb.IsVendor='Y'");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
-
+            int calendar_ID = 0;
+            int StartYear = 0;
+            int CurrentYear = 0;
+            //Finding the calender id and Current Year to get data on this basis
+            sql.Append(@"SELECT
+                         DISTINCT cy.CalendarYears,CASE WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
+                         else ci.C_Calendar_ID END AS C_Calendar_ID
+                         FROM C_Calendar cc
+                         LEFT JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
+                         LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Year cy ON (cy.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Period cp  ON (cy.C_Year_ID = cp.C_Year_ID)
+                         WHERE 
+                         cy.IsActive = 'Y'
+                         AND cp.IsActive = 'Y'
+                         AND oi.IsActive='Y'
+                         AND ci.IsActive='Y'
+                         AND current_date BETWEEN cp.StartDate AND cp.EndDate");
+            string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+            DataSet yearDs = DB.ExecuteDataset(yearSql, null, null);
+            if (yearDs != null && yearDs.Tables[0].Rows.Count > 0)
+            {
+                CurrentYear = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["CalendarYears"]);
+                calendar_ID = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["C_Calendar_ID"]);
+            }
+            sql.Clear();
             sql.Append($@"WITH InvoiceData AS (
                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
                              cb.Name,
@@ -624,25 +650,69 @@ namespace VASLogic.Models
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
                              WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
-                     )})
-                     SELECT
-                         Name,
-                         Pic,
-                         custImgExtension,
-                         min(DateInvoiced) AS minDateInvoiced,");
+                     )})");
+            sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year inner join c_period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
+            //Getting data according to Current month
+            if (ListValue == "CM")
+            {
+                sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
+                            @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
+                            AND CURRENT_DATE BETWEEN C_period.StartDate AND C_period.EndDate");
+            }
+            //Getting data according to Current Year
+            else if (ListValue == "CY")
+            {
+                sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
+                            @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
+                            AND C_Year.CALENDARYEARS='" + CurrentYear + "'");
+            }
+            //Getting data according to Last Year
+            else if (ListValue == "LY")
+            {
+                CurrentYear = CurrentYear - 1;
+                sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
+                            @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
+                            AND C_Year.CALENDARYEARS='" + CurrentYear + "'");
+            }
+            //Getting data according to Last 3 Year
+            else if (ListValue == "3Y")
+            {
+                StartYear = CurrentYear - 3;
+                CurrentYear = CurrentYear - 1;
+                sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
+                            @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
+                            AND C_Year.CALENDARYEARS BETWEEN '" + StartYear + "' AND '" + CurrentYear + "'");
+            }
+            //Getting data according to Last 5 Year
+            else if (ListValue == "5Y")
+            {
+                StartYear = CurrentYear - 5;
+                CurrentYear = CurrentYear - 1;
+                sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
+                            @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
+                            AND C_Year.CALENDARYEARS BETWEEN '" + StartYear + "' AND '" + CurrentYear + "'");
+            }
+            sql.Append(@" GROUP BY c_period.AD_Client_ID)");
+            sql.Append(@"SELECT
+                         id.Name,
+                         id.Pic,
+                         id.custImgExtension,
+                         min(id.DateInvoiced) AS minDateInvoiced,");
             if (ISOtrx)
             {
-                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'ARI' THEN DueAmt ELSE 0 END) -
-                             SUM(CASE WHEN DocBaseType = 'ARC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+                sql.Append(@"NVL((SUM(CASE WHEN id.DocBaseType = 'ARI' THEN id.DueAmt ELSE 0 END) -
+                             SUM(CASE WHEN id.DocBaseType = 'ARC' THEN id.DueAmt ELSE 0 END)),0) AS SumAmount");
             }
             else
             {
-                sql.Append(@"NVL((SUM(CASE WHEN DocBaseType = 'API' THEN DueAmt ELSE 0 END) -
-                          SUM(CASE WHEN DocBaseType = 'APC' THEN DueAmt ELSE 0 END)),0) AS SumAmount");
+                sql.Append(@"NVL((SUM(CASE WHEN id.DocBaseType = 'API' THEN id.DueAmt ELSE 0 END) -
+                          SUM(CASE WHEN id.DocBaseType = 'APC' THEN id.DueAmt ELSE 0 END)),0) AS SumAmount");
             }
             sql.Append(@" FROM
-                         InvoiceData
-                     Group by Name,Pic,custImgExtension
+                         InvoiceData id 
+                         INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=id.AD_Client_ID)
+                     WHERE id.dateinvoiced BETWEEN pd.StartDate AND pd.EndDate
+                     Group by id.Name,id.Pic,id.custImgExtension
                      Order by SumAmount desc 
                      FETCH FIRST 5 ROWS ONLY");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
@@ -687,6 +757,7 @@ namespace VASLogic.Models
             int calendar_ID = 0;
             string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
             string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
+
 
 
             // Organization Calendar
@@ -1026,7 +1097,7 @@ namespace VASLogic.Models
                                              )) *(l.linetotalamt) / nullif(
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
-                                         ), o.c_currency_id," +C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                         ), o.c_currency_id," + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
                                      WHEN ci.c_orderline_id IS NOT NULL
                                           AND l.qtydelivered < l.qtyinvoiced THEN
                                      currencyconvert(
@@ -1177,10 +1248,10 @@ namespace VASLogic.Models
         /// <param name="ColumnData"></param>
         /// <returns>Dictionary with column name and refrence id</returns>
         /// <author>VIS_427 </author>
-        public Dictionary<string, int> GetColumnIds(Ctx ct, dynamic columnDataArray)
+        public Dictionary<string, int> GetColumnIds(Ctx ct, string refernceName)
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
-            ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAS_ExpectedInvoiceList'", null, null));
+            ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
             return ColumnInfo;
         }
     }

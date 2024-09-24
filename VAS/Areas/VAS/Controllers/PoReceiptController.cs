@@ -196,16 +196,17 @@ namespace VAS.Areas.VAS.Controllers
         /// This function is Used to Get the ar/ap invoice data of top five business partners
         /// </summary>
         /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ListValue">ListValue</param>
         /// <author>VIS_427</author>
         /// <returns>List of ar/ap invoice data of top five business partners</returns>
-        public JsonResult GetInvTotalGrandData(bool ISOtrx)
+        public JsonResult GetInvTotalGrandData(bool ISOtrx,string ListValue)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
-                List<InvGrandTotalData> result = obj.GetInvTotalGrandData(ctx, ISOtrx);
+                List<InvGrandTotalData> result = obj.GetInvTotalGrandData(ctx, ISOtrx, ListValue);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -257,12 +258,11 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="ColumnData"></param>
         /// <returns>Dictionary with column name and refrence id</returns>
         /// <author>VIS_427 </author>
-        public JsonResult GetColumnID(string ColumnData)
+        public JsonResult GetColumnID( string refernceName)
         {
-            dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(ColumnData);
             Ctx ctx = Session["ctx"] as Ctx;
             PoReceiptTabPanelModel refernceId = new PoReceiptTabPanelModel();
-            Dictionary<string, int> columnData = refernceId.GetColumnIds(ctx, columnDataArray);
+            Dictionary<string, int> columnData = refernceId.GetColumnIds(ctx, refernceName);
             return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
         }
     }
