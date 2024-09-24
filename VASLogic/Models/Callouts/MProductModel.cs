@@ -794,14 +794,29 @@ namespace VIS.Models
         public DeliveryResult GetExpectedDelivery(Ctx ctx, int pageNo, int pageSize, string Type)
         {
             string WhereCondition = "";
-            if (Type == "P")
+            if (Type == "P") //Pending Delivery Order
             {
-                WhereCondition = " AND o.DateOrdered < CURRENT_DATE ";
+                WhereCondition = " AND o.DateOrdered < CURRENT_DATE AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
-            else
+            else if (Type == "EG") //Expected GRN
             {
-                WhereCondition = " AND o.DateOrdered >= CURRENT_DATE ";
-
+                WhereCondition = " AND o.DateOrdered >= CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+            }
+            else if (Type == "PG") //Pending GRN
+            {
+                WhereCondition = " AND o.DateOrdered < CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+            }
+            else if (Type == "CR") //Customer RMA
+            {
+                WhereCondition = " AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'Y' ";
+            }
+            else if (Type == "VR") //Vendor RMA
+            {
+                WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' ";
+            }
+            else //Expected Delivery Order
+            {
+                WhereCondition = " AND o.DateOrdered >= CURRENT_DATE  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
             DeliveryResult result = new DeliveryResult
             {
@@ -817,7 +832,7 @@ namespace VIS.Models
                         INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
                          INNER JOIN C_BPartner cb ON(cb.C_BPartner_ID=o.C_BPartner_ID)
                         INNER JOIN C_BPartner_Location l  ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                        AND o.IsSoTrx = 'Y'  AND o.DocStatus  IN('CO') AND o.IsReturnTrx = 'N' " + WhereCondition + @"  
+                        AND o.DocStatus  IN('CO')  " + WhereCondition + @"  
                         AND (ol.QtyOrdered - ol.QtyDelivered - 
                        (SELECT NVL(SUM(il.MovementQty), 0) 
                        FROM M_Inout i 
@@ -834,8 +849,25 @@ namespace VIS.Models
             {
                 if (pageNo == 1)
                 {
-                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_Order_ID) FROM (" + sb.ToString() + ")", null, null));
-                    result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
+                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_Order_ID) FROM (" + sb.ToString() + ") t ", null, null));
+                    if (Type == "EG" || Type == "PG")
+                    {
+                        result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_MaterialReceipt'", null, null));
+                    }
+
+                    else if (Type == "CR")
+                    {
+                        result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_CustomerReturn'", null, null));
+                    }
+                    else if (Type == "VR")
+                    {
+                        
+                        result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_VendorReturn'", null, null));
+                    }
+                    else
+                    {
+                        result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
+                    }
 
                 }
                 // Get the list of order IDs from the retrieved parent records
@@ -848,31 +880,34 @@ namespace VIS.Models
                 {
                     StringBuilder childSb = new StringBuilder();
                     childSb.Append(@"
-                 SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID,
-                 (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
-                 WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.Isactive = 'Y' 
-                 AND i.docstatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyOrdered, ol.C_UOM_ID,
+                SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID,
+                (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
+                WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' 
+                AND i.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyOrdered, ol.C_UOM_ID,
                 atr.Description AS AttributeName,u.Name AS Uom,p.Name As ProductName,(SELECT NVL(SUM(s.QtyOnHand),0)  FROM M_Storage s 
                 INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
                 WHERE 
-               NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty 
+                NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
+                NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
                 FROM C_OrderLine ol
-                 INNER JOIN C_UOM  u ON (u.C_UOM_ID=ol.C_UOM_ID)
-                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID)
-                 INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
+                INNER JOIN C_UOM  u ON (u.C_UOM_ID=ol.C_UOM_ID)
+                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID)
+                INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
                 LEFT JOIN  M_AttributeSetInstance atr ON (ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
                 WHERE    (ol.QtyOrdered - ol.QtyDelivered - 
                 (SELECT NVL(SUM(il.MovementQty), 0) 
                 FROM M_Inout i 
-                 INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
-                 WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID 
-                 AND il.IsActive = 'Y' 
-                 AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
+                INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
+                WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID 
+                AND il.IsActive = 'Y' 
+                AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
                  ol.C_Order_ID IN (" + string.Join(",", orderIds) + @") ORDER BY ol.C_Order_ID");
                     DataSet childDs = DB.ExecuteDataset(childSb.ToString(), null, null);
                     if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
                     {
+
                         /// Map order lines to parent orders
+
                         Dictionary<int, List<OrderLine>> orderLinesMap = childDs.Tables[0].AsEnumerable()
                             .GroupBy(row => Util.GetValueOfInt(row["C_Order_ID"]))
                             .ToDictionary(
@@ -880,6 +915,8 @@ namespace VIS.Models
                                 group => group.Select(row => new OrderLine
                                 {
 
+                                    QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
+                                     : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]), // Remaining qty in line uom
                                     M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]),
                                     C_OrderLine_ID = Util.GetValueOfInt(row["C_OrderLine_ID"]),
                                     C_Order_ID = Util.GetValueOfInt(row["C_Order_ID"]),
@@ -890,6 +927,7 @@ namespace VIS.Models
                                     UOM = Util.GetValueOfString(row["Uom"]),
                                     ProductName = Util.GetValueOfString(row["ProductName"]),
                                     OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"])
+
                                 }).ToList()
                             );
                         string Symbol = "$";
@@ -934,7 +972,7 @@ namespace VIS.Models
         }
 
         /// <summary>
-        /// VAI050-This method used to create delivery order
+        /// VAI050-This method used to create delivery order and Vendor Return
         /// </summary>
         /// <param name="ctx"></param>
         /// <param name="Order_ID"></param>
@@ -1114,7 +1152,7 @@ namespace VIS.Models
                     else if (MOrder.DELIVERYRULE_Force.Equals(order.GetDeliveryRule()))
                     {
                         Decimal deliver = toDeliver;
-                       
+
                         obj = CreateLine(order, line, deliver, storages, true, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
                         if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
                         {
@@ -1122,7 +1160,13 @@ namespace VIS.Models
                             return obj;
                         }
                     }
+                    else if (MOrder.DELIVERYRULE_Manual.Equals(order.GetDeliveryRule()))
+                    {
 
+                        obj["Shipment_ID"] = 0;
+                        obj["message"] =Msg.GetMsg(ctx, "VAS_DeliverRuleManual");
+                        return obj;
+                    }
                 }
             }//	for all order lines
             if (Util.GetValueOfInt(obj["Shipment_ID"]) > 0)
@@ -1135,18 +1179,18 @@ namespace VIS.Models
         }
 
 
-       /// <summary>
-       /// Create line
-       /// </summary>
-       /// <param name="order"></param>
-       /// <param name="orderLine"></param>
-       /// <param name="qty"></param>
-       /// <param name="storages"></param>
-       /// <param name="force"></param>
-       /// <param name="FiFo"></param>
-       /// <param name="ctx"></param>
-       /// <param name="trx"></param>
-       /// <returns></returns>
+        /// <summary>
+        /// Create line
+        /// </summary>
+        /// <param name="order"></param>
+        /// <param name="orderLine"></param>
+        /// <param name="qty"></param>
+        /// <param name="storages"></param>
+        /// <param name="force"></param>
+        /// <param name="FiFo"></param>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+        /// <returns></returns>
         public Dictionary<string, object> CreateLine(MOrder order, MOrderLine orderLine, Decimal qty,
             dynamic[] storages, bool force, bool FiFo, Ctx ctx, Trx trx)
         {
@@ -1155,7 +1199,7 @@ namespace VIS.Models
             bool isContainerApplicable = MTransaction.ProductContainerApplicable(ctx);
             int _line = 0;
             Dictionary<string, object> ret = new Dictionary<string, object>();
-           
+
             //	Create New Shipment
             if (_shipment == null)
             {
@@ -1520,21 +1564,21 @@ namespace VIS.Models
         }
 
 
-       /// <summary>
-       /// Get Storage container
-       /// </summary>
-       /// <param name="M_Warehouse_ID"></param>
-       /// <param name="M_Product_ID"></param>
-       /// <param name="M_AttributeSetInstance_ID"></param>
-       /// <param name="M_AttributeSet_ID"></param>
-       /// <param name="allAttributeInstances"></param>
-       /// <param name="minGuaranteeDate"></param>
-       /// <param name="FiFo"></param>
-       /// <param name="greater"></param>
-       /// <param name="isContainerConsider"></param>
-       /// <param name="ctx"></param>
-       /// <param name="trx"></param>
-       /// <returns></returns>
+        /// <summary>
+        /// Get Storage container
+        /// </summary>
+        /// <param name="M_Warehouse_ID"></param>
+        /// <param name="M_Product_ID"></param>
+        /// <param name="M_AttributeSetInstance_ID"></param>
+        /// <param name="M_AttributeSet_ID"></param>
+        /// <param name="allAttributeInstances"></param>
+        /// <param name="minGuaranteeDate"></param>
+        /// <param name="FiFo"></param>
+        /// <param name="greater"></param>
+        /// <param name="isContainerConsider"></param>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+        /// <returns></returns>
         public X_M_ContainerStorage[] GetContainerStorages(int M_Warehouse_ID, int M_Product_ID, int M_AttributeSetInstance_ID, int M_AttributeSet_ID,
                                                               bool allAttributeInstances, DateTime? minGuaranteeDate, bool FiFo, bool greater, bool isContainerConsider, Ctx ctx, Trx trx)
         {
@@ -1581,6 +1625,156 @@ namespace VIS.Models
         }
 
 
+        /// <summary>
+        /// VAI050-This method is used to generate GRN and also generate the Customer Return
+        /// </summary>
+        /// <param name="Order_ID"></param>
+        /// <param name="Order_LineIDs"></param>
+        /// <param name="ctx"></param>
+        /// <returns></returns>
+        public Dictionary<string, object> CreateGRN(int Order_ID, string Order_LineIDs, string Type, Ctx ctx)
+        {
+            VAdvantage.DataBase.Trx trx = null;
+            Dictionary<string, object> ret = null;
+            try
+            {
+                ret = new Dictionary<string, object>();
+                MInOut obj = null;
+                int M_Locator_ID = 0;
+                string FetchSingleRecord = "";
+                trx = VAdvantage.DataBase.Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
+                StringBuilder query = new StringBuilder();
+                query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID,o.C_BPartner_ID,o.C_BPartner_Location_ID,o.M_Warehouse_ID,o.AD_User_ID,ol.C_OrderLine_ID,ol.M_AttributeSetInstance_ID,
+                            ol.M_Product_ID,ol.C_UOM_ID,(ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
+                           (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
+                           WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' 
+                           AND i.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyRemianing
+                           FROM C_Order o INNER JOIN C_OrderLine ol ON(o.C_Order_ID = ol.C_Order_ID)
+                             WHERE ol.C_OrderLine_ID IN(" + Order_LineIDs + ")");
+                DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    obj = new MInOut(ctx, 0, trx);
+                    obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                    obj.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
+                    obj.SetC_BPartner_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_ID"]));
+                    obj.SetC_BPartner_Location_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]));
+                    obj.SetAD_User_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]));
+                    obj.SetM_Warehouse_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                    obj.SetC_Order_ID(Order_ID);
+                    if (Type == "CR")
+                    {
+                        obj.SetDateOrdered(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateOrdered"]));
+                        obj.SetIsReturnTrx(true);
+                        obj.SetIsSOTrx(true);
+                        obj.SetMovementType("C+");
+                        obj.SetC_DocType_ID(SetDocType(obj.GetAD_Org_ID(), ctx.GetAD_Client_ID(), "Y", "Y", "MMS"));
+                    }
+                    else
+                    {
+                        obj.SetMovementType("V+");
+                        obj.SetC_DocType_ID(SetDocType(obj.GetAD_Org_ID(), ctx.GetAD_Client_ID(), "N", "N", "MMR"));
+                    }
+                    obj.SetMovementDate(DateTime.Now);
+                    obj.SetDateAcct(DateTime.Now);
+                    if (!obj.Save())
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        string error = pp != null ? pp.GetName() : "";
+                        if (string.IsNullOrEmpty(error))
+                        {
+                            error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                        }
+
+                        ret["Shipment_ID"] = 0;
+                        ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_GRNNotSaved");
+                        return ret;
+                    }
+                    query.Clear();
+                   
+                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault  DESC");
+                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));                   
+
+                    MInOutLine objLine = null;
+                    int LineNo = 10;
+                    decimal QtyEnetered = 0;
+
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        QtyEnetered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfInt(ds.Tables[0].Rows[i]["ConversionRate"]);
+                        objLine = new MInOutLine(ctx, 0, trx);
+                        objLine.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                        objLine.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                        objLine.SetC_OrderLine_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_OrderLine_ID"]));
+                        objLine.SetC_UOM_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
+                        objLine.SetM_InOut_ID(obj.GetM_InOut_ID());
+                        objLine.SetLine(LineNo);
+                        objLine.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]));
+                        objLine.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        objLine.SetQtyEntered(QtyEnetered);
+                        //objLine.SetMovementQty(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]));
+                        objLine.SetMovementQty(QtyEnetered);
+                        objLine.SetM_Locator_ID(M_Locator_ID);
+                        if (!objLine.Save())
+                        {
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            string error = pp != null ? pp.GetName() : "";
+                            if (string.IsNullOrEmpty(error))
+                            {
+                                error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                            }
+
+                            ret["Shipment_ID"] = 0;
+                            ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_GRNNotSaved");
+                            return ret;
+                        }
+
+                        LineNo = LineNo + 10;
+
+                    }
+                    ret["Shipment_ID"] = obj.GetM_InOut_ID();
+                    ret["message"] = Msg.GetMsg(ctx, "VAS_GRNSaved");
+                    trx.Commit();
+                    return ret;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                }
+                ret["Shipment_ID"] = 0;
+                ret["message"] = Msg.GetMsg(ctx, "VAS_DeliveryOrderNotSaved");
+                return ret;
+            }
+            finally
+            {
+
+                if (trx != null)
+                    trx.Close();
+            }
+        }
+
+
+        /// <summary>
+        /// VAI050-This method use to get doctype
+        /// </summary>
+        /// <param name="AD_Org_ID"></param>
+        /// <param name="AD_Client_ID"></param>
+        /// <param name="IsSOTrx"></param>
+        /// <param name="IsReturnTrx"></param>
+        /// <param name="DocBaseType"></param>
+        /// <returns></returns>
+        public int SetDocType(int AD_Org_ID, int AD_Client_ID, string IsSOTrx, string IsReturnTrx, string DocBaseType)
+        {
+            string query = @"SELECT C_DocType_ID FROM C_DocType WHERE DocBaseType='" + DocBaseType + "' AND AD_Client_ID=" + AD_Client_ID + @"
+                   AND IsActive = 'Y' AND AD_Org_ID IN(0, " + AD_Org_ID + ") AND IsSOTrx ='" + IsSOTrx + "' AND IsReturnTrx = '" + IsReturnTrx + "' ORDER BY AD_Org_ID DESC";
+            return Util.GetValueOfInt(DB.ExecuteScalar(query));
+        }
+
+
 
         public class MultiplyRateItem
         {
@@ -1595,7 +1789,8 @@ namespace VIS.Models
             public int C_Order_ID { get; set; }
             public int C_OrderLine_ID { get; set; }
             public int M_AttributeSetInstance_ID { get; set; }
-            public decimal QtyOrdered { get; set; }
+            public decimal QtyOrdered { get; set; } //Remaing Qty in base uom
+            public decimal QtyEntered { get; set; } //Remaing qty in line uom
             public decimal OnHandQty { get; set; }
             public int C_UOM_ID { get; set; }
             public string AttributeName { get; set; }

@@ -1,14 +1,14 @@
 ﻿/************************************************************
  * Module Name    : VAS
- * Purpose        : Get the Pending Delivery Orders details
+ * Purpose        : Get the Vendor RMA   details and create vendor return
  * chronological  : Development
- * Created Date   : 19 Sep 2024
+ * Created Date   : 23 Sep 2024
  * Created by     : VAI050
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_PendingDeliveryWidget = function () {
+    VAS.VAS_VendorReturnWidget = function () {
         this.frame;
         this.windowNo;
         this.widgetInfo;
@@ -26,12 +26,12 @@
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             const orderContainer =
-                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-deliveries-container-pending">' +
+                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-vendor-container-pending">' +
                 '    <div class="VAS-deliveries-heading">' +
-                '        <h6>' + VIS.Msg.getMsg("VAS_Pendingdeliveries") + '</h6>' +
+                '        <h6>' + VIS.Msg.getMsg("VAS_VendorRMA") + '</h6>' +
                 '    </div>' +
                 '    <div class="VAS-delivery-count">' +
-                '        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Deliveries") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
+                '        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_VendorRMACount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
                 '    </div>' +
                 '    <div class="VAS-delivery-detail">' +
                 '        <div class="VAS-box-heading">' +
@@ -49,6 +49,7 @@
             createBusyIndicator();
 
             $root.append(orderContainer);
+            //    buildPagination();
         };
 
 
@@ -60,7 +61,7 @@
             $root.find('#VAS_DeliveryContainer_' + widgetID).show();
             $.ajax({
                 url: VIS.Application.contextUrl + "Product/GetExpectedDelivery",
-                data: { pageNo: pageNo, pageSize: pageSize, Type: "P" },
+                data: { pageNo: pageNo, pageSize: pageSize, Type: "VR" },
                 dataType: 'json',
                 success: function (response) {
                     var response = JSON.parse(response);
@@ -83,10 +84,10 @@
                                 '        <div class="VAS-total-items-count" title="' + VIS.Msg.getMsg("VAS_NoOfLines") + '">' + response.Orders[i]["LineCount"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("Vendor") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col grid-2-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_DeliveryLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_VendorLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
                                 '        <div class="VAS-lbl-text text-right" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + response.Orders[i]["ProductLocation"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
@@ -112,7 +113,7 @@
                         // Attach click event listener to delivery boxes
                         $root.off('click', '#VAS_DocumentNo_' + widgetID);
                         $root.on('click', '#VAS_DocumentNo_' + widgetID, function () {
-                            var docNo = $root.find(this).data('doc-no');
+                            var docNo = $(this).data('doc-no');
                             var customerName = $(this).data('customer-name');
                             var orderid = $(this).data('orderid');
                             displayOrderDetails(docNo, customerName, orderid);
@@ -144,14 +145,14 @@
             selectedOrderLineIDs = [];
 
             var productContainer =
-                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-deliveries-container-pending">' +
+                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-vendor-container-pending">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
                 '    <div class="VAS-deliveries-heading">' +
                 '        <h6>' +
                 '            <span id="VAS_BackTodelivery_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
-                '            ' + VIS.Msg.getMsg("VAS_BackToDeliveries") +
+                '            ' + VIS.Msg.getMsg("VAS_BackToVendorRMA") +
                 '        </h6>' +
-                '<span id="VAS_GenerateDeliveryOrder_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateDeliverOrder") + '"><i class="fa fa-truck" aria-hidden="true"></i></span>' +
+                '<span id="VAS_GenerateDeliveryOrder_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateVendorReturn") + '"><i class="fa fa-truck" aria-hidden="true"></i></span>' +
                 '    </div>' +
                 '    <div class="VAS-delivery-count">' +
                 '    </div>' +
@@ -162,7 +163,7 @@
                 '                    <i class="fa fa-file-text" aria-hidden="true"></i>' +
                 '                    <div class="VAS-doc-no">' + docNo + '</div>' +
                 '                </div>' +
-                '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + customerName + '</div>' +
+                '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("Vendor") + '">' + customerName + '</div>' +
                 '            </div>' +
                 '            <div class="VAS-dty-prod">' +
                 '                <div class="VAS-qtyProd-text">' + VIS.Msg.getMsg("VAS_NoOfLines") + '</div>' +
@@ -204,8 +205,6 @@
                     var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
                     var hasStock = line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered;
                     var boxClass = hasStock ? 'VAS-delivery-box' : 'VAS-delivery-box no-stock';
-
-                    // Determine badge class
                     var badgeClass;
                     if (line.OnHandQty >= line.QtyOrdered) {
                         badgeClass = 'badge-green'; //  stock available
@@ -217,24 +216,22 @@
                     }
 
                     $root.find('#VAS_OrderLine_' + widgetID).append(
-                        '<div class="' + boxClass + '">' +
-                        '<div class="VAS-box-heading">' +
-                        '<div class="VAS-icon-w-name">' +
-                        '<input type="checkbox" class="VAS-selection-checkbox" data-orderlineid="' + line.C_OrderLine_ID + '"' + (isChecked ? ' checked' : '') + (hasStock ? '' : ' disabled') + '/> ' +
-                        '<i class="fa fa-file-text" aria-hidden="true"></i>' +
-                        '<div class="VAS-doc-no" title="' + VIS.Msg.getMsg("VAS_Product") + '">' + line.ProductName + '</div>' +
-                        '</div>' +
-                        '<div class="VAS-total-items-count">' +
-                        '<span title = "' + VIS.Msg.getMsg("VAS_RemianingQty") + '" class="badge badge-light ' + badgeClass + '"> ' + line.QtyEntered + '</span ></div > ' +
-                        '</div>' +
-                        '<div class="VAS-spaceBetween-col">' +
-                        '<div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Attribute") + '">' + line.AttributeName + '</div>' +
-                        '<div class="vas-lbl-text" title="' + VIS.Msg.getMsg("VAS_Uom") + '"> ' + line.UOM + '</div>' +
-                        '</div>' +
-                        '</div>'
-                    );
+                        '            <div class="' + boxClass + '">' +
+                        '                <div class="VAS-box-heading">' +
+                        '                    <div class="VAS-icon-w-name">' +
+                        '                        <input type="checkbox" class="VAS-selection-checkbox" data-orderlineid="' + line.C_OrderLine_ID + '"' + (isChecked ? ' checked' : '') + (hasStock ? '' : ' disabled') + '/> ' +
+                        '                        <i class="fa fa-file-text" aria-hidden="true"></i>' +
+                        '                        <div class="VAS-doc-no" title="' + VIS.Msg.getMsg("VAS_Product") + '">' + line.ProductName + '</div>' +
+                        '                    </div>' +
+                        '                    <div class="VAS-total-items-count">' +
+                        '                    <span title = "' + VIS.Msg.getMsg("VAS_RemianingQty") + '" class="badge badge-light ' + badgeClass + '"> ' + line.QtyEntered + '</span ></div > ' +
+                        '                      </div>' +
+                        '                <div class="VAS-spaceBetween-col">' +
+                        '                    <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Attribute") + '">' + line.AttributeName + '</div>' +
+                        '                    <div class="vas-lbl-text" title="' + VIS.Msg.getMsg("VAS_Uom") + '"> ' + line.UOM + '</div>' +
+                        '                </div>' +
+                        '            </div>');
                 }
-
                 $root.find('#VAS_TotalQty_' + widgetID).text(childRecords.length);
                 /*  Append pagination controls*/
                 $root.find('#VAS_OrderLinePagination_' + widgetID).empty();
@@ -296,16 +293,15 @@
                 console.log(selectedOrderLineIDs);
             });
 
-            // Event listener for Generate Delivery Order button
             $root.on('click', '#VAS_GenerateDeliveryOrder_' + widgetID, function () {
                 var orderId = $(this).data('orderid');
-                generateDeliveryOrder(orderId);
+                generateVendorReturn(orderId);
             });
 
 
             $root.find('#VAS_GenerateDeliveryOrder_' + widgetID).hide();
 
-            function generateDeliveryOrder(orderId) {
+            function generateVendorReturn(orderId) {
                 $bsyDiv.css('visibility', 'visible');
                 var orderLineIDs = selectedOrderLineIDs.join(',');
                 $.ajax({
@@ -336,7 +332,7 @@
                                 message = response.message;
                             }
                             else {
-                                message = VIS.Msg.getMsg("VAS_DeliveryOrderNotGenerated");
+                                message = VIS.Msg.getMsg("VAS_VendorReturnNotGenerated");
                             }
                             spnWO.text(message);
                             spnWO.fadeIn();
@@ -352,8 +348,6 @@
                         $bsyDiv[0].style.visibility = "hidden";
                     }
                 });
-
-                console.log('Generating delivery order for ID:', orderId);
             }
 
         }
@@ -419,7 +413,7 @@
         };
     };
 
-    VAS.VAS_PendingDeliveryWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_VendorReturnWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -431,15 +425,15 @@
         }, 50);
     };
 
-    VAS.VAS_PendingDeliveryWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_VendorReturnWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_PendingDeliveryWidget.prototype.refreshWidget = function () {
+    VAS.VAS_VendorReturnWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_PendingDeliveryWidget.prototype.dispose = function () {
+    VAS.VAS_VendorReturnWidget.prototype.dispose = function () {
         this.frame = null;
         this.windowNo = null;
         $bsyDiv = null;
