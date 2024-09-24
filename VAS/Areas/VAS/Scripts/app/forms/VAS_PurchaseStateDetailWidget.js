@@ -47,15 +47,15 @@
                     $maindiv.append(HeadingDesign);
                     $maindiv.append(
                         '<div class="vas-psdwidg-whiteBox vas-psdwidg-itme2">' +
-                        '<div class="vas-psdwidg-totalSale">'  + (gridDataResult[0].Symbol.length != 3 ? ' ' + gridDataResult[0].Symbol : '') + ' ' +
+                        '<div class="vas-psdwidg-totalSale">' + (gridDataResult[0].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[0].Symbol +'</span>' : '')+
                         formatLargeNumber(gridDataResult[0].TotalAmt, gridDataResult[0].stdPrecision) + '<span class="vas-psdwidg-unit">'+unit+'</span>' + (gridDataResult[0].Symbol.length == 3 ? ' ' + gridDataResult[0].Symbol : '')+ '</div>' +
-                        '<div class="vas-psdwidg-salesYear">' + icon[0] +' ' + msgArray[0] + '</div>')
+                        '<div class="vas-psdwidg-salesYear">' + icon[0] + ' ' + '<span>' + msgArray[0] + '</span>' + '</div>')
                     for (var i = 1; i < gridDataResult.length; i++) {
                         $maindiv.append(
                             '<div class="vas-psdwidg-whiteBox">' +
-                            '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? ' ' + gridDataResult[i].Symbol : '') + ' '
-                            + formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
-                            '<div class="vas-psdwidg-salesYear">' + icon[i]+' '  + msgArray[i] + '</div>');
+                            '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' : '') +
+                            formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
+                            '<div class="vas-psdwidg-salesYear">' + icon[i] + ' ' + '<span>'+msgArray[i]+'</span>' + '</div>')
                     }
                     $root.append($maindiv);
                 }

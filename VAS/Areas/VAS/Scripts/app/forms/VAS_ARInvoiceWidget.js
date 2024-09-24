@@ -22,7 +22,7 @@
         var widgetID = null;
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
-            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
@@ -41,16 +41,16 @@
                         '    <div class="vas-arwidg-totalRec-amount">' +
                         '      <h1>' + TotalAmtArray[0] +
                         '<span class="vas-arwidg-cur-symbol">' +TotalAmtArray[1] + '<span>' +
-                        '<span>' + gridDataResult[4].Symbol + '</span></h1>' +
+                        '<span class="vas-arwidg-Symbol">' + gridDataResult[4].Symbol + '</span></h1>' +
                         '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase)+ '</div>' +
                         '    </div>' +
                         '  </div>');
                     var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + widgetID + '">');
                     for (var i = 0; i < gridDataResult.length - 1; i++) {
                         var widgetDataDesign = '<div class="vas-arwidg-receiveTxt-box">' +
-                            '<div class="vas-arwidg-orderTxt">' + msgArray[i] + '</div>' +
-                            '<div class="vas-arwidg-recBox-amt">' + (gridDataResult[i].daysAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
-                            '<span>' + gridDataResult[i].Symbol + '</span></div>' +
+                            '<div class="vas-arwidg-orderTxt">' + msgArray[i] + '</div>'+
+                            '<div class="vas-arwidg-recBox-amt">' +'<span class="vas-vaswidg-Symbol">'+ gridDataResult[i].Symbol + '</span>' + (gridDataResult[i].daysAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
+                            '</div>' +
                             '</div>'
                         listDesign.append(widgetDataDesign);
                     }
