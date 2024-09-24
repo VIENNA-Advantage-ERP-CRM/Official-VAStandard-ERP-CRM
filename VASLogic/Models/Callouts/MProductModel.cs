@@ -796,15 +796,15 @@ namespace VIS.Models
             string WhereCondition = "";
             if (Type == "P") //Pending Delivery Order
             {
-                WhereCondition = " AND o.DateOrdered < CURRENT_DATE AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised < CURRENT_DATE AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "EG") //Expected GRN
             {
-                WhereCondition = " AND o.DateOrdered >= CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised >= CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "PG") //Pending GRN
             {
-                WhereCondition = " AND o.DateOrdered < CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised < CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "CR") //Customer RMA
             {
@@ -816,7 +816,7 @@ namespace VIS.Models
             }
             else //Expected Delivery Order
             {
-                WhereCondition = " AND o.DateOrdered >= CURRENT_DATE  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised >= CURRENT_DATE  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
             DeliveryResult result = new DeliveryResult
             {
@@ -840,8 +840,8 @@ namespace VIS.Models
                         WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID 
                         AND il.IsActive = 'Y' 
                          AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0)
-                        GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name
-                        ORDER BY o.DateOrdered DESC ");
+                        GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name,o.DatePromised
+                        ORDER BY o.DatePromised DESC ");
 
 
             DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
@@ -861,7 +861,7 @@ namespace VIS.Models
                     }
                     else if (Type == "VR")
                     {
-                        
+
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_VendorReturn'", null, null));
                     }
                     else
@@ -1164,7 +1164,7 @@ namespace VIS.Models
                     {
 
                         obj["Shipment_ID"] = 0;
-                        obj["message"] =Msg.GetMsg(ctx, "VAS_DeliverRuleManual");
+                        obj["message"] = Msg.GetMsg(ctx, "VAS_DeliverRuleManual");
                         return obj;
                     }
                 }
@@ -1691,9 +1691,9 @@ namespace VIS.Models
                         return ret;
                     }
                     query.Clear();
-                   
+
                     query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault  DESC");
-                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));                   
+                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
 
                     MInOutLine objLine = null;
                     int LineNo = 10;
