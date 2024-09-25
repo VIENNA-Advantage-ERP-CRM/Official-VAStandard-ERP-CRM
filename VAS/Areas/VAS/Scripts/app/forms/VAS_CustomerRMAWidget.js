@@ -23,6 +23,8 @@
         var pageSize = 4;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
+
+
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             const orderContainer =
@@ -87,7 +89,7 @@
                                 '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col grid-2-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_CustomerLocation")  + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_CustomerLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
                                 '        <div class="VAS-lbl-text text-right" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + response.Orders[i]["ProductLocation"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
@@ -119,7 +121,7 @@
                             displayOrderDetails(docNo, customerName, orderid);
                         });
                     }
-                   
+
                     $bsyDiv.css('visibility', 'hidden');
 
                 },
@@ -138,7 +140,7 @@
 
             // Initialize the selected order line IDs array
             selectedOrderLineIDs = [];
-           
+
             var productContainer =
                 '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-customer-container-pending">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
@@ -147,7 +149,7 @@
                 '            <span id="VAS_BackTodelivery_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
                 '            ' + VIS.Msg.getMsg("VAS_BackToCustomerRMA") +
                 '        </h6>' +
-                '<span id="VAS_GenerateGRN_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateCustomerReturn") + '">'+
+                '<span id="VAS_GenerateGRN_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateCustomerReturn") + '">' +
                 '<i class="vis vis-action" ></i></span> ' +
                 '    </div>' +
                 '    <div class="VAS-delivery-count">' +
@@ -198,7 +200,7 @@
                 // Generate HTML for records of the current page
                 for (var i = startIndex; i < endIndex; i++) {
                     var line = childRecords[i];
-                    var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);                 
+                    var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
                     $root.find('#VAS_OrderLine_' + widgetID).append(
                         '            <div class="VAS-delivery-box">' +
                         '                <div class="VAS-box-heading">' +
@@ -256,6 +258,7 @@
 
             // Event listener for checkbox selection
             $root.on('change', '.VAS-selection-checkbox', function () {
+
                 var orderlineID = $(this).data('orderlineid');
                 if ($(this).is(':checked')) {
                     // Add ID to array if checked
@@ -296,13 +299,15 @@
                         var response = JSON.parse(response);
                         if (response.Shipment_ID > 0) {
                             try {
-                                if (AD_Window_ID > 0) {
-                                    var zoomQuery = new VIS.Query();
-                                    zoomQuery.addRestriction("M_InOut_ID", VIS.Query.prototype.EQUAL, response.Shipment_ID);
-                                    zoomQuery.setRecordCount(1);
-                                    VIS.viewManager.startWindow(AD_Window_ID, zoomQuery);
+                               /* if (AD_Window_ID > 0) {*/
+                                    var windowParam = {
+                                        "TabWhereClause": "M_InOut.M_InOut_ID="+ response.Shipment_ID + "",
+                                        "TabLayout": "Y",  // 'N'[Grid],'Y'[Single],'C'[Card]}	 	 
+                                        "TabIndex": "0",
+                                    }
+                                    $self.widgetFirevalueChanged(windowParam);
                                     $self.intialLoad(1);
-                                }
+                              //  }
                             }
                             catch (e) {
                                 console.log(e);
@@ -373,7 +378,6 @@
                     $self.currentPage++;
                     $self.intialLoad($self.currentPage);
 
-
                 }
             });
 
@@ -397,6 +401,8 @@
         };
     };
 
+
+
     VAS.VAS_CustomerRMAWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
@@ -409,9 +415,20 @@
         }, 50);
     };
 
+  
+    VAS.VAS_CustomerRMAWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener)
+            this.listener.widgetFirevalueChanged(value);
+    };
+
+    VAS.VAS_CustomerRMAWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
     VAS.VAS_CustomerRMAWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
+
 
     VAS.VAS_CustomerRMAWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
