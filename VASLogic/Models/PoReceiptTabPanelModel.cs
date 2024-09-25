@@ -626,9 +626,9 @@ namespace VASLogic.Models
                          AND cp.IsActive = 'Y'
                          AND oi.IsActive='Y'
                          AND ci.IsActive='Y'
-                         AND current_date BETWEEN cp.StartDate AND cp.EndDate");
-            string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
-            DataSet yearDs = DB.ExecuteDataset(yearSql, null, null);
+                         AND current_date BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID="+ctx.GetAD_Client_ID());
+           // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+            DataSet yearDs = DB.ExecuteDataset(sql.ToString(), null, null);
             if (yearDs != null && yearDs.Tables[0].Rows.Count > 0)
             {
                 CurrentYear = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["CalendarYears"]);
