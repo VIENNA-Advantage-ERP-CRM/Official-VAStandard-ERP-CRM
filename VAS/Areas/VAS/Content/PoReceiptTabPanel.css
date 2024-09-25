@@ -268,24 +268,24 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow-y: auto;
 }
 
-.VAS-payment-details ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
+    .VAS-payment-details ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
 
-.VAS-payment-details ul li {
-    border-radius: 6px;
-    background-color: rgba(var(--v-c-secondary), 1);
-    display: flex;
-    width: 100%;
-    gap: 0.5rem;
-    padding: 0.875rem;
-    position: relative;
-}
+        .VAS-payment-details ul li {
+            border-radius: 6px;
+            background-color: rgba(var(--v-c-secondary), 1);
+            display: flex;
+            width: 100%;
+            gap: 0.5rem;
+            padding: 0.875rem;
+            position: relative;
+        }
 
 .VAS-paymentDetail {
     display: grid;
@@ -293,6 +293,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     gap: 0.3rem;
     margin: 0 0 5px;
 }
+
     .VAS-paymentDetail.VAS-grid-col1 {
         margin-bottom: 0;
         line-height: 19px;
@@ -328,7 +329,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     top: 14px;
     cursor: pointer;
     font-size: 14px;
-    padding-right:7px;
+    padding-right: 7px;
 }
 
 .VAS-payment-details ul li .form-check {
@@ -346,6 +347,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     top: 7px;
     left: 4px;
 }
+
 .vas-ualdocno {
     font-size: 0.875rem;
     display: block;
@@ -354,6 +356,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 :root {
     --width-100: calc(1366px/3);
     --width-70: calc(768px*0.7/6);
@@ -405,9 +408,11 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 
 .vas-arwidg-totalRecTxt {
-    font-size: 0.875em;
+    font-size: 1em;
     text-align: center;
     color: rgba(var(--v-c-common),1);
+    font-family:Verdana;
+    font-weight:600
 }
 
 .vas-arwidg-rec-listing {
@@ -427,7 +432,8 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vas-arwidg-recBox-amt {
     font-weight: 600;
-    font-size: 1.2em;
+    font-size: 1em;
+    font-family:Verdana;
 }
 
     .vas-arwidg-recBox-amt span {
@@ -438,6 +444,7 @@ Only index.html and style.css is for your use There is no need to copy any other
     .vas-arwidg-receivable-container {
         font-size: 15px;
     }
+
     .vis-editModeWidget .vas-arwidg-receivable-container {
         font-size: 9px;
     }
@@ -586,9 +593,10 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-vendors-heading {
-    font-size: 0.875em;
-    font-weight:600;
+    font-size: 0.9em;
+    font-weight: 600;
     margin-bottom: 0.5em;
+    font-family: 'Verdana';
 }
 
 .vas-igtwidg-top-vendors-col {
@@ -631,13 +639,19 @@ span.vas-arwidg-cur-symbol {
 .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
     font-size: 0.875em;
     font-weight: 600;
+    font-family:'Verdana';
 }
 
 .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
     font-size: 0.875em;
     color: rgba(var(--v-c-on-secondary), 0.5);
 }
-
+.vas-igwidg-notfounddiv {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 .vas-igtwidg-cur-symbol {
     display: flex;
     align-items: center;
@@ -665,8 +679,9 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-amt-val {
     font-size: 1em;
-    font-weight:600;
+    font-weight: 600;
     color: #093756;
+    font-family:'Verdana';
 }
 
 
@@ -674,14 +689,16 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
         font-size: 11px;
     }
-
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
     .vis-editModeWidget .vas-igtwidg-vendors-listing {
         gap: 0.1em;
     }
 
     .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
         font-size: 10px;
-    }
+    }  
 }
 
 @media screen and (max-width: 1366px) {
@@ -691,6 +708,9 @@ span.vas-arwidg-cur-symbol {
 
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
         font-size: 7px;
+    }
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
     }
 
     .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
@@ -722,7 +742,9 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
         font-size: 0.75em;
     }
-
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
     .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
         font-size: 0.75em;
     }
@@ -741,13 +763,18 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-top-vendors-col {
         font-size: 14px;
     }
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }
 }
 
 @media screen and (max-width: 768px) {
     .vas-igtwidg-top-vendors-col {
         font-size: 12px;
     }
-
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }
     .vas-igtwidg-cur-symbol {
         font-size: 1.1em;
     }
@@ -788,18 +815,20 @@ span.vas-arwidg-cur-symbol {
         font-size: 5px;
     }
 }
+
 .vas-igtwiginvmillion {
     font-size: 1em;
     color: #093756;
-    font-weight:600;
+    font-weight: 600;
 }
+
 :root {
     --width-100: calc(1920px/9);
     --width-70: calc(1920px*0.7/9);
 }
 
 .vas-psdwidg-purchase-state-col {
-   /* background: rgb(9,55,86);*/
+    /* background: rgb(9,55,86);*/
     /*background: linear-gradient(145deg, rgba(9,55,86,1) 0%, rgba(0,132,196,1) 100%);*/
     background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
     height: 100%;
@@ -824,11 +853,15 @@ span.vas-arwidg-cur-symbol {
     font-weight: 600;
     color: #083959;
     line-height: 1.2em;
+    font-family:'Verdana';
 }
 
 .vas-psdwidg-salesYear {
     color: #083959;
     font-size: 0.8em;
+    font-family: Verdana;
+    max-width: 120px;
+    text-align: center;
 }
 
 .vas-psdwidg-tile-heading {
@@ -837,9 +870,11 @@ span.vas-arwidg-cur-symbol {
 
     .vas-psdwidg-tile-heading h1 {
         margin: 0;
-        font-size: 3.0em;
+        font-size: 2.0em;
         color: rgba(var(--v-c-common), 1);
         line-height: 1.1em;
+        font-family:Verdana;
+        font-weight:600;
     }
 
         .vas-psdwidg-tile-heading h1 span {
@@ -852,13 +887,15 @@ span.vas-arwidg-cur-symbol {
         color: #083959;
         font-size: 0.5em;
     }
+
     .vis-editModeWidget .vas-psdwidg-totalSale {
         font-size: 0.5em;
     }
+
     .vis-editModeWidget .vas-psdwidg-tile-heading h1 {
-        font-size: 2.0em;
+        font-size: 1.0em;
     }
-    }
+}
 
 @media screen and (max-width: 1366px) {
     .vas-psdwidg-sales-comparison-col {
@@ -939,19 +976,24 @@ span.vas-arwidg-cur-symbol {
         font-size: 7px;
     }
 }
+
 .vas-psdwidg-heading-item {
     grid-column: 1 / span 2;
     grid-row: 1;
 }
+
 .vas-psdwidg-itme2 {
     grid-column: 3;
 }
-.vas-psdwidg-stateheading{
-    position:absolute;
+
+.vas-psdwidg-stateheading {
+    position: absolute;
 }
-.vas-psdwidg-unit{
-    padding-left:1px;
+
+.vas-psdwidg-unit {
+    padding-left: 1px;
 }
+
 .vas-igtwidg-img-icon {
     align-items: center;
     background-color: rgba(var(--v-c-primary), .4);
@@ -965,9 +1007,11 @@ span.vas-arwidg-cur-symbol {
     overflow: hidden;
     width: 41px;
 }
+
 .vas-igtwidg-vendor-bgColor {
     background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);
 }
+
 .vas-igtwidg-customer-bgColor {
     background: rgb(249,253,169);
     background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%)
@@ -989,6 +1033,7 @@ span.vas-arwidg-cur-symbol {
     .vas-exinvd-expected-heading h6 {
         margin: 0;
         font-size: 0.875em;
+        font-weight:600;
     }
 
 .vas-exinvd-filterby-col {
@@ -1026,7 +1071,7 @@ span.vas-arwidg-cur-symbol {
 
 .vas-exinvd-invoices-box {
     background-color: rgba(var(--v-c-common), 1);
-    padding: 0.75em;
+    padding: 0.3em;
 }
 
     .vas-exinvd-invoices-box > h6 {
@@ -1095,9 +1140,9 @@ span.vas-arwidg-cur-symbol {
         color: rgba(var(--v-c-on-common), 0.9);
     }
 
-    .vas-exinvd-slider-arrows span {
+/* .vas-exinvd-slider-arrows span {
         font-size: 1.1em;
-    }
+    }*/
 
 
 
@@ -1105,12 +1150,15 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-exinvd-expected-invoice {
         font-size: 12px;
     }
-    .vis-editModeWidget.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+
+        .vis-editModeWidget.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
             margin: 7px 4px 10px;
-    }
+        }
+
     .vis-editModeWidget .vas-exinvd-slider-arrows {
         margin-top: 4px;
     }
+
         .vis-editModeWidget .vas-exinvd-slider-arrows i.fa {
             font-size: 13px;
         }
@@ -1251,30 +1299,122 @@ span.vas-arwidg-cur-symbol {
         font-size: 10px;
     }
 }
+
 .vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
     margin: 0 20px 10px 0;
 }
-.vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
-    flex-basis: 35%;
-    justify-content: flex-end;
-}
+
+    .vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
+        flex-basis: 35%;
+        justify-content: flex-end;
+    }
+
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv {
     flex-basis: 33%;
 }
+
 .vas-exinvd-expected-invoice .vas-exinvd-slider-arrows {
     margin-top: 13px;
     font-size: 8px;
 }
+
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
     height: auto;
 }
-.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text{
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
     padding: 0;
 }
+
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .vis-input-wrap {
     margin: 0;
 }
+
 .vas-disableArrow {
     pointer-events: none;
     opacity: 0.6;
 }
+
+.vas-exinvd-pagespan {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.vas-exinvd-lablecolor {
+    background-color: rgba(var(--v-c-primary), .1)
+}
+
+.vas-exinvd-expected-invoice .vis-input-wrap select ~ label {
+    background: transparent;
+    top: -9px;
+}
+.vas-arwidg-orderTxt{
+    font-weight:600;
+    font-family:Verdana;
+}
+
+.vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv > .input-group.vis-input-wrap {
+    margin: -4.2px 0 5px;
+}
+
+.vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+    height: auto;
+   /*width: calc(100% - 20px);*/
+    font-size: 14px;
+    border:0;
+}
+.vas-vaswidg-Symbol {
+    font-family: Gill Sans MT;
+    font-size:16px    
+}
+.vas-arwidg-Symbol {
+    font-family: Gill Sans MT;
+}
+.VAS-YearBasedDataListDiv {
+    margin-right: 9px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) select {
+    font-size: 10px;
+}
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-vendors-heading {
+    font-size: 9px;
+    letter-spacing: -0.8px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon span {
+    font-size: 10px !important;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon {
+    height: auto;
+    width: auto;
+    min-height: 22px;
+    min-width: 22px;
+}
+
+
+@media (max-width: 1300px) {
+    .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+        font-size: 12px;
+    }
+    .vas-vaswidg-Symbol {
+        font-size: 12px;
+    }
+}
+
+/*@media (max-width: 1024px) {
+    .vas-igtwidg-vendors-heading {
+        font-size: 8px;
+    }
+    .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+}
+
+@media(max-width: 1600px){
+    .vas-igtwidg-vendors-listing{
+        height: calc(100% - 25px);
+        overflow-y: auto;
+    }
+}*/

@@ -7,10 +7,7 @@
       ******************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
-
-
     VAS.PoReceiptTabPanel = function () {
-
         this.record_ID = 0;
         var $self = this;
         this.windowNo = 0;
@@ -40,7 +37,7 @@
 
         var wrapperDiv = $("<div class ='vas-apInvPoWrapper'></div>")
         lblTitle = $("<h6 class='vas-apInvPoTtl'>" + VAS.translatedTexts.VAS_InvoiceLineTitleTabPanel + "</h6>");
-        
+
         lblInvoiceLineId = $("<span class = 'vas-apInvPoTitle'>" + VAS.translatedTexts.VAS_InvoiceLine + "</span>");
         var $lblInvoiceLineValue = $('<span class = "vas-apInvPoValue"><label>&nbsp;</label></span>');
 
@@ -84,54 +81,59 @@
             wrapperDiv.append(lblTitle).append(InvoicePoListGroup);
             /* Attach design to Root division */
             $root.append(wrapperDiv);
-            /* Get the tabpanel data returned from ajax method to the lebels */
-            this.getPoReceiptData = function (parentID) {
-                $.ajax({
-                    url: VIS.Application.contextUrl + "VAS/PoReceipt/GetData",
-                    type: "GET",
-                    dataType: "json",
-                    contentType: "application/json; charset=utf-8",
-                    data: { parentID: parentID },
-                    success: function (data) {
-                        if (JSON.parse(data) != "") {
-                            data = JSON.parse(data);
-                            console.log(data);
-                            if (data[0].OrderDocumentNo != "" || data[0].GRNDocumentNo != ""){
-                                $lblOrderValue.text(data[0].OrderDocumentNo);
-                                $lblGrnLineValue.text(data[0].GRNDocumentNo);
-                                $lblInvoiceLineValue.text(data[0].InvoiceDocumentNo);
-                                $lblProductValue.text(data[0].ProductName);
-                                $lblAttributeSetInstanceValue.text(data[0].AttributeSetInstance);
-                                $lblQtyValue.text(data[0].Qty);
-                            }
-                        }
-                    },
-                    error: function (eror) {
-                        console.log(eror);
-                    }
-                })
-            }
-
-            this.getRoot = function () {
-                return $root;
-            };
         };
+
+        /* Get the tabpanel data returned from ajax method to the lebels */
+        this.getPoReceiptData = function (parentID) {
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS/PoReceipt/GetData",
+                type: "GET",
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                data: { parentID: parentID },
+                success: function (data) {
+                    if (JSON.parse(data) != "") {
+                        data = JSON.parse(data);
+                        console.log(data);
+                        if (data[0].OrderDocumentNo != "" || data[0].GRNDocumentNo != "") {
+                            $lblOrderValue.text(data[0].OrderDocumentNo);
+                            $lblGrnLineValue.text(data[0].GRNDocumentNo);
+                            $lblInvoiceLineValue.text(data[0].InvoiceDocumentNo);
+                            $lblProductValue.text(data[0].ProductName);
+                            $lblAttributeSetInstanceValue.text(data[0].AttributeSetInstance);
+                            $lblQtyValue.text(data[0].Qty);
+                        }
+                    }
+                },
+                error: function (eror) {
+                    console.log(eror);
+                }
+            })
+        }
+
+        this.getRoot = function () {
+            return $root;
+        };
+
 
         VAS.PoReceiptTabPanel.prototype.startPanel = function (windowNo, curTab) {
             this.windowNo = windowNo;
             this.curTab = curTab;
             this.init();
         };
+
         /* This function to update tab panel based on selected record */
         VAS.PoReceiptTabPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
             this.record_ID = recordID;
             this.selectedRow = selectedRow;
             this.getPoReceiptData(recordID);
         };
+
         /* This will set width as per window width in dafault case it is 75% */
         VAS.PoReceiptTabPanel.prototype.sizeChanged = function (width) {
             this.panelWidth = width;
         };
+
         /* Release all variables from memory */
         VAS.PoReceiptTabPanel.prototype.dispose = function () {
             this.record_ID = 0;
