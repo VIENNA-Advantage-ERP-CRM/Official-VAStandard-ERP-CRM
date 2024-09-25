@@ -19,15 +19,18 @@
         var CurrentPage = 0;
         var pageSize = 4;
         var bankBalData = [];
-        var $prevArrow;
+        var $prevArrowBank;
         var $pageInfo;
         var widgetID = null;
         var $divBusy;
+        var $divnoBankData;
+        var $dummyBankDiv;
 
         /*This function will load data in widget */
         function initializeComponent() {
             getControls();
             events();
+            createDummyDiv()
         };
         /**Get data from server for upcoming  */
         function GetBankBalanceData() {
@@ -39,8 +42,16 @@
                     var divString = "";
                     bankBalData = jQuery.parseJSON(data);
                     if (bankBalData == null || bankBalData.length <= 0) {
-                        divString += '<div class="VAS_noData">' + VIS.Msg.getMsg("VAS_NoData") + '</div>';
-                        $root.append(divString);
+                        if ($divBankBal.find(".VAS_noBankData").length > 0) {
+                            $divBankBal.find(".VAS_noBankData").remove();
+                        }
+                        divString = $('<div class="VAS_noBankData" id="div_noBankData_' + widgetID + '">' + VIS.Msg.getMsg("VAS_NoData") + '</div>');
+                        $divBankBal.append(divString);
+                        $divnoBankData.show();
+                        $divBankBody.hide();
+                        $nextArrowBank.addClass("disabled");
+                        $prevArrowBank.addClass("disabled");
+
                     }
                     else {
                         fillBankBalnaceData();
@@ -53,9 +64,19 @@
                 }
             });
         };
+        /** Create dummy div to append in structure */
+        function createDummyDiv() {
+            $dummyBankDiv = '<div class="VAS-bankBalDetail-box VAS-bankDummy-div">' +
+                '<div class="VAS-bankbal-name"> Bank Name</div>' +
+                '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">Currency' +
+                '</div> <div class="VAS-totalbankbal-amount">1000' +
+                '</div>' +
+                '</div>' +
+                '</div>';
+        };
         function bindDummyDiv(j) {
             for (var i = 0; i < j; i++) {
-                $divBankBody.append($divBankDet);
+                $divBankBody.append($dummyBankDiv);
             };
         }
         /**Bind bank balance data to container */
@@ -64,12 +85,12 @@
             if (bankBalData != null) {
                 var start = CurrentPage * pageSize;
                 var end = Math.min(start + pageSize, bankBalData.length);
-                var TxtPageFooter = (CurrentPage + 1).toString() + " "+ VIS.Msg.getMsg("VAS_Of") + " "+ Math.ceil(bankBalData.length / pageSize).toString();
+                var TxtPageFooter = (CurrentPage + 1).toString() + " " + VIS.Msg.getMsg("VAS_Of") + " " + Math.ceil(bankBalData.length / pageSize).toString();
                 $pageInfo.text(TxtPageFooter);
                 for (var i = start; i < end; i++) {
                     $divBankBody.append('<div class="VAS-bankBalDetail-box" id="div_bankDetail_' + widgetID + '">'
-                        + '<div class="VAS-bankbal-name">' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '</div>'
-                        + '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode"> ' + bankBalData[i].ISO_Code + '</div> <div class="VAS-totalbankbal-amount">'
+                        + '<div class="VAS-bankbal-name" title="' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '">' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '</div>'
+                        + '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">' + bankBalData[i].ISO_Code + '</div> <div class="VAS-totalbankbal-amount">'
                         + bankBalData[i].EndingBalance.toLocaleString(window.navigator.language,
                             { minimumFractionDigits: bankBalData[i].StdPrecision, maximumFractionDigits: bankBalData[i].StdPrecision }) + '</div></div>'
                         + '</div>');
@@ -78,17 +99,20 @@
                     bindDummyDiv(pageSize - (end - start));
                 }
                 if (CurrentPage == 0) {
-                    $prevArrow.addClass("disabled");
-                    $nextArrow.removeClass("disabled");
+                    $prevArrowBank.addClass("disabled");
+                    $nextArrowBank.removeClass("disabled");
                 }
                 else {
-                    $prevArrow.removeClass("disabled");
+                    $prevArrowBank.removeClass("disabled");
                     if (end == bankBalData.length) {
-                        $nextArrow.addClass("disabled");
+                        $nextArrowBank.addClass("disabled");
                     }
                     else {
-                        $nextArrow.removeClass("disabled");
+                        $nextArrowBank.removeClass("disabled");
                     }
+                }
+                if (end <= 4) {
+                    $nextArrowBank.addClass("disabled");
                 }
                 ShowBusy(false);
             }
@@ -96,7 +120,7 @@
 
         /** bind events for arrow buttons */
         function events() {
-            $nextArrow.on("click", function (e) {
+            $nextArrowBank.on("click", function (e) {
                 ShowBusy(true);
                 if ((CurrentPage + 1) * pageSize < bankBalData.length) {
                     CurrentPage++;
@@ -105,7 +129,7 @@
                 ShowBusy(false);
             })
 
-            $prevArrow.on("click", function (e) {
+            $prevArrowBank.on("click", function (e) {
                 ShowBusy(true);
                 if (CurrentPage > 0) {
                     CurrentPage--;
@@ -119,10 +143,11 @@
             $divBankBal = $root.find("#div_bankBal_widget_" + widgetID);
             $divBankBody = $root.find("#VAS_divbankBody_" + widgetID);
             $divBankDet = $root.find("#div_bankDetail_" + widgetID);
-            $nextArrow = $root.find("#VAS_BankBalNextArrow_" + widgetID);
-            $prevArrow = $root.find("#VAS_BankBalPrevArrow_" + widgetID);
+            $nextArrowBank = $root.find("#VAS_BankBalNextArrow_" + widgetID);
+            $prevArrowBank = $root.find("#VAS_BankBalPrevArrow_" + widgetID);
             $pageInfo = $root.find("#VAS_PageInfo_" + widgetID);
             $divBusy = $root.find("#busyDivId_" + widgetID);
+            $divnoBankData = $root.find("#div_noBankData_" + widgetID);
             ShowBusy(true);
             GetBankBalanceData();
         }
@@ -153,7 +178,7 @@
                 widgetID = $self.windowNo;
             }
             $root = $('<div class="VAS-bankBalroot" id="VAS_root_"></div>');
-            $root.append('<div class="VAS-BankBal-container"  id="div_bankBal_widget_' + widgetID + '"><div class="VAS-bankbalance-container" id="div_bankBal_' + widgetID + '">' +
+            $root.append('<div class="VAS-bankbalance-container" id="div_bankBal_widget_' + widgetID + '">' +
                 '<div class="VAS-bankbalwidget-header">' +
                 '<h1>' + VIS.Msg.getMsg("VAS_BankBalance") + '</h1>' +
                 '<div class="VAS-bankBalarrow-control">' +
@@ -161,7 +186,7 @@
                 '<span id="VAS_PageInfo_' + widgetID + '" ></span>' +
                 '<a href="#"><i id="VAS_BankBalNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>' +
                 '</div>' +
-                '</div><div class="VAS-bankbalwidget-body" id="VAS_divbankBody_' + widgetID + '"></div></div>');
+                '</div><div class="VAS-bankbalwidget-body" id="VAS_divbankBody_' + widgetID + '"></div>');
             createBusyIndicator();
             initializeComponent();
         };
@@ -197,6 +222,8 @@
         $self = null;
         $root = null;
         $divBusy = null;
+        $divnoBankData = null;
+        $dummyBankDiv = null;
     };
 
 })(VAS, jQuery);

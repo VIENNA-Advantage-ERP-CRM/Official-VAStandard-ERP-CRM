@@ -21,6 +21,7 @@
     justify-content: space-between;
     margin-bottom: 0.75em;
 }
+
 .VAS-bankBalDetail-box {
     background-color: #EAF3FC;
     border-radius: 6px;
@@ -33,15 +34,22 @@
 .VAS-bankbal-name {
     font-size: 1.1em;
     font-weight: 600;
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
 .VAS-bankbalISOCode {
     font-size: 1em;
     font-weight: 600;
     margin-right: 0.5em;
 }
+
 .VAS-totalbankbal-amount {
     font-size: 1em;
 }
+
 .VAS-BankBaldata {
     display: flex;
 }
@@ -60,42 +68,41 @@
     margin-right: 0.8rem;
 }
 
-.VAS-bankBalarrow-control a {
-    color: #1C75AF;
-    display: flex;
-    font-size: 1.4em;
-    text-decoration: none !important;
-}
-.VAS-bankBalarrow-control span {
-    font-size: 1.1em;
-}
-.VAS-bankBalarrow-control .fa.disabled {
-    cursor: not-allowed;
-    opacity: 0;
+    .VAS-bankBalarrow-control a {
+        color: #1C75AF;
+        display: flex;
+        font-size: 1.4em;
+        text-decoration: none !important;
+    }
+
+    .VAS-bankBalarrow-control span {
+        font-size: 1.1em;
+    }
+
+    .VAS-bankBalarrow-control .fa.disabled {
+        cursor: not-allowed;
+        opacity: 0;
+    }
+
+    .VAS-bankBalarrow-control a:hover {
+        color: #fcfcfc;
+    }
+
+.VAS-bankDummy-div {
+    background-color: unset;
+    user-select: none;
+    color: transparent;
 }
 
-.VAS-bankBalarrow-control a:hover {
-    color: #2e9feb;
-}
-.VAS_cr {
-    height: 100%;
-}
-
-.VAS_cr_inner {
-    height: 100%;
-}
-
-.VAS_cr_item {
-    height: 100%;
-}
-.VAS_noData {
+.VAS_noBankData {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    height: calc(100% - 1.30em);
     width: 100%;
-    color: #ffffff;
+    color: #000000;
     font-size: 23px;
+    background-color: #EAF3FC;
 }
 
 .VAS-bank-container {

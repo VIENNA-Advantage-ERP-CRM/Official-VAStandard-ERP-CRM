@@ -30,9 +30,14 @@
     justify-content: center;
     flex-direction: column;
 }
+
 .VAS-cashbook-name {
     font-size: 1.1em;
     font-weight: 600;
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .VAS-cashISOCode {
@@ -83,26 +88,21 @@
         color: #2e9feb;
     }
 
-.VAS_cr {
-    height: 100%;
+.VAS-cashDummy-div {
+    background-color: unset;
+    user-select: none;
+    color: transparent;
 }
 
-.VAS_cr_inner {
-    height: 100%;
-}
-
-.VAS_cr_item {
-    height: 100%;
-}
-
-.VAS_noData {
+.VAS_noCashData {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    height: calc(100% - 1.30em);
     width: 100%;
-    color: #ffffff;
+    color: #000000;
     font-size: 23px;
+    background-color: #fcfcfc;
 }
 
 .VAS-bank-container {
