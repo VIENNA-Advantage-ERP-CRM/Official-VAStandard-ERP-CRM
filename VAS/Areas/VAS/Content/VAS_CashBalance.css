@@ -1,0 +1,190 @@
+﻿.VAS-cashroot {
+    height: 100%;
+    width: 100%;
+}
+
+.VAS-cashbalance-container {
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
+    height: 100%;
+    padding: 0.75em;
+}
+
+.VAS-cashwidget-header h1 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.VAS-cashwidget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75em;
+}
+
+.VAS-cashDetail-box {
+    background-color: #FCFCFC;
+    border-radius: 6px;
+    padding: 0.75em;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+.VAS-cashbook-name {
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.VAS-cashISOCode {
+    font-size: 1em;
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+.VAS-cashbook-amount {
+    font-size: 1em;
+}
+
+.VAS-CashBaldata {
+    display: flex;
+}
+
+.VAS-cashwidget-body {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.75em;
+    height: calc(100% - 2.125em);
+}
+
+.VAS-casharrow-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-right: 0.8rem;
+}
+
+    .VAS-casharrow-control a {
+        color: #FCFCFC;
+        display: flex;
+        font-size: 1.4em;
+        text-decoration: none !important;
+    }
+
+    .VAS-casharrow-control span {
+        font-size: 1.1em;
+    }
+
+    .VAS-casharrow-control .fa.disabled {
+        cursor: not-allowed;
+        opacity: 0;
+    }
+
+    .VAS-casharrow-control a:hover {
+        color: #2e9feb;
+    }
+
+.VAS_cr {
+    height: 100%;
+}
+
+.VAS_cr_inner {
+    height: 100%;
+}
+
+.VAS_cr_item {
+    height: 100%;
+}
+
+.VAS_noData {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    color: #ffffff;
+    font-size: 23px;
+}
+
+.VAS-bank-container {
+    padding: 1.2em;
+    display: flex;
+    justify-content: space-between;
+    height: 100%;
+    flex-direction: column;
+    color: #000000;
+    position: relative;
+    background-image: linear-gradient(140deg, #D7E9EA 0%, #A1C5FF 80%);
+}
+
+.VAS-bank-container {
+    padding: 1em;
+    height: 100%;
+}
+
+/* all claims css */
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-cashbalance-container {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-cashbalance-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-cashbalance-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-cashbalance-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-cashbalance-container {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-cashbalance-container {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 5px;
+    }
+}
