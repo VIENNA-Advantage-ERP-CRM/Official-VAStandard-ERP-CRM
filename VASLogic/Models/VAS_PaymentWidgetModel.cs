@@ -31,17 +31,18 @@ namespace VASLogic.Models
                                     C_CURRENCY.STDPRECISION,
                                     C_BANKACCOUNTLINE.ENDINGBALANCE,
                                     C_BANKACCOUNTLINE.STATEMENTDATE,BAL.BA
-                                FROM  BAL            
-                                    INNER JOIN C_BANKACCOUNTLINE ON ( C_BANKACCOUNTLINE.C_BANKACCOUNTLINE_ID = BAL.C_BANKACCOUNTLINE_ID AND BAL.BA=1)    
-                                    INNER JOIN C_BANKACCOUNT ON C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID
-                                    INNER JOIN C_BANK ON ( C_BANKACCOUNT.C_BANK_ID = C_BANK.C_BANK_ID )
-                                    INNER JOIN C_CURRENCY ON ( C_BANKACCOUNT.C_CURRENCY_ID = C_CURRENCY.C_CURRENCY_ID )
+                                FROM C_BANKACCOUNT
+                                    INNER JOIN BAL ON (BAL.C_BANKACCOUNT_ID = C_BANKACCOUNT.C_BANKACCOUNT_ID AND BAL.BA=1 )            
+                                    INNER JOIN C_BANKACCOUNTLINE ON (C_BANKACCOUNTLINE.C_BANKACCOUNTLINE_ID = BAL.C_BANKACCOUNTLINE_ID AND BAL.BA=1 
+                                    AND C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID)
+                                    INNER JOIN C_BANK ON (C_BANKACCOUNT.C_BANK_ID = C_BANK.C_BANK_ID )
+                                    INNER JOIN C_CURRENCY ON (C_BANKACCOUNT.C_CURRENCY_ID = C_CURRENCY.C_CURRENCY_ID )
                                 WHERE C_BANK.ISACTIVE = 'Y'
                                     AND C_BANKACCOUNT.ISACTIVE = 'Y'
                                     AND C_BANKACCOUNTLINE.ISACTIVE = 'Y'
                                     AND C_CURRENCY.ISACTIVE = 'Y'";
 
-            qry = MRole.GetDefault(ctx).AddAccessSQL(qry, "C_BANKACCOUNT", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+            qry = MRole.GetDefault(ctx).AddAccessSQL(qry, "C_BankAccount", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
             //string abc = @")AS BankBalance)";
             string _sql = @"WITH BAL AS(SELECT ROW_NUMBER() OVER (PARTITION BY C_BANKACCOUNTLINE.C_BANKACCOUNT_ID
                 ORDER BY C_BANKACCOUNTLINE.STATEMENTDATE DESC, C_BANKACCOUNTLINE.C_BANKACCOUNTLINE_ID DESC) AS BA,

@@ -22,11 +22,13 @@
         var $pageInfo;
         var widgetID = null;
         var $divBusy;
+        var $dummDiv;
 
         /*This function will load data in widget */
         function initializeComponent() {
             getControls();
             events();
+            createDummyDiv();
         };
         /**Get data from server for upcoming  */
         function GetCashBalanceData() {
@@ -38,46 +40,64 @@
                     var divString = "";
                     cashBalData = jQuery.parseJSON(data);
                     if (cashBalData == null || cashBalData.length <= 0) {
-                        divString += '<div class="VAS_noData">' + VIS.Msg.getMsg("VAS_NoData") + '</div>';
-                        $root.append(divString);
+                        if ($divCashBal.find(".VAS_noBankData").length > 0) {
+                            $divCashBal.find(".VAS_noBankData").remove();
+                        }
+                        divString = $('<div class="VAS_noCashData"  id="div_noCashData_' + widgetID + '">' + VIS.Msg.getMsg("VAS_NoData") + '</div>');
+                        $divCashBal.append(divString);
+                        $divnoCashData.show();
+                        $divCashBody.hide();
+                        $prevArrow.addClass("disabled");
+                        $nextArrow.addClass("disabled");
                     }
                     else {
                         fillCashBalanceData();
                     }
-
                     ShowBusy(false);
-                }
-                ,
+                },
                 error: function (eror) {
                     console.log(eror);
                     ShowBusy(false);
                 }
             });
         };
+        /** Create dummy div to append in structure */
+        function createDummyDiv() {
+            $dummDiv = '<div class="VAS-cashDetail-box VAS-cashDummy-div">' +
+                '<div class="VAS-cashbook-name"> - </div>' +
+                '<div class="VAS-CashBaldata"><div class="VAS-cashISOCode">-' +
+                '</div> <div class="VAS-cashbook-amount">-' +
+                '</div>' +
+                '</div>' +
+                '</div>';
+        };
         function bindDummyDiv(j) {
             for (var i = 0; i < j; i++) {
-                $divCashBody.append($divCashDet);
+                $divCashBody.append($dummDiv);
             };
-        }
+        };
         /**Bind Cashbook data to container */
         function fillCashBalanceData() {
             $divCashBody.empty();
             if (cashBalData != null) {
                 var start = CurrentPage * pageSize;
                 var end = Math.min(start + pageSize, cashBalData.length);
-                var TxtPageFooter = (CurrentPage + 1).toString() +  " " + VIS.Msg.getMsg("VAS_Of") + " "  + Math.ceil(cashBalData.length / pageSize).toString();
+                var TxtPageFooter = (CurrentPage + 1).toString() + " " + VIS.Msg.getMsg("VAS_Of") + " " + Math.ceil(cashBalData.length / pageSize).toString();
                 $pageInfo.text(TxtPageFooter);
+                var width = $divCashBal.width();
                 for (var i = start; i < end; i++) {
                     $divCashBody.append('<div class="VAS-cashDetail-box" id="div_cashDetail_' + widgetID + '">'
-                        + '<div class="VAS-cashbook-name">' + cashBalData[i].Name + '</div>'
+                        + '<div style="width:' + (width - 20) +'px;" class="VAS-cashbook-name" title="' + cashBalData[i].Name + '">' + cashBalData[i].Name + '</div>'
                         + '<div class="VAS-CashBaldata"><div class="VAS-cashISOCode"> ' + cashBalData[i].ISO_Code + '</div> <div class="VAS-cashbook-amount">'
                         + cashBalData[i].CompletedBalance.toLocaleString(window.navigator.language,
                             { minimumFractionDigits: cashBalData[i].StdPrecision, maximumFractionDigits: cashBalData[i].StdPrecision }) + '</div></div>'
                         + '</div>');
                 };
+                $divCashDet.width(width - 20);
                 if (end - start < pageSize) {
                     bindDummyDiv(pageSize - (end - start));
                 }
+
                 if (CurrentPage == 0) {
                     $prevArrow.addClass("disabled");
                     $nextArrow.removeClass("disabled");
@@ -88,8 +108,12 @@
                         $nextArrow.addClass("disabled");
                     }
                     else {
+
                         $nextArrow.removeClass("disabled");
                     }
+                }
+                if (cashBalData.length <= 4) {
+                    $nextArrow.addClass("disabled");
                 }
                 ShowBusy(false);
             }
@@ -117,13 +141,14 @@
         };
         /** Get control elements from root */
         function getControls() {
-            $divBankBal = $root.find("#div_cashBal_widget_" + widgetID);
+            $divCashBal = $root.find("#div_cashBal_widget_" + widgetID);
             $divCashBody = $root.find("#VAS_divCashBody_" + widgetID);
             $divCashDet = $root.find("#div_cashDetail_" + widgetID);
             $nextArrow = $root.find("#VAS_CashNextArrow_" + widgetID);
             $prevArrow = $root.find("#VAS_CashPrevArrow_" + widgetID);
             $pageInfo = $root.find("#VAS_PageInfo_" + widgetID);
             $divBusy = $root.find("#busyDivId_" + widgetID);
+            $divnoCashData = $root.find("#div_noCashData_" + widgetID);
             ShowBusy(true);
             GetCashBalanceData();
         }
@@ -142,6 +167,20 @@
                 $divBusy.hide();
             }
         };
+        /**
+         *This function is used to resize the widget
+         * @param {any} height
+         * @param {any} width
+         */
+        this.sizeChanged = function (width) {
+            var containerWidth = $divCashBal.width();
+            var bankNameWidth = containerWidth - 20;
+            //$divCashBal.find(".VAS-cashbook-name").css("width", bankNameWidth + 'px;');
+            var length = $divCashBal.find(".VAS-cashbook-name").length;
+            for (var i = 0; i < length; i++) {
+                $($divCashBal.find(".VAS-cashbook-name")[i]).css("width", bankNameWidth + "px");
+            }
+        };
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             ShowBusy(true);
@@ -155,7 +194,7 @@
             }
             $root = $('<div class="VAS-cashroot"  id="VAS_cashroot_"></div>');
             createBusyIndicator();
-            $root.append('<div class="VAS-CashBal-container"  id="div_cashBal_widget_' + widgetID + '"><div class="VAS-cashbalance-container" id="div_bankBal_' + widgetID + '">' +
+            $root.append('<div class="VAS-cashbalance-container" id="div_cashBal_widget_' + widgetID + '">' +
                 '<div class="VAS-cashwidget-header">' +
                 '<h1>' + VIS.Msg.getMsg("VAS_CashBalance") + '</h1>' +
                 '<div class="VAS-casharrow-control">' +
@@ -163,7 +202,7 @@
                 '<span id="VAS_PageInfo_' + widgetID + '" ></span>' +
                 '<a href="#"><i id="VAS_CashNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>' +
                 '</div>' +
-                '</div><div class="VAS-cashwidget-body" id="VAS_divCashBody_' + widgetID + '"></div></div>');
+                '</div><div class="VAS-cashwidget-body" id="VAS_divCashBody_' + widgetID + '"></div>');
             initializeComponent();
         };
         //Privilized function
@@ -174,6 +213,11 @@
 
     VAS.VAS_CashBalanceWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
+    };
+
+    //Must Implement with same parameter
+    VAS.VAS_CashBalanceWidget.prototype.widgetSizeChange = function (width) {
+        this.sizeChanged(width);
     };
 
     VAS.VAS_CashBalanceWidget.prototype.init = function (windowNo, frame) {
@@ -197,6 +241,7 @@
         $bsyDiv = null;
         $self = null;
         $root = null;
+        $dummDiv = null;
     };
 
 })(VAS, jQuery);
