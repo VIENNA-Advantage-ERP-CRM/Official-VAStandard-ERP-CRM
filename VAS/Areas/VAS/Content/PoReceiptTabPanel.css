@@ -442,7 +442,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 @media screen and (max-width: 1920px) {
     .vas-arwidg-receivable-container {
-        font-size: 15px;
+        font-size: 1em;
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
@@ -456,7 +456,7 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 @media screen and (max-width: 1366px) {
     .vas-arwidg-receivable-container {
-        font-size: 13px;
+        font-size: 0.8em;
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
@@ -466,17 +466,20 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 @media screen and (max-width: 1200px) {
     .vas-arwidg-totalRec-amount h1 {
-        font-size: 20px;
+        font-size: 16px;
     }
 
     .vas-arwidg-recBox-amt {
         font-size: 10px;
     }
+    .vas-arwidg-receivable-container {
+        font-size: 0.8em;
+    }
 }
 
 @media screen and (max-width: 1024px) {
     .vas-arwidg-receivable-container {
-        font-size: 12px;
+        font-size: 0.7em;
     }
 
     .vas-arwidg-totalRec-amount {
@@ -494,6 +497,9 @@ Only index.html and style.css is for your use There is no need to copy any other
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
         font-size: 8px;
     }
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 13px;
+    }
 }
 
 @media screen and (max-width:900px) {
@@ -507,6 +513,9 @@ Only index.html and style.css is for your use There is no need to copy any other
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
         font-size: 8px;
+    }
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 12px;
     }
 }
 
@@ -525,6 +534,9 @@ Only index.html and style.css is for your use There is no need to copy any other
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
         font-size: 8px;
+    }
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 14px;
     }
 }
 
@@ -625,8 +637,8 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-thumb-w-txt img {
-    width: 3.125em;
-    height: 3.125em;
+    width: 2.5em;
+    height: 2.5em;
     border-radius: 100%;
 }
 
@@ -726,7 +738,7 @@ span.vas-arwidg-cur-symbol {
     }
 
     .vas-igtwidg-vendors-heading {
-        font-size: 1.2em;
+        font-size: 9px;
     }
 
     .vis-editModeWidget .vas-igtwidg-vendors-listing {
@@ -757,6 +769,9 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-invoiceTotalAmt {
         font-size: 7px;
     }
+   /* .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
 }
 
 @media screen and (max-width:900px) {
@@ -766,6 +781,9 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 7px;
     }
+    /*.vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
 }
 
 @media screen and (max-width: 768px) {
@@ -778,6 +796,9 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-cur-symbol {
         font-size: 1.1em;
     }
+   /* .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
 }
 
 @media screen and (max-width: 680px) {
@@ -898,22 +919,21 @@ span.vas-arwidg-cur-symbol {
 }
 
 @media screen and (max-width: 1366px) {
-    .vas-psdwidg-sales-comparison-col {
-        font-size: 12px;
-    }
-
-    .vas-psdwidg-tile-heading {
+    .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
         font-size: 10px;
     }
+   /* .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }*/
 }
 
 @media screen and (max-width: 1024px) {
-    .vas-psdwidg-tile-heading {
+    .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
         font-size: 8px;
     }
 
     .vas-psdwidg-sales-comparison-col {
-        font-size: 10px;
+        font-size: 0.6em;
     }
 }
 
@@ -929,7 +949,7 @@ span.vas-arwidg-cur-symbol {
 
 @media screen and (max-width: 768px) {
     .vas-psdwidg-sales-comparison-col {
-        font-size: 11px;
+        font-size: 9px;
     }
 
     .vas-psdwidg-tile-heading {
@@ -939,7 +959,7 @@ span.vas-arwidg-cur-symbol {
 
 @media screen and (max-width: 680px) {
     .vas-psdwidg-sales-comparison-col {
-        font-size: 10px;
+        font-size: 0.6em;
     }
 
     .vas-psdwidg-tile-heading {
@@ -949,7 +969,7 @@ span.vas-arwidg-cur-symbol {
 
 @media screen and (max-width: 600px) {
     .vas-psdwidg-sales-comparison-col {
-        font-size: 15px;
+        font-size: 0.8em;
     }
 
     .vas-psdwidg-tile-heading {
@@ -999,13 +1019,13 @@ span.vas-arwidg-cur-symbol {
     background-color: rgba(var(--v-c-primary), .4);
     border-radius: 100%;
     display: inline-flex;
-    height: 41px;
+    height:2.5em;
     justify-content: center;
     /* margin: 0 .4rem; */
-    min-height: 32px;
-    min-width: 32px;
+    /*min-height: 32px;
+    min-width: 32px;*/
     overflow: hidden;
-    width: 41px;
+    width: 2.5em;
 }
 
 .vas-igtwidg-vendor-bgColor {
@@ -1365,7 +1385,7 @@ span.vas-arwidg-cur-symbol {
 }
 .vas-vaswidg-Symbol {
     font-family: Gill Sans MT;
-    font-size:16px    
+    font-size: 1.1em;   
 }
 .vas-arwidg-Symbol {
     font-family: Gill Sans MT;
@@ -1396,11 +1416,11 @@ span.vas-arwidg-cur-symbol {
 
 @media (max-width: 1300px) {
     .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
-        font-size: 12px;
+        font-size: 8px;
     }
-    .vas-vaswidg-Symbol {
-        font-size: 12px;
-    }
+  /*  .vas-vaswidg-Symbol {
+        font-size: 10px;
+    }*/
 }
 
 /*@media (max-width: 1024px) {
