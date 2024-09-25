@@ -34,8 +34,7 @@ namespace VASLogic.Models
                                 FROM C_BANKACCOUNT
                                     INNER JOIN BAL ON (BAL.C_BANKACCOUNT_ID = C_BANKACCOUNT.C_BANKACCOUNT_ID AND BAL.BA=1 )            
                                     INNER JOIN C_BANKACCOUNTLINE ON (C_BANKACCOUNTLINE.C_BANKACCOUNTLINE_ID = BAL.C_BANKACCOUNTLINE_ID AND BAL.BA=1 
-                                    AND C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID)    
-                                   /* INNER JOIN C_BANKACCOUNT ON (C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID)*/
+                                    AND C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID)
                                     INNER JOIN C_BANK ON (C_BANKACCOUNT.C_BANK_ID = C_BANK.C_BANK_ID )
                                     INNER JOIN C_CURRENCY ON (C_BANKACCOUNT.C_CURRENCY_ID = C_CURRENCY.C_CURRENCY_ID )
                                 WHERE C_BANK.ISACTIVE = 'Y'

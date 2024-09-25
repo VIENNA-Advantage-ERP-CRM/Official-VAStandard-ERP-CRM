@@ -34,7 +34,7 @@
 .VAS-cashbook-name {
     font-size: 1.1em;
     font-weight: 600;
-    max-width: 280px;
+    /*max-width: 280px;*/
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
