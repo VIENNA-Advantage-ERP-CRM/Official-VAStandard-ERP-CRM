@@ -626,8 +626,8 @@ namespace VASLogic.Models
                          AND cp.IsActive = 'Y'
                          AND oi.IsActive='Y'
                          AND ci.IsActive='Y'
-                         AND current_date BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID="+ctx.GetAD_Client_ID());
-           // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+                         AND current_date BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
+            // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
             DataSet yearDs = DB.ExecuteDataset(sql.ToString(), null, null);
             if (yearDs != null && yearDs.Tables[0].Rows.Count > 0)
             {
@@ -648,10 +648,10 @@ namespace VASLogic.Models
                              C_Invoice ci
                              INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-                             LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
+                             LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INT))
                              WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})");
-            sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year inner join c_period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
+            sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year INNER JOIN C_Period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
             //Getting data according to Current month
             if (ListValue == "CM")
             {
