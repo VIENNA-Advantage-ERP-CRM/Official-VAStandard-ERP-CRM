@@ -77,36 +77,43 @@ namespace VAS.Models
         /// <returns>carts</returns>
         public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID)
         {
+
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
             StringBuilder sql = new StringBuilder();
+
+            sql.Clear();
+            sql.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
+            string WindowName = Util.GetValueOfString(DB.ExecuteScalar(sql.ToString(), null, null));
+
+            sql.Clear();
             sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
                 " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
                 " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
                 " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy");
 
-            if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory)) //Inventory count
+            if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory") //Inventory count
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT','PI')");
             }
 
-            if (windowID == Util.GetValueOfInt(Windows.InternalUse))//Inventory use
+            if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")//Inventory use
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.InventoryMove))
+            if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IM')");//Material Transfer
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IM')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt))
+            if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")//GRN
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','MR')");//GRN
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','MR')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.Shipment))
+            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")//shipment/Delivery order
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','SH')");//shipment
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','SH')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder))
+            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder")
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT')");//sales order/purchase order
             }
@@ -223,29 +230,33 @@ namespace VAS.Models
 
         {
             string msg = "";
-            int id = X_C_Order.Table_ID;
-            if (windowID == Util.GetValueOfInt(Windows.InternalUse))
+            StringBuilder query = new StringBuilder();
+            query.Clear();
+            query.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
+            string WindowName = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, null));
+
+            if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")
             {
                 msg = SaveInternalUseTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.InventoryMove))
+            else if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove")
             {
                 msg = SaveInventoryMoveTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment))
+            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_MaterialReceipt" || WindowName == "VAS_DeliveryOrder")
             {
-                msg = SaveGRNTransactions(ctx, TransactionID, lstInventoryLines, windowID, RefNo);
+                msg = SaveGRNTransactions(ctx, TransactionID, lstInventoryLines, windowID, RefNo, WindowName);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder))
+            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder")
             {
                 msg = SaveOrderTransactions(ctx, TransactionID, lstInventoryLines);
                 return msg;
             }
 
-            else if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory))
+            else if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory")
             {
 
                 Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_InventoryLine"));
@@ -273,7 +284,7 @@ namespace VAS.Models
 
 
                 LocatorId = MWarehouse.Get(ctx, warehouese).GetDefaultM_Locator_ID();
-               
+
                 if (!isContainerApplicable)
                 {
                     sql.Clear();
@@ -732,7 +743,7 @@ namespace VAS.Models
         /// <param name="windowID"></param>
         /// <param name="RefNo"></param>
         /// <returns>mesg</returns>
-        public string SaveGRNTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, int windowID, string RefNo)
+        public string SaveGRNTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, int windowID, string RefNo, string WindowName)
 
         {
             StringBuilder sql = new StringBuilder();
@@ -775,14 +786,14 @@ namespace VAS.Models
                         sql.Clear();
                         if (RefNo != "")
                         {
-                            if (windowID == Util.GetValueOfInt(Windows.Shipment))
+                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
-                            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt))
+                            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'N' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
                             else
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
                         }
-                        else if (windowID == Util.GetValueOfInt(Windows.Shipment))
+                        else if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")
                             sql.Append("SELECT C_Order_ID FROM M_InOut WHERE IsActive = 'Y' AND IsSOTrx = 'Y' AND M_InOut_ID = " + TransactionID);
 
                         if (sql.Length > 0)
@@ -841,7 +852,7 @@ namespace VAS.Models
                             if (hasOrderLines)
                             {
                                 DataRow[] drOL = null;
-                                if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt))
+                                if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")
                                 {
                                     if (Env.IsModuleInstalled("DTD001_"))
                                         drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
