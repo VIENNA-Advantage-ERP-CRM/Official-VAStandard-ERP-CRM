@@ -50,7 +50,7 @@ namespace VAS.Controllers
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo)
+        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo,int windowID)
         {
             List<Dictionary<string, object>> result = null;
             if (Session["ctx"] != null)
@@ -58,7 +58,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartData(CartName, UserId, FromDate, ToDate, RefNo);
+                result = obj.GetIventoryCartData(CartName, UserId, FromDate, ToDate, RefNo, windowID);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
@@ -87,12 +87,12 @@ namespace VAS.Controllers
         /// <param name="IsUpdateTrue"></param>
         /// <returns></returns>
         [HttpPost]
-        public JsonResult SaveTransactions(int InventoryId, string lstScanDetail,bool IsUpdateTrue)
+        public JsonResult SaveTransactions(int TransactionID, string lstScanDetail,bool IsUpdateTrue,int windowID, string RefNo)
         {
             VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
             List<Inventoryline> lstInentoryLines = JsonConvert.DeserializeObject<List<Inventoryline>>(lstScanDetail); 
             InventoryLinesModel objInventoryCount = new InventoryLinesModel();
-            return Json(JsonConvert.SerializeObject(objInventoryCount.SaveTransactions(ctx,InventoryId, lstInentoryLines, IsUpdateTrue)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(objInventoryCount.SaveTransactions(ctx, TransactionID, lstInentoryLines, IsUpdateTrue, windowID, RefNo)), JsonRequestBehavior.AllowGet);
         }
     }
 }

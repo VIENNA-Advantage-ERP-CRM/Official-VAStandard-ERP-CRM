@@ -23,6 +23,9 @@
         var UserIds = "";
         var selectedLines = [];
         var IsUpdateTrue = false;
+        var window_ID = 0;
+        var AD_tab_ID = 0;
+        var Reference = null;
 
         this.initalize = function () {
             createBusyIndicator();
@@ -125,7 +128,7 @@
                 + '</div>'
 
                 + '<div class="VAS-footerBtn-w-opt">'
-                + '<div class="form-check">'
+                + '<div class="form-check VAS-Update" style="display:none;">'
                 + '<input  type="checkbox" value="" id="VAS-Updatedcheckbox_' + $self.windowNo + '">'
                 + '<label class="form-check-label" for="defaultCheck8">'
                 + 'Update'
@@ -138,6 +141,14 @@
                 + '</div>'
                 + '</div>');
             $root.append($CartHeaderSection).append($CartLineDetailSection);
+
+            AD_tab_ID = VIS.context.getWindowTabContext($self.windowNo, 0, "AD_Tab_ID");
+            window_ID = VIS.dataContext.getJSONRecord("InfoProduct/GetWindowID", AD_tab_ID.toString());
+
+
+            if (window_ID == "168") {//update record only allowed in case of physical inventory
+                $root.find(".VAS-Update").css("display", "block");
+            }
         };
 
         this.intialLoad = function () {
@@ -217,7 +228,7 @@
         function LoadCartData() {
             $self.setBusy(true);
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData",
-                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo }, function (data) {
+                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID }, function (data) {
 
                     $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
                     $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
@@ -238,7 +249,7 @@
                                 + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
                                 + '<span class="VAS-line-lbl">Line</span>'
                                 + '</div>'
-                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" aria-hidden="true" ></i></a> '
+                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
                                 + '</div>'
                                 + '</div>');
 
@@ -249,7 +260,8 @@
                             $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "none");
 
                             var CartId = $(this).attr('vas-cart-id');
-                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId });
+                            Reference = $(this).attr('vas-CartRef');
+                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference });
 
                             if (result && result.length > 0) {
                                 $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));
@@ -410,9 +422,11 @@
                 dataType: "json",
                 async: true,
                 data: {
-                    InventoryId: $self.Record_ID,
+                    TransactionID: $self.Record_ID,
                     lstScanDetail: JSON.stringify(selectedLines),
-                    IsUpdateTrue: IsUpdateTrue
+                    IsUpdateTrue: IsUpdateTrue,
+                    windowID: window_ID,
+                    RefNo: Reference
                 },
                 success: function (result) {
                     if (JSON.parse(result) == "") {
