@@ -5,7 +5,7 @@
 
 .VAS-cashbalance-container {
     background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
-    height: 100%;
+   /* height: 100%;*/
     padding: 0.75em;
 }
 

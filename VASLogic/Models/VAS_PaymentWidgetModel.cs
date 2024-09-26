@@ -58,7 +58,7 @@ namespace VASLogic.Models
                             ENDINGBALANCE,
                             STATEMENTDATE
                         FROM
-                            (" + qry + @" ORDER BY C_BANK.NAME))";
+                            (" + qry + @" ORDER BY C_BANK.NAME)BankData)";
             DataSet _ds = DB.ExecuteDataset(_sql, null, null);
             if (_ds != null && _ds.Tables[0].Rows.Count > 0)
             {
