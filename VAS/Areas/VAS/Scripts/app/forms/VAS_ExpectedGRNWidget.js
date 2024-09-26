@@ -306,10 +306,12 @@
                         if (response.Shipment_ID > 0) {
                             try {
                                 if (AD_Window_ID > 0) {
-                                    var zoomQuery = new VIS.Query();
-                                    zoomQuery.addRestriction("M_InOut_ID", VIS.Query.prototype.EQUAL, response.Shipment_ID);
-                                    zoomQuery.setRecordCount(1);
-                                    VIS.viewManager.startWindow(AD_Window_ID, zoomQuery);
+                                    var windowParam = {
+                                        "TabWhereClause": "M_InOut.M_InOut_ID=" + response.Shipment_ID + "",
+                                        "TabLayout": "Y",  // 'N'[Grid],'Y'[Single],'C'[Card]}	 	 
+                                        "TabIndex": "0",
+                                    }
+                                    $self.widgetFirevalueChanged(windowParam);
                                     $self.intialLoad(1);
                                 }
                             }
@@ -406,6 +408,15 @@
             $self.intialLoad($self.currentPage);
 
         };
+    };
+
+    VAS.VAS_CustomerRMAWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener)
+            this.listener.widgetFirevalueChanged(value);
+    };
+
+    VAS.VAS_CustomerRMAWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_ExpectedGRNWidget.prototype.init = function (windowNo, frame) {

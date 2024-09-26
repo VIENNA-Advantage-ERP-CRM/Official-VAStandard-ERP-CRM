@@ -20,9 +20,10 @@
         var culture = new VIS.CultureSeparator();
         var msgArray = null;
         var widgetID = null;
+        var unit = null;
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
-            widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             createBusyIndicator();
             $bsyDiv[0].style.visibility = "visible";
         };
@@ -40,17 +41,17 @@
                         '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + widgetID + '">' +
                         '    <div class="vas-arwidg-totalRec-amount">' +
                         '      <h1>' + TotalAmtArray[0] +
-                        '<span class="vas-arwidg-cur-symbol">' +TotalAmtArray[1] + '<span>' +
-                        '<span>' + gridDataResult[4].Symbol + '</span></h1>' +
-                        '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase)+ '</div>' +
+                        '<span class="vas-arwidg-cur-symbol">' + TotalAmtArray[1] + '<span>' +
+                        '<span class="vas-arwidg-Symbol">' + gridDataResult[4].Symbol + '</span></h1>' +
+                        '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase) + '</div>' +
                         '    </div>' +
                         '  </div>');
                     var listDesign = $('<div class="vas-arwidg-rec-listing" id="vas_listContainer_' + widgetID + '">');
                     for (var i = 0; i < gridDataResult.length - 1; i++) {
                         var widgetDataDesign = '<div class="vas-arwidg-receiveTxt-box">' +
                             '<div class="vas-arwidg-orderTxt">' + msgArray[i] + '</div>' +
-                            '<div class="vas-arwidg-recBox-amt">' + (gridDataResult[i].daysAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
-                            '<span>' + gridDataResult[i].Symbol + '</span></div>' +
+                            '<div class="vas-arwidg-recBox-amt">' + '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + formatLargeNumber(gridDataResult[i].daysAmt, gridDataResult[i].stdPrecision) + unit
+                            '</div>' +
                             '</div>'
                         listDesign.append(widgetDataDesign);
                     }
@@ -61,6 +62,34 @@
                 $bsyDiv[0].style.visibility = "hidden";
             });
         };
+        /**
+        * This Function is responsible converting the value into million
+        * @param {any} number
+        * @param {any} stdPrecision
+        */
+        function formatLargeNumber(number, stdPrecision) {
+            // Determine the sign of the number
+            var isNegative = number < 0;
+            // Work with the absolute value for formatting
+            var absNumber = Math.abs(number);
+
+            var formattedNumber;
+
+            // Determine the unit and format the number accordingly
+            if (absNumber >= 1000000000000) { /* Trillion */
+                unit = VAS.translatedTexts.VAS_Trillion;
+                formattedNumber = (absNumber / 1000000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else if (absNumber >= 1000000000) { /* Billion */
+                unit = VAS.translatedTexts.VAS_Billion;
+                formattedNumber = (absNumber / 1000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            else {
+                unit = '';
+                formattedNumber = absNumber.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+            }
+            // Return the formatted number with the correct sign and unit
+            return (isNegative ? '-' : '') + formattedNumber;
+        }
         /*This function will show busy indicator in widget */
         function createBusyIndicator() {
             $bsyDiv = $('<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -103,7 +132,9 @@
                 "VAS_90to120",
                 "VAS_Older",
                 "VAS_TotalRec",
-                "VAS_TotalPurchase"
+                "VAS_TotalPurchase",
+                "VAS_Trillion",
+                "VAS_Billion"
             ];
 
             VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);

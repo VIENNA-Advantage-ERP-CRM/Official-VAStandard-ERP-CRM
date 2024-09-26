@@ -796,15 +796,15 @@ namespace VIS.Models
             string WhereCondition = "";
             if (Type == "P") //Pending Delivery Order
             {
-                WhereCondition = " AND o.DatePromised < CURRENT_DATE AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "EG") //Expected GRN
             {
-                WhereCondition = " AND o.DatePromised >= CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised >=TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "PG") //Pending GRN
             {
-                WhereCondition = " AND  o.DatePromised < CURRENT_DATE AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised <TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
             }
             else if (Type == "CR") //Customer RMA
             {
@@ -816,7 +816,7 @@ namespace VIS.Models
             }
             else //Expected Delivery Order
             {
-                WhereCondition = " AND  o.DatePromised >= CURRENT_DATE  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised >= TRUNC(CURRENT_DATE)  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
             DeliveryResult result = new DeliveryResult
             {
@@ -1704,7 +1704,7 @@ namespace VIS.Models
                         QtyEnetered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfInt(ds.Tables[0].Rows[i]["ConversionRate"]);
                         objLine = new MInOutLine(ctx, 0, trx);
                         objLine.SetAD_Client_ID(ctx.GetAD_Client_ID());
-                        objLine.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                        objLine.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
                         objLine.SetC_OrderLine_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_OrderLine_ID"]));
                         objLine.SetC_UOM_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
                         objLine.SetM_InOut_ID(obj.GetM_InOut_ID());

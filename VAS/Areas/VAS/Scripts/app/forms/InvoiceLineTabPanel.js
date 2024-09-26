@@ -18,7 +18,7 @@
         $self = this;
         var windowID = 0;
         var $iFrameDiv = null;
-        var $root = $('<div class = "root h-100"></div>');
+        var $root = $('<div class = "root h-100" style="position:relative;"></div>');
         var wrapperDiv = $("<div class ='vas-apInvWrapper h-100'></div>");
         var $bsyDiv = $('<div class="vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis-busyindicatordiv"></i></div></div>');
        
