@@ -418,12 +418,12 @@
         };
     };
 
-    VAS.VAS_CustomerRMAWidget.prototype.widgetFirevalueChanged = function (value) {
+    VAS.VAS_ExpectedDeliveryWidget.prototype.widgetFirevalueChanged = function (value) {
         if (this.listener)
             this.listener.widgetFirevalueChanged(value);
     };
 
-    VAS.VAS_CustomerRMAWidget.prototype.addChangeListener = function (listener) {
+    VAS.VAS_ExpectedDeliveryWidget.prototype.addChangeListener = function (listener) {
         this.listener = listener;
     };
     VAS.VAS_ExpectedDeliveryWidget.prototype.init = function (windowNo, frame) {
