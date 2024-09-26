@@ -47,6 +47,7 @@
                         }
                         divString = $('<div class="VAS_noBankData" id="div_noBankData_' + widgetID + '">' + VIS.Msg.getMsg("VAS_NoData") + '</div>');
                         $divBankBal.append(divString);
+                        $divBankBal.css("height", "100%");
                         $divnoBankData.show();
                         $divBankBody.hide();
                         $nextArrowBank.addClass("disabled");
@@ -181,7 +182,6 @@
             var containerWidth = $divBankBal.width();
             $divBankBal.find(".VAS-bankbal-name").css("width", width - 20 + 'px;');
             var bankNameWidth = containerWidth - 20;
-            //$divBankBal.find(".VAS-cashbook-name").css("width", bankNameWidth + 'px;');
             var length = $divBankBal.find(".VAS-bankbal-name").length;
             for (var i = 0; i < length; i++) {
                 $($divBankBal.find(".VAS-bankbal-name")[i]).css("width", bankNameWidth + "px");
