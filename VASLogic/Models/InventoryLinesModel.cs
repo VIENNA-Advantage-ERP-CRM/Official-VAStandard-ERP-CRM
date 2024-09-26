@@ -36,7 +36,10 @@ namespace VAS.Models
             MaterialReceipt = 184,
             InternalUse = 341,
             SalesOrder = 143,
-            PurchaseOrder = 181
+            PurchaseOrder = 181,
+            Requisition=322,
+            CustomerReturn=409,
+            VendorReturn=411
         }
 
         /// <summary>
@@ -113,7 +116,8 @@ namespace VAS.Models
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT','SH')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder")
+            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder)|| 
+                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "Sales Quotation") 
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT')");//sales order/purchase order
             }
@@ -245,14 +249,19 @@ namespace VAS.Models
                 msg = SaveInventoryMoveTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_MaterialReceipt" || WindowName == "VAS_DeliveryOrder")
+            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_MaterialReceipt" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn")
             {
                 msg = SaveGRNTransactions(ctx, TransactionID, lstInventoryLines, windowID, RefNo, WindowName);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder")
+            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "Sales Quotation")
             {
                 msg = SaveOrderTransactions(ctx, TransactionID, lstInventoryLines);
+                return msg;
+            }
+            else if (windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_Requisition")
+            {
+                msg = SaveRequisitionTransactions(ctx, TransactionID, lstInventoryLines);
                 return msg;
             }
 
@@ -786,14 +795,14 @@ namespace VAS.Models
                         sql.Clear();
                         if (RefNo != "")
                         {
-                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")
+                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID== Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
-                            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")
+                            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_CustomerReturn")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'N' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
                             else
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
                         }
-                        else if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")
+                        else if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
                             sql.Append("SELECT C_Order_ID FROM M_InOut WHERE IsActive = 'Y' AND IsSOTrx = 'Y' AND M_InOut_ID = " + TransactionID);
 
                         if (sql.Length > 0)
@@ -1068,6 +1077,85 @@ namespace VAS.Models
                         else
                             lines.SetC_UOM_ID(lstInventoryLines[i].UOMId);
 
+                        lines.SetPrice(PriceList);
+                        if (!lines.Save(trx))
+                        {
+
+                            msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
+                            {
+                                msg += " - " + pp.GetName();
+                            }
+                            trx.Rollback();
+                            trx.Close();
+
+                        }
+
+
+                    }
+                    if (trx != null)
+                    {
+                        trx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                    trx.Close();
+                }
+
+                return msg;
+            }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
+            return msg;
+        }
+
+
+        public string SaveRequisitionTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_RequisitionLine"));
+            int Org = 0;
+            int Client = 0;
+            int PriceList = 0;
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_PriceList_ID FROM M_Requisition  WHERE M_Requisition_ID =" + TransactionID);
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
+                PriceList= Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+            }
+
+        
+            try
+            {
+                if (lstInventoryLines != null)
+                {
+                    for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
+                    {
+                        MRequisitionLine lines = new MRequisitionLine(ctx, 0, trx);
+                        lines.SetAD_Client_ID(Client);
+                        lines.SetAD_Org_ID(Org);
+                        lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                        lines.SetQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetQtyEntered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+                        lines.Set_ValueNoCheck("C_UOM_ID", lstInventoryLines[i].UOMId);
+                        lines.SetM_Requisition_ID(TransactionID);
                         lines.SetPrice(PriceList);
                         if (!lines.Save(trx))
                         {
