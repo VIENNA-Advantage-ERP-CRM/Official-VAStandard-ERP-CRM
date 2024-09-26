@@ -215,6 +215,7 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
     <Compile Include="Areas\VAS\Controllers\VChargeController.cs" />
@@ -241,6 +242,8 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
+    <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
@@ -252,6 +255,8 @@
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_BankBalanceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
