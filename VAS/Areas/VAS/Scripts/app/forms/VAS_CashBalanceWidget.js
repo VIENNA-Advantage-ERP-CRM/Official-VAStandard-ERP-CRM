@@ -45,6 +45,7 @@
                         }
                         divString = $('<div class="VAS_noCashData"  id="div_noCashData_' + widgetID + '">' + VIS.Msg.getMsg("VAS_NoData") + '</div>');
                         $divCashBal.append(divString);
+                        $divCashBal.css("height", "100%");
                         $divnoCashData.show();
                         $divCashBody.hide();
                         $prevArrow.addClass("disabled");
@@ -175,7 +176,6 @@
         this.sizeChanged = function (width) {
             var containerWidth = $divCashBal.width();
             var bankNameWidth = containerWidth - 20;
-            //$divCashBal.find(".VAS-cashbook-name").css("width", bankNameWidth + 'px;');
             var length = $divCashBal.find(".VAS-cashbook-name").length;
             for (var i = 0; i < length; i++) {
                 $($divCashBal.find(".VAS-cashbook-name")[i]).css("width", bankNameWidth + "px");
