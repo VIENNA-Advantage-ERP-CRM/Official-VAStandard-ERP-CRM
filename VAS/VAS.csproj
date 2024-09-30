@@ -259,6 +259,8 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedTransferWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />

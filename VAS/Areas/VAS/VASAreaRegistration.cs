@@ -108,6 +108,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_CashBalanceWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_PurchaseStateDetailWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_CreateInventoryLines.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedTransferWidget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_PendingTransferWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedDeliveryWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_PendingDeliveryWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedInvoiceWidget.js",

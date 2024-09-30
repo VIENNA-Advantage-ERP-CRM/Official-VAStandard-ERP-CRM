@@ -790,7 +790,6 @@ namespace VIS.Models
         /// <param name="pageNo"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-
         public DeliveryResult GetExpectedDelivery(Ctx ctx, int pageNo, int pageSize, string Type)
         {
             string WhereCondition = "";
@@ -978,7 +977,6 @@ namespace VIS.Models
         /// <param name="Order_ID"></param>
         /// <param name="OrderLinesIDs"></param>
         /// <returns></returns>
-
         public Dictionary<string, object> CreateShipment(Ctx ctx, int Order_ID, string OrderLinesIDs)
         {
             Dictionary<string, object> obj = new Dictionary<string, object>();
@@ -1178,6 +1176,125 @@ namespace VIS.Models
             return obj;
         }
 
+
+        /// <summary>
+        /// VAI050-Get the list of expected Requisition
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public dynamic GetExpectedTransfer(Ctx ctx, int pageNo, int pageSize, string Type)
+        {
+            string WhereCondition = "";
+            if (Type.Contains("P")) //Pending Material Transfer
+            {
+                WhereCondition = " AND r.DateRequired < TRUNC(CURRENT_DATE) ";
+            }
+            else //Expected Material Transfer
+            {
+                WhereCondition = " AND r.DateRequired >= TRUNC(CURRENT_DATE) ";
+            }
+            dynamic result = new ExpandoObject();
+            result.Requisitions = new List<dynamic>();
+            StringBuilder sb = new StringBuilder();
+            sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT r.M_Requisition_ID, r.DocumentNo, r.DateDoc,
+                    COUNT(rl.M_RequisitionLine_ID) AS LineCount, r.TotalLines AS GrandTotal, sw.Name AS Source, w.Name AS Destination, 
+                    cb.Name AS Employee, CASE WHEN c.Cursymbol IS NOT NULL THEN c.Cursymbol ELSE c.ISO_Code END AS Symbol, c.StdPrecision
+                    FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON (r.M_Requisition_ID = rl.M_Requisition_ID)
+                    INNER JOIN M_WareHouse sw ON (r.DTD001_MWarehouseSource_ID = sw.M_WareHouse_ID)
+                    INNER JOIN M_WareHouse w ON (r.M_WareHouse_ID = w.M_WareHouse_ID)
+                    INNER JOIN M_PriceList p ON (r.M_PriceList_ID = p.M_PriceList_ID)
+                    INNER JOIN C_Currency c ON (p.C_Currency_ID = c.C_Currency_ID)
+                    LEFT JOIN C_BPartner cb ON (cb.C_BPartner_ID = r.C_BPartner_ID)", "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
+                    AND r.DocStatus IN ('CO')" + WhereCondition + @"AND (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0
+                    GROUP BY r.M_Requisition_ID, r.DocumentNo, r.DateDoc, r.TotalLines, sw.Name, w.Name, cb.Name, CASE WHEN c.Cursymbol IS NOT NULL 
+                    THEN c.Cursymbol ELSE c.ISO_Code END, c.StdPrecision ORDER BY r.DateDoc DESC");
+
+            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                if (pageNo == 1)
+                {
+                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_Requisition_ID) FROM (" + sb.ToString() + ") t ", null, null));
+                }
+
+                // Get the list of Requisitions IDs from the retrieved parent records
+                // Extract Requisition IDs
+                List<int> reqIDs = ds.Tables[0].AsEnumerable().Select(row => Util.GetValueOfInt(row["M_Requisition_ID"])).ToList();
+                if (reqIDs.Count > 0)
+                {
+                    StringBuilder childSb = new StringBuilder(@"
+                    SELECT rl.M_Requisition_ID,rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID,
+                    (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyOrdered, rl.C_UOM_ID,
+                    atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
+                    INNER JOIN M_Locator loc ON (loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=r.DTD001_MWarehouseSource_ID)
+                    WHERE NVL(s.M_Product_ID,0)=NVL(rl.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(rl.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
+                    NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0) AS ConversionRate
+                    FROM M_RequisitionLine rl INNER JOIN  M_Requisition r ON (rl.M_Requisition_ID=r.M_Requisition_ID)
+                    INNER JOIN M_Product p ON (rl.M_Product_ID=p.M_Product_ID) LEFT JOIN C_UOM u ON (rl.C_UOM_ID=u.C_UOM_ID) 
+                    LEFT JOIN  M_AttributeSetInstance atr ON (rl.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
+                    WHERE (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0 AND
+                    rl.M_Requisition_ID IN (" + string.Join(",", reqIDs) + @") ORDER BY rl.M_Requisition_ID");
+
+                    DataSet childDs = DB.ExecuteDataset(childSb.ToString(), null, null);
+                    if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
+                    {
+                        /// Map Requisition lines to parent Requisitions
+                        dynamic reqLine;
+                        Dictionary<int, List<dynamic>> ReqLinesMap = childDs.Tables[0].AsEnumerable()
+                            .GroupBy(row => Util.GetValueOfInt(row["M_Requisition_ID"]))
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group.Select(row =>
+                                {
+                                    reqLine = new ExpandoObject();
+                                    reqLine.QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
+                                     : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]); // Remaining qty in line uom
+                                    reqLine.M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]);
+                                    reqLine.M_RequisitionLine_ID = Util.GetValueOfInt(row["M_RequisitionLine_ID"]);
+                                    reqLine.M_Requisition_ID = Util.GetValueOfInt(row["M_Requisition_ID"]);
+                                    reqLine.M_AttributeSetInstance_ID = Util.GetValueOfInt(row["M_AttributeSetInstance_ID"]);
+                                    reqLine.QtyOrdered = Util.GetValueOfDecimal(row["QtyOrdered"]);
+                                    reqLine.C_UOM_ID = Util.GetValueOfInt(row["C_UOM_ID"]);
+                                    reqLine.AttributeName = Util.GetValueOfString(row["AttributeName"]);
+                                    reqLine.UOM = Util.GetValueOfString(row["Uom"]);
+                                    reqLine.ProductName = Util.GetValueOfString(row["ProductName"]);
+                                    reqLine.OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"]);
+                                    return reqLine;
+                                }).ToList()
+                            );
+
+                        // Step 4: Associate child records with their parent requisitions
+                        dynamic requisition;
+                        int reqId;
+                        foreach (DataRow parentRow in ds.Tables[0].Rows)
+                        {
+                            reqId = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
+                            requisition = new ExpandoObject();
+                            requisition.DocumentNo = Util.GetValueOfString(parentRow["DocumentNo"]);
+                            requisition.M_Requisition_ID = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
+                            requisition.DateDoc = Util.GetValueOfDateTime(parentRow["DateDoc"]);
+                            requisition.GrandTotal = Util.GetValueOfDecimal(parentRow["GrandTotal"]);
+                            requisition.LineCount = Util.GetValueOfDecimal(parentRow["LineCount"]);
+                            requisition.Source = Util.GetValueOfString(parentRow["Source"]);
+                            requisition.Destination = Util.GetValueOfString(parentRow["Destination"]);
+                            requisition.Employee = Util.GetValueOfString(parentRow["Employee"]);
+                            requisition.Symbol = Util.GetValueOfString(parentRow["Symbol"]);
+                            requisition.StdPrecision = Util.GetValueOfInt(parentRow["StdPrecision"]);
+                            requisition.ReqLines = ReqLinesMap.ContainsKey(reqId) ? ReqLinesMap[reqId] : new List<dynamic>();
+                            result.Requisitions.Add(requisition);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                return null;
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// Create line
@@ -1644,13 +1761,15 @@ namespace VIS.Models
                 string FetchSingleRecord = "";
                 trx = VAdvantage.DataBase.Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
-                query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID,o.C_BPartner_ID,o.C_BPartner_Location_ID,o.M_Warehouse_ID,o.AD_User_ID,ol.C_OrderLine_ID,ol.M_AttributeSetInstance_ID,
-                            ol.M_Product_ID,ol.C_UOM_ID,(ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
-                           (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
-                           WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' 
-                           AND i.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyRemianing
-                           FROM C_Order o INNER JOIN C_OrderLine ol ON(o.C_Order_ID = ol.C_Order_ID)
-                             WHERE ol.C_OrderLine_ID IN(" + Order_LineIDs + ")");
+                query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
+                            o.AD_User_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
+                            ol.M_Product_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
+                            (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
+                            INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID)
+                            WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID AND il.IsActive = 'Y' 
+                            AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing
+                            FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
+                            WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -1757,6 +1876,134 @@ namespace VIS.Models
             }
         }
 
+        /// <summary>
+        /// This method is used to generate Material Transfer
+        /// </summary>
+        /// <param name="M_Requisition_ID"></param>
+        /// <param name="M_RequisitionLines_IDs"></param>
+        /// <param name="ctx"></param>
+        /// <returns></returns>
+        public Dictionary<string, object> CreateMaterialTransfer(int M_Requisition_ID, string M_RequisitionLines_IDs, Ctx ctx)
+        {
+            VAdvantage.DataBase.Trx trx = null;
+            Dictionary<string, object> ret = null;
+            try
+            {
+                ret = new Dictionary<string, object>();
+                MMovement Mov = null;
+                int DocType_ID;
+                int LocatorFrom, LocatorTo;
+                trx = VAdvantage.DataBase.Trx.Get("VAS_GenMaterialTransfer" + DateTime.Now.Ticks);
+                StringBuilder query = new StringBuilder();
+                query.Append(@"SELECT r.DateRequired, r.AD_Org_ID, r.DTD001_MWarehouseSource_ID, r.M_Warehouse_ID, r.C_IncoTerm_ID, r.C_BPartner_ID,
+                           rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID, rl.C_UOM_ID, (rl.Qty/rl.QtyEntered) AS ConversionRate,
+                           r.AD_OrgTrx_ID, (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyRemianing
+                           FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON(r.M_Requisition_ID = rl.M_Requisition_ID)
+                           WHERE rl.M_RequisitionLine_ID IN (" + M_RequisitionLines_IDs + ")");
+                DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
+
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    query.Clear();
+                    query.Append(@"SELECT C_DocType_ID FROM C_DocType WHERE IsActive = 'Y' AND DocBaseType='MMM' AND AD_Client_ID=" + ctx.GetAD_Client_ID()
+                                     + " AND AD_Org_ID IN (0, " + Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]) + ") ORDER BY AD_Org_ID DESC, IsInTransit ASC");
+                    DocType_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
+
+                    Mov = new MMovement(ctx, 0, trx);
+                    Mov.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
+                    //Mov.SetMovementDate(DateTime.Now.Date);
+                    Mov.SetC_DocType_ID(DocType_ID);
+                    Mov.SetM_Warehouse_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                    Mov.SetDTD001_MWarehouseSource_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]));
+                    Mov.SetMovementDate(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateRequired"]));
+                    Mov.Set_Value("C_IncoTerm_ID", Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_IncoTerm_ID"]));
+                    if (!Mov.Save())
+                    {
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        string error = pp != null ? pp.GetName() : "";
+                        if (string.IsNullOrEmpty(error))
+                        {
+                            error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                        }
+
+                        ret["Movement_ID"] = 0;
+                        ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_TransferNotSaved");
+                        return ret;
+                    }
+
+                    query.Clear();
+                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]) + " ORDER BY IsDefault DESC");
+                    LocatorFrom = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
+
+                    query.Clear();
+                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault DESC");
+                    LocatorTo = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
+
+                    MMovementLine MovL = null;
+                    int LineNo = 10;
+                    decimal QtyEnetered = 0;
+
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        QtyEnetered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfInt(ds.Tables[0].Rows[i]["ConversionRate"]);
+                        MovL = new MMovementLine(ctx, 0, trx);
+                        MovL.SetAD_Client_ID(Mov.GetAD_Client_ID());
+                        MovL.SetAD_Org_ID(Mov.GetAD_Org_ID());
+                        MovL.SetM_RequisitionLine_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_RequisitionLine_ID"]));
+                        MovL.SetMovementQty(QtyEnetered);
+                        MovL.SetQtyEntered(QtyEnetered);
+                        MovL.SetM_Movement_ID(Mov.GetM_Movement_ID());
+                        MovL.SetM_Locator_ID(LocatorFrom);
+                        MovL.SetM_LocatorTo_ID(LocatorTo);
+                        MovL.SetLine(LineNo);
+                        MovL.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        MovL.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]));
+                        MovL.SetC_BPartner_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_BPartner_ID"]));
+                        //MovL.SetA_Asset_ID(asset_id);
+                        MovL.Set_Value("C_UOM_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
+
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_OrgTrx_ID"]) > 0)
+                        {
+                            MovL.Set_Value("AD_OrgTrx_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_OrgTrx_ID"]));
+                        }
+                        if (!MovL.Save())
+                        {
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            string error = pp != null ? pp.GetName() : "";
+                            if (string.IsNullOrEmpty(error))
+                            {
+                                error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                            }
+
+                            ret["Movement_ID"] = 0;
+                            ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_TransferNotSaved");
+                            return ret;
+                        }
+                        LineNo += 10;
+                    }
+                    ret["Movement_ID"] = Mov.GetM_Movement_ID();
+                    ret["message"] = Msg.GetMsg(ctx, "VAS_TransferSaved");
+                    trx.Commit();
+                    return ret;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                }
+                ret["Movement_ID"] = 0;
+                ret["message"] = Msg.GetMsg(ctx, "VAS_TransferNotSaved");
+                return ret;
+            }
+            finally
+            {
+                if (trx != null)
+                    trx.Close();
+            }
+        }
 
         /// <summary>
         /// VAI050-This method use to get doctype
