@@ -238,6 +238,41 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// Get the list of Expected Material Transfer
+        /// </summary>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public JsonResult GetExpectedTransfer(int pageNo, int pageSize, string Type)
+        {
+            dynamic result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetExpectedTransfer(ctx, pageNo, pageSize, Type);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
 
+        /// <summary>
+        /// This method used to create Material Transfer
+        /// </summary>
+        /// <param name="M_Requisition_ID"></param>
+        /// <param name="M_RequisitionLines_IDs"></param>
+        /// <param name="Type"></param>
+        /// <returns></returns>
+        public JsonResult CreateMaterialTransfer(int M_Requisition_ID, string M_RequisitionLines_IDs)
+        {
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.CreateMaterialTransfer(M_Requisition_ID, M_RequisitionLines_IDs, ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }
