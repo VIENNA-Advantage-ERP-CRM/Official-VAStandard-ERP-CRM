@@ -371,7 +371,7 @@ namespace VIS.Models
                 enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
             }
             sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineTotalAmt, 
-                    r.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
                     SUM(ol.QtyInvoiced) AS CurrentQty, ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355) AS UOM, img.ImageUrl 
                     FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
                     INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
@@ -1761,13 +1761,15 @@ namespace VIS.Models
                 string FetchSingleRecord = "";
                 trx = VAdvantage.DataBase.Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
-                query.Append(@"SELECT  r.DateOrdered,r.AD_Org_ID,r.C_BPartner_ID,r.C_BPartner_Location_ID,r.M_Warehouse_ID,r.AD_User_ID,ol.C_OrderLine_ID,ol.M_AttributeSetInstance_ID,
-                            ol.M_Product_ID,ol.C_UOM_ID,(ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
-                           (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
-                           WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' 
-                           AND i.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyRemianing
-                           FROM C_Order o INNER JOIN C_OrderLine ol ON(r.C_Order_ID = ol.C_Order_ID)
-                             WHERE ol.C_OrderLine_ID IN(" + Order_LineIDs + ")");
+                query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
+                            o.AD_User_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
+                            ol.M_Product_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
+                            (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
+                            INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID)
+                            WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID AND il.IsActive = 'Y' 
+                            AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing
+                            FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
+                            WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
