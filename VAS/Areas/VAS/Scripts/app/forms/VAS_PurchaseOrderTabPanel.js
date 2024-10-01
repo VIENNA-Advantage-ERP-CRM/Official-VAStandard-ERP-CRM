@@ -63,10 +63,10 @@
                         $root.append(lblTitle).append(headerLabel);
                         for (i = 0; i < data.length; i++) {
                             var productDesign = '<div class="VAS-polist-box">';
-                            if (data[i].OrderLineStatusValue === 'OP' || data[i].StatusValue === "") {
+                            if (data[i].OrderLineStatusValue === 'OP' || data[i].OrderLineStatusValue === "") {
                                 productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info vas-openItem"></span></div>';
                             }
-                            else if (data[i].StatusValu && data[i].OrderLineStatusValue.Contains('P')) {
+                            else if (data[i].OrderLineStatusValue && data[i].OrderLineStatusValue.contains('P')) {
                                 productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info"></span></div>';
                             }
                             else {
