@@ -26,13 +26,13 @@
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             GetColumnID();
             createBusyIndicator();
-            $maindiv = $('<div id="VAS_PieChart_' + widgetID + '" class="VAS-chart-container">');
+            $maindiv = $('<div id="vas_pieChartExpense_' + widgetID + '" class="vas-piechartexpense-container">');
             var MainHeadingComboDiv = $('<div class="d-flex justify-content-between">');
             var HeadingDiv = $('<div class= "vas-t10exp-heading">' + VIS.Msg.getMsg("VAS_Top10Expenses") + '</div>');
            // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
             /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
-            $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_DifferentYear", ColumnIds.AD_Reference_ID, false, null);
+            $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_DifferentYear", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             vDifferentYearDataList = new VIS.Controls.VComboBox("VAS_DifferentYear", true, false, true, $DifferentYearDataListLookUp, 20);
             vDifferentYearDataList.setValue("1");
@@ -63,9 +63,6 @@
 
                 // Remove existing canvas if exists
                 $root.find('canvas').remove();
-
-                // Remove existing message if exists
-                $root.find('.VAS-data-message').remove();
 
                 if (ExpenseData.length > 0) {
                     for (var i = 0; i < ExpenseData.length; i++) {
@@ -240,7 +237,7 @@
 
                     // Create a new canvas element and append it to the root
                     const canvas = $('<canvas></canvas>');
-                    var polarChart = $root.find('#VAS_PieChart_' + widgetID);
+                    var polarChart = $root.find('#vas_pieChartExpense_' + widgetID);
                     polarChart.append(canvas);
 
                     // Initialize the chart with the new data
