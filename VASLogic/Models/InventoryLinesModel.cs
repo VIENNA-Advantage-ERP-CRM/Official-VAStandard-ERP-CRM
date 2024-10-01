@@ -26,6 +26,23 @@ namespace VAS.Models
     {
         private static VLogger _log = VLogger.GetVLogger(typeof(MInventory).FullName);
         /// <summary>
+        /// VIS0336-set the window ids for fetching and saving records
+        /// </summary>
+        private enum Windows
+        {
+            PhysicalInventory = 168,
+            Shipment = 169,
+            InventoryMove = 170,
+            MaterialReceipt = 184,
+            InternalUse = 341,
+            SalesOrder = 143,
+            PurchaseOrder = 181,
+            Requisition=322,
+            CustomerReturn=409,
+            VendorReturn=411
+        }
+
+        /// <summary>
         /// VIS0336-using this method for fetching the users for create inventory line form
         /// </summary>
         /// <param name="SearchKey"></param>
@@ -61,16 +78,49 @@ namespace VAS.Models
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo)
+        public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID)
         {
+
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
             StringBuilder sql = new StringBuilder();
-            sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
-                " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, " +
-                " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
-                " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy WHERE VAICNT_TransactionType IN ('OT','PI')");
 
+            sql.Clear();
+            sql.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
+            string WindowName = Util.GetValueOfString(DB.ExecuteScalar(sql.ToString(), null, null));
+
+            sql.Clear();
+            sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
+                " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
+                " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
+                " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy");
+
+            if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory") //Inventory count
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','PI')");
+            }
+
+            if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")//Inventory use
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
+            }
+            if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IM')");
+            }
+            if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")//GRN
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','MR')");
+            }
+            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")//shipment/Delivery order
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','SH')");
+            }
+            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder)|| 
+                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "Sales Quotation") 
+            {
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT')");//sales order/purchase order
+            }
             if (!string.IsNullOrEmpty(CartName))
             {
                 CartName = CartName.ToUpper();
@@ -124,7 +174,7 @@ namespace VAS.Models
                     obj["CreatedBy"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj["CartLineCount"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["LineCount"]);
                     obj["TotalCartCount"] = Util.GetValueOfInt(ds.Tables.Count);
-
+                    obj["ReferenceNo"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["VAICNT_ReferenceNo"]);
 
                     retDic.Add(obj);
                 }
@@ -180,136 +230,726 @@ namespace VAS.Models
         /// <param name="lstScanDetail"></param>
         /// <param name="IsUpdateTrue"></param>
         /// <returns></returns>
-        public string SaveTransactions(Ctx ctx, int InventoryId, List<Inventoryline> lstInventoryLines, bool IsUpdateTrue)
+        public string SaveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, bool IsUpdateTrue, int windowID, string RefNo)
 
         {
             string msg = "";
+            StringBuilder query = new StringBuilder();
+            query.Clear();
+            query.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
+            string WindowName = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, null));
+
+            if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")
+            {
+                msg = SaveInternalUseTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
+                return msg;
+            }
+            else if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove")
+            {
+                msg = SaveInventoryMoveTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
+                return msg;
+            }
+            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_MaterialReceipt" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn")
+            {
+                msg = SaveGRNTransactions(ctx, TransactionID, lstInventoryLines, windowID, RefNo, WindowName);
+                return msg;
+            }
+            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "Sales Quotation")
+            {
+                msg = SaveOrderTransactions(ctx, TransactionID, lstInventoryLines);
+                return msg;
+            }
+            else if (windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_Requisition")
+            {
+                msg = SaveRequisitionTransactions(ctx, TransactionID, lstInventoryLines);
+                return msg;
+            }
+
+            else if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory")
+            {
+
+                Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_InventoryLine"));
+                int InventoryLineID = 0;
+                int Org = 0;
+                int Client = 0;
+                int warehouese = 0;
+                string Mdate = "";
+                StringBuilder sql = new StringBuilder(); ;
+                string InvlinePro = string.Empty;
+                InvlinePro = string.Join(",", lstInventoryLines.Select(p => p.ProductId.ToString()));
+                int LocatorId = 0;
+
+                bool isContainerApplicable = MTransaction.ProductContainerApplicable(ctx);
+                sql.Clear();
+                sql.Append("SELECT MovementDate,AD_Org_ID,M_Warehouse_ID,AD_Client_ID FROM M_Inventory WHERE M_Inventory_ID=" + TransactionID);
+                DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
+                {
+                    Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                    Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
+                    warehouese = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                    Mdate = Util.GetValueOfString(ds.Tables[0].Rows[0]["MovementDate"]);
+                }
+
+
+                LocatorId = MWarehouse.Get(ctx, warehouese).GetDefaultM_Locator_ID();
+
+                if (!isContainerApplicable)
+                {
+                    sql.Clear();
+                    sql = new StringBuilder(
+                    @"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty FROM
+                 (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
+                 ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
+                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
+                    @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
+                    @" AND l.M_Warehouse_ID = " + warehouese +
+                    @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID )
+                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, s.QtyOnHand, p.M_AttributeSet_ID FROM M_Product p 
+                 INNER JOIN M_Storage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
+                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0))
+                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
+                }
+                else
+                {
+                    sql.Clear();
+                    sql = new StringBuilder(@"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty, M_ProductContainer_ID
+                 FROM (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, NVL(t.M_ProductContainer_ID , 0) AS M_ProductContainer_ID,
+                 FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty
+                 FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
+                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
+               @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
+               @" AND l.M_Warehouse_ID = " + warehouese + @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, M_ProductContainer_ID ) 
+                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, mt.M_ProductContainer_ID, p.M_AttributeSet_ID FROM M_Product p 
+                 INNER JOIN M_ContainerStorage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
+                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0) AND mt.M_ProductContainer_ID = NVL(s.M_ProductContainer_ID , 0))
+                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
+                }
+                DataSet ds2 = DB.ExecuteDataset(sql.ToString(), null, null);
+                MInventoryLine inventorline = null;
+                decimal? Conqty = 0;
+                try
+                {
+                    if (lstInventoryLines != null)
+                    {
+
+                        sql.Clear();
+                        sql.Append("SELECT M_Product_ID, NVL(M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,M_InventoryLine_ID,C_UOM_ID FROM M_InventoryLine  WHERE M_Inventory_ID =" + TransactionID);
+                        DataSet ds1 = DB.ExecuteDataset(sql.ToString(), null, null);
+
+
+                        for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
+                        {
+
+                            InventoryLineID = 0;
+                            if (ds1 != null && ds1.Tables[0].Rows.Count > 0)
+                            {
+                                DataRow[] selectedTable = null;
+                                selectedTable = ds1.Tables[0].Select("M_Product_ID=" + lstInventoryLines[i].ProductId + " AND M_AttributeSetInstance_ID=" + lstInventoryLines[i].AttrId + " AND C_UOM_ID = " + lstInventoryLines[i].UOMId);
+                                if (selectedTable.Length > 0)
+                                {
+                                    InventoryLineID = Util.GetValueOfInt(selectedTable[0]["M_InventoryLine_ID"]);
+                                }
+                            }
+
+                            if (InventoryLineID == 0 || (IsUpdateTrue && InventoryLineID > 0))
+                            {
+                                DataRow[] selectedTable1 = null;
+                                selectedTable1 = ds2.Tables[0].Select("M_Product_ID=" + lstInventoryLines[i].ProductId);
+                                if (selectedTable1.Length > 0)
+                                {
+                                    if (Util.GetValueOfInt(selectedTable1[0]["C_UOM_ID"]) != lstInventoryLines[i].UOMId)
+                                    {
+                                        Conqty = MUOMConversion.ConvertProductFrom(ctx, lstInventoryLines[i].ProductId, lstInventoryLines[i].UOMId, Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                                    }
+                                    else
+                                    {
+                                        Conqty = Util.GetValueOfDecimal(selectedTable1[0]["Qty"]);
+                                    }
+                                }
+                                inventorline = new MInventoryLine(ctx, InventoryLineID, trx);
+
+                                if (InventoryLineID > 0)
+                                {
+                                    inventorline.Set_Value("QtyEntered", lstInventoryLines[i].Qty);
+                                    inventorline.SetAsOnDateCount(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                                    inventorline.Set_Value("VAICNT_InventoryCount_ID", lstInventoryLines[i].InventoryCountId);
+                                }
+                                else
+                                {
+                                    inventorline.SetM_Inventory_ID(TransactionID);
+                                    inventorline.SetAD_Org_ID(Org);
+                                    inventorline.SetAD_Client_ID(Client);
+                                    inventorline.SetM_Locator_ID(LocatorId);
+                                    inventorline.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                                    inventorline.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+                                    inventorline.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
+                                    inventorline.SetInventoryType("D");
+                                    inventorline.SetAdjustmentType("A");
+                                    inventorline.Set_Value("QtyEntered", lstInventoryLines[i].Qty);
+                                    inventorline.SetQtyBook(Util.GetValueOfDecimal(Conqty));
+                                    inventorline.SetAsOnDateCount(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                                    inventorline.Set_Value("VAICNT_InventoryCount_ID", lstInventoryLines[i].InventoryCountId);
+                                }
+                                if (!inventorline.Save(trx))
+                                {
+
+                                    msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                                    ValueNamePair pp = VLogger.RetrieveError();
+                                    if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
+                                    {
+                                        msg += " - " + pp.GetName();
+                                    }
+                                    trx.Rollback();
+                                    trx.Close();
+
+                                }
+                            }
+                        }
+
+                        if (trx != null)
+                        {
+                            trx.Commit();
+                        }
+
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (trx != null)
+                    {
+                        trx.Rollback();
+                        trx.Close();
+                    }
+
+                    return msg;
+                }
+                finally
+                {
+                    if (trx != null)
+                    {
+                        trx.Close();
+                    }
+                }
+            }
+            return msg;
+        }
+        /// <summary>
+        /// VIS0336-for saving data in inventory use window
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="InventoryId"></param>
+        /// <param name="lstInventoryLines"></param>
+        /// <param name="RefNo"></param>
+        /// <returns>mesg</returns>
+        public string SaveInternalUseTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, string RefNo)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
             Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_InventoryLine"));
-            int InventoryLineID = 0;
             int Org = 0;
             int Client = 0;
-            int warehouese = 0;
-            string Mdate = "";
-            StringBuilder sql = new StringBuilder(); ;
-            string InvlinePro = string.Empty;
-            InvlinePro = string.Join(",", lstInventoryLines.Select(p => p.ProductId.ToString()));
             int LocatorId = 0;
+            int Warehouse = 0;
+            int _charge = 0;
+            bool hasReqLines = false;
+            DataSet dsReqs = null;
+            StringBuilder sbLine = new StringBuilder("");
+            StringBuilder sbWhereCond = new StringBuilder("");
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_Warehouse_ID FROM M_Inventory WHERE M_Inventory_ID=" + TransactionID);
 
-            bool isContainerApplicable = MTransaction.ProductContainerApplicable(ctx);
-            sql.Clear();
-            sql.Append("SELECT MovementDate,AD_Org_ID,M_Warehouse_ID,AD_Client_ID FROM M_Inventory WHERE M_Inventory_ID=" + InventoryId);
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
                 Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
-                warehouese = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
-                Mdate = Util.GetValueOfString(ds.Tables[0].Rows[0]["MovementDate"]);
+                Warehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
             }
 
+            LocatorId = MWarehouse.Get(ctx, Warehouse).GetDefaultM_Locator_ID();
 
-            LocatorId = MWarehouse.Get(ctx, warehouese).GetDefaultM_Locator_ID();
-
-            if (!isContainerApplicable)
+            if (Util.GetValueOfString(RefNo) != "")
             {
                 sql.Clear();
-                sql = new StringBuilder(
-                @"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty FROM
-                 (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
-                 ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
-                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
-                @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
-                @" AND l.M_Warehouse_ID = " + warehouese +
-                @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID )
-                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, s.QtyOnHand, p.M_AttributeSet_ID FROM M_Product p 
-                 INNER JOIN M_Storage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
-                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0))
-                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
-            }
-            else
-            {
-                sql.Clear();
-                sql = new StringBuilder(@"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty, M_ProductContainer_ID
-                 FROM (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, NVL(t.M_ProductContainer_ID , 0) AS M_ProductContainer_ID,
-                 FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty
-                 FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
-                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
-           @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
-           @" AND l.M_Warehouse_ID = " + warehouese + @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, M_ProductContainer_ID ) 
-                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, mt.M_ProductContainer_ID, p.M_AttributeSet_ID FROM M_Product p 
-                 INNER JOIN M_ContainerStorage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
-                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0) AND mt.M_ProductContainer_ID = NVL(s.M_ProductContainer_ID , 0))
-                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
+                sql.Append(@"SELECT ol.M_RequisitionLine_ID,  ol.M_Product_ID FROM M_RequisitionLine ol INNER JOIN M_Requisition o
+                                    ON ol.M_Requisition_ID =o.M_Requisition_ID WHERE o.Documentno = '" + Util.GetValueOfString(RefNo) + @"' AND ol.M_RequisitionLine_ID NOT IN
+                                      (SELECT NVL(M_Requisitionline_ID,0) FROM M_InventoryLine WHERE M_Inventory_ID = " + TransactionID + ")");
+
+                if (Util.GetValueOfString(RefNo) != "")
+                {
+                    dsReqs = DB.ExecuteDataset(sql.ToString());
+                    if (dsReqs != null && dsReqs.Tables[0].Rows.Count > 0)
+                        hasReqLines = true;
+                }
             }
 
-            DataSet ds2 = DB.ExecuteDataset(sql.ToString(), null, null);
-            MInventoryLine inventorline = null;
-            decimal? Conqty = 0;
+
+            try
+            {
+                if (lstInventoryLines != null)
+                {
+                    Tuple<String, String, String> mInfo = null;
+                    if (Env.HasModulePrefix("DTD001_", out mInfo))
+                    {
+                        _charge = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Charge_ID FROM C_Charge WHERE isactive='Y' AND  DTD001_ChargeType='INV'"));
+                    }
+
+                    for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
+                    {
+
+                        MInventoryLine lines = new MInventoryLine(ctx, 0, trx);
+                        lines.Set_Value("QtyEntered", Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetQtyInternalUse(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetAD_Client_ID(Client);
+                        lines.SetAD_Org_ID(Org);
+                        lines.SetM_Inventory_ID(TransactionID);
+                        lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                        lines.SetM_Locator_ID(LocatorId);
+                        lines.Set_Value("QtyEntered", Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetIsInternalUse(true);
+                        lines.SetQtyInternalUse(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+                        lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
+                        lines.SetC_Charge_ID(_charge);
+                        if (hasReqLines)
+                        {
+                            if (sbLine.Length > 0)
+                            {
+                                sbWhereCond.Clear();
+                                sbWhereCond.Append(" AND M_RequisitionLine_ID NOT IN ( " + sbLine + " ) ");
+                            }
+                            DataRow[] dr = dsReqs.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + sbWhereCond);
+                            if (dr != null && dr.Length > 0)
+                            {
+                                int ReqLineID = Util.GetValueOfInt(dr[0]["M_RequisitionLine_ID"]);
+                                if (ReqLineID > 0)
+                                {
+                                    if (sbLine.Length > 0)
+                                        sbLine.Append(", " + dr[0]["M_RequisitionLine_ID"]);
+                                    else
+                                        sbLine.Append(dr[0]["M_RequisitionLine_ID"]);
+                                    lines.SetM_RequisitionLine_ID(ReqLineID);
+                                }
+                            }
+                        }
+
+                        if (!lines.Save(trx))
+                        {
+
+                            msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
+                            {
+                                msg += " - " + pp.GetName();
+                            }
+                            trx.Rollback();
+                            trx.Close();
+
+                        }
+
+                    }
+                    if (trx != null)
+                    {
+                        trx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                    trx.Close();
+                }
+
+                return msg;
+            }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
+            return msg;
+        }
+        /// <summary>
+        /// VIS0336 for saving data in material transfer
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="InventoryId"></param>
+        /// <param name="lstInventoryLines"></param>
+        /// <param name="RefNo"></param>
+        /// <returns>mesg</returns>
+        public string SaveInventoryMoveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, string RefNo)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_MovementLine"));
+            int Org = 0;
+            int Client = 0;
+            int ToLocatorId = 0;
+            int ToWarehouse = 0;
+            int FromWarehouse = 0;
+            int FromLocatorId = 0;
+            DataSet dsReqs = null;
+            bool hasReqLines = false;
+
+            DataSet dsAssets = null;
+            bool hasAssets = false;
+            StringBuilder sbLine = new StringBuilder("");
+            StringBuilder sbWhereCond = new StringBuilder("");
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_Warehouse_ID,DTD001_MWarehouseSource_ID FROM M_Movement  WHERE M_Movement_ID=" + TransactionID);
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
+                ToWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                FromWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]);
+
+            }
+
+            ToLocatorId = MWarehouse.Get(ctx, ToWarehouse).GetDefaultM_Locator_ID();
+            FromLocatorId = MWarehouse.Get(ctx, FromWarehouse).GetDefaultM_Locator_ID();
+
+
+            if (Util.GetValueOfString(RefNo) != "")
+            {
+                sql.Clear();
+                sql.Append("SELECT A_Asset_ID, M_Product_ID, NVL(M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID FROM A_Asset WHERE IsActive = 'Y' AND AD_Client_ID = "
+                    + ctx.GetAD_Client_ID());
+                dsAssets = DB.ExecuteDataset(sql.ToString());
+                if (dsAssets != null && dsAssets.Tables[0].Rows.Count > 0)
+                    hasAssets = true;
+            }
+
+
+            if (Util.GetValueOfString(RefNo) != "")
+            {
+                sql.Clear();
+                sql.Append(@"SELECT ol.M_RequisitionLine_ID, ol.M_Product_ID FROM M_RequisitionLine ol INNER JOIN M_Requisition o
+                                    ON ol.M_Requisition_ID =o.M_Requisition_ID WHERE o.Documentno = '" + Util.GetValueOfString(RefNo) + @"' AND ol.M_RequisitionLine_ID NOT IN
+                                      (SELECT NVL(M_Requisitionline_ID,0) FROM M_MovementLine WHERE M_Movement_ID = " + TransactionID + ")");
+
+                if (Util.GetValueOfString(RefNo) != "")
+                {
+                    dsReqs = DB.ExecuteDataset(sql.ToString());
+                    if (dsReqs != null && dsReqs.Tables[0].Rows.Count > 0)
+                        hasReqLines = true;
+                }
+            }
+
             try
             {
                 if (lstInventoryLines != null)
                 {
 
-                    sql.Clear();
-                    sql.Append("SELECT M_Product_ID, M_AttributeSetInstance_ID,M_InventoryLine_ID FROM M_InventoryLine  WHERE M_Inventory_ID =" + InventoryId);
-                    DataSet ds1 = DB.ExecuteDataset(sql.ToString(), null, null);
-
 
                     for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
                     {
 
-                        InventoryLineID = 0;
-                        if (ds1 != null && ds1.Tables[0].Rows.Count > 0)
+                        MMovementLine lines = new MMovementLine(ctx, 0, trx);
+
+                        lines.Set_Value("QtyEntered", Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetMovementQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+
+                        lines.SetAD_Client_ID(Client);
+                        lines.SetAD_Org_ID(Org);
+                        lines.SetM_Movement_ID(TransactionID);
+                        lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                        lines.Set_Value("QtyEntered", Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetMovementQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
+                        lines.SetM_Locator_ID(FromLocatorId);
+                        lines.SetM_LocatorTo_ID(ToLocatorId);
+
+                        if (hasReqLines)
                         {
-                            DataRow[] selectedTable = null;
-                            selectedTable = ds1.Tables[0].Select("M_Product_ID=" + lstInventoryLines[i].ProductId + " AND M_AttributeSetInstance_ID=" + lstInventoryLines[i].AttrId);
-                            if (selectedTable.Length > 0)
+                            if (sbLine.Length > 0)
                             {
-                                InventoryLineID = Util.GetValueOfInt(selectedTable[0]["M_InventoryLine_ID"]);
+                                sbWhereCond.Clear();
+                                sbWhereCond.Append(" AND M_RequisitionLine_ID NOT IN ( " + sbLine + " ) ");
+                            }
+                            DataRow[] dr = dsReqs.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + sbWhereCond);
+                            if (dr != null && dr.Length > 0)
+                            {
+                                int ReqLineID = Util.GetValueOfInt(dr[0]["M_RequisitionLine_ID"]);
+                                if (ReqLineID > 0)
+                                {
+                                    if (sbLine.Length > 0)
+                                        sbLine.Append(", " + dr[0]["M_RequisitionLine_ID"]);
+                                    else
+                                        sbLine.Append(dr[0]["M_RequisitionLine_ID"]);
+                                    lines.SetM_RequisitionLine_ID(ReqLineID);
+                                }
                             }
                         }
 
-                        if (InventoryLineID == 0 || (IsUpdateTrue && InventoryLineID > 0))
+                        if (lstInventoryLines[i].AttrId != 0)
                         {
-                            DataRow[] selectedTable1 = null;
-                            selectedTable1 = ds2.Tables[0].Select("M_Product_ID=" + lstInventoryLines[i].ProductId);
-                            if (selectedTable1.Length > 0)
+                            lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+                            if (hasAssets)
                             {
-                                if (Util.GetValueOfInt(selectedTable1[0]["C_UOM_ID"]) != lstInventoryLines[i].UOMId)
+                                DataRow[] drAst = dsAssets.Tables[0].Select(" M_Product_ID = " + lstInventoryLines[i].ProductId + " AND M_AttributeSetInstance_ID = " + lstInventoryLines[i].AttrId);
+                                if (drAst != null && drAst.Length > 0)
                                 {
-                                    Conqty = MUOMConversion.ConvertProductFrom(ctx, lstInventoryLines[i].ProductId, lstInventoryLines[i].UOMId, Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
-                                }
-                                else
-                                {
-                                    Conqty = Util.GetValueOfDecimal(selectedTable1[0]["Qty"]);
+                                    if (Util.GetValueOfInt(drAst[0]["A_Asset_ID"]) > 0)
+                                        lines.SetA_Asset_ID(Util.GetValueOfInt(drAst[0]["A_Asset_ID"]));
                                 }
                             }
-                            inventorline = new MInventoryLine(ctx, InventoryLineID, trx);
+                        }
 
-                            if (InventoryLineID > 0)
+                        if (!lines.Save(trx))
+                        {
+
+                            msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
                             {
-                                inventorline.Set_Value("QtyEntered", lstInventoryLines[i].Qty);
-                                inventorline.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
-                                inventorline.SetAsOnDateCount(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
-                                inventorline.Set_Value("VAICNT_InventoryCount_ID", lstInventoryLines[i].InventoryCountId);
+                                msg += " - " + pp.GetName();
+                            }
+                            trx.Rollback();
+                            trx.Close();
+
+                        }
+
+                    }
+                    if (trx != null)
+                    {
+                        trx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                    trx.Close();
+                }
+
+                return msg;
+            }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
+            return msg;
+        }
+        /// <summary>
+        /// VIS0336-for saving data in GRN and Shipment
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="InventoryId"></param>
+        /// <param name="lstInventoryLines"></param>
+        /// <param name="windowID"></param>
+        /// <param name="RefNo"></param>
+        /// <returns>mesg</returns>
+        public string SaveGRNTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, int windowID, string RefNo, string WindowName)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_InOutLine"));
+            int LocatorId = 0;
+            int ordID = 0;
+            DataSet dsOrderLines = null;
+            bool saved = true;
+            bool IsPrintDes = false;
+            bool hasOrderLines = false;
+            bool hasProdsPurch = false;
+            bool hasConversions = false;
+            bool fetchedUOMConv = false;
+            DataSet dsUOMConv = null;
+
+            MInOut io = new MInOut(ctx, TransactionID, null);
+            LocatorId = MWarehouse.Get(ctx, io.GetM_Warehouse_ID()).GetDefaultM_Locator_ID();
+
+            try
+            {
+                if (lstInventoryLines != null)
+                {
+
+
+                    DataSet dsProPO = GetPurchaingProduct(ctx.GetAD_Client_ID());
+
+                    if (Env.IsModuleInstalled("ED011_"))
+                    {
+                        if (!fetchedUOMConv)
+                        {
+                            dsUOMConv = GetUOMConversions(ctx.GetAD_Client_ID());
+                            fetchedUOMConv = true;
+                        }
+                    }
+
+                    if (LocatorId > 0)
+                    {
+
+                        sql.Clear();
+                        if (RefNo != "")
+                        {
+                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID== Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
+                                sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
+                            else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_CustomerReturn")
+                                sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'N' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
+                            else
+                                sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
+                        }
+                        else if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
+                            sql.Append("SELECT C_Order_ID FROM M_InOut WHERE IsActive = 'Y' AND IsSOTrx = 'Y' AND M_InOut_ID = " + TransactionID);
+
+                        if (sql.Length > 0)
+                            ordID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString()));
+
+                        if (ordID > 0)
+                        {
+                            string selColumn = "";
+                            #region 190 - Check if PrintDescription Column exists
+
+                            int ct = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(AD_Column_ID) FROM 
+                                                                AD_Column WHERE UPPER(ColumnName)=UPPER('PrintDescription') AND AD_Table_ID=260"));
+                            if (ct > 0)
+                                IsPrintDes = true;
+
+                            #endregion
+
+                            if (Env.IsModuleInstalled("DTD001_"))
+                                selColumn = " , ol.DTD001_Org_ID ";
+                            if (IsPrintDes)
+                                selColumn += " , ol.PrintDescription ";
+
+                            sql.Clear();
+                            sql.Append("SELECT ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID, ol.C_UOM_ID " + selColumn + "  FROM C_OrderLine ol WHERE ol.C_Order_ID = " + ordID);
+                            dsOrderLines = DB.ExecuteDataset(sql.ToString());
+                            if (dsOrderLines != null && dsOrderLines.Tables[0].Rows.Count > 0)
+                            {
+                                hasOrderLines = true;
+                            }
+                        }
+
+                        if (ordID > 0)
+                        {
+                            io.SetC_Order_ID(ordID);
+                            if (!io.Save())
+                                saved = false;
+                        }
+                    }
+                    if (saved)
+                    {
+
+                        for (int i = 0; i < lstInventoryLines.Count; i++)
+                        {
+
+                            MInOutLine lines = new MInOutLine(ctx, 0, trx);
+
+                            lines.SetMovementQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                            lines.SetQtyEntered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+
+                            lines.SetAD_Client_ID(io.GetAD_Client_ID());
+                            lines.SetAD_Org_ID(io.GetAD_Org_ID());
+                            lines.SetM_InOut_ID(TransactionID);
+                            lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                            lines.SetMovementQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                            lines.SetQtyEntered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                            if (hasOrderLines)
+                            {
+                                DataRow[] drOL = null;
+                                if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")
+                                {
+                                    if (Env.IsModuleInstalled("DTD001_"))
+                                        drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
+                                            + "AND C_UOM_ID = " + Util.GetValueOfInt(lstInventoryLines[i].UOMId) + " AND DTD001_Org_ID = " + ctx.GetAD_Org_ID());
+                                }
+                                if (!(drOL != null && drOL.Length > 0))
+                                {
+                                    drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
+                                        + "AND C_UOM_ID = " + Util.GetValueOfInt(lstInventoryLines[i].UOMId));
+                                    if (!(drOL != null && drOL.Length > 0))
+                                        drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
+                                        + "AND C_UOM_ID <> " + Util.GetValueOfInt(lstInventoryLines[i].UOMId));
+                                    if (!(drOL != null && drOL.Length > 0))
+                                        drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId));
+                                    if (!(drOL != null && drOL.Length > 0))
+                                        drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId));
+                                }
+                                if (drOL != null && drOL.Length > 0)
+                                {
+                                    lines.SetC_OrderLine_ID(Util.GetValueOfInt(drOL[0]["C_OrderLine_ID"]));
+                                    //190- Set the print description.
+                                    if (IsPrintDes)
+                                        lines.Set_Value("PrintDescription", Util.GetValueOfString(drOL[0]["PrintDescription"]));
+                                }
+                            }
+                            lines.SetM_Locator_ID(LocatorId);
+                            if (Util.GetValueOfInt(lstInventoryLines[i].AttrId) != 0)
+                                lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+
+                            if (!io.IsSOTrx())
+                            {
+                                if (dsProPO == null)
+                                {
+                                    dsProPO = GetPurchaingProduct(ctx.GetAD_Client_ID());
+                                    if (dsProPO != null && dsProPO.Tables[0].Rows.Count > 0)
+                                        hasProdsPurch = true;
+                                }
+
+                                int uomID = Util.GetValueOfInt(lstInventoryLines[i].UOMId);
+                                int uom = 0;
+                                if (hasProdsPurch)
+                                {
+                                    DataRow[] dr = dsProPO.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND C_BPartner_ID = " + io.GetC_BPartner_ID());
+                                    if (dr != null && dr.Length > 0)
+                                        uom = Util.GetValueOfInt(dr[0]["C_UOM_ID"]);
+                                }
+
+                                if (uomID != 0)
+                                {
+                                    if (uomID != uom && uom != 0)
+                                    {
+                                        if (!fetchedUOMConv)
+                                        {
+                                            dsUOMConv = GetUOMConversions(ctx.GetAD_Client_ID());
+                                            fetchedUOMConv = true;
+                                            if (dsUOMConv != null && dsUOMConv.Tables[0].Rows.Count > 0)
+                                                hasConversions = true;
+                                        }
+
+                                        if (hasConversions)
+                                        {
+                                            Decimal? Res = 0;
+                                            DataRow[] drConv = dsUOMConv.Tables[0].Select(" C_UOM_ID = " + uomID + " AND C_UOM_To_ID = " + uom + " AND M_Product_ID= " + Util.GetValueOfInt(lstInventoryLines[i].ProductId));
+                                            if (drConv != null && drConv.Length > 0)
+                                            {
+                                                Res = Util.GetValueOfDecimal(drConv[0]["MultiplyRate"]);
+                                                if (Res <= 0)
+                                                {
+                                                    drConv = dsUOMConv.Tables[0].Select(" C_UOM_ID = " + uomID + " AND C_UOM_To_ID = " + uom);
+                                                    if (drConv != null && drConv.Length > 0)
+                                                        Res = Util.GetValueOfDecimal(drConv[0]["MultiplyRate"]);
+                                                }
+                                            }
+
+                                            if (Res > 0)
+                                                lines.Set_Value("QtyEntered", Util.GetValueOfDecimal(lstInventoryLines[i].Qty) * Res);
+
+                                        }
+                                        lines.SetC_UOM_ID(uom);
+                                    }
+                                    else
+                                        lines.SetC_UOM_ID(uomID);
+                                }
                             }
                             else
-                            {
-                                inventorline.SetM_Inventory_ID(InventoryId);
-                                inventorline.SetAD_Org_ID(Org);
-                                inventorline.SetAD_Client_ID(Client);
-                                inventorline.SetM_Locator_ID(LocatorId);
-                                inventorline.SetM_Product_ID(lstInventoryLines[i].ProductId);
-                                inventorline.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
-                                inventorline.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
-                                inventorline.SetInventoryType("D");
-                                inventorline.SetAdjustmentType("A");
-                                inventorline.Set_Value("QtyEntered", lstInventoryLines[i].Qty);
-                                inventorline.SetQtyBook(Util.GetValueOfDecimal(Conqty));
-                                inventorline.SetAsOnDateCount(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
-                                inventorline.Set_Value("VAICNT_InventoryCount_ID", lstInventoryLines[i].InventoryCountId);
-                            }
-                            if (!inventorline.Save(trx))
+                                lines.SetC_UOM_ID(lstInventoryLines[i].UOMId);
+
+                            if (!lines.Save(trx))
                             {
 
                                 msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
@@ -323,11 +963,11 @@ namespace VAS.Models
 
                             }
                         }
-                    }
 
-                    if (trx != null)
-                    {
-                        trx.Commit();
+                        if (trx != null)
+                        {
+                            trx.Commit();
+                        }
                     }
 
                 }
@@ -349,9 +989,239 @@ namespace VAS.Models
                     trx.Close();
                 }
             }
-
-
             return msg;
+        }
+        /// <summary>
+        /// VIS0336-for saving data in sales order/purchase order
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="InventoryId"></param>
+        /// <param name="lstInventoryLines"></param>
+        /// <returns></returns>
+        public string SaveOrderTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("C_OrderLine"));
+            int Org = 0;
+            int Client = 0;
+            int BPartner = 0;
+            bool IsSOTrx = false;
+            DataSet dsProPO = null;
+            bool hasProdsPurch = false;
+            int PriceList = 0;
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_Warehouse_ID,IsSOTrx,C_BPartner_ID,M_PriceList_ID FROM C_Order WHERE C_Order_ID=" + TransactionID);
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
+                BPartner = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_ID"]);
+                PriceList = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                if (Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]) == "Y")
+                {
+                    IsSOTrx = true;
+
+                }
+            }
+
+            if (!IsSOTrx)
+            {
+                if (dsProPO == null)
+                {
+                    dsProPO = GetPurchaingProduct(ctx.GetAD_Client_ID());
+                    if (dsProPO != null && dsProPO.Tables[0].Rows.Count > 0)
+                        hasProdsPurch = true;
+                }
+            }
+            try
+            {
+                if (lstInventoryLines != null)
+                {
+                    for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
+                    {
+                        MOrderLine lines = new MOrderLine(ctx, 0, trx);
+                        lines.SetAD_Client_ID(Client);
+                        lines.SetAD_Org_ID(Org);
+                        lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                        lines.SetQtyEntered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetQtyOrdered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetC_Order_ID(TransactionID);
+
+                        if (lstInventoryLines[i].AttrId != 0)
+                            lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+
+                        if (IsSOTrx)
+                        {
+                            int uomID = Util.GetValueOfInt(lstInventoryLines[i].UOMId);
+                            int uom = 0;
+
+                            if (hasProdsPurch)
+                            {
+                                DataRow[] dr = dsProPO.Tables[0].Select(" M_Product_ID = " + lstInventoryLines[i].ProductId + " AND C_BPartner_ID = " + BPartner);
+                                if (dr != null && dr.Length > 0)
+                                    uom = Util.GetValueOfInt(dr[0]["C_UOM_ID"]);
+                            }
+
+                            if (uomID != 0)
+                            {
+                                if (uomID != uom && uom != 0)
+                                    lines.SetC_UOM_ID(uom);
+                                else
+                                    lines.SetC_UOM_ID(uomID);
+
+                            }
+                        }
+                        else
+                            lines.SetC_UOM_ID(lstInventoryLines[i].UOMId);
+
+                        lines.SetPrice(PriceList);
+                        if (!lines.Save(trx))
+                        {
+
+                            msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
+                            {
+                                msg += " - " + pp.GetName();
+                            }
+                            trx.Rollback();
+                            trx.Close();
+
+                        }
+
+
+                    }
+                    if (trx != null)
+                    {
+                        trx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                    trx.Close();
+                }
+
+                return msg;
+            }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
+            return msg;
+        }
+
+
+        public string SaveRequisitionTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines)
+
+        {
+            StringBuilder sql = new StringBuilder();
+            string msg = "";
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_RequisitionLine"));
+            int Org = 0;
+            int Client = 0;
+            int PriceList = 0;
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_PriceList_ID FROM M_Requisition  WHERE M_Requisition_ID =" + TransactionID);
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
+                PriceList= Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+            }
+
+        
+            try
+            {
+                if (lstInventoryLines != null)
+                {
+                    for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
+                    {
+                        MRequisitionLine lines = new MRequisitionLine(ctx, 0, trx);
+                        lines.SetAD_Client_ID(Client);
+                        lines.SetAD_Org_ID(Org);
+                        lines.SetM_Product_ID(lstInventoryLines[i].ProductId);
+                        lines.SetQty(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetQtyEntered(Util.GetValueOfDecimal(lstInventoryLines[i].Qty));
+                        lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
+                        lines.Set_ValueNoCheck("C_UOM_ID", lstInventoryLines[i].UOMId);
+                        lines.SetM_Requisition_ID(TransactionID);
+                        lines.SetPrice(PriceList);
+                        if (!lines.Save(trx))
+                        {
+
+                            msg = Msg.GetMsg(ctx, "VA075_ErrorSavingRecord");
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            if (pp != null && !String.IsNullOrEmpty(pp.GetName()))
+                            {
+                                msg += " - " + pp.GetName();
+                            }
+                            trx.Rollback();
+                            trx.Close();
+
+                        }
+
+
+                    }
+                    if (trx != null)
+                    {
+                        trx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                    trx.Close();
+                }
+
+                return msg;
+            }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
+            return msg;
+        }
+
+        public DataSet GetPurchaingProduct(int AD_Client_ID)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            DataSet dsProPurch = null;
+            _sqlQuery.Clear();
+            _sqlQuery.Append(@"SELECT vdr.C_UOM_ID, vdr.C_BPartner_ID, p.M_Product_ID FROM M_Product p LEFT JOIN 
+                            M_Product_Po vdr ON p.M_Product_ID= vdr.M_Product_ID WHERE p.AD_Client_ID = " + AD_Client_ID);
+            dsProPurch = DB.ExecuteDataset(_sqlQuery.ToString());
+            return dsProPurch;
+        }
+        /// <summary>
+        /// VIS0336-conversion method
+        /// </summary>
+        /// <param name="AD_Client_ID"></param>
+        /// <returns></returns>
+        public DataSet GetUOMConversions(int AD_Client_ID)
+        {
+            StringBuilder _sqlQuery = new StringBuilder();
+            DataSet dsConvs = null;
+            _sqlQuery.Clear();
+            _sqlQuery.Append(@"SELECT con.DivideRate, TRUNC(con.multiplyrate,4) AS MultiplyRate, con.C_UOM_ID, con.C_UOM_To_ID, con.M_Product_ID FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y' AND con.AD_Client_ID = " + AD_Client_ID);
+            dsConvs = DB.ExecuteDataset(_sqlQuery.ToString());
+            return dsConvs;
         }
 
     }
