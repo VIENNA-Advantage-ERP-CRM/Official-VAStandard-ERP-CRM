@@ -626,7 +626,7 @@ namespace VASLogic.Models
                          AND cp.IsActive = 'Y'
                          AND oi.IsActive='Y'
                          AND ci.IsActive='Y'
-                         AND current_date BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
+                         AND TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
             // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
             DataSet yearDs = DB.ExecuteDataset(sql.ToString(), null, null);
             if (yearDs != null && yearDs.Tables[0].Rows.Count > 0)
@@ -775,7 +775,7 @@ namespace VASLogic.Models
                  SELECT cp.StartDate, cp.EndDate, cp.AD_Client_ID
                  FROM C_Period cp
                  INNER JOIN C_Year cy ON (cy.C_Year_ID = cp.C_Year_ID)
-                 WHERE CURRENT_DATE BETWEEN cp.StartDate AND cp.EndDate
+                 WHERE TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate
                  AND cp.IsActive='Y' AND cy.IsActive='Y' AND cy.C_Calendar_ID =" + calendar_ID + ")");
 
             sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@" SELECT 'DueAmt' AS Type,
@@ -1254,6 +1254,250 @@ namespace VASLogic.Models
             ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
             return ColumnInfo;
         }
+        /// <summary>
+        /// This function is Used to Get Top 10 Expense Amounts
+        /// </summary>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="ctx">Context</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of  Get Top 10 Expense Amounts</returns>
+        public List<TopExpenseAmountData> GetTop10ExpenseAmountData(Ctx ctx, string ListValue)
+        {
+            TopExpenseAmountData obj = new TopExpenseAmountData(); ;
+            StringBuilder sql = new StringBuilder();
+            StringBuilder sqlQuarter = new StringBuilder();
+            List<TopExpenseAmountData> ExpenseAmountData = new List<TopExpenseAmountData>();
+            //string BPCheck = (ISOtrx == true ? "cb.IsCustomer='Y'" : "cb.IsVendor='Y'");
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            int calendar_ID = 0;
+            int CurrentYear = 0;
+            int currentQuarter = 0;
+            //Finding the calender id and Current Year to get data on this basis
+            sql.Append(@"SELECT
+                         DISTINCT cy.CalendarYears,CASE WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
+                         else ci.C_Calendar_ID END AS C_Calendar_ID
+                         FROM C_Calendar cc
+                         INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
+                         LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Year cy ON (cy.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Period cp  ON (cy.C_Year_ID = cp.C_Year_ID)
+                         WHERE 
+                         cy.IsActive = 'Y'
+                         AND cp.IsActive = 'Y'
+                         AND oi.IsActive='Y'
+                         AND ci.IsActive='Y'
+                         AND TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
+            // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+            DataSet yearDs = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (yearDs != null && yearDs.Tables[0].Rows.Count > 0)
+            {
+                CurrentYear = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["CalendarYears"]);
+                calendar_ID = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["C_Calendar_ID"]);
+            }
+            sql.Clear();
+            //Here we are getting the current quarter
+            sql.Append($@"SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                          WHERE y.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} 
+                          AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate AND y.C_Calendar_ID ={calendar_ID}");
+            DataSet quaterds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (quaterds != null && quaterds.Tables[0].Rows.Count > 0)
+            {
+                currentQuarter = Util.GetValueOfInt(quaterds.Tables[0].Rows[0]["Quarter"]);
+            }
+            sql.Clear();
+            //Main Query to get the data
+            sql.Append($@"WITH FactData AS ({MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 
+                         acct.C_AcctSchema_ID,
+                         fa.AD_Org_ID, 
+                         fa.AD_Client_ID,
+                         fa.DateAcct,
+                         ele.C_Element_ID,
+                         eleVal.Value || '_' || eleVal.NAME AS ExpenseName,
+                         SUM(fa.AmtAcctDr - fa.AmtAcctCR) AS ExpenseAmount
+                         FROM fact_acct fa
+                         INNER JOIN C_AcctSchema acct ON (fa.C_AcctSchema_ID = acct.C_AcctSchema_ID)
+                         INNER JOIN C_AcctSchema_Element acctEle ON (acctEle.C_AcctSchema_ID = acct.C_AcctSchema_ID AND ElementType = 'AC')
+                         INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
+                         INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND AccountType = 'E' AND fa.Account_ID = eleVal.C_ElementValue_ID)
+                         INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                         WHERE acctEle.IsActive = 'Y' AND eleVal.IsActive = 'Y'", "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                     )}");
+            sql.Append(@" GROUP BY 
+                         acct.C_AcctSchema_ID,
+                         fa.AD_Org_ID, 
+                         fa.AD_Client_ID,
+                         ele.C_Element_ID,
+                         eleVal.Value || '_' || eleVal.NAME,
+                         fa.DateAcct)");
+            //If the user selected this quarter the add the with clauses of current quarter
+            if (ListValue == "3")
+            {
+                sql.Append($@",curentPeriod AS
+                               (SELECT PeriodNo, FLOOR(PeriodNo / 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
+                AND y.C_Calendar_ID ={ calendar_ID}
+                AND TRUNC(CURRENT_DATE) between p.StartDate and p.EndDate ),
+                               PeriodQuater AS
+                               (SELECT PeriodNo, FLOOR(PeriodNo/ 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
+                AND y.C_Calendar_ID ={ calendar_ID})");
+            }
+            //If the user selected previous quarter the add the with clauses of current quarter
+            else if (ListValue == "5")
+            {
+
+                //thi if clause is when current quarter is 1 the previous quarter will be of previous year
+                if (currentQuarter == 1)
+                {
+                    CurrentYear = CurrentYear - 1;
+                    sql.Append($@",PeriodPreviousQuater AS
+                                              (SELECT FLOOR(MAX(PeriodNo)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                              WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})
+                                              ,PreviousPeriodQuater AS
+                                              (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                              WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})");
+                }
+                else
+                {
+                    sql.Append($@",curentPeriod AS 
+                                                    (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}
+                                                    AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate ),
+                                                    PeriodQuater AS
+                                                    (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})");
+                }
+            }
+            sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,");
+            //Getting data according to This Fiscal Year
+            if (ListValue == "1")
+            {
+                sql.Append(GetYearSql("Min(C_Period.StartDate)", "Max(C_Period.EndDate)", $@"C_Year.C_Calendar_ID ={calendar_ID}
+                    AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y' AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));
+            }
+            //Getting data according to This Month
+            else if (ListValue == "2")
+            {
+                sql.Append(GetYearSql("Min(C_Period.StartDate)", "Max(C_Period.EndDate)",
+                            $@"C_Year.C_Calendar_ID ={calendar_ID}
+                            AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y'
+                            AND TRUNC(CURRENT_DATE) BETWEEN C_Period.StartDate AND C_Period.EndDate"));
+            }
+            ////Getting data according to this quarter
+            else if (ListValue == "3")
+            {
+
+                sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)",
+                                     $@" c_period.periodno IN (
+                                     SELECT pq.periodno
+                                     FROM period_quarter pq
+                                     INNER JOIN curentPeriod cp ON (cp.Quarter = pq.Quarter)
+                                     ) AND C_Year.C_Calendar_ID ={calendar_ID}
+                                      AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y' AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));
+            }
+            //Getting data according to LasT Year
+            else if (ListValue == "4")
+            {
+                CurrentYear = CurrentYear - 1;
+                sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)",
+                           $@"C_Year.C_Calendar_ID ={calendar_ID}
+                             AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y'
+                            AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));
+            }
+            else if (ListValue == "5")
+            {
+                if (currentQuarter == 1)
+                {
+                    sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)",
+                                         $@" c_period.periodno IN (
+                                     SELECT pq.PeriodNo FROM PreviousPeriodQuater pq INNER JOIN PeriodPreviousQuater cp ON (cp.Quarter = pq.Quarter))
+                                      AND C_Year.C_Calendar_ID ={calendar_ID}
+                                      AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y' AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));
+                }
+                else
+                {
+                    sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)",
+                                             $@" c_period.periodno IN (
+                                    SELECT pq.PeriodNo FROM PeriodQuater pq INNER JOIN curentPeriod cp ON(cp.Quarter - 1 = pq.Quarter))
+                                     AND C_Year.C_Calendar_ID ={calendar_ID}
+                                      AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y' AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));
+                }
+            }
+            ////Getting data according Previous Month
+            else if (ListValue == "6")
+            {
+                sql.Append(GetYearSql("TRUNC(ADD_MONTHS(TRUNC(Current_Date), -1), 'MM')", "LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))", ""));
+            }
+            //Last 6 Months Data
+            else if (ListValue == "7")
+            {
+                if (DB.IsPostgreSQL())
+                {
+                    sql.Append(GetYearSql("DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'", "(DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 MONTH' + INTERVAL '1 MONTH - 1 day')", ""));
+                }
+                else
+                {
+                    sql.Append(GetYearSql("TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')", "LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))", ""));
+                }
+            }
+            //Last 12 Months Data
+            else if (ListValue == "8")
+            {
+                if (DB.IsPostgreSQL())
+                {
+                    sql.Append(GetYearSql("DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'", "(DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' + INTERVAL '1 month - 1 day')", ""));
+                }
+                else
+                {
+                    sql.Append(GetYearSql("TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')", "LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))", ""));
+                }
+
+            }
+            sql.Append($@" GROUP BY c_period.AD_Client_ID)");
+            sql.Append(@" SELECT SUM(ExpenseAmount) AS TotalExpenseAmount,
+                         fa.ExpenseName 
+                         FROM
+                         FactData fa 
+                         INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=fa.AD_Client_ID)
+                     WHERE fa.DateAcct BETWEEN pd.StartDate AND pd.EndDate
+                     GROUP BY fa.ExpenseName
+                     ORDER BY TotalExpenseAmount DESC
+                     FETCH FIRST 10 ROWS ONLY");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new TopExpenseAmountData();
+                    obj.ExpenseAmount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalExpenseAmount"]);
+                    obj.ExpenseName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ExpenseName"]);
+                    ExpenseAmountData.Add(obj);
+                }
+
+            }
+            return ExpenseAmountData;
+        }
+        /// <summary>
+        /// This function to concatenate the query based on differnet scenarios
+        /// </summary>
+        /// <param name="StartDate">StartDate</param>
+        /// <param name="EndDate">EndDate</param>
+        /// <param name="whereClaues">whereClaues</param>
+        /// <author>VIS_427</author>
+        /// <returns>Concatenated Query String</returns>
+        public string GetYearSql(string StartDate, string EndDate, string whereClaues)
+        {
+            StringBuilder sql = new StringBuilder();
+            sql.Append(@" " + StartDate + " AS StartDate, " + EndDate + " AS EndDate " +
+                " FROM C_Year INNER JOIN C_Period ON (C_Year.C_Year_ID=C_Period.C_Year_ID)");
+            if (whereClaues != "")
+            {
+                sql.Append(" WHERE " + whereClaues);
+            }
+            return sql.ToString();
+        }
+
     }
     public class TabPanel
     {
@@ -1391,5 +1635,11 @@ namespace VASLogic.Models
         public string DocumentNo { get; set; }
         public int recordCount { get; set; }
 
+    }
+    public class TopExpenseAmountData
+    {
+        public decimal ExpenseAmount { get; set; }
+        public string ExpenseName { get; set; }
+        public int stdPrecision { get; set; }
     }
 }

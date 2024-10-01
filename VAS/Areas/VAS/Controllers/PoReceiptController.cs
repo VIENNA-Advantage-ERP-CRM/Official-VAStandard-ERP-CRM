@@ -265,5 +265,19 @@ namespace VAS.Areas.VAS.Controllers
             Dictionary<string, int> columnData = refernceId.GetColumnIds(ctx, refernceName);
             return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is Used to Get Top 10 Expense Amounts
+        /// </summary>
+        /// <param name="ListValue">ListValue</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of  Get Top 10 Expense Amounts</returns>
+        public JsonResult GetTop10ExpenseAmountData(string ListValue)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel yearBasedExpenseData = new PoReceiptTabPanelModel();
+            List<TopExpenseAmountData> ExpenseData = yearBasedExpenseData.GetTop10ExpenseAmountData(ctx, ListValue);
+            return Json(JsonConvert.SerializeObject(ExpenseData), JsonRequestBehavior.AllowGet);
+        }
+
     }
 }
