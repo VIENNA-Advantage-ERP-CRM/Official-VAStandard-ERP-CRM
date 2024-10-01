@@ -678,6 +678,8 @@
     float: left;
     padding: 15px 10px 7px;
     width: 100%;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
     .vas-sortby-dropdown .vas-column-list-item:hover, .vas-single-selection-dropdown .vas-column-list-item:hover {
@@ -1635,6 +1637,108 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 .vas-tis-icondiv{
     float: left;
+}
+
+.vas-dateBlock .vis-advancedSearchInput1 {
+    display: flex;
+    align-items: center;
+    float: none;
+    width: auto;
+}
+.vas-dateBlock .vis-advancedSearchInput {
+    flex-basis: 33%;
+    margin-right: 0;
+    padding-right: 10px;
+}
+
+.vas-dateBlock .vis-advancedSearchHorigontal {
+    display: flex;
+    position: relative;
+    width: 14%;
+}
+
+.vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] {
+    margin-right: 4px;
+}
+    .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
+        margin-right: 7px;
+    }
+.vas-dateBlock .vis-advancedSearchInput select {
+    margin: 0;
+}
+
+.vas-sortCollection {
+    display: inline-block;
+    width: 100%;
+}
+
+.VAS-sortedItem {
+    margin-bottom: 10px;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+    .VAS-sortedItem:last-child {
+        margin-bottom: 0;
+    }
+
+.vas-join-multiselect {
+    padding: 12px 10px 7px;
+}
+
+html[dir=rtl] .vas-filters-editdelete-btns {
+    float: left;
+}
+
+html[dir=rtl] .vas-filters-block {
+    float: right;
+}
+
+    html[dir=rtl] .vas-filters-block .vas-selecttable {
+        float: right;
+    }
+
+html[dir=rtl] .vas-multiselect .vas-arrow-down, html[dir=rtl] .vas-joinfielddropdown .vas-arrow-down, html[dir=rtl] .vas-single-input .vas-arrow-down {
+    right: auto;
+    left: 10px;
+}
+
+html[dir=rtl] .vas-filterofMultipleCols i.fa.fa-exchange {
+    right: auto;
+    left: 0;
+}
+
+html[dir=rtl] .vas-checkboxes .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-sortby-dropdown {
+    float: none;
+}
+
+html[dir=rtl] .vas-add-label-content.vas-sortByDropdown {
+    display: flex;
+    flex-direction: column;
+}
+
+html[dir=rtl] .vas-filter-text-input.vas-single-selection-dropdown .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
+    margin-left: 7px;
+}
+
+html[dir=rtl] .vis-advanedSearch-InputsWrap.vis-advancedSearchMrgin {
+    margin-top: 15px;
+}
+
+html[dir=rtl] .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
+    margin-bottom: 0px;
 }
 
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/

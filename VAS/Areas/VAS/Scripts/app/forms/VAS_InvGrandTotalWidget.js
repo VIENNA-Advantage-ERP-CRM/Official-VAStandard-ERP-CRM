@@ -22,12 +22,17 @@
         var $maindiv = null;
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
+        var $dummDiv = null;
+        var RecCount = 0;
+        var listDesign = null;
+        var ExpectedRecordCount = 5;
 
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
             //This function will get the reference id of list
             GetColumnID();
             createBusyIndicator();
+            createDummyDiv()
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             var classTop5 = (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? 'vas-igtwidg-customer-bgColor' : 'vas-igtwidg-vendor-bgColor');
             $maindiv = $('<div class="vas-igtwidg-top-vendors-col ' + classTop5 + '">');
@@ -57,6 +62,25 @@
             }
             $bsyDiv[0].style.visibility = "visible";
         };
+        function createDummyDiv() {
+            $dummDiv = '<div class="vas-igtwidg-invoices-box vas-idtwidg-emptydiv">'+
+                '<div class="vas-igtwidg-invoices-detail" >'+
+                '<div class="vas-igtwidg-thumb-w-txt">'+
+                '<img src="" alt="" class="vas-igtwidg-emptyimg">'+
+                '<div class="vas-igtwidg-vendor-w-date">'+
+                 '<div class="vas-igtwidg-vendor-name"></div>'+
+                '<div class="vas-igtwidg-invoiceDate"></div>'+
+               '</div>'
+               '</div>'+
+               '<div class="vas-igtwidg-invoiceTotalAmt"><span class="vas-igtwidg-amt-val"></span><span class="vas-igtwidg-cur-symbol"><span></span></span></div>'+
+               '</div>'+
+               '</div>';
+        };
+        function bindDummyDiv(j) {
+            for (var i = 0; i < j; i++) {
+                listDesign.append($dummDiv);
+            };
+        };
 
         /*This function will load data in widget */
         this.intialLoad = function () {
@@ -68,10 +92,11 @@
                 if (gridDataResult != null && gridDataResult.length > 0) {
                     InitailizeMessage();
                     // Create the container for the list
-                    var listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + widgetID + '">');
+                     listDesign = $('<div class="vas-igtwidg-vendors-listing" id="vas_listContainer_' + widgetID + '">');
 
                     // Iterate through each item in the gridDataResult
                     for (var i = 0; i < gridDataResult.length; i++) {
+                        RecCount+=1
                         var custChar = '';
                         var custNameArr = gridDataResult[i].Name.trim().split(' ');
 
@@ -121,6 +146,9 @@
 
                         // Append the widget data design to the list container
                         listDesign.append(widgetDataDesign);
+                    }
+                    if (RecCount < ExpectedRecordCount) {
+                        bindDummyDiv(ExpectedRecordCount - RecCount);
                     }
                     $maindiv.append(listDesign);
                     $root.append($maindiv);
