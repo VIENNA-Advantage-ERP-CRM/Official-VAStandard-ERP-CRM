@@ -88,7 +88,7 @@
                 var width = $divCashBal.width();
                 for (var i = start; i < end; i++) {
                     $divCashBody.append('<div class="VAS-cashDetail-box" id="div_cashDetail_' + widgetID + '">'
-                        + '<div style="width:' + (width - 20) +'px;" class="VAS-cashbook-name" title="' + cashBalData[i].Name + '">' + cashBalData[i].Name + '</div>'
+                        + '<div class="VAS-cashbook-name" title="' + cashBalData[i].Name + '">' + cashBalData[i].Name + '</div>'
                         + '<div class="VAS-CashBaldata"><div class="VAS-cashISOCode"> ' + cashBalData[i].ISO_Code + '</div> <div class="VAS-cashbook-amount">'
                         + cashBalData[i].CompletedBalance.toLocaleString(window.navigator.language,
                             { minimumFractionDigits: cashBalData[i].StdPrecision, maximumFractionDigits: cashBalData[i].StdPrecision }) + '</div></div>'
