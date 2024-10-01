@@ -619,8 +619,8 @@ namespace VIS.Models
                     Dictionary<string, object> retDic = new Dictionary<string, object>();
                     retDic["Product_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]);
                     retDic["ProductName"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
-                    retDic["CurrentTotal"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["CurrentTotal"]);
-                    retDic["PreviousTotal"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["PreviousTotal"]);
+                    retDic["CurrentTotal"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["CurrentTotal"]);
+                    retDic["PreviousTotal"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PreviousTotal"]);
                     ProductList.Add(retDic);
                 }
                 return ProductList;
