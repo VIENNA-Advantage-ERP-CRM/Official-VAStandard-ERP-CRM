@@ -29,7 +29,7 @@
             $maindiv = $('<div id="vas_pieChartExpense_' + widgetID + '" class="vas-piechartexpense-container">');
             var MainHeadingComboDiv = $('<div class="d-flex justify-content-between">');
             var HeadingDiv = $('<div class= "vas-t10exp-heading">' + VIS.Msg.getMsg("VAS_Top10Expenses") + '</div>');
-           // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
+            // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
             /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
             $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_DifferentYear", ColumnIds.AD_Reference_ID, false, null);
@@ -166,73 +166,73 @@
                         },
                         plugins: [
                             doughnutLabelsLine = {
-                            id: 'doughnutLabelsLine',
-                            afterDraw(chart, args, options) {
-                                const { ctx, chartArea } = chart;
-                                const centerX = (chartArea.left + chartArea.right) / 2;
-                                const centerY = (chartArea.top + chartArea.bottom) / 2;
-                                const radius = Math.min(chartArea.width, chartArea.height) / 2;
-                                const offset = 90;
+                                id: 'doughnutLabelsLine',
+                                afterDraw: function (chart, args, options) {
+                                    const { ctx, chartArea } = chart;
+                                    const centerX = (chartArea.left + chartArea.right) / 2;
+                                    const centerY = (chartArea.top + chartArea.bottom) / 2;
+                                    const radius = Math.min(chartArea.width, chartArea.height) / 2;
+                                    const offset = 90;
 
-                                let previousY = null;
-                                let previousAngle = null;
+                                    let previousY = null;
+                                    let previousAngle = null;
 
-                                chart.data.datasets.forEach((dataset, i) => {
-                                    if (!chart.isDatasetVisible(i)) return;
+                                    chart.data.datasets.forEach((dataset, i) => {
+                                        if (!chart.isDatasetVisible(i)) return;
 
-                                    chart.getDatasetMeta(i).data.forEach((datapoint, index) => {
-                                        if (datapoint.hidden) return;
+                                        chart.getDatasetMeta(i).data.forEach((datapoint, index) => {
+                                            if (datapoint.hidden) return;
 
-                                        const { startAngle, endAngle } = datapoint;
-                                        let angle = (startAngle + endAngle) / 2;
+                                            const { startAngle, endAngle } = datapoint;
+                                            let angle = (startAngle + endAngle) / 2;
 
-                                        if (previousAngle !== null && Math.abs(angle - previousAngle) < 0.01) {
-                                            angle += 0.05;
-                                        }
+                                            if (previousAngle !== null && Math.abs(angle - previousAngle) < 0.01) {
+                                                angle += 0.05;
+                                            }
 
-                                        const adjustedRadius = radius - offset;
+                                            const adjustedRadius = radius - offset;
 
-                                        const startX = centerX + adjustedRadius * Math.cos(angle);
-                                        const startY = centerY + adjustedRadius * Math.sin(angle);
+                                            const startX = centerX + adjustedRadius * Math.cos(angle);
+                                            const startY = centerY + adjustedRadius * Math.sin(angle);
 
-                                        const { x, y } = datapoint.tooltipPosition();
-                                        const lineLength = radius / 3.5;  // Shortened line length
-                                        let extraLine = 10;               // Shortened extra line length
-                                        const xLine = x >= centerX ? x + lineLength + 25 : x - lineLength - 25;
-                                        let yLine = y >= centerY ? y + lineLength-25 : y - lineLength + 25;
+                                            const { x, y } = datapoint.tooltipPosition();
+                                            const lineLength = radius / 3.5;  // Shortened line length
+                                            let extraLine = 10;               // Shortened extra line length
+                                            const xLine = x >= centerX ? x + lineLength + 25 : x - lineLength - 25;
+                                            let yLine = y >= centerY ? y + lineLength - 25 : y - lineLength + 25;
 
-                                        const minSpacing = 20;
-                                        if (previousY !== null && Math.abs(yLine - previousY) < minSpacing) {
-                                            yLine = previousY + (y >= centerY ? minSpacing : -minSpacing);
-                                            extraLine += 5;               // Adjust extra line length as needed
-                                        }
+                                            const minSpacing = 20;
+                                            if (previousY !== null && Math.abs(yLine - previousY) < minSpacing) {
+                                                yLine = previousY + (y >= centerY ? minSpacing : -minSpacing);
+                                                extraLine += 5;               // Adjust extra line length as needed
+                                            }
 
-                                        previousY = yLine;
-                                        previousAngle = angle;
+                                            previousY = yLine;
+                                            previousAngle = angle;
 
-                                        ctx.beginPath();
-                                        ctx.moveTo(startX, startY);
-                                        ctx.lineTo(xLine, yLine);
-                                        ctx.lineTo(xLine + (x >= centerX ? extraLine : -extraLine), yLine);
-                                        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-                                        ctx.lineWidth = 1;
-                                        ctx.stroke();
-                                        ctx.closePath();
+                                            ctx.beginPath();
+                                            ctx.moveTo(startX, startY);
+                                            ctx.lineTo(xLine, yLine);
+                                            ctx.lineTo(xLine + (x >= centerX ? extraLine : -extraLine), yLine);
+                                            ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+                                            ctx.lineWidth = 1;
+                                            ctx.stroke();
+                                            ctx.closePath();
 
-                                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                                        ctx.font = '12px sans-serif';
+                                            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                                            ctx.font = '12px sans-serif';
 
-                                        const textAlign = x >= centerX ? 'left' : 'right';
-                                        const textX = x >= centerX ? xLine + extraLine + 5 : xLine - extraLine - 5;
-                                        const textY = yLine;
+                                            const textAlign = x >= centerX ? 'left' : 'right';
+                                            const textX = x >= centerX ? xLine + extraLine + 5 : xLine - extraLine - 5;
+                                            const textY = yLine;
 
-                                        ctx.textAlign = textAlign;
-                                        ctx.textBaseline = 'middle';
-                                        ctx.fillText(dataset.data[index], textX, textY);
+                                            ctx.textAlign = textAlign;
+                                            ctx.textBaseline = 'middle';
+                                            ctx.fillText(dataset.data[index], textX, textY);
+                                        });
                                     });
-                                });
-                            }
-                        }]
+                                }
+                            }]
                     };
 
                     // Create a new canvas element and append it to the root
