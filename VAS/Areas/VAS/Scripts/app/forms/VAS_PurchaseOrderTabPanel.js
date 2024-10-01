@@ -50,7 +50,7 @@
                         if (lblTitle != null) {
                             lblTitle.remove();
                         }
-                        if (data[0].OrderStatusValue == 'DE') {
+                        if (data[0].OrderStatusValue == 'DE' || data[0].OrderStatusValue == 'DI') {
                             lblTitle = $('<div class="VAS-delivered-msg"><i class="fa fa-check-circle" aria-hidden="true"></i><span class="">' + data[0].OrderStatus + '</span> </div>');
                         }
                         else if (data[0].OrderStatusValue === 'OP' || data[0].OrderStatusValue === "") {
@@ -63,11 +63,11 @@
                         $root.append(lblTitle).append(headerLabel);
                         for (i = 0; i < data.length; i++) {
                             var productDesign = '<div class="VAS-polist-box">';
-                            if (data[i].OrderLineStatusValue === 'PD') {
-                                productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info"></span></div>';
-                            }
-                            else if (data[i].OrderLineStatusValue === 'OP' || data[i].StatusValue === "") {
+                            if (data[i].OrderLineStatusValue === 'OP' || data[i].StatusValue === "") {
                                 productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info vas-openItem"></span></div>';
+                            }
+                            else if (data[i].StatusValu && data[i].OrderLineStatusValue.Contains('P')) {
+                                productDesign += '<div class="VAS-po-info-icon"><span class="vis vis-info"></span></div>';
                             }
                             else {
                                 productDesign += '<div class="VAS-po-approve-icon"><i class="fa fa-check-circle" aria-hidden="true"></i></div>';
