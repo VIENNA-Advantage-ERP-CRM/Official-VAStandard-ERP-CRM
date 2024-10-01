@@ -124,7 +124,7 @@
 
         var $filterDateDiv = $('<div class="vis-advanedSearch-InputsWrap vis-advancedSearchMrgin vas-dateBlock">'
             + '<div id="currentDate" class= "vis-form-group vis-advancedSearchInput1" ><input type="checkbox" '
-            + 'id="chkDynamic" name="IsDynamic" class="vis-pull-left"><label for="IsDynamic">Is Dynamic</label></div>'
+            + 'id="chkDynamic" name="IsDynamic" class="vis-pull-left"><label for="IsDynamic">' + VIS.Msg.getMsg("IsDynamic") + '</label></div>'
             + '<div class="vis-form-group vis-advancedSearchInput">'
             + '<select id="drpDynamicOp" disabled>'
             + '<option>' + VIS.Msg.getMsg("Today") + '</option>'
@@ -133,13 +133,13 @@
             + '<option>' + VIS.Msg.getMsg("lastxYears") + '</option>'
             + '</select></div>'
             + '<div class= "vis-form-group vis-advancedSearchHorigontal vis-pull-left"id = "divYear" style = "display: none;" >'
-            + '<input id = "txtYear" type = "number" min = "1" max = "99" > <label for="Year">Year</label>'
+            + '<input id = "txtYear" type = "number" min = "1" max = "99" > <label for="Year">' + VIS.Msg.getMsg("Year") + '</label>'
             + '</div>'
             + '<div class="vis-form-group vis-advancedSearchHorigontal vis-pull-left" id="divMonth" style="display: none;">'
             + ' <input id="txtMonth" type="number" min="1" max="12">'
-            + '<label for="Month">Month</label></div><div class="vis-form-group vis-advancedSearchHorigontal vis-pull-left" id="divDay" style="">'
+            + '<label for="Month">' + VIS.Msg.getMsg("Month") + '</label></div><div class="vis-form-group vis-advancedSearchHorigontal vis-pull-left" id="divDay" style="">'
             + '<input id="txtDay" type="number" min="0" max="31">'
-            + '<label for="Day">Day</label></div></div>');
+            + '<label for="Day">' + VIS.Msg.getMsg("Day") + '</label></div></div>');
         var sqlQuery = VIS.Msg.getMsg("VAS_SQLQuery");
         var $sortCollection = $("<div class='vas-sortCollection'>");
         var testSQL = VIS.Msg.getMsg("VAS_TestSql");
@@ -1573,7 +1573,7 @@
             }
         }
 
-        /*getting last x days query from current date*/
+        /*Getting last n days query*/
 
         function getDynamicValue(index) {
             var text = "";
@@ -1581,7 +1581,7 @@
             return text;
         };
 
-        /*calucating total days*/
+        /*Calucating total days*/
 
         function getTotalDays(index) {
             var totasldays = 0;
