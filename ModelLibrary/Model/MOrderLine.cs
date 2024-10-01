@@ -509,7 +509,7 @@ namespace VAdvantage.Model
                         // if Tax Preference is Location
                         else if (pref == "L")
                         {
-                            c_tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                            c_tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                             if (c_tax_ID > 0)
                             {
                                 SetC_Tax_ID(c_tax_ID);
@@ -533,7 +533,7 @@ namespace VAdvantage.Model
                                     }
                                     else
                                     {
-                                        c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                        c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                         if (c_tax_ID > 0)
                                         {
                                             SetC_Tax_ID(c_tax_ID);
@@ -543,7 +543,7 @@ namespace VAdvantage.Model
                                 }
                                 else
                                 {
-                                    c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (c_tax_ID > 0)
                                     {
                                         SetC_Tax_ID(c_tax_ID);
@@ -553,7 +553,7 @@ namespace VAdvantage.Model
                             }
                             else
                             {
-                                c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                 if (c_tax_ID > 0)
                                 {
                                     SetC_Tax_ID(c_tax_ID);
@@ -684,7 +684,7 @@ namespace VAdvantage.Model
             return C_Tax_ID;
         }
 
-        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
@@ -692,14 +692,18 @@ namespace VAdvantage.Model
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                    " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
                     " AND (CASE WHEN (tcr.VATAX_IsPostal = 'Y') THEN CASE WHEN tcr.Postal <= '" + Postal + "' AND tcr.Postal_To >= '" + Postal + "' THEN 1 ELSE 2" +
-                    " END ELSE  CASE WHEN tcr.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " END ELSE  CASE WHEN tcr.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
             if (C_Tax_ID > 0)
@@ -712,14 +716,18 @@ namespace VAdvantage.Model
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                         " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                         " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.VATAX_IsPostal = 'Y') THEN CASE WHEN tcr.Postal <= '" + Postal +
                         "' AND tcr.Postal_To >= '" + Postal + "' THEN 1 ELSE 2" + " END ELSE  CASE WHEN tcr.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                 if (C_Tax_ID > 0)
@@ -733,7 +741,9 @@ namespace VAdvantage.Model
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                             " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID IS NULL " + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.VATAX_IsPostal = 'Y') THEN CASE WHEN tcr.Postal <= '"
                             + Postal + "' AND tcr.Postal_To >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN tcr.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                            + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            + (isSoTrx ? 'S' : 'P') + "')";
+                        sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
 
                         if (C_Tax_ID > 0)
@@ -745,7 +755,9 @@ namespace VAdvantage.Model
                             // VIS0060: Changes done to get Tax Rate when not available with Postal code.
                             sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                                 " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                                " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                            sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
                             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                             if (C_Tax_ID > 0)
                             {
@@ -755,7 +767,9 @@ namespace VAdvantage.Model
                             {
                                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
-                                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                    + (isSoTrx ? 'S' : 'P') + "')";
+                                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                                sql += " ORDER BY tx.SOPOType DESC";
                                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                                 if (C_Tax_ID > 0)
                                 {
@@ -769,7 +783,7 @@ namespace VAdvantage.Model
             return C_Tax_ID;
         }
 
-        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
@@ -777,14 +791,18 @@ namespace VAdvantage.Model
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
                 " AND (CASE WHEN (trl.VATAX_IsPostal = 'Y') THEN CASE WHEN trl.Postal <= '" + Postal + "' AND trl.Postal_To >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.Postal = '"
-                + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
             if (C_Tax_ID > 0)
@@ -797,14 +815,18 @@ namespace VAdvantage.Model
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID +
-                    " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.VATAX_IsPostal = 'Y') THEN CASE WHEN trl.Postal <= '"
                     + Postal + "' AND trl.Postal_To >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                 if (C_Tax_ID > 0)
@@ -818,7 +840,9 @@ namespace VAdvantage.Model
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                         + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID IS NULL AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.VATAX_IsPostal = 'Y') THEN CASE WHEN trl.Postal <= '"
                         + Postal + "' AND trl.Postal_To >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.Postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "')";
+                        sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
 
                         if (C_Tax_ID > 0)
@@ -830,7 +854,9 @@ namespace VAdvantage.Model
                             // VIS0060: Changes done to get Tax Rate when not available with Postal code.
                             sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                             + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                            sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
                             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                             if (C_Tax_ID > 0)
                             {
@@ -840,7 +866,9 @@ namespace VAdvantage.Model
                             {
                                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','"
-                                + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                + (isSoTrx ? 'S' : 'P') + "')";
+                                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                                sql += " ORDER BY tx.SOPOType DESC";
                                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                                 if (C_Tax_ID > 0)
                                 {
@@ -852,6 +880,30 @@ namespace VAdvantage.Model
                 }
             }
             return C_Tax_ID;
+        }
+
+        /// <summary>
+        /// This function is used to create Where Clause for Indian Localization for Tax category
+        /// </summary>
+        /// <param name="Region_ID">Business Partner Region ID</param>
+        /// <param name="OrgRegion_ID">Organization Region ID</param>
+        /// <author>VIS0060</author>
+        /// <returns>Where Clause</returns>
+        public static string TaxWhereClauseIndianLoc(int Region_ID, int OrgRegion_ID)
+        {
+            string whereClause = string.Empty;
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                if (Region_ID != 0 && OrgRegion_ID != 0 && Region_ID != OrgRegion_ID)
+                {
+                    whereClause = " AND tx.VA106_GSTTaxType = '03'";
+                }
+                else if (Region_ID != 0 && OrgRegion_ID != 0 && Region_ID == OrgRegion_ID)
+                {
+                    whereClause = " AND tx.VA106_GSTTaxType != '03'";
+                }
+            }
+            return whereClause;
         }
 
         private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int taxRegion, int toCountry)

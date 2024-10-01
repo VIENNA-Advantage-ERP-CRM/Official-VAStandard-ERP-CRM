@@ -212,7 +212,7 @@ namespace VIS.Models
                         {
                             if (taxCat.GetVATAX_Preference2() == "L")
                             {
-                                C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                 if (C_Tax_ID > 0)
                                 {
                                     return C_Tax_ID;
@@ -235,7 +235,7 @@ namespace VIS.Models
                                                 }
                                                 else
                                                 {
-                                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                                     if (C_Tax_ID > 0)
                                                     {
                                                         return C_Tax_ID;
@@ -244,7 +244,7 @@ namespace VIS.Models
                                             }
                                             else
                                             {
-                                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                                 if (C_Tax_ID > 0)
                                                 {
                                                     return C_Tax_ID;
@@ -253,7 +253,7 @@ namespace VIS.Models
                                         }
                                         else
                                         {
-                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                             if (C_Tax_ID > 0)
                                             {
                                                 return C_Tax_ID;
@@ -278,7 +278,7 @@ namespace VIS.Models
                                         }
                                         else
                                         {
-                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                             if (C_Tax_ID > 0)
                                             {
                                                 return C_Tax_ID;
@@ -287,7 +287,7 @@ namespace VIS.Models
                                     }
                                     else
                                     {
-                                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                         if (C_Tax_ID > 0)
                                         {
                                             return C_Tax_ID;
@@ -296,7 +296,7 @@ namespace VIS.Models
                                 }
                                 else
                                 {
-                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (C_Tax_ID > 0)
                                     {
                                         return C_Tax_ID;
@@ -304,7 +304,7 @@ namespace VIS.Models
                                 }
                                 if (taxCat.GetVATAX_Preference3() == "L")
                                 {
-                                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (C_Tax_ID > 0)
                                     {
                                         return C_Tax_ID;
@@ -327,7 +327,7 @@ namespace VIS.Models
                 // if Tax Preference 1 is Location
                 else if (taxCat.GetVATAX_Preference1() == "L")
                 {
-                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                     if (C_Tax_ID > 0)
                     {
                         return C_Tax_ID;
@@ -361,7 +361,7 @@ namespace VIS.Models
                                                 }
                                                 else
                                                 {
-                                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                                     if (C_Tax_ID > 0)
                                                     {
                                                         return C_Tax_ID;
@@ -370,7 +370,7 @@ namespace VIS.Models
                                             }
                                             else
                                             {
-                                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                                 if (C_Tax_ID > 0)
                                                 {
                                                     return C_Tax_ID;
@@ -379,7 +379,7 @@ namespace VIS.Models
                                         }
                                         else
                                         {
-                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                             if (C_Tax_ID > 0)
                                             {
                                                 return C_Tax_ID;
@@ -415,7 +415,7 @@ namespace VIS.Models
                                     }
                                     else
                                     {
-                                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                         if (C_Tax_ID > 0)
                                         {
                                             return C_Tax_ID;
@@ -424,7 +424,7 @@ namespace VIS.Models
                                 }
                                 else
                                 {
-                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (C_Tax_ID > 0)
                                     {
                                         return C_Tax_ID;
@@ -433,7 +433,7 @@ namespace VIS.Models
                             }
                             else
                             {
-                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                 if (C_Tax_ID > 0)
                                 {
                                     return C_Tax_ID;
@@ -480,7 +480,7 @@ namespace VIS.Models
                             }
                             else
                             {
-                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                 if (C_Tax_ID > 0)
                                 {
                                     return C_Tax_ID;
@@ -489,7 +489,7 @@ namespace VIS.Models
                         }
                         else
                         {
-                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                             if (C_Tax_ID > 0)
                             {
                                 return C_Tax_ID;
@@ -498,7 +498,7 @@ namespace VIS.Models
                     }
                     else
                     {
-                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                        C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                         if (C_Tax_ID > 0)
                         {
                             return C_Tax_ID;
@@ -517,7 +517,7 @@ namespace VIS.Models
                             {
                                 if (taxCat.GetVATAX_Preference3() == "L")
                                 {
-                                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (C_Tax_ID > 0)
                                     {
                                         return C_Tax_ID;
@@ -538,7 +538,7 @@ namespace VIS.Models
                     }
                     else if (taxCat.GetVATAX_Preference2() == "L")
                     {
-                        C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                        C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                         if (C_Tax_ID > 0)
                         {
                             return C_Tax_ID;
@@ -705,7 +705,7 @@ namespace VIS.Models
                     // if Tax Preference is Location
                     else if (pref == "L")
                     {
-                        C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                        C_Tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                         if (C_Tax_ID > 0)
                         {
                             return C_Tax_ID;
@@ -728,7 +728,7 @@ namespace VIS.Models
                                 }
                                 else
                                 {
-                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (C_Tax_ID > 0)
                                     {
                                         return C_Tax_ID;
@@ -737,7 +737,7 @@ namespace VIS.Models
                             }
                             else
                             {
-                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                 if (C_Tax_ID > 0)
                                 {
                                     return C_Tax_ID;
@@ -746,7 +746,7 @@ namespace VIS.Models
                         }
                         else
                         {
-                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                            C_Tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                             if (C_Tax_ID > 0)
                             {
                                 return C_Tax_ID;
@@ -823,7 +823,7 @@ namespace VIS.Models
             return C_Tax_ID;
         }
 
-        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
@@ -831,14 +831,18 @@ namespace VIS.Models
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                    " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
                     " AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" +
-                    " END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             if (C_Tax_ID > 0)
@@ -851,14 +855,18 @@ namespace VIS.Models
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                         " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                         " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal +
                         "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" + " END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                 if (C_Tax_ID > 0)
@@ -872,7 +880,9 @@ namespace VIS.Models
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                             " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID IS NULL " + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '"
                             + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                            + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            + (isSoTrx ? 'S' : 'P') + "')";
+                        sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                         if (C_Tax_ID > 0)
                         {
@@ -883,7 +893,9 @@ namespace VIS.Models
                             // VIS0060: Changes done to get Tax Rate when not available with Postal code.
                             sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                                 " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                                " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                            sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
                             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                             if (C_Tax_ID > 0)
                             {
@@ -893,7 +905,9 @@ namespace VIS.Models
                             {
                                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
                                     " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
-                                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                    + (isSoTrx ? 'S' : 'P') + "')";
+                                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                                sql += " ORDER BY tx.SOPOType DESC";
                                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                                 if (C_Tax_ID > 0)
                                 {
@@ -907,7 +921,7 @@ namespace VIS.Models
             return C_Tax_ID;
         }
 
-        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
@@ -915,14 +929,18 @@ namespace VIS.Models
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
                 " AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '" + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '"
-                + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             if (C_Tax_ID > 0)
@@ -935,13 +953,17 @@ namespace VIS.Models
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','"
-                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '"
-                    + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                 if (C_Tax_ID > 0)
@@ -954,7 +976,9 @@ namespace VIS.Models
                     {
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                         + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID IS NULL AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '"
-                        + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                        sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
 
                         if (C_Tax_ID > 0)
@@ -966,7 +990,9 @@ namespace VIS.Models
                             // VIS0060: Changes done to get Tax Rate when not available with Postal code.
                             sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                             + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                            sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
                             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                             if (C_Tax_ID > 0)
                             {
@@ -976,7 +1002,9 @@ namespace VIS.Models
                             {
                                 sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                                 + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','"
-                                + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                                + (isSoTrx ? 'S' : 'P') + "')";
+                                sql += MOrderLine.TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                                sql += " ORDER BY tx.SOPOType DESC";
                                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
                                 if (C_Tax_ID > 0)
                                 {
