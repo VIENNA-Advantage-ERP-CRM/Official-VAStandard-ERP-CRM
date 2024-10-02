@@ -109,7 +109,7 @@
                             buildPagination(response.RecordCount);
                             AD_Window_ID = response.AD_Window_ID;
                         }
-                        $root.find('#VAS_PaginationText_' + widgetID).text($self.currentPage + ' of ' + $self.totalPages);
+                        $root.find('#VAS_PaginationText_' + widgetID).text($self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages);
                         // Attach click event listener to delivery boxes
                         $root.off('click', '#VAS_DocumentNo_' + widgetID);
                         $root.on('click', '#VAS_DocumentNo_' + widgetID, function () {
@@ -230,7 +230,7 @@
                 $root.find('#VAS_OrderLinePagination_' + widgetID).append(
                     '        <div class="VAS-slider-arrows-order-details">' +
                     '            <i class="fa fa-arrow-circle-left" aria-hidden="true" id="VAS_PreviousPage_' + widgetID + '"></i>' +
-                    '            <span>' + currentPage + ' of ' + totalPages + '</span>' +
+                    '            <span>' + currentPage + VIS.Msg.getMsg("VAS_Of") + totalPages + '</span>' +
                     '            <i class="fa fa-arrow-circle-right" aria-hidden="true" id="VAS_NextPage_' + widgetID + '"></i>' +
                     '        </div>');
             }
@@ -312,7 +312,8 @@
                                         "TabIndex": "0",
                                     }
                                     $self.widgetFirevalueChanged(windowParam);
-                                    $self.intialLoad(1);
+                                    $self.currentPage = 1;
+                                    $self.intialLoad($self.currentPage);
                                 }
                             }
                             catch (e) {
@@ -363,10 +364,10 @@
         function buildPagination(recordCount) {
             var $paginationContainer = $root.find('.VAS-pagination-container');
             $paginationContainer.empty(); // Clear existing pagination
-            $self.totalPages = Math.ceil(recordCount / 4); // Update totalPages
+            $self.totalPages = Math.ceil(recordCount / pageSize); // Update totalPages
             var $pagination = $('<div class="VAS-slider-arrows">' +
                 '        <i id="VAS_Prev_Page_' + widgetID + '" class="fa fa-arrow-circle-left" aria-hidden="true"></i>' +
-                '        <span id="VAS_PaginationText_' + widgetID + '">' + $self.currentPage + ' of ' + $self.totalPages + '</span>' +
+                '        <span id="VAS_PaginationText_' + widgetID + '">' + $self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages + '</span>' +
                 '        <i id="VAS_Next_Page_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
                 '    </div>');
 
