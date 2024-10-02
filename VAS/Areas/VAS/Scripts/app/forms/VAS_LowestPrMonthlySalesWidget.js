@@ -191,7 +191,7 @@
         /* This function updates the pagination controls display */
         function updatePagination() {
             var $pageCount = $root.find('#VAS_PageCount_' + widgetID);
-            $pageCount.text($self.currentPage + ' of ' + $self.totalPages);
+            $pageCount.text($self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages);
             var currentProduct = productList[$self.currentPage - 1];
             var lastYearSales = parseFloat(currentProduct.PreviousTotal);
             var currentSales = parseFloat(currentProduct.CurrentTotal);

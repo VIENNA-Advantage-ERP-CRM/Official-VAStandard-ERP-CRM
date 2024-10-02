@@ -793,7 +793,7 @@ namespace VIS.Models
         public DeliveryResult GetExpectedDelivery(Ctx ctx, int pageNo, int pageSize, string Type)
         {
             string WhereCondition = "";
-            if (Type == "P") //Pending Delivery Order
+            if (Type == "PD") //Pending Delivery Order
             {
                 WhereCondition = " AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
@@ -813,7 +813,7 @@ namespace VIS.Models
             {
                 WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' ";
             }
-            else //Expected Delivery Order
+            else if (Type == "ED") //Expected Delivery Order
             {
                 WhereCondition = " AND  o.DatePromised >= TRUNC(CURRENT_DATE)  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
             }
@@ -863,11 +863,10 @@ namespace VIS.Models
 
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_VendorReturn'", null, null));
                     }
-                    else
+                    else if (Type == "ED" || Type == "PD")
                     {
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
                     }
-
                 }
                 // Get the list of order IDs from the retrieved parent records
                 // Extract order IDs
