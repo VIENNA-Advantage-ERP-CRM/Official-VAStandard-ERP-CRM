@@ -1184,7 +1184,7 @@ namespace VAdvantage.Model
                 }
                 else if (Region_ID != 0 && OrgRegion_ID != 0 && Region_ID == OrgRegion_ID)
                 {
-                    whereClause = " AND tx.VA106_GSTTaxType != '03'";
+                    whereClause = " AND NVL(tx.VA106_GSTTaxType, ' ') != '03'";
                 }
             }
             return whereClause;
