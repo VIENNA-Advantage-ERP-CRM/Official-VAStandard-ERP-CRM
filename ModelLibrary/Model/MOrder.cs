@@ -5205,7 +5205,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <param name="C_Order_ID"></param>
         public static void UpdateOrderStatus(Ctx ctx, int C_Order_ID, Trx trx)
         {
-            string qry = @"UPDATE C_Order o SET o.VAS_OrderStatus = 
+            string qry = @"UPDATE C_Order o SET VAS_OrderStatus = 
                             (SELECT CASE WHEN (SUM(QtyInvoiced) = 0 AND SUM(QtyDelivered) = 0) THEN 'OP' 
                             WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered) AND SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DI'
                             WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN CASE WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered))

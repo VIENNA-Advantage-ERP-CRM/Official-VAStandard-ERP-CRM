@@ -199,59 +199,42 @@ namespace VASLogic.Models
         public List<dynamic> GetPOLineData(Ctx ctx, int OrderID)
         {
 
-            string sql = @"WITH StatusAndUPCData AS (
-                        SELECT ol.C_OrderLine_ID, i.ImageUrl,  cu.Name AS UOM,
-                         p.Name AS  ProductName,
-                          CASE  WHEN ol.M_AttributeSetInstance_ID IS NOT NULL AND ol.M_AttributeSetInstance_ID > 0 THEN ma.Description
-                          ELSE NULL
-                        END AS AttributeName,
-                          CASE 
-                        WHEN ol.QtyOrdered - ol.QtyDelivered = 0 THEN 'DE'
-                        WHEN ol.QtyDelivered = 0 THEN 'OP'
-                        ELSE 'PD'
-                        END AS OrderLineStatusValue,
-                        CASE 
-                        WHEN SUM(ol.QtyOrdered - ol.QtyDelivered) OVER () = 0 THEN 'DE'
-                        WHEN SUM(ol.QtyDelivered) OVER () = 0 THEN 'OP'
-                        ELSE 'PD'
-                        END AS OrderStatusValue,
-                       COALESCE(attr.UPC, cuconv.UPC, p.UPC,p.Value) AS PreferredUPC,
-                       ROW_NUMBER() OVER (PARTITION BY ol.C_OrderLine_ID ORDER BY
-                       CASE
-                       WHEN attr.UPC IS NOT NULL THEN 1
-                       WHEN cuconv.UPC IS NOT NULL THEN 2
-                       ELSE 3
-                       END
-                       ) AS rn,              
-                       CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID  THEN ROUND(ol.QtyDelivered/NULLIF(cuconv.dividerate, 0), 2)
-                       ELSE ol.QtyDelivered END AS QtyDelivered
-                      FROM
-                      C_OrderLine ol
-                      INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
-                      INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
-                      INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
-                      LEFT JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
-                      LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
-                      LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
-                      AND attr.M_Product_ID = ol.M_Product_ID
-                      AND attr.C_UOM_ID = ol.C_UOM_ID
-                      AND attr.UPC IS NOT NULL)
-                      LEFT JOIN C_UOM_Conversion cuconv ON (cuconv.C_UOM_ID = p.C_UOM_ID
-                      AND cuconv.C_UOM_To_ID = ol.C_UOM_ID
-                     AND cuconv.M_Product_ID = ol.M_Product_ID)
-                     WHERE ol.C_Order_ID = " + OrderID + @"
-                    )
-                   SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyEntered AS QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
-                   sod.OrderLineStatusValue, arlOrderLine.Name As OrderLineStatus,sod.OrderStatusValue,arlOrder.Name AS OrderStatus ,
-                  sod.ProductName,sod.AttributeName
-                   FROM StatusAndUPCData sod
-                   INNER JOIN C_OrderLine ol ON (sod.C_OrderLine_ID = ol.C_OrderLine_ID)
-                   LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
-                  LEFT JOIN AD_Ref_List arlOrderLine ON (arlOrderLine.AD_Reference_ID = ar.AD_Reference_ID
-                  AND arlOrderLine.Value = sod.OrderLineStatusValue)
-                  LEFT JOIN AD_Ref_List arlOrder ON (arlOrder.AD_Reference_ID = ar.AD_Reference_ID
-                  AND arlOrder.Value = sod.OrderStatusValue)
-                  WHERE sod.rn = 1 ORDER BY ol.Line";
+            string sql = @"WITH StatusAndUPCData AS (SELECT ol.C_OrderLine_ID, i.ImageUrl, cu.Name AS UOM, p.Name AS ProductName,
+                        CASE WHEN NVL(ol.M_AttributeSetInstance_ID, 0) > 0 THEN ma.Description ELSE NULL END AS AttributeName,
+                        CASE WHEN (ol.QtyInvoiced = 0 AND ol.QtyDelivered = 0) THEN 'OP' 
+                        WHEN (ol.QtyInvoiced = ol.QtyOrdered AND ol.QtyDelivered = ol.QtyOrdered) THEN 'DI'
+                        WHEN (ol.QtyInvoiced = ol.QtyOrdered) THEN CASE WHEN (ol.QtyDelivered > 0 AND ol.QtyDelivered < ol.QtyOrdered)
+                        THEN 'PF' ELSE 'IN' END 
+                        WHEN (ol.QtyInvoiced > 0 AND ol.QtyInvoiced < ol.QtyOrdered) THEN CASE WHEN (ol.QtyDelivered = ol.QtyOrdered)
+                        THEN 'FP' ELSE 'PI' END
+                        WHEN (ol.QtyDelivered = ol.QtyOrdered) THEN 'DE'
+                        WHEN (ol.QtyDelivered > 0 AND ol.QtyDelivered < ol.QtyOrdered) THEN 'PD' END AS OrderLineStatusValue,
+                        o.VAS_OrderStatus AS OrderStatusValue,
+                        COALESCE(attr.UPC, cuconv.UPC, p.UPC,p.Value) AS PreferredUPC,
+                        ROW_NUMBER() OVER (PARTITION BY ol.C_OrderLine_ID ORDER BY
+                        CASE WHEN attr.UPC IS NOT NULL THEN 1 WHEN cuconv.UPC IS NOT NULL THEN 2 ELSE 3 END) AS rn,              
+                        CASE WHEN p.C_UOM_ID !=  ol.C_UOM_ID  THEN ROUND(ol.QtyDelivered/NULLIF(cuconv.dividerate, 0), 2)
+                        ELSE ol.QtyDelivered END AS QtyDelivered
+                        FROM C_OrderLine ol INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
+                        INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
+                        INNER JOIN C_UOM cu ON (cu.C_UOM_ID = ol.C_UOM_ID)
+                        LEFT JOIN M_AttributeSetInstance ma ON (ma.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID)
+                        LEFT JOIN AD_Image i ON (i.AD_Image_ID = p.AD_Image_ID)
+                        LEFT JOIN M_ProductAttributes attr ON (attr.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                        AND attr.M_Product_ID = ol.M_Product_ID AND attr.C_UOM_ID = ol.C_UOM_ID AND attr.UPC IS NOT NULL)
+                        LEFT JOIN C_UOM_Conversion cuconv ON (cuconv.C_UOM_ID = p.C_UOM_ID AND cuconv.C_UOM_To_ID = ol.C_UOM_ID
+                        AND cuconv.M_Product_ID = ol.M_Product_ID) WHERE ol.C_Order_ID = " + OrderID + @")
+                        SELECT sod.C_OrderLine_ID,sod.ImageUrl,sod.UOM, ol.QtyEntered AS QtyOrdered, sod.QtyDelivered,sod.PreferredUPC AS UPC,
+                        sod.OrderLineStatusValue, arl.Name As OrderLineStatus, sod.OrderStatusValue, arlOrder.Name AS OrderStatus,
+                        sod.ProductName, sod.AttributeName
+                        FROM StatusAndUPCData sod
+                        INNER JOIN C_OrderLine ol ON (sod.C_OrderLine_ID = ol.C_OrderLine_ID)
+                        LEFT JOIN AD_Reference ar ON (ar.Name = 'VAS_OrderStatus')
+                        LEFT JOIN AD_Ref_List arl ON (arl.AD_Reference_ID = ar.AD_Reference_ID
+                        AND arl.Value = sod.OrderLineStatusValue)
+                        LEFT JOIN AD_Ref_List arlOrder ON (arlOrder.AD_Reference_ID = ar.AD_Reference_ID
+                        AND arlOrder.Value = sod.OrderStatusValue)
+                        WHERE sod.rn = 1 ORDER BY ol.Line";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
