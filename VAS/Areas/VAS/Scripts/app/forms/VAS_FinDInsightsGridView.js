@@ -155,7 +155,7 @@
         function GetData(pageNo) {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetFinDataInsightGrid", { "tableName": tableName, "pageNo": pageNo, "pageSize": pageSize, "AD_Org_ID": orgId }, function (dr) {
                 data = dr;
-                if (data?.length) {
+                if (data != null && data.length > 0) {
                     if (data.length > 1) {
                         columnsData = (data[0].ColName).split(',')
                         Data = data.shift();
