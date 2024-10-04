@@ -246,8 +246,6 @@
         /** Refresh Widget Data */
         this.refreshWidget = function () {
             $bsyDiv[0].style.visibility = "visible";
-            ExpenseAmountData = [];
-            ExpenseNameArray = [];
             $maindiv.find('#vas_norecordcont_' + widgetID).remove();
             $self.getExpRevDetails();
         };
