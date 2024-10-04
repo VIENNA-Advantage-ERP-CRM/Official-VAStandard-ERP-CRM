@@ -1476,6 +1476,47 @@ span.vas-arwidg-cur-symbol {
         outline: none;
     }
 
+
+/**Expense Revenue Profit Widget CSS*/
+
+.vas-barline-ExRePr-container {
+    padding: 0.5em;
+    width:100%;
+    height:100%
+}
+
+    .vas-barline-ExRePr-container .input-group.vis-input-wrap {
+        /*margin-bottom: -15px;*/
+        width: 30%;
+        padding-right:10px;
+    }
+
+    .vas-barline-ExRePr-container select.vis-ev-col-mandatory {
+        width: 100%;
+        height: auto;
+        border: none;
+    }
+
+.vas-barline-ExRePr-canvas {
+    /*height: 100% !important*/
+}
+
+.vas-ExRePr-heading {
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    font-family: 'Verdana';
+    /*color: rgba(var(--v-c-common), 1);*/
+    font-size: 1.1em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    /*padding: 1em;*/
+}
+
+.vas-ExRePr-background {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+}
+
 .vas-fdi-marquee {
     overflow: hidden;
     /*background: rgba(145,150,190, 0.7);*/

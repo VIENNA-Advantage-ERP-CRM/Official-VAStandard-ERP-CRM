@@ -5,7 +5,7 @@
        * Created Date   : 12 January 2024
        * Created by     : VAI066
       ******************************************************/
-using CoreLibrary.DataBase;
+
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using VAdvantage.Utility;
 using VAdvantage.Common;
 using VAdvantage.Model;
+using VAdvantage.DataBase;
 
 namespace VASLogic.Models
 {
@@ -1565,8 +1566,7 @@ namespace VASLogic.Models
                             ORDER BY AD_Reference_ID ";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                      for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
             {
                 if (!NotIncludeCol.Contains(Util.GetValueOfString(ds.Tables[0].Rows[i]["ColumnName"])))
                 {
@@ -1578,6 +1578,275 @@ namespace VASLogic.Models
                 }
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// This function is used to Retrieve Data of Income and Expense
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">List Value for filteration</param>
+        /// <returns>Data</returns>
+        /// <author>VIS_0045</author>
+        public VAS_ExpenseRevenue GetExpenseRevenueDetails(Ctx ctx, string ListValue)
+        {
+            VAS_ExpenseRevenue lstExprevData = new VAS_ExpenseRevenue();
+            decimal[] lstExpData = null;
+            decimal[] lstRevData = null;
+            decimal[] lstProfitData = null;
+            string[] lstLabel = null;
+            int CurrentYear = 0;
+            int calendar_ID = 0;
+
+            // Get Financial Year Data 
+            DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                lstExprevData.ErrorMessage = errorMessage;
+                return lstExprevData;
+            }
+            else
+            {
+                CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+            }
+
+            // Get Expense/Income Data
+            DataSet dsExpRev = GetExpenseRevenueData(ctx, ListValue, calendar_ID, CurrentYear, out errorMessage);
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                lstExprevData.ErrorMessage = errorMessage;
+                return lstExprevData;
+            }
+            else
+            {
+                lstLabel = new string[dsExpRev.Tables[0].Rows.Count];
+                lstExpData = new decimal[dsExpRev.Tables[0].Rows.Count];
+                lstRevData = new decimal[dsExpRev.Tables[0].Rows.Count];
+                lstProfitData = new decimal[dsExpRev.Tables[0].Rows.Count];
+                DataRow dr = null;
+                for (int i=0; i < dsExpRev.Tables[0].Rows.Count;i++) 
+                {
+                    dr = dsExpRev.Tables[0].Rows[i];
+
+                    lstExpData[i] = Util.GetValueOfDecimal(dr["ExpenseAmount"]);
+                    lstRevData[i] = Util.GetValueOfDecimal(dr["revenueAmount"]);
+                    lstProfitData[i] = Util.GetValueOfDecimal(dr["revenueAmount"]) - Util.GetValueOfDecimal(dr["ExpenseAmount"]);
+                    lstLabel[i] = Util.GetValueOfString(dr["Name"]);
+                }
+
+                lstExprevData.lstLabel = lstLabel;
+                lstExprevData.lstExpData = lstExpData;
+                lstExprevData.lstRevData = lstRevData;
+                lstExprevData.lstProfitData = lstProfitData;
+            }
+
+            return lstExprevData;
+        }
+
+        /// <summary>
+        /// This function is used to get Previous Year based on financial Year
+        /// </summary>
+        /// <param name="CalendarYear">Current Calendar Year</param>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <param name="C_Calendar_ID">Calendar ID</param>
+        /// <returns>DataSet</returns>
+        /// <author>VIS_0045</author>
+        public int GetPreviousPeriod(int CalendarYear, int AD_Client_ID, int C_Calendar_ID)
+        {
+            string sql = $@" WITH CurrentPeriod AS (
+                            /* Fetch current year data and calculate previous period using LAG */
+                            SELECT 
+                                pl.periodno, 
+                                pl.C_Period_ID, 
+                                pl.StartDate, 
+                                pl.EndDate,
+                                pl.C_Year_ID,
+                                pl.AD_Client_ID,
+                                CAST(y.CalendarYears AS INT) AS CalendarYears,
+                                LAG(pl.C_Period_ID) OVER (PARTITION BY y.CalendarYears ORDER BY pl.periodno) AS Previous_Period_ID
+                            FROM 
+                                C_Period pl
+                                INNER JOIN C_Year y ON y.C_Year_ID = pl.C_Year_ID
+                            WHERE pl.IsActive = 'Y' AND 
+                                pl.AD_Client_ID = {AD_Client_ID}
+                                AND y.C_Calendar_ID = {C_Calendar_ID}
+                                AND y.CalendarYears = {GlobalVariable.TO_STRING(CalendarYear.ToString())}
+                        ),";
+
+            sql += $@" PreviousPeriod AS (
+                        /* Fetch the previous year's last period (PeriodNo = MAX(PeriodNo)) */
+                        SELECT 
+                            pl.C_Period_ID
+                        FROM 
+                            C_Period pl
+                            INNER JOIN C_Year y ON y.C_Year_ID = pl.C_Year_ID
+                        WHERE 
+                            pl.AD_Client_ID = {AD_Client_ID}
+                            AND y.C_Calendar_ID = {C_Calendar_ID}
+                            AND y.CalendarYears = {GlobalVariable.TO_STRING((CalendarYear - 1).ToString())}
+                            AND pl.PeriodNo = (
+                                /* Directly get the max period number in the same query */
+                                SELECT MAX(PeriodNo) 
+                                FROM C_Period pll 
+                                WHERE pll.IsActive = 'Y' AND pll.C_Year_ID = pl.C_Year_ID )
+                        )";
+
+            sql += $@" SELECT 
+                        COALESCE(cp.Previous_Period_ID,  pp.C_Period_ID) AS PreviousPeriod
+                    FROM 
+                        CurrentPeriod cp
+                    JOIN 
+                        PreviousPeriod pp ON (1=1)
+                    WHERE Current_Date Between cp.StartDate and cp.EndDate";
+
+            int C_Period_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+            return C_Period_ID;
+
+        }
+
+        /// <summary>
+        /// This function is used to get the Financial Year Details
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ErrorMessage">Error Message if any</param>
+        /// <returns>DataSet</returns>
+        /// <author>VIS_0045</author>
+        public DataSet GetFinancialYearDetail(Ctx ctx, out string ErrorMessage)
+        {
+            ErrorMessage = "";
+            string sql = "";
+            sql = @"SELECT
+                         DISTINCT cy.CalendarYears,
+                         CASE 
+                         WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
+                         ELSE ci.C_Calendar_ID END AS C_Calendar_ID, 
+                         cp.C_Period_ID 
+                         FROM C_Calendar cc
+                         INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
+                         LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Year cy ON (cy.C_Calendar_ID=cc.C_Calendar_ID)
+                         INNER JOIN C_Period cp  ON (cy.C_Year_ID = cp.C_Year_ID)
+                         WHERE 
+                         cy.IsActive = 'Y'
+                         AND cp.IsActive = 'Y'
+                         AND oi.IsActive='Y'
+                         AND ci.IsActive='Y'
+                         AND TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID();
+            DataSet ds = DB.ExecuteDataset(sql);
+            if (ds == null || (ds != null && ds.Tables.Count == 0) || (ds != null && ds.Tables[0].Rows.Count == 0))
+            {
+                ErrorMessage = Msg.GetMsg(ctx, "VAS_CalendarNotFound");
+            }
+            return ds;
+        }
+
+        /// <summary>
+        /// This function is used to get the Expense / Income Data
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">List Value for filter data</param>
+        /// <param name="C_Calendar_ID">Calander ID</param>
+        /// <param name="CalendarYears">Calendar Year</param>
+        /// <param name="ErrorMessage"><Error Message if any/param>
+        /// <returns>Dataset</returns>
+        /// <author>VIS_0045</author>
+        public DataSet GetExpenseRevenueData(Ctx ctx, string ListValue, int C_Calendar_ID, int CalendarYears, out string ErrorMessage)
+        {
+            ErrorMessage = "";
+            string sql = $@" SELECT 
+                         acct.C_AcctSchema_ID, 
+                         fa.AD_Client_ID,
+                         fa.C_Period_ID,
+                         p.Name,
+                        SUM(CASE WHEN eleVal.AccountType = 'E' THEN (fa.AmtAcctDR - fa.AmtAcctCR) ELSE 0 END) AS ExpenseAmount,
+                        SUM(CASE WHEN eleVal.AccountType = 'R' THEN (fa.AmtAcctCR - fa.AmtAcctDR) ELSE 0 END) AS revenueAmount
+                         FROM fact_acct fa
+                         INNER JOIN C_AcctSchema acct ON (fa.C_AcctSchema_ID = acct.C_AcctSchema_ID)
+                         INNER JOIN C_AcctSchema_Element acctEle ON (acctEle.C_AcctSchema_ID = acct.C_AcctSchema_ID AND acctEle.ElementType = 'AC')
+                         INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
+                         INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND eleVal.AccountType IN ('R', 'E') AND fa.Account_ID = eleVal.C_ElementValue_ID)
+                         INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                         INNER JOIN C_Period p ON (p.C_Period_ID = fa.C_Period_ID)
+                         INNER JOIN C_Year y ON (y.C_Year_ID = p.C_Year_ID)
+                         WHERE acctEle.IsActive = 'Y' 
+                               AND eleVal.IsActive = 'Y' 
+                               AND y.C_Calendar_ID = {C_Calendar_ID}
+                               AND p.IsActive = 'Y' AND y.IsActive = 'Y' ";
+            if (ListValue.Equals("01"))
+            {
+                /* Financial Year */
+                sql += $@" AND y.CalendarYears = {GlobalVariable.TO_STRING(CalendarYears.ToString())}";
+            }
+            else if (ListValue.Equals("03"))
+            {
+                /* Previous Year */
+                sql += $@" AND y.CalendarYears = {GlobalVariable.TO_STRING((CalendarYears - 1).ToString())}";
+            }
+            else if (ListValue.Equals("02"))
+            {
+                /* This Month */
+                sql += $@" AND Trunc(Current_Date) Between p.StartDate and p.EndDate ";
+            }
+            else if (ListValue.Equals("04"))
+            {
+                /* Previous Month */
+                int C_Period_ID = GetPreviousPeriod(CalendarYears, ctx.GetAD_Client_ID(), C_Calendar_ID);
+                if (C_Period_ID > 0)
+                {
+                    sql += $@" AND p.C_Period_ID = { C_Period_ID } ";
+                }
+                else
+                {
+                    ErrorMessage = Msg.GetMsg(ctx, "VAS_PreviosuPeriodnotFound");
+                    return null;
+                }
+            }
+            else if (ListValue == "05")
+            {
+                //Last 6 Months Data
+                if (DB.IsPostgreSQL())
+                {
+                    sql += " AND date_trunc(p.startdate) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'";
+                    sql += " AND date_trunc(p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                }
+                else
+                {
+                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')";
+                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                }
+            }
+            else if (ListValue == "06")
+            {
+                //Last 12 Months Data
+                if (DB.IsPostgreSQL())
+                {
+                    sql += " AND date_trunc(p.startdate) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'";
+                    sql += " AND date_trunc(p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                }
+                else
+                {
+                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')";
+                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                }
+            }
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += @" GROUP BY
+                      acct.C_AcctSchema_ID, 
+                      fa.AD_Client_ID,
+                      fa.C_Period_ID,
+                      p.Name
+                      order by
+                      acct.C_AcctSchema_ID, 
+                      fa.AD_Client_ID,
+                      fa.C_Period_ID ";
+
+            DataSet dsExpRevData = DB.ExecuteDataset(sql);
+            if (dsExpRevData == null || (dsExpRevData != null && dsExpRevData.Tables.Count == 0) || (dsExpRevData != null && dsExpRevData.Tables[0].Rows.Count == 0))
+            {
+                ErrorMessage = Msg.GetMsg(ctx, "VAS_ExpRevdatanotFound");
+            }
+            return dsExpRevData;
         }
     }
     public class TabPanel
@@ -1722,5 +1991,14 @@ namespace VASLogic.Models
         public decimal ExpenseAmount { get; set; }
         public string ExpenseName { get; set; }
         public int stdPrecision { get; set; }
+    }
+
+    public class VAS_ExpenseRevenue
+    {
+        public decimal[] lstExpData { get; set; }
+        public decimal[] lstRevData { get; set; }
+        public decimal[] lstProfitData { get; set; }
+        public string[] lstLabel { get; set; }
+        public string ErrorMessage { get; set; }
     }
 }
