@@ -1480,7 +1480,105 @@ namespace VASLogic.Models
             }
             return sql.ToString();
         }
+        /// <summary>
+        /// This function is Used to Get the Finance Instigh Data
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue/param>
+        /// <returns>returns Finance Instigh Data</returns>
+        /// <author>VIS_427</author>
+        public List<dynamic> GetFinInsightsData(Ctx ctx, string ListValue)
+        {
+            List<dynamic> retData = new List<dynamic>();
+            String sql = @"SELECT VA113_DataObject,Name,VA113_REF_TABLE_VIEW, DisplayName, VA113_Result,AD_Org_ID FROM VA113_INSIGHTS";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "VA113_INSIGHTS", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dynamic obj = new ExpandoObject();
+                    obj.DataObject = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_DataObject"]);
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.TabelView = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_REF_TABLE_VIEW"]);
+                    obj.DisplayName = Util.GetValueOfString(ds.Tables[0].Rows[i]["DisplayName"]);
+                    obj.Result= Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_Result"]);
+                    obj.AD_Org_ID= Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                    retData.Add(obj);
+                }
+            }
+            return retData;
+        }
+        /// <summary>
+        /// This Function is use to get the data in grid
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="tableName">tableName</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <returns>returns the data in grid</returns>
+        /// <author>VIS_427</author>
+        public List<dynamic> GetFinDataInsightGrid(Ctx ctx, string tableName, int pageNo, int pageSize,int AD_Org_ID)
+        {
+            List<dynamic> retData = new List<dynamic>();
+            string[] NotIncludeCol = { "AD_Client_ID", "AD_Org_ID", "Export_ID", "CreatedBy", "UpdatedBy", "Created", "Updated", "IsActive", "DATA_OBJECT" };
+            string columnNames = GetDataGridColumn(ctx, tableName, NotIncludeCol);
+            dynamic obj = new ExpandoObject();
+            string sql = @"SELECT " + columnNames + " FROM " + tableName.ToUpper()+" WHERE AD_Client_ID = "+ctx.GetAD_Client_ID()+" AND AD_Org_ID = "+ AD_Org_ID;
+            //sql = MRole.GetDefault(ctx).AddAccessSQL(sql, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            obj.ColName = columnNames;
+            retData.Add(obj);
+            string[] colName = columnNames.Split(',');
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql + ")t", null, null));
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new ExpandoObject();
+                    IDictionary<string, object> dict = (IDictionary<string, object>)obj;
 
+                    for (int j = 0; j < colName.Length; j++)
+                    {
+                        string trimmedColName = colName[j].Trim(); // Trim to avoid whitespace issues
+                        dict[trimmedColName] = Util.GetValueOfString(ds.Tables[0].Rows[i][trimmedColName]);
+                    }
+                    dict["recid"] = i + 1;
+                    dict["Count"] = RecordCount;
+                    retData.Add(obj);
+                }
+            }
+            return retData;
+        }
+        /// <summary>
+        /// This Function is use to get the Name of Column  of Table
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="tableName">tableName</param>
+        /// <param name="NotIncludeCol">NotIncludeCol</param>
+        /// <returns>returns the Name of Column  of Table</returns>
+        /// <author>VIS_427</author>
+        public string GetDataGridColumn(Ctx ctx, string tablename, string[] NotIncludeCol)
+        {
+            String sql = $@"SELECT ac.ColumnName FROM AD_Column ac
+                           INNER JOIN AD_Table at ON (at.AD_Table_ID=ac.AD_Table_ID) WHERE UPPER(at.TableName)= UPPER({VAdvantage.DataBase.GlobalVariable.TO_STRING(tablename.ToString())})
+                            ORDER BY AD_Reference_ID ";
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+            {
+                if (!NotIncludeCol.Contains(Util.GetValueOfString(ds.Tables[0].Rows[i]["ColumnName"])))
+                {
+                    if (sb.Length > 0)
+                    {
+                        sb.Append(",");
+                    }
+                    sb.Append(Util.GetValueOfString(ds.Tables[0].Rows[i]["ColumnName"]));
+                }
+            }
+            return sb.ToString();
+        }
     }
     public class TabPanel
     {
