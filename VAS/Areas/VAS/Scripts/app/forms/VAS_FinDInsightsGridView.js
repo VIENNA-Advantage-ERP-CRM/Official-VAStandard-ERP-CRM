@@ -1,7 +1,7 @@
 ﻿/********************************************************
 * Module Name    : VAS
 * Purpose        : To show the homepage for finDInsightGW Form
-* Class Used     : VAS.GridTest
+* Class Used     : VAS.Gridinsight
 * Chronological Development
 * VAI-093         3 Oct 2024
 ******************************************************/
@@ -17,7 +17,7 @@
         this.log = VIS.Logging.VLogger.getVLogger("finDInsightGW_Form");/* init log Class */
         var self = this;
         var gridDiv;
-        var testGrid = null;
+        var insightGrid = null;
         var orgId = null;
         var InsightGridCounter = 0;
         var pageSize = 50;
@@ -64,7 +64,7 @@
             setBusy(true);
 
             /* creating html structure */
-            createStructure();
+            createinsighstructure();
 
             /*function used to the get the data for the grid */
             GetData(pageNo);
@@ -79,7 +79,7 @@
         };
 
         /* function used to create basic HTML structure */
-        function createStructure() {
+        function createinsighstructure() {
 
             mainContainerDiv = $('<div class="VAS-finDInsightGW-Grid-container h-100">');
             gridDiv = $('<div class="VAS-finDInsightGW-gridDiv "style="height:70vh">');
@@ -92,13 +92,13 @@
 
         /* function used  to load grid */
         function loadGrid(colz, InsightData = []) {
-            if (testGrid != null) {
-                testGrid.destroy();
-                testGrid = null;
+            if (insightGrid != null) {
+                insightGrid.destroy();
+                insightGrid = null;
             }
 
 
-            testGrid = $(gridDiv).w2grid({
+            insightGrid = $(gridDiv).w2grid({
                 name: "VAS_Grid_" + InsightGridCounter,
                 recordHeight: 25,
                 show: {
@@ -170,7 +170,7 @@
                         /* function used to create fields for the columns for w2ui grid */
 
                         createColumnData(columnsData);
-                        VIS.ADialog.info('', '', VIS.Msg.getMsg("VAS_RecordNotFound"));
+                        VIS.ADialog.info("VAS_RecordNotFound");
                     }
                     
                 }
@@ -324,9 +324,9 @@
         /* function used to clear the variables and dispose the frame */
         this.disposeComponent = function () {
             self = null;
-            if (testGrid != null) {
-                testGrid.destroy();
-                testGrid = null;
+            if (insightGrid != null) {
+                insightGrid.destroy();
+                insightGrid = null;
             }
             if ($root)
                 $root.remove();
@@ -334,7 +334,7 @@
             gridDiv = null;
             $button1 = null;
             $button2 = null;
-            testGrid = null;
+            insightGrid = null;
             orgId = null;
             Label = null;
             columnsData = null;
