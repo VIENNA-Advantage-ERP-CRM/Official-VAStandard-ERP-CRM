@@ -91,7 +91,7 @@
         };
 
         /* function used  to load grid */
-        function loadGrid(colz, InsightData) {
+        function loadGrid(colz, InsightData = []) {
             if (testGrid != null) {
                 testGrid.destroy();
                 testGrid = null;
@@ -155,15 +155,25 @@
         function GetData(pageNo) {
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetFinDataInsightGrid", { "tableName": tableName, "pageNo": pageNo, "pageSize": pageSize, "AD_Org_ID": orgId }, function (dr) {
                 data = dr;
-                if (data) {
-                    columnsData = (data[0].ColName).split(',')
-                    Data = data.shift();
+                if (data?.length) {
+                    if (data.length > 1) {
+                        columnsData = (data[0].ColName).split(',')
+                        Data = data.shift();
 
-                    /* function used to create fields for the columns for w2ui grid */
-                    createColumnData(columnsData);
+                        /* function used to create fields for the columns for w2ui grid */
+                        createColumnData(columnsData);
+                        //Calculted Page count
+                        TotalPageCount = Math.ceil(data[0].Count / pageSize);
+                    } else {
+                        columnsData = (data[0].ColName).split(',');
+                        data.shift();
+                        /* function used to create fields for the columns for w2ui grid */
+
+                        createColumnData(columnsData);
+                        VIS.ADialog.info('', '', VIS.Msg.getMsg("VAS_RecordNotFound"));
+                    }
+                    
                 }
-                //Calculted Page count
-                TotalPageCount = Math.ceil(data[0].Count / pageSize);
 
                 /* function used for loading the grid */
                 loadGrid(columnsData, data);
