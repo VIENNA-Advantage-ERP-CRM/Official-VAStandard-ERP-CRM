@@ -329,6 +329,7 @@
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
     <Content Include="Areas\VAS\Views\web.config" />
     <Content Include="Areas\VAS\Views\PaymentAllocation\Index.cshtml" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpRevProfitWidget.js" />
     <None Include="packages.config" />
     <Content Include="Areas\VAS\Scripts\app\forms\acctviewer.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\acctviewermenu.js" />

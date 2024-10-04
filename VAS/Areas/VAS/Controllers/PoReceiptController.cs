@@ -279,5 +279,18 @@ namespace VAS.Areas.VAS.Controllers
             return Json(JsonConvert.SerializeObject(ExpenseData), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// This function is used to get Data of Income and Revenue
+        /// </summary>
+        /// <param name="ListValue">List Value for data filterartion</param>
+        /// <returns>Data</returns>
+        /// <author>VIS_0045</author>
+        public JsonResult GetIncomeAndExpenseData(string ListValue)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel objIncomeAndExpenseData = new PoReceiptTabPanelModel();
+            VAS_ExpenseRevenue lstIncomeAndExpenseData = objIncomeAndExpenseData.GetExpenseRevenueDetails(ctx, ListValue);
+            return Json(JsonConvert.SerializeObject(lstIncomeAndExpenseData), JsonRequestBehavior.AllowGet);
+        }
     }
 }
