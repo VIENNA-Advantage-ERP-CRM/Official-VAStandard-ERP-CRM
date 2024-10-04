@@ -119,7 +119,7 @@
 
                         // this is used to set the padding for legend
                         const plugin = {
-                            beforeInit(chart) {
+                            beforeInit: function (chart) {
                                 const originalFit = chart.legend.fit;
                                 chart.legend.fit = function fit() {
                                     originalFit.bind(chart.legend)();
