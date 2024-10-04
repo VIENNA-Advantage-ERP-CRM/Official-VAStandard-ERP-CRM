@@ -795,27 +795,27 @@ namespace VIS.Models
             string WhereCondition = "";
             if (Type == "PD") //Pending Delivery Order
             {
-                WhereCondition = " AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = @" AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "EG") //Expected GRN
             {
-                WhereCondition = " AND o.DatePromised >=TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised >=TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "PG") //Pending GRN
             {
-                WhereCondition = " AND  o.DatePromised <TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised <TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "CR") //Customer RMA
             {
-                WhereCondition = " AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'Y' ";
+                WhereCondition = " AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'Y' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "VR") //Vendor RMA
             {
-                WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' ";
+                WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "ED") //Expected Delivery Order
             {
-                WhereCondition = " AND  o.DatePromised >= TRUNC(CURRENT_DATE)  AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' ";
+                WhereCondition = @" AND o.DatePromised >= TRUNC(CURRENT_DATE) AND o.IsSOTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             DeliveryResult result = new DeliveryResult
             {
@@ -823,24 +823,19 @@ namespace VIS.Models
             };
             StringBuilder sb = new StringBuilder();
             sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT o.C_Order_ID, o.DocumentNo, o.DateOrdered,
-                       COUNT(ol.C_OrderLine_ID) AS LineCount,
-                       SUM(NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS GrandTotal,
-                       w.Name AS ProductLocation,l.Name AS Deliverylocation,cb.Name AS CustomerName
-                        FROM C_Order o
-                        INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
-                        INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
-                         INNER JOIN C_BPartner cb ON(cb.C_BPartner_ID=o.C_BPartner_ID)
-                        INNER JOIN C_BPartner_Location l  ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                        AND o.DocStatus  IN('CO')  " + WhereCondition + @"  
-                        AND (ol.QtyOrdered - ol.QtyDelivered - 
-                       (SELECT NVL(SUM(il.MovementQty), 0) 
-                       FROM M_Inout i 
-                       INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
-                        WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID 
-                        AND il.IsActive = 'Y' 
-                         AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0)
-                        GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name,o.DatePromised
-                        ORDER BY o.DatePromised DESC ");
+                    COUNT(ol.C_OrderLine_ID) AS LineCount,
+                    SUM(NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS GrandTotal,
+                    w.Name AS ProductLocation,l.Name AS Deliverylocation,cb.Name AS CustomerName
+                    FROM C_Order o
+                    INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
+                    INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
+                    INNER JOIN C_BPartner cb ON(cb.C_BPartner_ID=o.C_BPartner_ID)
+                    INNER JOIN C_BPartner_Location l  ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
+                    AND o.DocStatus  IN('CO')  " + WhereCondition + @"  
+                    AND (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
+                    WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0)
+                    GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name,o.DatePromised
+                    ORDER BY o.DatePromised DESC");
 
 
             DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
@@ -853,7 +848,6 @@ namespace VIS.Models
                     {
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_MaterialReceipt'", null, null));
                     }
-
                     else if (Type == "CR")
                     {
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_CustomerReturn'", null, null));

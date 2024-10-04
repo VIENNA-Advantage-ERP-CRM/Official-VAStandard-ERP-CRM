@@ -1516,3 +1516,261 @@ span.vas-arwidg-cur-symbol {
     background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
     position: relative;
 }
+
+.vas-fdi-marquee {
+    overflow: hidden;
+    /*background: rgba(145,150,190, 0.7);*/
+    height: 100%;
+}
+
+    .vas-fdi-marquee p {
+        height: auto;
+        width: 100%;
+        display: inline-block;
+        animation: vas-fdi-marquee 30s linear infinite;
+    }
+
+        .vas-fdi-marquee p:hover {
+            cursor: pointer;
+            animation-play-state: paused;
+            color: #fff;
+        }
+
+@keyframes vas-fdi-marquee {
+    from {
+        transform: translateY(25%);
+    }
+
+    to {
+        transform: translateY(-100%);
+    }
+}
+
+.vas-fdi-feed-container {
+    background: rgb(145,150,190);
+    background: linear-gradient(90deg, #FFB595 0%, #D58B81 60%);
+    width: 100%;
+    height: 100%;
+    /*padding: 1em;*/
+}
+
+.vas-fdi-widget-head {
+    color: rgba(var(--v-c-common), 1);
+    font-size: 1.3em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    padding: 1em;
+}
+
+.vas-fdi-req-generated {
+    display: flex;
+    align-items: center;
+    width: 95%;
+    gap: 0.875em;
+    margin-bottom: 15px;
+    padding: 0 6px;
+    background-color: #ffffff20;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: 0.5rem;
+}
+    .vas-fdi-req-generated i{
+        color: #fff;
+    }
+    .vas-fdi-req-count {
+        font-size: 6em;
+        font-weight: 600;
+        color: rgba(var(--v-c-common), 1);
+    }
+
+.vas-fdi-reqGen-Txt, .vas-fdi-woGen-Txt {
+    font-size: 1.5em;
+    color: rgba(var(--v-c-common), 1);
+}
+
+    /*.vas-fdi-reqGen-Txt span {
+        //display: block;
+    }*/
+
+.vas-fdi-spaceBetween {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.vas-fdi-req-generated:last-child {
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 2560px) {
+    .vas-fdi-widget-head {
+        margin: 0;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 14px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+    }
+}
+
+@media screen and (max-width: 2000px) {
+    .vas-fdi-feed-container {
+        font-size: 13px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 1920px) {
+    .vas-fdi-req-generated {
+        font-size: 12px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-fdi-feed-container {
+        font-size: 12px;
+    }
+
+    .vas-fdi-widget-head {
+        margin: 0;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 9px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 7px;
+    }
+
+    .vas-fdi-reqGen-Txt {
+        font-size: 1.8em;
+        color: rgba(var(--v-c-common), 1);
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 8px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 5px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+        font-size: 6em;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-fdi-feed-container {
+        font-size: 13px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 8px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-fdi-feed-container {
+        font-size: 14px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-fdi-feed-container {
+        font-size: 12px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 375px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-fdi-req-generated {
+        font-size: 6px;
+    }
+}
+.vas-custom-link {
+    text-decoration: none;
+    color: inherit; 
+}
+.vas-custom-link:hover {
+    color: inherit;
+    text-decoration: underline;
+}
+.vas-fdi-notfounddiv {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 258px;
+    font-size: 1.8rem;
+}

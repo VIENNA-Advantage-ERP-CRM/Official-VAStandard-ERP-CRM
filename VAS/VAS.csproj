@@ -260,9 +260,13 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_DueFulfilmentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_DueOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedFulfilmentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpenseAmountWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedTransferWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsights.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsightsGridView.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedGRNWidget.js" />

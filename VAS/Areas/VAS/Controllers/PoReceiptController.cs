@@ -278,6 +278,35 @@ namespace VAS.Areas.VAS.Controllers
             List<TopExpenseAmountData> ExpenseData = yearBasedExpenseData.GetTop10ExpenseAmountData(ctx, ListValue);
             return Json(JsonConvert.SerializeObject(ExpenseData), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is Used to Get the Finance Instigh Data
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue/param>
+        /// <returns>returns Finance Instigh Data</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetFinInsightsData(string ListValue)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel yearBasedExpenseData = new PoReceiptTabPanelModel();
+            List<dynamic> ExpenseData = yearBasedExpenseData.GetFinInsightsData(ctx, ListValue);
+            return Json(JsonConvert.SerializeObject(ExpenseData), JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
+        /// This Function is use to get the data in grid
+        /// </summary>
+        /// <param name="tableName">tableName</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <returns>returns the data in grid</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetFinDataInsightGrid(string tableName,int pageNo,int pageSize,int AD_Org_ID)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel yearBasedExpenseData = new PoReceiptTabPanelModel();
+            List<dynamic> ExpenseData = yearBasedExpenseData.GetFinDataInsightGrid(ctx, tableName, pageNo, pageSize, AD_Org_ID);
+            return Json(JsonConvert.SerializeObject(ExpenseData), JsonRequestBehavior.AllowGet);
+        }
 
         /// <summary>
         /// This function is used to get Data of Income and Revenue
