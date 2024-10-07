@@ -18,7 +18,7 @@
         var $self = this;
         var $maindiv = null;
         var vDifferentYearDataList = null;
-        var $root = $('<div class="h-100 w-100 vas-ExRePr-background">');
+        var $root = $('<div class="h-100 w-100 vas-ExAmount-background">');
         var ExpenseAmountData = [];
         var ExpenseNameArray = [];
 
