@@ -88,19 +88,18 @@
     margin-bottom: .4em;
 }
 
-.VAS-orders-heading h6 {
-    margin: 0;
-    font-size: 1em;
-    color: rgba(var(--v-c-common), 1);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.3em;
-}
-
-    .VAS-orders-heading h6 .vis {
-        font-size: 0.875em;
+    .VAS-orders-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
     }
+
+        .VAS-orders-heading h6 .vis {
+            font-size: 0.875em;
+        }
 
 .VAS-deliveries-listing {
     display: flex;
@@ -174,6 +173,10 @@
         color: rgba(var(--v-c-on-common), 1);
     }
 
+.VAS-orders-text-white {
+    color: rgba(var(--v-c-common), 1) !important;
+}
+
 .VAS-total-items-count {
     font-weight: 600;
     color: rgba(var(--v-c-on-common), 1);
@@ -214,18 +217,12 @@
     grid-template-columns: repeat(3, 1fr);
 }
 
-.VAS-delivery-detail .VAS-icon-w-name .fa, .VAS-delivery-detail .VAS-icon-w-name .VAS-doc-no, .VAS-delivery-detail .VAS-total-items-count {
-    color: rgba(var(--v-c-common), 1);
-}
-
 .VAS-qtyProd-text {
     font-weight: 600;
-    color: rgba(var(--v-c-common), 1);
     font-size: 0.875em;
 }
 
 .VAS-expectedTxt {
-    color: rgba(var(--v-c-common), 0.8);
     font-size: 0.875em;
 }
 
@@ -265,12 +262,10 @@
     .VAS-slider-arrows .fa {
         font-size: 2.6em;
         cursor: pointer;
-        color: rgba(var(--v-c-common), 0.9);
     }
 
     .VAS-slider-arrows span {
         font-size: 1.1em;
-        color: rgba(var(--v-c-common), 1);
     }
 
 .VAS-slider-arrows-order-details {
@@ -285,14 +280,11 @@
     .VAS-slider-arrows-order-details .fa {
         font-size: 2.6em;
         cursor: pointer;
-        color: rgba(var(--v-c-common), 0.9);
     }
 
     .VAS-slider-arrows-order-details span {
         font-size: 1.1em;
-        color: rgba(var(--v-c-common), 1);
     }
-
 
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .VAS-endService-container {

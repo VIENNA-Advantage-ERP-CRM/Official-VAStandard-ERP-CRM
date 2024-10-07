@@ -145,7 +145,7 @@
             selectedOrderLineIDs = [];
 
             var productContainer =
-                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-grn-container">' +
+                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-Expected-Order-container">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
                 '    <div class="VAS-orders-heading">' +
                 '        <h6>' +

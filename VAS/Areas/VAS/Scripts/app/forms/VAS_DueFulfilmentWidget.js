@@ -143,12 +143,12 @@
             selectedOrderLineIDs = [];
 
             var productContainer =
-                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-deliveries-container-pending">' +
+                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-due-fulfilment-container">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
                 '    <div class="VAS-orders-heading">' +
                 '        <h6>' +
                 '            <span id="VAS_BackTodelivery_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
-                '            ' + VIS.Msg.getMsg("VAS_BackToDeliveries") +
+                '            ' + VIS.Msg.getMsg("VAS_BackToFulfilment") +
                 '        </h6>' +
                 '<span id="VAS_GenerateDeliveryOrder_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="'
                 + VIS.Msg.getMsg("VAS_GenerateDeliverOrder") + '"><i class="fa fa-truck" aria-hidden="true"></i></span>' +
@@ -160,7 +160,7 @@
                 '            <div class="VAS-expected-col">' +
                 '                <div class="VAS-icon-w-name">' +
                 '                    <i class="fa fa-file-text" aria-hidden="true"></i>' +
-                '                    <div class="VAS-doc-no">' + docNo + '</div>' +
+                '                    <div class="VAS-doc-no" title="' + VIS.Msg.getMsg("Document_No") + '">' + docNo + '</div>' +
                 '                </div>' +
                 '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + customerName + '</div>' +
                 '            </div>' +
