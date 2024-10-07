@@ -274,5 +274,24 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VAI050-This method used to create grn and customer return
+        /// </summary>
+        /// <param name="C_Order_ID"></param>
+        /// <param name="C_OrderLines_IDs"></param>
+        /// <param name="Type"></param>
+        /// <returns></returns>
+        public JsonResult CreateSalesOrder(int C_Order_ID, string C_OrderLines_IDs)
+        {
+            Dictionary<string, object> result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.CreateSalesOrder(C_Order_ID, C_OrderLines_IDs, ctx);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }
