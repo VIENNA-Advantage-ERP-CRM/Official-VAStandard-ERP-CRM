@@ -18,7 +18,7 @@
         var $self = this;
         var $maindiv = null;
         var vDifferentYearDataList = null;
-        var $root = $('<div class="h-100 w-100 vas-ExAmount-background">');
+        var $root = $('<div class="h-100 w-100 vas-t10exp-background">');
         var ExpenseAmountData = [];
         var ExpenseNameArray = [];
 
@@ -27,7 +27,7 @@
             GetColumnID();
             createBusyIndicator();
             $maindiv = $('<div id="vas_pieChartExpense_' + widgetID + '" class="vas-piechartexpense-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-expam-div">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-t10exp-div">');
             var HeadingDiv = $('<div class= "vas-t10exp-heading">' + VIS.Msg.getMsg("VAS_Top10Expenses") + '</div>');
             // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
