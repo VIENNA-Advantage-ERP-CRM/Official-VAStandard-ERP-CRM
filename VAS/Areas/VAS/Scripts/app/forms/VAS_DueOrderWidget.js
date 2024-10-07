@@ -145,12 +145,12 @@
             selectedOrderLineIDs = [];
 
             var productContainer =
-                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
+                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-due-fulfilment-container">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
                 '    <div class="VAS-orders-heading">' +
                 '        <h6>' +
                 '            <span id="VAS_BackTodelivery_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
-                '            ' + VIS.Msg.getMsg("VAS_BackToGRN") +
+                '            ' + VIS.Msg.getMsg("VAS_BackToOrder") +
                 '        </h6>' +
                 '<span id="VAS_GenerateGRN_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateGRN") + '">' +
                 '<i class="vis vis-action" ></i ></span> ' +
