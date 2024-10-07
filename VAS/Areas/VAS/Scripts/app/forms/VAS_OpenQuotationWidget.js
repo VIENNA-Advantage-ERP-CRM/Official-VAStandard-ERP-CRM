@@ -84,10 +84,10 @@
                                 '        <div class="VAS-total-items-count" title="' + VIS.Msg.getMsg("VAS_NoOfLines") + '">' + response.Orders[i]["LineCount"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("Vendor") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col grid-2-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_VendorLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_DeliveryLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
                                 '        <div class="VAS-lbl-text text-right" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + response.Orders[i]["ProductLocation"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
@@ -164,7 +164,7 @@
                 '                    <i class="fa fa-file-text" aria-hidden="true"></i>' +
                 '                    <div class="VAS-doc-no" title="' + VIS.Msg.getMsg("Document_No") + '">' + docNo + '</div>' +
                 '                </div>' +
-                '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("Vendor") + '">' + customerName + '</div>' +
+                '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + customerName + '</div>' +
                 '            </div>' +
                 '            <div class="VAS-dty-prod">' +
                 '                <div class="VAS-qtyProd-text">' + VIS.Msg.getMsg("VAS_NoOfLines") + '</div>' +
@@ -203,7 +203,7 @@
                 // Generate HTML for records of the current page
                 for (var i = startIndex; i < endIndex; i++) {
                     var line = childRecords[i];
-                    var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);                   
+                    var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
 
                     $root.find('#VAS_OrderLine_' + widgetID).append(
                         '            <div class="VAS-delivery-box">' +
@@ -318,7 +318,7 @@
                                 message = response.message;
                             }
                             else {
-                                message = VIS.Msg.getMsg("VAS_DeliveryOrderNotGenerated");
+                                message = VIS.Msg.getMsg("VAS_SalesOrderNotGenerated");
                             }
                             spnWO.text(message);
                             spnWO.fadeIn();
