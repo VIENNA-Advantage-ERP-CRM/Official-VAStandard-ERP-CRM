@@ -795,27 +795,31 @@ namespace VIS.Models
             string WhereCondition = "";
             if (Type == "PD") //Pending Delivery Order
             {
-                WhereCondition = @" AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = @" AND o.DatePromised < TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsSalesQuotation = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "EG") //Expected GRN
             {
-                WhereCondition = " AND o.DatePromised >=TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = " AND o.DatePromised >=TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsSalesQuotation = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "PG") //Pending GRN
             {
-                WhereCondition = " AND  o.DatePromised <TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = " AND  o.DatePromised <TRUNC(CURRENT_DATE) AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'N' AND o.IsSalesQuotation = 'N' AND o.IsBlanketTrx = 'N' ";
             }
             else if (Type == "CR") //Customer RMA
             {
-                WhereCondition = " AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'Y' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = " AND o.IsSoTrx = 'Y' AND o.IsReturnTrx = 'Y' ";
             }
             else if (Type == "VR") //Vendor RMA
             {
-                WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = " AND o.IsSoTrx = 'N' AND o.IsReturnTrx = 'Y' ";
             }
             else if (Type == "ED") //Expected Delivery Order
             {
-                WhereCondition = @" AND o.DatePromised >= TRUNC(CURRENT_DATE) AND o.IsSOTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsBlanketTrx = 'N' ";
+                WhereCondition = @" AND o.DatePromised >= TRUNC(CURRENT_DATE) AND o.IsSOTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsSalesQuotation = 'N' AND o.IsBlanketTrx = 'N' ";
+            }
+            else if (Type == "OQ") //Open Sales Quotations
+            {
+                WhereCondition = @" AND o.IsSOTrx = 'Y' AND o.IsReturnTrx = 'N' AND o.IsSalesQuotation = 'Y' AND NVL(ol.Ref_OrderLine_ID, 0) = 0";
             }
             DeliveryResult result = new DeliveryResult
             {
@@ -837,7 +841,6 @@ namespace VIS.Models
                     GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name,o.DatePromised
                     ORDER BY o.DatePromised DESC");
 
-
             DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -854,12 +857,15 @@ namespace VIS.Models
                     }
                     else if (Type == "VR")
                     {
-
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_VendorReturn'", null, null));
                     }
                     else if (Type == "ED" || Type == "PD")
                     {
                         result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
+                    }
+                    else if (Type == "OQ")
+                    {
+                        result.AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
                     }
                 }
                 // Get the list of order IDs from the retrieved parent records
@@ -870,43 +876,32 @@ namespace VIS.Models
 
                 if (orderIds.Count > 0)
                 {
-                    StringBuilder childSb = new StringBuilder();
-                    childSb.Append(@"
-                SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID,
-                (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON( i.M_Inout_ID = il.M_Inout_ID)
-                WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' 
-                AND i.DocStatus NOT IN ('RE' , 'VO' , 'CL' , 'CO'))) AS QtyOrdered, ol.C_UOM_ID,
-                atr.Description AS AttributeName,u.Name AS Uom,p.Name As ProductName,(SELECT NVL(SUM(s.QtyOnHand),0)  FROM M_Storage s 
-                INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
-                WHERE 
-                NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
-                NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
-                FROM C_OrderLine ol
-                INNER JOIN C_UOM  u ON (u.C_UOM_ID=ol.C_UOM_ID)
-                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID)
-                INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
-                LEFT JOIN  M_AttributeSetInstance atr ON (ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
-                WHERE    (ol.QtyOrdered - ol.QtyDelivered - 
-                (SELECT NVL(SUM(il.MovementQty), 0) 
-                FROM M_Inout i 
-                INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
-                WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID 
-                AND il.IsActive = 'Y' 
-                AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
-                 ol.C_Order_ID IN (" + string.Join(",", orderIds) + @") ORDER BY ol.C_Order_ID");
-                    DataSet childDs = DB.ExecuteDataset(childSb.ToString(), null, null);
+                    sb.Clear();
+                    sb.Append(@"
+                    SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID,
+                    (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
+                    WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyOrdered, 
+                    ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
+                    INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
+                    WHERE NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty,
+                    NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
+                    FROM C_OrderLine ol INNER JOIN C_UOM  u ON (u.C_UOM_ID=ol.C_UOM_ID)
+                    INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID)
+                    INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
+                    LEFT JOIN  M_AttributeSetInstance atr ON (ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
+                    WHERE (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
+                    WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
+                    ol.C_Order_ID IN (" + string.Join(",", orderIds) + @") ORDER BY ol.C_Order_ID");
+                    DataSet childDs = DB.ExecuteDataset(sb.ToString(), null, null);
                     if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
                     {
-
                         /// Map order lines to parent orders
-
                         Dictionary<int, List<OrderLine>> orderLinesMap = childDs.Tables[0].AsEnumerable()
                             .GroupBy(row => Util.GetValueOfInt(row["C_Order_ID"]))
                             .ToDictionary(
                                 group => group.Key,
                                 group => group.Select(row => new OrderLine
                                 {
-
                                     QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
                                      : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]), // Remaining qty in line uom
                                     M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]),
@@ -919,14 +914,15 @@ namespace VIS.Models
                                     UOM = Util.GetValueOfString(row["Uom"]),
                                     ProductName = Util.GetValueOfString(row["ProductName"]),
                                     OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"])
-
                                 }).ToList()
                             );
+
                         string Symbol = "$";
                         int StdPrecision = 2;
-                        string query = @"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol, StdPrecision 
-                                         FROM C_Currency WHERE C_Currency_ID=" + ctx.GetContextAsInt("$C_Currency_ID");
-                        DataSet dsCurrency = DB.ExecuteDataset(query, null, null);
+                        sb.Clear();
+                        sb.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol, StdPrecision 
+                                         FROM C_Currency WHERE C_Currency_ID=" + ctx.GetContextAsInt("$C_Currency_ID"));
+                        DataSet dsCurrency = DB.ExecuteDataset(sb.ToString(), null, null);
                         if (dsCurrency != null && dsCurrency.Tables.Count > 0 && dsCurrency.Tables[0].Rows.Count > 0)
                         {
                             Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
@@ -951,6 +947,124 @@ namespace VIS.Models
                                 OrderLines = orderLinesMap.ContainsKey(orderId) ? orderLinesMap[orderId] : new List<OrderLine>()
                             };
                             result.Orders.Add(parentOrder);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                return null;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// VAI050-Get the list of expected Requisition
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public dynamic GetExpectedTransfer(Ctx ctx, int pageNo, int pageSize, string Type)
+        {
+            string WhereCondition = "";
+            if (Type.Contains("P")) //Pending Material Transfer
+            {
+                WhereCondition = " AND r.DateRequired < TRUNC(CURRENT_DATE) ";
+            }
+            else //Expected Material Transfer
+            {
+                WhereCondition = " AND r.DateRequired >= TRUNC(CURRENT_DATE) ";
+            }
+            dynamic result = new ExpandoObject();
+            result.Requisitions = new List<dynamic>();
+            StringBuilder sb = new StringBuilder();
+            sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT r.M_Requisition_ID, r.DocumentNo, r.DateDoc,
+                    COUNT(rl.M_RequisitionLine_ID) AS LineCount, r.TotalLines AS GrandTotal, sw.Name AS Source, w.Name AS Destination, 
+                    cb.Name AS Employee, CASE WHEN c.Cursymbol IS NOT NULL THEN c.Cursymbol ELSE c.ISO_Code END AS Symbol, c.StdPrecision
+                    FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON (r.M_Requisition_ID = rl.M_Requisition_ID)
+                    INNER JOIN M_WareHouse sw ON (r.DTD001_MWarehouseSource_ID = sw.M_WareHouse_ID)
+                    INNER JOIN M_WareHouse w ON (r.M_WareHouse_ID = w.M_WareHouse_ID)
+                    INNER JOIN M_PriceList p ON (r.M_PriceList_ID = p.M_PriceList_ID)
+                    INNER JOIN C_Currency c ON (p.C_Currency_ID = c.C_Currency_ID)
+                    LEFT JOIN C_BPartner cb ON (cb.C_BPartner_ID = r.C_BPartner_ID)", "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
+                    AND r.DocStatus IN ('CO')" + WhereCondition + @"AND (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0
+                    GROUP BY r.M_Requisition_ID, r.DocumentNo, r.DateDoc, r.TotalLines, sw.Name, w.Name, cb.Name, CASE WHEN c.Cursymbol IS NOT NULL 
+                    THEN c.Cursymbol ELSE c.ISO_Code END, c.StdPrecision ORDER BY r.DateDoc DESC");
+
+            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                if (pageNo == 1)
+                {
+                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_Requisition_ID) FROM (" + sb.ToString() + ") t ", null, null));
+                }
+
+                // Get the list of Requisitions IDs from the retrieved parent records
+                // Extract Requisition IDs
+                List<int> reqIDs = ds.Tables[0].AsEnumerable().Select(row => Util.GetValueOfInt(row["M_Requisition_ID"])).ToList();
+                if (reqIDs.Count > 0)
+                {
+                    StringBuilder childSb = new StringBuilder(@"
+                    SELECT rl.M_Requisition_ID,rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID,
+                    (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyOrdered, rl.C_UOM_ID,
+                    atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
+                    INNER JOIN M_Locator loc ON (loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=r.DTD001_MWarehouseSource_ID)
+                    WHERE NVL(s.M_Product_ID,0)=NVL(rl.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(rl.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
+                    NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0) AS ConversionRate
+                    FROM M_RequisitionLine rl INNER JOIN  M_Requisition r ON (rl.M_Requisition_ID=r.M_Requisition_ID)
+                    INNER JOIN M_Product p ON (rl.M_Product_ID=p.M_Product_ID) LEFT JOIN C_UOM u ON (rl.C_UOM_ID=u.C_UOM_ID) 
+                    LEFT JOIN  M_AttributeSetInstance atr ON (rl.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
+                    WHERE (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0 AND
+                    rl.M_Requisition_ID IN (" + string.Join(",", reqIDs) + @") ORDER BY rl.M_Requisition_ID");
+
+                    DataSet childDs = DB.ExecuteDataset(childSb.ToString(), null, null);
+                    if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
+                    {
+                        /// Map Requisition lines to parent Requisitions
+                        dynamic reqLine;
+                        Dictionary<int, List<dynamic>> ReqLinesMap = childDs.Tables[0].AsEnumerable()
+                            .GroupBy(row => Util.GetValueOfInt(row["M_Requisition_ID"]))
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group.Select(row =>
+                                {
+                                    reqLine = new ExpandoObject();
+                                    reqLine.QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
+                                     : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]); // Remaining qty in line uom
+                                    reqLine.M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]);
+                                    reqLine.M_RequisitionLine_ID = Util.GetValueOfInt(row["M_RequisitionLine_ID"]);
+                                    reqLine.M_Requisition_ID = Util.GetValueOfInt(row["M_Requisition_ID"]);
+                                    reqLine.M_AttributeSetInstance_ID = Util.GetValueOfInt(row["M_AttributeSetInstance_ID"]);
+                                    reqLine.QtyOrdered = Util.GetValueOfDecimal(row["QtyOrdered"]);
+                                    reqLine.C_UOM_ID = Util.GetValueOfInt(row["C_UOM_ID"]);
+                                    reqLine.AttributeName = Util.GetValueOfString(row["AttributeName"]);
+                                    reqLine.UOM = Util.GetValueOfString(row["Uom"]);
+                                    reqLine.ProductName = Util.GetValueOfString(row["ProductName"]);
+                                    reqLine.OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"]);
+                                    return reqLine;
+                                }).ToList()
+                            );
+
+                        // Step 4: Associate child records with their parent requisitions
+                        dynamic requisition;
+                        int reqId;
+                        foreach (DataRow parentRow in ds.Tables[0].Rows)
+                        {
+                            reqId = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
+                            requisition = new ExpandoObject();
+                            requisition.DocumentNo = Util.GetValueOfString(parentRow["DocumentNo"]);
+                            requisition.M_Requisition_ID = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
+                            requisition.DateDoc = Util.GetValueOfDateTime(parentRow["DateDoc"]);
+                            requisition.GrandTotal = Util.GetValueOfDecimal(parentRow["GrandTotal"]);
+                            requisition.LineCount = Util.GetValueOfDecimal(parentRow["LineCount"]);
+                            requisition.Source = Util.GetValueOfString(parentRow["Source"]);
+                            requisition.Destination = Util.GetValueOfString(parentRow["Destination"]);
+                            requisition.Employee = Util.GetValueOfString(parentRow["Employee"]);
+                            requisition.Symbol = Util.GetValueOfString(parentRow["Symbol"]);
+                            requisition.StdPrecision = Util.GetValueOfInt(parentRow["StdPrecision"]);
+                            requisition.ReqLines = ReqLinesMap.ContainsKey(reqId) ? ReqLinesMap[reqId] : new List<dynamic>();
+                            result.Requisitions.Add(requisition);
                         }
                     }
                 }
@@ -1167,126 +1281,6 @@ namespace VIS.Models
 
 
             return obj;
-        }
-
-
-        /// <summary>
-        /// VAI050-Get the list of expected Requisition
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="pageNo"></param>
-        /// <param name="pageSize"></param>
-        /// <returns></returns>
-        public dynamic GetExpectedTransfer(Ctx ctx, int pageNo, int pageSize, string Type)
-        {
-            string WhereCondition = "";
-            if (Type.Contains("P")) //Pending Material Transfer
-            {
-                WhereCondition = " AND r.DateRequired < TRUNC(CURRENT_DATE) ";
-            }
-            else //Expected Material Transfer
-            {
-                WhereCondition = " AND r.DateRequired >= TRUNC(CURRENT_DATE) ";
-            }
-            dynamic result = new ExpandoObject();
-            result.Requisitions = new List<dynamic>();
-            StringBuilder sb = new StringBuilder();
-            sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT r.M_Requisition_ID, r.DocumentNo, r.DateDoc,
-                    COUNT(rl.M_RequisitionLine_ID) AS LineCount, r.TotalLines AS GrandTotal, sw.Name AS Source, w.Name AS Destination, 
-                    cb.Name AS Employee, CASE WHEN c.Cursymbol IS NOT NULL THEN c.Cursymbol ELSE c.ISO_Code END AS Symbol, c.StdPrecision
-                    FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON (r.M_Requisition_ID = rl.M_Requisition_ID)
-                    INNER JOIN M_WareHouse sw ON (r.DTD001_MWarehouseSource_ID = sw.M_WareHouse_ID)
-                    INNER JOIN M_WareHouse w ON (r.M_WareHouse_ID = w.M_WareHouse_ID)
-                    INNER JOIN M_PriceList p ON (r.M_PriceList_ID = p.M_PriceList_ID)
-                    INNER JOIN C_Currency c ON (p.C_Currency_ID = c.C_Currency_ID)
-                    LEFT JOIN C_BPartner cb ON (cb.C_BPartner_ID = r.C_BPartner_ID)", "r", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                    AND r.DocStatus IN ('CO')" + WhereCondition + @"AND (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0
-                    GROUP BY r.M_Requisition_ID, r.DocumentNo, r.DateDoc, r.TotalLines, sw.Name, w.Name, cb.Name, CASE WHEN c.Cursymbol IS NOT NULL 
-                    THEN c.Cursymbol ELSE c.ISO_Code END, c.StdPrecision ORDER BY r.DateDoc DESC");
-
-            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
-            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-            {
-                if (pageNo == 1)
-                {
-                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_Requisition_ID) FROM (" + sb.ToString() + ") t ", null, null));
-                }
-
-                // Get the list of Requisitions IDs from the retrieved parent records
-                // Extract Requisition IDs
-                List<int> reqIDs = ds.Tables[0].AsEnumerable().Select(row => Util.GetValueOfInt(row["M_Requisition_ID"])).ToList();
-                if (reqIDs.Count > 0)
-                {
-                    StringBuilder childSb = new StringBuilder(@"
-                    SELECT rl.M_Requisition_ID,rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID,
-                    (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyOrdered, rl.C_UOM_ID,
-                    atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
-                    INNER JOIN M_Locator loc ON (loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=r.DTD001_MWarehouseSource_ID)
-                    WHERE NVL(s.M_Product_ID,0)=NVL(rl.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(rl.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
-                    NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0) AS ConversionRate
-                    FROM M_RequisitionLine rl INNER JOIN  M_Requisition r ON (rl.M_Requisition_ID=r.M_Requisition_ID)
-                    INNER JOIN M_Product p ON (rl.M_Product_ID=p.M_Product_ID) LEFT JOIN C_UOM u ON (rl.C_UOM_ID=u.C_UOM_ID) 
-                    LEFT JOIN  M_AttributeSetInstance atr ON (rl.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
-                    WHERE (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) > 0 AND
-                    rl.M_Requisition_ID IN (" + string.Join(",", reqIDs) + @") ORDER BY rl.M_Requisition_ID");
-
-                    DataSet childDs = DB.ExecuteDataset(childSb.ToString(), null, null);
-                    if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
-                    {
-                        /// Map Requisition lines to parent Requisitions
-                        dynamic reqLine;
-                        Dictionary<int, List<dynamic>> ReqLinesMap = childDs.Tables[0].AsEnumerable()
-                            .GroupBy(row => Util.GetValueOfInt(row["M_Requisition_ID"]))
-                            .ToDictionary(
-                                group => group.Key,
-                                group => group.Select(row =>
-                                {
-                                    reqLine = new ExpandoObject();
-                                    reqLine.QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
-                                     : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]); // Remaining qty in line uom
-                                    reqLine.M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]);
-                                    reqLine.M_RequisitionLine_ID = Util.GetValueOfInt(row["M_RequisitionLine_ID"]);
-                                    reqLine.M_Requisition_ID = Util.GetValueOfInt(row["M_Requisition_ID"]);
-                                    reqLine.M_AttributeSetInstance_ID = Util.GetValueOfInt(row["M_AttributeSetInstance_ID"]);
-                                    reqLine.QtyOrdered = Util.GetValueOfDecimal(row["QtyOrdered"]);
-                                    reqLine.C_UOM_ID = Util.GetValueOfInt(row["C_UOM_ID"]);
-                                    reqLine.AttributeName = Util.GetValueOfString(row["AttributeName"]);
-                                    reqLine.UOM = Util.GetValueOfString(row["Uom"]);
-                                    reqLine.ProductName = Util.GetValueOfString(row["ProductName"]);
-                                    reqLine.OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"]);
-                                    return reqLine;
-                                }).ToList()
-                            );
-
-                        // Step 4: Associate child records with their parent requisitions
-                        dynamic requisition;
-                        int reqId;
-                        foreach (DataRow parentRow in ds.Tables[0].Rows)
-                        {
-                            reqId = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
-                            requisition = new ExpandoObject();
-                            requisition.DocumentNo = Util.GetValueOfString(parentRow["DocumentNo"]);
-                            requisition.M_Requisition_ID = Util.GetValueOfInt(parentRow["M_Requisition_ID"]);
-                            requisition.DateDoc = Util.GetValueOfDateTime(parentRow["DateDoc"]);
-                            requisition.GrandTotal = Util.GetValueOfDecimal(parentRow["GrandTotal"]);
-                            requisition.LineCount = Util.GetValueOfDecimal(parentRow["LineCount"]);
-                            requisition.Source = Util.GetValueOfString(parentRow["Source"]);
-                            requisition.Destination = Util.GetValueOfString(parentRow["Destination"]);
-                            requisition.Employee = Util.GetValueOfString(parentRow["Employee"]);
-                            requisition.Symbol = Util.GetValueOfString(parentRow["Symbol"]);
-                            requisition.StdPrecision = Util.GetValueOfInt(parentRow["StdPrecision"]);
-                            requisition.ReqLines = ReqLinesMap.ContainsKey(reqId) ? ReqLinesMap[reqId] : new List<dynamic>();
-                            result.Requisitions.Add(requisition);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                return null;
-            }
-
-            return result;
         }
 
         /// <summary>
@@ -1999,6 +1993,164 @@ namespace VIS.Models
         }
 
         /// <summary>
+        /// VAI050-This method is used to generate GRN and also generate the Customer Return
+        /// </summary>
+        /// <param name="Order_ID"></param>
+        /// <param name="Order_LineIDs"></param>
+        /// <param name="ctx"></param>
+        /// <returns></returns>
+        public Dictionary<string, object> CreateSalesOrder(int Order_ID, string Order_LineIDs, Ctx ctx)
+        {
+            Trx trx = null;
+            Dictionary<string, object> ret = null;
+            try
+            {
+                ret = new Dictionary<string, object>();
+                trx = Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
+
+                MOrder from = new MOrder(ctx, Order_ID, trx);
+                MOrder to = new MOrder(from.GetCtx(), 0, trx);
+                to.Set_TrxName(trx);
+                PO.CopyValues(from, to, from.GetAD_Client_ID(), from.GetAD_Org_ID());
+                to.Set_ValueNoCheck("C_Order_ID", Env.ZERO);
+                to.Set_ValueNoCheck("DocumentNo", null);
+                to.SetDocStatus(X_C_Order.DOCSTATUS_Drafted);
+                to.SetDocAction(X_C_Order.DOCACTION_Complete);
+                to.SetC_DocType_ID(0);
+                to.SetC_DocTypeTarget_ID();
+                to.SetIsSelected(false);
+                to.SetDateOrdered(DateTime.Now);
+                to.SetDateAcct(DateTime.Now);
+                to.SetDatePromised(DateTime.Now);
+                to.SetDatePrinted(null);
+                to.SetIsPrinted(false);
+                to.SetIsApproved(false);
+                to.SetIsCreditApproved(false);
+                to.SetC_Payment_ID(0);
+                to.SetC_CashLine_ID(0);
+                //	Amounts are updated  when adding lines
+                to.SetGrandTotal(Env.ZERO);
+                to.SetTotalLines(Env.ZERO);
+                to.SetIsDelivered(false);
+                to.SetIsInvoiced(false);
+                to.SetIsSelfService(false);
+                to.SetIsTransferred(false);
+                to.SetPosted(false);
+                to.SetProcessed(false);
+                to.SetPOReference(Util.GetValueOfString(from.GetDocumentNo()));
+                if (to.Get_ColumnIndex("C_Order_Quotation") > 0)
+                    to.SetC_Order_Quotation(Order_ID);
+
+                if (to.Get_ColumnIndex("VAS_ContractMaster_ID") >= 0 && Util.GetValueOfInt(from.Get_Value("VAS_ContractMaster_ID")) > 0)
+                {
+                    to.Set_Value("VAS_ContractMaster_ID", from.Get_Value("VAS_ContractMaster_ID"));
+                }
+
+                if (to.Get_ColumnIndex("C_IncoTerm_ID") > 0)
+                {
+                    to.SetC_IncoTerm_ID(from.GetC_IncoTerm_ID());
+                }
+
+                if (to.Get_ColumnIndex("ConditionalFlag") > -1)
+                {
+                    to.SetConditionalFlag(MOrder.CONDITIONALFLAG_PrepareIt);
+                }
+
+                if (!to.Save(trx))
+                {
+                    trx.Rollback();
+                    ValueNamePair pp = VLogger.RetrieveError();
+                    string error = pp != null ? pp.GetName() : "";
+                    if (string.IsNullOrEmpty(error))
+                    {
+                        error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                    }
+                    ret["SalesOrder_ID"] = 0;
+                    ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_OrderNotSaved");
+                    return ret;
+                }
+
+                DB.ExecuteQuery("UPDATE C_Order SET Ref_Order_ID = " + to.GetC_Order_ID() + " WHERE C_Order_ID = " + from.GetC_Order_ID(), null, trx);
+
+                if (Env.IsModuleInstalled("VA075_") && to.Get_ColumnIndex("VA075_FieldServiceReq_ID") > 0 && from.Get_ValueAsInt("VA075_FieldServiceReq_ID") > 0)
+                {
+                    DB.ExecuteQuery("UPDATE VA075_FieldServiceReq SET C_Order_ID=" + to.GetC_Order_ID() + " WHERE VA075_FieldServiceReq_ID="
+                        + from.Get_ValueAsInt("VA075_FieldServiceReq_ID"), null, trx);
+                }
+
+                StringBuilder query = new StringBuilder();
+                query.Append(@"SELECT ol.AD_Org_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID, ol.M_Product_ID, ol.C_UOM_ID, 
+                            ol.QtyEntered, ol.QtyOrdered, ol.PriceEntered, ol.PriceActual, ol.PriceList, ol.C_Tax_ID
+                            FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
+                            WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
+                DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    MOrderLine objLine = null;
+                    int LineNo = 10;
+
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        objLine = new MOrderLine(to);
+                        objLine.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                        objLine.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
+                        objLine.SetC_Order_ID(to.GetC_Order_ID());
+                        objLine.SetLine(LineNo);
+                        objLine.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]));
+                        objLine.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        objLine.SetC_UOM_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
+                        objLine.SetC_Tax_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Tax_ID"]));
+                        objLine.SetQtyEntered(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyEntered"]));
+                        objLine.SetQtyOrdered(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]));
+                        objLine.SetPriceEntered(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceEntered"]));
+                        objLine.SetPriceActual(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceActual"]));
+                        objLine.SetPriceList(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PriceList"]));
+                        if (objLine.Get_ColumnIndex("C_Quotation_Line_ID") >= 0)
+                            objLine.Set_Value("C_Quotation_Line_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_OrderLine_ID"]));
+                        if (!objLine.Save())
+                        {
+                            ValueNamePair pp = VLogger.RetrieveError();
+                            string error = pp != null ? pp.GetName() : "";
+                            if (string.IsNullOrEmpty(error))
+                            {
+                                error = pp != null ? Msg.GetMsg(ctx, pp.GetValue()) : "";
+                            }
+
+                            ret["SalesOrder_ID"] = 0;
+                            ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_OrderNotSaved");
+                            return ret;
+                        }
+
+                        LineNo += 10;
+                        DB.ExecuteQuery("UPDATE C_OrderLine SET Ref_OrderLine_ID = " + objLine.GetC_OrderLine_ID() + " WHERE C_OrderLine_ID = "
+                            + Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_OrderLine_ID"]), null, trx);
+                    }
+
+                    ret["SalesOrder_ID"] = to.GetC_Order_ID();
+                    ret["message"] = Msg.GetMsg(ctx, "VAS_OrderSaved");
+                    trx.Commit();
+                    return ret;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                }
+                ret["SalesOrder_ID"] = 0;
+                ret["message"] = ex.Message;
+                return ret;
+            }
+            finally
+            {
+                if (trx != null)
+                    trx.Close();
+            }
+        }
+
+        /// <summary>
         /// VAI050-This method use to get doctype
         /// </summary>
         /// <param name="AD_Org_ID"></param>
@@ -2013,8 +2165,6 @@ namespace VIS.Models
                    AND IsActive = 'Y' AND AD_Org_ID IN(0, " + AD_Org_ID + ") AND IsSOTrx ='" + IsSOTrx + "' AND IsReturnTrx = '" + IsReturnTrx + "' ORDER BY AD_Org_ID DESC";
             return Util.GetValueOfInt(DB.ExecuteScalar(query));
         }
-
-
 
         public class MultiplyRateItem
         {
