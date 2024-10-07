@@ -18,7 +18,7 @@
         var $self = this;
         var $maindiv = null;
         var vDifferentYearDataList = null;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-ExRePr-background">');
         var ExpenseAmountData = [];
         var ExpenseNameArray = [];
 
@@ -27,7 +27,7 @@
             GetColumnID();
             createBusyIndicator();
             $maindiv = $('<div id="vas_pieChartExpense_' + widgetID + '" class="vas-piechartexpense-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-expam-div">');
             var HeadingDiv = $('<div class= "vas-t10exp-heading">' + VIS.Msg.getMsg("VAS_Top10Expenses") + '</div>');
             // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
@@ -84,7 +84,7 @@
                         'rgba(75, 192, 192, 0.5)',  // Teal
                         'rgba(153, 102, 255, 0.5)', // Purple
                         'rgba(255, 159, 64, 0.5)',  // Orange
-                        'rgba(54, 162, 235, 0.5)'    // Light Blue
+                        'rgb(124, 246, 0)'    // Light Green
                     ];
 
                     // Prepare the data object for the chart
