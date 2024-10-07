@@ -13,6 +13,24 @@
     height: 100%;
 }
 
+.VAS-due-fulfilment-container {
+    background: transparent linear-gradient(146deg, #F9F1ED 0%, #FAD2C0 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+}
+
+.VAS-Expected-fulfilment-container {
+    background: transparent linear-gradient(146deg, #DBFFFE 0%, #EDEDFF 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+}
+
+.VAS-Expected-Order-container {
+    background: transparent linear-gradient(146deg, #F4FFEA 0%, #D4F8DE 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+}
+
 .VAS-grn-container {
     background: #A8D8EA;
     background: #2CA6A4;
@@ -62,6 +80,27 @@
         .VAS-deliveries-heading h6 .vis {
             font-size: 0.875em;
         }
+
+.VAS-orders-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .4em;
+}
+
+.VAS-orders-heading h6 {
+    margin: 0;
+    font-size: 1em;
+    color: rgba(var(--v-c-common), 1);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+    .VAS-orders-heading h6 .vis {
+        font-size: 0.875em;
+    }
 
 .VAS-deliveries-listing {
     display: flex;
@@ -356,18 +395,19 @@
 
 
 .badge-green {
-    background-color: green; 
+    background-color: green;
     font-size: 12px;
     color: white;
 }
 
 .badge-red {
-    background-color: red; 
+    background-color: red;
     font-size: 12px;
     color: white;
 }
+
 .badge-orange {
-    background-color: orange; 
+    background-color: orange;
     font-size: 12px;
     color: white;
 }

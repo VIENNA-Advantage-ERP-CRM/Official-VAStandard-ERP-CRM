@@ -26,8 +26,8 @@
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             const orderContainer =
-                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
-                '    <div class="VAS-deliveries-heading">' +
+                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-due-fulfilment-container">' +
+                '    <div class="VAS-orders-heading">' +
                 '        <h6>' + VIS.Msg.getMsg("VAS_OpenQuotation") + '</h6>' +
                 '    </div>' +
                 '    <div class="VAS-delivery-count">' +
@@ -147,7 +147,7 @@
             var productContainer =
                 '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
-                '    <div class="VAS-deliveries-heading">' +
+                '    <div class="VAS-orders-heading">' +
                 '        <h6>' +
                 '            <span id="VAS_BackTodelivery_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
                 '            ' + VIS.Msg.getMsg("VAS_BackToGRN") +
