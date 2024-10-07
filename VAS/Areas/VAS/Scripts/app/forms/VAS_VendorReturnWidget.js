@@ -157,17 +157,17 @@
                 '    <div class="VAS-delivery-count">' +
                 '    </div>' +
                 '    <div class="VAS-delivery-detail">' +
-                '        <div class="VAS-box-heading">' +
+                '        <div class="VAS-box-heading VAS-orders-text-white">' +
                 '            <div class="VAS-expected-col">' +
                 '                <div class="VAS-icon-w-name">' +
-                '                    <i class="fa fa-file-text" aria-hidden="true"></i>' +
-                '                    <div class="VAS-doc-no">' + docNo + '</div>' +
+                '                    <i class="fa fa-file-text VAS-orders-text-white" aria-hidden="true"></i>' +
+                '                    <div class="VAS-doc-no VAS-orders-text-white">' + docNo + '</div>' +
                 '                </div>' +
                 '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("Vendor") + '">' + customerName + '</div>' +
                 '            </div>' +
                 '            <div class="VAS-dty-prod">' +
                 '                <div class="VAS-qtyProd-text">' + VIS.Msg.getMsg("VAS_NoOfLines") + '</div>' +
-                '                <div class="VAS-total-items-count"><span id="VAS_TotalQty_' + widgetID + '"></span></div>' +
+                '                <div class="VAS-total-items-count VAS-orders-text-white"><span id="VAS_TotalQty_' + widgetID + '"></span></div>' +
                 '            </div>' +
                 '        </div>' +
                 '    </div>' +
@@ -236,7 +236,7 @@
                 /*  Append pagination controls*/
                 $root.find('#VAS_OrderLinePagination_' + widgetID).empty();
                 $root.find('#VAS_OrderLinePagination_' + widgetID).append(
-                    '        <div class="VAS-slider-arrows-order-details">' +
+                    '        <div class="VAS-slider-arrows-order-details VAS-orders-text-white">' +
                     '            <i class="fa fa-arrow-circle-left" aria-hidden="true" id="VAS_PreviousPage_' + widgetID + '"></i>' +
                     '            <span>' + currentPage + VIS.Msg.getMsg("VAS_Of") + totalPages + '</span>' +
                     '            <i class="fa fa-arrow-circle-right" aria-hidden="true" id="VAS_NextPage_' + widgetID + '"></i>' +
@@ -370,7 +370,7 @@
             var $paginationContainer = $root.find('.VAS-pagination-container');
             $paginationContainer.empty(); // Clear existing pagination
             $self.totalPages = Math.ceil(recordCount / pageSize); // Update totalPages
-            var $pagination = $('<div class="VAS-slider-arrows">' +
+            var $pagination = $('<div class="VAS-slider-arrows VAS-orders-text-white">' +
                 '        <i id="VAS_Prev_Page_' + widgetID + '" class="fa fa-arrow-circle-left" aria-hidden="true"></i>' +
                 '        <span id="VAS_PaginationText_' + widgetID + '">' + $self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages + '</span>' +
                 '        <i id="VAS_Next_Page_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
