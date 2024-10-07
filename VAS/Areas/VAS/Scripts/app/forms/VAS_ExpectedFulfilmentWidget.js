@@ -161,7 +161,7 @@
                 '            <div class="VAS-expected-col">' +
                 '                <div class="VAS-icon-w-name">' +
                 '                    <i class="fa fa-file-text" aria-hidden="true"></i>' +
-                '                    <div class="VAS-doc-no">' + docNo + '</div>' +
+                '                    <div class="VAS-doc-no" title="' + VIS.Msg.getMsg("Document_No") + '">' + docNo + '</div>' +
                 '                </div>' +
                 '                <div class="VAS-expectedTxt" title="' + VIS.Msg.getMsg("VAS_Customer") + '">' + customerName + '</div>' +
                 '            </div>' +
