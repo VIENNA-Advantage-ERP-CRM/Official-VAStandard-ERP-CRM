@@ -238,6 +238,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
+    <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
@@ -258,6 +259,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_BankBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreditUtilizationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_DueFulfilmentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_DueOrderWidget.js" />
