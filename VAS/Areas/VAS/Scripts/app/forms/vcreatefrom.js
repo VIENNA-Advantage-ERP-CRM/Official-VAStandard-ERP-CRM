@@ -5,7 +5,7 @@
     function VCreateFrom(mTab) {
 
         //call parent function on close
-        this.onClose = null;
+        this.onClose;
         this.dGrid = null;
         var SELECT_DESELECT_ALL = "SelectDeselectAll";
         //select all button status
@@ -763,6 +763,10 @@
                     obj.dispose();
                     if (obj.dGrid != null) {
                         obj.dGrid.destroy();
+                    }
+                    /* VIS_0045: DevOps Bug 6189 -> 08/Oct/2024 -> OnClose function is used to refresh the Grid and to display lines in bottom*/
+                    if (obj.onClose) {
+                        obj.onClose();
                     }
                     $self = null;
                     obj.$root.dialog("destroy");
