@@ -123,7 +123,7 @@
                                 '</div>' +
                                 '</div>' +
                                 '<div class="progress">' +
-                                '<div class="progress-bar bg-danger" role="progressbar" style="width: "' + response.Customers[i].CreditUtil + '"%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>' +
+                                '<div class="progress-bar bg-danger" role="progressbar" style="width:' + response.Customers[i].CreditUtil + '%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>' +
                                 '</div>' +
                                 '</div>');
                         }
