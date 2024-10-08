@@ -2166,6 +2166,81 @@ namespace VIS.Models
             return Util.GetValueOfInt(DB.ExecuteScalar(query));
         }
 
+        /// <summary>
+        /// Get the list of Customer with Credit Limit Utilization
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public dynamic GetCustomerCredit(Ctx ctx, int pageNo, int pageSize)
+        {
+            dynamic result = new ExpandoObject();
+            result.Customers = new List<dynamic>();
+            StringBuilder sb = new StringBuilder();
+            sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT bp.C_BPartner_ID, bp.Name, img.ImageUrl, bp.CreditStatusSettingOn, 
+                    ref.Name AS CreditStatus, cl.C_BPartner_Location_ID,
+                    CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SO_CreditLimit ELSE cl.SO_CreditLimit END AS SO_CreditLimit,
+                    CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SO_CreditUsed ELSE cl.SO_CreditUsed END AS SO_CreditUsed,
+                    CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.CreditValidation ELSE cl.CreditValidation END AS CreditValidation,
+                    CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SOCreditStatus ELSE cl.SOCreditStatus END AS SOCreditStatus
+                    FROM C_BPartner bp INNER JOIN C_BPartner_Location cl ON (bp.C_BPartner_ID = cl.C_BPartner_ID)
+                    INNER JOIN AD_Ref_List ref ON (ref.Value = CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SOCreditStatus ELSE cl.SOCreditStatus END 
+                    AND ref.AD_Reference_ID = 289)
+                    LEFT JOIN AD_Image img ON (bp.Pic = img.AD_Image_ID)
+                    WHERE CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SO_CreditLimit ELSE cl.SO_CreditLimit END > 0",
+                    "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO));
+
+            DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                if (pageNo == 1)
+                {
+                    result.RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_BPartner_ID) FROM (" + sb.ToString() + ") t ", null, null));
+                }
+                dynamic obj;
+                foreach (DataRow parentRow in ds.Tables[0].Rows)
+                {
+                    obj = new ExpandoObject();
+                    obj.Name = Util.GetValueOfString(parentRow["Name"]);
+                    obj.C_BPartner_ID = Util.GetValueOfInt(parentRow["C_BPartner_ID"]);
+                    obj.Location_ID = Util.GetValueOfInt(parentRow["C_BPartner_Location_ID"]);
+                    obj.SO_CreditLimit = Util.GetValueOfDecimal(parentRow["SO_CreditLimit"]);
+                    obj.SO_CreditUsed = Util.GetValueOfDecimal(parentRow["SO_CreditUsed"]);
+                    obj.CreditUtil = Math.Round(decimal.Multiply(decimal.Divide(obj.SO_CreditUsed, obj.SO_CreditLimit), 100), 2, MidpointRounding.AwayFromZero);
+                    obj.SOCreditStatus = Util.GetValueOfString(parentRow["SOCreditStatus"]);
+                    obj.CreditSetting = Util.GetValueOfString(parentRow["CreditStatusSettingOn"]);
+                    obj.CreditValidation = Util.GetValueOfString(parentRow["CreditValidation"]);
+                    obj.CreditStatus = Util.GetValueOfString(parentRow["CreditStatus"]);
+                    obj.ImageUrl = Util.GetValueOfString(parentRow["ImageUrl"]);
+                    result.Customers.Add(obj);
+                }
+            }
+            else
+            {
+                return null;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Update Customer Credit Limit
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="BP_ID"></param>
+        /// <param name="Loc_ID"></param>
+        /// <param name="CreditSetting"></param>
+        /// <param name="CreditValidation"></param>
+        /// <returns>1 if success</returns>
+        public int UpdateCreditValidation(Ctx ctx, int BP_ID, int Loc_ID, string CreditSetting, string CreditValidation)
+        {
+            string tableName = CreditSetting == "CH" ? "C_BPartner" : "C_BPartner_Location";
+            return DB.ExecuteQuery(@"UPDATE " + tableName + " SET CreditValidation = '" + CreditValidation + "' WHERE " + tableName + "_ID = " +
+                (CreditSetting == "CH" ? BP_ID : Loc_ID));
+        }
+
+
         public class MultiplyRateItem
         {
             public int C_UOM_To_ID { get; set; }

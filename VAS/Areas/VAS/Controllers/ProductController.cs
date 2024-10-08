@@ -293,5 +293,43 @@ namespace ViennaAdvantageWeb.Areas.VIS.Controllers
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// Get the list of Customer with Credit Limit Utilization
+        /// </summary>
+        /// <param name="pageNo"></param>
+        /// <param name="pageSize"></param>
+        /// <returns>List of Customers</returns>
+        public JsonResult GetCustomerCredit(int pageNo, int pageSize)
+        {
+            dynamic result = null;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.GetCustomerCredit(ctx, pageNo, pageSize);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Update Customer Credit Validation
+        /// </summary>
+        /// <param name="BP_ID"></param>
+        /// <param name="Loc_ID"></param>
+        /// <param name="CreditSetting"></param>
+        /// <param name="CreditValidation"></param>
+        /// <returns>1 if success</returns>
+        public JsonResult UpdateCreditValidation(int BP_ID, int Loc_ID, string CreditSetting, string CreditValidation)
+        {
+            int  result = 0;
+            if (Session["ctx"] != null)
+            {
+                var ctx = Session["ctx"] as Ctx;
+                MProductModel obj = new MProductModel();
+                result = obj.UpdateCreditValidation(ctx, BP_ID, Loc_ID, CreditSetting, CreditValidation);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }
