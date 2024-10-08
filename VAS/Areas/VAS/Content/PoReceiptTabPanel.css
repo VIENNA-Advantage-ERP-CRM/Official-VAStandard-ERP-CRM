@@ -377,11 +377,11 @@ Only index.html and style.css is for your use There is no need to copy any other
     /*background: rgb(79,217,150);
     background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);*/
     background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
-    padding: 1.8em 0.75em;
+    padding: 1.4em 0.75em;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 15px 0 0;
+    margin: 12px 0 0;
 }
 
 .vas-arwidg-totalRec-amount h1 {
@@ -411,8 +411,8 @@ Only index.html and style.css is for your use There is no need to copy any other
     font-size: 1em;
     text-align: center;
     color: rgba(var(--v-c-common),1);
-    font-family:Verdana;
-    font-weight:600
+    font-family: Verdana;
+    font-weight: 600
 }
 
 .vas-arwidg-rec-listing {
@@ -432,8 +432,8 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 .vas-arwidg-recBox-amt {
     font-weight: 600;
-    font-size: 1em;
-    font-family:Verdana;
+    font-size: 1.2em;
+    font-family: Verdana;
 }
 
     .vas-arwidg-recBox-amt span {
@@ -442,48 +442,49 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 @media screen and (max-width: 1920px) {
     .vas-arwidg-receivable-container {
-        font-size: 1em;
+        font-size: 0.7em;
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 9px;
+        font-size: 7px;
     }
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
-        font-size: 9px;
+        font-size: 7px;
     }
 }
 
 @media screen and (max-width: 1366px) {
     .vas-arwidg-receivable-container {
-        font-size: 0.8em;
+        font-size: 0.6em;
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 9px;
+        font-size: 6px;
     }
 }
 
 @media screen and (max-width: 1200px) {
     .vas-arwidg-totalRec-amount h1 {
-        font-size: 16px;
+        font-size: 12px;
     }
 
     .vas-arwidg-recBox-amt {
-        font-size: 10px;
+        font-size: 8px;
     }
+
     .vas-arwidg-receivable-container {
-        font-size: 0.8em;
+        font-size: 0.6em;
     }
 }
 
 @media screen and (max-width: 1024px) {
     .vas-arwidg-receivable-container {
-        font-size: 0.7em;
+        font-size: 0.6em;
     }
 
     .vas-arwidg-totalRec-amount {
-        font-size: 10px;
+        font-size: 8px;
     }
 
     .vas-arwidg-totalAmt-box {
@@ -491,12 +492,13 @@ Only index.html and style.css is for your use There is no need to copy any other
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 9px;
+        font-size: 4px;
     }
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
-        font-size: 8px;
+        font-size: 7px;
     }
+
     .vas-arwidg-totalRec-amount h1 {
         font-size: 13px;
     }
@@ -507,13 +509,18 @@ Only index.html and style.css is for your use There is no need to copy any other
         font-size: 9px;
     }
 
+    .vas-arwidg-receivable-container {
+        font-size: 0.6em;
+    }
+
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 9px;
+        font-size: 7px;
     }
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
-        font-size: 8px;
+        font-size: 7px;
     }
+
     .vas-arwidg-totalRec-amount h1 {
         font-size: 12px;
     }
@@ -521,75 +528,76 @@ Only index.html and style.css is for your use There is no need to copy any other
 
 @media screen and (max-width: 768px) {
     .vas-arwidg-receivable-container {
-        font-size: 11px;
+        font-size: 7px;
     }
 
     .vas-arwidg-totalRecTxt {
-        font-size: 1.2em;
+        font-size: 1em;
     }
 
     .vis-editModeWidget .vas-arwidg-receivable-container {
-        font-size: 9px;
+        font-size: 3px;
     }
 
     .vis-editModeWidget .vas-arwidg-totalRec-amount {
-        font-size: 8px;
+        font-size: 4px;
     }
+
     .vas-arwidg-totalRec-amount h1 {
-        font-size: 14px;
+        font-size: 4px;
     }
 }
 
 @media screen and (max-width: 600px) {
     .vas-arwidg-receivable-container {
-        font-size: 16px;
+        font-size: 5px;
     }
 
     .vas-arwidg-totalRec-amount {
-        font-size: 15px;
+        font-size: 6px;
     }
 
         .vas-arwidg-totalRec-amount h1 {
-            font-size: 13px;
+            font-size: 6px;
         }
 
     .vas-arwidg-totalRecTxt {
-        font-size: 13px;
+        font-size: 6px;
     }
 
     .vas-arwidg-recBox-amt {
         font-weight: 600;
-        font-size: 10px;
+        font-size: 6px;
     }
 }
 
 @media screen and (max-width: 480px) {
     .vas-arwidg-receivable-container {
-        font-size: 14px;
+        font-size: 9px;
     }
 
     .vas-arwidg-totalRec-amount {
-        font-size: 13px;
+        font-size: 9px;
     }
 }
 
 @media screen and (max-width: 375px) {
     .vas-arwidg-receivable-container {
-        font-size: 13px;
+        font-size: 8px;
     }
 
     .vas-arwidg-totalRec-amount {
-        font-size: 12px;
+        font-size: 8px;
     }
 }
 
 @media screen and (max-width: 320px) {
     .vas-arwidg-receivable-container {
-        font-size: 10px;
+        font-size: 7px;
     }
 
     .vas-arwidg-totalRec-amount {
-        font-size: 10px;
+        font-size: 7px;
     }
 }
 
@@ -651,19 +659,21 @@ span.vas-arwidg-cur-symbol {
 .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
     font-size: 0.875em;
     font-weight: 600;
-    font-family:'Verdana';
+    font-family: 'Verdana';
 }
 
 .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
     font-size: 0.875em;
     color: rgba(var(--v-c-on-secondary), 0.5);
 }
+
 .vas-igwidg-notfounddiv {
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
 }
+
 .vas-igtwidg-cur-symbol {
     display: flex;
     align-items: center;
@@ -693,7 +703,7 @@ span.vas-arwidg-cur-symbol {
     font-size: 1em;
     font-weight: 600;
     color: #093756;
-    font-family:'Verdana';
+    font-family: 'Verdana';
 }
 
 
@@ -701,16 +711,18 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
         font-size: 11px;
     }
+
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 8px;
     }
+
     .vis-editModeWidget .vas-igtwidg-vendors-listing {
         gap: 0.1em;
     }
 
     .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
         font-size: 10px;
-    }  
+    }
 }
 
 @media screen and (max-width: 1366px) {
@@ -721,6 +733,7 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
         font-size: 7px;
     }
+
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 8px;
     }
@@ -754,9 +767,11 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
         font-size: 0.75em;
     }
+
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 8px;
     }
+
     .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
         font-size: 0.75em;
     }
@@ -769,7 +784,7 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-invoiceTotalAmt {
         font-size: 7px;
     }
-   /* .vas-vaswidg-Symbol {
+    /* .vas-vaswidg-Symbol {
         font-size: 7px;
     }*/
 }
@@ -778,6 +793,7 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-top-vendors-col {
         font-size: 14px;
     }
+
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 7px;
     }
@@ -790,13 +806,15 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-top-vendors-col {
         font-size: 12px;
     }
+
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 7px;
     }
+
     .vas-igtwidg-cur-symbol {
         font-size: 1.1em;
     }
-   /* .vas-vaswidg-Symbol {
+    /* .vas-vaswidg-Symbol {
         font-size: 7px;
     }*/
 }
@@ -874,7 +892,7 @@ span.vas-arwidg-cur-symbol {
     font-weight: 600;
     color: #083959;
     line-height: 1.2em;
-    font-family:'Verdana';
+    font-family: 'Verdana';
 }
 
 .vas-psdwidg-salesYear {
@@ -894,8 +912,8 @@ span.vas-arwidg-cur-symbol {
         font-size: 2.0em;
         color: rgba(var(--v-c-common), 1);
         line-height: 1.1em;
-        font-family:Verdana;
-        font-weight:600;
+        font-family: Verdana;
+        font-weight: 600;
     }
 
         .vas-psdwidg-tile-heading h1 span {
@@ -922,7 +940,7 @@ span.vas-arwidg-cur-symbol {
     .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
         font-size: 10px;
     }
-   /* .vas-psdwidg-sales-comparison-col {
+    /* .vas-psdwidg-sales-comparison-col {
         font-size: 10px;
     }*/
 }
@@ -1019,7 +1037,7 @@ span.vas-arwidg-cur-symbol {
     background-color: rgba(var(--v-c-primary), .4);
     border-radius: 100%;
     display: inline-flex;
-    height:2.5em;
+    height: 2.5em;
     justify-content: center;
     /* margin: 0 .4rem; */
     /*min-height: 32px;
@@ -1053,7 +1071,7 @@ span.vas-arwidg-cur-symbol {
     .vas-exinvd-expected-heading h6 {
         margin: 0;
         font-size: 0.875em;
-        font-weight:600;
+        font-weight: 600;
     }
 
 .vas-exinvd-filterby-col {
@@ -1368,9 +1386,10 @@ span.vas-arwidg-cur-symbol {
     background: transparent;
     top: -9px;
 }
-.vas-arwidg-orderTxt{
-    font-weight:600;
-    font-family:Verdana;
+
+.vas-arwidg-orderTxt {
+    font-weight: 600;
+    font-family: Verdana;
 }
 
 .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv > .input-group.vis-input-wrap {
@@ -1379,17 +1398,20 @@ span.vas-arwidg-cur-symbol {
 
 .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
     height: auto;
-   /*width: calc(100% - 20px);*/
+    /*width: calc(100% - 20px);*/
     font-size: 14px;
-    border:0;
+    border: 0;
 }
+
 .vas-vaswidg-Symbol {
     font-family: Gill Sans MT;
-    font-size: 1.1em;   
+    font-size: 1.1em;
 }
+
 .vas-arwidg-Symbol {
     font-family: Gill Sans MT;
 }
+
 .VAS-YearBasedDataListDiv {
     margin-right: 9px;
 }
@@ -1397,6 +1419,7 @@ span.vas-arwidg-cur-symbol {
 .vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) select {
     font-size: 10px;
 }
+
 .vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-vendors-heading {
     font-size: 9px;
     letter-spacing: -0.8px;
@@ -1418,7 +1441,7 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
         font-size: 8px;
     }
-  /*  .vas-vaswidg-Symbol {
+    /*  .vas-vaswidg-Symbol {
         font-size: 10px;
     }*/
 }
@@ -1444,6 +1467,7 @@ span.vas-arwidg-cur-symbol {
     user-select: none;
     color: transparent;
 }
+
 .vas-igtwidg-thumb-w-txt img.vas-igtwidg-emptyimg {
     width: 0px;
 }
@@ -1454,20 +1478,24 @@ span.vas-arwidg-cur-symbol {
     margin-bottom: -15px;
     width: 30%;
 }
+
 .vas-piechartexpense-container select.vis-ev-col-mandatory {
     width: 100%;
     height: auto;
 }
+
 .vas-t10exp-heading {
     font-size: 0.9em;
     font-weight: 600;
     margin-bottom: 0.5em;
     font-family: 'Verdana';
 }
+
 .vas-piechartexpense-container {
     /*background: linear-gradient(145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);*/
     height: 100%;
 }
+
     .vas-piechartexpense-container select {
         border: 0;
         width: 28%;
@@ -1476,19 +1504,18 @@ span.vas-arwidg-cur-symbol {
         outline: none;
     }
 
-
 /**Expense Revenue Profit Widget CSS*/
 
 .vas-barline-ExRePr-container {
     padding: 0.5em;
-    width:100%;
-    height:100%
+    width: 100%;
+    height: 100%
 }
 
     .vas-barline-ExRePr-container .input-group.vis-input-wrap {
         /*margin-bottom: -15px;*/
         width: 30%;
-        padding-right:10px;
+        padding-right: 10px;
     }
 
     .vas-barline-ExRePr-container select.vis-ev-col-mandatory {
@@ -1551,15 +1578,15 @@ span.vas-arwidg-cur-symbol {
     background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
     width: 100%;
     height: 100%;
-   padding-bottom: 0.8em;
+    padding-bottom: 0.8em;
 }
 
 .vas-fdi-widget-head {
     color: #ffffff;
     font-size: 1.5em;
-   /* box-shadow: 0 8px 6px -6px #ffffff;*/
+    /* box-shadow: 0 8px 6px -6px #ffffff;*/
     padding: 1em;
-    font-weight:600;
+    font-weight: 600;
 }
 
 .vas-fdi-req-generated {
@@ -1574,21 +1601,23 @@ span.vas-arwidg-cur-symbol {
     padding: 0.5rem;
     margin: 0.5rem;
 }
-    .vas-fdi-req-generated i{
+
+    .vas-fdi-req-generated i {
         color: #fff;
     }
-    .vas-fdi-req-count {
-        font-size: 6em;
-        font-weight: 600;
-        color: rgba(var(--v-c-common), 1);
-    }
+
+.vas-fdi-req-count {
+    font-size: 6em;
+    font-weight: 600;
+    color: rgba(var(--v-c-common), 1);
+}
 
 .vas-fdi-reqGen-Txt, .vas-fdi-woGen-Txt {
     font-size: 1.5em;
     color: rgba(var(--v-c-common), 1);
 }
 
-    /*.vas-fdi-reqGen-Txt span {
+/*.vas-fdi-reqGen-Txt span {
         //display: block;
     }*/
 
@@ -1759,14 +1788,17 @@ span.vas-arwidg-cur-symbol {
         font-size: 6px;
     }
 }
+
 .vas-custom-link {
     text-decoration: none;
     color: rgba(var(--v-c-on-secondary),1);
 }
+
     .vas-custom-link:hover {
         color: rgba(var(--v-c-on-secondary),1);
         text-decoration: none;
     }
+
 .vas-fdi-notfounddiv {
     height: 100%;
     display: flex;
@@ -1775,12 +1807,19 @@ span.vas-arwidg-cur-symbol {
     padding-top: 258px;
     font-size: 1.8rem;
 }
+
 .vas-t10exp-background {
     background: rgb(245,245,245);
     background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
     position: relative;
 }
+
 .vas-t10exp-div {
     padding: 5px 10px 0;
     box-shadow: 0 8px 6px -6px #0000001f;
+}
+
+canvas.vas-t10exp-canvas {
+    height: 100% !important;
+    width: 100% !important;
 }

@@ -1280,7 +1280,7 @@ namespace VASLogic.Models
             }
             sql.Clear();
             //Here we are getting the current quarter
-            sql.Append($@"SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+            sql.Append($@"SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                           WHERE y.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} 
                           AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate AND y.C_Calendar_ID ={calendar_ID}");
             DataSet quaterds = DB.ExecuteDataset(sql.ToString(), null, null);
@@ -1317,12 +1317,12 @@ namespace VASLogic.Models
             if (ListValue == "3")
             {
                 sql.Append($@",curentPeriod AS
-                               (SELECT PeriodNo, FLOOR(PeriodNo / 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               (SELECT PeriodNo, CEIL(PeriodNo / 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
                                WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
                 AND y.C_Calendar_ID ={ calendar_ID}
                 AND TRUNC(CURRENT_DATE) between p.StartDate and p.EndDate ),
                                PeriodQuater AS
-                               (SELECT PeriodNo, FLOOR(PeriodNo/ 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               (SELECT PeriodNo, CEIL(PeriodNo/ 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
                                WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
                 AND y.C_Calendar_ID ={ calendar_ID})");
             }
@@ -1335,20 +1335,20 @@ namespace VASLogic.Models
                 {
                     CurrentYear = CurrentYear - 1;
                     sql.Append($@",PeriodPreviousQuater AS
-                                              (SELECT FLOOR(MAX(PeriodNo)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                              (SELECT CEIL(MAX(PeriodNo)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                               WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})
                                               ,PreviousPeriodQuater AS
-                                              (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                              (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                               WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})");
                 }
                 else
                 {
                     sql.Append($@",curentPeriod AS 
-                                                    (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                                     WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}
                                                     AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate ),
                                                     PeriodQuater AS
-                                                    (SELECT PeriodNo, FLOOR(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                                     WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})");
                 }
             }
@@ -1374,7 +1374,7 @@ namespace VASLogic.Models
                 sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)",
                                      $@" c_period.periodno IN (
                                      SELECT pq.periodno
-                                     FROM period_quarter pq
+                                     FROM PeriodQuater pq
                                      INNER JOIN curentPeriod cp ON (cp.Quarter = pq.Quarter)
                                      ) AND C_Year.C_Calendar_ID ={calendar_ID}
                                       AND C_Year.IsActive = 'Y' AND C_Period.IsActive='Y' AND C_Year.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}"));

@@ -56,7 +56,7 @@
             $self.vExpectedList.setValue("AL");
             var $ExpectedListControlWrap = $('<div class="vis-control-wrap">');
             $ExpectedListDiv.append($ExpectedListControlWrap);
-            $ExpectedListControlWrap.append($self.vExpectedList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_FilterBy") + '</label>');
+            $ExpectedListControlWrap.append($self.vExpectedList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
             $ExpectedListDiv.append($ExpectedListControlWrap);
             ExpectedListDiv.append($ExpectedListDiv);
             headingDiv.append(ExpectedListDiv);
@@ -265,7 +265,7 @@
         * This function is used to get the refernce id of list
         */
         var GetColumnID = function () {
-            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "ColumnData": '' }, null);
+            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "refernceName": "VAS_ExpectedInvoiceList" }, null);
         }
 
         /*This function used to get root*/
