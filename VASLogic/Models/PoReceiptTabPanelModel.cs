@@ -1304,7 +1304,7 @@ namespace VASLogic.Models
                          INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
                          INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND AccountType = 'E' AND fa.Account_ID = eleVal.C_ElementValue_ID)
                          INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
-                         WHERE acctEle.IsActive = 'Y' AND eleVal.IsActive = 'Y'", "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                         WHERE acctEle.IsActive = 'Y' AND eleVal.IsActive = 'Y' AND fa.PostingType='A'", "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )}");
             sql.Append(@" GROUP BY 
                          acct.C_AcctSchema_ID,
@@ -1771,7 +1771,7 @@ namespace VASLogic.Models
                          WHERE acctEle.IsActive = 'Y' 
                                AND eleVal.IsActive = 'Y' 
                                AND y.C_Calendar_ID = {C_Calendar_ID}
-                               AND p.IsActive = 'Y' AND y.IsActive = 'Y' ";
+                               AND p.IsActive = 'Y' AND y.IsActive = 'Y' AND fa.PostingType='A' ";
             if (ListValue.Equals("01"))
             {
                 /* Financial Year */
