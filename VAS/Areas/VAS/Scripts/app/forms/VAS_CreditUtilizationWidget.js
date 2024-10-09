@@ -180,7 +180,7 @@
 
                         /* Add Pagination div on first tym data load*/
                         if (pageNo == 1) {
-                            $self.totalPages = response.RecordCount;
+                            $self.totalPages = Math.ceil(response.RecordCount / pageSize);
                         }
                         spnPageCount.text($self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages);
 

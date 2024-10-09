@@ -180,6 +180,10 @@
         font-size: 0.875em;
         font-weight: 600;
         color: rgba(var(--v-c-on-common), 1);
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+        overflow: hidden;
     }
 
 .VAS-orders-text-white {
@@ -231,8 +235,16 @@
     font-size: 0.875em;
 }
 
+.VAS-expected-col {
+    width: 70%;
+}
+
 .VAS-expectedTxt {
     font-size: 0.875em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
 }
 
 
@@ -487,6 +499,10 @@
 .VAS-userCredit-detail .VAS-userCredit-name {
     /*font-size: 0.875em;*/
     color: rgba(var(--v-c-on-common), 1);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
 }
 
 .VAS-userCredit-detail .VAS-userCreditStatus {
