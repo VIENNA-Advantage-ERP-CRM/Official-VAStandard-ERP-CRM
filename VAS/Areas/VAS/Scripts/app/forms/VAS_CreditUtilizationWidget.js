@@ -21,6 +21,7 @@
         var pageSize = 4;
         var $divCustContainer, $divChartContainer, divCustomer, divChart, spnPageCount;
         var lookupCredit, ctrlCredit, $cmbCredit, btnUpdate;
+        var bp_ID, loc_ID, creditsetting, creditVal, creditlimit, creditused;
 
         this.initalize = function () {
             widgetID = this.windowNo;
@@ -36,21 +37,17 @@
                 '<i class="fa fa-arrow-circle-right VAS-page-next" id="VAS_Next_' + widgetID + '" aria-hidden="true"></i>' +
                 '</div>' +
                 '</div>' +
-                '<div class="VAS-creditLimit-chart" id="VAS_ChartContainer_' + widgetID + '">' +
-                //'<div class="VAS-orders-heading"><h6><span id="VAS_BackToCustomer_' + widgetID + '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' +
-                //VIS.Msg.getMsg("VAS_BackToCust") + '</h6 ></div > ' +
-                //'<div class="VAS-chart-container" id="VAS_divChart_' + widgetID + '"></div>' +
-                //'<div class="VAS-inputWbtn">' +
-                //'<div class="input-group vis-input-wrap">' +
-                //'<div class="vis-control-wrap" id="VAS_cmbCredit_' + widgetID + '">' +
-                ////'<select name="VAS_Phase" id="">' +
-                ////'<option value="">Select</option>' +
-                ////'</select>' +
-                //'<label for="VAS_Phase">' + VIS.Msg.getMsg("VAS_CreditValidation") + '</label>' +
-                //'</div>' +
-                //'</div>' +
-                //'<input type="button" class="btn ui-button ui-widget" value="Update">' +
-                //'</div>' +
+                '<div class="VAS-creditLimit-chart" id="VAS_ChartContainer_' + widgetID + '" aria-controls="credit-limit">' +
+                '<div class="VAS-chart-container" id="VAS_divChart_' + widgetID + '"></div>' +
+                '<div class="VAS-inputWbtn">' +
+                '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
+                '<div class="input-group vis-input-wrap">' +
+                '<div class="vis-control-wrap" id="VAS_cmbCredit_' + widgetID + '">' +
+                '<label for="VAS_Phase">' + VIS.Msg.getMsg("VAS_CreditValidation") + '</label>' +
+                '</div>' +
+                '</div>' +
+                '<input type="button" id="VAS_btnUpdate_' + widgetID + '" class="btn ui-button ui-widget" value="Update">' +
+                '</div>' +
                 '</div>' +
                 '</div>');
 
@@ -58,11 +55,15 @@
             $divChartContainer = $root.find("#VAS_ChartContainer_" + widgetID);
             divCustomer = $divCustContainer.find("#VAS_divCustomers_" + widgetID);
 
-
+            divChart = $divChartContainer.find("#VAS_divChart_" + widgetID);
+            $cmbCredit = $divChartContainer.find("#VAS_cmbCredit_" + widgetID);
+            btnUpdate = $divChartContainer.find("#VAS_btnUpdate_" + widgetID);
             spnPageCount = $root.find("#VAS_spnPageCount_" + widgetID);
-            $divChartContainer.hide();
 
-
+            referenceID = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "Common/GetReference", { Name: "CreditValidation" });
+            lookupCredit = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "CreditValidation", referenceID, false, "AD_Ref_List.IsActive = 'Y'");
+            ctrlCredit = new VIS.Controls.VComboBox("CreditValidation", true, false, true, lookupCredit, 50);
+            $cmbCredit.prepend(ctrlCredit.getControl());
 
             // Add event listeners for arrows
             $divCustContainer.find('#VAS_Prev_' + widgetID).on('click', function (e) {
@@ -80,12 +81,34 @@
                     $self.intialLoad($self.currentPage);
                 }
             });
+
+            btnUpdate.on('click', function () {
+                if (ctrlCredit.getValue() == creditVal) {
+                    return;
+                }
+                $bsyDiv.css('visibility', 'visible');
+                VIS.dataContext.getJSONData(VIS.Application.contextUrl + "Product/UpdateCreditValidation",
+                    { BP_ID: bp_ID, Loc_ID: loc_ID, CreditSetting: creditsetting, CreditValidation: ctrlCredit.getValue() }, function (result) {
+                        var spnWO = $root.find('#VAS_spnErrorMessage_' + widgetID);
+                        var message = "";
+                        if (result == 1) {
+                            creditVal = ctrlCredit.getValue();
+                            message = VIS.Msg.getMsg("VAS_CreditValUpd");
+                        }
+                        else {
+                            ctrlCredit.setValue(creditVal);
+                            message = VIS.Msg.getMsg("VAS_CreditValNotUpd");
+                        }
+                        spnWO.text(message);
+                        spnWO.fadeIn();
+                        spnWO.fadeOut(5000);
+                        $self.intialLoad($self.currentPage);
+                    });
+            });
         };
 
         /* This function will load data in widget */
         this.intialLoad = function (pageNo) {
-            // Show busy indicator
-            $bsyDiv.css('visibility', 'visible');
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "Product/GetCustomerCredit",
                 { pageNo: pageNo, pageSize: pageSize }, function (response) {
                     divCustomer.empty();
@@ -109,13 +132,30 @@
                                 statusClass = "VAS-greyStatusColor";
                             }
 
-                            divCustomer.append('<div class="VAS-credit-limit-nav" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
+                            var hue = Math.floor(Math.random() * (360 - 0)) + 0;
+                            var v = Math.floor(Math.random() * 16) + 80;
+                            var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
+                            var pastelClr = 'hsl(' + hue + ', 100%,' + (v - 50) + '%)';
+
+                            var highlightChar = response.Customers[i].Name;
+                            var txt = highlightChar.trim().split(' ');
+                            highlightChar = txt[0].substring(0, 1).toUpper();
+                            if (txt.length > 1) {
+                                highlightChar += txt[txt.length - 1].substring(0, 1).toUpper();
+                            }
+                            else {
+                                highlightChar = txt[0].substring(0, 2).toUpper();
+                            }
+
+                            divCustomer.append('<div class="VAS-credit-limit-nav ' + (i == 0 ? "active" : "") + '" aria-controls="credit-limit" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
                                 '" data-creditused="' + response.Customers[i]["SO_CreditUsed"] + '" data-bpid="' + response.Customers[i]["C_BPartner_ID"] +
                                 '" data-locid="' + response.Customers[i]["Location_ID"] + '" data-creditsetting="' + response.Customers[i]["CreditSetting"] +
                                 '" data-creditval="' + response.Customers[i]["CreditValidation"] + '">' +
                                 '<div class="VAS-credit-des">' +
-                                '<img src="' + (response.Customers[i].ImageUrl != "" ? VIS.Application.contextUrl + response.Customers[i].ImageUrl :
-                                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/dummy.jpg') + '" alt=""> ' +
+                                //'<img src="' + (response.Customers[i].ImageUrl != "" ? VIS.Application.contextUrl + response.Customers[i].ImageUrl :
+                                //    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/dummy.jpg') + '" alt=""> ' +
+                                '<div class="VAS-credit-img" style="background-color:' + pastel + '; color:' + pastelClr + '">' +
+                                '<span>' + highlightChar + '</span></div>' +
                                 '<div class="VAS-userCredit-detail">' +
                                 '<div class="VAS-userCredit-name">' + response.Customers[i].Name + '</div>' +
                                 '<div class="VAS-userCreditStatus">' + VIS.Msg.getMsg("VAS_Status") + '<span class="' + statusClass + '">' +
@@ -126,6 +166,16 @@
                                 '<div class="progress-bar bg-danger" role="progressbar" style="width:' + response.Customers[i].CreditUtil + '%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>' +
                                 '</div>' +
                                 '</div>');
+
+                            if (i == 0) {
+                                bp_ID = response.Customers[i]["C_BPartner_ID"];
+                                loc_ID = response.Customers[i]["Location_ID"];
+                                creditsetting = response.Customers[i]["CreditSetting"];
+                                creditVal = response.Customers[i]["CreditValidation"];
+                                creditlimit = response.Customers[i]["SO_CreditLimit"];
+                                creditused = response.Customers[i]["SO_CreditUsed"];
+                                displayUtilizationDetails(bp_ID, loc_ID, creditsetting, creditVal, creditlimit);
+                            }
                         }
 
                         /* Add Pagination div on first tym data load*/
@@ -138,42 +188,25 @@
                         divCustomer.off('click', '.VAS-credit-limit-nav');
                         divCustomer.on('click', '.VAS-credit-limit-nav', function () {
                             $bsyDiv.css('visibility', 'visible');
-                            displayUtilizationDetails($(this).data('bpid'), $(this).data('locid'), $(this).data('creditsetting'),
-                                $(this).data('creditval'), $(this).data('creditlimit'), $(this).data('creditused'));
+
+                            divCustomer.find('.VAS-credit-limit-nav').removeClass('active');
+                            $(this).addClass('active');
+
+                            bp_ID = $(this).data('bpid');
+                            loc_ID = $(this).data('locid');
+                            creditsetting = $(this).data('creditsetting');
+                            creditVal = $(this).data('creditval');
+                            creditlimit = $(this).data('creditlimit');
+                            creditused = $(this).data('creditused');
+                            displayUtilizationDetails(bp_ID, loc_ID, creditsetting, creditVal, creditlimit);
                         });
                     }
                     $bsyDiv.css('visibility', 'hidden');
                 });
         };
 
-        function displayUtilizationDetails(bp_ID, loc_ID, creditsetting, creditVal, creditLimit, creditUsed) {
-            $divCustContainer.hide();
-            $divChartContainer.show();
-            $divChartContainer.empty();
-            $divChartContainer.append('<div class="VAS-orders-heading"><h6><span id="VAS_BackToCustomer_' + widgetID +
-                '" class="vis vis-arrow-left VAS-pointer-cursor"></span>' + VIS.Msg.getMsg("VAS_BackToCust") + '</h6 ></div > ' +
-                '<div class="VAS-chart-container" id="VAS_divChart_' + widgetID + '"></div>' +
-                '<div class="VAS-inputWbtn">' +
-                '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
-                '<div class="input-group vis-input-wrap">' +
-                '<div class="vis-control-wrap" id="VAS_cmbCredit_' + widgetID + '">' +
-                //'<select name="VAS_Phase" id="">' +
-                //'<option value="">Select</option>' +
-                //'</select>' +
-                '<label for="VAS_Phase">' + VIS.Msg.getMsg("VAS_CreditValidation") + '</label>' +
-                '</div>' +
-                '</div>' +
-                '<input type="button" id="VAS_btnUpdate_' + widgetID + '" class="btn ui-button ui-widget" value="Update">' +
-                '</div>');
-
-            divChart = $divChartContainer.find("#VAS_divChart_" + widgetID);
-            $cmbCredit = $divChartContainer.find("#VAS_cmbCredit_" + widgetID);
-            btnUpdate = $divChartContainer.find("#VAS_btnUpdate_" + widgetID);
-
-            referenceID = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "Common/GetReference", { Name: "CreditValidation" });
-            lookupCredit = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "CreditValidation", referenceID, false, "AD_Ref_List.IsActive = 'Y'");
-            ctrlCredit = new VIS.Controls.VComboBox("CreditValidation", true, false, true, lookupCredit, 50);
-            $cmbCredit.prepend(ctrlCredit.getControl());
+        function displayUtilizationDetails() {
+            divChart.empty();
 
             // Remove existing canvas if exists
             $divChartContainer.find('canvas').remove();
@@ -181,22 +214,32 @@
             // Prepare the data object for the chart
             const data = {
                 labels: [
-                    'Credit Limit',
-                    'Credit Used'
+                    VIS.Msg.getMsg("CreditLimit"),
+                    VIS.Msg.getMsg("VAS_CreditUsed")
                 ],
-                label: 'Credit Limit Utilization',
+                label: VIS.Msg.getMsg("VAS_CreditUtilization"),
                 datasets: [
                     {
                         backgroundColor: [
                             'rgba(255, 99, 132, 0.6)',
                             'rgba(54, 162, 235, 0.5)'
                         ],
-                        data: [creditLimit, creditUsed],
+                        data: [creditlimit, creditused],
                         borderColor: 'rgba(0,0,0,0)', // Transparent border color
                         borderWidth: 0, // No border
                         hoverOffset: 4
                     },
                 ],
+            };
+
+            const plugin = {
+                beforeInit: function (chart) {
+                    const originalFit = chart.legend.fit;
+                    chart.legend.fit = function fit() {
+                        originalFit.bind(chart.legend)();
+                        this.height += 10;
+                    }
+                }
             };
 
             // Define the chart configuration for Doughnut chart
@@ -263,36 +306,6 @@
             new Chart(ctx, config);
 
             ctrlCredit.setValue(creditVal);
-
-            // Back to Customers
-            $divChartContainer.on('click', '#VAS_BackToCustomer_' + widgetID, function () {
-                $divCustContainer.show();
-                $divChartContainer.hide();
-            });
-
-            $divChartContainer.on('click', '#VAS_btnUpdate_' + widgetID, function () {
-                if (ctrlCredit.getValue() == creditVal) {
-                    return;
-                }
-                $bsyDiv.css('visibility', 'visible');
-                VIS.dataContext.getJSONData(VIS.Application.contextUrl + "Product/UpdateCreditValidation",
-                    { BP_ID: bp_ID, Loc_ID: loc_ID, CreditSetting: creditsetting, CreditValidation: ctrlCredit.getValue() }, function (result) {
-                        var spnWO = $root.find('#VAS_spnErrorMessage_' + widgetID);
-                        var message = "";
-                        if (result == 1) {
-                            creditVal = ctrlCredit.getValue();
-                            message = VIS.Msg.getMsg("VAS_CreditValUpd");
-                        }
-                        else {
-                            ctrlCredit.setValue(creditVal);
-                            message = VIS.Msg.getMsg("VAS_CreditValNotUpd");
-                        }
-                        spnWO.text(message);
-                        spnWO.fadeIn();
-                        spnWO.fadeOut(5000);
-                        $bsyDiv.css('visibility', 'hidden');
-                    });
-            });
             $bsyDiv.css('visibility', 'hidden');
         }
 
