@@ -446,7 +446,7 @@
     padding: 0.3em;
     display: flex;
     flex-direction: column;
-    /*gap: 0.3em;*/
+    gap: 0.3em;
     justify-content: space-evenly;
     border-radius: 6px;
     position: relative;
