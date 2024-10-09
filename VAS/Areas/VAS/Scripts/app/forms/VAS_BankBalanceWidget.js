@@ -92,7 +92,7 @@
                 for (var i = start; i < end; i++) {
                     $divBankBody.append('<div class="VAS-bankBalDetail-box" id="div_bankDetail_' + widgetID + '">'
                         + '<div class="VAS-bankbal-name" title="' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '">' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '</div>'
-                        + '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">' + bankBalData[i].ISO_Code + '</div> <div class="VAS-totalbankbal-amount">'
+                        + '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">' + bankBalData[i].CurSymbol + '</div> <div class="VAS-totalbankbal-amount">'
                         + bankBalData[i].EndingBalance.toLocaleString(window.navigator.language,
                             { minimumFractionDigits: bankBalData[i].StdPrecision, maximumFractionDigits: bankBalData[i].StdPrecision }) + '</div></div>'
                         + '</div>');
