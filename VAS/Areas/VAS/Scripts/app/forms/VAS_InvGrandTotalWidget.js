@@ -45,7 +45,7 @@
             $YearBasedDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_YearBasedData", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             $self.vYearBasedDataList = new VIS.Controls.VComboBox("VAS_YearBasedData", true, false, true, $YearBasedDataListLookUp, 20);
-            $self.vYearBasedDataList.setValue("CM");
+            $self.vYearBasedDataList.setValue("CY");
             var $YearBasedDataListControlWrap = $('<div class="vis-control-wrap">');
             $YearBasedDataListDiv.append($YearBasedDataListControlWrap);
             $YearBasedDataListControlWrap.append($self.vYearBasedDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
@@ -54,6 +54,7 @@
             HeadingComboDiv.append(HeadingDiv).append(YearBasedDataListDiv);
             $maindiv.append(HeadingComboDiv);
             $self.vYearBasedDataList.fireValueChanged = function () {
+                RecCount = 0;
                 $self.vYearBasedDataList.setValue($self.vYearBasedDataList.getValue());
                 $maindiv.find('#vas_listContainer_' + widgetID).remove();
                 $maindiv.find('#vas_norecordcont_' + widgetID).remove();
@@ -242,6 +243,7 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             $bsyDiv[0].style.visibility = "visible";
+            RecCount = 0;
             $maindiv.find('#vas_listContainer_' + widgetID).remove();
             $maindiv.find('#vas_norecordcont_' + widgetID).remove();
             $self.intialLoad();
