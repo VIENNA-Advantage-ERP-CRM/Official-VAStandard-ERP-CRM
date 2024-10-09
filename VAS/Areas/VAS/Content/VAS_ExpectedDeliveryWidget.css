@@ -410,9 +410,10 @@
     background: linear-gradient(145deg, rgba(237,245,250,1) 0%, rgba(240,240,240,1) 100%);
     padding: 0.75em;
     height: 100%;
-    /*display: grid;
+    display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.75em;*/
+    gap: 0.75em;
+    font-family: Verdana;
 }
 
     .VAS-creditLimit-container .nav {
@@ -442,10 +443,10 @@
 
 .VAS-credit-limit-nav {
     background-color: rgba(var(--v-c-common), 1);
-    padding: 0.5em;
+    padding: 0.3em;
     display: flex;
     flex-direction: column;
-    gap: 0.5em;
+    /*gap: 0.3em;*/
     justify-content: space-evenly;
     border-radius: 6px;
     position: relative;
@@ -454,16 +455,23 @@
 .VAS-credit-des {
     width: 100%;
     display: grid;
-    grid-template-columns: 4.125em auto;
-    gap: 0.5em;
+    grid-template-columns: 3.125em auto;
+    gap: 0.3em;
     align-items: center;
 }
 
-    .VAS-credit-des img {
-        width: 4em;
-        height: 4em;
-        border-radius: 100%;
-        object-fit: contain;
+.VAS-credit-img {
+    width: 3em;
+    height: 3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 100%;
+}
+
+    .VAS-credit-img span {
+        font-weight: bold;
+        font-size: 1.2em;
     }
 
 .VAS-userCredit-detail .VAS-userCredit-name {
@@ -472,24 +480,12 @@
 }
 
 .VAS-userCredit-detail .VAS-userCreditStatus {
-    /*font-size: 0.875em;*/
+    font-size: 0.875em;
     color: rgba(var(--v-c-on-common), 1);
 }
 
 .VAS-redStatusColor {
     color: rgba(var(--v-c-mandatory), 1);
-}
-.VAS-greyStatusColor {
-    color: #6c757d;
-}
-.VAS-orangeStatusColor {
-    color: #fd7e14;
-}
-.VAS-greenStatusColor {
-    color: #28a745;
-}
-.VAS-yelloStatusColor {
-    color: #ffc107;
 }
 
 .VAS-credit-limit-nav .progress {
@@ -517,13 +513,13 @@
 }
 
     .VAS-tiles-pagination .fa {
-        font-size: 2em;
+        font-size: 1.6em;
         color: rgba(var(--v-c-primary), 1);
         cursor: pointer;
     }
 
 .VAS-total-count {
-    /*font-size: 0.875em;*/
+    font-size: 0.875em;
     color: rgba(var(--v-c-on-common), 1);
     text-align: center;
 }
@@ -531,6 +527,10 @@
 .VAS-inputWbtn {
     text-align: center;
 }
+
+    .VAS-inputWbtn .ui-widget {
+        padding: 0.2rem 1.2rem !important;
+    }
 
 .VAS-creditLimit-container .tab-content .tab-pane {
     height: 100%;
@@ -563,7 +563,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: -webkit-fill-available;
 }
 
 
@@ -588,7 +587,7 @@
         font-size: 0.5em;
     }
 
-    .VAS-credit-des img {
+    .VAS-credit-img span {
         width: 2em;
         height: 2em;
     }
