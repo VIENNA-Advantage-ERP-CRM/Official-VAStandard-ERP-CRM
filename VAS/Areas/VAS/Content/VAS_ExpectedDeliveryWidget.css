@@ -487,6 +487,10 @@
 .VAS-userCredit-detail .VAS-userCredit-name {
     /*font-size: 0.875em;*/
     color: rgba(var(--v-c-on-common), 1);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
 }
 
 .VAS-userCredit-detail .VAS-userCreditStatus {
