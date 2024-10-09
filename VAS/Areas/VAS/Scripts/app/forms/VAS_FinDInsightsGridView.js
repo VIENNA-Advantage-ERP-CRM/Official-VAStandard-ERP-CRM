@@ -82,11 +82,11 @@
         function createinsighstructure() {
 
             mainContainerDiv = $('<div class="VAS-finDInsightGW-Grid-container h-100">');
-            gridDiv = $('<div class="VAS-finDInsightGW-gridDiv "style="height:70vh">');
+            gridDiv = $('<div class="VAS-finDInsightGW-gridDiv "style="height:calc(100vh - 152px); width: 100%;">');
             divPaging = $('<div class="VAS-finDInsightGW-Paging mr-3" style="display:flex;align-items: center;justify-content:end;margin-top:10px">');
             mainContainerDiv.append(gridDiv).append(divPaging);
             $root.append(mainContainerDiv);
-            
+
 
         };
 

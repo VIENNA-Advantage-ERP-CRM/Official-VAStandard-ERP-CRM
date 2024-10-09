@@ -410,6 +410,7 @@ namespace VASLogic.Models
         {
             ARInvWidgData obj = new ARInvWidgData();
             StringBuilder sql = new StringBuilder();
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
             string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
             string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
@@ -420,7 +421,7 @@ namespace VASLogic.Models
                              cs.C_InvoicePaySchedule_ID,
                              cd.DocBaseType,
                              ci.DateInvoiced,
-                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,CAST(cs.VA009_BseCurrncy AS INTEGER),ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
+                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,"+ C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
@@ -1115,7 +1116,7 @@ namespace VASLogic.Models
                              LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO','CL') ");
                 sqlmain.Append(@"GROUP BY
-                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered, custimg.ImageExtension, cb.Name,o.AD_Client_ID
+                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered,custimg.ImageExtension, cb.Name,o.AD_Client_ID
                              HAVING SUM(
                                         CASE
                                         WHEN mil.c_orderline_id IS NOT NULL
@@ -1519,15 +1520,34 @@ namespace VASLogic.Models
         /// <param name="pageSize">pageSize</param>
         /// <returns>returns the data in grid</returns>
         /// <author>VIS_427</author>
-        public List<dynamic> GetFinDataInsightGrid(Ctx ctx, string tableName, int pageNo, int pageSize,int AD_Org_ID)
+        public List<dynamic> GetFinDataInsightGrid(Ctx ctx, string tableName, int pageNo, int pageSize, int AD_Org_ID)
         {
+            string columnNames = string.Empty;
+            dynamic obj = new ExpandoObject();
             List<dynamic> retData = new List<dynamic>();
             string[] NotIncludeCol = { "AD_Client_ID", "AD_Org_ID", "Export_ID", "CreatedBy", "UpdatedBy", "Created", "Updated", "IsActive", "DATA_OBJECT" };
-            string columnNames = GetDataGridColumn(ctx, tableName, NotIncludeCol);
-            dynamic obj = new ExpandoObject();
-            string sql = @"SELECT " + columnNames + " FROM " + tableName.ToUpper()+" WHERE AD_Client_ID = "+ctx.GetAD_Client_ID()+" AND AD_Org_ID = "+ AD_Org_ID;
+            NotIncludeCol = NotIncludeCol.Select(s => s.ToUpper()).ToArray();
+
+            string sql = @"SELECT * FROM " + tableName.ToUpper() + " WHERE AD_Client_ID = " + ctx.GetAD_Client_ID() + " AND AD_Org_ID = " + AD_Org_ID;
             //sql = MRole.GetDefault(ctx).AddAccessSQL(sql, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (DataColumn col in ds.Tables[0].Columns)
+                {
+                    if (!NotIncludeCol.Contains(Util.GetValueOfString(col.ColumnName)))
+                    {
+                        if (sb.Length > 0)
+                        {
+                            sb.Append(",");
+                        }
+                        sb.Append(Util.GetValueOfString(col.ColumnName));
+                    }
+                }
+                columnNames = sb.ToString();
+            }
+
             obj.ColName = columnNames;
             retData.Add(obj);
             string[] colName = columnNames.Split(',');
