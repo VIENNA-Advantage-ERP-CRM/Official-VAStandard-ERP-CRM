@@ -28,7 +28,7 @@ namespace VASLogic.Models
                                     C_BANKACCOUNT.C_CURRENCY_ID,
                                     C_BANKACCOUNT.ACCOUNTNO,
                                     C_CURRENCY.ISO_CODE,C_BANK.NAME,
-                                    C_CURRENCY.STDPRECISION,
+                                    C_CURRENCY.STDPRECISION,C_CURRENCY.CURSYMBOL,
                                     C_BANKACCOUNTLINE.ENDINGBALANCE,
                                     C_BANKACCOUNTLINE.STATEMENTDATE,BAL.BA
                                 FROM C_BANKACCOUNT
@@ -53,7 +53,7 @@ namespace VASLogic.Models
                             C_BANKACCOUNT_ID,
                             C_CURRENCY_ID,
                             ACCOUNTNO,
-                            ISO_CODE,NAME,
+                            ISO_CODE,NAME,CurSymbol,
                             STDPRECISION,
                             ENDINGBALANCE,
                             STATEMENTDATE
@@ -71,6 +71,7 @@ namespace VASLogic.Models
                     bankDetails.Name = Util.GetValueOfString(_ds.Tables[0].Rows[i]["Name"]);
                     bankDetails.AccountNo = Util.GetValueOfString(_ds.Tables[0].Rows[i]["AccountNo"]);
                     bankDetails.ISO_Code = Util.GetValueOfString(_ds.Tables[0].Rows[i]["ISO_Code"]);
+                    bankDetails.CurSymbol = Util.GetValueOfString(_ds.Tables[0].Rows[i]["CurSymbol"]);
                     bankDetails.StdPrecision = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["StdPrecision"]);
                     bankDetails.EndingBalance = Decimal.Round(Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["EndingBalance"]),
                         Util.GetValueOfInt(_ds.Tables[0].Rows[i]["StdPrecision"]), MidpointRounding.AwayFromZero);
@@ -89,7 +90,7 @@ namespace VASLogic.Models
         public List<CashbookDetails> GetCashBookBalance(Ctx ctx)
         {
             List<CashbookDetails> getCashbookDetails = new List<CashbookDetails>();
-            string _sql = @"SELECT C_CashBook.AD_Client_ID,C_CashBook.AD_Org_ID, C_CashBook.C_CashBook_ID,C_Currency.ISO_Code,
+            string _sql = @"SELECT C_CashBook.AD_Client_ID,C_CashBook.AD_Org_ID, C_CashBook.C_CashBook_ID,C_Currency.ISO_Code,C_CURRENCY.CurSymbol,
                             C_Currency.StdPrecision,C_CashBook.CompletedBalance,C_CashBook.Name FROM  C_CashBook
                             INNER JOIN C_Currency ON (C_CashBook.C_Currency_ID=C_Currency.C_Currency_ID)
                             WHERE C_CashBook.IsActive='Y' AND C_Currency.IsActive='Y' ORDER BY C_CashBook.Name ASC";
@@ -102,6 +103,7 @@ namespace VASLogic.Models
                     CashbookDetails cashbookDetails = new CashbookDetails();
                     cashbookDetails.Name = Util.GetValueOfString(_ds.Tables[0].Rows[i]["Name"]);
                     cashbookDetails.ISO_Code = Util.GetValueOfString(_ds.Tables[0].Rows[i]["ISO_Code"]);
+                    cashbookDetails.CurSymbol = Util.GetValueOfString(_ds.Tables[0].Rows[i]["CurSymbol"]);
                     cashbookDetails.StdPrecision = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["StdPrecision"]);
                     cashbookDetails.CompletedBalance = Decimal.Round(Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["CompletedBalance"]),
                         Util.GetValueOfInt(_ds.Tables[0].Rows[i]["StdPrecision"]), MidpointRounding.AwayFromZero);
@@ -120,6 +122,7 @@ namespace VASLogic.Models
             public int C_Currency_ID { get; set; }
             public string AccountNo { get; set; }
             public string ISO_Code { get; set; }
+            public string CurSymbol { get; set; }
             public decimal EndingBalance { get; set; }
             public int StdPrecision { get; set; }
             public DateTime? StatementDate { get; set; }
@@ -130,6 +133,7 @@ namespace VASLogic.Models
             public int C_Currency_ID { get; set; }
             public string Name { get; set; }
             public string ISO_Code { get; set; }
+            public string CurSymbol { get; set; }
             public int StdPrecision { get; set; }
             public decimal CompletedBalance { get; set; }
         }
