@@ -1777,6 +1777,7 @@ namespace VASLogic.Models
                          acct.C_AcctSchema_ID, 
                          fa.AD_Client_ID,
                          fa.C_Period_ID,
+                         y.CalendarYears,
                          p.Name,
                         SUM(CASE WHEN eleVal.AccountType = 'E' THEN (fa.AmtAcctDR - fa.AmtAcctCR) ELSE 0 END) AS ExpenseAmount,
                         SUM(CASE WHEN eleVal.AccountType = 'R' THEN (fa.AmtAcctCR - fa.AmtAcctDR) ELSE 0 END) AS revenueAmount
@@ -1855,10 +1856,12 @@ namespace VASLogic.Models
                       acct.C_AcctSchema_ID, 
                       fa.AD_Client_ID,
                       fa.C_Period_ID,
+                      y.CalendarYears,
                       p.Name
                       order by
                       acct.C_AcctSchema_ID, 
                       fa.AD_Client_ID,
+                      y.CalendarYears,
                       fa.C_Period_ID ";
 
             DataSet dsExpRevData = DB.ExecuteDataset(sql);

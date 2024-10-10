@@ -35,7 +35,7 @@
                 var gridDataResult = dr;
                 if (gridDataResult != null && gridDataResult.length > 0) {
                     InitailizeMessage();
-                    var HeadingDesign = '<div class="vas-psdwidg-whiteBox vas-psdwidg-tile-heading vas-psdwidg-heading-item">';
+                    var HeadingDesign = '<div class="vas-psdwidg-whiteBoxhead vas-psdwidg-tile-heading vas-psdwidg-heading-item">';
                     //If isSotrx tru means sale transaction then will show sale as label else will be purchase
                     if (VIS.Env.getCtx().isSOTrx($self.windowNo)) {
                         HeadingDesign += '<h1><span>' + VAS.translatedTexts.VAS_Sale + '</span><span>' + VAS.translatedTexts.VAS_SaleState + '</span></h1>';
@@ -47,15 +47,17 @@
                     $maindiv.append(HeadingDesign);
                     $maindiv.append(
                         '<div class="vas-psdwidg-whiteBox vas-psdwidg-itme2">' +
-                        '<div class="vas-psdwidg-totalSale">' + (gridDataResult[0].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[0].Symbol +'</span>' : '')+
-                        formatLargeNumber(gridDataResult[0].TotalAmt, gridDataResult[0].stdPrecision) + '<span class="vas-psdwidg-unit">'+unit+'</span>' + (gridDataResult[0].Symbol.length == 3 ? ' ' + gridDataResult[0].Symbol : '')+ '</div>' +
-                        '<div class="vas-psdwidg-salesYear">' + icon[0] + ' ' + '<span>' + msgArray[0] + '</span>' + '</div>')
+                        '<div class="vas-psdwidg-totalSale">' + (gridDataResult[0].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[0].Symbol +'</span>' +' ' : '')+
+                        formatLargeNumber(gridDataResult[0].TotalAmt, gridDataResult[0].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[0].Symbol.length == 3 ? ' ' + gridDataResult[0].Symbol : '') + '</div>' +
+                        '<div class="vas-psdwidg-icondiv">' + icon[0] +'</div>'+
+                        '<div class="vas-psdwidg-salesYear">' + '<span>' + msgArray[0] + '</span>' + '</div>')
                     for (var i = 1; i < gridDataResult.length; i++) {
                         $maindiv.append(
                             '<div class="vas-psdwidg-whiteBox">' +
-                            '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' : '') +
+                            '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + ' ': '') +
                             formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
-                            '<div class="vas-psdwidg-salesYear">' + icon[i] + ' ' + '<span>'+msgArray[i]+'</span>' + '</div>')
+                            '<div class="vas-psdwidg-icondiv">' + icon[i] + '</div>' +
+                            '<div class="vas-psdwidg-salesYear">'+ '<span>'+msgArray[i]+'</span>' + '</div>')
                     }
                     $root.append($maindiv);
                 }
