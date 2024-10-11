@@ -12,8 +12,10 @@
         this.frame;
         this.windowNo;
         var $bsyDiv;
+        var $dummDiv = null;
         var $self = this;
         var ctx = VIS.Env.getCtx();
+        var RecCount = 0;
         var widgetID = null;
         //this pgaeno will be responsible to get data from database
         var pageNo = 1;
@@ -24,8 +26,8 @@
         //Main pagesize to get data in array
         var pageSize = 500;
         //Page size to show data in main div
-        var arrayPageSize = 5;
-        var countRecord = 5;
+        var arrayPageSize = 4;
+        var countRecord = 4;
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = null;
         var gridDataResult = null;
@@ -33,15 +35,17 @@
         var ExpectedListDiv = null;
         var ColumnIds = null;
         var totalRecordCount = null;
+        var listDesign = null;
 
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
             GetColumnID();
+            createDummyDiv();
+            createBusyIndicator();
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             $maindiv = $('<div class="vas-exinvd-expected-invoice">')
             var headingDiv = $('<div class="vas-exinvd-expected-heading">');
-            var filterDiv = $('<h6>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</h6 >' +
-                '<div class="vas-exinvd-filterby-col">');
+            var filterDiv = $('<h6>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</h6 >');
             //'<i class="fa fa-filter" aria-hidden="true"></i>');
             // '<div class="vas-exinvd-filter-label">'+ VIS.Msg.getMsg("VAS_FilterBy") +'</div>');
             headingDiv.append(filterDiv);
@@ -66,19 +70,20 @@
                 pageNoarray = 1;
                 CurrentPage = 1;
                 pageSize = 500;
-                arrayPageSize = 5;
-                countRecord = 5;
+                arrayPageSize = 4;
+                RecCount = 0;
+                countRecord = 4;
                 $self.vExpectedList.setValue($self.vExpectedList.getValue());
                 $maindiv.find('#vas_listContainer_' + widgetID).remove();
                 $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
+                $maindiv.find('#vas_norecordcont_' + widgetID).remove();
                 $self.intialLoad();
             }
-            createBusyIndicator();
-            $bsyDiv[0].style.visibility = "visible";
         };
 
         /*This function will load data in widget */
         this.intialLoad = function () {
+            $bsyDiv[0].style.visibility = "visible";
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetExpectedInvoiceData", { "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo), "pageNo": pageNo, "pageSize": pageSize, "ListValue": $self.vExpectedList.getValue() }, function (dr) {
                 TotalAmtArray = dr;
                 if (TotalAmtArray != null && TotalAmtArray.length > 0) {
@@ -95,21 +100,47 @@
                     CreateListDesign();
                 }
                 else {
+                    $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
                     $root.append($maindiv);
                 }
                 $bsyDiv[0].style.visibility = "hidden";
             });
         };
+        /*this function will create empty div if records are less then 4*/
+        function createDummyDiv() {
+            $dummDiv =
+                $('<div class="vas-exinvd-invoices-box vas-exinvd-emptydiv">' +
+                    ' <h6></h6>' +
+                    '<div class="vas-exinvd-invoices-detail">' +
+                    '<div class="vas-exinvd-thumb-txt">' +
+                    '<img src="" alt="" style="width:0px">' +
+                    '<div class="vas-exinvd-company-w-date">' +
+                    '<div class="vas-exinvd-com-name"></div>' +
+                    '<div class="vas-exinvd-invoiceDate"></div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="vas-exinvd-invoice-w-amount">' +
+                    '<div class="vas-exinvd-invoice-lbl"></div>' +
+                    '<div class="vas-exinvd-invoiceTotalAmt"><span></span></div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>');
+        };
+        function bindDummyDiv(j) {
+            for (var i = 0; i < j; i++) {
+                listDesign.append($dummDiv);
+            };
+        };
         /*This function will create the design */
         function CreateListDesign() {
-            $bsyDiv[0].style.visibility = "visible";
             var hue = Math.floor(Math.random() * (360 - 0)) + 0;
             var v = Math.floor(Math.random() * (75 - 60 + 1)) + 60;
             var pastel = 'hsl(' + hue + ', 100%,' + v + '%)';
-            var listDesign = $('<div class="vas-exinvd-invoicesListing" id="vas_listContainer_' + widgetID + '">');
+            listDesign = $('<div class="vas-exinvd-invoicesListing" id="vas_listContainer_' + widgetID + '">');
 
             // Iterate through each item in the gridDataResult
             for (var i = 0; i < gridDataResult.length; i++) {
+                RecCount = RecCount + 1;
                 totalRecordCount = gridDataResult[0].recordCount;
                 var custChar = '';
                 var custNameArr = gridDataResult[i].Name.trim().split(' ');
@@ -139,7 +170,11 @@
                 }
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-exinvd-invoices-box">' +
+                    '<div class="vas-exinvd-amtdiv">' +
                     '<h6>' + headingText + '</h6>' +
+                    '<div class="vas-exinvd-invoiceTotalAmt">' + (gridDataResult[i].Symbol.length != 3 ? '<span>' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
+                    (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span>' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
+                    '</div>' +
                     '<div class="vas-exinvd-invoices-detail">' +
                     '<div class="vas-exinvd-thumb-w-txt">';
 
@@ -157,13 +192,12 @@
                 widgetDataDesign +=
                     '<div class="vas-exinvd-company-w-date">' +
                     '<div class="vas-exinvd-com-name">' + gridDataResult[i].Name + '</div>' +
-                    '<div class="vas-exinvd-invoiceDate">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
+                    '<div class="vas-exinvd-invoiceDate">' + VIS.Msg.getMsg("DateOrdered") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>'+
+                    '<div class="vas-exinvd-invoiceDate">' + VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '</div>'+
                     '</div>' +
                     '</div>' +
                     '<div class="vas-exinvd-invoice-w-amount" >' +
                     '<div class="vas-exinvd-invoice-lbl">' + gridDataResult[i].DocumentNo + '</div>' +
-                    '<div class="vas-exinvd-invoiceTotalAmt">' + (gridDataResult[i].Symbol.length != 3 ? '<span>' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
-                    (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span>' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
                     '</div>' +
                     '</div>' +
                     '</div>';
@@ -171,11 +205,18 @@
                 // Append the widget data design to the list container
                 listDesign.append(widgetDataDesign);
             }
+            /*if the record are less then 4 than append empty div*/
+            if (RecCount < arrayPageSize) {
+                bindDummyDiv(arrayPageSize - RecCount);
+            }
             TotalPagesofrecords = Math.ceil(totalRecordCount / arrayPageSize);
-            var arrowDiv = $('<div class="vas-exinvd-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
+            var arrowDiv = $(
+                '<div class="vas-exinvd-pagingdiv">'+
+                '<div class="vas-exinvd-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
                 '<i class= "fa fa-arrow-circle-left" aria-hidden="true"></i>' +
                 '<span class="vas-exinvd-pagespan">' + CurrentPage + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + TotalPagesofrecords + '</span > ' +
                 '<i class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
+                '</div>'+
                 '</div>');
             $maindiv.append(listDesign).append(arrowDiv);
             $root.append($maindiv);
@@ -223,7 +264,6 @@
             if (pageNo >= totalPages && countRecord >= TotalAmtArray.length) {
                 arrowDiv.find(".fa-arrow-circle-right").addClass('vas-disableArrow');
             }
-            $bsyDiv[0].style.visibility = "hidden";
         }
         /**
         * This Function is used to slice array of records according to start and end index
@@ -277,12 +317,14 @@
             $bsyDiv[0].style.visibility = "visible";
             $maindiv.find('#vas_listContainer_' + widgetID).remove();
             $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
+            $maindiv.find('#vas_norecordcont_' + widgetID).remove();
             pageNo = 1;
             pageNoarray = 1;
             pageSize = 500;
             CurrentPage = 1;
-            arrayPageSize = 5;
-            countRecord = 5;
+            RecCount = 0;
+            arrayPageSize = 4;
+            countRecord = 4;
             $self.intialLoad();
         };
     };
