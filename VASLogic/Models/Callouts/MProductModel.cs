@@ -370,8 +370,16 @@ namespace VIS.Models
                 startdate = "TRUNC(SYSDATE, 'YEAR')";
                 enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
             }
-            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineTotalAmt, 
-                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
+            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineNetAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID) AS LineTotalAmt, 
                     SUM(ol.QtyInvoiced) AS CurrentQty, ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355) AS UOM, img.ImageUrl 
                     FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
                     INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID)
@@ -379,7 +387,14 @@ namespace VIS.Models
                     LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
                     WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
-                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
+             HAVING NVL(SUM(NVL(ol.LineNetAmt,0)),0)-(SELECT NVL( SUM(
+                                  NVL(ril.LineNetAmt,0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID)>0
                     ORDER BY LineTotalAmt DESC FETCH FIRST 10 ROWS ONLY)");
 
             if (DB.IsPostgreSQL())
@@ -392,8 +407,16 @@ namespace VIS.Models
                 startdate = "TRUNC(SYSDATE, 'YEAR') - INTERVAL '1' YEAR";
                 enddate = "TRUNC(SYSDATE, 'YEAR')";
             }
-            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
-                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt, 
+            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineNetAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID) AS LineTotalAmt, 
                     SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
                     WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
@@ -459,8 +482,16 @@ namespace VIS.Models
                 startdate = "TRUNC(SYSDATE, 'YEAR')";
                 enddate = "TRUNC(ADD_MONTHS(SYSDATE, 12), 'YEAR')";
             }
-            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineTotalAmt, 
-                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt,
+            sb.Append("WITH current_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT SUM(NVL(currencyConvert(ol.LineNetAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID) AS LineTotalAmt,
                     SUM(ol.QtyInvoiced) AS CurrentQty, ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355) AS UOM, img.ImageUrl 
                     FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
                     INNER JOIN M_Product p ON (ol.M_Product_ID = p.M_Product_ID) 
@@ -468,8 +499,14 @@ namespace VIS.Models
                     LEFT JOIN AD_Image img ON (p.AD_Image_ID = img.AD_Image_ID)
                     WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN ('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
-                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
-                    HAVING SUM(ol.LineTotalAmt) > 0 ORDER BY LineTotalAmt ASC FETCH FIRST 10 ROWS ONLY)");
+                    MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @" GROUP BY ol.M_Product_ID, p.Name, NVL(u.UOMSymbol, u.X12DE355), img.ImageUrl 
+                    HAVING NVL(SUM(NVL(ol.LineNetAmt,0)),0)-(SELECT NVL( SUM(
+                                  NVL(ril.LineNetAmt,0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID)>0 ORDER BY LineTotalAmt ASC FETCH FIRST 10 ROWS ONLY)");
 
             if (DB.IsPostgreSQL())
             {
@@ -481,8 +518,16 @@ namespace VIS.Models
                 startdate = "TRUNC(SYSDATE, 'YEAR') - INTERVAL '1' YEAR";
                 enddate = "TRUNC(SYSDATE, 'YEAR')";
             }
-            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineTotalAmt, 
-                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS LineTotalAmt,
+            sb.Append(", previous_year AS(" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT ol.M_Product_ID, SUM(NVL(currencyConvert(ol.LineNetAmt, 
+                    o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=ol.M_Product_ID) AS LineTotalAmt,
                     SUM(ol.QtyInvoiced) AS PreviousQty FROM C_InvoiceLine ol INNER JOIN C_Invoice o ON (ol.C_Invoice_ID = o.C_Invoice_ID)
                     WHERE o.IsSOTrx='Y' AND o.IsReturnTrx='N' AND o.DocStatus IN('CO', 'CL') AND o.AD_Client_ID = " + ctx.GetAD_Client_ID()
                     + @" AND o.DateInvoiced >= " + startdate + " AND o.DateInvoiced < " + enddate, "ol",
@@ -568,20 +613,35 @@ namespace VIS.Models
             queryBuilder.Append(@"WITH current_year AS ( " + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT
                                   SUM(nvl(
                                  currencyconvert(
-                                 il.linetotalamt, l.c_currency_id, " + C_Currency_ID + @", l.dateacct, l.c_conversiontype_id, l.AD_Client_id, l.ad_org_id
-                                 ), 0)) AS linetotalamt,
+                                 il.LineNetAmt, l.c_currency_id, " + C_Currency_ID + @", l.dateacct, l.c_conversiontype_id, l.AD_Client_id, l.ad_org_id
+                                 ), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=il.M_Product_ID) AS linetotalamt,
                                 il.m_product_id,
                                  p.name
                                   FROM  C_InvoiceLine il
                                  INNER JOIN C_Invoice l ON(il.C_Invoice_ID = l.C_Invoice_ID)
                                  INNER JOIN m_product p ON(il.m_product_id = p.m_product_id)
+                                 INNER JOIN M_InOutLine dl ON(dl.C_OrderLine_ID=il.C_OrderLine_ID)
+                                 INNER JOIN M_InOut d ON(d.M_InOut_ID=dl.M_InOut_ID AND d.ISSoTrx='Y' AND d.IsReturnTrx='N')
                                  LEFT JOIN ad_image img ON(p.ad_image_id = img.ad_image_id)", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
                                   AND l.IsSOTrx='Y' AND l.IsReturnTrx='N' AND
                                  l.docstatus IN('CO', 'CL') " + WhereCondition + @"
                                  AND l.DateInvoiced >= ").Append(startdate).Append(@"
                                  AND l.DateInvoiced <= ").Append(enddate).Append(@"
                                  GROUP BY il.M_Product_ID, p.Name
-                                 HAVING SUM(il.linetotalamt) > 0
+                                 HAVING SUM(il.LineNetAmt)-(SELECT  NVL(SUM(NVL( ril.LineNetAmt,0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+       AND ri.Docstatus IN ('CO', 'CL')
+         AND ril.M_Product_ID=il.M_Product_ID) > 0
                                  ORDER BY LineTotalAmt " + Type + @"
                                  FETCH FIRST 10 ROWS ONLY),");
             if (DB.IsPostgreSQL())
@@ -596,15 +656,23 @@ namespace VIS.Models
             }
             queryBuilder.Append(@"previous_year AS (" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT 
                                  il.M_Product_ID,
-                                 SUM(NVL(currencyConvert(il.LineTotalAmt,
-                                 l.C_Currency_ID, " + C_Currency_ID + @", l.DateAcct, l.C_ConversionType_ID, l.AD_Client_ID, l.AD_Org_ID), 0)) AS LineTotalAmt
+                                 SUM(NVL(currencyConvert(il.LineNetAmt,
+                                 l.C_Currency_ID, " + C_Currency_ID + @", l.DateAcct, l.C_ConversionType_ID, l.AD_Client_ID, l.AD_Org_ID), 0))-(SELECT  NVL(SUM(nvl(
+                                 currencyconvert(
+                                 ril.LineNetAmt, ri.c_currency_id,  " + C_Currency_ID + @", ri.dateacct, ri.c_conversiontype_id, ri.AD_Client_id, ri.AD_Org_ID
+                                 ), 0)),0)
+        FROM C_InvoiceLine ril
+        INNER JOIN C_Invoice ri ON (ril.C_Invoice_ID = ri.C_Invoice_ID)
+        WHERE ri.IsReturnTrx = 'Y' AND ri.IsSotrx = 'Y'
+        AND ri.Docstatus IN ('CO', 'CL')
+        AND ril.M_Product_ID=il.M_Product_ID) AS LineTotalAmt
                                  FROM  C_InvoiceLine il
                                  INNER JOIN C_Invoice l ON(il.C_Invoice_ID = l.C_Invoice_ID)", "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"   
                                    AND l.IsSOTrx='Y' AND l.IsReturnTrx='N' AND
                                  l.docstatus IN ('CO', 'CL') " + WhereCondition + @"
                                  AND l.DateInvoiced >= ").Append(startdate).Append(@"
                                  AND l.DateInvoiced <= ").Append(enddate).Append(@"
-                                 GROUP BY il.m_product_id )");
+                                 GROUP BY il.m_product_id ,il.C_OrderLine_ID)");
             queryBuilder.Append(@"SELECT  cy.M_Product_ID,  cy.Name,
                                   NVL(py.LineTotalAmt, 0) AS PreviousTotal, 
                                   cy.LineTotalAmt AS CurrentTotal
