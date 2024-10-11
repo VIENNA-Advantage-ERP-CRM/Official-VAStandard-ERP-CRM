@@ -1114,9 +1114,9 @@ span.vas-arwidg-cur-symbol {
 
 .vas-exinvd-invoicesListing {
     display: grid;
-    grid-template-columns: repeat(1, 1fr);
-    gap: 0.6em;
-    height: calc(100% - 5.3125em);
+    /*grid-template-columns: repeat(1, 1fr);*/
+    gap: 0.3em;
+    height: calc(100% - 60px);
     overflow: hidden;
 }
 
@@ -1169,27 +1169,32 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-exinvd-invoiceTotalAmt {
-    font-size: 0.75em;
+    font-size: 1.2em;
+}
+.vas-exinvd-amtdiv {
+    display: flex;
+    justify-content: space-between;
 }
 
-    .vas-exinvd-invoiceTotalAmt span {
-        color: #EEB645;
-        font-weight: 600;
-    }
+.vas-exinvd-invoiceTotalAmt span {
+    color: #EEB645;
+    font-weight: 600;
+}
 
 .vas-exinvd-slider-arrows {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 0.6em;
-    padding: 0 0.875em;
+    /*padding: 0.6em 0.875em 0;
+    border-top: 1px solid #846291;*/
 }
 
-    .vas-exinvd-slider-arrows .fa {
-        font-size: 2.6em;
-        cursor: pointer;
-        color: rgba(var(--v-c-on-common), 0.9);
-    }
+.vas-exinvd-slider-arrows .fa {
+    font-size: 2.6em;
+    cursor: pointer;
+    color: rgba(var(--v-c-on-common), 0.9);
+}
 
 /* .vas-exinvd-slider-arrows span {
         font-size: 1.1em;
@@ -1217,15 +1222,15 @@ span.vas-arwidg-cur-symbol {
 
 @media screen and (max-width: 1366px) {
     .vas-exinvd-expected-invoice {
-        font-size: 10px;
+        font-size: 8px;
     }
 
-    .vas-exinvd-invoicesListing {
+ /*   .vas-exinvd-invoicesListing {
         height: calc(100% - 6em);
-    }
+    }*/
 
     .vas-exinvd-invoices-box {
-        font-size: 12px;
+        font-size: 10px;
     }
 
     .vas-exinvd-expected-heading h6 {
@@ -1242,15 +1247,14 @@ span.vas-arwidg-cur-symbol {
 }
 
 @media screen and (max-width: 1024px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
     .vas-exinvd-invoices-box {
-        font-size: 10px;
+        font-size: 8px;
     }
 
     .vas-exinvd-expected-heading h6 {
-        font-size: 1.1em;
-    }
-
-    .vas-exinvd-filter-label {
         font-size: 1em;
     }
 
@@ -1261,11 +1265,11 @@ span.vas-arwidg-cur-symbol {
 
 @media screen and (max-width:900px) {
     .vas-exinvd-expected-invoice {
-        font-size: 12px;
+        font-size: 8px;
     }
 
     .vas-exinvd-invoices-box {
-        font-size: 11px;
+        font-size: 9px;
     }
 
     .vis-editModeWidget .vas-exinvd-expected-invoice {
@@ -1361,16 +1365,17 @@ span.vas-arwidg-cur-symbol {
     }
 
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv {
-    flex-basis: 33%;
+    /*flex-basis: 33%;*/
 }
 
 .vas-exinvd-expected-invoice .vas-exinvd-slider-arrows {
-    margin-top: 13px;
+    margin-top: 7px;
     font-size: 8px;
 }
 
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
     height: auto;
+    border:0;
 }
 
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
@@ -1836,4 +1841,7 @@ span.vas-arwidg-cur-symbol {
 canvas.vas-t10exp-canvas {
     height: 100% !important;
     width: 100% !important;
+}
+.vas-exinvd-emptydiv {
+    background-color: rgba(var(--v-c-primary), 0);
 }
