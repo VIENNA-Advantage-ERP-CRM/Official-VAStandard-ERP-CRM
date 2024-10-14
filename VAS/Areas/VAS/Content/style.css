@@ -768,7 +768,7 @@
 .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
     display: flex;
     position: relative;
-    margin-bottom: 10px;
+    /*margin-bottom: 10px;*/
 }
 
 .vas-filterofMultipleCols {
@@ -1686,9 +1686,45 @@ html[dir="rtl"] .vas-sql-result-msg {
     padding: 12px 10px 7px;
 }
 
-html[dir=rtl] .vas-filters-editdelete-btns {
-    float: left;
+.vis-advanedSearch-InputsWrap.vis-advancedSearchMrgin {
+    margin-top: 15px;
 }
+
+.VAS-pagingDiv {
+    margin-top: 10px;
+    /*display: flex;
+    justify-content: space-between;
+    align-items: center;*/
+}
+    .VAS-pagingDiv li:first-child {
+        background: rgba(var(--v-c-common), 1);
+        border: 1px solid rgba(0, 0, 0, .18);
+        min-width: 24px;
+        justify-content: center;
+        border-bottom-left-radius: 5px;
+        border-top-left-radius: 5px;
+    }
+    .VAS-pagingDiv li:nth-child(2) {
+        margin: 0;
+        border-radius: 0;
+        border-left: 0;
+        padding: 0px;
+    }
+    .VAS-pagingDiv li i {
+        font-size: 12px;
+    }
+    .VAS-pagingDiv li select {
+        font-size: 15px;
+    }
+        .VAS-pagingDiv li select:focus{
+            border-color: transparent;
+        }
+        .VAS-pagingDiv li:last-child {
+            min-width: 24px;
+        }
+    html[dir=rtl] .vas-filters-editdelete-btns {
+        float: left;
+    }
 
 html[dir=rtl] .vas-filters-block {
     float: right;
@@ -1731,14 +1767,6 @@ html[dir=rtl] .vas-column-list-item {
 
 html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
     margin-left: 7px;
-}
-
-html[dir=rtl] .vis-advanedSearch-InputsWrap.vis-advancedSearchMrgin {
-    margin-top: 15px;
-}
-
-html[dir=rtl] .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
-    margin-bottom: 0px;
 }
 
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
