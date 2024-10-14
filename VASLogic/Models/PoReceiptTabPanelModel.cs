@@ -1049,6 +1049,7 @@ namespace VASLogic.Models
                              o.DocumentNo,
                              o.DateOrdered,
                              o.DateOrdered AS FilterDate,
+                             o.DatePromised AS PromisedDate,
                              custimg.ImageExtension,
                              cb.Name,
                              o.AD_Client_ID,
@@ -1114,9 +1115,9 @@ namespace VASLogic.Models
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
                              LEFT JOIN C_InvoiceLine ci ON ( ci.C_OrderLine_ID = l.C_OrderLine_ID )
                              LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO','CL') ");
+                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO') ");
                 sqlmain.Append(@"GROUP BY
-                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered,custimg.ImageExtension, cb.Name,o.AD_Client_ID
+                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID
                              HAVING SUM(
                                         CASE
                                         WHEN mil.c_orderline_id IS NOT NULL
@@ -1150,6 +1151,9 @@ namespace VASLogic.Models
                              CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END AS FilterDate,
+                             CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
+                             ELSE NULL
+                             END AS PromisedDate,
                              custimg.ImageExtension,
                              cb.Name,
                              min.AD_Client_ID,
@@ -1185,7 +1189,8 @@ namespace VASLogic.Models
                 sqlmain.Append(@" GROUP BY
                              cb.Pic, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
-                             END, custimg.ImageExtension, cb.Name,min.AD_Client_ID 
+                             END,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
+                             ELSE NULL END, custimg.ImageExtension, cb.Name,min.AD_Client_ID 
                               HAVING
                               SUM(coalesce(
                                   l.movementqty, 0
@@ -1215,6 +1220,7 @@ namespace VASLogic.Models
                     obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
                     obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
                     obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
+                    obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
                     {
@@ -2005,6 +2011,7 @@ namespace VASLogic.Models
         public string ImageUrl { get; set; }
         public string Name { get; set; }
         public DateTime OrderdDate { get; set; }
+        public DateTime DatePromised { get; set; }
         public string DocumentNo { get; set; }
         public int recordCount { get; set; }
 
