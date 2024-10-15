@@ -4775,7 +4775,7 @@ namespace VAdvantage.Model
             //	Create invoice Allocation for Payment incase of prepay Order
             if (GetC_Order_ID() != 0)
             {
-                string orderType = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocSubTypeSO FROM C_Order o INNER JOIN C_DocType dt ON o.C_DocTypeTarget_ID = dt.C_DocType_ID WHERE o.IsActive='Y' AND  C_Order_ID = " + GetC_Order_ID(), null, Get_Trx()));
+                string orderType = Util.GetValueOfString(DB.ExecuteScalar("SELECT dt.DocSubTypeSO FROM C_Order o INNER JOIN C_DocType dt ON o.C_DocTypeTarget_ID = dt.C_DocType_ID WHERE o.IsActive='Y' AND  o.C_Order_ID = " + GetC_Order_ID(), null, Get_Trx()));
                 if (orderType.Equals(X_C_DocType.DOCSUBTYPESO_PrepayOrder))
                 {
                     return AllocateOrder();

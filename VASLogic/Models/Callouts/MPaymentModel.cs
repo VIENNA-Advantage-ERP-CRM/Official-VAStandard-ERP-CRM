@@ -228,7 +228,7 @@ namespace VIS.Models
                 retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
                 retDic["C_ConversionType_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
                 //check weather it is PrePayment or not
-                if (Util.GetValueOfString(DB.ExecuteScalar("SELECT DocSubTypeSO FROM C_Order o INNER JOIN C_DocType DT ON o.C_DocTypeTarget_ID = DT.C_DocType_ID WHERE o.IsActive='Y' AND  C_Order_ID = " + C_Order_ID, null, null)).Equals(X_C_DocType.DOCSUBTYPESO_PrepayOrder))
+                if (Util.GetValueOfString(DB.ExecuteScalar("SELECT DT.DocSubTypeSO FROM C_Order o INNER JOIN C_DocType DT ON o.C_DocTypeTarget_ID = DT.C_DocType_ID WHERE o.IsActive='Y' AND  o.C_Order_ID = " + C_Order_ID, null, null)).Equals(X_C_DocType.DOCSUBTYPESO_PrepayOrder))
                 {
                     retDic["IsPrePayOrder"] = true;
                 }
