@@ -1146,6 +1146,20 @@
                     }
                 }
                 mTab.setValue("InvoiceAmt", invoiceOpen);
+                /*VIS_427 Getting conversion rate to convert amount*/
+                var currencyRate = VIS.Env.ONE;
+                var C_Currency_Invoice_ID = Util.getValueOfInt(dr["C_Currency_ID"]);
+                var C_Currency_ID = ctx.getContextAsInt(windowNo, "C_Currency_ID");
+                var C_ConversionType_ID = ctx.getContextAsInt(windowNo, "C_ConversionType_ID");
+                var AD_Client_ID = ctx.getContextAsInt(windowNo, "AD_Client_ID");
+                var AD_Org_ID = ctx.getContextAsInt(windowNo, "AD_Org_ID");
+                var ConvDate = ctx.getContext(windowNo, "DateAcct");
+                if (C_Currency_ID > 0 && C_Currency_Invoice_ID > 0 && C_Currency_ID != C_Currency_Invoice_ID) {
+                    var paramStr = C_Currency_Invoice_ID + "," + C_Currency_ID + "," + ConvDate + "," + C_ConversionType_ID + "," + AD_Client_ID + "," + AD_Org_ID;
+                    currencyRate = VIS.dataContext.getJSONRecord("MConversionRate/GetRate", paramStr);
+                    invoiceOpen = Util.getValueOfDecimal((invoiceOpen * currencyRate));
+                    discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate));
+                }
                // if (_chk == 0) {
                 mTab.setValue("Amount", (invoiceOpen - discountAmt));
                 //}
@@ -1283,6 +1297,20 @@
         var paramString = C_Currency_Invoice_ID.toString();
         var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", paramString);
         var precision = currency["StdPrecision"];
+        /*VIS_427 Getting conversion rate to convert amount*/
+        var C_Currency_ID = ctx.getContextAsInt(windowNo, "C_Currency_ID");
+        var C_ConversionType_ID = ctx.getContextAsInt(windowNo, "C_ConversionType_ID");
+        var AD_Client_ID = ctx.getContextAsInt(windowNo, "AD_Client_ID");
+        var AD_Org_ID = ctx.getContextAsInt(windowNo, "AD_Org_ID");
+        var ConvDate = ctx.getContext(windowNo, "DateAcct");
+        if (C_Currency_ID > 0 && C_Currency_Invoice_ID > 0 && C_Currency_ID != C_Currency_Invoice_ID) {
+            var paramStr = C_Currency_Invoice_ID + "," + C_Currency_ID + "," + ConvDate + "," + C_ConversionType_ID + "," + AD_Client_ID + "," + AD_Org_ID;
+            currencyRate = VIS.dataContext.getJSONRecord("MConversionRate/GetRate", paramStr);
+            invoiceOpenAmt = Util.getValueOfDecimal((invoiceOpenAmt * currencyRate).toFixed(precision));
+            if (colName != "Amount") {
+                amount = Util.getValueOfDecimal((amount * currencyRate).toFixed(precision));
+            }
+        }
         //  PayAmt - calculate write off
         if (colName == "Amount") {
             //writeOffAmt = Decimal.Subtract(Decimal.Subtract(Decimal.Subtract(invoiceAmt, amount), discountAmt), overUnderAmt);
