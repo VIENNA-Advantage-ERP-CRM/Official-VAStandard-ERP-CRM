@@ -239,6 +239,7 @@
             //var qry = "SELECT DueAmt , DiscountDate , DiscountAmt , DiscountDays2 , Discount2  FROM C_InvoicePaySchedule WHERE C_InvoicePaySchedule_ID=" + C_InvoicePaySchedule_ID;
             var paramString = C_InvoicePaySchedule_ID.toString() + "," + mTab.getValue("C_Cash_ID") + "," + mTab.getValue("C_Invoice_ID");
             var data = VIS.dataContext.getJSONRecord("MCashBook/GetPaySheduleData", paramString);
+            var IsReturnTrx = VIS.Utility.Util.getValueOfString(data["IsReturnTrx"]);
             /*VIS_427 Set Currency when user change invoicepayschedule so that can convert value of schedule
             according to currency*/
             mTab.setValue("C_Currency_ID", Util.getValueOfInt(data["C_Currency_ID"]));
@@ -246,8 +247,7 @@
                 if (mTab.getTableName() == "C_Payment") {
                     /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice schedule*/
                     mTab.setValue("VAS_IsDiscountApplied", false);
-                    var dateTrx = mTab.getValue("DateTrx");
-                    var IsReturnTrx = data["IsReturnTrx"];
+                    var dateTrx = mTab.getValue("DateTrx");                    
                     //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
                     if (IsReturnTrx == "Y") {
                         if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
@@ -267,7 +267,7 @@
                             mTab.setValue("PayAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
                             mTab.setValue("PaymentAmount", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
                         }
-                      
+
                     }
                     else {
                         if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
@@ -287,6 +287,78 @@
                             mTab.setValue("PayAmt", (Util.getValueOfDecimal(data["DueAmt"])));
                             mTab.setValue("PaymentAmount", (Util.getValueOfDecimal(data["DueAmt"])));
                         }
+                    }
+                }
+                /*VIS_427 Bug Id 6192 Handled conversion of amount on allocate tab*/
+                else if (mTab.getTableName() == "C_PaymentAllocate") {
+                    var amount = Util.getValueOfDecimal(data["DueAmt"]);
+                    var discountAmt = Util.getValueOfDecimal(data["DiscountAmt"]);
+                    var Discount2 = Util.getValueOfDecimal(data["Discount2"]);
+                    var C_Currency_Invoice_ID = Util.getValueOfInt(data["C_Currency_ID"]);
+                    var C_Currency_ID = ctx.getContextAsInt(windowNo, "C_Currency_ID");
+                    var C_ConversionType_ID = ctx.getContextAsInt(windowNo, "C_ConversionType_ID");
+                    var AD_Client_ID = ctx.getContextAsInt(windowNo, "AD_Client_ID");
+                    var AD_Org_ID = ctx.getContextAsInt(windowNo, "AD_Org_ID");
+                    var ConvDate = ctx.getContext(windowNo, "DateAcct");
+                    if (C_Currency_ID > 0 && C_Currency_Invoice_ID > 0 && C_Currency_ID != C_Currency_Invoice_ID) {
+                        var paramStr = C_Currency_Invoice_ID + "," + C_Currency_ID + "," + ConvDate + "," + C_ConversionType_ID + "," + AD_Client_ID + "," + AD_Org_ID;
+                        currencyRate = VIS.dataContext.getJSONRecord("MConversionRate/GetRate", paramStr);
+                        amount = Util.getValueOfDecimal((amount * currencyRate).toFixed(2));
+                        discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(2));
+                    }
+                    mTab.setValue("Amount", amount);
+                    ctx.setContext(windowNo, "InvTotalAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                    mTab.setValue("WriteOffAmt", 0);
+                    mTab.setValue("OverUnderAmt", 0);
+                    var accountDate = Util.getValueOfDate(data["accountDate"]);
+                    var isSoTrx = Util.getValueOfString(data["isSoTrx"]);
+                    if (Util.getValueOfDate(data["DiscountDate"]) >= accountDate) {
+                        if (IsReturnTrx == "Y") {
+                            mTab.setValue("DiscountAmt", -1 * discountAmt);
+                            mTab.setValue("Amount", -1 * (amount - discountAmt));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * Util.getValueOfDecimal(data["DueAmt"]));
+                            }
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", discountAmt);
+                            mTab.setValue("Amount", (amount - discountAmt));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
+                        }
+
+                    }
+                    else if (Util.getValueOfDate(data["DiscountDays2"]) >= accountDate) {
+                        if (IsReturnTrx == "Y") {
+                            mTab.setValue("DiscountAmt", -1 * Discount2);
+                            mTab.setValue("Amount", -1 * (amount - Discount2));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
+                        }
+                        else {
+                            mTab.setValue("DiscountAmt", Discount2);
+                            mTab.setValue("Amount", (amount - Discount2));
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
+                        }
+                    }
+                    else {
+                        if (IsReturnTrx == "Y") {
+                            mTab.setValue("Amount", -1 * amount);
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
+                            }
+                        }
+                        else {
+                            mTab.setValue("Amount", amount);
+                            if (mTab.getTableName() == "C_PaymentAllocate") {
+                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
+                            }
+                        }
+                        mTab.setValue("DiscountAmt", 0);
                     }
                 }
                 else {
@@ -315,7 +387,7 @@
                                 mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
                             }
                         }
-                       
+
                     }
                     else if (Util.getValueOfDate(data["DiscountDays2"]) >= accountDate) {
                         if (isSoTrx == "N") {
@@ -417,8 +489,8 @@
         var payAmt = Util.getValueOfDecimal(mTab.getValue("Amount"));
         var stdPrecision = 2;
         this.setCalloutActive(true);
-        var convertedAmt = 0;   
-        if ("I" == mTab.getValue("CashType")) {            
+        var convertedAmt = 0;
+        if ("I" == mTab.getValue("CashType")) {
             var discountAmt = Util.getValueOfDecimal(mTab.getValue("DiscountAmt"));
             var writeOffAmt = Util.getValueOfDecimal(mTab.getValue("WriteOffAmt"));
             var overUnderAmt = Util.getValueOfDecimal(mTab.getValue("OverUnderAmt"));
@@ -467,7 +539,7 @@
                 if (overUnderAmt < 0) {
                     overUnderAmt = overUnderAmt * -1;
                     mTab.setValue("OverUnderAmt", overUnderAmt);
-                }               
+                }
                 if (invTotalAmt < 0) {
                     invTotalAmt = invTotalAmt * -1;
                 }
@@ -506,7 +578,7 @@
                 }
             }
             else // calculate PayAmt
-            {               
+            {
                 var sub = (invTotalAmt - discountAmt);
                 payAmt = ((sub - writeOffAmt) - overUnderAmt).toFixed(stdPrecision);
                 //payAmt = Decimal.Subtract(Decimal.Subtract(invTotalAmt, discountAmt), writeOffAmt);
@@ -844,7 +916,7 @@
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);
         }
         else if (Util.getValueOfString(mTab.getValue("CashType")) == "I" || Util.getValueOfString(mTab.getValue("CashType")) == "O") { //VA230:Invoice and Order
-            mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);            
+            mTab.getField("VSS_PAYMENTTYPE").setReadOnly(true);
         }
         else {
             mTab.getField("VSS_PAYMENTTYPE").setReadOnly(false);
