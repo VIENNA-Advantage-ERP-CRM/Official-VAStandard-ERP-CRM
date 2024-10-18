@@ -535,7 +535,7 @@ namespace VAdvantage.Model
 
                 /*VIS_427 Bug Id 6192 if record exsist in allocate and user change Transaction date then not to 
                  save record*/
-                if (Is_ValueChanged("DateTrx") &&
+                if (Is_ValueChanged("DateAcct") &&
                     Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_PaymentAllocate_ID) FROM C_PaymentAllocate WHERE C_Invoice_ID IS NOT NULL AND C_Payment_ID=" + GetC_Payment_ID(), null, Get_Trx())) > 0)
                 {
                     log.SaveError("VAS_DeleteLineFirst", "");

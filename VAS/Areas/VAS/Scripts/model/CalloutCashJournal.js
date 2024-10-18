@@ -247,7 +247,7 @@
                 if (mTab.getTableName() == "C_Payment") {
                     /*VIS_427 Set value of VAS_IsDiscountApplied false when user change invoice schedule*/
                     mTab.setValue("VAS_IsDiscountApplied", false);
-                    var dateTrx = mTab.getValue("DateTrx");                    
+                    var dateTrx = mTab.getValue("DateTrx");
                     //VIS_427 Bug id 5620 set value of payment and discount when user select value through payment window 
                     if (IsReturnTrx == "Y") {
                         if (//(Globalize.format(new Date(dateTrx), "yyyy-MM-dd") >= Globalize.format(new Date(data["DateInvoiced"]), "yyyy-MM-dd")) &&
@@ -300,63 +300,53 @@
                     var AD_Client_ID = ctx.getContextAsInt(windowNo, "AD_Client_ID");
                     var AD_Org_ID = ctx.getContextAsInt(windowNo, "AD_Org_ID");
                     var ConvDate = ctx.getContext(windowNo, "DateAcct");
+                    var dateTrx = ctx.getContext(windowNo, "DateTrx");
+                    var currency = VIS.dataContext.getJSONRecord("MCurrency/GetCurrency", C_Currency_ID.toString());
+                    var precision = currency["StdPrecision"];
                     if (C_Currency_ID > 0 && C_Currency_Invoice_ID > 0 && C_Currency_ID != C_Currency_Invoice_ID) {
                         var paramStr = C_Currency_Invoice_ID + "," + C_Currency_ID + "," + ConvDate + "," + C_ConversionType_ID + "," + AD_Client_ID + "," + AD_Org_ID;
                         currencyRate = VIS.dataContext.getJSONRecord("MConversionRate/GetRate", paramStr);
-                        amount = Util.getValueOfDecimal((amount * currencyRate).toFixed(2));
-                        discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(2));
+                        amount = Util.getValueOfDecimal((amount * currencyRate).toFixed(precision));
+                        discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(precision));
+                        Discount2 = Util.getValueOfDecimal((Discount2 * currencyRate).toFixed(precision));
                     }
                     mTab.setValue("Amount", amount);
                     ctx.setContext(windowNo, "InvTotalAmt", Util.getValueOfDecimal(data["DueAmt"]));
                     mTab.setValue("WriteOffAmt", 0);
                     mTab.setValue("OverUnderAmt", 0);
-                    var accountDate = Util.getValueOfDate(data["accountDate"]);
-                    var isSoTrx = Util.getValueOfString(data["isSoTrx"]);
-                    if (Util.getValueOfDate(data["DiscountDate"]) >= accountDate) {
+                    if (Globalize.format(new Date(data["DiscountDate"]), "yyyy-MM-dd") >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd")) {
                         if (IsReturnTrx == "Y") {
                             mTab.setValue("DiscountAmt", -1 * discountAmt);
                             mTab.setValue("Amount", -1 * (amount - discountAmt));
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", -1 * Util.getValueOfDecimal(data["DueAmt"]));
-                            }
+                            mTab.setValue("InvoiceAmt", -1 * Util.getValueOfDecimal(data["DueAmt"]));
                         }
                         else {
                             mTab.setValue("DiscountAmt", discountAmt);
                             mTab.setValue("Amount", (amount - discountAmt));
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
-                            }
+                            mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
                         }
 
                     }
-                    else if (Util.getValueOfDate(data["DiscountDays2"]) >= accountDate) {
+                    else if (Globalize.format(new Date(data["DiscountDays2"])) >= Globalize.format(new Date(dateTrx), "yyyy-MM-dd")) {
                         if (IsReturnTrx == "Y") {
                             mTab.setValue("DiscountAmt", -1 * Discount2);
                             mTab.setValue("Amount", -1 * (amount - Discount2));
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
-                            }
+                            mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
                         }
                         else {
                             mTab.setValue("DiscountAmt", Discount2);
                             mTab.setValue("Amount", (amount - Discount2));
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
-                            }
+                            mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
                         }
                     }
                     else {
                         if (IsReturnTrx == "Y") {
                             mTab.setValue("Amount", -1 * amount);
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
-                            }
+                            mTab.setValue("InvoiceAmt", -1 * (Util.getValueOfDecimal(data["DueAmt"])));
                         }
                         else {
                             mTab.setValue("Amount", amount);
-                            if (mTab.getTableName() == "C_PaymentAllocate") {
-                                mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
-                            }
+                            mTab.setValue("InvoiceAmt", Util.getValueOfDecimal(data["DueAmt"]));
                         }
                         mTab.setValue("DiscountAmt", 0);
                     }
