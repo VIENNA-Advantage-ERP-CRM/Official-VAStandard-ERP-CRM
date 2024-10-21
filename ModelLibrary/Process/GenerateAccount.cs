@@ -31,7 +31,7 @@ namespace ViennaAdvantageServer.Process
             int value = 0;
             // VAdvantage.Model.MBPartner bp = new VAdvantage.Model.MBPartner(GetCtx(), C_Bpartner_ID, Get_TrxName());
             //BPartner.SetC_Greeting_ID(
-            string sqlbp = "UPDATE C_BPartner set VAS_IsConverted='Y', IsCustomer='Y', IsProspect='N' WHERE C_BPartner_ID=" + C_Bpartner_ID + "";
+            string sqlbp = "UPDATE C_BPartner SET VAS_IsConverted='Y', IsCustomer='Y', IsProspect='N' WHERE C_BPartner_ID=" + C_Bpartner_ID + "";
             value = DB.ExecuteQuery(sqlbp, null, Get_TrxName());
             if (value == -1)
             {
