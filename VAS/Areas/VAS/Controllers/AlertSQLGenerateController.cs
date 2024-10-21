@@ -54,7 +54,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="pageSize">page Size</param>
         /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName)
+        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName, int recordCount)
         {
             if (Session["Ctx"] != null)
             {
@@ -62,7 +62,7 @@ namespace VAS.Areas.VAS.Controllers
                 AlertSqlGenerate obj = new AlertSqlGenerate();
                 if (!string.IsNullOrEmpty(query))
                     query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
-                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize, tableName)), JsonRequestBehavior.AllowGet);
+                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize, tableName, recordCount)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }

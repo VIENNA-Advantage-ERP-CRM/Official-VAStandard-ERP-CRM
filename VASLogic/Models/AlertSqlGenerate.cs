@@ -147,21 +147,26 @@ namespace VIS.Models
         /// <param name="pageSize">page Size</param>
         /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public List<Dictionary<string, string>> GetResult(Ctx ctx, string query, int pageNo, int pageSize, string tableName)
+        public GetRecords GetResult(Ctx ctx, string query, int pageNo, int pageSize, string tableName, int recordCount)
         {
-            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();        
+            GetRecords results = new GetRecords
+            {
+                RecordList = new List<Dictionary<string, string>>() // Initialize the list
+            };
             query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            query += " FETCH FIRST 100 ROWS ONLY";
+            // query += " FETCH FIRST 100 ROWS ONLY";
+
             if (ValidateSql(query))
             {
                 DataSet ds = new DataSet();
-                if (pageNo == 0)
+
+                if (pageNo == 1)
                 {
                     ds = DB.ExecuteDataset(query);
                 }
                 else
                 {
-                    ds = VIS.DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
+                    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
                 }
 
                 if (ds != null && ds.Tables.Count > 0)
@@ -169,6 +174,16 @@ namespace VIS.Models
                     DataTable table = ds.Tables[0];
                     int rowCount = table.Rows.Count;
                     int colCount = table.Columns.Count;
+                    if (recordCount == 0 && pageNo == 1)
+                    {
+                        results.TotalRecord = rowCount;
+                        rowCount = 100;
+                    }
+                    else
+                    {
+                        results.TotalRecord = recordCount;
+                    }
+
                     for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
                     {
                         Dictionary<string, string> rowResult = new Dictionary<string, string>();
@@ -178,10 +193,11 @@ namespace VIS.Models
                             string columnName = table.Columns[colIndex].ColumnName;
                             string columnValue = Util.GetValueOfString(table.Rows[rowIndex][columnName]);
                             rowResult[columnName] = columnValue;
-
                         }
-                        results.Add(rowResult);
+                        results.RecordList.Add(rowResult); // Add rowResult to the list
                     }
+
+                   // results.TotalRecord = totatRecCount; // Set Totalrecord
                     return results;
                 }
                 else
@@ -536,5 +552,10 @@ namespace VIS.Models
         public string Name { get; set; }
         public string tableName { get; set; }
         public bool isNameExist { get; set; }
+    }
+    public class GetRecords
+    {
+        public List<Dictionary<string, string>> RecordList { get; set; }
+        public int TotalRecord { get; set; }
     }
 }

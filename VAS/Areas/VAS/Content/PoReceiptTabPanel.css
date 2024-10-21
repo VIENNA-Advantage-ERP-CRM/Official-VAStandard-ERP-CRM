@@ -1069,7 +1069,8 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-exinvd-expected-invoice {
-    background-color: rgba(var(--v-c-primary), .1);
+    /* background-color: rgba(var(--v-c-primary), .1);*/
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
     padding: 0.5em;
     height: 100%;
 }
@@ -1083,8 +1084,9 @@ span.vas-arwidg-cur-symbol {
 
     .vas-exinvd-expected-heading h6 {
         margin: 0;
-        font-size: 0.875em;
+        font-size: 1em;
         font-weight: 600;
+        font-family:Verdana;
     }
 
 .vas-exinvd-filterby-col {
@@ -1114,17 +1116,20 @@ span.vas-arwidg-cur-symbol {
 
 .vas-exinvd-invoicesListing {
     display: grid;
-    /*grid-template-columns: repeat(1, 1fr);*/
+    grid-template-columns: repeat(1, 1fr);
     gap: 0.3em;
     height: calc(100% - 60px);
     overflow: hidden;
+    grid-template-rows: repeat(4, 1fr);
 }
 
 .vas-exinvd-invoices-box {
     background-color: rgba(var(--v-c-common), 1);
     padding: 0.3em;
 }
-
+/*    .vas-exinvd-invoices-box.vas-exinvd-emptydiv {
+        display: none;
+    }*/
     .vas-exinvd-invoices-box > h6 {
         font-size: 0.875em;
         font-weight: 600;
@@ -1141,6 +1146,7 @@ span.vas-arwidg-cur-symbol {
     display: flex;
     align-items: center;
     gap: 0.8em;
+    font-family:Verdana;
 }
 
     .vas-exinvd-thumb-w-txt img {
@@ -1166,6 +1172,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-invoice-lbl {
     font-size: 0.875em;
     font-weight: 600;
+    font-family:Verdana;
 }
 
 .vas-exinvd-invoiceTotalAmt {
@@ -1174,6 +1181,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-amtdiv {
     display: flex;
     justify-content: space-between;
+    font-family:Verdana;
 }
 
 .vas-exinvd-invoiceTotalAmt span {
@@ -1394,6 +1402,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-pagespan {
     font-size: 14px;
     font-weight: 600;
+    font-family:Verdana;
 }
 
 .vas-exinvd-lablecolor {
