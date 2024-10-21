@@ -29,9 +29,9 @@ namespace ViennaAdvantageServer.Process
         protected override String DoIt()
         {
             int value = 0;
-            VAdvantage.Model.MBPartner bp = new VAdvantage.Model.MBPartner(GetCtx(), C_Bpartner_ID, Get_TrxName());
+            // VAdvantage.Model.MBPartner bp = new VAdvantage.Model.MBPartner(GetCtx(), C_Bpartner_ID, Get_TrxName());
             //BPartner.SetC_Greeting_ID(
-            String sqlbp = "update c_bpartner set iscustomer='Y', isprospect='N' where c_bpartner_id=" + C_Bpartner_ID + "";
+            string sqlbp = "UPDATE C_BPartner set VAS_IsConverted='Y', IsCustomer='Y', IsProspect='N' WHERE C_BPartner_ID=" + C_Bpartner_ID + "";
             value = DB.ExecuteQuery(sqlbp, null, Get_TrxName());
             if (value == -1)
             {
