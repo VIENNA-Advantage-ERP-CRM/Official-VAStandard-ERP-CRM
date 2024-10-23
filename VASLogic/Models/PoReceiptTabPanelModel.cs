@@ -1888,13 +1888,12 @@ namespace VASLogic.Models
         /// <author>VIS_427</author>
         public List<VAS_ScheduleDetail> GetScheduleData(Ctx ctx, int InvoiceId, int pageNo, int pageSize)
         {
-            //Fixed query to get data for subtotal and grandtotal
             List<VAS_ScheduleDetail> InvocieTaxTabPanel = new List<VAS_ScheduleDetail>();
             String sql = @"SELECT
                                cs.C_InvoicePaySchedule_ID,
                                cs.DueDate,
                                cs.DueAmt,
-                               cs.VA009_PAYMENTMETHOD_ID,
+                               cs.VA009_PaymentMethod_ID,
                                cs.VA009_IsPaid,
                                cy.StdPrecision,
                                p.DocumentNo AS PaymentDoc,
@@ -1906,30 +1905,30 @@ namespace VASLogic.Models
                                COALESCE(bsl.EftValutaDate, p.CheckDate) AS CheckDate,
                                ch.DateAcct AS CashAcctDate,
                                ch.DocumentNo AS CashDoc,
-                               cs.C_CASHLINE_ID,
+                               cs.C_CashLine_ID,
                                cs.C_Payment_ID
                            FROM 
                                C_InvoicePaySchedule cs 
                            INNER JOIN 
-                               C_Invoice ci ON ci.C_Invoice_ID = cs.C_Invoice_ID
+                               C_Invoice ci ON (ci.C_Invoice_ID = cs.C_Invoice_ID)
                            INNER JOIN 
-                               C_Currency cy ON cy.C_Currency_ID = ci.C_Currency_ID
+                               C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID)
                            INNER JOIN 
-                               VA009_PAYMENTMETHOD pm ON (cs.VA009_PAYMENTMETHOD_ID=pm.VA009_PAYMENTMETHOD_ID)
+                               VA009_PaymentMethod pm ON (cs.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
                            LEFT JOIN 
-                               C_Payment p ON cs.C_Payment_ID = p.C_Payment_ID
+                               C_Payment p ON (cs.C_Payment_ID = p.C_Payment_ID)
                            LEFT JOIN 
-                               C_CashLine cl ON cl.C_CASHLINE_ID = cs.C_CASHLINE_ID
+                               C_CashLine cl ON (cl.C_CashLine_ID = cs.C_CashLine_ID)
                            LEFT JOIN 
-                               C_Cash ch ON cl.C_Cash_ID = ch.C_Cash_ID
+                               C_Cash ch ON (cl.C_Cash_ID = ch.C_Cash_ID)
                            LEFT JOIN 
-                               C_BankAccount cb ON cb.C_BankAccount_ID = p.C_BankAccount_ID
+                               C_BankAccount cb ON (cb.C_BankAccount_ID = p.C_BankAccount_ID)
                            LEFT JOIN 
-                               C_Bank b ON b.C_Bank_ID = cb.C_Bank_ID
+                               C_Bank b ON (b.C_Bank_ID = cb.C_Bank_ID)
                            LEFT JOIN 
-                               C_BankStatement bs ON cb.C_BankAccount_ID = bs.C_BankAccount_ID
+                               C_BankStatement bs ON (cb.C_BankAccount_ID = bs.C_BankAccount_ID)
                            LEFT JOIN 
-                               C_BankStatementLine bsl ON bsl.C_BankStatement_ID = bs.C_BankStatement_ID
+                               C_BankStatementLine bsl ON (bsl.C_BankStatement_ID = bs.C_BankStatement_ID)
                            WHERE 
                                cs.C_Invoice_ID  = " + InvoiceId;
 
