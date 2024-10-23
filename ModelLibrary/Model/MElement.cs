@@ -130,7 +130,7 @@ namespace VAdvantage.Model
 
             //VIS383:04/06/2024 DevOps TASK ID:5877:- When tree is not define then create new tree id behalf of element name 
             // when we are saving new record, system will create tree everytime, because for the newrecord, system was setting default tree record automatically.
-            if (newRecord || Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
+            if ((newRecord && Util.GetValueOfInt(GetAD_Tree_ID()) == 0) || Util.GetValueOfInt(GetAD_Tree_ID()) == 0)
             {
                 int treeId = 0;
                 string msgError = CreateNewTree(GetCtx(), Get_Trx(), GetName(), out treeId);
