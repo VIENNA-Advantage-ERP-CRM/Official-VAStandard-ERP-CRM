@@ -321,5 +321,21 @@ namespace VAS.Areas.VAS.Controllers
             VAS_ExpenseRevenue lstIncomeAndExpenseData = objIncomeAndExpenseData.GetExpenseRevenueDetails(ctx, ListValue);
             return Json(JsonConvert.SerializeObject(lstIncomeAndExpenseData), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This Function is use to get the data of invoice schedule and payment/cash associated with it
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="InvoiceId">InvoiceId</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <returns>returns the data</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetScheduleData(int InvoiceId,int pageNo,int pageSize)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
+            List<VAS_ScheduleDetail> result = objScheduleData.GetScheduleData(ctx, InvoiceId, pageNo, pageSize);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }

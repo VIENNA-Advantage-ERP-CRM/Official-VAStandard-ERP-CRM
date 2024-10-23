@@ -127,7 +127,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpenseAmountWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpRevProfitWidget.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsights.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsightsGridView.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsightsGridView.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ScheduleDetail.js"
                   );
 
 
