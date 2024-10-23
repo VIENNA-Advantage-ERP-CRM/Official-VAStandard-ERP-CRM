@@ -421,7 +421,7 @@ namespace VASLogic.Models
                              cs.C_InvoicePaySchedule_ID,
                              cd.DocBaseType,
                              ci.DateInvoiced,
-                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ,"+ C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
+                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
@@ -1254,7 +1254,7 @@ namespace VASLogic.Models
         /// <returns>List of  Get Top 10 Expense Amounts</returns>
         public List<TopExpenseAmountData> GetTop10ExpenseAmountData(Ctx ctx, string ListValue)
         {
-            TopExpenseAmountData obj = new TopExpenseAmountData(); ;
+            TopExpenseAmountData obj = new TopExpenseAmountData();
             StringBuilder sql = new StringBuilder();
             StringBuilder sqlQuarter = new StringBuilder();
             List<TopExpenseAmountData> ExpenseAmountData = new List<TopExpenseAmountData>();
@@ -1510,8 +1510,8 @@ namespace VASLogic.Models
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj.TabelView = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_REF_TABLE_VIEW"]);
                     obj.DisplayName = Util.GetValueOfString(ds.Tables[0].Rows[i]["DisplayName"]);
-                    obj.Result= Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_Result"]);
-                    obj.AD_Org_ID= Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                    obj.Result = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA113_Result"]);
+                    obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                     retData.Add(obj);
                 }
             }
@@ -1592,7 +1592,7 @@ namespace VASLogic.Models
                             ORDER BY AD_Reference_ID ";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             StringBuilder sb = new StringBuilder();
-                      for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
             {
                 if (!NotIncludeCol.Contains(Util.GetValueOfString(ds.Tables[0].Rows[i]["ColumnName"])))
                 {
@@ -1650,7 +1650,7 @@ namespace VASLogic.Models
                 lstRevData = new decimal[dsExpRev.Tables[0].Rows.Count];
                 lstProfitData = new decimal[dsExpRev.Tables[0].Rows.Count];
                 DataRow dr = null;
-                for (int i=0; i < dsExpRev.Tables[0].Rows.Count;i++) 
+                for (int i = 0; i < dsExpRev.Tables[0].Rows.Count; i++)
                 {
                     dr = dsExpRev.Tables[0].Rows[i];
 
@@ -1877,6 +1877,94 @@ namespace VASLogic.Models
             }
             return dsExpRevData;
         }
+        /// <summary>
+        /// This Function is use to get the data of invoice schedule and payment/cash associated with it
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="InvoiceId">InvoiceId</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <returns>returns the data</returns>
+        /// <author>VIS_427</author>
+        public List<VAS_ScheduleDetail> GetScheduleData(Ctx ctx, int InvoiceId, int pageNo, int pageSize)
+        {
+            List<VAS_ScheduleDetail> InvocieTaxTabPanel = new List<VAS_ScheduleDetail>();
+            String sql = @"SELECT
+                               cs.C_InvoicePaySchedule_ID,
+                               cs.DueDate,
+                               cs.DueAmt,
+                               cs.VA009_PaymentMethod_ID,
+                               cs.VA009_IsPaid,
+                               cy.StdPrecision,
+                               p.DocumentNo AS PaymentDoc,
+                               pm.VA009_Name AS PayMethod,
+                               p.DateAcct AS PaymentDateAcct,
+                               p.C_BankAccount_ID,
+                               b.Name || '_' || cb.AccountNo As AcctName,
+                               COALESCE(bsl.TrxNo, bsl.EftCheckNo, p.CheckNo) AS CheckNo,
+                               COALESCE(bsl.EftValutaDate, p.CheckDate) AS CheckDate,
+                               ch.DateAcct AS CashAcctDate,
+                               ch.DocumentNo AS CashDoc,
+                               cs.C_CashLine_ID,
+                               cs.C_Payment_ID
+                           FROM 
+                               C_InvoicePaySchedule cs 
+                           INNER JOIN 
+                               C_Invoice ci ON (ci.C_Invoice_ID = cs.C_Invoice_ID)
+                           INNER JOIN 
+                               C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID)
+                           INNER JOIN 
+                               VA009_PaymentMethod pm ON (cs.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
+                           LEFT JOIN 
+                               C_Payment p ON (cs.C_Payment_ID = p.C_Payment_ID)
+                           LEFT JOIN 
+                               C_CashLine cl ON (cl.C_CashLine_ID = cs.C_CashLine_ID)
+                           LEFT JOIN 
+                               C_Cash ch ON (cl.C_Cash_ID = ch.C_Cash_ID)
+                           LEFT JOIN 
+                               C_BankAccount cb ON (cb.C_BankAccount_ID = p.C_BankAccount_ID)
+                           LEFT JOIN 
+                               C_Bank b ON (b.C_Bank_ID = cb.C_Bank_ID)
+                           LEFT JOIN 
+                               C_BankStatement bs ON (cb.C_BankAccount_ID = bs.C_BankAccount_ID)
+                           LEFT JOIN 
+                               C_BankStatementLine bsl ON (bsl.C_BankStatement_ID = bs.C_BankStatement_ID)
+                           WHERE 
+                               cs.C_Invoice_ID  = " + InvoiceId;
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql + ")t", null, null));
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    VAS_ScheduleDetail obj = new VAS_ScheduleDetail();
+                    obj.RecordCount = RecordCount;
+                    obj.LineNum = i + 1;
+                    obj.DueAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["DueAmt"]);
+                    obj.IsPaid = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_IsPaid"]);
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Payment_ID"]) != 0)
+                    {
+                        obj.DateAcct = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PaymentDateAcct"]);
+                        obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["PaymentDoc"]);
+                        obj.CheckNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["CheckNo"]);
+                        obj.CheckDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["CheckDate"]);
+                    }
+                    else if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_CASHLINE_ID"]) != 0)
+                    {
+                        obj.DateAcct = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["CashAcctDate"]);
+                        obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["CashDoc"]);
+                    }
+                    obj.DueDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DueDate"]).Value;
+                    obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["PayMethod"]);
+                    obj.AccountNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["AcctName"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+                    obj.C_InvoicePaySchedule_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_InvoicePaySchedule_ID"]);
+                    InvocieTaxTabPanel.Add(obj);
+                }
+            }
+            return InvocieTaxTabPanel;
+        }
     }
     public class TabPanel
     {
@@ -2030,5 +2118,21 @@ namespace VASLogic.Models
         public decimal[] lstProfitData { get; set; }
         public string[] lstLabel { get; set; }
         public string ErrorMessage { get; set; }
+    }
+    public class VAS_ScheduleDetail
+    {
+        public decimal DueAmt { get; set; }
+        public string IsPaid { get; set; }
+        public DateTime DueDate { get; set; }
+        public DateTime? DateAcct { get; set; }
+        public string DocumentNo { get; set; }
+        public string AccountNo { get; set; }
+        public string CheckNo { get; set; }
+        public DateTime? CheckDate { get; set; }
+        public string PayMethod { get; set; }
+        public int LineNum { get; set; }
+        public int stdPrecision { get; set; }
+        public int C_InvoicePaySchedule_ID { get; set; }
+        public int RecordCount { get; set; }
     }
 }
