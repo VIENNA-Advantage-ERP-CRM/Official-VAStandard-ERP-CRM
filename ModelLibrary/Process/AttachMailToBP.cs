@@ -108,7 +108,8 @@ namespace VAdvantage.Process
 
                 if (ds.Tables[0].Rows[i]["imappassword"] != DBNull.Value && ds.Tables[0].Rows[i]["imappassword"] != null)
                 {
-                    user.Password = Convert.ToString(ds.Tables[0].Rows[i]["imappassword"]);
+                    user.Password = SecureEngine.IsEncrypted(Convert.ToString(ds.Tables[0].Rows[i]["imappassword"])) ?
+                        SecureEngine.Decrypt(Convert.ToString(ds.Tables[0].Rows[i]["imappassword"])) : Convert.ToString(ds.Tables[0].Rows[i]["imappassword"]);
                 }
                 else
                 {
@@ -168,7 +169,7 @@ namespace VAdvantage.Process
                     GetMails(user, AD_User_ID, AD_Client_ID, AD_Org_ID);
                 }
 
-                DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true) 
+                DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true)
                     + " WHERE AD_UserMailConfigration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_UserMailConfigration_ID"]));
             }
 
@@ -190,10 +191,11 @@ namespace VAdvantage.Process
                 {
                     uidList = imapMail.Search(Expression.SentSince(lastRun.Value));
                 }
-                else {
+                else
+                {
                     uidList = imapMail.SearchFlag(Flag.All);
                 }
-                
+
                 uidList.Reverse();
 
                 //DocumentService ser = new DocumentService();
@@ -476,7 +478,7 @@ namespace VAdvantage.Process
                                     }
                                     else
                                     {
-                                        SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + message.Subject  + Msg.GetMsg(GetCtx(), "ANDAttachto")  + userOrBp + " = " + Util.GetValueOfString(dt.Rows[j]["Name"]), _tableID, record_ID, Util.GetValueOfString(dt.Rows[j]["Value"]));
+                                        SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + message.Subject + Msg.GetMsg(GetCtx(), "ANDAttachto") + userOrBp + " = " + Util.GetValueOfString(dt.Rows[j]["Name"]), _tableID, record_ID, Util.GetValueOfString(dt.Rows[j]["Value"]));
                                     }
                                 }
                             }
