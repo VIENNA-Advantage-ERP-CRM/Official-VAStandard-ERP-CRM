@@ -1859,7 +1859,8 @@ canvas.vas-t10exp-canvas {
     flex-direction: column;
     width: 100%;
     padding: 0.5rem;
-    min-height: 395px;
+    min-height: calc(100vh - 300px);
+    max-height: calc(100vh - 300px);
 }
 
 .vas-scheduleData-ttl {
@@ -1873,6 +1874,8 @@ canvas.vas-t10exp-canvas {
     box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
     border-radius: 1.15rem;
     padding: 0.85rem;
+    margin: auto;
+    width: 96%;
 }
 
 .vas-scheduleData-sglItem {
@@ -1983,6 +1986,8 @@ canvas.vas-t10exp-canvas {
 }
 .vas-newListItem {
     position: relative;
+    margin: auto;
+    width: 96%;
 }
 
     .vas-newListItem::before {
@@ -2042,5 +2047,9 @@ hr.vas-paymentData-underline {
     top: 0;
     border-bottom-left-radius: 15px;
     border-top-right-radius: 15px;
+}
+.VAS-ScheduleData {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
 }
 /*Schedule Data CSS End*/
