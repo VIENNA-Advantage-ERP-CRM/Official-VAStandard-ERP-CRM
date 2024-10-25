@@ -23,6 +23,10 @@
     /// <param name="value">The new value</param>
     /// <returns>""</returns>
     CalloutBudget.prototype.SetYearAndPeriodNull = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive())
+        {
+            return "";
+        }
         if (value == null || value.toString() == "") {
             return "";
         }
@@ -34,6 +38,7 @@
         {
             mTab.setValue("C_Year_ID", null)
         }
+        this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
         return "";
     };
