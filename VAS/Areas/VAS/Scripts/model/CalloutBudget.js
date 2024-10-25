@@ -13,30 +13,36 @@
         VIS.CalloutEngine.call(this, "VIS.CalloutBudget"); //must call
     }
     VIS.Utility.inheritPrototype(CalloutBudget, VIS.CalloutEngine);//inherit CalloutEngine
-    /// <summary>
-    ///Setting the value of year and period null when Budget Control Basis Field is changed
-    /// </summary>
-    /// <param name="ctx">Context</param>
-    /// <param name="WindowNo">current Window No</param>
-    /// <param name="mTab">Model Tab</param>
-    /// <param name="mField">Model Field</param>
-    /// <param name="value">The new value</param>
-    /// <returns>""</returns>
+    /**
+     * Setting the value of year and period null when Budget Control Basis Field is changed
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
     CalloutBudget.prototype.SetYearAndPeriodNull = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        if (this.isCalloutActive())
-        {
+        if (this.isCalloutActive()) {
             return "";
         }
         if (value == null || value.toString() == "") {
             return "";
         }
-        if (mTab.getValue("BudgetControlBasis") == "A")
-        {
-            mTab.setValue("C_Period_ID", null)
+        try {
+            this.setCalloutActive(true);
+            //If BudgetControlBasis is Annual then set C_Period_ID null
+            if (mTab.getValue("BudgetControlBasis") == "A") {
+                mTab.setValue("C_Period_ID", null)
+            }
+            //If BudgetControlBasis is Period then set C_Year_ID null
+            else if (mTab.getValue("BudgetControlBasis") == "P") {
+                mTab.setValue("C_Year_ID", null)
+            }
         }
-        else if (mTab.getValue("BudgetControlBasis") == "P")
-        {
-            mTab.setValue("C_Year_ID", null)
+        catch (err) {
+            this.setCalloutActive(false);
+            return err;
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;
