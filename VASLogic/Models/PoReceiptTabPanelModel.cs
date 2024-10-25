@@ -1053,15 +1053,14 @@ namespace VASLogic.Models
                              custimg.ImageExtension,
                              cb.Name,
                              o.AD_Client_ID,
-                             SUM( CASE
-                                    WHEN mil.C_OrderLine_ID IS NOT NULL
+                             SUM(CASE
+                                    WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered > l.qtyinvoiced THEN
                                              coalesce(
                                                  l.QtyOrdered, 0
                                              ) - coalesce(
-                                                 l.QtyDelivered, 0)
-                                             
-                                     WHEN ci.C_OrderLine_ID IS NOT NULL
+                                                 l.QtyDelivered, 0)       
+                                     WHEN ci.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.QtyDelivered < l.qtyinvoiced THEN
                                      COALESCE(
                                                  l.QtyOrdered, 0
@@ -1072,7 +1071,7 @@ namespace VASLogic.Models
                                      END)            AS remainingquantity,
                                       SUM(
                                      CASE
-                                     WHEN mil.C_OrderLine_ID IS NOT NULL
+                                     WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered >= l.qtyinvoiced THEN
                                      currencyconvert(
                                          round(
@@ -1084,7 +1083,7 @@ namespace VASLogic.Models
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
                                          ), o.c_currency_id," + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
-                                     WHEN ci.c_orderline_id IS NOT NULL
+                                     WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered < l.qtyinvoiced THEN
                                      currencyconvert(
                                          round(
@@ -1099,9 +1098,8 @@ namespace VASLogic.Models
                                      ELSE
                                      currencyconvert(
                                          round(
-                                             COALESCE(
-                                                 l.qtyordered, 0
-                                             ) * (l.linetotalamt) / nullif(
+                                             (COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * 
+                                             (l.linetotalamt) / nullif(
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
                                          ), o.c_currency_id, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
@@ -1120,14 +1118,14 @@ namespace VASLogic.Models
                              cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID
                              HAVING SUM(
                                         CASE
-                                        WHEN mil.c_orderline_id IS NOT NULL
+                                        WHEN mil.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                              AND l.qtydelivered > l.qtyinvoiced THEN
                                                 coalesce(
                                                     l.qtyordered, 0
                                                 ) - coalesce(
                                                     l.qtydelivered, 0)
                                                 
-                                        WHEN ci.c_orderline_id IS NOT NULL
+                                        WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                              AND l.qtydelivered < l.qtyinvoiced THEN
                                         coalesce(
                                                     l.qtyordered, 0
