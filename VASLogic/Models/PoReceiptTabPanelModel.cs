@@ -1926,9 +1926,11 @@ namespace VASLogic.Models
                            LEFT JOIN 
                                C_BankStatement bs ON (cb.C_BankAccount_ID = bs.C_BankAccount_ID)
                            LEFT JOIN 
-                               C_BankStatementLine bsl ON (bsl.C_BankStatement_ID = bs.C_BankStatement_ID)
+                               C_BankStatementLine bsl ON (bsl.C_BankStatement_ID = bs.C_BankStatement_ID AND 
+                                    (bsl.C_Payment_ID = p.C_Payment_ID OR bsl.C_CashLine_ID = cl.C_CashLine_ID) )
                            WHERE 
                                cs.C_Invoice_ID  = " + InvoiceId;
+            sql += " ORDER BY cs.DueDate ";
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
