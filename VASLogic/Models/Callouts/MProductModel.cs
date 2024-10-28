@@ -946,9 +946,10 @@ namespace VIS.Models
                 Orders = new List<ParentOrder>()
             };
             StringBuilder sb = new StringBuilder();
-            sb.Append(@"" + MRole.GetDefault(ctx).AddAccessSQL(@"SELECT o.C_Order_ID, o.DocumentNo, o.DateOrdered,
+            sb.Append(MRole.GetDefault(ctx).AddAccessSQL(@"SELECT o.C_Order_ID, o.DocumentNo, o.DateOrdered,
                     COUNT(ol.C_OrderLine_ID) AS LineCount,
-                    SUM(NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0)) AS GrandTotal,
+                    NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") + 
+                    @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS GrandTotal,
                     w.Name AS ProductLocation,l.Name AS Deliverylocation,cb.Name AS CustomerName
                     FROM C_Order o
                     INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
@@ -958,7 +959,8 @@ namespace VIS.Models
                     AND o.DocStatus  IN('CO')  " + WhereCondition + @"  
                     AND (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
                     WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0)
-                    GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered,w.Name,l.Name,cb.Name,o.DatePromised
+                    GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered, w.Name, l.Name, cb.Name, o.DatePromised, o.GrandTotal, o.C_Currency_ID, 
+                    o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID
                     ORDER BY o.DatePromised DESC");
 
             DataSet ds = DB.ExecuteDataset(sb.ToString(), null, null, pageSize, pageNo);

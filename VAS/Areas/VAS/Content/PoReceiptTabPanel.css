@@ -1069,7 +1069,8 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-exinvd-expected-invoice {
-    background-color: rgba(var(--v-c-primary), .1);
+    /* background-color: rgba(var(--v-c-primary), .1);*/
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
     padding: 0.5em;
     height: 100%;
 }
@@ -1083,8 +1084,9 @@ span.vas-arwidg-cur-symbol {
 
     .vas-exinvd-expected-heading h6 {
         margin: 0;
-        font-size: 0.875em;
+        font-size: 1em;
         font-weight: 600;
+        font-family:Verdana;
     }
 
 .vas-exinvd-filterby-col {
@@ -1114,17 +1116,20 @@ span.vas-arwidg-cur-symbol {
 
 .vas-exinvd-invoicesListing {
     display: grid;
-    /*grid-template-columns: repeat(1, 1fr);*/
+    grid-template-columns: repeat(1, 1fr);
     gap: 0.3em;
     height: calc(100% - 60px);
     overflow: hidden;
+    grid-template-rows: repeat(4, 1fr);
 }
 
 .vas-exinvd-invoices-box {
     background-color: rgba(var(--v-c-common), 1);
     padding: 0.3em;
 }
-
+/*    .vas-exinvd-invoices-box.vas-exinvd-emptydiv {
+        display: none;
+    }*/
     .vas-exinvd-invoices-box > h6 {
         font-size: 0.875em;
         font-weight: 600;
@@ -1141,6 +1146,7 @@ span.vas-arwidg-cur-symbol {
     display: flex;
     align-items: center;
     gap: 0.8em;
+    font-family:Verdana;
 }
 
     .vas-exinvd-thumb-w-txt img {
@@ -1166,6 +1172,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-invoice-lbl {
     font-size: 0.875em;
     font-weight: 600;
+    font-family:Verdana;
 }
 
 .vas-exinvd-invoiceTotalAmt {
@@ -1174,6 +1181,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-amtdiv {
     display: flex;
     justify-content: space-between;
+    font-family:Verdana;
 }
 
 .vas-exinvd-invoiceTotalAmt span {
@@ -1199,7 +1207,6 @@ span.vas-arwidg-cur-symbol {
 /* .vas-exinvd-slider-arrows span {
         font-size: 1.1em;
     }*/
-
 
 
 @media screen and (max-width: 1920px) {
@@ -1394,6 +1401,7 @@ span.vas-arwidg-cur-symbol {
 .vas-exinvd-pagespan {
     font-size: 14px;
     font-weight: 600;
+    font-family:Verdana;
 }
 
 .vas-exinvd-lablecolor {
@@ -1845,3 +1853,203 @@ canvas.vas-t10exp-canvas {
 .vas-exinvd-emptydiv {
     background-color: rgba(var(--v-c-primary), 0);
 }
+/*Schedule Data CSS*/
+.vas-scheduleDataWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+    min-height: calc(100vh - 300px);
+    max-height: calc(100vh - 300px);
+}
+
+.vas-scheduleData-ttl {
+    color: rgba(var(--v-c-primary),1);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+
+.vas-scheduleDataListItem {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    margin: auto;
+    width: 96%;
+}
+
+.vas-scheduleData-sglItem {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.vas-scheduleData-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.vas-scheduleDatacheckbox-label {
+    font-weight: normal;
+    font-size: 12px;
+    margin-bottom: 0;
+}
+
+.vas-scheduleDataElementTTl, .vas-scheduleDataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-scheduleDataElementValue, .vas-singleRequesitionValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-scheduleDataElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-paymentDataListItem {
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    border: 1px solid;
+    background: linear-gradient(145deg, rgb(245 245 245) 0%, rgba(255, 236, 236, 1) 100%);
+}
+
+.vas-paymentData-sglItem {
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.vas-paymentData-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.vas-paymentDatacheckbox-label {
+    font-weight: normal;
+    font-size: 12px;
+    margin-bottom: 0;
+}
+
+.vas-paymentDataElementTTl, .vas-paymentDataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-paymentDataElementValue, .vas-singleRequesitionValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-paymentDataElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-scheduleData-Active {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+}
+.vas-paymentDataListItem{
+    pointer-events:none;
+}
+.VAS-PaymentData{
+    margin-top:19px
+}
+.vas-newListItem {
+    position: relative;
+    margin: auto;
+    width: 96%;
+}
+
+    .vas-newListItem::before {
+        content: "";
+        background-image: url("Images/arrow.png");
+        position: absolute;
+        left: 0;
+        right: 0;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 20px;
+        width: 30px;
+        height: 30px;
+        top: -25px;
+        margin: auto;
+    }
+
+.vas-paymentheading {
+    width: 100%;
+    padding-bottom: 8px;
+    font-weight:600;
+}
+hr.vas-paymentData-underline {
+    border: 1px solid black;
+    margin-top: 1px;
+}
+
+.vas-scheduleDataListItem-block{
+    position: relative;
+}
+.vas-scheduleDataListClosed {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+.vas-scheduleDataListPaid {
+    background: green;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+.vas-scheduleDataListNotPaid {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+.VAS-ScheduleData {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+}
+/*Schedule Data CSS End*/

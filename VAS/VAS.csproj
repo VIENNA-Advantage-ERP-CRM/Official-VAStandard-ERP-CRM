@@ -237,6 +237,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\Images\arrow.png" />
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
@@ -271,6 +272,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsights.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsightsGridView.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ScheduleDetail.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />
@@ -301,6 +303,7 @@
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
+    <Content Include="Areas\VAS\Scripts\model\CalloutBudget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutCashJournal.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutcheckinout.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutcontract.js" />
