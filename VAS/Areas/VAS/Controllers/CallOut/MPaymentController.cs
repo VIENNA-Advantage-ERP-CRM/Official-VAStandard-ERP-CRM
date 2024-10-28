@@ -123,5 +123,20 @@ namespace VIS.Controllers
             MPaymentModel objPInvModel = new MPaymentModel();
             return Json(JsonConvert.SerializeObject(objPInvModel.GetProvisionalInvoiceData(Util.GetValueOfInt(fields))), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// This function is used to set the Business Partner Detail on Payment Screen
+        /// </summary>
+        /// <param name="fields">Business Partner ID, Document Type ID</param>
+        /// <returns>BP Details</returns>
+        /// <author> VIS_045 -> 28/Oct/2024</author>
+        public JsonResult GetBPartnerDetail(string fields)
+        {
+            string retJSON = "";
+            Ctx ctx = Session["ctx"] as Ctx;
+            MPaymentModel objBPModel = new MPaymentModel();
+            retJSON = JsonConvert.SerializeObject(objBPModel.GetBPartnerDetail(ctx, fields));
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
