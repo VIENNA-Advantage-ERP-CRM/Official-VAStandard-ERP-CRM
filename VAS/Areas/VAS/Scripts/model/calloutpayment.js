@@ -9,6 +9,70 @@
     };
     VIS.Utility.inheritPrototype(CalloutPayment, VIS.CalloutEngine);//inherit CalloutEngine
 
+
+    /**
+     * This function is used to set the Business Partner Detail on Payment Screen
+     * VIS_045 -> 28/Oct/2024
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutPayment.prototype.BPartner = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+
+        this.setCalloutActive(true);
+        try {
+            // Get Document ID
+            var C_DocType_ID = Util.getValueOfString(mTab.getValue("C_DocType_ID"));
+
+            // Business Partner ID, Document Type ID
+            var paramString = value.toString() + "," + C_DocType_ID;
+
+            // Get BP Details
+            dr = VIS.dataContext.getJSONRecord("MPayment/GetBPartnerDetail", paramString);
+            if (dr != null) {
+
+                // BP Location
+                mTab.setValue("C_BPartner_Location_ID", Util.getValueOfInt(dr["C_BPartner_Location_ID"]));
+
+                if (dr["IsVA009ModuleInstall"]) {
+                    /* Payment Method / Tender Type*/
+                    if (Util.getValueOfString(dr["IsSOTrx"]).equals("Y")) {
+                        mTab.setValue("VA009_PaymentMethod_ID", Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]));
+                        mTab.setValue("TenderType", Util.getValueOfString(dr["VA009_PaymentBaseType"]));
+                    }
+                    else if (Util.getValueOfString(dr["IsSOTrx"]).equals("N")) {
+                        mTab.setValue("VA009_PaymentMethod_ID", Util.getValueOfInt(dr["VA009_PO_PaymentMethod_ID"]));
+                        mTab.setValue("TenderType", Util.getValueOfString(dr["PO_PaymentBaseType"]));
+                    }
+                    else {
+                        if (Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]) > 0) {
+                            mTab.setValue("VA009_PaymentMethod_ID", Util.getValueOfInt(dr["VA009_PaymentMethod_ID"]));
+                            mTab.setValue("TenderType", Util.getValueOfString(dr["VA009_PaymentBaseType"]));
+                        }
+                        else if (Util.getValueOfInt(dr["VA009_PO_PaymentMethod_ID"]) > 0) {
+                            mTab.setValue("VA009_PaymentMethod_ID", Util.getValueOfInt(dr["VA009_PO_PaymentMethod_ID"]));
+                            mTab.setValue("TenderType", Util.getValueOfString(dr["PO_PaymentBaseType"]));
+                        }
+                    }
+                }
+            }
+        }
+        catch (err) {
+            this.setCalloutActive(false);
+            this.log.log(Level.SEVERE, "CalloutPayment.BPartner -" + value, err.message);
+            return err.toString();
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    }
+
     /// <summary>
     /// Payment_Invoice.
     /// when Invoice selected
@@ -237,8 +301,8 @@
                  as we need to set payment amount after subtracting it from pay amount*/
                 //if (_chk == 0)//Pratap
                 //{
-                    mTab.setValue("PayAmt", (invoiceOpen - discountAmt));
-                    mTab.setValue("PaymentAmount", (invoiceOpen - discountAmt));
+                mTab.setValue("PayAmt", (invoiceOpen - discountAmt));
+                mTab.setValue("PaymentAmount", (invoiceOpen - discountAmt));
                 //}
                 mTab.setValue("C_InvoicePaySchedule_ID", C_InvoicePaySchedule_ID);//Pratap
                 mTab.setValue("DiscountAmt", discountAmt);
@@ -722,7 +786,7 @@
                     //discountAmt = enteredDiscountAmt;
                     enteredDiscountAmt = Util.getValueOfDecimal((enteredDiscountAmt * currencyRate).toFixed(currency["StdPrecision"]));
                 }
-                    discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(currency["StdPrecision"]));
+                discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(currency["StdPrecision"]));
                 //currency.GetStdPrecision());//, MidpointRounding.AwayFromZero);
                 this.log.fine("Rate=" + currencyRate + ", InvoiceOpenAmt=" + invoiceOpenAmt + ", DiscountAmt=" + discountAmt);
             }
@@ -1146,7 +1210,7 @@
                     }
                 }
                 mTab.setValue("InvoiceAmt", invoiceOpen);
-               // if (_chk == 0) {
+                // if (_chk == 0) {
                 mTab.setValue("Amount", (invoiceOpen - discountAmt));
                 //}
                 mTab.setValue("DiscountAmt", discountAmt);
