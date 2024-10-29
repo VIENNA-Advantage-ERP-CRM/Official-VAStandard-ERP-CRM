@@ -51,7 +51,7 @@
         VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
         var $root = $('<div class = "vas-scheduleData-root"></div>');
         var wrapperDiv = $("<div class ='vas-scheduleDataWrapper'></div>");
-        var divPaging = $('<div class="VAS-scheduledata-Paging mr-3" style="display:flex;align-items: center;justify-content:end;margin-top:10px">');
+        var divPaging = $('<div class="VAS-scheduledata-Paging mr-3">');
 
         this.init = function () {
             ScheduleDataPanel();
