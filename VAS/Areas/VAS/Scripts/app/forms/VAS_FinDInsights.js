@@ -44,7 +44,7 @@
                         divContainer.find('p').append(' <div class="vas-fdi-req-generated">' +
                             '<div class="vas-fdi-req-count"></div>' +
                             '<a href="#" class="vas-fdi-reqGen-Txt vas-custom-link" data-name="' + InsightData[i].Name + '" data-dataobject="' + InsightData[i].DataObject + '" data-tableview="' + InsightData[i].TabelView + '" data-ad_org_id="' + InsightData[i].AD_Org_ID +'">' +
-                            '<span style="font-size: 1.8em;">' + InsightData[i].Result + '</span>' + '    ' + '<span style="font-size: 1.2em;">' + InsightData[i].DisplayName + '</span>' +
+                            '<span style="font-size: 1.8em;">' + InsightData[i].Result + '</span>' + '    ' + '<span style="font-size: 1.2em;">' +  ExtractText(InsightData[i].DisplayName) + '</span>' +
                             '</a>' +
                             '</div>' +
                             '</div>');
@@ -63,6 +63,31 @@
                     insightDataView.Initialize();
                 });
             });
+        };
+
+        /**
+         * This function is used to extract the Data between @@ values and convert it according to culture 
+         * @param {any} DisplayName
+         */
+        function ExtractText(DisplayName) {
+            /* Extracted Variable */
+            var extractedText = "";
+
+            /* get Extracted Data */
+            var matches = DisplayName.match(/@(.+?)@/);
+            if (matches && matches[1]) {
+                /* Match[1] contain text between @@ */
+                extractedText = matches[1];
+
+                /* Convert Original Text with Culture */
+                var newText = DisplayName.replace("@" + extractedText + "@", VIS.Msg.getMsg(extractedText));
+
+                /* return Text */
+                return newText
+            }
+
+            /* When Display Name dont contain text which contain @@ then return Original text */
+            return DisplayName;
         };
 
         function createBusyIndicator() {

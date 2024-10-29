@@ -139,8 +139,8 @@
         function createColumnData(data) {
             columnsData = data.map(name => ({
                 field: name,
-                caption: name,
-                columnName: name,
+                caption: VIS.Msg.getMsg(name),
+                columnName: VIS.Msg.getMsg(name),
                 size: '10%',
                 sortable: true,
                 resizable: true
