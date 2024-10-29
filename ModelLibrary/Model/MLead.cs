@@ -493,6 +493,7 @@ namespace VAdvantage.Model
             catch (Exception ex)
             {
                 log.Log(Level.SEVERE, "MLead" + ex.Message, ex);
+                return "@SaveError@";
                 //if (dr != null)
                 //{
                 //    dr.Close();

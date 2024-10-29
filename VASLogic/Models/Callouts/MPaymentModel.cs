@@ -62,14 +62,14 @@ namespace VIS.Models
         {
             string[] paramValue = fields.Split(',');
             int C_Invoice_ID = Util.GetValueOfInt(paramValue[0]);
-            int C_PaySchedule_ID = Util.GetValueOfInt(paramValue[1]); 
+            int C_PaySchedule_ID = Util.GetValueOfInt(paramValue[1]);
             DateTime? trxDate = DateTime.Parse(paramValue[2]);
             Dictionary<String, Object> retDic = null;
             string sql = "";
             if (Env.IsModuleInstalled("VA009_"))
             {
                 sql = "SELECT i.C_BPartner_ID, i.C_Currency_ID, i.C_ConversionType_ID, i.C_Bpartner_Location_Id,"
-                    //+ " invoiceOpen(C_Invoice_ID, @param1) as invoiceOpen,"
+                     //+ " invoiceOpen(C_Invoice_ID, @param1) as invoiceOpen,"
                      + " NVL(p.DueAmt , 0) - NVL(p.VA009_PaidAmntInvce , 0) as invoiceOpen,"
                      + " invoiceDiscount(" + C_Invoice_ID + ",@param1," + C_PaySchedule_ID + ") as invoiceDiscount,"
                      + " i.IsSOTrx, i.IsInDispute, i.IsReturnTrx"
@@ -123,7 +123,7 @@ namespace VIS.Models
             StringBuilder sql = new StringBuilder();
             try
             {
-                string[] paramValue = fields.Split(',');                
+                string[] paramValue = fields.Split(',');
                 bool countVA027 = Env.IsModuleInstalled("VA027_");
                 int bp_BusinessPartner = Util.GetValueOfInt(paramValue[1]);
                 DateTime? asOnDate = Util.GetValueOfDateTime(paramValue[2]);
@@ -137,13 +137,13 @@ namespace VIS.Models
                    "LEFT JOIN C_InvoicePaySchedule IPS ON IPS.c_invoice_ID = i.c_invoice_ID " +
                    " WHERE i.docstatus IN ('CO','CL') AND i.IsActive ='Y' AND i.ispaid ='N' " +
                    " AND ips.duedate IS NOT NULL AND NVL(ips.dueamt,0)!=0 AND i.c_bpartner_id = " + bp_BusinessPartner + " AND i.AD_Client_ID=" + Client_ID +
-                    //" AND TRUNC(ips.duedate) <= (CASE WHEN  TRUNC(@param1) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param2) END ) " +
+                   //" AND TRUNC(ips.duedate) <= (CASE WHEN  TRUNC(@param1) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param2) END ) " +
                    " AND TRUNC(ips.duedate) <= TRUNC(@param1) ) " +
                    " UNION SELECT c.iso_code, paymentAvailable(p.C_Payment_ID)*p.MultiplierAP*-1 AS OpenAmt " +
                    " FROM C_Payment_v p LEFT JOIN C_Currency C ON C.C_Currency_ID=p.C_Currency_ID " +
                    " LEFT JOIN c_payment pay ON (p.c_payment_id   =pay.c_payment_ID) WHERE p.IsAllocated  ='N' " +
                    " AND p.C_BPARTNER_ID = " + bp_BusinessPartner + " AND p.DocStatus     IN ('CO','CL') " + " AND p.AD_Client_ID=" + Client_ID +
-                    //" AND TRUNC(pay.DateTrx) <= ( CASE WHEN TRUNC(@param3) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param4) END) " +
+                   //" AND TRUNC(pay.DateTrx) <= ( CASE WHEN TRUNC(@param3) > TRUNC(sysdate) THEN TRUNC(sysdate) ELSE TRUNC(@param4) END) " +
                    " AND TRUNC(pay.DateTrx) <= TRUNC(@param2) " +
                    ") GROUP BY iso_code ) ) WHERE RN = CNT START WITH RN = 1 CONNECT BY RN = PRIOR RN + 1 ");
                 SqlParameter[] param = new SqlParameter[2];
@@ -232,7 +232,7 @@ namespace VIS.Models
                 {
                     retDic["IsPrePayOrder"] = true;
                 }
-                else 
+                else
                 {
                     retDic["IsPrePayOrder"] = false;
                 }
@@ -277,7 +277,7 @@ namespace VIS.Models
             string sql = "SELECT C_BPartner_ID,C_BPartner_Location_ID,GrandTotal, C_Currency_ID, C_ConversionType_ID ";
             if (Env.IsModuleInstalled("VA009_"))
             {
-              //  sql += ", VA009_PaymentMethod_ID";
+                //  sql += ", VA009_PaymentMethod_ID";
             }
             sql += " FROM C_ProvisionalInvoice  WHERE C_ProvisionalInvoice_ID=" + C_ProvisionalInvoice_ID;
             DataSet ds = DB.ExecuteDataset(sql, null, null);
@@ -291,10 +291,94 @@ namespace VIS.Models
                 retDic["C_ConversionType_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
                 if (Env.IsModuleInstalled("VA009_"))
                 {
-                   // retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
+                    // retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
                 }
             }
             return retDic;
         }
+
+        /// <summary>
+        /// This function is used to set the Business Partner Detail on Payment Screen
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="fields">Business Partner ID, Document Type ID</param>
+        /// <returns>BP Details</returns>
+        /// <author> VIS_045 -> 28/Oct/2024</author>
+        public Dictionary<string, object> GetBPartnerDetail(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int C_BPartner_ID = Util.GetValueOfInt(paramValue[0]);
+            int C_DocType_ID = Util.GetValueOfInt(paramValue[1]);
+            Dictionary<string, object> retDic = null;
+
+            string sql = "SELECT ";
+            if (Env.IsModuleInstalled("VA009_"))
+            {
+                sql += " p.VA009_PaymentMethod_ID, p.VA009_PO_PaymentMethod_ID,";
+                sql += @" CASE WHEN pm.VA009_PaymentBaseType = 'K' THEN 'C'
+                               WHEN pm.VA009_PaymentBaseType = 'S' THEN 'K'
+                               WHEN pm.VA009_PaymentBaseType = 'D' THEN 'D'
+                               WHEN pm.VA009_PaymentBaseType = 'T' THEN 'A'
+                               ELSE 'A' END AS VA009_PaymentBaseType, 
+                         CASE WHEN pm1.VA009_PaymentBaseType = 'K' THEN 'C'
+                               WHEN pm1.VA009_PaymentBaseType = 'S' THEN 'K'
+                               WHEN pm1.VA009_PaymentBaseType = 'D' THEN 'D'
+                               WHEN pm1.VA009_PaymentBaseType = 'T' THEN 'A'
+                               ELSE 'A' END AS PO_PaymentBaseType,";
+            }
+            if (C_DocType_ID > 0)
+            {
+                sql += " doc.IsSOTrx,";
+            }
+            sql += $@" lship.C_BPartner_Location_ID, 
+                       c.AD_User_ID,
+                       lbill.C_BPartner_Location_ID AS Bill_Location_ID
+                       FROM C_BPartner p
+                       LEFT OUTER JOIN C_BPartner_Location lbill ON (p.C_BPartner_ID=lbill.C_BPartner_ID AND lbill.IsBillTo='Y' AND lbill.IsActive='Y')
+                       LEFT OUTER JOIN C_BPartner_Location lship ON (p.C_BPartner_ID=lship.C_BPartner_ID AND lship.IsShipTo='Y' AND lship.IsActive='Y')
+                       LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) ";
+            sql += $@" LEFT JOIN VA009_PaymentMethod pm ON (pm.VA009_PaymentMethod_ID = p.VA009_PaymentMethod_ID)
+                       LEFT JOIN VA009_PaymentMethod pm1 ON (pm1.VA009_PaymentMethod_ID = p.VA009_PO_PaymentMethod_ID)";
+            if (C_DocType_ID > 0)
+            {
+                sql += $@" LEFT JOIN C_DocType doc ON (doc.C_DocType_ID = {C_DocType_ID})";
+            }
+            sql += $@" WHERE p.C_BPartner_ID={ C_BPartner_ID } AND p.IsActive='Y'";
+            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                retDic = new Dictionary<string, object>();
+
+                if (Env.IsModuleInstalled("VA009_"))
+                {
+                    retDic["VA009_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]);
+                    retDic["VA009_PaymentBaseType"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA009_PaymentBaseType"]);
+                    retDic["PO_PaymentBaseType"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["PO_PaymentBaseType"]);
+                    retDic["VA009_PO_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PO_PaymentMethod_ID"]);
+                    retDic["IsVA009ModuleInstall"] = true;
+                }
+                else
+                {
+                    retDic["IsVA009ModuleInstall"] = false;
+                }
+
+                if (C_DocType_ID > 0)
+                {
+                    retDic["IsSOTrx"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsSOTrx"]);
+                }
+                else
+                {
+                    retDic["IsSOTrx"] = "";
+                }
+
+                retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
+                retDic["AD_User_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]);
+                retDic["Bill_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Bill_Location_ID"]);
+
+            }
+            return retDic;
+        }
+
+
     }
 }
