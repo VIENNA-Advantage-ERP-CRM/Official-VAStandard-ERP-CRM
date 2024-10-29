@@ -5679,6 +5679,9 @@ namespace VAdvantage.Model
             reversal.SetDiscountAmt(Decimal.Negate(GetDiscountAmt()));
             reversal.SetWriteOffAmt(Decimal.Negate(GetWriteOffAmt()));
             reversal.SetOverUnderAmt(Decimal.Negate(GetOverUnderAmt()));
+            //VIS_427 On reversal Set the value of check date and check number to reversal document
+            reversal.SetCheckNo(GetCheckNo());
+            reversal.SetCheckDate(GetCheckDate());
             //Remove PDC reference
             if (Env.IsModuleInstalled("VA027_"))
             {
