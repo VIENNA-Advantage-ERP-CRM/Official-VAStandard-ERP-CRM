@@ -1859,8 +1859,9 @@ canvas.vas-t10exp-canvas {
     flex-direction: column;
     width: 100%;
     padding: 0.5rem;
-    min-height: calc(100vh - 300px);
-    max-height: calc(100vh - 300px);
+    /*min-height: calc(100vh - 300px);
+    max-height: calc(100vh - 300px);*/
+    height: calc(100% - 48px);
 }
 
 .vas-scheduleData-ttl {
@@ -2048,8 +2049,30 @@ hr.vas-paymentData-underline {
     border-bottom-left-radius: 15px;
     border-top-right-radius: 15px;
 }
-.VAS-ScheduleData {
-    max-height: calc(100vh - 320px);
-    overflow-y: auto;
+/*.VAS-ScheduleData {*/
+    /*max-height: calc(100vh - 320px);*/
+    /*overflow-y: auto;*/
+/*}*/
+
+.vas-scheduleData-root{
+    height:100%
+}
+
+.VAS-scheduledata-Paging {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    margin-top: 10px;
+    position: sticky;
+    bottom: 0px;
+    background: #fff;
+}
+
+.vas-scheduleDataListGroup{
+    overflow:auto;
+}
+
+.vas-scheduledatalist{
+    margin-top:1px;
 }
 /*Schedule Data CSS End*/
