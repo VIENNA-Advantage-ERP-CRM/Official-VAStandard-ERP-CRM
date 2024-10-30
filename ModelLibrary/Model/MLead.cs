@@ -433,12 +433,12 @@ namespace VAdvantage.Model
             if (error != null && error.Length > 0)
                 return error;
             CreateBPLocation();
-            
+
             try
             {
                 int id = _bp.GetC_BPartner_ID();
                 string qry = "UPDATE C_BPartner SET Description='', Value='" + _bp.GetValue() + GetBPName() + "' WHERE C_BPartner_ID=" + id;
-                int check = DB.ExecuteQuery(qry, null, Get_TrxName());                
+                int check = DB.ExecuteQuery(qry, null, Get_TrxName());
 
                 if (GetR_InterestArea_ID() != 0)
                 {
@@ -467,19 +467,19 @@ namespace VAdvantage.Model
                             locID = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["C_BPartner_Location_ID"]);
                             phone = Util.GetValueOfString(ds1.Tables[0].Rows[0]["Phone"]);
                             fax = Util.GetValueOfString(ds1.Tables[0].Rows[0]["Fax"]);
-                        }                        
-                        
+                        }
+
                         foreach (DataRow dr in ds.Tables[0].Rows)
                         {
                             X_R_ContactInterest Prospect = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
                             Prospect.SetR_InterestArea_ID(Util.GetValueOfInt(dr[0]));
-                            Prospect.SetC_BPartner_ID(GetRef_BPartner_ID());                            
+                            Prospect.SetC_BPartner_ID(GetRef_BPartner_ID());
                             Prospect.SetC_BPartner_Location_ID(locID);
                             Prospect.SetPhone(phone);
                             Prospect.SetFax(fax);
-                            Prospect.SetAD_User_ID(UserId);                            
+                            Prospect.SetAD_User_ID(UserId);
                             Prospect.SetC_Job_ID(jobID);
-                            Prospect.SetSubscribeDate(DateTime.Today);                            
+                            Prospect.SetSubscribeDate(DateTime.Today);
                             Prospect.SetEMail(mail);
                             if (Prospect.Save())
                             {
@@ -737,6 +737,12 @@ namespace VAdvantage.Model
                     SetR_Status_ID(0);
                 else if (_Status != null)
                     SetProcessed(_Status.IsClosed());
+            }
+
+            // Set Lead to Processed if Status is Converted or Lost
+            if (Is_ValueChanged("Status") && (GetStatus().Equals("20") || GetStatus().Equals("23")))
+            {
+                SetProcessed(true);
             }
 
             // Added work from SOTC module.
