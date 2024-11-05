@@ -740,7 +740,7 @@ namespace VAdvantage.Model
             }
 
             // Set Lead to Processed if Status is Converted or Lost
-            if (Is_ValueChanged("Status") && (GetStatus().Equals("20") || GetStatus().Equals("23")))
+            if (Is_ValueChanged("Status") && (base.GetStatus().Equals("20") || base.GetStatus().Equals("23")))
             {
                 SetProcessed(true);
             }
