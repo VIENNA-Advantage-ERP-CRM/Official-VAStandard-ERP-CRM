@@ -306,6 +306,15 @@
                     if (C_Currency_ID > 0 && C_Currency_Invoice_ID > 0 && C_Currency_ID != C_Currency_Invoice_ID) {
                         var paramStr = C_Currency_Invoice_ID + "," + C_Currency_ID + "," + ConvDate + "," + C_ConversionType_ID + "," + AD_Client_ID + "," + AD_Org_ID;
                         currencyRate = VIS.dataContext.getJSONRecord("MConversionRate/GetRate", paramStr);
+                        /*If currency rate not found then show message and set amount's field zero*/
+                        if (currencyRate == null || currencyRate == 0) {
+                            mTab.setValue("Amount", 0);
+                            mTab.setValue("DiscountAmt", 0);
+                            mTab.setValue("WriteOffAmt", 0);
+                            mTab.setValue("OverUnderAmt", 0);
+                            this.setCalloutActive(false);
+                            return "NoCurrencyConversion";
+                        }
                         amount = Util.getValueOfDecimal((amount * currencyRate).toFixed(precision));
                         discountAmt = Util.getValueOfDecimal((discountAmt * currencyRate).toFixed(precision));
                         Discount2 = Util.getValueOfDecimal((Discount2 * currencyRate).toFixed(precision));
