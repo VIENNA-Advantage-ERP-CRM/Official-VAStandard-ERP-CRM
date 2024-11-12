@@ -127,6 +127,8 @@ namespace ViennaAdvantage.Process
                 }
             }
 
+            // VIS0060: Set Lead status to Converted.
+            lead.SetStatus(X_C_Lead.STATUS_Converted);
             lead.Save();
 
             // Work done specific to SOTC Module
