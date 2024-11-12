@@ -1987,6 +1987,7 @@ namespace VASLogic.Models
             StringBuilder sql = new StringBuilder();
             int CurrentYear = 0;
             int calendar_ID = 0;
+            int PeriodID = 0;
             List<ExpectedPayment> invGrandTotalData = new List<ExpectedPayment>();
             string OrderCheck = (ISOtrx == true ? " AND co.IsSOTrx='Y' " : " AND co.IsSOTrx='N' ");
             string InvoiceCheck = (ISOtrx == true ? " AND ci.IsSOTrx='Y' " : " AND ci.IsSOTrx='N' ");
@@ -2015,14 +2016,22 @@ namespace VASLogic.Models
             {
                 //Getting the details of current financialYear
                 DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
-                CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
-                calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+                {
+                    CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                    calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                    PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+                }
 
                 // This month
                 if (FinancialPeriodValue == "01")
                 {
+                    DataSet dsPeriod = null;
                     //this dataset returns start and end date of period
-                    DataSet dsPeriod = GetPeriodData(calendar_ID, CurrentYear, ctx, Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]));
+                    if (PeriodID > 0)
+                    {
+                        dsPeriod = GetPeriodData(ctx, PeriodID);
+                    }
                     if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                     {
                         string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
@@ -2036,9 +2045,13 @@ namespace VASLogic.Models
                 // Next month
                 else if (FinancialPeriodValue == "02")
                 {
+                    DataSet dsPeriod = null;
                     //this function returns the period id of next period
                     int C_Period_ID = GetNextPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
-                    DataSet dsPeriod = GetPeriodData(calendar_ID, CurrentYear, ctx, C_Period_ID);
+                    if (C_Period_ID > 0)
+                    {
+                        dsPeriod = GetPeriodData(ctx, C_Period_ID);
+                    }
                     if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                     {
                         string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
@@ -2055,12 +2068,14 @@ namespace VASLogic.Models
                     sqlmain.Append(" AND Current_Date > cs.DueDate");
                 }
             }
+            //if user enter from date but not to date and from date less then Current date then this condition will execute
             if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
             {
                 sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
                 sqlmain.Append(@"AND Current_Date");
             }
+            //if user enter from date and to date then this condition will execute
             else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
             {
                 sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
@@ -2068,12 +2083,14 @@ namespace VASLogic.Models
                 sqlmain.Append(@"AND " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
             }
+            //if user enter does not enter from date but enters todate then this condition will execute
             else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
             {
                 sql.Append(@" AND TRUNC(cs.DueDate) <= " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
             }
-            else if(Util.GetValueOfDateTime(fromDate) > DateTime.Now)
+            //if from date greater then today's date
+            else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
             {
                 toDate = fromDate;
                 sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
@@ -2101,13 +2118,22 @@ namespace VASLogic.Models
             if (!String.IsNullOrEmpty(FinancialPeriodValue))
             {
                 DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
-                CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
-                calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+                {
+                    CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                    calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                    PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+                }
 
                 // This month
                 if (FinancialPeriodValue == "01")
                 {
-                    DataSet dsPeriod = GetPeriodData(calendar_ID, CurrentYear, ctx, Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]));
+                    DataSet dsPeriod = null;
+                    //this dataset returns start and end date of period
+                    if (PeriodID > 0)
+                    {
+                        dsPeriod = GetPeriodData(ctx, PeriodID);
+                    }
                     if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                     {
                         string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
@@ -2122,7 +2148,11 @@ namespace VASLogic.Models
                 else if (FinancialPeriodValue == "02")
                 {
                     int C_Period_ID = GetNextPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
-                    DataSet dsPeriod = GetPeriodData(calendar_ID, CurrentYear, ctx, C_Period_ID != 0 ? C_Period_ID : 0);
+                    DataSet dsPeriod = null;
+                    if (C_Period_ID > 0)
+                    {
+                         dsPeriod = GetPeriodData(ctx, C_Period_ID);
+                    }
                     if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                     {
                         string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
@@ -2139,12 +2169,14 @@ namespace VASLogic.Models
                     sqlmain.Append(" AND Current_Date > ps.DueDate");
                 }
             }
+            //if user enter from date but not to date and from date less then Current date then this condition will execute
             if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
             {
                 sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
                 sqlmain.Append(@"AND Current_Date");
             }
+            //if user enter from date and to date then this condition will execute
             else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
             {
                 sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
@@ -2152,11 +2184,13 @@ namespace VASLogic.Models
                 sqlmain.Append(@"AND " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
             }
+            //if user enter does not enter from date but enters todate then this condition will execute
             else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
             {
                 sqlmain.Append(@" AND TRUNC(ps.DueDate) <= " +
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
             }
+            //if from date greater then today's date
             else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
             {
                 toDate = fromDate;
@@ -2204,20 +2238,15 @@ namespace VASLogic.Models
         /// This function is used to get Periods Data based Period ID
         /// </summary>
         /// <param name="Period_ID">Period_IDr</param>
-        /// <param name="CurrentYear">CurrentYear</param>
-        /// <param name="calendar_ID">Calendar ID</param>
         /// <param name="ctx">Context</param>
         /// <returns>DataSet</returns>
         /// <author>VIS_427</author>
-        public DataSet GetPeriodData(int calendar_ID, int CurrentYear, Ctx ctx,int Period_ID)
+        public DataSet GetPeriodData(Ctx ctx,int Period_ID)
         {
-            string sql = $@"SELECT Min(StartDate) AS StartDate,MAX(EndDate) AS EndDate FROM C_Period WHERE AD_Client_ID = {ctx.GetAD_Client_ID()}";
-            if (Period_ID > 0)
-            {
-                sql += " AND C_Period_ID="+Period_ID;
-            }
-            DataSet dsPeriod = DB.ExecuteDataset(sql, null, null);
-            return dsPeriod;
+                string sql = $@"SELECT Min(StartDate) AS StartDate,MAX(EndDate) AS EndDate FROM C_Period WHERE AD_Client_ID = {ctx.GetAD_Client_ID()} AND C_Period_ID=" + Period_ID;
+
+                DataSet dsPeriod = DB.ExecuteDataset(sql, null, null);
+                return dsPeriod;
         }
         /// <summary>
         /// This function is used to get Next Periods Period ID based on financial Year

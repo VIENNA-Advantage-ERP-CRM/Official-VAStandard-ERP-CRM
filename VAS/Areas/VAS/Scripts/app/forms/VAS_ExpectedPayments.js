@@ -91,7 +91,7 @@
                     $FinancialPeriodListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_FinancialPeriodPaymentList", ColumnIds.AD_Reference_ID, false);
                     // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
                     $self.vFinancialPeriodList = new VIS.Controls.VComboBox("VAS_FinancialPeriodPaymentList", true, false, true, $FinancialPeriodListLookUp, 20);
-                    $self.vFinancialPeriodList.setValue("01");
+                   // $self.vFinancialPeriodList.setValue("01");
                     var $FinancialPeriodListControlWrap = $('<div class="vis-control-wrap">');
                     $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
                     $FinancialPeriodListControlWrap.append($self.vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VIS.Msg.getMsg("VAS_FinancialPeriodDiv") + '</label>');;
@@ -131,40 +131,44 @@
                     vSearchBPartner.fireValueChanged = function () {
                         C_BPartner_ID = vSearchBPartner.value;
                     };
+                    $ApplyButton.on("click", function () {
+                        if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
+                            VIS.ADialog.info("VAS_SelectAnyOneFilter");
+                            return '';
+                        }
+                        if ($FromDate.getValue() > $ToDate.getValue()) {
+                            VIS.ADialog.info('VAS_PlzEnterCorrectDate');
+                            $ToDate.setValue(null);
+                            return;
+                        }
+                        IsFilterBtnClicked = false;
+                        pageNo = 1;
+                        pageNoarray = 1;
+                        CurrentPage = 1;
+                        pageSize = 500;
+                        arrayPageSize = 4;
+                        RecCount = 0;
+                        countRecord = 4;
+                        FinancialPeriodValue = $self.vFinancialPeriodList.getValue()
+                        fromDate = $FromDate.getValue();
+                        toDate = $ToDate.getValue();
+                        $FilterHeader.remove();
+                        $maindiv.find('#vas_listContainer_' + widgetID).remove();
+                        $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
+                        $maindiv.find('#vas_norecordcont_' + widgetID).remove();
+                        $self.intialLoad();
+                    });
+                    CloseBtn.on('click', function () {
+                        $self.vFinancialPeriodList.setValue(null);
+                        vSearchBPartner.setValue(null);
+                        $FromDate.setValue(null);
+                        $ToDate.setValue(null);
+                    });
                 }
                 else {
                     $FilterHeader.remove();
                     IsFilterBtnClicked = false;
                 }
-                $ApplyButton.on("click", function () {
-                    IsFilterBtnClicked = false;
-                    if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
-                        VIS.ADialog.info("VAS_SelectAnyOneFilter");
-                        $FilterHeader.remove();
-                        return '';
-                    }
-                    pageNo = 1;
-                    pageNoarray = 1;
-                    CurrentPage = 1;
-                    pageSize = 500;
-                    arrayPageSize = 4;
-                    RecCount = 0;
-                    countRecord = 4;
-                    FinancialPeriodValue = $self.vFinancialPeriodList.getValue()
-                    fromDate = $FromDate.getValue();
-                    toDate = $ToDate.getValue();
-                    $FilterHeader.remove();
-                    $maindiv.find('#vas_listContainer_' + widgetID).remove();
-                    $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
-                    $maindiv.find('#vas_norecordcont_' + widgetID).remove();
-                    $self.intialLoad();
-                });
-                CloseBtn.on('click', function () {
-                    $self.vFinancialPeriodList.setValue(null);
-                    vSearchBPartner.setValue(null);
-                    $FromDate.setValue(null);
-                    $ToDate.setValue(null);
-                });
             })
         };
 
