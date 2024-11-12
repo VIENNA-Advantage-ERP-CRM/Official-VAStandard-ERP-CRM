@@ -337,5 +337,33 @@ namespace VAS.Areas.VAS.Controllers
             List<VAS_ScheduleDetail> result = objScheduleData.GetScheduleData(ctx, InvoiceId, pageNo, pageSize);
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is Used to show Expected Payments against orders and Invoice
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <param name="C_BPartner_ID">C_BPartner_ID</param>
+        /// <param name="FinancialPeriodValue">FinancialPeriodValue</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of data of Expected Payment against order and Invoice</returns>
+        public JsonResult GetExpectedPaymentData(bool ISOtrx, int pageNo, int pageSize, string FinancialPeriodValue,
+               string C_BPartner_ID, string fromDate, string toDate)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
+                List<ExpectedPayment> result = obj.GetExpectedPaymentData(ctx, ISOtrx, pageNo, pageSize, FinancialPeriodValue,
+                C_BPartner_ID, fromDate, toDate);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
