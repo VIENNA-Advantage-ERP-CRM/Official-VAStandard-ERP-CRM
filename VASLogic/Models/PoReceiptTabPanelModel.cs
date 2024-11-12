@@ -609,7 +609,6 @@ namespace VASLogic.Models
                          WHERE 
                          cy.IsActive = 'Y'
                          AND cp.IsActive = 'Y'
-                         AND oi.IsActive='Y'
                          AND ci.IsActive='Y'
                          AND TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
             // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
