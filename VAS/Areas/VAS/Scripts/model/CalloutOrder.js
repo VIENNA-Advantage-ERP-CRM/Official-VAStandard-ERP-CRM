@@ -1735,10 +1735,10 @@
                     var productType = productInfo["productType"].toString();
                     ctx.setContext(windowNo, "ProductType", productType);
                     if (productType == "S") {
-                        mTab.setValue("IsContract", true);
+                        //mTab.setValue("IsContract", true);
                     }
                     else {
-                        mTab.setValue("IsContract", false);
+                        //mTab.setValue("IsContract", false);
                         mTab.setValue("NoofCycle", null);
                         mTab.setValue("QtyPerCycle", null);
                         mTab.setValue("StartDate", null);
