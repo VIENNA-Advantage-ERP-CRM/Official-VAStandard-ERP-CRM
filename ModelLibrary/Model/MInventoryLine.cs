@@ -34,6 +34,13 @@ namespace VAdvantage.Model
         private Decimal? containerQty = 0;
         private decimal qtyReserved = 0;
         private MStorage storage = null;
+        private bool CreateInventoryCartForm = false;
+
+        public bool CartInventoryForm
+        {
+            get { return CreateInventoryCartForm; }
+            set { CreateInventoryCartForm = value; }
+        }
         /// <summary>
         /// Standard Constructor
         /// </summary>
@@ -394,11 +401,18 @@ namespace VAdvantage.Model
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
                     {
-                        if (GetQtyInternalUse() > RemainingQty)
+                        if (GetQtyInternalUse() > RemainingQty && !CreateInventoryCartForm)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
                             return false;
                         }
+                        //VIS0336:implement check for create line from cart form for cretaing line with pending qty
+                        else if (CreateInventoryCartForm)
+                        {
+                            SetQtyInternalUse(RemainingQty);
+                            Set_Value("QtyEntered", RemainingQty);
+                        }
+
                     }
                     else
                     {

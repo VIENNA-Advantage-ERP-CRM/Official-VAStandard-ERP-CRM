@@ -37,9 +37,9 @@ namespace VAS.Models
             InternalUse = 341,
             SalesOrder = 143,
             PurchaseOrder = 181,
-            Requisition=322,
-            CustomerReturn=409,
-            VendorReturn=411
+            Requisition = 322,
+            CustomerReturn = 409,
+            VendorReturn = 411
         }
 
         /// <summary>
@@ -78,35 +78,71 @@ namespace VAS.Models
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID)
+        public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName)
         {
 
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
             StringBuilder sql = new StringBuilder();
+            string AllowNonItem = "N";
 
-            sql.Clear();
-            sql.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
-            string WindowName = Util.GetValueOfString(DB.ExecuteScalar(sql.ToString(), null, null));
+            if (WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_MaterialReceipt" || 
+                windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn))
+            {
+                sql.Clear();
+                sql.Append("SELECT IsAllowNonItem FROM M_INOUT m INNER JOIN AD_Client c on m.AD_Client_id =c.AD_Client_id where m.M_INOUT_Id =" + RecordId);
+                if (Util.GetValueOfString(DB.ExecuteScalar(sql.ToString(), null, null)) == "Y")
+                {
+                    AllowNonItem = "Y";
+                }
+            }
 
             sql.Clear();
             sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
                 " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
-                " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
-                " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy");
+                " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine l inner join M_Product p on l.M_Product_ID=p.M_Product_ID");
+
+            if ((windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory"
+                || windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove"
+                || windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_PhysicalInventory"))
+            {
+                sql.Append(" and p.ProductType='I' ");
+
+            }
+            else if (WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_MaterialReceipt" ||
+                windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn))
+            {
+                if (AllowNonItem == "N")
+                {
+
+                    sql.Append(" and p.ProductType='I' ");
+
+                }
+
+            }
+
+            sql.Append(" WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
+            " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy ");
 
             if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory") //Inventory count
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','PI')");
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR ( VAICNT_TransactionType IN ('PI') AND VAICNT_ReferenceNo IN " +
+                    " (SELECT Value FROM M_Locator WHERE M_Warehouse_ID=(SELECT M_Warehouse_ID FROM M_Inventory  WHERE M_Inventory_ID=" + RecordId + ")))");
             }
 
             if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")//Inventory use
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
+                // sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType IN ('IU') AND VAICNT_ReferenceNo IN " +
+                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = (SELECT M_Warehouse_ID FROM M_Inventory  " +
+                    " WHERE M_Inventory_ID=" + RecordId + ") AND DTD001_MWarehouseSource_ID=(SELECT M_Warehouse_ID FROM M_Inventory  WHERE M_Inventory_ID=" + RecordId + ")))");
             }
+
             if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IM')");
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType ='IM' AND  VAICNT_ReferenceNo IN (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' " +
+                    "AND DTD001_MWarehouseSource_ID = (SELECT DTD001_MWarehouseSource_ID FROM M_Movement WHERE M_Movement_ID=" + RecordId + ") AND M_Warehouse_ID=" +
+                    " (SELECT M_Warehouse_ID FROM M_Movement  WHERE M_Movement_ID=" + RecordId + ")) )");
             }
             if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")//GRN
             {
@@ -114,13 +150,16 @@ namespace VAS.Models
             }
             if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")//shipment/Delivery order
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','SH')");
+                sql.Append(" WHERE VAICNT_TransactionType IN ('SH')");
             }
-            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder)|| 
-                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "Sales Quotation") 
+            if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) ||
+                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "Sales Quotation")
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT')");//sales order/purchase order
             }
+
+
+
             if (!string.IsNullOrEmpty(CartName))
             {
                 CartName = CartName.ToUpper();
@@ -175,7 +214,7 @@ namespace VAS.Models
                     obj["CartLineCount"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["LineCount"]);
                     obj["TotalCartCount"] = Util.GetValueOfInt(ds.Tables.Count);
                     obj["ReferenceNo"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["VAICNT_ReferenceNo"]);
-
+                    obj["AllowNonitem"] = AllowNonItem;
                     retDic.Add(obj);
                 }
             }
@@ -184,23 +223,61 @@ namespace VAS.Models
 
             return retDic;
         }
+
         // <summary>
         /// VIS0336-using this method for fetching the lines against the cart 
         /// </summary>
         /// <param name="CartId"></param>
         /// <returns></returns>
-        public List<Dictionary<string, object>> GetIventoryCartLines(int CartId)
+        public List<Dictionary<string, object>> GetIventoryCartLines(int CartId, string ScreenName, int RecordId, string AllowNonItem)
         {
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
+            DataSet ds = new DataSet();
+            int FromWarehouse = 0;
+            int ToWarehouse = 0;
+            StringBuilder sql = new StringBuilder();
 
-            string sql = "SELECT po.VAICNT_InventoryCount_ID,po.VAICNT_InventoryCountLine_ID,po.M_Product_ID,prd.Name AS ProductName, po.C_UOM_ID, u.Name AS UomName, po.UPC, " +
+            if (ScreenName == "VAS_InventoryMove")
+            {
+                sql.Append("SELECT M_Warehouse_ID,DTD001_MWarehouseSource_ID FROM M_Movement WHERE  M_Movement_ID=" + RecordId);
+                ds = DB.ExecuteDataset(sql.ToString(), null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    FromWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                    ToWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]);
+                }
+            }
+
+            sql.Clear();
+            sql.Append("SELECT po.VAICNT_InventoryCount_ID,po.VAICNT_InventoryCountLine_ID,po.M_Product_ID,prd.Name AS ProductName, po.C_UOM_ID, u.Name AS UomName, po.UPC, " +
                         " po.M_AttributeSetInstance_ID, ats.Description, po.VAICNT_Quantity, " +
                         " ats.Description FROM VAICNT_InventoryCountLine po LEFT JOIN C_UOM u ON po.C_UOM_ID = u.C_UOM_ID LEFT JOIN M_Product prd" +
                         " ON po.M_Product_ID= prd.M_Product_ID LEFT JOIN M_AttributeSetInstance ats ON po.M_AttributeSetInstance_ID = ats.M_AttributeSetInstance_ID" +
-                        " WHERE po.IsActive = 'Y' AND po.VAICNT_InventoryCount_ID = " + CartId + " ORDER BY po.Line";
+                        " WHERE po.IsActive = 'Y' AND po.VAICNT_InventoryCount_ID = " + CartId);
+            //VIS0336:implement check for non item checkbox
+            if (ScreenName == "VAS_InventoryMove" || ScreenName == "VAS_PhysicalInventory" || ScreenName == "VAS_InternalUseInventory")
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            {
+
+                sql.Append(" AND prd.ProductType='I'");
+            }
+
+            else if (ScreenName == "VAS_CustomerReturn" || ScreenName == "VAS_VendorReturn" || ScreenName == "VAS_DeliveryOrder" || ScreenName == "VAS_MaterialReceipt")
+            {
+                if (AllowNonItem == "N")
+                {
+                    sql.Append(" and prd.ProductType='I' ");
+
+                }
+
+            }
+
+            sql.Append(" ORDER BY po.Line");
+
+
+
+            ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 retDic = new List<Dictionary<string, object>>();
@@ -217,10 +294,13 @@ namespace VAS.Models
                     obj["AttrId"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
                     obj["AttrName"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
                     obj["Quantity"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAICNT_Quantity"]);
-
+                    obj["FromWarehouse"] = FromWarehouse;
+                    obj["ToWarehouse"] = ToWarehouse;
 
                     retDic.Add(obj);
                 }
+
+                //retDic.Add(obj);
             }
             return retDic;
         }
@@ -230,7 +310,7 @@ namespace VAS.Models
         /// <param name="lstScanDetail"></param>
         /// <param name="IsUpdateTrue"></param>
         /// <returns></returns>
-        public string SaveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, bool IsUpdateTrue, int windowID, string RefNo)
+        public string SaveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, bool IsUpdateTrue, int windowID, string RefNo, int FromLocatorId, int ToLocatorId)
 
         {
             string msg = "";
@@ -246,7 +326,7 @@ namespace VAS.Models
             }
             else if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove")
             {
-                msg = SaveInventoryMoveTransactions(ctx, TransactionID, lstInventoryLines, RefNo);
+                msg = SaveInventoryMoveTransactions(ctx, TransactionID, lstInventoryLines, RefNo, FromLocatorId, ToLocatorId);
                 return msg;
             }
             else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_MaterialReceipt" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn")
@@ -291,9 +371,14 @@ namespace VAS.Models
                     Mdate = Util.GetValueOfString(ds.Tables[0].Rows[0]["MovementDate"]);
                 }
 
+                sql.Clear();
+                sql.Append("SELECT M_Locator_ID FROM M_Locator WHERE Value='" + RefNo + "' AND M_Warehouse_ID=" + warehouese);
+                LocatorId = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+                if (LocatorId == 0)
+                {
+                    LocatorId = hasDefaultLocator(warehouese);
 
-                LocatorId = MWarehouse.Get(ctx, warehouese).GetDefaultM_Locator_ID();
-
+                }
                 if (!isContainerApplicable)
                 {
                     sql.Clear();
@@ -467,7 +552,14 @@ namespace VAS.Models
                 Warehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
             }
 
-            LocatorId = MWarehouse.Get(ctx, Warehouse).GetDefaultM_Locator_ID();
+            //sql.Clear();
+            //sql.Append("SELECT M_Locator_ID FROM M_Locator WHERE Value=" + RefNo + " AND M_Warehouse_ID=" + Warehouse);
+            //LocatorId = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            //if (LocatorId == 0)
+            //{
+            LocatorId = hasDefaultLocator(Warehouse);
+
+            //  }
 
             if (Util.GetValueOfString(RefNo) != "")
             {
@@ -490,10 +582,7 @@ namespace VAS.Models
                 if (lstInventoryLines != null)
                 {
                     Tuple<String, String, String> mInfo = null;
-                    if (Env.HasModulePrefix("DTD001_", out mInfo))
-                    {
-                        _charge = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Charge_ID FROM C_Charge WHERE isactive='Y' AND  DTD001_ChargeType='INV'"));
-                    }
+                    _charge = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Charge_ID FROM C_Charge WHERE isactive='Y' AND  DTD001_ChargeType='INV'"));
 
                     for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
                     {
@@ -512,6 +601,7 @@ namespace VAS.Models
                         lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
                         lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
                         lines.SetC_Charge_ID(_charge);
+                        lines.CartInventoryForm = true;
                         if (hasReqLines)
                         {
                             if (sbLine.Length > 0)
@@ -582,7 +672,7 @@ namespace VAS.Models
         /// <param name="lstInventoryLines"></param>
         /// <param name="RefNo"></param>
         /// <returns>mesg</returns>
-        public string SaveInventoryMoveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, string RefNo)
+        public string SaveInventoryMoveTransactions(Ctx ctx, int TransactionID, List<Inventoryline> lstInventoryLines, string RefNo, int FromLocatorId, int ToLocatorId)
 
         {
             StringBuilder sql = new StringBuilder();
@@ -590,10 +680,10 @@ namespace VAS.Models
             Trx trx = Trx.GetTrx(Trx.CreateTrxName("M_MovementLine"));
             int Org = 0;
             int Client = 0;
-            int ToLocatorId = 0;
+            // int ToLocatorId = 0;
             int ToWarehouse = 0;
             int FromWarehouse = 0;
-            int FromLocatorId = 0;
+            //  int FromLocatorId = 0;
             DataSet dsReqs = null;
             bool hasReqLines = false;
 
@@ -608,13 +698,13 @@ namespace VAS.Models
             {
                 Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
                 Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
-                ToWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
-                FromWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]);
+                //ToWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                //  FromWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]);
 
             }
 
-            ToLocatorId = MWarehouse.Get(ctx, ToWarehouse).GetDefaultM_Locator_ID();
-            FromLocatorId = MWarehouse.Get(ctx, FromWarehouse).GetDefaultM_Locator_ID();
+            //ToLocatorId = hasDefaultLocator(ToWarehouse);
+            //FromLocatorId = hasDefaultLocator(FromWarehouse);
 
 
             if (Util.GetValueOfString(RefNo) != "")
@@ -666,7 +756,7 @@ namespace VAS.Models
                         lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
                         lines.SetM_Locator_ID(FromLocatorId);
                         lines.SetM_LocatorTo_ID(ToLocatorId);
-
+                        lines.CartInventoryForm = true;
                         if (hasReqLines)
                         {
                             if (sbLine.Length > 0)
@@ -770,7 +860,7 @@ namespace VAS.Models
             DataSet dsUOMConv = null;
 
             MInOut io = new MInOut(ctx, TransactionID, null);
-            LocatorId = MWarehouse.Get(ctx, io.GetM_Warehouse_ID()).GetDefaultM_Locator_ID();
+            LocatorId = hasDefaultLocator(io.GetM_Warehouse_ID());
 
             try
             {
@@ -780,13 +870,10 @@ namespace VAS.Models
 
                     DataSet dsProPO = GetPurchaingProduct(ctx.GetAD_Client_ID());
 
-                    if (Env.IsModuleInstalled("ED011_"))
+                    if (!fetchedUOMConv)
                     {
-                        if (!fetchedUOMConv)
-                        {
-                            dsUOMConv = GetUOMConversions(ctx.GetAD_Client_ID());
-                            fetchedUOMConv = true;
-                        }
+                        dsUOMConv = GetUOMConversions(ctx.GetAD_Client_ID());
+                        fetchedUOMConv = true;
                     }
 
                     if (LocatorId > 0)
@@ -795,7 +882,7 @@ namespace VAS.Models
                         sql.Clear();
                         if (RefNo != "")
                         {
-                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID== Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
+                            if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder" || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_VendorReturn")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'Y' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
                             else if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || WindowName == "VAS_CustomerReturn")
                                 sql.Append("SELECT C_Order_ID FROM C_Order WHERE IsActive = 'Y' AND IsSOTrx= 'N' AND AD_Client_ID =" + ctx.GetAD_Client_ID() + " AND DocumentNo = '" + RefNo + "'");
@@ -863,9 +950,9 @@ namespace VAS.Models
                                 DataRow[] drOL = null;
                                 if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")
                                 {
-                                    if (Env.IsModuleInstalled("DTD001_"))
-                                        drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
-                                            + "AND C_UOM_ID = " + Util.GetValueOfInt(lstInventoryLines[i].UOMId) + " AND DTD001_Org_ID = " + ctx.GetAD_Org_ID());
+
+                                    drOL = dsOrderLines.Tables[0].Select(" M_Product_ID = " + Util.GetValueOfInt(lstInventoryLines[i].ProductId) + " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(lstInventoryLines[i].AttrId)
+                                        + "AND C_UOM_ID = " + Util.GetValueOfInt(lstInventoryLines[i].UOMId) + " AND DTD001_Org_ID = " + ctx.GetAD_Org_ID());
                                 }
                                 if (!(drOL != null && drOL.Length > 0))
                                 {
@@ -1053,7 +1140,7 @@ namespace VAS.Models
                         if (lstInventoryLines[i].AttrId != 0)
                             lines.SetM_AttributeSetInstance_ID(lstInventoryLines[i].AttrId);
 
-                        if (IsSOTrx)
+                        if (!IsSOTrx)
                         {
                             int uomID = Util.GetValueOfInt(lstInventoryLines[i].UOMId);
                             int uom = 0;
@@ -1137,10 +1224,10 @@ namespace VAS.Models
             {
                 Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
                 Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
-                PriceList= Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                PriceList = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
             }
 
-        
+
             try
             {
                 if (lstInventoryLines != null)
@@ -1224,6 +1311,12 @@ namespace VAS.Models
             return dsConvs;
         }
 
+        public int hasDefaultLocator(int M_Warehouse_ID)
+        {
+
+            string sql = "SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID = " + M_Warehouse_ID + " AND  IsActive = 'Y' ORDER BY IsDefault DESC";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql));
+        }
     }
     public class Inventoryline
     {
