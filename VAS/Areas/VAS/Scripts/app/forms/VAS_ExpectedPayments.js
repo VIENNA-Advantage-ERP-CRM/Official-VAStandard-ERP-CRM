@@ -292,7 +292,7 @@
                 var widgetDataDesign = '<div class="vas-expay-payments-box">' +
                     '<div class="vas-expay-payments-detail">' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-com-name">' + headingText + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
@@ -321,7 +321,7 @@
                     '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_ISO_Code") + ': ' + gridDataResult[i].ISO_Code + '">' + gridDataResult[i].ISO_Code + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueAmt") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueAmtExPay") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
                     (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
                     '</div>' +
                     '</div>' +

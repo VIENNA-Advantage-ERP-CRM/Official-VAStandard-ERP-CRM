@@ -2472,7 +2472,7 @@ hr.vas-paymentData-underline {
 }
 
 .vas-expay-filterPopupWrap {
-    padding-top: 40px;
+    padding-top: 36px;
 }
 
 .vas-expay-filter-flyout {
@@ -2484,12 +2484,12 @@ hr.vas-paymentData-underline {
     border-radius: 5px;
     box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
     max-width: 450px;
-    min-width: 326px;
+    min-width: 317px;
     background: white;
     Max-height: 400px;
     /*overflow: auto;
     margin-top: 5px;*/
-    margin-left: -278px;
+    margin-left: -272px;
 }
 
 .vas-expay-flyout-header {
@@ -2523,7 +2523,7 @@ hr.vas-paymentData-underline {
 
 .vas-expay-com-name {
     /*padding-top: 5px;*/
-    max-width: 155px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2551,5 +2551,8 @@ hr.vas-paymentData-underline {
 .vas-expay-symbol{
     font-weight:600;
     font-family:Verdana;
+}
+.vas-expay-head-font{
+    font-weight:600;
 }
 /*Expected Payments css End*/
