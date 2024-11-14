@@ -266,6 +266,20 @@ namespace VAS.Areas.VAS.Controllers
             return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
         }
         /// <summary>
+        /// This Method is used to return the refrence id 
+        /// </summary>
+        /// <param name="refernceName"></param>
+        /// <returns>Dictionary with column name and refrence id</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetColumnIDForExpPayment( string refernceName)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            dynamic columnDataArray = JsonConvert.DeserializeObject<dynamic[]>(refernceName);
+            PoReceiptTabPanelModel refernceId = new PoReceiptTabPanelModel();
+            Dictionary<string, int> columnData = refernceId.GetColumnIDForExpPayment(ctx, columnDataArray);
+            return Json(JsonConvert.SerializeObject(columnData), JsonRequestBehavior.AllowGet);
+        }
+        /// <summary>
         /// This function is Used to Get Top 10 Expense Amounts
         /// </summary>
         /// <param name="ListValue">ListValue</param>
@@ -349,10 +363,11 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="FinancialPeriodValue">FinancialPeriodValue</param>
         /// <param name="fromDate">fromDate</param>
         /// <param name="toDate">toDate</param>
+        /// <param name="docTypeValue">docTypeValue</param>
         /// <author>VIS_427</author>
         /// <returns>List of data of Expected Payment against order and Invoice</returns>
         public JsonResult GetExpectedPaymentData(bool ISOtrx, int pageNo, int pageSize, string FinancialPeriodValue,
-               string C_BPartner_ID, string fromDate, string toDate)
+               string C_BPartner_ID, string fromDate, string toDate,string docTypeValue)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -360,7 +375,7 @@ namespace VAS.Areas.VAS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 PoReceiptTabPanelModel obj = new PoReceiptTabPanelModel();
                 List<ExpectedPayment> result = obj.GetExpectedPaymentData(ctx, ISOtrx, pageNo, pageSize, FinancialPeriodValue,
-                C_BPartner_ID, fromDate, toDate);
+                C_BPartner_ID, fromDate, toDate, docTypeValue);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
