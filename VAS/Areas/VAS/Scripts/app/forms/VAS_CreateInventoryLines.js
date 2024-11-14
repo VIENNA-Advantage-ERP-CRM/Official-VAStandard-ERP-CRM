@@ -26,6 +26,19 @@
         var window_ID = 0;
         var AD_tab_ID = 0;
         var Reference = null;
+        var WindowName = "";
+        var _FromLocatorLookUp;
+        var $FromLocatorControl;
+        var _FlocatCtrl = "";
+        var FromLoctr = 0;
+        var ToLoctor = 0;
+
+        var _ToLocatorLookUp;
+        var ToWarehouse = 0;
+        var DTDSrcWarehouse = 0;
+
+
+        //var WindowName = VIS.context.m_map[1]["1|0|Name"];
 
         this.initalize = function () {
             createBusyIndicator();
@@ -96,6 +109,17 @@
 
                 + '</div>'
                 + '</div>'
+
+                + '<div class="VAS-Inventorymove" style="display:flex;gap:10px;width:50%;">'
+                + ' <div class="input-group vis-input-wrap vis-formouterwrpdiv" id="VAS_FlocatorCtrl' + $self.windowNo + '" style="width:50%" > '
+                + '</div > '
+
+                + ' <div class="input-group vis-input-wrap vis-formouterwrpdiv" id="VAS_TolocatorCtrl' + $self.windowNo + '" style="width:50%" > '
+                + '</div > '
+                + '</div > '
+
+
+
                 + '<div class="VAS-total-lines">'
                 + '<span class="VAS-lineCount"><span class= "VAS-LineCount" id = "VAS-LineCount_' + $self.windowNo + '"><span></span>'
                 + '<span class="VAS-line-lbl">Line</span>'
@@ -144,7 +168,9 @@
 
             AD_tab_ID = VIS.context.getWindowTabContext($self.windowNo, 0, "AD_Tab_ID");
             window_ID = VIS.dataContext.getJSONRecord("InfoProduct/GetWindowID", AD_tab_ID.toString());
-
+            WindowName = VIS.context.getContext($self.windowNo, "ScreenName");
+            ToWarehouse = VIS.context.getContextAsInt($self.windowNo, "M_Warehouse_ID");
+            DTDSrcWarehouse = VIS.context.getContextAsInt($self.windowNo, "DTD001_MWarehouseSource_ID");
 
             if (window_ID == "168") {//update record only allowed in case of physical inventory
                 $root.find(".VAS-Update").css("display", "block");
@@ -228,7 +254,7 @@
         function LoadCartData() {
             $self.setBusy(true);
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData",
-                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID }, function (data) {
+                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID, "RecordId": $self.Record_ID, "WindowName": WindowName, "ToWarehouse": ToWarehouse, "DTDSrcWarehouse": DTDSrcWarehouse}, function (data) {
 
                     $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
                     $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
@@ -249,11 +275,12 @@
                                 + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
                                 + '<span class="VAS-line-lbl">Line</span>'
                                 + '</div>'
-                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
+                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
                                 + '</div>'
                                 + '</div>');
 
                         }
+
                         $root.find("#VAS-CartId_" + $self.windowNo).off('click');
                         $root.on('click', "#VAS-CartId_" + $self.windowNo, function () {
                             $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "block");
@@ -261,7 +288,8 @@
 
                             var CartId = $(this).attr('vas-cart-id');
                             Reference = $(this).attr('vas-CartRef');
-                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference });
+
+                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID });
 
                             if (result && result.length > 0) {
                                 $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));
@@ -289,6 +317,52 @@
                                 $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
                                     Fetchdata();
                                 });
+
+
+                                if (WindowName == "VAS_InventoryMove") {
+
+                                    $root.find(".VAS-Inventorymove").css("display", "flex");
+                                    $root.find("#VAS_FlocatorCtrl" + $self.windowNo).empty();
+                                    $root.find("#VAS_TolocatorCtrl" + $self.windowNo).empty();
+
+                                    _FlocatCtrl = $root.find("#VAS_FlocatorCtrl" + $self.windowNo);
+                                    _TolocatCtrl = $root.find("#VAS_TolocatorCtrl" + $self.windowNo);
+
+                                    //From warehouse
+                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + ToWarehouse;
+                                    _FromLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
+                                    $FromLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _FromLocatorLookUp, 50);
+                                    var Flocatorctrlwrap = $('<div class="vis-control-wrap">');
+                                    var Flocatorbtnwrap = $('<div class="input-group-append">');
+                                    _FlocatCtrl.append(Flocatorctrlwrap);
+                                    _FlocatCtrl.append(Flocatorbtnwrap);
+                                    Flocatorctrlwrap.append($FromLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_FromLocator") + '</label>'));
+                                    FromLoctr = VIS.Utility.Util.getValueOfInt($FromLocatorControl.getValue());
+                                    $FromLocatorControl.fireValueChanged = function () {
+                                        FromLoctr = VIS.Utility.Util.getValueOfInt($FromLocatorControl.getValue());
+                                    }
+
+
+                                    ////towarehouse
+                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + DTDSrcWarehouse;
+                                    _ToLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
+                                    $ToLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _ToLocatorLookUp, 50);
+                                    var Tolocatorctrlwrap = $('<div class="vis-control-wrap">');
+                                    var Tolocatorbtnwrap = $('<div class="input-group-append">');
+                                    _TolocatCtrl.append(Tolocatorctrlwrap);
+                                    _TolocatCtrl.append(Tolocatorbtnwrap);
+                                    Tolocatorctrlwrap.append($ToLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_ToLocator") + '</label>'));
+                                    ToLoctor = VIS.Utility.Util.getValueOfInt($ToLocatorControl.getValue());
+
+                                    $ToLocatorControl.fireValueChanged = function () {
+                                        ToLoctor = VIS.Utility.Util.getValueOfInt($ToLocatorControl.getValue());
+                                    }
+
+                                }
+
+                                else {
+                                    $root.find(".VAS-Inventorymove").css("display", "none");
+                                }
                             }
                         });
                     }
@@ -345,6 +419,8 @@
             $root.find('.VAS-CartLineDetails').find('#VAS-BackArrow_' + $self.windowNo).click(function () {
                 LoadCartData();
             });
+
+
             $root.find("#selectAllCheckbox").on("change", function () {
                 var isChecked = $(this).is(':checked');
                 $root.find("#VAS-CartLinesDetails_" + $self.windowNo + " input[type='checkbox']").prop('checked', isChecked);
@@ -364,6 +440,20 @@
                 if (selectedLines.length == 0) {
                     VIS.ADialog.info("VAS_PleaseSelectLines", null, "", "");
                     return;
+                }
+
+
+                if (WindowName == "VAS_InventoryMove") {
+                    if (FromLoctr == 0 || ToLoctor == 0) {
+                        VIS.ADialog.info("VAS_PleaseSelectLocator", null, "", "");
+                        return;
+                    }
+
+
+                    if (FromLoctr == ToLoctor) {
+                        VIS.ADialog.info("VAS_InValidCase", null, "", "");
+                        return;
+                    }
                 }
                 SaveTransaction();
             });
@@ -426,7 +516,9 @@
                     lstScanDetail: JSON.stringify(selectedLines),
                     IsUpdateTrue: IsUpdateTrue,
                     windowID: window_ID,
-                    RefNo: Reference
+                    RefNo: Reference,
+                    FromLocatorId: FromLoctr,
+                    ToLocatorId: ToLoctor
                 },
                 success: function (result) {
                     if (JSON.parse(result) == "") {
@@ -434,7 +526,7 @@
                         VIS.ADialog.info("VAS_RecordSaved", null, "", "");
                     }
                     else {
-                        VIS.ADialog.info("VAS_RecNotSaved", null, "", "");
+                        VIS.ADialog.info(result);
                     }
                     $self.setBusy(false);
                 },

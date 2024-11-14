@@ -50,7 +50,7 @@ namespace VAS.Controllers
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo,int windowID)
+        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo,int windowID, int RecordId,string WindowName,int ToWarehouse,int DTDSrcWarehouse)
         {
             List<Dictionary<string, object>> result = null;
             if (Session["ctx"] != null)
@@ -58,7 +58,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartData(CartName, UserId, FromDate, ToDate, RefNo, windowID);
+                result = obj.GetIventoryCartData(ctx,CartName, UserId, FromDate, ToDate, RefNo, windowID, RecordId, WindowName, ToWarehouse, DTDSrcWarehouse);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
@@ -67,7 +67,7 @@ namespace VAS.Controllers
         /// </summary>
         /// <param name="CartId"></param>
         /// <returns></returns>
-        public JsonResult GetIventoryCartLines(int CartId)
+        public JsonResult GetIventoryCartLines(int CartId , string ScreenName, int RecordId)
         {
             List<Dictionary<string, object>> result = null;
             if (Session["ctx"] != null)
@@ -75,7 +75,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartLines(CartId);
+                result = obj.GetIventoryCartLines(ctx,CartId,  ScreenName,  RecordId);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
@@ -87,12 +87,12 @@ namespace VAS.Controllers
         /// <param name="IsUpdateTrue"></param>
         /// <returns></returns>
         [HttpPost]
-        public JsonResult SaveTransactions(int TransactionID, string lstScanDetail,bool IsUpdateTrue,int windowID, string RefNo)
+        public JsonResult SaveTransactions(int TransactionID, string lstScanDetail,bool IsUpdateTrue,int windowID, string RefNo, int FromLocatorId, int ToLocatorId)
         {
             VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
             List<Inventoryline> lstInentoryLines = JsonConvert.DeserializeObject<List<Inventoryline>>(lstScanDetail); 
             InventoryLinesModel objInventoryCount = new InventoryLinesModel();
-            return Json(JsonConvert.SerializeObject(objInventoryCount.SaveTransactions(ctx, TransactionID, lstInentoryLines, IsUpdateTrue, windowID, RefNo)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(objInventoryCount.SaveTransactions(ctx, TransactionID, lstInentoryLines, IsUpdateTrue, windowID, RefNo, FromLocatorId, ToLocatorId)), JsonRequestBehavior.AllowGet);
         }
     }
 }
