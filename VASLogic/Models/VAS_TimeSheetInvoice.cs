@@ -87,7 +87,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_Charge c ON (st.C_Charge_ID = c.C_Charge_ID)
                         LEFT OUTER JOIN M_Product p ON (st.M_Product_ID = p.M_Product_ID)
                         LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
-                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cust.Pic)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cust.Pic AS INTEGER))
                         LEFT OUTER JOIN R_Request rq ON (st.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (st.C_Project_ID = cp.C_Project_ID)
                         LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND st.C_ProjectPhase_ID=cpp.C_ProjectPhase_ID)
@@ -136,7 +136,7 @@ namespace VASLogic.Models
                 sql.Append(@" UNION ( SELECT CASE
                         WHEN wo.VA075_Task_ID IS NOT NULL THEN st.Name
                         ELSE wo.Description
-                        END AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID,rs.Name AS ResourceName, 
+                        END AS DocumentNo, CAST(wo.S_Resource_ID AS INTEGER) AS ResourceID,rs.Name AS ResourceName, 
                         NULL AS M_Product_ID,
                         wo.C_Charge_ID,
                         c.Name AS item_name,
@@ -148,14 +148,14 @@ namespace VASLogic.Models
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID, cust.VA009_PaymentMethod_ID,wo.VA075_Task_ID,wo.C_Uom_ID,
                         um.Name as UomName,NULL AS ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
-                        cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic,
+                        cust.C_PaymentTerm_ID,0 AS PriceList,0 AS PriceLimit,cy.StdPrecision,'N' AS EnforcePriceLimit,0 AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cust.Pic,
                         NULL AS ImageExtension,NULL AS AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
                         LEFT OUTER JOIN VA075_Task st ON (st.VA075_Task_ID=wo.VA075_Task_ID)
                         INNER JOIN S_Resource rs ON (rs.S_Resource_ID=wo.S_Resource_ID)
                         INNER JOIN C_BPartner cust ON (wo.C_BPartner_ID=cust.C_BPartner_ID AND  cust.IsCustomer='Y')
                         LEFT OUTER JOIN C_BPartner_Location cbl ON (cbl.C_BPartner_ID = cust.C_BPartner_ID)
-                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cust.Pic)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cust.Pic AS INTEGER))
                         INNER JOIN C_Charge c ON (wo.C_Charge_ID = c.C_Charge_ID)
                         LEFT OUTER JOIN R_Request rq ON (wo.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (wo.C_Project_ID = cp.C_Project_ID)
@@ -207,7 +207,7 @@ namespace VASLogic.Models
                         CASE
                         WHEN wo.VA075_Task_ID IS NOT NULL THEN st.Name
                         ELSE wo.Description
-                        END AS DocumentNo, TO_NUMBER(wo.S_Resource_ID) AS ResourceID, rs.Name AS ResourceName, 
+                        END AS DocumentNo, CAST(wo.S_Resource_ID AS INTEGER) AS ResourceID, rs.Name AS ResourceName, 
                         wo.M_Product_ID,
                         NULL AS C_Charge_ID,
                         p.Name AS item_name,
@@ -219,7 +219,7 @@ namespace VASLogic.Models
                         ORDER BY cbl.IsRemitTo DESC, cbl.C_BPartner_Location_ID DESC)) END AS C_BPartner_Location_ID, cb.VA009_PaymentMethod_ID,wo.VA075_Task_ID,wo.C_Uom_ID,
                         um.Name as UomName,mpv.ValidFrom,
                         wo.VA075_TASKENDDATE AS RecordingDate, wo.VA075_TimeEstimate AS EstimatedTime,
-                        cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,Null AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic,
+                        cb.C_PaymentTerm_ID,pp.PriceList,pp.PriceLimit,cy.StdPrecision,mp.EnforcePriceLimit,0 AS S_TimeExpenseLine_ID,wo.VA075_WorkOrderOperation_ID,cb.Pic,
                         img.ImageExtension,p.AD_Image_ID,custimg.ImageExtension AS custImgExtension
                         FROM VA075_WorkOrderOperation wo
                         LEFT OUTER JOIN VA075_Task st ON (st.VA075_Task_ID = wo.VA075_Task_ID)
@@ -228,7 +228,7 @@ namespace VASLogic.Models
                         LEFT OUTER JOIN C_BPartner_Location cbl ON(cbl.C_BPartner_ID = cb.C_BPartner_ID)
                         INNER JOIN M_Product p ON (wo.M_Product_ID = p.M_Product_ID)
                         LEFT OUTER JOIN AD_Image img ON (img.AD_Image_ID = p.AD_Image_ID)
-                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = cb.Pic)
+                        LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
                         LEFT OUTER JOIN R_Request rq ON (wo.R_Request_ID = rq.R_Request_ID)
                         LEFT OUTER JOIN C_Project cp ON (wo.C_Project_ID = cp.C_Project_ID)
                         LEFT OUTER JOIN C_ProjectPhase cpp ON (cpp.C_Project_ID = cp.C_Project_ID AND wo.C_ProjectPhase_ID= cpp.C_ProjectPhase_ID)

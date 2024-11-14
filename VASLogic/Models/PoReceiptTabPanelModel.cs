@@ -609,7 +609,6 @@ namespace VASLogic.Models
                          WHERE 
                          cy.IsActive = 'Y'
                          AND cp.IsActive = 'Y'
-                         AND oi.IsActive='Y'
                          AND ci.IsActive='Y'
                          AND TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate AND cc.AD_Client_ID=" + ctx.GetAD_Client_ID());
             // string yearSql = MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "cc", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
@@ -1241,6 +1240,38 @@ namespace VASLogic.Models
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
             ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
+            return ColumnInfo;
+        }
+        /// <summary>
+        /// This Method is used to return the refrence id 
+        /// </summary>
+        /// <param name="ct">context</param>
+        /// <param name="columnDataArray"></param>
+        /// <returns>Dictionary with column name and refrence id</returns>
+        /// <author>VIS_427 </author>
+        public Dictionary<string, int> GetColumnIDForExpPayment(Ctx ct, dynamic columnDataArray)
+        {
+            //Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+            //ColumnInfo["AD_Reference_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
+            //return ColumnInfo;
+            Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+            foreach (var item in columnDataArray)
+            {
+                // Extract column name and table name
+                string refernceName = item.refernceName;
+                string ColumnName = item.ColumnName;
+                if (!String.IsNullOrEmpty(refernceName))
+                {
+                    ColumnInfo[refernceName] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT AD_Reference_ID FROM AD_Reference WHERE Name='" + refernceName + "'", null, null));
+                }
+                if (!String.IsNullOrEmpty(ColumnName))
+                {
+                    string sql = @"SELECT AD_Column_ID FROM AD_Column 
+                               WHERE ColumnName ='" + ColumnName + @"' 
+                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='C_Payment')";
+                    ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                }
+            }
             return ColumnInfo;
         }
         /// <summary>
@@ -1962,6 +1993,362 @@ namespace VASLogic.Models
             }
             return InvocieTaxTabPanel;
         }
+        /// <summary>
+        /// This function is Used to show Expected Payments against orders and Invoice
+        /// </summary>
+        /// <param name="ISOtrx">ISOtrx</param>
+        /// <param name="ctx">Context</param>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="pageNo">pageNo</param>
+        /// <param name="pageSize">pageSize</param>
+        /// <param name="C_BPartner_ID">C_BPartner_ID</param>
+        /// <param name="FinancialPeriodValue">FinancialPeriodValue</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
+        /// <param name="docTypeValue">docTypeValue</param>
+        /// <author>VIS_427</author>
+        /// <returns>List of data of Expected Payment against order and Invoice</returns>
+        public List<ExpectedPayment> GetExpectedPaymentData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string FinancialPeriodValue,
+               string C_BPartner_ID, string fromDate, string toDate,string docTypeValue)
+        {
+            ExpectedPayment obj = new ExpectedPayment();
+            StringBuilder sqlmain = new StringBuilder();
+            StringBuilder sql = new StringBuilder();
+            int CurrentYear = 0;
+            int calendar_ID = 0;
+            int PeriodID = 0;
+            List<ExpectedPayment> invGrandTotalData = new List<ExpectedPayment>();
+            string OrderCheck = (ISOtrx == true ? " AND co.IsSOTrx='Y' " : " AND co.IsSOTrx='N' ");
+            string InvoiceCheck = (ISOtrx == true ? " AND ci.IsSOTrx='Y' " : " AND ci.IsSOTrx='N' ");
+            var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
+            sql.Append($@"SELECT * FROM  (");
+            //If Doctype Value is Null or ALL or Invoice
+            if (docTypeValue == null || docTypeValue == "01" || docTypeValue == "03")
+            {
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
+                             SELECT DISTINCT cs.DueDate,
+                             CASE WHEN cd.DocBaseType IN ('ARC','APC') THEN - cs.DueAmt
+                             ELSE cs.DueAmt END AS DueAmt,
+                             ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType
+                             FROM C_InvoicePaySchedule cs
+                             INNER JOIN C_Invoice ci ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             INNER JOIN C_BPartner cb ON (ci.C_BPartner_ID = cb.C_BPartner_ID)
+                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID=ci.C_Currency_ID)
+                             INNER JOIN VA009_PaymentMethod pm ON (cs.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(BPCheck + InvoiceCheck + " AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N'");
+                //Added business partner condition 
+                if (Util.GetValueOfInt(C_BPartner_ID) != 0)
+                {
+                    sqlmain.Append(" AND ci.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                }
+                if (!String.IsNullOrEmpty(FinancialPeriodValue))
+                {
+                    //Getting the details of current financialYear
+                    DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+                    if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+                    {
+                        CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                        calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                        PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+                    }
+
+                    // This month
+                    if (FinancialPeriodValue == "01")
+                    {
+                        DataSet dsPeriod = null;
+                        //this dataset returns start and end date of period
+                        if (PeriodID > 0)
+                        {
+                            dsPeriod = GetPeriodData(ctx, PeriodID);
+                        }
+                        if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                        {
+                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                            sqlmain.Append(@"AND " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                        }
+                    }
+                    // Next month
+                    else if (FinancialPeriodValue == "02")
+                    {
+                        DataSet dsPeriod = null;
+                        //this function returns the period id of next period
+                        int C_Period_ID = GetNextPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                        if (C_Period_ID > 0)
+                        {
+                            dsPeriod = GetPeriodData(ctx, C_Period_ID);
+                        }
+                        if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                        {
+                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                            sqlmain.Append(@"AND " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                        }
+                    }
+                    //Passed Due Date
+                    else if (FinancialPeriodValue == "03")
+                    {
+                        sqlmain.Append(" AND Current_Date > cs.DueDate");
+                    }
+                }
+                //if user enter from date but not to date and from date less then Current date then this condition will execute
+                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                {
+                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND Current_Date");
+                }
+                //if user enter from date and to date then this condition will execute
+                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+                {
+                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+                //if user enter does not enter from date but enters todate then this condition will execute
+                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+                {
+                    sql.Append(@" AND TRUNC(cs.DueDate) <= " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+                //if from date greater then today's date
+                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
+                {
+                    toDate = fromDate;
+                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+            }
+            //If Doctype Value is Null or ALL
+            if (docTypeValue == null || docTypeValue == "01")
+            {
+                sqlmain.Append(" UNION ALL ");
+            }
+            //If Doctype Value is Null or ALL or Order
+            if (docTypeValue == null || docTypeValue == "01" || docTypeValue == "02")
+            {
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
+                             SELECT DISTINCT ps.DueDate,
+                             ps.DueAmt AS DueAmt,
+                             co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,cb.pic,custimg.ImageExtension,'Order' AS WindowType
+                             FROM VA009_OrderPaySchedule ps
+                             INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
+                             INNER JOIN C_BPartner cb ON (co.C_BPartner_ID = cb.C_BPartner_ID)
+                             INNER JOIN C_Currency cy ON (cy.C_Currency_ID=co.C_Currency_ID)
+                             INNER JOIN VA009_PaymentMethod pm ON (co.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "ps", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(BPCheck + OrderCheck + " AND co.DocStatus IN ('CO','CL') AND ps.VA009_IsPaid='N'");
+                //Added business partner condition 
+                if (Util.GetValueOfInt(C_BPartner_ID) != 0)
+                {
+                    sqlmain.Append(" AND co.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                }
+                if (!String.IsNullOrEmpty(FinancialPeriodValue))
+                {
+                    DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+                    if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+                    {
+                        CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                        calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                        PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+                    }
+
+                    // This month
+                    if (FinancialPeriodValue == "01")
+                    {
+                        DataSet dsPeriod = null;
+                        //this dataset returns start and end date of period
+                        if (PeriodID > 0)
+                        {
+                            dsPeriod = GetPeriodData(ctx, PeriodID);
+                        }
+                        if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                        {
+                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                            sqlmain.Append(@"AND " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                        }
+                    }
+                    // Next month
+                    else if (FinancialPeriodValue == "02")
+                    {
+                        int C_Period_ID = GetNextPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                        DataSet dsPeriod = null;
+                        if (C_Period_ID > 0)
+                        {
+                            dsPeriod = GetPeriodData(ctx, C_Period_ID);
+                        }
+                        if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                        {
+                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                            sqlmain.Append(@"AND " +
+                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                        }
+                    }
+                    //Passed Due Date
+                    else if (FinancialPeriodValue == "03")
+                    {
+                        sqlmain.Append(" AND Current_Date > ps.DueDate");
+                    }
+                }
+                //if user enter from date but not to date and from date less then Current date then this condition will execute
+                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                {
+                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND Current_Date");
+                }
+                //if user enter from date and to date then this condition will execute
+                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+                {
+                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+                //if user enter does not enter from date but enters todate then this condition will execute
+                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+                {
+                    sqlmain.Append(@" AND TRUNC(ps.DueDate) <= " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+                //if from date greater then today's date
+                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
+                {
+                    toDate = fromDate;
+                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                    sqlmain.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                }
+            }
+            sql.Append(sqlmain);
+            sql.Append(")T ORDER BY T.DueDate");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                //fetching the record count to use it for pagination
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
+                sql.Clear();
+                //this query is returning the field of base currency
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    obj = new ExpectedPayment();
+                    obj.recordCount = RecordCount;
+                    obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["DueAmt"]);
+                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DueDate"]).Value;
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
+                    obj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
+                    obj.windowType = Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]);
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    {
+                        obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
+
+                    }
+                    invGrandTotalData.Add(obj);
+                }
+            }
+            return invGrandTotalData;
+        }
+        /// <summary>
+        /// This function is used to get Periods Data based Period ID
+        /// </summary>
+        /// <param name="Period_ID">Period_IDr</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>DataSet</returns>
+        /// <author>VIS_427</author>
+        public DataSet GetPeriodData(Ctx ctx,int Period_ID)
+        {
+                string sql = $@"SELECT Min(StartDate) AS StartDate,MAX(EndDate) AS EndDate FROM C_Period WHERE AD_Client_ID = {ctx.GetAD_Client_ID()} AND C_Period_ID=" + Period_ID;
+
+                DataSet dsPeriod = DB.ExecuteDataset(sql, null, null);
+                return dsPeriod;
+        }
+        /// <summary>
+        /// This function is used to get Next Periods Period ID based on financial Year
+        /// </summary>
+        /// <param name="CalendarYear">Current Calendar Year</param>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <param name="C_Calendar_ID">Calendar ID</param>
+        /// <returns>DataSet</returns>
+        /// <author>VIS_427</author>
+        public int GetNextPeriod(int CalendarYear, int AD_Client_ID, int C_Calendar_ID)
+        {
+            string sql = $@" WITH CurrentPeriod AS (
+                            /* Fetch current year data and calculate next period using LEAD */
+                            SELECT 
+                                pl.periodno, 
+                                pl.C_Period_ID, 
+                                pl.StartDate, 
+                                pl.EndDate,
+                                pl.C_Year_ID,
+                                pl.AD_Client_ID,
+                                CAST(y.CalendarYears AS INT) AS CalendarYears,
+                                LEAD(pl.c_period_id) OVER(PARTITION BY y.calendaryears ORDER BY pl.periodno) AS Next_Period_ID
+                            FROM 
+                                C_Period pl
+                                INNER JOIN C_Year y ON y.C_Year_ID = pl.C_Year_ID
+                            WHERE pl.IsActive = 'Y' AND 
+                                pl.AD_Client_ID = {AD_Client_ID}
+                                AND y.C_Calendar_ID = {C_Calendar_ID}
+                                AND y.CalendarYears = {GlobalVariable.TO_STRING(CalendarYear.ToString())}
+                        ),";
+
+            sql += $@" NextPeriod AS (
+                        /* Fetch the Next year's First period (PeriodNo = MIN(PeriodNo)) */
+                        SELECT 
+                            pl.C_Period_ID
+                        FROM 
+                            C_Period pl
+                            INNER JOIN C_Year y ON y.C_Year_ID = pl.C_Year_ID
+                        WHERE 
+                            pl.AD_Client_ID = {AD_Client_ID}
+                            AND y.C_Calendar_ID = {C_Calendar_ID}
+                            AND y.CalendarYears = {GlobalVariable.TO_STRING((CalendarYear + 1).ToString())}
+                            AND pl.PeriodNo = (
+                                /* Directly get the max period number in the same query */
+                                SELECT MIN(PeriodNo) 
+                                FROM C_Period pll 
+                                WHERE pll.IsActive = 'Y' AND pll.C_Year_ID = pl.C_Year_ID )
+                        )";
+
+            sql += $@" SELECT 
+                        COALESCE(cp.Next_Period_ID,  pp.C_Period_ID) AS NextPeriod
+                    FROM 
+                        CurrentPeriod cp
+                    LEFT JOIN 
+                        NextPeriod pp ON (1=1)
+                    WHERE Current_Date Between cp.StartDate and cp.EndDate";
+
+            int C_Period_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+            return C_Period_ID;
+
+        }
     }
     public class TabPanel
     {
@@ -2131,5 +2518,22 @@ namespace VASLogic.Models
         public int stdPrecision { get; set; }
         public int C_InvoicePaySchedule_ID { get; set; }
         public int RecordCount { get; set; }
+    }
+    public class ExpectedPayment
+    {
+        public decimal TotalAmt { get; set; }
+        public string Symbol { get; set; }
+        public string RecordType { get; set; }
+        public int stdPrecision { get; set; }
+        public string ImageUrl { get; set; }
+        public string Name { get; set; }
+        public DateTime OrderdDate { get; set; }
+        public DateTime DatePromised { get; set; }
+        public string DocumentNo { get; set; }
+        public int recordCount { get; set; }
+        public string ISO_Code { get; set; }
+        public string PayMethod { get; set; }
+        public string windowType { get; set; }
+
     }
 }

@@ -6489,9 +6489,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 StringBuilder Info = new StringBuilder();
                 // JID_0216: System void/reverse the Shipment and invoice related to SO and voided document number will be displayed with the document name. 
                 //	Reverse All *Shipments*
-                //Info.Append("@M_InOut_ID@:");
-                Info.Append(Msg.GetMsg(GetCtx(), "Shipment") + ":");
+                //Info.Append("@M_InOut_ID@:");                
                 MInOut[] shipments = GetShipments(false);   //	get all (line based)
+                if (shipments.Length > 0)
+                {
+                    Info.Append(Msg.GetMsg(GetCtx(), "Shipment") + ":");
+                }
                 for (int i = 0; i < shipments.Length; i++)
                 {
                     MInOut ship = shipments[i];
@@ -6539,10 +6542,13 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     ship.Save(Get_TrxName());
                 }   //	for all shipments
 
-                //	Reverse All *Invoices*
-                Info.Append(" - @C_Invoice_ID@:");
+                //	Reverse All *Invoices*               
                 //Info.Append(Msg.GetMsg(GetCtx(), "SalesOrder"));
                 MInvoice[] invoices = GetInvoices(false);   //	get all (line based)
+                if (invoices.Length > 0)
+                {
+                    Info.Append(" - @C_Invoice_ID@:");
+                }
                 for (int i = 0; i < invoices.Length; i++)
                 {
                     MInvoice invoice = invoices[i];
@@ -6584,9 +6590,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 }   //	for all shipments
 
                 //	Reverse All *RMAs*
-                //Info.Append("@C_Order_ID@:");
-                Info.Append(" - " + Msg.GetMsg(GetCtx(), "RMA") + ":");
+                //Info.Append("@C_Order_ID@:");               
                 MOrder[] rmas = GetRMAs();
+                if (rmas.Length > 0)
+                {
+                    Info.Append(" - " + Msg.GetMsg(GetCtx(), "RMA") + ":");
+                }
                 for (int i = 0; i < rmas.Length; i++)
                 {
                     MOrder rma = rmas[i];

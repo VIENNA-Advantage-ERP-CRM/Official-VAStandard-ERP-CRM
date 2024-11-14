@@ -129,7 +129,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsights.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsightsGridView.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ScheduleDetail.js",
-                   "~/Areas/VAS/Scripts/model/CalloutBudget.js"
+                   "~/Areas/VAS/Scripts/model/CalloutBudget.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedPayments.js"
                   );
 
 

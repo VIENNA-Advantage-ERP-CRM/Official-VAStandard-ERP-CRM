@@ -266,6 +266,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_DueOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedFulfilmentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedOrderWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedPayments.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpenseAmountWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_OpenQuotationWidget.js" />

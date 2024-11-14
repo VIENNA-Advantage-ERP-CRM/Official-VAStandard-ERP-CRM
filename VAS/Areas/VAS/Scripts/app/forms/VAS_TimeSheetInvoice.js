@@ -1306,7 +1306,8 @@
             $RequestSelected = $('<div class="vas-tis-dropdown-lbl">');
             TimeDiv = $('<div class="VAS-Time">');
             $TimeAndExpenseDiv = $('<div class="input-group vis-input-wrap">');
-            var TimeAndExpenseLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.MultiKey);
+            var validationcode = "S_TimeExpense.DocStatus IN ('CO','CL')";
+            var TimeAndExpenseLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.S_TimeExpense_ID, VIS.DisplayType.MultiKey, "S_TimeExpense_ID", 0, false, validationcode);
             $self.vSearchTimeAndExpense = new VIS.Controls.VTextBoxButton("S_TimeExpense_ID", true, false, true, VIS.DisplayType.MultiKey, TimeAndExpenseLookUp);
             var $TimeAndExpenseControlWrap = $('<div class="vis-control-wrap">');
             var $TimeAndExpenseButtonWrap = $('<div class="input-group-append">');
