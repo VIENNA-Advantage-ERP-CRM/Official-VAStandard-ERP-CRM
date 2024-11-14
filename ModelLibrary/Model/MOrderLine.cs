@@ -5288,69 +5288,71 @@ namespace VAdvantage.Model
         private bool CalculateChildTax(MOrder order, MOrderTax oTax, MTax tax, Trx trxName)
         {
             MTax[] cTaxes = tax.GetChildTaxes(false);	//	Multiple taxes
-            for (int j = 0; j < cTaxes.Length; j++)
+            if (cTaxes.Length > 0)
             {
-                MOrderTax newITax = null;
-                MTax cTax = cTaxes[j];
-                Decimal taxAmt = cTax.CalculateTax(oTax.GetTaxBaseAmt(), false, GetPrecision());
-
-                // check child tax record is avialable or not 
-                // if not then create new record
-                String sql = "SELECT * FROM C_OrderTax WHERE C_Order_ID=" + order.GetC_Order_ID() + " AND C_Tax_ID=" + cTax.GetC_Tax_ID();
-                try
+                for (int j = 0; j < cTaxes.Length; j++)
                 {
-                    DataSet ds = DataBase.DB.ExecuteDataset(sql, null, trxName);
-                    if (ds.Tables.Count > 0)
+                    MOrderTax newITax = null;
+                    MTax cTax = cTaxes[j];
+                    Decimal taxAmt = cTax.CalculateTax(oTax.GetTaxBaseAmt(), false, GetPrecision());
+
+                    // check child tax record is avialable or not 
+                    // if not then create new record
+                    String sql = "SELECT * FROM C_OrderTax WHERE C_Order_ID=" + order.GetC_Order_ID() + " AND C_Tax_ID=" + cTax.GetC_Tax_ID();
+                    try
                     {
-                        foreach (DataRow dr in ds.Tables[0].Rows)
+                        DataSet ds = DataBase.DB.ExecuteDataset(sql, null, trxName);
+                        if (ds.Tables.Count > 0)
                         {
-                            newITax = new MOrderTax(GetCtx(), dr, trxName);
+                            foreach (DataRow dr in ds.Tables[0].Rows)
+                            {
+                                newITax = new MOrderTax(GetCtx(), dr, trxName);
+                            }
                         }
                     }
-                }
-                catch (Exception e)
-                {
-                    _log.Log(Level.SEVERE, sql, e);
-                }
+                    catch (Exception e)
+                    {
+                        _log.Log(Level.SEVERE, sql, e);
+                    }
 
-                if (newITax != null)
-                {
-                    newITax.Set_TrxName(trxName);
-                }
+                    if (newITax != null)
+                    {
+                        newITax.Set_TrxName(trxName);
+                    }
 
-                // Create New
-                if (newITax == null)
-                {
-                    newITax = new MOrderTax(GetCtx(), 0, Get_TrxName());
-                    newITax.SetClientOrg(this);
-                    newITax.SetC_Order_ID(GetC_Order_ID());
-                    newITax.SetC_Tax_ID(cTax.GetC_Tax_ID());
-                }
+                    // Create New
+                    if (newITax == null)
+                    {
+                        newITax = new MOrderTax(GetCtx(), 0, Get_TrxName());
+                        newITax.SetClientOrg(this);
+                        newITax.SetC_Order_ID(GetC_Order_ID());
+                        newITax.SetC_Tax_ID(cTax.GetC_Tax_ID());
+                    }
 
-                newITax.SetPrecision(GetPrecision());
-                newITax.SetIsTaxIncluded(IsTaxIncluded());
-                newITax.SetTaxBaseAmt(oTax.GetTaxBaseAmt());
-                newITax.SetTaxAmt(taxAmt);
-                //Set Tax Amount (Base Currency) on Invoice Tax Window 
-                //                if (newITax.Get_ColumnIndex("TaxBaseCurrencyAmt") > 0)
-                //                {
-                //                    decimal? baseTaxAmt = taxAmt;
-                //                    int primaryAcctSchemaCurrency = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Currency_ID FROM C_AcctSchema WHERE C_AcctSchema_ID = 
-                //                                            (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + GetAD_Client_ID() + ")", null, Get_Trx()));
-                //                    if (order.GetC_Currency_ID() != primaryAcctSchemaCurrency)
-                //                    {
-                //                        baseTaxAmt = MConversionRate.Convert(GetCtx(), taxAmt, primaryAcctSchemaCurrency, order.GetC_Currency_ID(),
-                //                                                                                   order.GetDateAcct(), order.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
-                //                    }
-                //                    newITax.Set_Value("TaxBaseCurrencyAmt", baseTaxAmt);
-                //                }
-                if (!newITax.Save(Get_TrxName()))
+                    newITax.SetPrecision(GetPrecision());
+                    newITax.SetIsTaxIncluded(IsTaxIncluded());
+                    newITax.SetTaxBaseAmt(oTax.GetTaxBaseAmt());
+                    newITax.SetTaxAmt(taxAmt);
+                    //Set Tax Amount (Base Currency) on Invoice Tax Window 
+                    //                if (newITax.Get_ColumnIndex("TaxBaseCurrencyAmt") > 0)
+                    //                {
+                    //                    decimal? baseTaxAmt = taxAmt;
+                    //                    int primaryAcctSchemaCurrency = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT C_Currency_ID FROM C_AcctSchema WHERE C_AcctSchema_ID = 
+                    //                                            (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + GetAD_Client_ID() + ")", null, Get_Trx()));
+                    //                    if (order.GetC_Currency_ID() != primaryAcctSchemaCurrency)
+                    //                    {
+                    //                        baseTaxAmt = MConversionRate.Convert(GetCtx(), taxAmt, primaryAcctSchemaCurrency, order.GetC_Currency_ID(),
+                    //                                                                                   order.GetDateAcct(), order.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                    //                    }
+                    //                    newITax.Set_Value("TaxBaseCurrencyAmt", baseTaxAmt);
+                    //                }
+                    if (!newITax.Save(Get_TrxName()))
+                        return false;
+                }
+                // Delete Summary Level Tax Line
+                if (!oTax.Delete(true, Get_TrxName()))
                     return false;
             }
-            // Delete Summary Level Tax Line
-            if (!oTax.Delete(true, Get_TrxName()))
-                return false;
-
             return true;
         }
 
