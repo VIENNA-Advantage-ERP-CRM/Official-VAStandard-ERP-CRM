@@ -26,11 +26,12 @@
         //Main pagesize to get data in array
         var pageSize = 500;
         //Page size to show data in main div
-        var arrayPageSize = 4;
-        var countRecord = 4;
+        var arrayPageSize = 6;
+        var countRecord = 6;
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = null;
         var gridDataResult = null;
+        var $FilterHeader = null
         var TotalAmtArray = [];
         var vSearchBPartner = null;
         var ColumnIds = null;
@@ -39,8 +40,15 @@
         var FinancialPeriodValue = null;
         var fromDate = null;
         var toDate = null;
+        var isSOTrx = null;
         var C_BPartner_ID = null;
         var IsFilterBtnClicked = false;
+        var docTypeValue = null;
+        var ColumnData = [
+            { refernceName: "VAS_DocTypeExPayPaymentList" },
+            { refernceName: "VAS_FinancialPeriodPaymentList" },
+            { ColumnName: "C_BPartner_ID" }
+        ];
 
         /*Intialize function will intialize busy indiactor*/
         this.initalize = function () {
@@ -48,9 +56,11 @@
             createDummyDiv();
             createBusyIndicator();
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
+            /*If Screen is AR Receipt then IsSoTrx will be true else for AP Payment it will be false*/
+            isSOTrx = VIS.context.getWindowContext($self.windowNo, "IsReceipt") == 'Y' ? true : false;
             $maindiv = $('<div class="vas-expay-expected-payment">')
             var headingDiv = $('<div class="vas-expay-expected-heading">');
-            var HeadingLabelDiv = $('<div>' + VIS.Msg.getMsg("VAS_ExpectedPayment") + '</div>')
+            var HeadingLabelDiv = $('<div style="font-size:1.4em">' + VIS.Msg.getMsg("VAS_ExpectedPayment") + '</div>')
             var filetrDiv = $("<div class='vas-expay-filter dropdown'>" +
                 "<div class='vas-expay-icondiv'>" +
                 "<span class='vas-expay-filterspn btn d-flex position-relative' type='button' id='vas_expay_dropdownMenu_" + $self.windowNo + "'>" +
@@ -71,57 +81,74 @@
                     $FilterHeader = $(
                         '  <div class="vas-expay-filter-flyout">' +
                         '    <div class="vas-from-row">');
+
+                    DocTypeExPayListDiv = $('<div class="VAS-DocTypeExPayListDiv">');
+                    $DocTypeExPayListDiv = $('<div class="input-group vis-input-wrap">');
+                    /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
+                    $DocTypeExPayListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_DocTypeExPayPaymentList", ColumnIds.VAS_DocTypeExPayPaymentList, false);
+                    // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
+                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", true, false, true, $DocTypeExPayListLookUp, 20);
+                    $self.vDocTypeExPayList.setValue("01");
+                    var $DocTypeExPayListControlWrap = $('<div class="vis-control-wrap">');
+                    $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
+                    $DocTypeExPayListControlWrap.append($self.vDocTypeExPayList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: #fff; top:-9px;">' + VIS.Msg.getMsg("VAS_DocTypeExPayDiv") + '</label>');;
+                    $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
+                    DocTypeExPayListDiv.append($DocTypeExPayListDiv);
+
+                    FinancialPeriodListDiv = $('<div class="VAS-FinancialPeriodListDiv">');
+                    $FinancialPeriodListDiv = $('<div class="input-group vis-input-wrap">');
+                    /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
+                    $FinancialPeriodListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_FinancialPeriodPaymentList", ColumnIds.VAS_FinancialPeriodPaymentList, false);
+                    // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
+                    $self.vFinancialPeriodList = new VIS.Controls.VComboBox("VAS_FinancialPeriodPaymentList", true, false, true, $FinancialPeriodListLookUp, 20);
+                    // $self.vFinancialPeriodList.setValue("01");
+                    var $FinancialPeriodListControlWrap = $('<div class="vis-control-wrap">');
+                    $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
+                    $FinancialPeriodListControlWrap.append($self.vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: #fff; top:-9px;">' + VIS.Msg.getMsg("VAS_FinancialPeriodDiv") + '</label>');;
+                    $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
+                    FinancialPeriodListDiv.append($FinancialPeriodListDiv);
+
                     //Created customer search control to filter out data
                     var BPartnerDiv = $('<div class="vas-BPartnerDiv">');
                     $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
-                    var BPartnerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, 5398, VIS.DisplayType.Search);
+                    var BPartnerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search);
                     vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, BPartnerLookUp);
                     var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                     var $BPartnerButtonWrap = $('<div class="input-group-append">');
                     $BPartnerDiv.append($BPartnerControlWrap);
-                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');;
+                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');;
                     $BPartnerDiv.append($BPartnerControlWrap);
                     $BPartnerButtonWrap.append(vSearchBPartner.getBtn(0));
                     $BPartnerDiv.append($BPartnerButtonWrap);
                     BPartnerDiv.append($BPartnerDiv);
 
-                    FinancialPeriodListDiv = $('<div class="VAS-FinancialPeriodListDiv">');
-                    $FinancialPeriodListDiv = $('<div class="input-group vis-input-wrap">');
-                    /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
-                    $FinancialPeriodListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_FinancialPeriodPaymentList", ColumnIds.AD_Reference_ID, false);
-                    // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-                    $self.vFinancialPeriodList = new VIS.Controls.VComboBox("VAS_FinancialPeriodPaymentList", true, false, true, $FinancialPeriodListLookUp, 20);
-                   // $self.vFinancialPeriodList.setValue("01");
-                    var $FinancialPeriodListControlWrap = $('<div class="vis-control-wrap">');
-                    $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
-                    $FinancialPeriodListControlWrap.append($self.vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-tis-lablels">' + VIS.Msg.getMsg("VAS_FinancialPeriodDiv") + '</label>');;
-                    $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
-                    FinancialPeriodListDiv.append($FinancialPeriodListDiv);
-
                     //Created from and to date control to filter out data
-                    var FromDatediv = $('<div class="vas-FromdateDiv">');
+                    var FromDatediv = $('<div class="vas-expay-dateWidth vas-FromdateDiv">');
                     $FromDatewrapDiv = $('<div class="input-group vis-input-wrap">');
                     $FromDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
                     var $FromDateWrap = $('<div class="vis-control-wrap">');
                     $FromDatewrapDiv.append($FromDateWrap);
-                    $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-tis-lablels">' + VIS.Msg.getMsg("VAS_FromDate") + '</label>');;
+                    $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels">' + VIS.Msg.getMsg("VAS_FromDate") + '</label>');;
                     FromDatediv.append($FromDatewrapDiv);
 
-                    var toDatediv = $('<div class="vas-todateDiv">');
+                    var toDatediv = $('<div class="vas-expay-dateWidth vas-todateDiv">');
                     $toDatewrapDiv = $('<div class="input-group vis-input-wrap">');
                     $ToDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
                     var $toDateWrap = $('<div class="vis-control-wrap">');
                     $toDatewrapDiv.append($toDateWrap);
-                    $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-tis-lablels">' + VIS.Msg.getMsg("VAS_ToDate") + '</label>');;
+                    $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels">' + VIS.Msg.getMsg("VAS_ToDate") + '</label>');;
                     toDatediv.append($toDatewrapDiv);
-                    $FilterHeader.append(BPartnerDiv).append(FinancialPeriodListDiv).append(FromDatediv).append(toDatediv);
+                    var $DatesDiv = $('<div class="vas-expay-datefilter">');
+                    $DatesDiv.append(FromDatediv).append(toDatediv);
+                    $FilterHeader.append(DocTypeExPayListDiv).append(FinancialPeriodListDiv).append(BPartnerDiv).append($DatesDiv);
+
                     var ButtonDiv = $('<div class="vas-expay-btndiv">');
                     var ApplyBtn = $('<div class="vas-flyout-footer">' +
-                        '<button id="VAS_Apply_' + $self.windowNo + '" class="vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Apply") + '</button>' +
+                        '<button id="VAS_Apply_' + $self.windowNo + '" class="VIS_Pref_btn-2 vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Apply") + '</button>' +
                         '</div>'
                     );
                     var CloseBtn = $('<div class="vas-flyout-footer">' +
-                        '<button id="VAS_Close_' + $self.windowNo + '" class="vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Clear") + '</button>' +
+                        '<button id="VAS_Close_' + $self.windowNo + '" class="VIS_Pref_btn-2 vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Clear") + '</button>' +
                         '</div>'
                     );
                     ButtonDiv.append(CloseBtn).append(ApplyBtn);
@@ -146,12 +173,13 @@
                         pageNoarray = 1;
                         CurrentPage = 1;
                         pageSize = 500;
-                        arrayPageSize = 4;
+                        arrayPageSize = 6;
                         RecCount = 0;
-                        countRecord = 4;
+                        countRecord = 6;
                         FinancialPeriodValue = $self.vFinancialPeriodList.getValue()
                         fromDate = $FromDate.getValue();
                         toDate = $ToDate.getValue();
+                        docTypeValue = $self.vDocTypeExPayList.getValue();
                         $FilterHeader.remove();
                         $maindiv.find('#vas_listContainer_' + widgetID).remove();
                         $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
@@ -176,8 +204,8 @@
         this.intialLoad = function () {
             $bsyDiv[0].style.visibility = "visible";
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetExpectedPaymentData", {
-                "ISOtrx": VIS.Env.getCtx().isSOTrx($self.windowNo), "pageNo": pageNo, "pageSize": pageSize, "FinancialPeriodValue": FinancialPeriodValue,
-                "C_BPartner_ID": C_BPartner_ID, "fromDate": fromDate, "toDate": toDate
+                "ISOtrx": isSOTrx, "pageNo": pageNo, "pageSize": pageSize, "FinancialPeriodValue": FinancialPeriodValue,
+                "C_BPartner_ID": C_BPartner_ID, "fromDate": fromDate, "toDate": toDate, "docTypeValue": docTypeValue
             }, function (dr) {
                 TotalAmtArray = dr;
                 if (TotalAmtArray != null && TotalAmtArray.length > 0) {
@@ -248,13 +276,13 @@
 
                 // Determine the correct text based on conditions
                 if (gridDataResult[i].windowType === "Order") {
-                    if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true) {
+                    if (isSOTrx == true) {
                         headingText = VIS.Msg.getMsg("VAS_AdvSalesOrder");
                     } else {
                         headingText = VIS.Msg.getMsg("VAS_AdvPurchaseOrder");
                     }
                 } else if (gridDataResult[i].windowType === "Invoice") {
-                    if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true) {
+                    if (isSOTrx == true) {
                         headingText = VIS.Msg.getMsg("VAS_SalesInvoice");
                     } else {
                         headingText = VIS.Msg.getMsg("VAS_PurchaseInvoice");
@@ -262,40 +290,39 @@
                 }
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-expay-payments-box">' +
-                    '<div class="vas-expay-amtdiv">' +
-                    '<h6 class="vas-expay-headDiv">' + headingText + '</h6>' +
-                    '</div>' +
                     '<div class="vas-expay-payments-detail">' +
-                    '<div class="vas-expay-payment-w-amount" style="display: flex;gap: 0.6em;">';
-
-                if (gridDataResult[i].ImageUrl != null) {
-                    // Append image if available
-                    widgetDataDesign += '<img class="vas-businessPartnerImg" alt="' + gridDataResult[i].ImageUrl + '" src="' + VIS.Application.contextUrl + gridDataResult[i].ImageUrl + '">'
-                } else {
-
-                    // Append initial if image is not available
-                    widgetDataDesign +=
-                        '<div style="float:left; background-color:' + pastel + '" class="vas-igtwidg-img-icon">' +
-                        '<span style="font-size: 16px;">' + custChar + '</span>' +
-                        '</div>';
-                }
-                widgetDataDesign +=
-                    // '<div class="vas-expay-company-w-date">' +
-                    '<div class="vas-expay-com-name" title="' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>'+
-                    '</div>' +
-                    '<div class="vas-expay-payment-w-amount" style="margin-left:53px;">' +
-                    '<div class="vas-expay-payment-lbl">' + gridDataResult[i].DocumentNo + '</div>' +
-                    '</div>' +
-                    '<div class="vas-expay-paymentDate">' + VIS.Msg.getMsg("DueDate") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
-                    '<div class="vas-expay-payment-w-amount" style="margin-left:53px;">' +
-                    '<div class="vas-expay-payment-lbl">' + (gridDataResult[i].Symbol.length != 3 ? '<span>' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
-                    (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span>' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
+                    '<div class="vas-expay-payment-w-amount">' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl">' + gridDataResult[i].PayMethod + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
                     '</div>' +
-                    '<div class="vas-expay-payment-w-amount" style="margin-left:53px;>' +
-                    '<div class="vas-expay-payment-lbl">' + gridDataResult[i].ISO_Code + '</div>' +
+                    '<div class="vas-expay-payment-w-amount">';
+
+                //if (gridDataResult[i].ImageUrl != null) {
+                //    // Append image if available
+                //    widgetDataDesign += '<img class="vas-businessPartnerImg" alt="' + gridDataResult[i].ImageUrl + '" src="' + VIS.Application.contextUrl + gridDataResult[i].ImageUrl + '">'
+                //} else {
+
+                //    // Append initial if image is not available
+                //    widgetDataDesign +=
+                //        '<div style="float:left; background-color:' + pastel + '" class="vas-igtwidg-img-icon">' +
+                //        '<span style="font-size: 16px;">' + custChar + '</span>' +
+                //        '</div>';
+                //}
+                widgetDataDesign +=
+                    // '<div class="vas-expay-company-w-date">' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_BusinessPartner") + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
+                    '</div>' +
+                    '<div class="vas-expay-payment-w-amount">' +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
+                    '</div>' +
+                    '<div class="vas-expay-payment-w-amount">' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_ISO_Code") + ': ' + gridDataResult[i].ISO_Code + '">' + gridDataResult[i].ISO_Code + '</div>' +
+                    '</div>' +
+                    '<div class="vas-expay-payment-w-amount">' +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueAmtExPay") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
+                    (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
                     '</div>' +
                     '</div>' +
                     '</div>';
@@ -387,7 +414,7 @@
         * This function is used to get the refernce id of list
         */
         var GetColumnID = function () {
-            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "refernceName": "VAS_FinancialPeriodPaymentList" }, null);
+            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnIDForExpPayment", { "refernceName": JSON.stringify(ColumnData) }, null);
         }
 
         /*This function used to get root*/
@@ -408,9 +435,13 @@
             pageNoarray = 1;
             pageSize = 500;
             CurrentPage = 1;
+            if ($FilterHeader != null) {
+                $FilterHeader.remove();
+            }
             RecCount = 0;
-            arrayPageSize = 4;
-            countRecord = 4;
+            arrayPageSize = 6;
+            docTypeValue = null;
+            countRecord = 6;
             $self.intialLoad();
         };
     };
