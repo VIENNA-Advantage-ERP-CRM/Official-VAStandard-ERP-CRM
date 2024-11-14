@@ -269,7 +269,7 @@
                                 + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
                                 + '<span class="VAS-line-lbl">Line</span>'
                                 + '</div>'
-                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '" allow-nonitem="' + data[i].AllowNonitem + '" vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
+                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
                                 + '</div>'
                                 + '</div>');
 
@@ -282,9 +282,8 @@
 
                             var CartId = $(this).attr('vas-cart-id');
                             Reference = $(this).attr('vas-CartRef');
-                            var AllowItem = $(this).attr('allow-nonitem');
 
-                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID, "AllowNonItem": AllowItem});
+                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID});
 
                             if (result && result.length > 0) {
                                 $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));

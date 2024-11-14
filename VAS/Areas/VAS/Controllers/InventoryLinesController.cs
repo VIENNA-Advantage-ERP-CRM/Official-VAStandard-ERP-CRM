@@ -58,7 +58,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartData(CartName, UserId, FromDate, ToDate, RefNo, windowID, RecordId, WindowName);
+                result = obj.GetIventoryCartData(ctx,CartName, UserId, FromDate, ToDate, RefNo, windowID, RecordId, WindowName);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
@@ -67,7 +67,7 @@ namespace VAS.Controllers
         /// </summary>
         /// <param name="CartId"></param>
         /// <returns></returns>
-        public JsonResult GetIventoryCartLines(int CartId , string ScreenName, int RecordId,string AllowNonItem)
+        public JsonResult GetIventoryCartLines(int CartId , string ScreenName, int RecordId)
         {
             List<Dictionary<string, object>> result = null;
             if (Session["ctx"] != null)
@@ -75,7 +75,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartLines(CartId,  ScreenName,  RecordId, AllowNonItem);
+                result = obj.GetIventoryCartLines(ctx,CartId,  ScreenName,  RecordId);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }

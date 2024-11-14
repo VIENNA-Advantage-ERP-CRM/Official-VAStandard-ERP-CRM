@@ -49,6 +49,7 @@ namespace VAS.Models
         /// <returns>users</returns>
         public List<KeyNamePair> GetUsers(Ctx ctx, string value)
         {
+           
             List<KeyNamePair> user = null;
             StringBuilder sql = new StringBuilder();
             sql.Append("SELECT Name,AD_User_ID FROM AD_User WHERE IsActive='Y' ");
@@ -78,24 +79,13 @@ namespace VAS.Models
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public List<Dictionary<string, object>> GetIventoryCartData(string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName)
+        public List<Dictionary<string, object>> GetIventoryCartData( Ctx ctx, string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName)
         {
-
+            
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
             StringBuilder sql = new StringBuilder();
-            string AllowNonItem = "N";
-
-            if (WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_MaterialReceipt" || 
-                windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn))
-            {
-                sql.Clear();
-                sql.Append("SELECT IsAllowNonItem FROM M_INOUT m INNER JOIN AD_Client c on m.AD_Client_id =c.AD_Client_id where m.M_INOUT_Id =" + RecordId);
-                if (Util.GetValueOfString(DB.ExecuteScalar(sql.ToString(), null, null)) == "Y")
-                {
-                    AllowNonItem = "Y";
-                }
-            }
+            string allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem"));
 
             sql.Clear();
             sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
@@ -112,7 +102,7 @@ namespace VAS.Models
             else if (WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "VAS_DeliveryOrder" || WindowName == "VAS_MaterialReceipt" ||
                 windowID == Util.GetValueOfInt(Windows.Shipment) || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn))
             {
-                if (AllowNonItem == "N")
+                if (allowNonItem == "N")
                 {
 
                     sql.Append(" and p.ProductType='I' ");
@@ -214,7 +204,6 @@ namespace VAS.Models
                     obj["CartLineCount"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["LineCount"]);
                     obj["TotalCartCount"] = Util.GetValueOfInt(ds.Tables.Count);
                     obj["ReferenceNo"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["VAICNT_ReferenceNo"]);
-                    obj["AllowNonitem"] = AllowNonItem;
                     retDic.Add(obj);
                 }
             }
@@ -229,7 +218,7 @@ namespace VAS.Models
         /// </summary>
         /// <param name="CartId"></param>
         /// <returns></returns>
-        public List<Dictionary<string, object>> GetIventoryCartLines(int CartId, string ScreenName, int RecordId, string AllowNonItem)
+        public List<Dictionary<string, object>> GetIventoryCartLines(Ctx ctx ,int CartId, string ScreenName, int RecordId)
         {
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
@@ -237,6 +226,7 @@ namespace VAS.Models
             int FromWarehouse = 0;
             int ToWarehouse = 0;
             StringBuilder sql = new StringBuilder();
+            string AllowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem"));
 
             if (ScreenName == "VAS_InventoryMove")
             {
