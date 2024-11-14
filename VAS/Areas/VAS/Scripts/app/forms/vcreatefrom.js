@@ -773,6 +773,15 @@
                     obj.$root = null;
                 }
             });
+
+            /*VIS_0060: 13-Nov-2024, Set Order in case of delivery Order*/
+            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx"))) {
+                obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "C_Order_ID"));
+
+                // Change event for Order
+                var eventnew = { propertyName: "C_Order_ID" }
+                obj.vetoablechange(eventnew);
+            }
         };
 
         // function to check comma or dot from given value and return new value
@@ -974,7 +983,7 @@
         if (OrgId > 0) {
             sql += " AND C_Order.AD_Org_ID = " + OrgId;
         }
-        
+
         if (C_BPartner_ID > 0) {
             if (forInvoice) {
                 sql += " AND (C_Order.C_BPartner_ID = " + C_BPartner_ID + " OR C_Order.Bill_BPartner_ID = " + C_BPartner_ID + ")";
@@ -983,7 +992,7 @@
                 sql += " AND C_Order.C_BPartner_ID = " + C_BPartner_ID;
             }
         }
-       
+
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
                 { "columns": column, "forInvoices": forInvoice, "recordID": recordId, "Table": "C_Order" }, null);
@@ -1021,7 +1030,7 @@
 
         var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), VIS.Env.getWindowNo(), 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
         this.cmbOrder = new VIS.Controls.VTextBoxButton("C_Order_ID", true, false, true, VIS.DisplayType.Search, lookupOrder);
-
+      
         //$.ajax({
         //    url: VIS.Application.contextUrl + "VCreateFrom/VCreateGetOrders",
         //    type: 'POST',
@@ -1687,6 +1696,12 @@
         if ($self.mTab.keyColumnName == "C_ProvisionalInvoice_ID") {
             this.middelDiv.css('height', '64%');
         }
+        else if ($self.mTab.keyColumnName == "C_Invoice_ID") {
+            this.middelDiv.css('height', '62%');
+        }
+        else if ($self.mTab.keyColumnName == "M_InOut_ID") {
+            this.middelDiv.css('height', '54%');
+        }
 
         this.topDiv.append(line);
         line.append(col);
@@ -1844,6 +1859,9 @@
 
             //if (window.DTD001) {
             DivInputCtrlWrap.append(this.relatedToOrg.getControl());
+
+            /*VIS_045 - 13-Nov-2024, Hide Related to Organization, assign by (Surya)*/
+            line.hide();
         }
         //End Fifth Row
         /******************************/
