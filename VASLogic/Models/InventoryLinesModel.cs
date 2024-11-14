@@ -79,7 +79,7 @@ namespace VAS.Models
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public List<Dictionary<string, object>> GetIventoryCartData( Ctx ctx, string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName)
+        public List<Dictionary<string, object>> GetIventoryCartData( Ctx ctx, string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName, int ToWarehouse, int DTDSrcWarehouse)
         {
             
             List<Dictionary<string, object>> retDic = null;
@@ -117,22 +117,20 @@ namespace VAS.Models
             if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory") //Inventory count
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR ( VAICNT_TransactionType IN ('PI') AND VAICNT_ReferenceNo IN " +
-                    " (SELECT Value FROM M_Locator WHERE M_Warehouse_ID=(SELECT M_Warehouse_ID FROM M_Inventory  WHERE M_Inventory_ID=" + RecordId + ")))");
+                    " (SELECT Value FROM M_Locator WHERE M_Warehouse_ID="+ ToWarehouse + "))");
             }
 
             if (windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory")//Inventory use
             {
                 // sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType IN ('IU') AND VAICNT_ReferenceNo IN " +
-                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = (SELECT M_Warehouse_ID FROM M_Inventory  " +
-                    " WHERE M_Inventory_ID=" + RecordId + ") AND DTD001_MWarehouseSource_ID=(SELECT M_Warehouse_ID FROM M_Inventory  WHERE M_Inventory_ID=" + RecordId + ")))");
+                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = "+ ToWarehouse + " AND DTD001_MWarehouseSource_ID="+ DTDSrcWarehouse + "))");
             }
 
             if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType ='IM' AND  VAICNT_ReferenceNo IN (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' " +
-                    "AND DTD001_MWarehouseSource_ID = (SELECT DTD001_MWarehouseSource_ID FROM M_Movement WHERE M_Movement_ID=" + RecordId + ") AND M_Warehouse_ID=" +
-                    " (SELECT M_Warehouse_ID FROM M_Movement  WHERE M_Movement_ID=" + RecordId + ")) )");
+                    "AND DTD001_MWarehouseSource_ID = "+ DTDSrcWarehouse + " AND M_Warehouse_ID= "+ ToWarehouse + ") )");
             }
             if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")//GRN
             {
@@ -223,21 +221,9 @@ namespace VAS.Models
             List<Dictionary<string, object>> retDic = null;
             Dictionary<string, object> obj = null;
             DataSet ds = new DataSet();
-            int FromWarehouse = 0;
-            int ToWarehouse = 0;
             StringBuilder sql = new StringBuilder();
             string AllowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem"));
 
-            if (ScreenName == "VAS_InventoryMove")
-            {
-                sql.Append("SELECT M_Warehouse_ID,DTD001_MWarehouseSource_ID FROM M_Movement WHERE  M_Movement_ID=" + RecordId);
-                ds = DB.ExecuteDataset(sql.ToString(), null, null);
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    FromWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]);
-                    ToWarehouse = Util.GetValueOfInt(ds.Tables[0].Rows[0]["DTD001_MWarehouseSource_ID"]);
-                }
-            }
 
             sql.Clear();
             sql.Append("SELECT po.VAICNT_InventoryCount_ID,po.VAICNT_InventoryCountLine_ID,po.M_Product_ID,prd.Name AS ProductName, po.C_UOM_ID, u.Name AS UomName, po.UPC, " +
@@ -284,13 +270,10 @@ namespace VAS.Models
                     obj["AttrId"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
                     obj["AttrName"] = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
                     obj["Quantity"] = Util.GetValueOfInt(ds.Tables[0].Rows[i]["VAICNT_Quantity"]);
-                    obj["FromWarehouse"] = FromWarehouse;
-                    obj["ToWarehouse"] = ToWarehouse;
-
+                   
                     retDic.Add(obj);
                 }
 
-                //retDic.Add(obj);
             }
             return retDic;
         }
