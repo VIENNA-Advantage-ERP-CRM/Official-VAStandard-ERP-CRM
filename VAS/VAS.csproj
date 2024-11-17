@@ -269,6 +269,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedPayments.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpenseAmountWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedTransferWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvoiceMatchedTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_OpenQuotationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsights.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsightsGridView.js" />

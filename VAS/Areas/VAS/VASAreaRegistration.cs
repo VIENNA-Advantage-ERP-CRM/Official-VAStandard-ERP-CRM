@@ -130,7 +130,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_FinDInsightsGridView.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_ScheduleDetail.js",
                    "~/Areas/VAS/Scripts/model/CalloutBudget.js",
-                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedPayments.js"
+                   "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedPayments.js",
+                   "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceMatchedTabPanel.js"
                   );
 
 
@@ -150,7 +151,7 @@ namespace VAS
                 );
 
             style.Include("~/Areas/VAS/Content/VIS.rtl.css");
-            
+
 
             //style.Include("~/Areas/VAS/Content/VAS.all.min.css");
             //modScript.Include("~/Areas/VAS/Scripts/VAS.all.min.js");
