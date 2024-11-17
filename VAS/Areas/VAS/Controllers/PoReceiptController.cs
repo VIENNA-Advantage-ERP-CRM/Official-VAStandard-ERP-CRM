@@ -380,5 +380,13 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        public JsonResult GetInvoiceLineMatchData(int InvoiceId, int pageNo, int pageSize)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
+            List<VAS_InvoiceMatchingDetail> result = objScheduleData.GetInvoiceLineMatchData(ctx, InvoiceId, pageNo, pageSize);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }

@@ -2063,12 +2063,12 @@ hr.vas-paymentData-underline {
 }
 
 /*.VAS-ScheduleData {*/
-    /*max-height: calc(100vh - 320px);*/
-    /*overflow-y: auto;*/
+/*max-height: calc(100vh - 320px);*/
+/*overflow-y: auto;*/
 /*}*/
 
-.vas-scheduleData-root{
-    height:100%
+.vas-scheduleData-root {
+    height: 100%
 }
 
 .VAS-scheduledata-Paging {
@@ -2081,12 +2081,12 @@ hr.vas-paymentData-underline {
     background: #fff;
 }
 
-.vas-scheduleDataListGroup{
-    overflow:auto;
+.vas-scheduleDataListGroup {
+    overflow: auto;
 }
 
-.vas-scheduledatalist{
-    margin-top:1px;
+.vas-scheduledatalist {
+    margin-top: 1px;
 }
 /*Schedule Data CSS End*/
 
@@ -2187,7 +2187,7 @@ hr.vas-paymentData-underline {
 
 .vas-expay-company-w-date .vas-expay-paymentDate {
     font-size: 0.875em;
-/*    color: rgba(var(--v-c-on-secondary), 0.5);*/
+    /*    color: rgba(var(--v-c-on-secondary), 0.5);*/
 }
 
 /*.vas-expay-payment-w-amount {
@@ -2251,8 +2251,9 @@ hr.vas-paymentData-underline {
         .vis-editModeWidget .vas-expay-slider-arrows i.fa {
             font-size: 13px;
         }
+
     .vas-expay-expected-payment {
-        font-size:12px
+        font-size: 12px
     }
 }
 
@@ -2396,10 +2397,10 @@ hr.vas-paymentData-underline {
     margin: 0 20px 10px 0;
 }*/
 
-    .vas-expay-expected-payment .vas-expay-expected-heading .vas-expay-filterby-col {
-        flex-basis: 35%;
-        justify-content: flex-end;
-    }
+.vas-expay-expected-payment .vas-expay-expected-heading .vas-expay-filterby-col {
+    flex-basis: 35%;
+    justify-content: flex-end;
+}
 
 .vas-expay-expected-payment .VAS-ExpectedListDiv {
     /*flex-basis: 33%;*/
@@ -2534,25 +2535,142 @@ hr.vas-paymentData-underline {
     border-radius: 7px;
     color: #ffffff;
 }
-.vas-expay-text-align{
-    text-align:right;
+
+.vas-expay-text-align {
+    text-align: right;
 }
+
 .vas-expay-lablels {
     background: #fff;
     top: -9px;
 }
-.vas-expay-dateWidth{
-    width:48%;
+
+.vas-expay-dateWidth {
+    width: 48%;
 }
-.vas-expay-datefilter{
-    display:flex;
-    gap:0.5em
+
+.vas-expay-datefilter {
+    display: flex;
+    gap: 0.5em
 }
-.vas-expay-symbol{
-    font-weight:600;
-    font-family:Verdana;
+
+.vas-expay-symbol {
+    font-weight: 600;
+    font-family: Verdana;
 }
-.vas-expay-head-font{
-    font-weight:600;
+
+.vas-expay-head-font {
+    font-weight: 600;
 }
 /*Expected Payments css End*/
+
+
+/** Invoice Match Detail CSS Start*/
+.vas-invmatch-DataItem {
+    background-color: #EDF5FA;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 16px;
+   /* width: 90%;
+    max-width: 400px;*/
+    text-align: left;
+}
+
+.vas-invmatch-headerRow {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.vas-invmatch-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+}
+
+    .vas-invmatch-info-row span {
+        display: inline-block;
+        font-size: 14px;
+    }
+
+.vas-invmatch-uom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    margin-top: 8px;
+}
+
+.vas-invmatch-matched {
+    color: #4caf50;
+}
+
+.vas-invmatch-unmatched {
+    color: #f44336;
+}
+
+.vas-invmatch-Data-root {
+    height: 100%
+}
+
+.vas-invmatch-DataWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+    height: calc(100% - 48px);
+}
+
+.vas-invmatch-data-Paging {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    margin-top: 10px;
+    position: sticky;
+    bottom: 0px;
+    background: #fff;
+}
+
+.vas-invmatch-DataListGroup {
+    overflow: auto;
+}
+
+.vas-invmatch-datalist {
+    margin-top: 1px;
+}
+
+.vas-invmatch-DataElementTTl, .vas-invmatch-DataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-invmatch-DataElementValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-invmatch-DataListItem {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    margin: auto;
+    width: 96%;
+}
+
+.vas-invmatch-Data-sglItem {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/** Invoice Match Detail CSS End*/
