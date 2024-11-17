@@ -2349,6 +2349,47 @@ namespace VASLogic.Models
             return C_Period_ID;
 
         }
+
+        public List<VAS_InvoiceMatchingDetail> GetInvoiceLineMatchData(Ctx ctx, int InvoiceId, int pageNo, int pageSize)
+        {
+            List<VAS_InvoiceMatchingDetail> InvocieTaxTabPanel = new List<VAS_InvoiceMatchingDetail>();
+            String sql = @"SELECT il.Line, p.Name AS ProductName, uom.Name AS UOMName, uom.StdPrecision AS UOMPrecision, 
+                            il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, 
+                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced
+                            FROM
+                            C_Invoice i 
+                            INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = i.C_Invoice_ID)
+                            INNER JOIN M_Product p ON (p.M_Product_ID = il.M_Product_ID)
+                            INNER JOIN C_UOM uom ON (uom.C_UOM_ID = il.C_UOM_ID)
+                            LEFT JOIN C_OrderLine ol ON (ol.C_OrderLIne_ID = il.C_OrderLine_ID)
+                            WHERE il.IsActive = 'Y' AND p.ProductType = 'I' AND i.C_Invoice_ID = " + InvoiceId;
+            sql += " ORDER BY il.Line ";
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql + ")t", null, null));
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    VAS_InvoiceMatchingDetail obj = new VAS_InvoiceMatchingDetail();
+                    obj.RecordCount = RecordCount;
+                    obj.Line = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Line"]);
+                    obj.ProductName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ProductName"]);
+                    obj.UomName = Util.GetValueOfString(ds.Tables[0].Rows[i]["UOMName"]);
+                    obj.C_Invoiceline_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Invoiceline_ID"]);
+                    obj.QtyEntered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyEntered"]);
+                    obj.QtyInvoiced = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyInvoiced"]);
+                    obj.C_OrderLine_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_OrderLine_ID"]);
+                    obj.M_InOutLine_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_InOutLine_ID"]);
+                    obj.QtyOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
+                    obj.OrderDelivered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderDelivered"]);
+                    obj.OrderInvoiced = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderInvoiced"]);
+                    obj.UOMPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["UOMPrecision"]);
+                    InvocieTaxTabPanel.Add(obj);
+                }
+            }
+            return InvocieTaxTabPanel;
+        }
     }
     public class TabPanel
     {
@@ -2535,5 +2576,22 @@ namespace VASLogic.Models
         public string PayMethod { get; set; }
         public string windowType { get; set; }
 
+    }
+
+    public class VAS_InvoiceMatchingDetail
+    {
+        public int Line { get; set; }
+        public string ProductName { get; set; }
+        public string UomName { get; set; }
+        public decimal QtyEntered { get; set; }
+        public decimal QtyInvoiced { get; set; }
+        public int C_OrderLine_ID { get; set; }
+        public int M_InOutLine_ID { get; set; }
+        public decimal QtyOrdered { get; set; }
+        public decimal OrderDelivered { get; set; }
+        public decimal OrderInvoiced { get; set; }
+        public int C_Invoiceline_ID { get; set; }
+        public int UOMPrecision { get; set; }
+        public int RecordCount { get; set; }
     }
 }
