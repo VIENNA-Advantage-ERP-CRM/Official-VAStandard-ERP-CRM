@@ -2570,7 +2570,7 @@ hr.vas-paymentData-underline {
     background-color: #EDF5FA;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 16px;
+    padding: 10px;
    /* width: 90%;
     max-width: 400px;*/
     text-align: left;
@@ -2589,7 +2589,7 @@ hr.vas-paymentData-underline {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 8px 0;
+    margin: 0 0;
 }
 
     .vas-invmatch-info-row span {
@@ -2670,7 +2670,21 @@ hr.vas-paymentData-underline {
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
-    margin-top: 15px;
+    margin-top: 10px;
+}
+
+.vas-invmatch-setCol1Width {
+width:33%;
+}
+
+.vas-invmatch-DataRow {
+background-color:#F9F9F9;
+padding:0.2rem;
+margin-top:5px;
+}
+
+.vas-invmatch-ExpectedMargin {
+margin-top:-10px;
 }
 
 /** Invoice Match Detail CSS End*/
