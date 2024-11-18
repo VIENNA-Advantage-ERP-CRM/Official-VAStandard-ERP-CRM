@@ -782,6 +782,9 @@
                 var eventnew = { propertyName: "C_Order_ID" }
                 obj.vetoablechange(eventnew);
             }
+            else {
+                obj.locatorField.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "M_Locator_ID"));
+            }
         };
 
         // function to check comma or dot from given value and return new value
