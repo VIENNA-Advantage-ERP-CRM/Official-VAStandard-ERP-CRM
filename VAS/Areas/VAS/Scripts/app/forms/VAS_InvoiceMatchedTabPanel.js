@@ -217,7 +217,7 @@
 
                                     TabPaneldesign += '<div class="vas-scheduleData-sglItem vas-invmatch-DataRow mb-2">' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-scheduleDataElementValue vas-invmatch-setCol1Width">' + VIS.Msg.getMsg("VAS_GRN") + '</span>' +
+                                        '<span class="vas-scheduleDataElementValue">' + VIS.Msg.getMsg("VAS_GRN") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="vas-scheduleDataElementValue text-right">' + (data[i].ExpectedGRN).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
@@ -232,10 +232,10 @@
                                         '<span class="vas-scheduleDataElementValue">' + VIS.Msg.getMsg("VAS_Price") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].OrderPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].OrderPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].InvoicePrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].InvoicePrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
                                         '</div>' +
                                         '</div>';
 
