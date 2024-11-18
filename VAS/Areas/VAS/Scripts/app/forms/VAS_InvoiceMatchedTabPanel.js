@@ -21,7 +21,7 @@
         var $self = this;
         var TotalPageCount = 0;
         var C_Invoice_ID = 0;
-        
+
         var ulPaging = null;
         var liFirstPage = null;
         var liPrevPage = null;
@@ -172,34 +172,104 @@
                                 let OrderClass = data[i].C_OrderLine_ID === 0 ? "vas-invmatch-DataElementValue vas-invmatch-unmatched" : "vas-invmatch-DataElementValue vas-invmatch-matched";
                                 let grnClass = data[i].M_InOutLine_ID === 0 ? "vas-invmatch-DataElementValue vas-invmatch-unmatched" : "vas-invmatch-DataElementValue vas-invmatch-matched";
 
-                                TabPaneldesign = '<div data-invoiceLineid="' + data[i].C_Invoiceline_ID + '" class="vas-scheduledatalist mb-2">' +
-                                    '<div class="vas-invmatch-DataListItem">';
+                                TabPaneldesign = '<div data-payscheduleid="' + data[i].C_Invoiceline_ID + '" class="vas-scheduledatalist">' +
+                                    '<div class="vas-scheduleDataListItem mb-2 vas-scheduleDataListItem-block">';
+                                let Discrepancy = data[i].ExpectedOrder - data[i].QtyInvoiced < 0 ||
+                                    data[i].ExpectedGRN - data[i].QtyInvoiced < 0 || data[i].OrderPrice - data[i].InvoicePrice < 0;
+
+                                if (Discrepancy) {
+                                    TabPaneldesign += '<span class="vas-scheduleDataListNotPaid">' + VIS.Msg.getMsg("VAS_Discrepancy") + '</span>';
+                                }
+                                else {
+                                    TabPaneldesign += '<span class="vas-scheduleDataListPaid">' + VIS.Msg.getMsg("VAS_Matched") + '</span>';
+                                }
                                 TabPaneldesign +=
-                                    /* data Item Container */
-                                    '<div class="vas-invmatch-DataItem">' +
-                                    /* Header Row */
+                                    '<div class="vas-scheduleData-sglItem mb-2">' +
+                                    //'<div class="vas-scheduleDataElement">' +
                                     '<div class="vas-invmatch-headerRow">' +
                                     '<span class="">' + data[i].Line + '</span>' +
-                                    '<span class="" style="margin-left:25px">' + data[i].ProductName + '</span>' +
-                                    '</div>' +
-                                    '<div class="vas-invmatch-info-row vas-invmatch-Data-sglItem">' +
-                                    /* Quantity Row*/
-                                    '<div class="vas-scheduleDataElement">' +
-                                    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Quantity + '</span>' +
-                                    '<span class="vas-invmatch-DataElementValue">' + (data[i].QtyEntered).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + ' ' + data[i].UomName + '</span>' +
-                                    '</div>' +
-                                    /* PO and GRN span*/
-                                    '<div class="vas-scheduleDataElement">' +
-                                    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_PO + '</span>';
-                                TabPaneldesign += '<span class="' + OrderClass + '">'
-                                    + (data[i].C_OrderLine_ID = 0 ? VAS.translatedTexts.VAS_UnMatched : VAS.translatedTexts.VAS_Matched) + '</span>' +
-                                    '</div>' +
-                                    '<div class="vas-scheduleDataElement">' +
-                                    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_GRN + '</span>';
-                                TabPaneldesign += '<span class="' + grnClass + '">'
-                                    + (data[i].M_InOutLine_ID = 0 ? VAS.translatedTexts.VAS_UnMatched : VAS.translatedTexts.VAS_Matched) + '</span>' +
-                                    '</div>' +
-                                    '</div></div></div></div>';
+                                    '<span class="font-weight-bold" style="margin-left:25px">' + data[i].ProductName + '</span>' +
+                                    '</div></div>';
+                                if (Discrepancy) {
+                                    TabPaneldesign += '<div class="vas-scheduleData-sglItem vas-invmatch-ExpectedMargin mb-2">' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue vas-invmatch-setCol1Width">&nbsp;</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementTTl font-weight-bold">' + VIS.Msg.getMsg("VAS_Expected") + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementTTl font-weight-bold">' + VIS.Msg.getMsg("VAS_Actual") + '</span>' +
+                                        '</div>' +
+                                        '</div>';
+
+                                    TabPaneldesign += '<div class="vas-scheduleData-sglItem vas-invmatch-DataRow mb-2">' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue">' + VIS.Msg.getMsg("VAS_Order") + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].ExpectedOrder).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '</div>';
+
+                                    TabPaneldesign += '<div class="vas-scheduleData-sglItem vas-invmatch-DataRow mb-2">' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue vas-invmatch-setCol1Width">' + VIS.Msg.getMsg("VAS_GRN") + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].ExpectedGRN).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '</div>';
+
+                                    TabPaneldesign += '<div class="vas-scheduleData-sglItem vas-invmatch-DataRow mb-2">' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue">' + VIS.Msg.getMsg("VAS_Price") + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].OrderPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
+                                        '<span class="vas-scheduleDataElementValue text-right">' + (data[i].InvoicePrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '</div>' +
+                                        '</div>';
+
+                                }
+                                TabPaneldesign += '</div></div>';
+
+                                //TabPaneldesign = '<div data-invoiceLineid="' + data[i].C_Invoiceline_ID + '" class="vas-scheduledatalist mb-2">' +
+                                //    '<div class="vas-invmatch-DataListItem">';
+                                //TabPaneldesign +=
+                                //    /* data Item Container */
+                                //    '<div class="vas-invmatch-DataItem">' +
+                                //    /* Header Row */
+                                //    '<div class="vas-invmatch-headerRow">' +
+                                //    '<span class="">' + data[i].Line + '</span>' +
+                                //    '<span class="" style="margin-left:25px">' + data[i].ProductName + '</span>' +
+                                //    '</div>' +
+                                //    '<div class="vas-invmatch-info-row vas-invmatch-Data-sglItem">' +
+                                //    /* Quantity Row*/
+                                //    '<div class="vas-scheduleDataElement">' +
+                                //    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_Quantity + '</span>' +
+                                //    '<span class="vas-invmatch-DataElementValue">' + (data[i].QtyEntered).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + ' ' + data[i].UomName + '</span>' +
+                                //    '</div>' +
+                                //    /* PO and GRN span*/
+                                //    '<div class="vas-scheduleDataElement">' +
+                                //    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_PO + '</span>';
+                                //TabPaneldesign += '<span class="' + OrderClass + '">'
+                                //    + (data[i].C_OrderLine_ID = 0 ? VAS.translatedTexts.VAS_UnMatched : VAS.translatedTexts.VAS_Matched) + '</span>' +
+                                //    '</div>' +
+                                //    '<div class="vas-scheduleDataElement">' +
+                                //    '<span class="vas-invmatch-DataElementTTl font-weight-bold">' + VAS.translatedTexts.VAS_GRN + '</span>';
+                                //TabPaneldesign += '<span class="' + grnClass + '">'
+                                //    + (data[i].M_InOutLine_ID = 0 ? VAS.translatedTexts.VAS_UnMatched : VAS.translatedTexts.VAS_Matched) + '</span>' +
+                                //    '</div>' +
+                                //    '</div></div></div></div>';
 
                                 //Appending design to wrapperDiv
                                 wrapperDiv.find('#VAS-ScheduleData_' + $self.windowNo).append(TabPaneldesign);
