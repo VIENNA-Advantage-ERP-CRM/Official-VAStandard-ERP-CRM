@@ -45,8 +45,7 @@
                 '</div>');
         };
         /*This function is used to get invoice tax data*/
-        this.getInvoiceTaxData = function (recordID) {
-            wrapperDiv.find('#VAS-TaxDetail_' + $self.windowNo).empty();
+        this.getInvoiceTaxData = function (recordID) {            
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetTaxData",
                 type: "GET",
@@ -54,6 +53,7 @@
                 contentType: "application/json; charset=utf-8",
                 data: { InvoiceId: recordID },
                 success: function (data) {
+                    wrapperDiv.find('#VAS-TaxDetail_' + $self.windowNo).empty();
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         console.log(data);
