@@ -29,10 +29,10 @@
         };
 
         /*This function is used to get Order tax data*/
-        this.getOrderSummary = function (recordID) {
-            wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
+        this.getOrderSummary = function (recordID) {            
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetOrderSummary",
                 { "OrderId": recordID }, function (data) {
+                    wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).empty();
                     if (data != null && data.length > 0) {
                         wrapperDiv.find('#VAS-TaxDetail_' + self.windowNo).append($('<div class="VAS-summary-header">' +
                             '<span class="">' + VIS.Msg.getMsg("VAS_SubTotal") + ":" + '</span>' +
