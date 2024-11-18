@@ -420,7 +420,7 @@ namespace VASLogic.Models
                              ci.AD_Client_ID,
                              cs.C_InvoicePaySchedule_ID,
                              cd.DocBaseType,
-                             ci.DateInvoiced,
+                             cs.DueDate AS DateInvoiced,
                              currencyConvert(cs.DueAmt ,cs.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
