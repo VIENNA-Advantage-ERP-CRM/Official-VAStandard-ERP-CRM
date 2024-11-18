@@ -79,7 +79,7 @@ namespace VAS.Models
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public List<Dictionary<string, object>> GetIventoryCartData( Ctx ctx, string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName, int ToWarehouse, int DTDSrcWarehouse)
+        public List<Dictionary<string, object>> GetIventoryCartData( Ctx ctx, string CartName, string UserId, string FromDate, string ToDate, string RefNo, int windowID, int RecordId, string WindowName, int ToWarehouse, int DTDSrcWarehouse,int BPartnerId)
         {
             
             List<Dictionary<string, object>> retDic = null;
@@ -88,7 +88,7 @@ namespace VAS.Models
             string allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem"));
 
             sql.Clear();
-            sql.Append("SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
+            sql.Append("SELECT * FROM (SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
                 " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
                 " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine l inner join M_Product p on l.M_Product_ID=p.M_Product_ID");
 
@@ -124,7 +124,7 @@ namespace VAS.Models
             {
                 // sql.Append(" WHERE VAICNT_TransactionType IN ('OT','IU')");
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR (VAICNT_TransactionType IN ('IU') AND VAICNT_ReferenceNo IN " +
-                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = "+ ToWarehouse + " AND DTD001_MWarehouseSource_ID="+ DTDSrcWarehouse + "))");
+                    " (SELECT DocumentNo FROM M_Requisition WHERE DocStatus ='CO' AND M_Warehouse_ID = "+ ToWarehouse + " AND DTD001_MWarehouseSource_ID="+ ToWarehouse + "))");
             }
 
             if (windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove") //Material Transfer
@@ -134,19 +134,17 @@ namespace VAS.Models
             }
             if (windowID == Util.GetValueOfInt(Windows.MaterialReceipt) || WindowName == "VAS_MaterialReceipt")//GRN
             {
-                sql.Append(" WHERE VAICNT_TransactionType IN ('OT','MR')");
+                sql.Append(" WHERE VAICNT_TransactionType IN ('OT') OR ( VAICNT_TransactionType IN ('MR') AND VAICNT_ReferenceNo IN  (SELECT DocumentNo FROM C_order where docstatus='CO' and  M_Warehouse_ID="+ ToWarehouse + " and C_BPartner_ID="+ BPartnerId + "))");
             }
             if (windowID == Util.GetValueOfInt(Windows.Shipment) || WindowName == "VAS_DeliveryOrder")//shipment/Delivery order
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('SH')");
             }
             if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) ||
-                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "Sales Quotation")
+                windowID == Util.GetValueOfInt(Windows.Requisition) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_Requisition" || windowID == Util.GetValueOfInt(Windows.CustomerReturn) || windowID == Util.GetValueOfInt(Windows.VendorReturn) || WindowName == "VAS_CustomerReturn" || WindowName == "VAS_VendorReturn" || WindowName == "VAS_SalesQuotation")
             {
                 sql.Append(" WHERE VAICNT_TransactionType IN ('OT')");//sales order/purchase order
             }
-
-
 
             if (!string.IsNullOrEmpty(CartName))
             {
@@ -186,6 +184,8 @@ namespace VAS.Models
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(ToDate), true)));
 
             }
+
+            sql.Append(" ) t where t.LineCount>0 ");
 
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
@@ -307,7 +307,7 @@ namespace VAS.Models
                 msg = SaveGRNTransactions(ctx, TransactionID, lstInventoryLines, windowID, RefNo, WindowName);
                 return msg;
             }
-            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "Sales Quotation")
+            else if (windowID == Util.GetValueOfInt(Windows.SalesOrder) || windowID == Util.GetValueOfInt(Windows.PurchaseOrder) || WindowName == "VAS_PurchaseOrder" || WindowName == "VAS_SalesOrder" || WindowName == "VAS_SalesQuotation")
             {
                 msg = SaveOrderTransactions(ctx, TransactionID, lstInventoryLines);
                 return msg;
