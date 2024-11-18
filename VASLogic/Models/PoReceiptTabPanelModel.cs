@@ -2353,14 +2353,15 @@ namespace VASLogic.Models
         public List<VAS_InvoiceMatchingDetail> GetInvoiceLineMatchData(Ctx ctx, int InvoiceId, int pageNo, int pageSize)
         {
             List<VAS_InvoiceMatchingDetail> InvocieTaxTabPanel = new List<VAS_InvoiceMatchingDetail>();
-            String sql = @"SELECT il.Line, p.Name AS ProductName, uom.Name AS UOMName, uom.StdPrecision AS UOMPrecision, 
-                            il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, 
-                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced
+            String sql = @"SELECT il.Line, p.Name AS ProductName, uom.Name AS UOMName, uom.StdPrecision AS UOMPrecision, c.StdPrecision AS CurrencyPrecision, 
+                            il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, il.PriceEntered AS InvoicePrice, 
+                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced, ol.PriceEntered AS OrderPrice 
                             FROM
                             C_Invoice i 
                             INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = i.C_Invoice_ID)
                             INNER JOIN M_Product p ON (p.M_Product_ID = il.M_Product_ID)
-                            INNER JOIN C_UOM uom ON (uom.C_UOM_ID = il.C_UOM_ID)
+                            INNER JOIN C_UOM uom ON (uom.C_UOM_ID = p.C_UOM_ID)
+                            INNER JOIN C_Currency c ON (c.C_Currency_ID = i.C_Currency_ID) 
                             LEFT JOIN C_OrderLine ol ON (ol.C_OrderLIne_ID = il.C_OrderLine_ID)
                             WHERE il.IsActive = 'Y' AND p.ProductType = 'I' AND i.C_Invoice_ID = " + InvoiceId;
             sql += " ORDER BY il.Line ";
@@ -2384,7 +2385,12 @@ namespace VASLogic.Models
                     obj.QtyOrdered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]);
                     obj.OrderDelivered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderDelivered"]);
                     obj.OrderInvoiced = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderInvoiced"]);
+                    obj.ExpectedOrder = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyOrdered"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderInvoiced"]);
+                    obj.ExpectedGRN = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderDelivered"]) - Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderInvoiced"]);
+                    obj.OrderPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderPrice"]);
+                    obj.InvoicePrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["InvoicePrice"]);
                     obj.UOMPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["UOMPrecision"]);
+                    obj.CurrencyPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["CurrencyPrecision"]);
                     InvocieTaxTabPanel.Add(obj);
                 }
             }
@@ -2592,6 +2598,11 @@ namespace VASLogic.Models
         public decimal OrderInvoiced { get; set; }
         public int C_Invoiceline_ID { get; set; }
         public int UOMPrecision { get; set; }
+        public int CurrencyPrecision { get; set; }
+        public decimal InvoicePrice { get; set; }
+        public decimal OrderPrice { get; set; }
+        public decimal ExpectedOrder { get; set; }
+        public decimal ExpectedGRN { get; set; }
         public int RecordCount { get; set; }
     }
 }
