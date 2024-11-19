@@ -2585,6 +2585,13 @@ hr.vas-paymentData-underline {
     margin-bottom: 8px;
 }
 
+.vas-invmatch-Qty {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-size: 10px;
+}
+
 .vas-invmatch-info-row {
     display: flex;
     justify-content: space-between;
@@ -2665,6 +2672,32 @@ hr.vas-paymentData-underline {
     width: 96%;
 }
 
+.vas-invmatch-DataListItem-block {
+    position: relative;
+}
+
+.vas-invmatch-DataListNotPaid {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.vas-invmatch-DataListPaid {
+    background: green;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
 .vas-invmatch-Data-sglItem {
     display: flex;
     align-items: flex-start;
@@ -2685,6 +2718,15 @@ margin-top:5px;
 
 .vas-invmatch-ExpectedMargin {
 margin-top:-10px;
+}
+
+.vas-invmatch-DiscrepancyFont {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 13px;
 }
 
 /** Invoice Match Detail CSS End*/
