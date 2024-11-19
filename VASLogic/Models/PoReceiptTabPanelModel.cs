@@ -1674,6 +1674,7 @@ namespace VASLogic.Models
             }
             else
             {
+                lstExprevData.Precision = Util.GetValueOfInt(dsExpRev.Tables[0].Rows[0]["StdPrecision"]);
                 lstLabel = new string[dsExpRev.Tables[0].Rows.Count];
                 lstExpData = new decimal[dsExpRev.Tables[0].Rows.Count];
                 lstRevData = new decimal[dsExpRev.Tables[0].Rows.Count];
@@ -1814,6 +1815,7 @@ namespace VASLogic.Models
                          fa.C_Period_ID,
                          y.CalendarYears,
                          p.Name,
+                         c.StdPrecision, 
                         SUM(CASE WHEN eleVal.AccountType = 'E' THEN (fa.AmtAcctDR - fa.AmtAcctCR) ELSE 0 END) AS ExpenseAmount,
                         SUM(CASE WHEN eleVal.AccountType = 'R' THEN (fa.AmtAcctCR - fa.AmtAcctDR) ELSE 0 END) AS revenueAmount
                          FROM fact_acct fa
@@ -1822,6 +1824,7 @@ namespace VASLogic.Models
                          INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
                          INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND eleVal.AccountType IN ('R', 'E') AND fa.Account_ID = eleVal.C_ElementValue_ID)
                          INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                         INNER JOIN C_Currency c ON (c.C_Currency_ID = acct.C_Currency_ID) 
                          INNER JOIN C_Period p ON (p.C_Period_ID = fa.C_Period_ID)
                          INNER JOIN C_Year y ON (y.C_Year_ID = p.C_Year_ID)
                          WHERE acctEle.IsActive = 'Y' 
@@ -1892,12 +1895,13 @@ namespace VASLogic.Models
                       fa.AD_Client_ID,
                       fa.C_Period_ID,
                       y.CalendarYears,
-                      p.Name
+                      p.Name, 
+                      c.StdPrecision 
                       order by
                       acct.C_AcctSchema_ID, 
                       fa.AD_Client_ID,
                       y.CalendarYears,
-                      fa.C_Period_ID ";
+                      fa.C_Period_ID";
 
             DataSet dsExpRevData = DB.ExecuteDataset(sql);
             if (dsExpRevData == null || (dsExpRevData != null && dsExpRevData.Tables.Count == 0) || (dsExpRevData != null && dsExpRevData.Tables[0].Rows.Count == 0))
@@ -2608,6 +2612,7 @@ namespace VASLogic.Models
         public decimal[] lstProfitData { get; set; }
         public string[] lstLabel { get; set; }
         public string ErrorMessage { get; set; }
+        public int Precision { get; set; }
     }
     public class VAS_ScheduleDetail
     {

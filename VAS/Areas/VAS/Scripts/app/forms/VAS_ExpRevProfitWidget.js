@@ -80,6 +80,8 @@
                     }
                     else {
 
+                        let precision = ExpRevData.Precision;
+
                         // Define static labels and colors
                         const labels = ExpRevData.lstLabel;
 
@@ -189,7 +191,7 @@
                                                 const labels = tooltipItem.chart.data.labels;
                                                 const dsLabel = dataset.label;
                                                 const value = dataset.data[dataIndex];
-                                                return dsLabel + " - " + labels[dataIndex] + ': ' + value;
+                                                return dsLabel + " - " + labels[dataIndex] + ': ' + value.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                                             }
                                         }
                                     },
