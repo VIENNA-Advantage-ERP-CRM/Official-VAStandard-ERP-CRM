@@ -2730,3 +2730,43 @@ margin-top:-10px;
 }
 
 /** Invoice Match Detail CSS End*/
+
+/**Cash Flow Widget CSS*/
+.vas-barline-ExRePr-container {
+    padding: 0.5em;
+    width: 100%;
+    height: 100%
+}
+
+.vas-barline-cashFlow-container .input-group.vis-input-wrap {
+    /*margin-bottom: -15px;*/
+    width: 9rem;
+    padding-right: 10px;
+}
+
+.vas-barline-cashFlow-container select.vis-ev-col-mandatory {
+    width: 100%;
+    height: auto;
+    border: none;
+    padding: 0px;
+}
+
+.vas-barline-ExRePr-canvas {
+    /*height: 100% !important*/
+}
+
+.vas-cashFlow-heading {
+    font-weight: 600;
+    margin-bottom: 0.3em;
+    font-family: 'Verdana';
+    /*color: rgba(var(--v-c-common), 1);*/
+    font-size: 0.9em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    padding-top: 0.2em;
+}
+
+.vas-cashFlow-background {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+}

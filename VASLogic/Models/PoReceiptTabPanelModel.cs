@@ -2459,6 +2459,308 @@ namespace VASLogic.Models
             }
             return IsDiscrepancy;
         }
+        /// <summary>
+        /// This function is used to get Cash Flow data
+        /// </summary>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>list of cash out and cash in amount</returns>
+        /// <author>VIS_427</author>
+        public List<CashFlowClass> GetCashFlowData(Ctx ctx, string ListValue)
+        {
+            CashFlowClass obj = new CashFlowClass();
+            StringBuilder sqlmain = new StringBuilder();
+            StringBuilder sql = new StringBuilder();
+            DataSet dsPeriod = null;
+            DataSet dsYear = null;
+            int PeriodID = 0;
+            int C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            List<CashFlowClass> invGrandTotalData = new List<CashFlowClass>();
+            int CurrentYear = 0;
+            int calendar_ID = 0;
+            
+            // Get Financial Year Data 
+            DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+            if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+            {
+                CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+            }
+            sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+            int precision= Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            sql.Clear();
+            sql.Append(@"SELECT SUM(CashOutbifurcated_Amount) AS CashOutAmt,SUM(CashInbifurcated_Amount) AS CashInAmt FROM (");
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 
+                         o.DOCUMENTNO,
+                         o.DATEPROMISED AS promised_date,
+                         doc.DocBaseType,
+                         o.IsSotrx,
+                         o.IsReturnTrx,
+                         o.GRANDTOTAL,
+                         o.C_PAYMENTTERM_ID,
+                         case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END AS NETDAYS,
+                         ps.PERCENTAGE,
+                         CASE WHEN o.IsSOtrx='N' THEN
+                         currencyConvert(
+                             CASE 
+                                 WHEN ps.C_PaySchedule_ID IS NULL THEN 
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND(NVL(o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0)), 0),"+ precision + @")
+                                 ELSE 
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND((NVL((o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0))) * ps.PERCENTAGE, 0) / 100), " + precision +@")
+                             END, 
+                             o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateOrdered, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         )
+                         ELSE 0 END AS CashOutbifurcated_Amount,
+                         CASE WHEN o.IsSOtrx='Y' THEN
+                         currencyConvert(
+                             CASE 
+                                 WHEN ps.C_PaySchedule_ID IS NULL THEN 
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND(NVL(o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0)), 0), " + precision + @")
+                                 ELSE 
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND((NVL((o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0))) * ps.PERCENTAGE, 0) / 100), " + precision + @")
+                             END, 
+                             o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateOrdered, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         ) 
+                         ELSE 0 END AS CashInbifurcated_Amount,
+                         o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date
+                     FROM 
+                         C_Order o
+                     INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
+                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
+                     INNER JOIN C_PAYMENTTERM pt ON o.C_PAYMENTTERM_ID = pt.C_PAYMENTTERM_ID AND pt.VA009_Advance = 'N'
+                     LEFT JOIN C_PAYSCHEDULE ps ON pt.C_PAYMENTTERM_ID = ps.C_PAYMENTTERM_ID AND ps.VA009_Advance = 'N'
+                     LEFT JOIN C_InvoiceLine il ON il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.Processed = 'Y' AND il.ReversalDoc_ID IS NULL
+                     WHERE 
+                         o.DOCSTATUS IN ('CO', 'CL') 
+                         AND doc.DocBaseType IN ('SOO','POO')", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            sqlmain.Append(@" GROUP BY 
+                         o.DOCUMENTNO,
+                         o.DATEPROMISED,
+                         doc.DocBaseType,
+                         o.IsSotrx,
+                         o.IsReturnTrx,
+                         o.GRANDTOTAL,
+                         o.C_PAYMENTTERM_ID,
+                         ps.C_PaySchedule_ID,
+                         pt.NETDAYS, 
+                         ps.NETDAYS,
+                         ps.PERCENTAGE,
+                         o.C_Currency_ID, 
+                         o.DateOrdered, 
+                         o.C_ConversionType_ID, 
+                         o.AD_Client_ID, 
+                         o.AD_Org_ID");
+            sqlmain.Append(@" UNION ALL ");
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
+                         SELECT 
+                         o.DOCUMENTNO,
+                         o.DATEInvoiced AS promised_date,
+                         doc.DocBaseType,
+                         o.IsSotrx,
+                         o.IsReturnTrx,
+                         o.GRANDTOTAL,
+                         o.C_PAYMENTTERM_ID,
+                         0 AS NETDAYS,
+                         0 AS PERCENTAGE,
+                         CASE WHEN o.IsSOtrx='N' THEN
+                         currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateInvoiced, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         ) ELSE 0 END AS CashOutbifurcated_Amount,
+                         CASE WHEN o.IsSOtrx='Y' THEN
+                         currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateInvoiced, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         ) ELSE 0 END AS CashInbifurcated_Amount,
+                         ips.DueDate AS expected_due_date
+                     FROM 
+                         C_Invoice o
+                     INNER JOIN C_InvoicePaySchedule ips ON (o.C_Invoice_ID = ips.C_Invoice_ID) 
+                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
+                     WHERE 
+                          o.DOCSTATUS IN ( 'CO', 'CL')  
+                          AND ips.VA009_IsPaid = 'N' AND doc.IsExpenseInvoice = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            sqlmain.Append(" UNION ALL ");
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@" 
+                          SELECT 
+                         o.DOCUMENTNO,
+                         o.DATEPROMISED AS promised_date,
+                         doc.DocBaseType,
+                         o.IsSotrx,
+                         o.IsReturnTrx,
+                         o.GRANDTOTAL,
+                         o.C_PAYMENTTERM_ID,
+                         0 AS NETDAYS,
+                         0 AS PERCENTAGE,
+                         CASE WHEN o.IsSOtrx='N' THEN
+                         currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateOrdered, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         ) ELSE 0 END AS CashOutbifurcated_Amount,
+                         CASE WHEN o.IsSOtrx='Y' THEN
+                         currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
+                             " + C_Currency_ID + @", 
+                             o.DateOrdered, 
+                             o.C_ConversionType_ID, 
+                             o.AD_Client_ID, 
+                             o.AD_Org_ID
+                         ) ELSE 0 END AS CashInbifurcated_Amount,
+                         ips.DueDate AS expected_due_date
+                     FROM 
+                         C_Order o
+                     INNER JOIN VA009_OrderPaySchedule ips ON (o.C_Order_ID = ips.C_Order_ID) 
+                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
+                     WHERE 
+                          o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO')
+                          AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            sql.Append(sqlmain);
+            sql.Append(") WHERE ");
+            //This Year
+            if (ListValue == "01")
+            {
+                dsYear = GetYearData(ctx, CurrentYear, calendar_ID);
+                if (dsYear != null && dsYear.Tables[0].Rows.Count > 0)
+                {
+                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
+                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" expected_due_date BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                    sql.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                }
+            }
+
+            // This month
+            else if (ListValue == "02")
+            {
+
+                //this dataset returns start and end date of period
+                if (PeriodID > 0)
+                {
+                    dsPeriod = GetPeriodData(ctx, PeriodID);
+                }
+                if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                {
+                    string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                    string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" expected_due_date BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                    sql.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                }
+            }
+            //Previous Year
+            else if (ListValue.Equals("03"))
+            {
+                dsYear = GetYearData(ctx, CurrentYear - 1, calendar_ID);
+                if (dsYear != null && dsYear.Tables[0].Rows.Count > 0)
+                {
+                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
+                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" expected_due_date BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                    sql.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                }
+
+            }
+            else if (ListValue.Equals("04"))
+            {
+                /* Previous Month */
+                int C_Period_ID = GetPreviousPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                if (C_Period_ID > 0)
+                {
+                    dsPeriod = GetPeriodData(ctx, PeriodID);
+                }
+                if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
+                {
+                    string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                    string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" expected_due_date BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                    sql.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                }
+
+            }
+            //last 6 months
+            else if (ListValue == "05")
+            {
+                //Last 6 Months Data
+                if (DB.IsPostgreSQL())
+                {
+                    sql.Append(" date_trunc(expected_due_date) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'");
+                    sql.Append(" AND date_trunc(expected_due_date) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')");
+                }
+                else
+                {
+                    sql.Append(" TRUNC(expected_due_date) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')");
+                    sql.Append(" AND TRUNC(expected_due_date) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))");
+                }
+            }
+            //last 12 months
+            else if (ListValue == "06")
+            {
+                //Last 12 Months Data
+                if (DB.IsPostgreSQL())
+                {
+                    sql.Append(" date_trunc(expected_due_date) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'");
+                    sql.Append(" AND date_trunc(expected_due_date) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')");
+                }
+                else
+                {
+                    sql.Append(" TRUNC(expected_due_date) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')");
+                    sql.Append(" AND TRUNC(expected_due_date) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))");
+                }
+            }
+
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                obj = new CashFlowClass();
+                obj.CashOutAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashOutAmt"]);
+                obj.CashInAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashInAmt"]);
+                obj.stdPrecision = precision;
+                invGrandTotalData.Add(obj);
+            }
+            return invGrandTotalData;
+        }
+        /// <summary>
+        /// This function is used to get Calender Year Data
+        /// </summary>
+        /// <param name="calenderYear">calenderYear</param>
+        /// <param name="C_Calender_ID">C_Calender_ID</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>DataSet</returns>
+        /// <author>VIS_427</author>
+        public DataSet GetYearData(Ctx ctx, int calenderYear, int C_Calender_ID)
+        {
+            string sql = $@"SELECT Min(p.StartDate) AS StartDate,MAX(p.EndDate) AS EndDate FROM C_Period p
+                            INNER JOIN C_Year cy ON (cy.C_Year_ID = p.C_Year_ID) WHERE cy.AD_Client_ID = {ctx.GetAD_Client_ID()} AND cy.CalendarYears={calenderYear} AND cy.C_Calendar_ID={C_Calender_ID}";
+
+            DataSet dsYear = DB.ExecuteDataset(sql, null, null);
+            return dsYear;
+        }
     }
     public class TabPanel
     {
@@ -2673,5 +2975,11 @@ namespace VASLogic.Models
         public bool IsDiscrepancy { get; set; }
         public int DiscrepancyCount { get; set; }
         public int RecordCount { get; set; }
+    }
+    public class CashFlowClass
+    {
+        public decimal CashOutAmt { get; set; }
+        public decimal CashInAmt { get; set; }
+        public int stdPrecision { get; set; }
     }
 }
