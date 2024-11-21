@@ -775,7 +775,7 @@
             });
 
             /*VIS_0060: 13-Nov-2024, Set Order in case of delivery Order*/
-            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx"))) {
+            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx")) || "Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
                 obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "C_Order_ID"));
 
                 // Change event for Order
