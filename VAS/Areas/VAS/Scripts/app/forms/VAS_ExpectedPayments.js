@@ -305,7 +305,7 @@
                 }
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-expay-payments-box">' +
-                    '<span class="VAS-searchLinkIconBlock">' +
+                    '<span class="VAS-expay-searchLinkIconBlock">' +
                     '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID + '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
                     '</span>' +
                     '<div class="vas-expay-payments-detail">' +
