@@ -60,7 +60,7 @@
             isSOTrx = VIS.context.getWindowContext($self.windowNo, "IsReceipt") == 'Y' ? true : false;
             $maindiv = $('<div class="vas-expay-expected-payment">')
             var headingDiv = $('<div class="vas-expay-expected-heading">');
-            var HeadingLabelDiv = $('<div style="font-size:1.4em">' + VIS.Msg.getMsg("VAS_ExpectedPayment") + '</div>')
+            var HeadingLabelDiv = $('<div style="font-size:1.4em">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_ExpectedReceipt") : VIS.Msg.getMsg("VAS_ExpectedPayment")) + '</div>')
             var filetrDiv = $("<div class='vas-expay-filter dropdown'>" +
                 "<div class='vas-expay-icondiv'>" +
                 "<span class='vas-expay-filterspn btn d-flex position-relative' type='button' id='vas_expay_dropdownMenu_" + $self.windowNo + "'>" +
@@ -154,6 +154,13 @@
                     ButtonDiv.append(CloseBtn).append(ApplyBtn);
                     $FilterHeader.append(ButtonDiv);
                     $maindiv.append($FilterHeader);
+                    if (C_BPartner_ID != null || FinancialPeriodValue != null || fromDate != null || toDate != null || docTypeValue != null) {
+                        $self.vFinancialPeriodList.setValue(FinancialPeriodValue);
+                        vSearchBPartner.setValue(C_BPartner_ID);
+                        $FromDate.setValue(fromDate);
+                        $ToDate.setValue(toDate);
+                        $self.vDocTypeExPayList.setValue(docTypeValue);
+                    }
                     var $ApplyButton = ApplyBtn.find("#VAS_Apply_" + $self.windowNo);
                     vSearchBPartner.fireValueChanged = function () {
                         C_BPartner_ID = vSearchBPartner.value;
@@ -187,10 +194,18 @@
                         $self.intialLoad();
                     });
                     CloseBtn.on('click', function () {
+                        if ($self.vFinancialPeriodList.oldValue == null) {
+                            $self.vFinancialPeriodList.setValue(0);
+                        }
                         $self.vFinancialPeriodList.setValue(null);
                         vSearchBPartner.setValue(null);
                         $FromDate.setValue(null);
                         $ToDate.setValue(null);
+                        C_BPartner_ID = null;
+                        FinancialPeriodValue = null;
+                        fromDate = null;
+                        toDate = null;
+                        docTypeValue = null;
                     });
                 }
                 else {
@@ -290,6 +305,9 @@
                 }
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-expay-payments-box">' +
+                    '<span class="VAS-searchLinkIconBlock">' +
+                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID + '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
+                    '</span>' +
                     '<div class="vas-expay-payments-detail">' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font">' + headingText + '</div>' +
@@ -389,6 +407,12 @@
             if (pageNo >= totalPages && countRecord >= TotalAmtArray.length) {
                 arrowDiv.find(".fa-arrow-circle-right").addClass('vas-disableArrow');
             }
+            $maindiv.find('.glyphicon-zoom-in').on("click", function () {
+                var Record_ID = VIS.Utility.Util.getValueOfInt($(this).attr("data-Record_ID"));
+                var windowId = VIS.Utility.Util.getValueOfInt($(this).attr("data-windowId"));
+                var Primary_ID = VIS.Utility.Util.getValueOfString($(this).attr("data-Primary_ID"));
+                handleZoomClick(Record_ID, windowId, Primary_ID);
+            })
         }
         /**
         * This Function is used to slice array of records according to start and end index
@@ -416,7 +440,20 @@
         var GetColumnID = function () {
             ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnIDForExpPayment", { "refernceName": JSON.stringify(ColumnData) }, null);
         }
-
+        /**
+        * this fucntion is used to zoom to window for the record which is clicked from grid
+        * @param {any} Record_ID
+        * @param {any} windowId
+        * @param {any} Primary_ID
+        */
+        function handleZoomClick(Record_ID, windowId, Primary_ID) {
+            if (windowId > 0) {
+                var zoomQuery = new VIS.Query();
+                zoomQuery.addRestriction(Primary_ID, VIS.Query.prototype.EQUAL, Record_ID);
+                zoomQuery.setRecordCount(1);
+                VIS.viewManager.startWindow(windowId, zoomQuery);
+            }
+        }
         /*This function used to get root*/
         this.getRoot = function () {
             return $root;
@@ -431,6 +468,7 @@
             FinancialPeriodValue = null;
             fromDate = null;
             toDate = null;
+            docTypeValue = null;
             pageNo = 1;
             pageNoarray = 1;
             pageSize = 500;

@@ -2021,22 +2021,25 @@ namespace VASLogic.Models
             StringBuilder sql = new StringBuilder();
             int CurrentYear = 0;
             int calendar_ID = 0;
+            int InvoiceWinId = 0;
+            int OrderWinId = 0;
+            int ExpInvID = 0;
             int PeriodID = 0;
             List<ExpectedPayment> invGrandTotalData = new List<ExpectedPayment>();
             string OrderCheck = (ISOtrx == true ? " AND co.IsSOTrx='Y' " : " AND co.IsSOTrx='N' ");
             string InvoiceCheck = (ISOtrx == true ? " AND ci.IsSOTrx='Y' " : " AND ci.IsSOTrx='N' ");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
-            string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
+           // string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " ");
             sql.Append($@"SELECT * FROM  (");
             //If Doctype Value is Null or ALL or Invoice
             if (docTypeValue == null || docTypeValue == "01" || docTypeValue == "03")
             {
                 sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
-                             SELECT DISTINCT cs.DueDate,
+                             SELECT DISTINCT ci.C_Invoice_ID AS Record_ID,cs.DueDate,
                              CASE WHEN cd.DocBaseType IN ('ARC','APC') THEN - cs.DueAmt
                              ELSE cs.DueAmt END AS DueAmt,
                              ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType,cd.IsExpenseInvoice AS IsExInv
                              FROM C_InvoicePaySchedule cs
                              INNER JOIN C_Invoice ci ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
@@ -2044,7 +2047,7 @@ namespace VASLogic.Models
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=ci.C_Currency_ID)
                              INNER JOIN VA009_PaymentMethod pm ON (cs.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(BPCheck + InvoiceCheck + " AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N'");
+                sqlmain.Append(InvoiceCheck + " AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N'");
                 //Added business partner condition 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
@@ -2146,17 +2149,17 @@ namespace VASLogic.Models
             if (docTypeValue == null || docTypeValue == "01" || docTypeValue == "02")
             {
                 sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
-                             SELECT DISTINCT ps.DueDate,
+                             SELECT DISTINCT co.C_Order_ID AS Record_ID,ps.DueDate,
                              ps.DueAmt AS DueAmt,
                              co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
-                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv
                              FROM VA009_OrderPaySchedule ps
                              INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
                              INNER JOIN C_BPartner cb ON (co.C_BPartner_ID = cb.C_BPartner_ID)
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=co.C_Currency_ID)
                              INNER JOIN VA009_PaymentMethod pm ON (co.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "ps", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(BPCheck + OrderCheck + " AND co.DocStatus IN ('CO','CL') AND ps.VA009_IsPaid='N'");
+                sqlmain.Append(OrderCheck + " AND co.DocStatus IN ('CO','CL') AND ps.VA009_IsPaid='N'");
                 //Added business partner condition 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
@@ -2255,11 +2258,23 @@ namespace VASLogic.Models
                 //fetching the record count to use it for pagination
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
                 sql.Clear();
- 
-                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                //Getting windows id to zoom the records
+                if (ISOtrx)
                 {
+                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ARInvoice'", null, null));
+                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
+                }
+                else
+                {
+                    ExpInvID= Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ExpenseInvoice'", null, null));
+                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_APInvoice'", null, null));
+                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrder'", null, null));
+                }
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {                   
                     obj = new ExpectedPayment();
                     obj.recordCount = RecordCount;
+                    obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["DueAmt"]);
                     obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["Symbol"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
@@ -2269,6 +2284,21 @@ namespace VASLogic.Models
                     obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
                     obj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
                     obj.windowType = Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]);
+                    if(Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]) == "Order")
+                    {
+                        obj.Window_ID = OrderWinId;
+                        obj.Primary_ID = "C_Order_ID";
+                    }
+                    else if(Util.GetValueOfString(ds.Tables[0].Rows[i]["IsExInv"]) == "Y")
+                    {
+                        obj.Window_ID = ExpInvID;
+                        obj.Primary_ID = "C_Invoice_ID";
+                    }
+                    else
+                    {
+                        obj.Window_ID = InvoiceWinId;
+                        obj.Primary_ID = "C_Invoice_ID";
+                    }
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
                     {
                         obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
@@ -2535,17 +2565,17 @@ namespace VASLogic.Models
                              o.AD_Client_ID, 
                              o.AD_Org_ID
                          ) 
-                         ELSE 0 END AS CashInbifurcated_Amount,");
-            if (DB.IsOracle())
-            {
-                sqlOrder.Append("o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date");
-            }
-            else
+                         ELSE 0 END AS CashInbifurcated_Amount,");            
+            if(DB.IsPostgreSQL())
             {
                 sqlOrder.Append(@"(o.DATEPROMISED + (CASE 
                                  WHEN ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS
                                  ELSE ps.NETDAYS
                                  END || ' days')::interval) AS expected_due_date");
+            }
+            else
+            {
+                sqlOrder.Append("o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date");
             }
             sqlOrder.Append(@" FROM 
                          C_Order o
@@ -2977,6 +3007,9 @@ namespace VASLogic.Models
     }
     public class ExpectedPayment
     {
+        public int Record_ID { get; set; }
+        public int Window_ID { get; set; }
+        public string Primary_ID { get; set; }
         public decimal TotalAmt { get; set; }
         public string Symbol { get; set; }
         public string RecordType { get; set; }
