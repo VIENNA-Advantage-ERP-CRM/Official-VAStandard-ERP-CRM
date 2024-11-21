@@ -153,7 +153,7 @@
                     );
                     ButtonDiv.append(CloseBtn).append(ApplyBtn);
                     $FilterHeader.append(ButtonDiv);
-                    $FilterDiv.append($FilterHeader);
+                    $maindiv.append($FilterHeader);
                     var $ApplyButton = ApplyBtn.find("#VAS_Apply_" + $self.windowNo);
                     vSearchBPartner.fireValueChanged = function () {
                         C_BPartner_ID = vSearchBPartner.value;

@@ -388,5 +388,19 @@ namespace VAS.Areas.VAS.Controllers
             List<VAS_InvoiceMatchingDetail> result = objScheduleData.GetInvoiceLineMatchData(ctx, InvoiceId, pageNo, pageSize);
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
+        /// <summary>
+        /// This function is used to get Cash Flow data
+        /// </summary>
+        /// <param name="ListValue">ListValue</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>list of cash out and cash in amount</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetCashFlowData(string ListValue)
+        { 
+            Ctx ctx = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
+            List<CashFlowClass> result = objScheduleData.GetCashFlowData(ctx, ListValue);
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
     }
 }
