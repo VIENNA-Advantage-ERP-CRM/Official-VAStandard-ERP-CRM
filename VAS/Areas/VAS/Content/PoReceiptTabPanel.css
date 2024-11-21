@@ -332,10 +332,21 @@ Only index.html and style.css is for your use There is no need to copy any other
     padding-right: 7px;
 }
 
-.VAS-payment-details ul li .form-check {
-    position: relative;
-    top: 2px;
+.VAS-expay-searchLinkIconBlock {
+    position: unset;
+    float: right;
+    right: 6px;
+    top: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    padding-right: 7px;
+    margin-top: 1.3em;
 }
+
+    .VAS-payment-details ul li .form-check {
+        position: relative;
+        top: 2px;
+    }
 
 .VAS-payment-details ul li.active {
     background-color: rgba(var(--v-c-primary), 0.1);
@@ -2166,6 +2177,7 @@ hr.vas-paymentData-underline {
     align-items: center;
     justify-content: space-between;
     grid-template-columns: repeat(2, 1fr);
+    width:90%;
 }
 
 .vas-expay-thumb-w-txt {
@@ -2447,7 +2459,7 @@ hr.vas-paymentData-underline {
 
 .vas-expay-filterspn {
     width: 35px;
-    border: 1px solid rgba(var(--v-c-on-secondary), .2);
+    /*border: 1px solid rgba(var(--v-c-on-secondary), .2);*/
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -2479,18 +2491,18 @@ hr.vas-paymentData-underline {
 
 .vas-expay-filter-flyout {
     position: absolute;
-    top: 40px;
+    top: 42px;
     z-index: 100;
     /* border: 1px solid #e4e4e4; */
     padding: 10px;
     border-radius: 5px;
-    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    /*box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;*/
     /* max-width: 450px; */
     /* min-width: 317px; */
     background: white;
     Max-height: 400px;
     margin-left: 0;
-    width: calc(100% - 6px);
+    width: calc(100% - 12px);
     left: 0;
     right: 0;
     margin: auto;
