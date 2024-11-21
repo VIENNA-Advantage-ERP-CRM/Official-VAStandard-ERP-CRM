@@ -35,9 +35,9 @@
             // Create Control Div
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
             /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
-            $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_ExpRevProfitWidget", ColumnIds.AD_Reference_ID, false, null);
+            $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_CashFlowWidgetList", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-            vDifferentYearDataList = new VIS.Controls.VComboBox("VAS_ExpRevProfitWidget", true, false, true, $DifferentYearDataListLookUp, 20);
+            vDifferentYearDataList = new VIS.Controls.VComboBox("VAS_CashFlowWidgetList", true, false, true, $DifferentYearDataListLookUp, 20);
             vDifferentYearDataList.setValue("01");
             var $DifferentYearDataListControlWrap = $('<div class="vis-control-wrap">');
             $DifferentYearDataListDiv.append($DifferentYearDataListControlWrap);
@@ -75,8 +75,8 @@
 
                     // Remove existing canvas if exists
                     $root.find('canvas').remove();
-                    precision = CashFlowData[0].stdPrecision;
-                    if (CashFlowData == null && CashFlowData.length == 0) {
+                   
+                    if (CashFlowData.length == 0) {
                         // If there is an error in the response, show "No record found" message
                         $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
                         $root.append($maindiv);
@@ -85,6 +85,7 @@
                             cashFlowArr.push(CashFlowData[0].CashOutAmt);
                             cashFlowArr.push(CashFlowData[0].CashInAmt);
                         }
+                        precision = CashFlowData[0].stdPrecision;
                         // Define static labels and colors
                         const lstLabel = [VIS.Msg.getMsg("VAS_CashOut"), VIS.Msg.getMsg("VAS_CashIn")]
                         const backgroundColors = [
@@ -207,7 +208,7 @@
 
         /** Get List Reference ID for filter Data */
         var GetColumnID = function () {
-            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "refernceName": "VAS_ExpRevProfitWidget" }, null);
+            ColumnIds = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetColumnID", { "refernceName": "VAS_CashFlowWidgetList" }, null);
         }
 
         /** Add busy Indicator in Root */

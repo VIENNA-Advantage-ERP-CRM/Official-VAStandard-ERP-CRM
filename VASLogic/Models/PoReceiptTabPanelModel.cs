@@ -1776,7 +1776,8 @@ namespace VASLogic.Models
                          CASE 
                          WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
                          ELSE ci.C_Calendar_ID END AS C_Calendar_ID, 
-                         cp.C_Period_ID 
+                         cp.C_Period_ID,
+                         CEIL(cp.PeriodNo/3) AS CurQuarter
                          FROM C_Calendar cc
                          INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
                          LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
@@ -2034,7 +2035,8 @@ namespace VASLogic.Models
                              SELECT DISTINCT cs.DueDate,
                              CASE WHEN cd.DocBaseType IN ('ARC','APC') THEN - cs.DueAmt
                              ELSE cs.DueAmt END AS DueAmt,
-                             ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType
+                             ci.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Invoice' AS WindowType
                              FROM C_InvoicePaySchedule cs
                              INNER JOIN C_Invoice ci ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
@@ -2146,7 +2148,8 @@ namespace VASLogic.Models
                 sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
                              SELECT DISTINCT ps.DueDate,
                              ps.DueAmt AS DueAmt,
-                             co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,cb.pic,custimg.ImageExtension,'Order' AS WindowType
+                             co.DocumentNo,cb.Name,pm.VA009_Name,cy.ISO_Code,CASE WHEN cy.Cursymbol IS NOT NULL THEN cy.Cursymbol ELSE cy.ISO_Code END AS Symbol,
+                             cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType
                              FROM VA009_OrderPaySchedule ps
                              INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
                              INNER JOIN C_BPartner cb ON (co.C_BPartner_ID = cb.C_BPartner_ID)
@@ -2252,18 +2255,15 @@ namespace VASLogic.Models
                 //fetching the record count to use it for pagination
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
                 sql.Clear();
-                //this query is returning the field of base currency
-                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
-
+ 
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     obj = new ExpectedPayment();
                     obj.recordCount = RecordCount;
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["DueAmt"]);
-                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["Symbol"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
-                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
                     obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DueDate"]).Value;
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
@@ -2471,6 +2471,7 @@ namespace VASLogic.Models
             CashFlowClass obj = new CashFlowClass();
             StringBuilder sqlmain = new StringBuilder();
             StringBuilder sql = new StringBuilder();
+            StringBuilder sqlOrder = new StringBuilder();
             DataSet dsPeriod = null;
             DataSet dsYear = null;
             int PeriodID = 0;
@@ -2478,7 +2479,8 @@ namespace VASLogic.Models
             List<CashFlowClass> invGrandTotalData = new List<CashFlowClass>();
             int CurrentYear = 0;
             int calendar_ID = 0;
-            
+            int currQuarter = 0;
+            bool isNextYearQuarter = false;
             // Get Financial Year Data 
             DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
             if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
@@ -2486,12 +2488,13 @@ namespace VASLogic.Models
                 CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
                 calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
                 PeriodID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Period_ID"]);
+                currQuarter = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CurQuarter"]);
             }
             sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-            int precision= Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             sql.Clear();
-            sql.Append(@"SELECT SUM(CashOutbifurcated_Amount) AS CashOutAmt,SUM(CashInbifurcated_Amount) AS CashInAmt FROM (");
-            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 
+            sql.Append(@"SELECT SUM(t.CashOutbifurcated_Amount) AS CashOutAmt,SUM(t.CashInbifurcated_Amount) AS CashInAmt FROM (");
+            sqlOrder.Append($@"SELECT 
                          o.DOCUMENTNO,
                          o.DATEPROMISED AS promised_date,
                          doc.DocBaseType,
@@ -2505,9 +2508,9 @@ namespace VASLogic.Models
                          currencyConvert(
                              CASE 
                                  WHEN ps.C_PaySchedule_ID IS NULL THEN 
-                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND(NVL(o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0)), 0),"+ precision + @")
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND(NVL(o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0)), 0)," + precision + @")
                                  ELSE 
-                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND((NVL((o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0))) * ps.PERCENTAGE, 0) / 100), " + precision +@")
+                                     CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ROUND((NVL((o.GRANDTOTAL - SUM(NVL(il.LineTotalAmt, 0))) * ps.PERCENTAGE, 0) / 100), " + precision + @")
                              END, 
                              o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
@@ -2532,9 +2535,19 @@ namespace VASLogic.Models
                              o.AD_Client_ID, 
                              o.AD_Org_ID
                          ) 
-                         ELSE 0 END AS CashInbifurcated_Amount,
-                         o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date
-                     FROM 
+                         ELSE 0 END AS CashInbifurcated_Amount,");
+            if (DB.IsOracle())
+            {
+                sqlOrder.Append("o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date");
+            }
+            else
+            {
+                sqlOrder.Append(@"(o.DATEPROMISED + (CASE 
+                                 WHEN ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS
+                                 ELSE ps.NETDAYS
+                                 END || ' days')::interval) AS expected_due_date");
+            }
+            sqlOrder.Append(@" FROM 
                          C_Order o
                      INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
@@ -2543,7 +2556,8 @@ namespace VASLogic.Models
                      LEFT JOIN C_InvoiceLine il ON il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.Processed = 'Y' AND il.ReversalDoc_ID IS NULL
                      WHERE 
                          o.DOCSTATUS IN ('CO', 'CL') 
-                         AND doc.DocBaseType IN ('SOO','POO')", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                         AND doc.DocBaseType IN ('SOO','POO')");
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(@" GROUP BY 
                          o.DOCUMENTNO,
                          o.DATEPROMISED,
@@ -2634,26 +2648,11 @@ namespace VASLogic.Models
                           o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sql.Append(sqlmain);
-            sql.Append(") WHERE ");
-            //This Year
-            if (ListValue == "01")
-            {
-                dsYear = GetYearData(ctx, CurrentYear, calendar_ID);
-                if (dsYear != null && dsYear.Tables[0].Rows.Count > 0)
-                {
-                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
-                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" expected_due_date BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                    sql.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
-                }
-            }
+            sql.Append(")t WHERE ");
 
             // This month
-            else if (ListValue == "02")
+            if (ListValue == "01")
             {
-
                 //this dataset returns start and end date of period
                 if (PeriodID > 0)
                 {
@@ -2663,77 +2662,92 @@ namespace VASLogic.Models
                 {
                     string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" expected_due_date BETWEEN " +
+                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
                     sql.Append(@"AND " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
                 }
             }
-            //Previous Year
-            else if (ListValue.Equals("03"))
+            //Next Month
+            else if (ListValue == "02")
             {
-                dsYear = GetYearData(ctx, CurrentYear - 1, calendar_ID);
-                if (dsYear != null && dsYear.Tables[0].Rows.Count > 0)
-                {
-                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
-                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" expected_due_date BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                    sql.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
-                }
-
-            }
-            else if (ListValue.Equals("04"))
-            {
-                /* Previous Month */
-                int C_Period_ID = GetPreviousPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                int C_Period_ID = GetNextPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                dsPeriod = null;
                 if (C_Period_ID > 0)
                 {
-                    dsPeriod = GetPeriodData(ctx, PeriodID);
+                    dsPeriod = GetPeriodData(ctx, C_Period_ID);
                 }
                 if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                 {
                     string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" expected_due_date BETWEEN " +
+                    sqlmain.Append(@" AND TRUNC(t.expected_due_date) BETWEEN " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                    sqlmain.Append(@"AND " +
+                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                }
+            }
+            //This Quarter Year
+            else if (ListValue.Equals("03"))
+            {
+                string quarterSql = $@"SELECT Min(p.StartDate) AS StartDate,MAX(p.EndDate) AS EndDate FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.C_Year_ID)
+                                                    WHERE CEIL(p.PeriodNo/3)={currQuarter} AND y.CalendarYears={GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
+                dsYear = DB.ExecuteDataset(quarterSql);
+                string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
+                string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
+                sql.Append(@"AND " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+            }
+            //Next Quarter
+            else if (ListValue.Equals("04"))
+            {
+                int NextQuarter = 0;
+                int MaxQuarter = GetMaxQuarter(calendar_ID, CurrentYear);
+                //If max quarter and current quarter is same the the current year is going on else next year
+                if (currQuarter != MaxQuarter)
+                {
+                    NextQuarter = currQuarter + 1;
+                }
+                else
+                {
+                    isNextYearQuarter = true;
+                    NextQuarter = GetNextYearQuarter(calendar_ID, CurrentYear + 1);
+                }
+                if (NextQuarter > 0)
+                {
+                    CurrentYear = isNextYearQuarter == false ? CurrentYear : CurrentYear + 1;
+                    string quarterSql = $@"SELECT Min(p.StartDate) AS StartDate,MAX(p.EndDate) AS EndDate FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.C_Year_ID)
+                                           WHERE CEIL(p.PeriodNo/3)={NextQuarter} 
+                                           AND y.CalendarYears={GlobalVariable.TO_STRING(CurrentYear.ToString())} 
+                                           AND y.C_Calendar_ID={calendar_ID}";
+                    dsYear = DB.ExecuteDataset(quarterSql);
+                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
+                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
                     sql.Append(@"AND " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
                 }
 
             }
-            //last 6 months
+            //Next 6 months
             else if (ListValue == "05")
             {
-                //Last 6 Months Data
+                // Next 6 months data (current month + Next 5 months)
                 if (DB.IsPostgreSQL())
                 {
-                    sql.Append(" date_trunc(expected_due_date) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'");
-                    sql.Append(" AND date_trunc(expected_due_date) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')");
+                    sql.Append("  date_trunc('MONTH', t.expected_due_date) >= DATE_TRUNC('MONTH', CURRENT_DATE)");
+                    sql.Append(" AND date_trunc('MONTH', t.expected_due_date) <= DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '5 MONTHS'");
                 }
                 else
                 {
-                    sql.Append(" TRUNC(expected_due_date) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')");
-                    sql.Append(" AND TRUNC(expected_due_date) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))");
-                }
-            }
-            //last 12 months
-            else if (ListValue == "06")
-            {
-                //Last 12 Months Data
-                if (DB.IsPostgreSQL())
-                {
-                    sql.Append(" date_trunc(expected_due_date) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'");
-                    sql.Append(" AND date_trunc(expected_due_date) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')");
-                }
-                else
-                {
-                    sql.Append(" TRUNC(expected_due_date) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')");
-                    sql.Append(" AND TRUNC(expected_due_date) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))");
-                }
-            }
 
+                    sql.Append(" TRUNC(t.expected_due_date) >= TRUNC(Current_Date, 'MM')");
+                    sql.Append(" AND TRUNC(t.expected_due_date) <= TRUNC(ADD_MONTHS(TRUNC(Current_Date), 5), 'MM')");
+                }
+            }
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -2761,6 +2775,35 @@ namespace VASLogic.Models
             DataSet dsYear = DB.ExecuteDataset(sql, null, null);
             return dsYear;
         }
+        /// <summary>
+        /// This function is used to Maximum Quarter in year
+        /// </summary>
+        /// <param name="calenderYear">calenderYear</param>
+        /// <param name="C_Calender_ID">C_Calender_ID</param>
+        /// <returns>Maximum Quarter</returns>
+        /// <author>VIS_427</author>
+        public int GetMaxQuarter(int calendar_ID, int CalenderYear)
+        {
+            string sql = $@"SELECT CEIL(MAX(p.PeriodNo)/3) FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                            WHERE y.CalendarYears={GlobalVariable.TO_STRING(CalenderYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
+            int Quarter = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            return Quarter;
+        }
+        /// <summary>
+        /// This function is used to Next Year minimum Quarter
+        /// </summary>
+        /// <param name="calenderYear">calenderYear</param>
+        /// <param name="C_Calender_ID">C_Calender_ID</param>
+        /// <returns>Quarter</returns>
+        /// <author>VIS_427</author>
+        public int GetNextYearQuarter(int calendar_ID, int CalenderYear)
+        {
+            string sql = $@"SELECT CEIL(MIN(p.PeriodNo)/3) FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                            WHERE y.CalendarYears={GlobalVariable.TO_STRING(CalenderYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
+            int Quarter = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            return Quarter;
+        }
+
     }
     public class TabPanel
     {
