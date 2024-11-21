@@ -160,7 +160,6 @@
         };
         /*This function is used to get invoice schedule data*/
         this.getInvoiceTaxData = function (recordID) {
-            wrapperDiv.find('#VAS-ScheduleData_' + $self.windowNo).empty();
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetScheduleData",
                 type: "GET",
@@ -168,6 +167,7 @@
                 contentType: "application/json; charset=utf-8",
                 data: { InvoiceId: recordID, pageNo: pageNo, pageSize: pageSize },
                 success: function (data) {
+                    wrapperDiv.find('#VAS-ScheduleData_' + $self.windowNo).empty();
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         if (data != null && data.length > 0) {
@@ -266,7 +266,7 @@
                             })
 
                         }
-                        
+
                     }
                     else {
                         $root.find('.VAS-scheduledata-Paging').hide();
