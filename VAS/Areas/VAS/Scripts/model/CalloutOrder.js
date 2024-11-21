@@ -2318,6 +2318,11 @@
                     + " -> PriceEntered=" + PriceEntered);
                 mTab.setValue("PriceEntered", PriceEntered);
                 mTab.setValue("PriceActual", PriceActual);
+
+                if (PriceList == 0) {
+                    PriceList = PriceActual;
+                    mTab.setValue("PriceList", PriceList);
+                }
             }
             else if (mField.getColumnName() == "PriceEntered") {
                 PriceEntered = Util.getValueOfDecimal(value.toFixed(PriceListPrecision));
@@ -2331,17 +2336,19 @@
 
             //  Discount entered - Calculate Actual/Entered
             if (mField.getColumnName() == "Discount") {
-                PriceActual = Util.getValueOfDecimal((100.0 - Discount)
-                    / 100.0 * PriceList);
+                if (PriceList > 0) {
+                    PriceActual = Util.getValueOfDecimal((100.0 - Discount)
+                        / 100.0 * PriceList);
 
-                if (Util.scale(PriceActual) > PriceListPrecision)
-                    PriceActual = PriceActual.toFixed(PriceListPrecision);
+                    if (Util.scale(PriceActual) > PriceListPrecision)
+                        PriceActual = PriceActual.toFixed(PriceListPrecision);
 
-                PriceEntered = PriceActual;
-                if (PriceEntered == null)
                     PriceEntered = PriceActual;
-                mTab.setValue("PriceActual", PriceActual);
-                mTab.setValue("PriceEntered", PriceEntered);
+                    if (PriceEntered == null)
+                        PriceEntered = PriceActual;
+                    mTab.setValue("PriceActual", PriceActual);
+                    mTab.setValue("PriceEntered", PriceEntered);
+                }
             }
             //	calculate Discount
             else {

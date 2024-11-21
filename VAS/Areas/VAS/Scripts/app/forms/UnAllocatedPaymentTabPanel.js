@@ -61,8 +61,7 @@
        * @param {any} IsSoTrx
        * @param {any} AD_Org_ID
        */
-        this.getUnAllocatedPayData = function (C_BPartner_ID, IsSoTrx, AD_Org_ID) {
-            wrapperDiv.find('#VAS-unallocated_' + $self.windowNo).empty();
+        this.getUnAllocatedPayData = function (C_BPartner_ID, IsSoTrx, AD_Org_ID) {            
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetUnAllocatedPayData",
                 type: "GET",
@@ -70,6 +69,7 @@
                 contentType: "application/json; charset=utf-8",
                 data: { C_BPartner_ID: C_BPartner_ID, IsSoTrx: IsSoTrx, AD_Org_ID: AD_Org_ID },
                 success: function (res) {
+                    wrapperDiv.find('#VAS-unallocated_' + $self.windowNo).empty();
                     var gridDataResult = JSON.parse(res);
                     for (var i = 0; i < gridDataResult.length; i++) {
                         var TabPaneldesign = '<li>' +
