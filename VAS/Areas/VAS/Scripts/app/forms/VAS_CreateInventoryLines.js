@@ -36,7 +36,7 @@
         var _ToLocatorLookUp;
         var ToWarehouse = 0;
         var DTDSrcWarehouse = 0;
-
+        var Bpartner = 0;
 
         //var WindowName = VIS.context.m_map[1]["1|0|Name"];
 
@@ -171,6 +171,7 @@
             WindowName = VIS.context.getContext($self.windowNo, "ScreenName");
             ToWarehouse = VIS.context.getContextAsInt($self.windowNo, "M_Warehouse_ID");
             DTDSrcWarehouse = VIS.context.getContextAsInt($self.windowNo, "DTD001_MWarehouseSource_ID");
+            Bpartner = VIS.context.getContextAsInt($self.windowNo, "C_BPartner_ID");
 
             if (window_ID == "168") {//update record only allowed in case of physical inventory
                 $root.find(".VAS-Update").css("display", "block");
@@ -254,7 +255,7 @@
         function LoadCartData() {
             $self.setBusy(true);
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData",
-                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID, "RecordId": $self.Record_ID, "WindowName": WindowName, "ToWarehouse": ToWarehouse, "DTDSrcWarehouse": DTDSrcWarehouse}, function (data) {
+                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID, "RecordId": $self.Record_ID, "WindowName": WindowName, "ToWarehouse": ToWarehouse, "DTDSrcWarehouse": DTDSrcWarehouse, "BPartnerId": Bpartner }, function (data) {
 
                     $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
                     $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
@@ -315,6 +316,8 @@
                                 }
 
                                 $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
+                                    var allChecked = $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox").length === $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox:checked").length;
+                                    $root.find("#selectAllCheckbox").prop('checked', allChecked);
                                     Fetchdata();
                                 });
 
@@ -329,7 +332,7 @@
                                     _TolocatCtrl = $root.find("#VAS_TolocatorCtrl" + $self.windowNo);
 
                                     //From warehouse
-                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + ToWarehouse;
+                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + DTDSrcWarehouse;
                                     _FromLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
                                     $FromLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _FromLocatorLookUp, 50);
                                     var Flocatorctrlwrap = $('<div class="vis-control-wrap">');
@@ -344,7 +347,7 @@
 
 
                                     ////towarehouse
-                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + DTDSrcWarehouse;
+                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + ToWarehouse;
                                     _ToLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
                                     $ToLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _ToLocatorLookUp, 50);
                                     var Tolocatorctrlwrap = $('<div class="vis-control-wrap">');

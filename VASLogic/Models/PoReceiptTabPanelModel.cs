@@ -420,13 +420,13 @@ namespace VASLogic.Models
                              ci.AD_Client_ID,
                              cs.C_InvoicePaySchedule_ID,
                              cd.DocBaseType,
-                             ci.DateInvoiced,
+                             cs.DueDate AS DateInvoiced,
                              currencyConvert(cs.DueAmt ,cs.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
                          FROM
                              C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' AND cd.IsExpenseInvoice = 'N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -450,7 +450,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                         DateInvoiced >= Current_Date - 30
+                         DateInvoiced <= Current_Date AND DateInvoiced >= Current_Date - 30
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -1674,6 +1674,7 @@ namespace VASLogic.Models
             }
             else
             {
+                lstExprevData.Precision = Util.GetValueOfInt(dsExpRev.Tables[0].Rows[0]["StdPrecision"]);
                 lstLabel = new string[dsExpRev.Tables[0].Rows.Count];
                 lstExpData = new decimal[dsExpRev.Tables[0].Rows.Count];
                 lstRevData = new decimal[dsExpRev.Tables[0].Rows.Count];
@@ -1814,6 +1815,7 @@ namespace VASLogic.Models
                          fa.C_Period_ID,
                          y.CalendarYears,
                          p.Name,
+                         c.StdPrecision, 
                         SUM(CASE WHEN eleVal.AccountType = 'E' THEN (fa.AmtAcctDR - fa.AmtAcctCR) ELSE 0 END) AS ExpenseAmount,
                         SUM(CASE WHEN eleVal.AccountType = 'R' THEN (fa.AmtAcctCR - fa.AmtAcctDR) ELSE 0 END) AS revenueAmount
                          FROM fact_acct fa
@@ -1822,6 +1824,7 @@ namespace VASLogic.Models
                          INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
                          INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND eleVal.AccountType IN ('R', 'E') AND fa.Account_ID = eleVal.C_ElementValue_ID)
                          INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
+                         INNER JOIN C_Currency c ON (c.C_Currency_ID = acct.C_Currency_ID) 
                          INNER JOIN C_Period p ON (p.C_Period_ID = fa.C_Period_ID)
                          INNER JOIN C_Year y ON (y.C_Year_ID = p.C_Year_ID)
                          WHERE acctEle.IsActive = 'Y' 
@@ -1892,12 +1895,13 @@ namespace VASLogic.Models
                       fa.AD_Client_ID,
                       fa.C_Period_ID,
                       y.CalendarYears,
-                      p.Name
+                      p.Name, 
+                      c.StdPrecision 
                       order by
                       acct.C_AcctSchema_ID, 
                       fa.AD_Client_ID,
                       y.CalendarYears,
-                      fa.C_Period_ID ";
+                      fa.C_Period_ID";
 
             DataSet dsExpRevData = DB.ExecuteDataset(sql);
             if (dsExpRevData == null || (dsExpRevData != null && dsExpRevData.Tables.Count == 0) || (dsExpRevData != null && dsExpRevData.Tables[0].Rows.Count == 0))
@@ -2009,7 +2013,7 @@ namespace VASLogic.Models
         /// <author>VIS_427</author>
         /// <returns>List of data of Expected Payment against order and Invoice</returns>
         public List<ExpectedPayment> GetExpectedPaymentData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string FinancialPeriodValue,
-               string C_BPartner_ID, string fromDate, string toDate,string docTypeValue)
+               string C_BPartner_ID, string fromDate, string toDate, string docTypeValue)
         {
             ExpectedPayment obj = new ExpectedPayment();
             StringBuilder sqlmain = new StringBuilder();
@@ -2282,12 +2286,12 @@ namespace VASLogic.Models
         /// <param name="ctx">Context</param>
         /// <returns>DataSet</returns>
         /// <author>VIS_427</author>
-        public DataSet GetPeriodData(Ctx ctx,int Period_ID)
+        public DataSet GetPeriodData(Ctx ctx, int Period_ID)
         {
-                string sql = $@"SELECT Min(StartDate) AS StartDate,MAX(EndDate) AS EndDate FROM C_Period WHERE AD_Client_ID = {ctx.GetAD_Client_ID()} AND C_Period_ID=" + Period_ID;
+            string sql = $@"SELECT Min(StartDate) AS StartDate,MAX(EndDate) AS EndDate FROM C_Period WHERE AD_Client_ID = {ctx.GetAD_Client_ID()} AND C_Period_ID=" + Period_ID;
 
-                DataSet dsPeriod = DB.ExecuteDataset(sql, null, null);
-                return dsPeriod;
+            DataSet dsPeriod = DB.ExecuteDataset(sql, null, null);
+            return dsPeriod;
         }
         /// <summary>
         /// This function is used to get Next Periods Period ID based on financial Year
@@ -2350,12 +2354,22 @@ namespace VASLogic.Models
 
         }
 
+        /// <summary>
+        /// This function is used to get the Invoice Line Details including Order and GRN details
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="InvoiceId">Invoice_ID</param>
+        /// <param name="pageNo">Page No</param>
+        /// <param name="pageSize">Page Size</param>
+        /// <returns>Data</returns>
+        /// <author>VIS_045, 16-Nov-2024</author>
         public List<VAS_InvoiceMatchingDetail> GetInvoiceLineMatchData(Ctx ctx, int InvoiceId, int pageNo, int pageSize)
         {
             List<VAS_InvoiceMatchingDetail> InvocieTaxTabPanel = new List<VAS_InvoiceMatchingDetail>();
             String sql = @"SELECT il.Line, p.Name AS ProductName, uom.Name AS UOMName, uom.StdPrecision AS UOMPrecision, c.StdPrecision AS CurrencyPrecision, 
-                            il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, il.PriceEntered AS InvoicePrice, 
-                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced, ol.PriceEntered AS OrderPrice 
+                            il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, il.PriceEntered AS InvoicePrice, i.DocStatus,
+                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced, ol.PriceEntered AS OrderPrice, 
+                            (SELECT NVL(DueAmt, 0) FROM VA009_OrderPaySchedule ops WHERE ops.C_Order_ID = ol.C_Order_ID AND ops.VA009_IsPaid= 'N') AS NotPaidAdvanceOrder
                             FROM
                             C_Invoice i 
                             INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = i.C_Invoice_ID)
@@ -2370,6 +2384,18 @@ namespace VASLogic.Models
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql + ")t", null, null));
+                int DiscrepancyCount = 0;
+                decimal TotalAdvanceAmt = 0;
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    if (CheckDiscrepancyInvoice(ds.Tables[0].Rows[i]))
+                    {
+                        DiscrepancyCount = DiscrepancyCount + 1;
+                    }
+
+                    TotalAdvanceAmt += Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["NotPaidAdvanceOrder"]);
+                }
+
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     VAS_InvoiceMatchingDetail obj = new VAS_InvoiceMatchingDetail();
@@ -2391,10 +2417,47 @@ namespace VASLogic.Models
                     obj.InvoicePrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["InvoicePrice"]);
                     obj.UOMPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["UOMPrecision"]);
                     obj.CurrencyPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["CurrencyPrecision"]);
+                    obj.DocStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocStatus"]);
+                    obj.AdvanceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["NotPaidAdvanceOrder"]);
+                    obj.IsDiscrepancy = CheckDiscrepancyInvoice(ds.Tables[0].Rows[i]);
+                    obj.TotalAdvanceAmt = TotalAdvanceAmt;
+                    obj.DiscrepancyCount = DiscrepancyCount;
                     InvocieTaxTabPanel.Add(obj);
                 }
             }
             return InvocieTaxTabPanel;
+        }
+
+        /// <summary>
+        /// This function is used to check any discrepancy found in reccord or not
+        /// </summary>
+        /// <param name="dr">DataRow</param>
+        /// <returns>True when discrepancy found</returns>
+        /// <author>VIS_045; 18-Nov-2024</author>
+        public bool CheckDiscrepancyInvoice(DataRow dr)
+        {
+            bool IsDiscrepancy = false;
+
+            // Check record is completed or closed
+            bool Iscompleted = Util.GetValueOfString(dr["DocStatus"]).Equals("CO") || Util.GetValueOfString(dr["DocStatus"]).Equals("CL");
+
+            if (Util.GetValueOfInt(dr["C_OrderLine_ID"]) == 0 || Util.GetValueOfInt(dr["M_InOutLine_ID"]) == 0)
+            {
+                IsDiscrepancy = true;
+            }
+            // check discrepany found in price in completeted Invoice 
+            else if (Iscompleted && (Util.GetValueOfDecimal(dr["OrderPrice"]) - Util.GetValueOfDecimal(dr["InvoicePrice"]) < 0))
+            {
+                IsDiscrepancy = true;
+            }
+            // Check discrepany found in QtyOrdered and Qty Invoiced or not
+            else if ((Util.GetValueOfDecimal(dr["QtyOrdered"]) - Util.GetValueOfDecimal(dr["OrderInvoiced"]) - (Iscompleted ? 0 : Util.GetValueOfDecimal(dr["QtyInvoiced"])) < 0) ||
+                (Util.GetValueOfDecimal(dr["OrderDelivered"]) - Util.GetValueOfDecimal(dr["OrderInvoiced"]) - (Iscompleted ? 0 : Util.GetValueOfDecimal(dr["QtyInvoiced"])) < 0) ||
+                (Util.GetValueOfDecimal(dr["OrderPrice"]) - Util.GetValueOfDecimal(dr["InvoicePrice"]) < 0))
+            {
+                IsDiscrepancy = true;
+            }
+            return IsDiscrepancy;
         }
     }
     public class TabPanel
@@ -2549,6 +2612,7 @@ namespace VASLogic.Models
         public decimal[] lstProfitData { get; set; }
         public string[] lstLabel { get; set; }
         public string ErrorMessage { get; set; }
+        public int Precision { get; set; }
     }
     public class VAS_ScheduleDetail
     {
@@ -2603,6 +2667,11 @@ namespace VASLogic.Models
         public decimal OrderPrice { get; set; }
         public decimal ExpectedOrder { get; set; }
         public decimal ExpectedGRN { get; set; }
+        public string DocStatus { get; set; }
+        public decimal AdvanceAmt { get; set; }
+        public decimal TotalAdvanceAmt { get; set; }
+        public bool IsDiscrepancy { get; set; }
+        public int DiscrepancyCount { get; set; }
         public int RecordCount { get; set; }
     }
 }
