@@ -3866,6 +3866,10 @@ namespace VAdvantage.Model
                     SetQtyInvoiced(GetQtyInvoiced());
 
                 //JID_1744 PriceList Precision should as per Price List Precision --> rather than currency precision
+                if (GetPriceList() == 0)
+                {
+                    SetPriceList(GetPriceActual());
+                }
                 if (newRecord || Is_ValueChanged("PriceList"))
                     SetPriceList(Decimal.Round(GetPriceList(), priceListPrcision, MidpointRounding.AwayFromZero));
 
