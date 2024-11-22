@@ -308,6 +308,7 @@
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutBudget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutCashJournal.js" />
+    <Content Include="Areas\VAS\Scripts\model\CalloutChartOfAccount.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutcheckinout.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutcontract.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutcrm.js" />
