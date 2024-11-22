@@ -50,7 +50,7 @@ namespace VAS.Controllers
         /// <param name="ToDate"></param>
         /// <param name="RefNo"></param>
         /// <returns>carts</returns>
-        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo,int windowID, int RecordId,string WindowName,int ToWarehouse,int DTDSrcWarehouse,int BPartnerId)
+        public JsonResult GetIventoryCartData(string CartName, string UserId,string FromDate,string ToDate, string RefNo,int windowID, int RecordId,string WindowName,int ToWarehouse,int DTDSrcWarehouse,int BPartnerId,int OrderNo)
         {
             List<Dictionary<string, object>> result = null;
             if (Session["ctx"] != null)
@@ -58,7 +58,7 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 InventoryLinesModel obj = new InventoryLinesModel();
-                result = obj.GetIventoryCartData(ctx,CartName, UserId, FromDate, ToDate, RefNo, windowID, RecordId, WindowName, ToWarehouse, DTDSrcWarehouse, BPartnerId);
+                result = obj.GetIventoryCartData(ctx,CartName, UserId, FromDate, ToDate, RefNo, windowID, RecordId, WindowName, ToWarehouse, DTDSrcWarehouse, BPartnerId, OrderNo);
             }
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }

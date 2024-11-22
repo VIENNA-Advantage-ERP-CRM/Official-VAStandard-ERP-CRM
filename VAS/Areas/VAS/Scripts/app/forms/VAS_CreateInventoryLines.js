@@ -37,7 +37,7 @@
         var ToWarehouse = 0;
         var DTDSrcWarehouse = 0;
         var Bpartner = 0;
-
+        var OrderNo = 0;
         //var WindowName = VIS.context.m_map[1]["1|0|Name"];
 
         this.initalize = function () {
@@ -172,6 +172,7 @@
             ToWarehouse = VIS.context.getContextAsInt($self.windowNo, "M_Warehouse_ID");
             DTDSrcWarehouse = VIS.context.getContextAsInt($self.windowNo, "DTD001_MWarehouseSource_ID");
             Bpartner = VIS.context.getContextAsInt($self.windowNo, "C_BPartner_ID");
+            OrderNo = VIS.context.getContextAsInt($self.windowNo, "C_Order_ID");
 
             if (window_ID == "168") {//update record only allowed in case of physical inventory
                 $root.find(".VAS-Update").css("display", "block");
@@ -255,7 +256,7 @@
         function LoadCartData() {
             $self.setBusy(true);
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartData",
-                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID, "RecordId": $self.Record_ID, "WindowName": WindowName, "ToWarehouse": ToWarehouse, "DTDSrcWarehouse": DTDSrcWarehouse, "BPartnerId": Bpartner }, function (data) {
+                { "CartName": CartName, "UserId": UserIds, "FromDate": $FromDate.getValue(), "ToDate": $ToDate.getValue(), "RefNo": RefNo, "windowID": window_ID, "RecordId": $self.Record_ID, "WindowName": WindowName, "ToWarehouse": ToWarehouse, "DTDSrcWarehouse": DTDSrcWarehouse, "BPartnerId": Bpartner, "OrderNo": OrderNo }, function (data) {
 
                     $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "none");
                     $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "");
