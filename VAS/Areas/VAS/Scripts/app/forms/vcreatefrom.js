@@ -775,7 +775,7 @@
             });
 
             /*VIS_0060: 13-Nov-2024, Set Order in case of delivery Order*/
-            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx"))) {
+            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx")) || "Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
                 obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "C_Order_ID"));
 
                 // Change event for Order
@@ -974,7 +974,7 @@
         }
 
 
-        var OrgId = VIS.Env.getCtx().getContextAsInt(this.windowNo, "AD_Org_ID")
+        var OrgId = VIS.Env.getCtx().getContextAsInt(this.windowNo, "AD_Org_ID");
         // Added by Vivek on 09/10/2017 advised by Pradeep
         var _isdrop = "Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsDropShip"));
         var _isSoTrx = "Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsSOTrx"));
@@ -1033,7 +1033,7 @@
 
         var lookupOrder = VIS.MLookupFactory.get(VIS.Env.getCtx(), VIS.Env.getWindowNo(), 0, VIS.DisplayType.Search, "C_Order_ID", 0, false, sql);
         this.cmbOrder = new VIS.Controls.VTextBoxButton("C_Order_ID", true, false, true, VIS.DisplayType.Search, lookupOrder);
-      
+
         //$.ajax({
         //    url: VIS.Application.contextUrl + "VCreateFrom/VCreateGetOrders",
         //    type: 'POST',
@@ -1252,7 +1252,12 @@
 
         this.lblBankAccount.getControl().text(VIS.Msg.getMsg("BankAcctCurrency"));
         this.lblBPartner.getControl().text(VIS.Msg.getMsg("BusinessPartner"));
-        this.lblOrder.getControl().text(VIS.Msg.getMsg("Order"));
+        if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
+            this.lblOrder.getControl().text(VIS.Msg.getMsg("RMA"));
+        }
+        else {
+            this.lblOrder.getControl().text(VIS.Msg.getMsg("Order"));
+        }
         this.lblInvoice.getControl().text(VIS.Msg.getMsg("Invoice"));
         this.lblShipment.getControl().text(VIS.Msg.getMsg("Shipment/Receipt"));
         this.lblLocator.getControl().text(VIS.Msg.getMsg("M_Locator_ID"));

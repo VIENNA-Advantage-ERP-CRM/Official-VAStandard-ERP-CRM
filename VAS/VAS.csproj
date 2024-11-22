@@ -259,6 +259,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_BankBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashBalanceWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashFlowWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreateInventoryLines.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CreditUtilizationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CustomerRMAWidget.js" />
