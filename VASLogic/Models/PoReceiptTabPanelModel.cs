@@ -2471,7 +2471,11 @@ namespace VASLogic.Models
             // Check record is completed or closed
             bool Iscompleted = Util.GetValueOfString(dr["DocStatus"]).Equals("CO") || Util.GetValueOfString(dr["DocStatus"]).Equals("CL");
 
-            if (Util.GetValueOfInt(dr["C_OrderLine_ID"]) == 0 || Util.GetValueOfInt(dr["M_InOutLine_ID"]) == 0)
+            if (Util.GetValueOfInt(dr["C_OrderLine_ID"]) == 0 && Util.GetValueOfInt(dr["M_InOutLine_ID"]) == 0)
+            {
+                IsDiscrepancy = false;
+            }
+            else if (Util.GetValueOfInt(dr["C_OrderLine_ID"]) == 0 || Util.GetValueOfInt(dr["M_InOutLine_ID"]) == 0)
             {
                 IsDiscrepancy = true;
             }
