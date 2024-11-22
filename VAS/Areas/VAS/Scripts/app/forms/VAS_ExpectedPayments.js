@@ -74,8 +74,9 @@
             $maindiv.append(headingDiv);
             /*Find FilterDiv which will open filter section on click of filter button*/
             var FilterToClickDiv = filetrDiv.find("#vas_expay_dropdownMenu_" + $self.windowNo);
-            FilterToClickDiv.on("click", function () {
+            FilterToClickDiv.on("click", function () {              
                 if (!IsFilterBtnClicked) {
+                    filetrDiv.addClass('vas-disableArrow');
                     IsFilterBtnClicked = true;
                     var $FilterDiv = $root.find("#vas_expay_FilterPopupWrap_" + $self.windowNo);
                     $FilterHeader = $(
@@ -207,12 +208,15 @@
                         toDate = null;
                         docTypeValue = null;
                     });
+                    setTimeout(function () {
+                        filetrDiv.removeClass('vas-disableArrow');
+                    }, 1000);
                 }
                 else {
                     $FilterHeader.remove();
                     IsFilterBtnClicked = false;
-                }
-            })
+                }               
+            })          
         };
 
         /*This function will load data in widget */

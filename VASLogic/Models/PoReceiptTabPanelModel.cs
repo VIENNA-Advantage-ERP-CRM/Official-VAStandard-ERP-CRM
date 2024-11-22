@@ -2127,7 +2127,7 @@ namespace VASLogic.Models
                 //if user enter does not enter from date but enters todate then this condition will execute
                 else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
                 {
-                    sql.Append(@" AND TRUNC(cs.DueDate) <= " +
+                    sqlmain.Append(@" AND TRUNC(cs.DueDate) <= " +
                     (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
                 }
                 //if from date greater then today's date
