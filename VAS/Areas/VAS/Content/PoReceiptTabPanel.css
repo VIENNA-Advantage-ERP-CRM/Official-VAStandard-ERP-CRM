@@ -2580,7 +2580,7 @@ hr.vas-paymentData-underline {
 /*Expected Payments css End*/
 
 
-/** Invoice Match Detail CSS Start*/
+/** Invoice Match Detail Tab Panel CSS Start*/
 .vas-invmatch-DataItem {
     background-color: #EDF5FA;
     border-radius: 8px;
@@ -2742,6 +2742,10 @@ margin-top:-10px;
     font-weight: bold;
     margin-bottom: 8px;
     font-size: 13px;
+}
+
+.vas-invmatch-notMatched {
+    color:red;
 }
 
 /** Invoice Match Detail CSS End*/

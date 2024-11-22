@@ -220,6 +220,7 @@
                                 // need to insert div
                                 TabPaneldesign += '</div> ';
                                 if (Discrepancy) {
+
                                     TabPaneldesign += '<div class="vas-invmatch-Data-sglItem vas-invmatch-ExpectedMargin mb-2">' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="vas-invmatch-DataElementValue vas-invmatch-setCol1Width">&nbsp;</span>' +
@@ -232,39 +233,65 @@
                                         '</div>' +
                                         '</div>';
 
+                                    let dataElementValueClass = "vas-invmatch-DataElementValue text-right";
+                                    /*if (data[i].C_OrderLine_ID != 0) {*/
+                                        if ((data[i].DocStatus == 'CO' || data[i].DocStatus == 'CL')) {
+                                            if (data[i].ExpectedOrder < 0) {
+                                                dataElementValueClass = "vas-invmatch-DataElementValue text-right vas-invmatch-notMatched";
+                                            }
+                                        }
+                                        else if ((data[i].ExpectedOrder - data[i].QtyInvoiced) < 0) {
+                                            dataElementValueClass = "vas-invmatch-DataElementValue text-right vas-invmatch-notMatched";
+                                        }
+                                    /*}*/
                                     TabPaneldesign += '<div class="vas-invmatch-Data-sglItem vas-invmatch-DataRow mb-2">' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="vas-invmatch-DataElementValue">' + VIS.Msg.getMsg("VAS_Order") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].ExpectedOrder).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].ExpectedOrder).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '</div>';
 
+                                    dataElementValueClass = "vas-invmatch-DataElementValue text-right";
+                                    if ((data[i].DocStatus == 'CO' || data[i].DocStatus == 'CL')) {
+                                        if (data[i].ExpectedGRN < 0) {
+                                            dataElementValueClass = "vas-invmatch-DataElementValue text-right vas-invmatch-notMatched";
+                                        }
+                                    }
+                                    else if ((data[i].ExpectedGRN - data[i].QtyInvoiced) < 0) {
+                                        dataElementValueClass = "vas-invmatch-DataElementValue text-right vas-invmatch-notMatched";
+                                    }
                                     TabPaneldesign += '<div class="vas-invmatch-Data-sglItem vas-invmatch-DataRow mb-2">' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="vas-invmatch-DataElementValue">' + VIS.Msg.getMsg("VAS_GRN") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].ExpectedGRN).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].ExpectedGRN).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '</div>';
 
+                                    dataElementValueClass = "vas-invmatch-DataElementValue text-right";
+                                    if (data[i].C_OrderLine_ID != 0) {
+                                        if ((data[i].OrderPrice - data[i].InvoicePrice) < 0) {
+                                            dataElementValueClass = "vas-invmatch-DataElementValue text-right vas-invmatch-notMatched";
+                                        }
+                                    }
                                     TabPaneldesign += '<div class="vas-invmatch-Data-sglItem vas-invmatch-DataRow mb-2">' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="vas-invmatch-DataElementValue">' + VIS.Msg.getMsg("VAS_Price") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].OrderPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].CurrencyPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].OrderPrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].CurrencyPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="vas-invmatch-DataElementValue text-right">' + (data[i].InvoicePrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].CurrencyPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '">' + (data[i].InvoicePrice).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].CurrencyPrecision, maximumFractionDigits: data[i].CurrencyPrecision }) + '</span>' +
                                         '</div>' +
                                         '</div>';
 
