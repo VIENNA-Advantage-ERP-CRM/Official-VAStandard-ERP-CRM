@@ -1252,7 +1252,7 @@
 
         this.lblBankAccount.getControl().text(VIS.Msg.getMsg("BankAcctCurrency"));
         this.lblBPartner.getControl().text(VIS.Msg.getMsg("BusinessPartner"));
-        if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
+        if ("Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsReturnTrx"))) {
             this.lblOrder.getControl().text(VIS.Msg.getMsg("RMA"));
         }
         else {
