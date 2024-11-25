@@ -2477,7 +2477,7 @@ namespace VASLogic.Models
             }
             else if (Util.GetValueOfInt(dr["C_OrderLine_ID"]) == 0 || Util.GetValueOfInt(dr["M_InOutLine_ID"]) == 0)
             {
-                IsDiscrepancy = true;
+                IsDiscrepancy = false;
             }
             // check discrepany found in price in completeted Invoice 
             else if (Iscompleted && (Util.GetValueOfDecimal(dr["OrderPrice"]) - Util.GetValueOfDecimal(dr["InvoicePrice"]) < 0))
