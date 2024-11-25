@@ -97,7 +97,7 @@ namespace VAdvantage.Model
                 Set_Value("VA107_Prerequisites", task.Get_Value("VA107_Prerequisites"));
                 Set_Value("VA107_RecommendedResource", task.Get_Value("VA107_RecommendedResource"));
                 Set_Value("VA107_RefTask_ID", task.Get_Value("VA107_RefTask_ID"));
-                Set_Value("VA107_Status", task.Get_Value("VA107_Status"));
+                Set_Value("VA107_Status", "D");
                 Set_Value("VA107_RequestType", task.Get_Value("VA107_RequestType"));
 
             }
