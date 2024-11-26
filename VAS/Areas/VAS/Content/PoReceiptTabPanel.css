@@ -2769,15 +2769,15 @@ margin-top:-10px;
    /* padding: 0px;*/
 }
 
-/*.vas-barline-ExRePr-canvas {
-    height: 100% !important
-}*/
+.vas-expay-barline-canvas {
+    height: 85% !important
+}
 
 .vas-cashFlow-heading {
     font-weight: 600;
     margin-bottom: 0.3em;
     font-family: 'Verdana';
-    /*color: rgba(var(--v-c-common), 1);*/
+   /*color: rgba(var(--v-c-common), 1);*/
     font-size: 0.9em;
     box-shadow: 0 8px 6px -6px #ffffff;
     padding-top: 0.2em;
@@ -2788,9 +2788,9 @@ margin-top:-10px;
     background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
     position: relative;
 }
-.vas-barline-cashFlow-container{
+/*.vas-barline-cashFlow-container{
     height:100%;
-}
+}*/
 
 .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] {
     background-image: linear-gradient(45deg, transparent 50%, #000 50%), linear-gradient(135deg, #000 50%, transparent 50%);
