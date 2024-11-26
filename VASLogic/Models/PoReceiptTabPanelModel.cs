@@ -1777,7 +1777,7 @@ namespace VASLogic.Models
                          WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
                          ELSE ci.C_Calendar_ID END AS C_Calendar_ID, 
                          cp.C_Period_ID,
-                         CEIL(cp.PeriodNo/3) AS CurQuarter
+                         CEIL(CAST(cp.PeriodNo AS NUMERIC)/3) AS CurQuarter
                          FROM C_Calendar cc
                          INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
                          LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
@@ -2075,12 +2075,12 @@ namespace VASLogic.Models
                         }
                         if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                         {
-                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
                             sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                            sqlmain.Append(@"AND " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                            (GlobalVariable.TO_DATE(StartDate, true)));
+                            sqlmain.Append(@" AND " +
+                             (GlobalVariable.TO_DATE(EndDate, true)));
                         }
                     }
                     // Next month
@@ -2095,12 +2095,12 @@ namespace VASLogic.Models
                         }
                         if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                         {
-                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
                             sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                            sqlmain.Append(@"AND " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                            (GlobalVariable.TO_DATE(StartDate, true)));
+                            sqlmain.Append(@" AND " +
+                             (GlobalVariable.TO_DATE(EndDate, true)));
                         }
                     }
                     //Passed Due Date
@@ -2186,12 +2186,12 @@ namespace VASLogic.Models
                         }
                         if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                         {
-                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
                             sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                            sqlmain.Append(@"AND " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                            (GlobalVariable.TO_DATE(StartDate, true)));
+                            sqlmain.Append(@" AND " +
+                             (GlobalVariable.TO_DATE(EndDate, true)));
                         }
                     }
                     // Next month
@@ -2205,12 +2205,12 @@ namespace VASLogic.Models
                         }
                         if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                         {
-                            string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                            string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                            DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                            DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
                             sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                            sqlmain.Append(@"AND " +
-                            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                            (GlobalVariable.TO_DATE(StartDate, true)));
+                            sqlmain.Append(@" AND " +
+                             (GlobalVariable.TO_DATE(EndDate, true)));
                         }
                     }
                     //Passed Due Date
@@ -2694,12 +2694,12 @@ namespace VASLogic.Models
                 }
                 if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                 {
-                    string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                    string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                    DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                    DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
                     sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                    sql.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                    (GlobalVariable.TO_DATE(StartDate, true)));
+                    sql.Append(@" AND " +
+                     (GlobalVariable.TO_DATE(EndDate, true)));
                 }
             }
             //Next Month
@@ -2713,26 +2713,26 @@ namespace VASLogic.Models
                 }
                 if (dsPeriod != null && dsPeriod.Tables[0].Rows.Count > 0)
                 {
-                    string StartDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["StartDate"]);
-                    string EndDate = Util.GetValueOfString(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sqlmain.Append(@" AND TRUNC(t.expected_due_date) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                    DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
+                    DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
+                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    (GlobalVariable.TO_DATE(StartDate, true)));
+                    sql.Append(@" AND " +
+                     (GlobalVariable.TO_DATE(EndDate, true)));
                 }
             }
             //This Quarter Year
             else if (ListValue.Equals("03"))
             {
                 string quarterSql = $@"SELECT Min(p.StartDate) AS StartDate,MAX(p.EndDate) AS EndDate FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.C_Year_ID)
-                                                    WHERE CEIL(p.PeriodNo/3)={currQuarter} AND y.CalendarYears={GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
+                                                    WHERE CEIL(CAST(p.PeriodNo AS NUMERIC)/3)={currQuarter} AND y.CalendarYears={GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
                 dsYear = DB.ExecuteDataset(quarterSql);
-                string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
-                string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
+                DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
                 sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
-                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                sql.Append(@"AND " +
-                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                (GlobalVariable.TO_DATE(StartDate, true)));
+                sql.Append(@" AND " +
+                 (GlobalVariable.TO_DATE(EndDate, true)));
             }
             //Next Quarter
             else if (ListValue.Equals("04"))
@@ -2753,16 +2753,16 @@ namespace VASLogic.Models
                 {
                     CurrentYear = isNextYearQuarter == false ? CurrentYear : CurrentYear + 1;
                     string quarterSql = $@"SELECT Min(p.StartDate) AS StartDate,MAX(p.EndDate) AS EndDate FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.C_Year_ID)
-                                           WHERE CEIL(p.PeriodNo/3)={NextQuarter} 
+                                           WHERE CEIL(CAST(p.PeriodNo AS NUMERIC)/3)={NextQuarter} 
                                            AND y.CalendarYears={GlobalVariable.TO_STRING(CurrentYear.ToString())} 
                                            AND y.C_Calendar_ID={calendar_ID}";
                     dsYear = DB.ExecuteDataset(quarterSql);
-                    string StartDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["StartDate"]);
-                    string EndDate = Util.GetValueOfString(dsYear.Tables[0].Rows[0]["EndDate"]);
+                    DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
+                    DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
                     sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(StartDate), true)));
-                    sql.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(EndDate), true)));
+                    (GlobalVariable.TO_DATE(StartDate, true)));
+                    sql.Append(@" AND " +
+                     (GlobalVariable.TO_DATE(EndDate, true)));
                 }
 
             }
@@ -2832,7 +2832,7 @@ namespace VASLogic.Models
         /// <author>VIS_427</author>
         public int GetNextYearQuarter(int calendar_ID, int CalenderYear)
         {
-            string sql = $@"SELECT CEIL(MIN(p.PeriodNo)/3) FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+            string sql = $@"SELECT CEIL(CAST(p.PeriodNo AS NUMERIC)/3) FROM C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                             WHERE y.CalendarYears={GlobalVariable.TO_STRING(CalenderYear.ToString())} AND y.C_Calendar_ID={calendar_ID}";
             int Quarter = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return Quarter;

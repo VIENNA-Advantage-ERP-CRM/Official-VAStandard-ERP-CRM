@@ -182,7 +182,7 @@
 
 
                         // Create a new canvas element and append it to the root
-                        const canvas = $('<canvas class="vas-barline-ExRePr-canvas" height="270px"></canvas>')
+                        const canvas = $('<canvas class="vas-expay-barline-canvas"></canvas>')
 
                             /*.css({
                             width: '100%',   // Set width to 100% (or any fixed value)
