@@ -143,14 +143,16 @@ namespace VIS.Models
         {
             int C_BPartner_ID = Util.GetValueOfInt(fields);
             Dictionary<string, int> retDic = null;
-            string sql = "SELECT au.Ad_User_ID,  cl.C_BPartner_Location_ID FROM C_BPartner cp INNER JOIN C_BPartner_Location cl ON cl.C_BPartner_ID = cp.C_BPartner_ID " +
-                "INNER JOIN Ad_User au ON au.C_BPartner_ID = cp.C_BPartner_ID WHERE cp.C_BPartner_ID = " + C_BPartner_ID + " AND cp.IsActive ='Y' ORDER BY cp.Created";
+            string sql = "SELECT au.Ad_User_ID,  cl.C_BPartner_Location_ID,mpv.M_PriceList_Version_ID FROM C_BPartner cp INNER JOIN C_BPartner_Location cl ON cl.C_BPartner_ID = cp.C_BPartner_ID " +
+                "INNER JOIN Ad_User au ON au.C_BPartner_ID = cp.C_BPartner_ID  LEFT JOIN M_PriceList pl on (cp.M_PriceList_ID=pl.M_PriceList_ID) LEFT JOIN M_PriceList_Version mpv ON(pl.M_PriceList_ID = mpv.M_PriceList_ID) WHERE cp.C_BPartner_ID = " + C_BPartner_ID + " AND mpv.VALIDFROM <= SYSDATE AND cp.IsActive ='Y' ORDER BY mpv.VALIDFROM DESC";
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 retDic = new Dictionary<string, int>();
                 retDic["AD_User_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0][0]);
                 retDic["C_BPartner_Location_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0][1]);
+                retDic["M_PriceList_Version_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0][2]);
+
             }
             return retDic;
         }
