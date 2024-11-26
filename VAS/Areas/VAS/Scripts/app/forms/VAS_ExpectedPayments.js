@@ -88,11 +88,11 @@
                     /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
                     $DocTypeExPayListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_DocTypeExPayPaymentList", ColumnIds.VAS_DocTypeExPayPaymentList, false);
                     // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", true, false, true, $DocTypeExPayListLookUp, 20);
+                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", false, false, true, $DocTypeExPayListLookUp, 20);
                     $self.vDocTypeExPayList.setValue("01");
                     var $DocTypeExPayListControlWrap = $('<div class="vis-control-wrap">');
                     $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
-                    $DocTypeExPayListControlWrap.append($self.vDocTypeExPayList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: #fff; top:-9px;">' + VIS.Msg.getMsg("VAS_DocTypeExPayDiv") + '</label>');;
+                    $DocTypeExPayListControlWrap.append($self.vDocTypeExPayList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="top:-9px;background-color: rgb(235, 235, 235);color:black;">' + VIS.Msg.getMsg("VAS_DocTypeExPayDiv") + '</label>');;
                     $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
                     DocTypeExPayListDiv.append($DocTypeExPayListDiv);
 
@@ -101,11 +101,11 @@
                     /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
                     $FinancialPeriodListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_FinancialPeriodPaymentList", ColumnIds.VAS_FinancialPeriodPaymentList, false);
                     // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-                    $self.vFinancialPeriodList = new VIS.Controls.VComboBox("VAS_FinancialPeriodPaymentList", true, false, true, $FinancialPeriodListLookUp, 20);
+                    $self.vFinancialPeriodList = new VIS.Controls.VComboBox("VAS_FinancialPeriodPaymentList", false, false, true, $FinancialPeriodListLookUp, 20);
                     // $self.vFinancialPeriodList.setValue("01");
                     var $FinancialPeriodListControlWrap = $('<div class="vis-control-wrap">');
                     $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
-                    $FinancialPeriodListControlWrap.append($self.vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: #fff; top:-9px;">' + VIS.Msg.getMsg("VAS_FinancialPeriodDiv") + '</label>');;
+                    $FinancialPeriodListControlWrap.append($self.vFinancialPeriodList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="top:-9px;background-color: rgb(235, 235, 235);color:black;">' + VIS.Msg.getMsg("VAS_FinancialPeriodDiv") + '</label>');;
                     $FinancialPeriodListDiv.append($FinancialPeriodListControlWrap);
                     FinancialPeriodListDiv.append($FinancialPeriodListDiv);
 
@@ -113,11 +113,11 @@
                     var BPartnerDiv = $('<div class="vas-BPartnerDiv">');
                     $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
                     var BPartnerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search);
-                    vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", true, false, true, VIS.DisplayType.Search, BPartnerLookUp);
+                    vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", false, false, true, VIS.DisplayType.Search, BPartnerLookUp);
                     var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                     var $BPartnerButtonWrap = $('<div class="input-group-append">');
                     $BPartnerDiv.append($BPartnerControlWrap);
-                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');;
+                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="top:-9px;background-color: rgb(235, 235, 235);color:black;">' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');;
                     $BPartnerDiv.append($BPartnerControlWrap);
                     $BPartnerButtonWrap.append(vSearchBPartner.getBtn(0));
                     $BPartnerDiv.append($BPartnerButtonWrap);
@@ -126,18 +126,18 @@
                     //Created from and to date control to filter out data
                     var FromDatediv = $('<div class="vas-expay-dateWidth vas-FromdateDiv">');
                     $FromDatewrapDiv = $('<div class="input-group vis-input-wrap">');
-                    $FromDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
+                    $FromDate = new VIS.Controls.VDate("DateReport", false, false, true, VIS.DisplayType.Date, "DateReport");
                     var $FromDateWrap = $('<div class="vis-control-wrap">');
                     $FromDatewrapDiv.append($FromDateWrap);
-                    $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels">' + VIS.Msg.getMsg("VAS_FromDate") + '</label>');;
+                    $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels" style="color:black;">' + VIS.Msg.getMsg("VAS_FromDate") + '</label>');;
                     FromDatediv.append($FromDatewrapDiv);
 
                     var toDatediv = $('<div class="vas-expay-dateWidth vas-todateDiv">');
                     $toDatewrapDiv = $('<div class="input-group vis-input-wrap">');
-                    $ToDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
+                    $ToDate = new VIS.Controls.VDate("DateReport", false, false, true, VIS.DisplayType.Date, "DateReport");
                     var $toDateWrap = $('<div class="vis-control-wrap">');
                     $toDatewrapDiv.append($toDateWrap);
-                    $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels">' + VIS.Msg.getMsg("VAS_ToDate") + '</label>');;
+                    $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '')).append('<label class="vas-expay-lablels" style="color:black;">' + VIS.Msg.getMsg("VAS_ToDate") + '</label>');;
                     toDatediv.append($toDatewrapDiv);
                     var $DatesDiv = $('<div class="vas-expay-datefilter">');
                     $DatesDiv.append(FromDatediv).append(toDatediv);
