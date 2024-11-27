@@ -303,6 +303,9 @@
     CalloutProjectCBPartner.prototype.SetAddress = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if ((this.isCalloutActive()) || value == null || value.toString() == "") {
+            mTab.setValue("C_BPartner_Location_ID", null);
+            mTab.setValue("AD_User_ID", null);
+            mTab.setValue("M_PriceList_Version_ID", null);
             return "";
         }
         try {
@@ -324,6 +327,12 @@
                         mTab.setValue("AD_User_ID", null);
                     else
                         mTab.setValue("AD_User_ID", _User_ID);
+
+                    var M_PriceList_Version_ID = VIS.Utility.Util.getValueOfInt(dr["M_PriceList_Version_ID"]);
+                    if (M_PriceList_Version_ID == 0)
+                        mTab.setValue("M_PriceList_Version_ID", null);
+                    else
+                        mTab.setValue("M_PriceList_Version_ID", M_PriceList_Version_ID);
                 }
             }
             else if (mField.getColumnName() == "C_BPartnerSR_ID") {
@@ -343,6 +352,12 @@
                         mTab.setValue("AD_User_ID", null);
                     else
                         mTab.setValue("AD_User_ID", _User_ID);
+
+                    var M_PriceList_Version_ID = VIS.Utility.Util.getValueOfInt(dr["M_PriceList_Version_ID"]);
+                    if (M_PriceList_Version_ID == 0)
+                        mTab.setValue("M_PriceList_Version_ID", null);
+                    else
+                        mTab.setValue("M_PriceList_Version_ID", M_PriceList_Version_ID);
                 }
             }
             //var sql = "SELECT au.ad_user_id,  cl.c_bpartner_location_id FROM c_bpartner cp  INNER JOIN c_bpartner_location cl ON cl.c_bpartner_id=cp.c_bpartner_id INNER JOIN Ad_User au ON au.c_bpartner_id   =cp.c_bpartner_id WHERE cp.c_bpartner_id= " + VIS.Utility.Util.getValueOfString(mTab.getValue("C_BPartner_ID")) + " AND cp.isactive       ='Y'  ORDER BY cp.created";

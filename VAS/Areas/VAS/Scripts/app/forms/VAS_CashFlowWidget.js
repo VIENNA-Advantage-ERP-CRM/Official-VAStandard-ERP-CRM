@@ -30,7 +30,7 @@
 
             $maindiv = $('<div id="VAS-BarLine-ERP_' + widgetID + '" class="vas-barline-cashFlow-container">');
             var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-cashFlow-heading">');
-            var HeadingDiv = $('<div class= "">' + VIS.Msg.getMsg("VAS_CashFlowWidget") + '</div>');
+            var HeadingDiv = $('<div class= "vas-cf-heading">' + VIS.Msg.getMsg("VAS_CashFlowWidget") + '</div>');
 
             // Create Control Div
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');
@@ -145,7 +145,7 @@
                                 },
                                 plugins: {
                                     legend: {
-                                        display: true,
+                                        display: false,
                                         position: 'bottom', // Positioning the legend on the right
                                         labels: {
                                             generateLabels: function (chart) {
@@ -182,10 +182,12 @@
 
 
                         // Create a new canvas element and append it to the root
-                        const canvas = $('<canvas class="vas-barline-ExRePr-canvas"></canvas>').css({
+                        const canvas = $('<canvas class="vas-expay-barline-canvas"></canvas>')
+
+                            /*.css({
                             width: '100%',   // Set width to 100% (or any fixed value)
-                            height: '300px'  // Set height for the canvas
-                        });
+                            height: '250px'  // Set height for the canvas
+                        });*/
                         var polarChart = $root.find('#VAS-BarLine-ERP_' + widgetID);
                         polarChart.append(canvas);
 
