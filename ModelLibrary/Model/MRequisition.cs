@@ -248,6 +248,16 @@ namespace VAdvantage.Model
                 }
             }
 
+            // VIS0060: Date Required should be greater than or equal to Document date.
+            if (GetDocumentDate() != null && GetDateRequired() != null)
+            {
+                if (GetDocumentDate().Value.Date > GetDateRequired().Value.Date)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_OrderDateGrtRequired"));
+                    return false;
+                }
+            }
+
             if (GetM_PriceList_ID() == 0)
             {
                 SetM_PriceList_ID();
