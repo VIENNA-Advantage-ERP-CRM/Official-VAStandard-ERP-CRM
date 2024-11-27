@@ -776,16 +776,16 @@
 
             /*VIS_0060: 13-Nov-2024, Set Order in case of delivery Order*/
             if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx")) || "Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
-                if (VIS.Env.getCtx().getContextAsInt(this.windowNo, "C_Order_ID") > 0) {
-                    obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "C_Order_ID"));
+                if (VIS.Env.getCtx().getContextAsInt(obj.windowNo, "C_Order_ID") > 0) {
+                    obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(obj.windowNo, "C_Order_ID"));
 
                     // Change event for Order
                     var eventnew = { propertyName: "C_Order_ID" }
                     obj.vetoablechange(eventnew);
                 }
             }
-            else {
-                obj.locatorField.setValue(VIS.Env.getCtx().getContextAsInt(this.windowNo, "M_Locator_ID"));
+            else if (obj.locatorField) {
+                obj.locatorField.setValue(VIS.Env.getCtx().getContextAsInt(obj.windowNo, "M_Locator_ID"));
             }
         };
 
