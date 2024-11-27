@@ -2561,6 +2561,16 @@ namespace VAdvantage.Model
                     }
                 }
 
+                // VIS0060: Quotation Valit Till date should be greater than or equal to Quote date.
+                if (IsSalesQuotation() && GetDateOrdered() != null && Get_Value("ValidTillDate") != null)
+                {
+                    if (GetDateOrdered().Value.Date > Util.GetValueOfDateTime(Get_Value("ValidTillDate")).Value.Date)
+                    {
+                        log.SaveError("Error", Msg.GetMsg(GetCtx(), "VAS_QuoteDateGrtValid"));
+                        return false;
+                    }
+                }
+
                 //SI_0648_2 : payment rule and payment method should be same as on payment base type of payment method window
                 if (Env.IsModuleInstalled("VA009_") && GetVA009_PaymentMethod_ID() > 0)
                 {
