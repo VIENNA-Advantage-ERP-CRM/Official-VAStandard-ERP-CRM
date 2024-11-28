@@ -169,8 +169,6 @@
                 '</ul>' +
                 '<div>');
 
-
-
             pagingPlusBtnDiv = $('<div class="VAS-pagingDiv d-none">');
             $addJoinBtn = $("<input class='VIS_Pref_btn-2 vas-add-join-btn' id='vas-addjoin-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_AddJoin") + "'>");
             $addFilterBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' id='vas-addfilter-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_AddFilter") + "'>");
@@ -262,6 +260,7 @@
             $sqlContent.append($selectQuery).append($queryResultGrid);
             $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText.append($sqlGenDeleteIcon)).append($selectGeneratorQuery).append(gridDiv2);
 
+            // Empty the Condition's Operator value
             $filterOperator.val('');
 
 
@@ -856,6 +855,7 @@
                     else if (VIS.DisplayType.YesNo == dataType) {
                         data += '<span class="vas-filter-price-value">' + "'" + filterArray[i].filterValue.substring(1, filterArray[i].filterValue.length - 1) + "'" + '</span>';
                     }
+                    // Added the condition if display type is lookup datatype
                     else if (VIS.DisplayType.IsLookup(dataType)) {
                         data += '<span class="vas-filter-price-value d-none">' + filterArray[i].filterValue + '</span>';
                         data += '<span class="vas-filter-price-name">' + filterArray[i].columnVal + '</span>';
@@ -991,6 +991,7 @@
                     $filterOperator.val(filterCondition);
                     $filterValue.val(updatedword);
 
+                    // Checked if there is a New Column or Old Column in Condition section dropdown in case of edit
                     var filterPriceName = filterItem.find(".vas-filter-price-name.active").text().trim();
                     if ($filterNewColumn.css('display') != 'none') {
                         $filterNewColumn.find('input').val(filterPriceName);
@@ -1006,15 +1007,6 @@
                     $filterSelectArrow.css('pointer-events', 'none');
 
                     let $filterPriceItem = $filterColumnName.children('.vas-column-list-item');
-
-                    //var displayType = filterItem.find(".vas-filter-datatype.active").text();
-                    //if (displayType == VIS.DisplayType.YesNo) {
-                    //    if (filterItem.find(".vas-filter-price-value").text() == "'Y'") {
-                    //        $filterValue.prop('checked', true);
-                    //    } else {
-                    //        $filterValue.prop('checked', false);
-                    //    }
-                    //}
 
                     $filterPriceItem.each(function () {
                         let filterPriceEditedVal = $(this).attr('value');
@@ -1176,16 +1168,7 @@
                 var filterColumn = $filterColumnInput.val();
                 var updatedFilterValue = $filterValue.val();
                 var selectedVal = $filterValInput.val();
-                //var output;
-                //// Check if the input is a number
-                //if (!isNaN(selectedVal) && selectedVal.trim() !== '') {
-                //    // It's a number, display without quotes
-                //    output = selectedVal;
-                //} else {
-                //    // It's a string, display with quotes
-                //    output = '"' + selectedVal + '"';
-                //}
-                // console.log("result is", updatedFilterValue);
+
                 var displayType = $filterColumnName.children('.vas-column-list-item.active').attr("datatype");
                 if ($filterValueDiv.css('display') != 'none') {
                     if (autoComValue != null) {
@@ -1244,6 +1227,7 @@
                         $filters.find('.vas-selecttable.active').text(filterColumn);
                         var oldQuery = $filterEditDiv.text();
                         var sqlGenQuery = $selectGeneratorQuery.text();
+                        // Checked if there is a New Column or Old Column in Condition section dropdown in case of edit
                         var reqFilterVal = $filterValInput.val();
                         if ($filterNewColumn.css('display') != 'none') {
                             $filters.find('.vas-filter-price-name.active').text(updatedFilterValue);
@@ -1608,6 +1592,8 @@
                 var sortQuery = "";
                 var sortColumn = $sortColumnInput.val();
                 var sql = $selectGeneratorQuery.text();
+
+                // Append subquery in sorting in Add Sort section
                 var datatype = $sortColumnInput.attr('datatype');
                 if (VIS.DisplayType.IsLookup(datatype)) {
                     var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
@@ -2159,6 +2145,7 @@
                         mainTableName = result[0].TableName;
                         joinCommonColumn = result;
                         for (var i = 0; i < result.length; i++) {
+                            // Append the dynamic values of Sort/Joins/Conditions and displayed on UI
                             $sortByDropdown.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + mainTableName + "." + result[i].DBColumn + " refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + " TableName=" + mainTableName + " columnID="
                                 + result[i].ColumnID + " datatype=" + result[i].DataType + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
                             $filterColumnName.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + " TableName=" + mainTableName + " columnID="
@@ -2178,7 +2165,7 @@
                         var selectedItem = $(this).parent('.vas-column-list-item');
                         var columnDatatype = selectedItem.attr('datatype');
                         var desiredResult = "";
-                        var fieldName = selectedItem.attr('fieldName');;
+                        var fieldName = selectedItem.attr('fieldName');
                         fieldName = fieldName.replace(/[^a-zA-Z0-9\s]+/g, '');
                         if (VIS.DisplayType.IsLookup(columnDatatype)) {
                             desiredResult = GetLookup(columnDatatype, $(this).parent('.vas-column-list-item').attr('columnID'),
@@ -2522,6 +2509,7 @@
                             $saveGeneratorBtn.hide();
                             $testSqlGeneratorBtn.removeClass('vas-show-grid');
                             $sqlResultDiv.addClass('vas-sql-result-error');
+                            // Removed the paging if result is null
                             pagingPlusBtnDiv.addClass('d-none');
                         }
                     },
@@ -2785,6 +2773,11 @@
             });
         }
 
+        /**
+         * Added the attributes when user change the dropdown value in Add Sort Section
+         * @param {any} self
+         * @param {any} $sortSelectedItem
+         */
         function sortOnChange(self, $sortSelectedItem) {
             let $sortByItemVal = self.attr('value');
             self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).val($sortByItemVal);
@@ -2834,6 +2827,9 @@
             return results;
         }
 
+        /*
+           Clears the values of controls used
+        */
         function clear() {
             tableID = 0;
             mainTableName = "";
