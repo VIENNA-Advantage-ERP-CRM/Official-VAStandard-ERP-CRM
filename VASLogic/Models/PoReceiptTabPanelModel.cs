@@ -2548,7 +2548,7 @@ namespace VASLogic.Models
                              END, 
                              o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2564,7 +2564,7 @@ namespace VASLogic.Models
                              END, 
                              o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2624,7 +2624,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='N' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateInvoiced, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2632,7 +2632,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='Y' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateInvoiced, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2660,7 +2660,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='N' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2668,7 +2668,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='Y' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID

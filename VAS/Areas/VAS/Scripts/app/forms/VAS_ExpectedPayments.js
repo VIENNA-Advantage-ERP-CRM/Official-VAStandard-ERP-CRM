@@ -88,7 +88,7 @@
                     /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
                     $DocTypeExPayListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_DocTypeExPayPaymentList", ColumnIds.VAS_DocTypeExPayPaymentList, false);
                     // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", false, false, true, $DocTypeExPayListLookUp, 20);
+                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", true, false, true, $DocTypeExPayListLookUp, 20);
                     $self.vDocTypeExPayList.setValue("01");
                     var $DocTypeExPayListControlWrap = $('<div class="vis-control-wrap">');
                     $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
