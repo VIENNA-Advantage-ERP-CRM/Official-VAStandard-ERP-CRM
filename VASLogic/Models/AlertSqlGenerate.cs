@@ -169,7 +169,7 @@ namespace VIS.Models
                     ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
                 }
 
-                if (ds != null && ds.Tables.Count > 0)
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     DataTable table = ds.Tables[0];
                     int rowCount = table.Rows.Count;
@@ -501,7 +501,14 @@ namespace VIS.Models
             }         
             if (lookup.queryDirect.Length > 0 && !string.IsNullOrEmpty(displayCol))
             {
-                subquery = " (SELECT " + displayCol + " FROM " + lookup.tableName +" WHERE " + lookup.keyColumn + " = " + tableName + "." + columnName+ ") AS " + columnName + "_TXT "; 
+                if (lookup.tableName.Equals("AD_Ref_List"))
+                {
+                    subquery = " (SELECT " + displayCol + " FROM " + lookup.tableName + " WHERE " + lookup.keyColumn + " = " + tableName + "." + columnName + " AND AD_Reference_ID = " + refrenceID + ") AS " + columnName + "_TXT ";
+                }
+                else
+                {
+                    subquery = " (SELECT " + displayCol + " FROM " + lookup.tableName + " WHERE " + lookup.keyColumn + " = " + tableName + "." + columnName + ") AS " + columnName + "_TXT ";
+                }
                 subquery = subquery.ToLower();
             }
             return subquery;
