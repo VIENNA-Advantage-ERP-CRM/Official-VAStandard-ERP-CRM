@@ -167,10 +167,10 @@
                         C_BPartner_ID = vSearchBPartner.value;
                     };
                     $ApplyButton.on("click", function () {
-                        if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
-                            VIS.ADialog.info("VAS_SelectAnyOneFilter");
-                            return '';
-                        }
+                        //if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
+                        //    VIS.ADialog.info("VAS_SelectAnyOneFilter");
+                        //    return '';
+                        //}
                         if ($FromDate.getValue() > $ToDate.getValue()) {
                             VIS.ADialog.info('VAS_PlzEnterCorrectDate');
                             $ToDate.setValue(null);

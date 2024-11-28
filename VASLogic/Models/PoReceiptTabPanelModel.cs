@@ -2644,7 +2644,7 @@ namespace VASLogic.Models
                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
                      WHERE 
                           o.DOCSTATUS IN ( 'CO', 'CL')  
-                          AND ips.VA009_IsPaid = 'N' AND doc.IsExpenseInvoice = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                          AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(" UNION ALL ");
             sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@" 
                           SELECT 
