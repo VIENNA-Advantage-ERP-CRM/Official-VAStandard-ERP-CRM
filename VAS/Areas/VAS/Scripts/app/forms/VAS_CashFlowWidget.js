@@ -182,12 +182,10 @@
 
 
                         // Create a new canvas element and append it to the root
-                        const canvas = $('<canvas class="vas-expay-barline-canvas"></canvas>')
-
-                            /*.css({
+                        const canvas = $('<canvas class="vas-expay-barline-canvas"></canvas>').css({
                             width: '100%',   // Set width to 100% (or any fixed value)
-                            height: '250px'  // Set height for the canvas
-                        });*/
+                            height: '100%'  // Set height for the canvas
+                        });
                         var polarChart = $root.find('#VAS-BarLine-ERP_' + widgetID);
                         polarChart.append(canvas);
 
