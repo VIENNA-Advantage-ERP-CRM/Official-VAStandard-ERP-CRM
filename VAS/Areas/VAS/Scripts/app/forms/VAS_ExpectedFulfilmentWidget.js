@@ -302,16 +302,17 @@
             for (var i = startIndex; i < endIndex; i++) {
                 var line = childRecords[i];
                 var isChecked = selectedOrderLineIDs.includes(line.C_OrderLine_ID);
-                var hasStock = line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered;
+                var hasStock = line.ProductType != 'I' || (line.OnHandQty > 0 && line.OnHandQty >= line.QtyOrdered);
                 var boxClass = hasStock ? 'VAS-delivery-box' : 'VAS-delivery-box no-stock';
                 var badgeClass;
-                if (line.OnHandQty >= line.QtyOrdered) {
+                if (line.ProductType != 'I' ||line.OnHandQty >= line.QtyOrdered) {
                     badgeClass = 'badge-green'; //  stock available
-                } else if (line.OnHandQty < line.QtyOrdered && line.OnHandQty > 0) {
+                }
+                else if (line.OnHandQty < line.QtyOrdered && line.OnHandQty > 0) {
                     badgeClass = 'badge-orange'; //stock less tham order 
-                } else {
+                }
+                else {
                     badgeClass = 'badge-red'; // Insufficient stock
-
                 }
 
                 $root.find('#VAS_OrderLine_' + widgetID).append(
