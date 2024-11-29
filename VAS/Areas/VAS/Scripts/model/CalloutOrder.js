@@ -1936,10 +1936,10 @@
                 mTab.setValue("PriceEntered", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
                 mTab.setValue("PrintDescription", Util.getValueOfString(dr["PrintDescription"]));
                 mTab.setValue("PriceActual", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
+                mTab.setValue("PriceList", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
             }
 
-            mTab.setValue("PriceLimit", VIS.Env.ZERO);
-            mTab.setValue("PriceList", VIS.Env.ZERO);
+            mTab.setValue("PriceLimit", VIS.Env.ZERO);            
             mTab.setValue("Discount", VIS.Env.ZERO);
         }
         catch (err) {
