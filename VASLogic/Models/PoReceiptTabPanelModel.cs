@@ -2548,7 +2548,7 @@ namespace VASLogic.Models
                              END, 
                              o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2564,7 +2564,7 @@ namespace VASLogic.Models
                              END, 
                              o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2624,7 +2624,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='N' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateInvoiced, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2632,7 +2632,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='Y' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateInvoiced, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2644,7 +2644,7 @@ namespace VASLogic.Models
                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
                      WHERE 
                           o.DOCSTATUS IN ( 'CO', 'CL')  
-                          AND ips.VA009_IsPaid = 'N' AND doc.IsExpenseInvoice = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                          AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(" UNION ALL ");
             sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@" 
                           SELECT 
@@ -2660,7 +2660,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='N' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID
@@ -2668,7 +2668,7 @@ namespace VASLogic.Models
                          CASE WHEN o.IsSOtrx='Y' THEN
                          currencyConvert(CASE WHEN o.IsReturnTrx = 'Y' THEN -1 ELSE 1 END * ips.DueAmt, o.C_Currency_ID, 
                              " + C_Currency_ID + @", 
-                             o.DateOrdered, 
+                             CURRENT_DATE, 
                              o.C_ConversionType_ID, 
                              o.AD_Client_ID, 
                              o.AD_Org_ID

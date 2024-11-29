@@ -88,7 +88,7 @@
                     /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
                     $DocTypeExPayListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_DocTypeExPayPaymentList", ColumnIds.VAS_DocTypeExPayPaymentList, false);
                     // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
-                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", false, false, true, $DocTypeExPayListLookUp, 20);
+                    $self.vDocTypeExPayList = new VIS.Controls.VComboBox("VAS_DocTypeExPayPaymentList", true, false, true, $DocTypeExPayListLookUp, 20);
                     $self.vDocTypeExPayList.setValue("01");
                     var $DocTypeExPayListControlWrap = $('<div class="vis-control-wrap">');
                     $DocTypeExPayListDiv.append($DocTypeExPayListControlWrap);
@@ -167,10 +167,10 @@
                         C_BPartner_ID = vSearchBPartner.value;
                     };
                     $ApplyButton.on("click", function () {
-                        if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
-                            VIS.ADialog.info("VAS_SelectAnyOneFilter");
-                            return '';
-                        }
+                        //if (C_BPartner_ID == null && $self.vFinancialPeriodList.getValue() == null && $FromDate.getValue() == null && $ToDate.getValue() == null) {
+                        //    VIS.ADialog.info("VAS_SelectAnyOneFilter");
+                        //    return '';
+                        //}
                         if ($FromDate.getValue() > $ToDate.getValue()) {
                             VIS.ADialog.info('VAS_PlzEnterCorrectDate');
                             $ToDate.setValue(null);
