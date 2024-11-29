@@ -1292,6 +1292,10 @@ namespace VASLogic.Models
             int calendar_ID = 0;
             int CurrentYear = 0;
             int currentQuarter = 0;
+            /*get precision of base currency*/
+            sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+            int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            sql.Clear();
             //Finding the calender id and Current Year to get data on this basis
             sql.Append(@"SELECT
                          DISTINCT cy.CalendarYears,CASE WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
@@ -1492,6 +1496,7 @@ namespace VASLogic.Models
                     obj = new TopExpenseAmountData();
                     obj.ExpenseAmount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalExpenseAmount"]);
                     obj.ExpenseName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ExpenseName"]);
+                    obj.stdPrecision = precision;
                     ExpenseAmountData.Add(obj);
                 }
 
