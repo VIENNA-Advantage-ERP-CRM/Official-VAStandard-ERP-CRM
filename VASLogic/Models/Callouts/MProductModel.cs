@@ -912,6 +912,7 @@ namespace VIS.Models
         /// <returns></returns>
         public DeliveryResult GetExpectedDelivery(Ctx ctx, int pageNo, int pageSize, string Type)
         {
+            bool isAllownonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
             string WhereCondition = "";
             if (Type == "PD") //Pending Delivery Order
             {
@@ -948,15 +949,15 @@ namespace VIS.Models
             StringBuilder sb = new StringBuilder();
             sb.Append(MRole.GetDefault(ctx).AddAccessSQL(@"SELECT o.C_Order_ID, o.DocumentNo, o.DateOrdered,
                     COUNT(ol.C_OrderLine_ID) AS LineCount,
-                    NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") + 
+                    NVL(currencyConvert(o.GrandTotal,o.C_Currency_ID, " + ctx.GetContextAsInt("$C_Currency_ID") +
                     @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS GrandTotal,
                     w.Name AS ProductLocation,l.Name AS Deliverylocation,cb.Name AS CustomerName
-                    FROM C_Order o
-                    INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
-                    INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
+                    FROM C_Order o INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID" +
+                    (!isAllownonItem ? " INNER JOIN M_Product p ON ol.M_Product_ID = p.M_Product_ID AND p.ProductType = 'I'" : "") +
+                    @" INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
                     INNER JOIN C_BPartner cb ON(cb.C_BPartner_ID=o.C_BPartner_ID)
                     INNER JOIN C_BPartner_Location l  ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
-                    AND o.DocStatus  IN('CO')  " + WhereCondition + @"  
+                    AND o.DocStatus IN('CO')  " + WhereCondition + @"
                     AND (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON i.M_Inout_ID = il.M_Inout_ID
                     WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0)
                     GROUP BY o.C_Order_ID, o.DocumentNo, o.DateOrdered, w.Name, l.Name, cb.Name, o.DatePromised, o.GrandTotal, o.C_Currency_ID, 
@@ -999,21 +1000,38 @@ namespace VIS.Models
                 if (orderIds.Count > 0)
                 {
                     sb.Clear();
-                    sb.Append(@"
-                    SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, ol.M_AttributeSetInstance_ID,
-                    (ol.QtyOrdered-ol.QtyDelivered- (SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
+                    sb.Append(@"SELECT * FROM (SELECT ol.C_Order_ID,ol.C_OrderLine_ID, ol.M_Product_ID, 0 AS C_Charge_ID, ol.M_AttributeSetInstance_ID,
+                    (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
                     WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyOrdered, 
-                    ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
+                    ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, p.ProductType, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
                     INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
                     WHERE NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty,
                     NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
-                    FROM C_OrderLine ol INNER JOIN C_UOM  u ON (u.C_UOM_ID=ol.C_UOM_ID)
-                    INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID)
-                    INNER JOIN C_Order o ON o.C_Order_ID = ol.C_Order_ID
-                    LEFT JOIN  M_AttributeSetInstance atr ON (ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
+                    FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
+                    INNER JOIN M_Product p ON (ol.M_Product_ID=p.M_Product_ID)
+                    LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)                    
+                    LEFT JOIN  M_AttributeSetInstance atr ON(ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
                     WHERE (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
                     WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
-                    ol.C_Order_ID IN (" + string.Join(",", orderIds) + @") ORDER BY ol.C_Order_ID");
+                    ol.C_Order_ID IN (" + string.Join(",", orderIds) + @")" + (!isAllownonItem ? " AND p.ProductType='I'" : ""));
+
+                    if (isAllownonItem)
+                    {
+                        sb.Append(@" UNION SELECT ol.C_Order_ID,ol.C_OrderLine_ID, 0 AS M_Product_ID, ol.C_Charge_ID, ol.M_AttributeSetInstance_ID,
+                        (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
+                        WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyOrdered, 
+                        ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, c.Name As ProductName, 'C' AS ProductType, 0 AS OnHandQty,
+                        NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
+                        FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
+                        INNER JOIN C_Charge c ON (ol.C_Charge_ID=c.C_Charge_ID)
+                        LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)
+                        LEFT JOIN  M_AttributeSetInstance atr ON(ol.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
+                        WHERE (ol.QtyOrdered - ol.QtyDelivered - (SELECT NVL(SUM(il.MovementQty), 0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
+                        WHERE il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO')) > 0) AND
+                        ol.C_Order_ID IN (" + string.Join(",", orderIds) + @")");
+                    }
+                    sb.Append(") t ORDER BY C_Order_ID");
+
                     DataSet childDs = DB.ExecuteDataset(sb.ToString(), null, null);
                     if (childDs != null && childDs.Tables.Count > 0 && childDs.Tables[0].Rows.Count > 0)
                     {
@@ -1035,6 +1053,7 @@ namespace VIS.Models
                                     AttributeName = Util.GetValueOfString(row["AttributeName"]),
                                     UOM = Util.GetValueOfString(row["Uom"]),
                                     ProductName = Util.GetValueOfString(row["ProductName"]),
+                                    ProductType = Util.GetValueOfString(row["ProductType"]),
                                     OnHandQty = Util.GetValueOfDecimal(row["OnHandQty"])
                                 }).ToList()
                             );
@@ -1871,8 +1890,8 @@ namespace VIS.Models
                 trx = VAdvantage.DataBase.Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
-                            o.AD_User_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
-                            ol.M_Product_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
+                            o.AD_User_ID, o.SalesRep_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
+                            ol.M_Product_ID, ol.C_Charge_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
                             (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
                             INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID)
                             WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID AND il.IsActive = 'Y' 
@@ -1882,6 +1901,10 @@ namespace VIS.Models
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
+                    query.Clear();
+                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault  DESC");
+                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
+
                     obj = new MInOut(ctx, 0, trx);
                     obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
                     obj.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
@@ -1890,6 +1913,7 @@ namespace VIS.Models
                     obj.SetAD_User_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_User_ID"]));
                     obj.SetM_Warehouse_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]));
                     obj.SetC_Order_ID(Order_ID);
+                    obj.SetSalesRep_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["SalesRep_ID"]));
                     if (Type == "CR")
                     {
                         obj.SetDateOrdered(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateOrdered"]));
@@ -1902,6 +1926,7 @@ namespace VIS.Models
                     {
                         obj.SetMovementType("V+");
                         obj.SetC_DocType_ID(SetDocType(obj.GetAD_Org_ID(), ctx.GetAD_Client_ID(), "N", "N", "MMR"));
+                        obj.Set_Value("M_Locator_ID", M_Locator_ID);
                     }
                     obj.SetMovementDate(DateTime.Now);
                     obj.SetDateAcct(DateTime.Now);
@@ -1918,10 +1943,6 @@ namespace VIS.Models
                         ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_GRNNotSaved");
                         return ret;
                     }
-                    query.Clear();
-
-                    query.Append("SELECT M_Locator_ID FROM M_Locator WHERE M_Warehouse_ID=" + Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]) + " ORDER BY IsDefault  DESC");
-                    M_Locator_ID = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, null));
 
                     MInOutLine objLine = null;
                     int LineNo = 10;
@@ -1938,7 +1959,14 @@ namespace VIS.Models
                         objLine.SetM_InOut_ID(obj.GetM_InOut_ID());
                         objLine.SetLine(LineNo);
                         objLine.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]));
-                        objLine.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]) > 0)
+                        {
+                            objLine.SetM_Product_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]));
+                        }
+                        else
+                        {
+                            objLine.SetC_Charge_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Charge_ID"]));
+                        }
                         objLine.SetQtyEntered(QtyEnetered);
                         //objLine.SetMovementQty(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]));
                         objLine.SetMovementQty(QtyEnetered);
@@ -2383,6 +2411,7 @@ namespace VIS.Models
             public string AttributeName { get; set; }
             public string UOM { get; set; }
             public string ProductName { get; set; }
+            public string ProductType { get; set; }
         }
 
         public class ParentOrder
