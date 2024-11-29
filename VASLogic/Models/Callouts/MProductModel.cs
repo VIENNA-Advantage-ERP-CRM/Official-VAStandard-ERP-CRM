@@ -953,7 +953,7 @@ namespace VIS.Models
                     @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS GrandTotal,
                     w.Name AS ProductLocation,l.Name AS Deliverylocation,cb.Name AS CustomerName
                     FROM C_Order o INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID" +
-                    (isAllownonItem ? " INNER JOIN M_Product p ON ol.M_Product_ID = p.M_Product_ID AND p.ProductType = 'I'" : "") +
+                    (!isAllownonItem ? " INNER JOIN M_Product p ON ol.M_Product_ID = p.M_Product_ID AND p.ProductType = 'I'" : "") +
                     @" INNER JOIN M_WareHouse w ON( w.M_WareHouse_ID=o.M_WareHouse_ID)
                     INNER JOIN C_BPartner cb ON(cb.C_BPartner_ID=o.C_BPartner_ID)
                     INNER JOIN C_BPartner_Location l  ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO) + @"
