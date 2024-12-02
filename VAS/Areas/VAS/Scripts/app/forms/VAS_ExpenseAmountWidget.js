@@ -65,6 +65,7 @@
                 $root.find('canvas').remove();
 
                 if (ExpenseData.length > 0) {
+                    var precision = ExpenseData[0].stdPrecision;
                     for (var i = 0; i < ExpenseData.length; i++) {
                         if (ExpenseData[i].ExpenseAmount != 0) {
                             ExpenseAmountData.push(ExpenseData[i].ExpenseAmount);
@@ -143,7 +144,7 @@
                                             const dataset = tooltipItem.chart.data.datasets[datasetIndex];
                                             const labels = tooltipItem.chart.data.labels;
                                             const value = dataset.data[dataIndex];
-                                            return labels[dataIndex] + ': ' + value;
+                                            return labels[dataIndex] + ': ' + parseFloat(value).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                                         }
                                     }
                                 },

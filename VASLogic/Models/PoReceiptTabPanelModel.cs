@@ -1333,12 +1333,14 @@ namespace VASLogic.Models
                          fa.DateAcct,
                          ele.C_Element_ID,
                          eleVal.Value || '_' || eleVal.NAME AS ExpenseName,
-                         SUM(fa.AmtAcctDr - fa.AmtAcctCR) AS ExpenseAmount
+                         SUM(fa.AmtAcctDr - fa.AmtAcctCR) AS ExpenseAmount,
+                         cy.StdPrecision
                          FROM fact_acct fa
                          INNER JOIN C_AcctSchema acct ON (fa.C_AcctSchema_ID = acct.C_AcctSchema_ID)
                          INNER JOIN C_AcctSchema_Element acctEle ON (acctEle.C_AcctSchema_ID = acct.C_AcctSchema_ID AND ElementType = 'AC')
                          INNER JOIN C_Element ele ON (ele.C_Element_ID = acctEle.C_Element_ID)
                          INNER JOIN C_ElementValue eleVal ON (eleVal.C_Element_ID = ele.C_Element_ID AND AccountType = 'E' AND fa.Account_ID = eleVal.C_ElementValue_ID)
+                         INNER JOIN C_Currency cy ON (fa.C_Currency_ID = cy.C_Currency_ID)
                          INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID)
                          WHERE acctEle.IsActive = 'Y' AND eleVal.IsActive = 'Y' AND fa.PostingType='A'", "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )}");
@@ -1348,7 +1350,8 @@ namespace VASLogic.Models
                          fa.AD_Client_ID,
                          ele.C_Element_ID,
                          eleVal.Value || '_' || eleVal.NAME,
-                         fa.DateAcct)");
+                         fa.DateAcct,
+                         cy.StdPrecision)");
             //If the user selected this quarter the add the with clauses of current quarter
             if (ListValue == "3")
             {
@@ -1475,12 +1478,13 @@ namespace VASLogic.Models
             }
             sql.Append($@" GROUP BY c_period.AD_Client_ID)");
             sql.Append(@" SELECT SUM(ExpenseAmount) AS TotalExpenseAmount,
-                         fa.ExpenseName 
+                         fa.ExpenseName,
+                         fa.StdPrecision
                          FROM
                          FactData fa 
                          INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=fa.AD_Client_ID)
                      WHERE fa.DateAcct BETWEEN pd.StartDate AND pd.EndDate
-                     GROUP BY fa.ExpenseName
+                     GROUP BY fa.ExpenseName,fa.StdPrecision
                      ORDER BY TotalExpenseAmount DESC
                      FETCH FIRST 10 ROWS ONLY");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
@@ -1492,6 +1496,7 @@ namespace VASLogic.Models
                     obj = new TopExpenseAmountData();
                     obj.ExpenseAmount = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalExpenseAmount"]);
                     obj.ExpenseName = Util.GetValueOfString(ds.Tables[0].Rows[i]["ExpenseName"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
                     ExpenseAmountData.Add(obj);
                 }
 
