@@ -1868,8 +1868,8 @@ namespace VASLogic.Models
                 //Last 6 Months Data
                 if (DB.IsPostgreSQL())
                 {
-                    sql += " AND date_trunc('MONTH', p.StartDate::TIMESTAMP) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'";
-                    sql += " AND date_trunc('MONTH', p.EndDate::TIMESTAMP) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                    sql += " AND date_trunc('MONTH', p.StartDate) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'";
+                    sql += " AND date_trunc('MONTH', p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
                 }
                 else
                 {
@@ -1882,8 +1882,8 @@ namespace VASLogic.Models
                 //Last 12 Months Data
                 if (DB.IsPostgreSQL())
                 {
-                    sql += " AND date_trunc('MONTH', p.StartDate::TIMESTAMP) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'";
-                    sql += " AND date_trunc('MONTH', p.StartDate::TIMESTAMP) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                    sql += " AND date_trunc('MONTH', p.StartDate) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'";
+                    sql += " AND date_trunc('MONTH', p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
                 }
                 else
                 {
