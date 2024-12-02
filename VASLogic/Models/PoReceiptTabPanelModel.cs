@@ -1873,8 +1873,8 @@ namespace VASLogic.Models
                 }
                 else
                 {
-                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')";
-                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                    sql += " AND TRUNC(p.startdate,'MM') >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')";
+                    sql += " AND TRUNC(p.EndDate,'MM') <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
                 }
             }
             else if (ListValue == "06")
@@ -1887,8 +1887,8 @@ namespace VASLogic.Models
                 }
                 else
                 {
-                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')";
-                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                    sql += " AND TRUNC(p.startdate,'MM') >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')";
+                    sql += " AND TRUNC(p.EndDate,'MM') <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
                 }
             }
 
