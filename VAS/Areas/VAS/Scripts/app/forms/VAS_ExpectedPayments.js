@@ -334,13 +334,13 @@
                 //}
                 widgetDataDesign +=
                     // '<div class="vas-expay-company-w-date">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_BusinessPartner") + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_ISO_Code") + ': ' + gridDataResult[i].ISO_Code + '">' + gridDataResult[i].ISO_Code + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_Currency") + ': ' + gridDataResult[i].ISO_Code + '">' + gridDataResult[i].ISO_Code + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueAmtExPay") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
