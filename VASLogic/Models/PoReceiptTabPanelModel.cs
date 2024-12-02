@@ -1295,7 +1295,9 @@ namespace VASLogic.Models
             //Finding the calender id and Current Year to get data on this basis
             sql.Append(@"SELECT
                          DISTINCT cy.CalendarYears,CASE WHEN oi.C_Calendar_ID IS NOT NULL THEN oi.C_Calendar_ID
-                         else ci.C_Calendar_ID END AS C_Calendar_ID
+                         else ci.C_Calendar_ID END AS C_Calendar_ID,
+                         cp.PeriodNo,
+                         CEIL(CAST(cp.PeriodNo AS NUMERIC)/3) AS Quarter
                          FROM C_Calendar cc
                          INNER JOIN AD_ClientInfo ci ON (ci.C_Calendar_ID=cc.C_Calendar_ID)
                          LEFT JOIN AD_OrgInfo oi ON (oi.C_Calendar_ID=cc.C_Calendar_ID)
@@ -1313,16 +1315,7 @@ namespace VASLogic.Models
             {
                 CurrentYear = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["CalendarYears"]);
                 calendar_ID = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["C_Calendar_ID"]);
-            }
-            sql.Clear();
-            //Here we are getting the current quarter
-            sql.Append($@"SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
-                          WHERE y.CALENDARYEARS={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} 
-                          AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate AND y.C_Calendar_ID ={calendar_ID}");
-            DataSet quaterds = DB.ExecuteDataset(sql.ToString(), null, null);
-            if (quaterds != null && quaterds.Tables[0].Rows.Count > 0)
-            {
-                currentQuarter = Util.GetValueOfInt(quaterds.Tables[0].Rows[0]["Quarter"]);
+                currentQuarter = Util.GetValueOfInt(yearDs.Tables[0].Rows[0]["Quarter"]);
             }
             sql.Clear();
             //Main Query to get the data
@@ -1356,12 +1349,12 @@ namespace VASLogic.Models
             if (ListValue == "3")
             {
                 sql.Append($@",curentPeriod AS
-                               (SELECT PeriodNo, CEIL(PeriodNo / 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               (SELECT PeriodNo, CEIL(CAST(p.PeriodNo AS NUMERIC)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
                                WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
                 AND y.C_Calendar_ID ={ calendar_ID}
                 AND TRUNC(CURRENT_DATE) between p.StartDate and p.EndDate ),
                                PeriodQuater AS
-                               (SELECT PeriodNo, CEIL(PeriodNo/ 3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
+                               (SELECT PeriodNo, CEIL(CAST(p.PeriodNo AS NUMERIC)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON(p.C_Year_ID = y.c_year_ID)
                                WHERE y.CalendarYears ={ VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())}
                 AND y.C_Calendar_ID ={ calendar_ID})");
             }
@@ -1374,7 +1367,7 @@ namespace VASLogic.Models
                 {
                     CurrentYear = CurrentYear - 1;
                     sql.Append($@",PeriodPreviousQuater AS
-                                              (SELECT CEIL(MAX(PeriodNo)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                              (SELECT CEIL(CAST(MAX(p.PeriodNo) AS NUMERIC)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                               WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})
                                               ,PreviousPeriodQuater AS
                                               (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
@@ -1383,11 +1376,11 @@ namespace VASLogic.Models
                 else
                 {
                     sql.Append($@",curentPeriod AS 
-                                                    (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    (SELECT PeriodNo, CEIL(CAST(p.PeriodNo AS NUMERIC)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                                     WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID}
                                                     AND TRUNC(CURRENT_DATE) between p.startdate and p.enddate ),
                                                     PeriodQuater AS
-                                                    (SELECT PeriodNo, CEIL(PeriodNo/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
+                                                    (SELECT PeriodNo, CEIL(CAST(p.PeriodNo AS NUMERIC)/3) AS Quarter from C_Period p INNER JOIN C_Year y ON (p.C_Year_ID = y.c_year_ID)
                                                     WHERE y.CalendarYears={VAdvantage.DataBase.GlobalVariable.TO_STRING(CurrentYear.ToString())} AND y.C_Calendar_ID={calendar_ID})");
                 }
             }
@@ -1449,7 +1442,11 @@ namespace VASLogic.Models
             ////Getting data according Previous Month
             else if (ListValue == "6")
             {
-                sql.Append(GetYearSql("TRUNC(ADD_MONTHS(TRUNC(Current_Date), -1), 'MM')", "LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))", ""));
+                int C_Period_ID = GetPreviousPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
+                if (C_Period_ID > 0)
+                {
+                    sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)", " c_period.C_Period_ID="+ C_Period_ID));
+                }
             }
             //Last 6 Months Data
             else if (ListValue == "7")
@@ -1871,13 +1868,13 @@ namespace VASLogic.Models
                 //Last 6 Months Data
                 if (DB.IsPostgreSQL())
                 {
-                    sql += " AND date_trunc(p.startdate) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'";
-                    sql += " AND date_trunc(p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                    sql += " AND date_trunc('MONTH', p.StartDate) >=  DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '6 MONTHS'";
+                    sql += " AND date_trunc('MONTH', p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
                 }
                 else
                 {
-                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')";
-                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                    sql += " AND TRUNC(p.startdate,'MM') >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -6), 'MM')";
+                    sql += " AND TRUNC(p.EndDate,'MM') <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
                 }
             }
             else if (ListValue == "06")
@@ -1885,13 +1882,13 @@ namespace VASLogic.Models
                 //Last 12 Months Data
                 if (DB.IsPostgreSQL())
                 {
-                    sql += " AND date_trunc(p.startdate) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'";
-                    sql += " AND date_trunc(p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
+                    sql += " AND date_trunc('MONTH', p.StartDate) >=  DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'";
+                    sql += " AND date_trunc('MONTH', p.EndDate) <= (DATE_TRUNC('MONTH', CURRENT_DATE) - INTERVAL '1 day')";
                 }
                 else
                 {
-                    sql += " AND TRUNC(p.startdate) >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')";
-                    sql += " AND TRUNC(p.EndDate) <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
+                    sql += " AND TRUNC(p.startdate,'MM') >= TRUNC(ADD_MONTHS(TRUNC(Current_Date), -12), 'MM')";
+                    sql += " AND TRUNC(p.EndDate,'MM') <= LAST_DAY(ADD_MONTHS(TRUNC(Current_Date, 'MM'), -1))";
                 }
             }
 
