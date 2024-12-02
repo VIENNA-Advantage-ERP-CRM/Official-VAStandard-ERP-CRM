@@ -75,9 +75,9 @@
 
                     // Remove existing canvas if exists
                     $root.find('canvas').remove();
-                   
+
                     if (CashFlowData.length == 0) {
-                        // If there is an error in the response, show "No record found" message
+                        // If there is no data, show "No record found" message
                         $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
                         $root.append($maindiv);
                     } else {
@@ -86,11 +86,32 @@
                             cashFlowArr.push(CashFlowData[0].CashInAmt);
                         }
                         precision = CashFlowData[0].stdPrecision;
+                        const zeroLinePlugin = {
+                            id: 'zeroLine',
+                            beforeDraw: function (chart) {
+                                const ctx = chart.ctx;
+                                const yScale = chart.scales.y;
+                                const xScale = chart.scales.x;
+
+                                // Find the pixel for 0 on the Y-axis
+                                const zeroY = yScale.getPixelForValue(0);
+
+                                // Draw the line
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.moveTo(xScale.left, zeroY);
+                                ctx.lineTo(xScale.right, zeroY);
+                                ctx.lineWidth = 1;
+                                ctx.strokeStyle = 'rgb(211,211,211)';
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+                        };
                         // Define static labels and colors
                         const lstLabel = [VIS.Msg.getMsg("VAS_CashOut"), VIS.Msg.getMsg("VAS_CashIn")]
                         const backgroundColors = [
-                            'rgba(255, 99, 132, 0.7)',  // Red
-                            'rgba(0, 187, 0, 0.7)',      // Green,
+                            'rgba(255, 99, 132, 0.7)',  // Red (Cash Out)
+                            'rgba(0, 187, 0, 0.7)',     // Green (Cash In)
                         ];
 
                         // Prepare the data object for the chart
@@ -102,15 +123,12 @@
                                     data: cashFlowArr,  // This must be an array of numbers
                                     borderColor: 'rgba(0,0,0,0)', // Transparent border color
                                     borderWidth: 0, // No border
-                                    backgroundColor: backgroundColors, // Red background color
+                                    backgroundColor: backgroundColors, // Background colors
                                 }
                             ],
                         };
 
-                        // Check if the labels and data are correct
-                        // console.log("Chart Data:", data);
-
-                        // This is used to set the padding for the legend
+                        // Plugin to adjust legend height (optional)
                         const plugin = {
                             beforeInit: function (chart) {
                                 const originalFit = chart.legend.fit;
@@ -121,45 +139,32 @@
                             }
                         };
 
-                        // Define the chart configuration for BAR chart
+                        // Define the chart configuration for the bar chart
                         const config = {
                             type: 'bar',
                             data: data,
                             options: {
                                 responsive: true,
-                                layout: {
-                                    padding: 0
-                                },
+                                maintainAspectRatio: false,
+                                //layout: {
+                                //    padding: 0
+                                //},
                                 scales: {
                                     x: {
                                         grid: {
-                                            display: true // Hide the grid lines on the x-axis   
+                                            display: true // Show grid lines on the x-axis
                                         }
                                     },
                                     y: {
                                         grid: {
-                                            display: false, // Hide the grid lines on the y-axis
-                                            //beginAtZero: true,
-                                        }
+                                            display: false, // Hide grid lines on the y-axis
+                                        },
+                                        beginAtZero: true,// Ensure y-axis starts at 0
                                     },
                                 },
                                 plugins: {
                                     legend: {
-                                        display: false,
-                                        position: 'bottom', // Positioning the legend on the right
-                                        labels: {
-                                            generateLabels: function (chart) {
-                                                const data = chart.data;
-                                                const labels = data.labels;
-                                                return labels.map((label, i) => ({
-                                                    text: label,
-                                                    fillStyle: backgroundColors[i] || '#000000',
-                                                    strokeStyle: 'transparent',
-                                                    lineWidth: 0
-                                                }));
-                                            },
-                                            boxWidth: 10
-                                        },
+                                        display: false, // Disable default legend
                                     },
                                     tooltip: {
                                         enabled: true,
@@ -177,15 +182,17 @@
                                     },
                                 }
                             },
-                            plugins: [plugin]
+                            plugins: [plugin],
+                            plugins: [zeroLinePlugin]
                         };
-
 
                         // Create a new canvas element and append it to the root
                         const canvas = $('<canvas class="vas-expay-barline-canvas"></canvas>').css({
                             width: '100%',   // Set width to 100% (or any fixed value)
                             height: '100%'  // Set height for the canvas
                         });
+
+                        // Append canvas to the root container
                         var polarChart = $root.find('#VAS-BarLine-ERP_' + widgetID);
                         polarChart.append(canvas);
 
@@ -193,6 +200,22 @@
                         const ctx = canvas[0].getContext('2d');
                         const chart = new Chart(ctx, config);
                         console.log("Chart initialized:", chart);
+
+                        // Ensure the canvas resizes dynamically on window resize
+                        function resizeChart() {
+                            // Set the canvas internal dimensions based on container size
+                            const container = polarChart;  // `polarChart` is the container
+                            const width = container.width();
+                            const height = container.height();
+
+                            canvas[0].width = width;   // Set canvas internal width
+                            canvas[0].height = height; // Set canvas internal height
+
+                            chart.resize(); // Re-render the chart to reflect the new canvas size
+                        }
+
+                        // Initial resize to make sure the chart fits correctly when loaded
+                        resizeChart();
 
                         // Check if the chart was initialized correctly
                         if (!chart) {
