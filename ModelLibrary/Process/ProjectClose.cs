@@ -74,8 +74,42 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
 
 		project.SetProcessed(true);
 		project.Save();
+			
+            //to set processed status true
+            if (Env.IsModuleInstalled("VA107_"))
+            {
+                StringBuilder sql = new StringBuilder();
+                sql.Append("UPDATE C_ProjectPhase SET Processed ='Y' WHERE C_Project_ID=" + m_C_Project_ID);
+                int sucess = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                if (sucess < 0)
+                {
+                    Get_Trx().Rollback();
+                }
+                sql.Clear();
+                sql.Append("UPDATE C_ProjectTask SET Processed ='Y' WHERE C_ProjectPhase_ID IN (SELECT C_ProjectPhase_ID FROM C_ProjectPhase WHERE C_Project_ID=" + m_C_Project_ID + ")");
+                int count = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                if (count < 0)
+                {
+                    Get_Trx().Rollback();
+                }
+                sql.Clear();
+                sql.Append("UPDATE VA107_ProjectModule SET Processed = 'Y' WHERE C_Project_ID = " + m_C_Project_ID);
+                int c = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                if (c < 0)
+                {
+                    Get_Trx().Rollback();
+                }
+                sql.Clear();
+                sql.Append("UPDATE VA107_ProjectDocument SET Processed ='Y' WHERE VA107_ProjectModule_ID IN (SELECT VA107_ProjectModule_ID FROM VA107_ProjectModule WHERE C_Project_ID=" + m_C_Project_ID + ")");
+                int s = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                if (s < 0)
+                {
+                    Get_Trx().Rollback();
+                }
 
-		return "";
+            }
+
+            return "";
 	}	//	doIt
 
 }	//	ProjectClose
