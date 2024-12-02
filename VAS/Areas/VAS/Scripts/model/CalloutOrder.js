@@ -3037,7 +3037,7 @@
 
                     QtyOrdered = Util.getValueOfDecimal(mTab.getValue("QtyOrdered"));
                     if (shippedQty < QtyOrdered) {
-                        if (ctx.isSOTrx()) {
+                        if (ctx.isSOTrx(windowNo)) {
                             //mTab.fireDataStatusEEvent("QtyShippedLessThanQtyReturned", shippedQty.toString(), false);
                             VIS.ADialog.info("QtyShippedAndReturned", null, shippedQty.toString(), "");
                         }
@@ -3145,7 +3145,7 @@
             //}
             //	Storage
             if (M_Product_ID != 0
-                && ctx.isSOTrx()
+                && ctx.isSOTrx(windowNo)
                 && QtyOrdered > 0
                 && !isReturnTrx)		//	no negative (returns)
             {
@@ -3258,7 +3258,7 @@
             if (order["Bill_User_ID"] != 0)
                 mTab.setValue("Bill_User_ID", Util.getValueOfInt(order["Bill_User_ID"]));
 
-            if (ctx.isSOTrx())
+            if (ctx.isSOTrx(windowNo))
                 mTab.setValue("M_ReturnPolicy_ID", Util.getValueOfInt(bpartner["M_ReturnPolicy_ID"]));
             else
                 mTab.setValue("M_ReturnPolicy_ID", Util.getValueOfInt(bpartner["PO_ReturnPolicy_ID"]));
