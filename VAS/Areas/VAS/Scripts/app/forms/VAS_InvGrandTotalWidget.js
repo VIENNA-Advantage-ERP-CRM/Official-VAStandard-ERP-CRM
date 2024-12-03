@@ -45,7 +45,7 @@
             $YearBasedDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "VAS_YearBasedData", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             $self.vYearBasedDataList = new VIS.Controls.VComboBox("VAS_YearBasedData", true, false, true, $YearBasedDataListLookUp, 20);
-            $self.vYearBasedDataList.setValue("CY");
+            $self.vYearBasedDataList.setValue("02");
             var $YearBasedDataListControlWrap = $('<div class="vis-control-wrap">');
             $YearBasedDataListDiv.append($YearBasedDataListControlWrap);
             $YearBasedDataListControlWrap.append($self.vYearBasedDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
