@@ -195,101 +195,123 @@ namespace VAdvantage.Model
         /// <returns>true if calculated</returns>
         private bool CalculatePLV()
         {
-            String sql = "";
+            StringBuilder sql = new StringBuilder();
             if (_M_Product_ID == 0 || _M_PriceList_Version_ID == 0)
                 return false;
-            // Check For Advance Pricing Module
-            if (Env.IsModuleInstalled("VAPRC_"))
+            int prodUOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE  M_Product_ID=" + _M_Product_ID));
+            /** Price List - Ensuring valid Uom id ** Dt:01/02/2021 ** Modified By: Kumar **/
+            if (_C_UOM_ID <= 0)
             {
-                if (Env.IsModuleInstalled("ED011_"))
-                {
-                    /** Price List - Ensuring valid Uom id ** Dt:01/02/2021 ** Modified By: Kumar **/
-                    if (_C_UOM_ID <= 0)
-                    {
-                        //vikas  mantis Issue ( 0000517)
-                        string _sql = null;
-                        _sql = "SELECT C_UOM_ID FROM M_Product WHERE  M_Product_ID=" + _M_Product_ID;
-                        _C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar(_sql));
-                    }
-                    sql = "SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd,"	//	1
-                       + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"		//	2
-                       + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"	//	3
-                       + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                       + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
-                       + "FROM M_Product p"
-                       + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
-                       + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
-                       + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
-                       + "WHERE pv.IsActive='Y'"
-                       + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                       + " AND pv.M_PriceList_Version_ID=" + _M_PriceList_Version_ID	//	#2
-                       + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID  //	#3
-                       + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
-                       + " AND pp.IsActive='Y'";
-                }
-                else
-                {
-                    sql = "SELECT bomPriceStdAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceStd,"	//	1
-                        + " bomPriceListAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceList,"		//	2
-                        + " bomPriceLimitAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceLimit,"	//	3
-                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                        + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
-                        + "FROM M_Product p"
-                        + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
-                        + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
-                        + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
-                        + "WHERE pv.IsActive='Y'"
-                        + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                        + " AND pv.M_PriceList_Version_ID=" + _M_PriceList_Version_ID	//	#2
-                        + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID;   //	#3
-                }
+                //vikas  mantis Issue ( 0000517)
+                _C_UOM_ID = prodUOM_ID;
             }
-            else
+
+            sql.Append("SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd," //	1
+               + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"      //	2
+               + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"    //	3
+               + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"   //	4..7
+               + " pl.EnforcePriceLimit, pl.IsTaxIncluded " // 8..9
+               + "FROM M_Product p"
+               + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
+               + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
+               + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
+               + "WHERE pv.IsActive='Y'"
+               + " AND p.M_Product_ID=" + _M_Product_ID             //	#1
+               + " AND pv.M_PriceList_Version_ID=" + _M_PriceList_Version_ID    //	#2
+               + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID  //	#3
+               + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
+               + " AND pp.IsActive='Y'");
+
+            _calculated = false;
+            try
             {
-                sql = "SELECT bomPriceStd(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceStd,"	//	1
-                    + " bomPriceList(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceList,"		//	2
-                    + " bomPriceLimit(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceLimit,"	//	3
-                    + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                    + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
+                DataSet ds = ExecuteQuery.ExecuteDataset(sql.ToString(), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow dr = ds.Tables[0].Rows[0];
+                    //	Prices
+                    _PriceStd = Util.GetValueOfDecimal(dr[0]);//.getBigDecimal(1);
+                    if (dr[0] == null)
+                        _PriceStd = Env.ZERO;
+                    _PriceList = Util.GetValueOfDecimal(dr[1]);//.getBigDecimal(2);
+                    if (dr[1] == null)
+                        _PriceList = Env.ZERO;
+                    _PriceLimit = Util.GetValueOfDecimal(dr[2]);//.getBigDecimal(3);
+                    if (dr[2] == null)
+                        _PriceLimit = Env.ZERO;
+                    //
+                    _C_UOM_ID = Util.GetValueOfInt(dr[3].ToString());//.getInt(4);
+                    _C_Currency_ID = Util.GetValueOfInt(dr[5].ToString());//.getInt(6);
+                    _M_Product_Category_ID = Util.GetValueOfInt(dr[6].ToString());//.getInt(7);
+                    _enforcePriceLimit = "Y".Equals(dr[7].ToString());//.getString(8));
+                    _isTaxIncluded = "Y".Equals(dr[8].ToString());//.getString(9));
+                                                                  //
+                    log.Fine("M_PriceList_Version_ID=" + _M_PriceList_Version_ID + " - " + _PriceStd);
+                    _calculated = true;
+                }
+                else if (_C_UOM_ID != prodUOM_ID)
+                {
+                    sql.Clear();
+                    sql.Append("SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd," //	1
+                    + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"      //	2
+                    + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"    //	3
+                    + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"   //	4..7
+                    + " pl.EnforcePriceLimit, pl.IsTaxIncluded " // 8..9
                     + "FROM M_Product p"
                     + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
                     + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
                     + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
                     + "WHERE pv.IsActive='Y'"
-                    + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                    + " AND pv.M_PriceList_Version_ID=" + _M_PriceList_Version_ID;	//	#2
-            }
-            _calculated = false;
-            try
-            {
-                DataSet ds = ExecuteQuery.ExecuteDataset(sql, null);
-                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                {
-                    DataRow dr = ds.Tables[0].Rows[i];
-                    //	Prices
-                    _PriceStd = Utility.Util.GetValueOfDecimal(dr[0]);//.getBigDecimal(1);
-                    if (dr[0] == null)
-                        _PriceStd = Env.ZERO;
-                    _PriceList = Utility.Util.GetValueOfDecimal(dr[1]);//.getBigDecimal(2);
-                    if (dr[1] == null)
-                        _PriceList = Env.ZERO;
-                    _PriceLimit = Utility.Util.GetValueOfDecimal(dr[2]);//.getBigDecimal(3);
-                    if (dr[2] == null)
-                        _PriceLimit = Env.ZERO;
-                    //
-                    _C_UOM_ID = Utility.Util.GetValueOfInt(dr[3].ToString());//.getInt(4);
-                    _C_Currency_ID = Utility.Util.GetValueOfInt(dr[5].ToString());//.getInt(6);
-                    _M_Product_Category_ID = Utility.Util.GetValueOfInt(dr[6].ToString());//.getInt(7);
-                    _enforcePriceLimit = "Y".Equals(dr[7].ToString());//.getString(8));
-                    _isTaxIncluded = "Y".Equals(dr[8].ToString());//.getString(9));
-                    //
-                    log.Fine("M_PriceList_Version_ID=" + _M_PriceList_Version_ID + " - " + _PriceStd);
-                    _calculated = true;
+                    + " AND p.M_Product_ID=" + _M_Product_ID             //	#1
+                    + " AND pv.M_PriceList_Version_ID=" + _M_PriceList_Version_ID    //	#2
+                    + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID  //	#3
+                    + " AND pp.C_UOM_ID = " + prodUOM_ID  //    #4
+                    + " AND pp.IsActive='Y'");
+                    ds = ExecuteQuery.ExecuteDataset(sql.ToString(), null);
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow dr = ds.Tables[0].Rows[0];
+                        //	Prices
+                        _PriceStd = Util.GetValueOfDecimal(dr[0]);
+                        _PriceList = Util.GetValueOfDecimal(dr[1]);
+                        _PriceLimit = Util.GetValueOfDecimal(dr[2]);
+
+                        sql.Clear();
+                        sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y' " +
+                                                   " AND con.M_Product_ID = " + _M_Product_ID +
+                                                   " AND con.C_UOM_ID = " + prodUOM_ID + " AND con.C_UOM_To_ID = " + _C_UOM_ID);
+                        var rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, null));
+                        if (rate == 0)
+                        {
+                            sql.Clear();
+                            sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y'" +
+                                  " AND con.C_UOM_ID = " + prodUOM_ID + " AND con.C_UOM_To_ID = " + _C_UOM_ID);
+                            rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, null));
+                        }
+
+                        if (rate == 0)
+                        {
+                            rate = 1;
+                        }
+
+                        _PriceStd = _PriceStd * rate;
+                        _PriceList = _PriceList * rate;
+                        _PriceLimit = _PriceLimit * rate;
+                        //
+                        _C_UOM_ID = Util.GetValueOfInt(dr[3].ToString());//.getInt(4);
+                        _C_Currency_ID = Util.GetValueOfInt(dr[5].ToString());//.getInt(6);
+                        _M_Product_Category_ID = Util.GetValueOfInt(dr[6].ToString());//.getInt(7);
+                        _enforcePriceLimit = "Y".Equals(dr[7].ToString());//.getString(8));
+                        _isTaxIncluded = "Y".Equals(dr[8].ToString());//.getString(9));
+                                                                      //
+                        log.Fine("M_PriceList_Version_ID=" + _M_PriceList_Version_ID + " - " + _PriceStd);
+                        _calculated = true;
+                    }
                 }
             }
             catch (Exception e)
             {
-                log.Log(Level.SEVERE, sql, e);
+                log.Log(Level.SEVERE, sql.ToString(), e);
                 _calculated = false;
             }
             return _calculated;
@@ -301,7 +323,7 @@ namespace VAdvantage.Model
         /// <returns>true if calculated</returns>
         private bool CalculatePL()
         {
-            String sql = "";
+            StringBuilder sql = new StringBuilder();
             if (_M_Product_ID == 0)
                 return false;
 
@@ -311,111 +333,139 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            int prodUOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE  M_Product_ID=" + _M_Product_ID));
+
             //	Get Prices for Price List
-            // Check For Advance Pricing Module
-            if (Env.IsModuleInstalled("VAPRC_"))
+            if (_C_UOM_ID <= 0)
             {
-                if (Env.IsModuleInstalled("ED011_"))
+                _C_UOM_ID = prodUOM_ID;
+            }
+
+            sql.Append("SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd," //	1
+               + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"      //	2
+               + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"    //	3
+               + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit "  // 4..8
+               + "FROM M_Product p"
+               + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
+               + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
+               + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
+               + " WHERE pv.IsActive='Y'"
+               + " AND p.M_Product_ID=" + _M_Product_ID             //	#1
+               + " AND pv.M_PriceList_ID=" + _M_PriceList_ID            //	#2
+               + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
+               + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
+               + " AND pp.IsActive='Y'"
+               + " ORDER BY pv.ValidFrom DESC");
+
+            _calculated = false;
+            if (_PriceDate == null)
+                _PriceDate = DateTime.Now;
+            //IDataReader dr = null;
+            try
+            {
+                DataSet ds = ExecuteQuery.ExecuteDataset(sql.ToString(), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    if (_C_UOM_ID <= 0)
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
-                        _C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE  M_Product_ID=" + _M_Product_ID));
+                        DataRow dr = ds.Tables[0].Rows[i];
+                        DateTime? plDate = Util.GetValueOfDateTime(dr[4]);
+                        //	we have the price list
+                        //	if order date is after or equal PriceList validFrom
+                        if (plDate == null || !(_PriceDate < plDate))
+                        {
+                            //	Prices
+                            _PriceStd = Util.GetValueOfDecimal(dr[0]);
+                            _PriceList = Util.GetValueOfDecimal(dr[1]);
+                            _PriceLimit = Util.GetValueOfDecimal(dr[2]);
+
+                            _C_UOM_ID = Util.GetValueOfInt(dr[3].ToString());
+                            _C_Currency_ID = Util.GetValueOfInt(dr[5].ToString());
+                            _M_Product_Category_ID = Util.GetValueOfInt(dr[6].ToString());
+                            _enforcePriceLimit = "Y".Equals(dr[7].ToString());
+                            //
+                            log.Fine("M_PriceList_ID=" + _M_PriceList_ID + "(" + plDate + ")" + " - " + _PriceStd);
+                            _calculated = true;
+                            break;
+                        }
                     }
-                    sql = "SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd,"	//	1
-                       + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"		//	2
-                       + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"	//	3
-                       + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit "	// 4..8
+                }
+                else if (_C_UOM_ID != prodUOM_ID)
+                {
+                    sql.Clear();
+                    sql.Append("SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd," //	1
+                       + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"      //	2
+                       + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"    //	3
+                       + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit "  // 4..8
                        + "FROM M_Product p"
                        + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
                        + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
                        + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
                        + " WHERE pv.IsActive='Y'"
-                       + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                       + " AND pv.M_PriceList_ID=" + _M_PriceList_ID			//	#2
+                       + " AND p.M_Product_ID=" + _M_Product_ID             //	#1
+                       + " AND pv.M_PriceList_ID=" + _M_PriceList_ID            //	#2
                        + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
-                       + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
+                       + " AND pp.C_UOM_ID = " + prodUOM_ID  //    #4
                        + " AND pp.IsActive='Y'"
-                       + " ORDER BY pv.ValidFrom DESC";
-                }
-                else
-                {
-                    sql = "SELECT bomPriceStdAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceStd,"	//	1
-                        + " bomPriceListAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceList,"		//	2
-                        + " bomPriceLimitAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceLimit,"	//	3
-                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit "	// 4..8
-                        + "FROM M_Product p"
-                        + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
-                        + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
-                        + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
-                        + " WHERE pv.IsActive='Y'"
-                        + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                        + " AND pv.M_PriceList_ID=" + _M_PriceList_ID			//	#2
-                        + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
-                        + " ORDER BY pv.ValidFrom DESC";
-                }
-            }
-            else
-            {
-                sql = "SELECT bomPriceStd(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceStd,"	//	1
-                    + " bomPriceList(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceList,"		//	2
-                    + " bomPriceLimit(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceLimit,"  	//	3
-                    + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,pl.EnforcePriceLimit "	// 4..8
-                    + "FROM M_Product p"
-                    + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
-                    + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
-                    + " INNER JOIN M_PriceList pl ON (pv.M_PriceList_ID=pl.M_PriceList_ID) "
-                    + "WHERE pv.IsActive='Y'"
-                    + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                    + " AND pv.M_PriceList_ID=" + _M_PriceList_ID			//	#2
-                    + " ORDER BY pv.ValidFrom DESC";
-            }
-            _calculated = false;
-            if (_PriceDate == null)
-                _PriceDate = DateTime.Now;
-            IDataReader dr = null;
-            try
-            {
-                dr = ExecuteQuery.ExecuteReader(sql, null);
-                while (!_calculated && dr.Read())
-                {
-                    DateTime? plDate = Utility.Util.GetValueOfDateTime(dr[4]);
-                    //	we have the price list
-                    //	if order date is after or equal PriceList validFrom
-                    if (plDate == null || !(_PriceDate < plDate))
+                       + " ORDER BY pv.ValidFrom DESC");
+                    ds = ExecuteQuery.ExecuteDataset(sql.ToString(), null);
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                     {
-                        //	Prices
-                        _PriceStd = Utility.Util.GetValueOfDecimal(dr[0]);
-                        // if (dr.wasNull())
-                        if (dr[0] == null)
-                            _PriceStd = Env.ZERO;
-                        _PriceList = Utility.Util.GetValueOfDecimal(dr[1]);
-                        // if (dr.wasNull())
-                        if (dr[1] == null)
-                            _PriceList = Env.ZERO;
-                        _PriceLimit = Utility.Util.GetValueOfDecimal(dr[2]);
-                        //if (dr.wasNull())
-                        if (dr[2] == null)
-                            _PriceLimit = Env.ZERO;
-                        //
-                        _C_UOM_ID = Utility.Util.GetValueOfInt(dr[3].ToString());
-                        _C_Currency_ID = Utility.Util.GetValueOfInt(dr[5].ToString());
-                        _M_Product_Category_ID = Utility.Util.GetValueOfInt(dr[6].ToString());
-                        _enforcePriceLimit = "Y".Equals(dr[7].ToString());
-                        //
-                        log.Fine("M_PriceList_ID=" + _M_PriceList_ID + "(" + plDate + ")" + " - " + _PriceStd);
-                        _calculated = true;
-                        break;
+                        for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                        {
+                            DataRow dr = ds.Tables[0].Rows[i];
+                            DateTime? plDate = Util.GetValueOfDateTime(dr[4]);
+                            //	we have the price list
+                            //	if order date is after or equal PriceList validFrom
+                            if (plDate == null || !(_PriceDate < plDate))
+                            {
+                                //	Prices
+                                _PriceStd = Util.GetValueOfDecimal(dr[0]);
+                                _PriceList = Util.GetValueOfDecimal(dr[1]);
+                                _PriceLimit = Util.GetValueOfDecimal(dr[2]);
+
+                                sql.Clear();
+                                sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y' " +
+                                                           " AND con.M_Product_ID = " + _M_Product_ID +
+                                                           " AND con.C_UOM_ID = " + prodUOM_ID + " AND con.C_UOM_To_ID = " + _C_UOM_ID);
+                                var rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, null));
+                                if (rate == 0)
+                                {
+                                    sql.Clear();
+                                    sql.Append("SELECT con.DivideRate FROM C_UOM_Conversion con INNER JOIN C_UOM uom ON con.C_UOM_ID = uom.C_UOM_ID WHERE con.IsActive = 'Y'" +
+                                          " AND con.C_UOM_ID = " + prodUOM_ID + " AND con.C_UOM_To_ID = " + _C_UOM_ID);
+                                    rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, null));
+                                }
+
+                                if (rate == 0)
+                                {
+                                    rate = 1;
+                                }
+
+                                _PriceStd = _PriceStd * rate;
+                                _PriceList = _PriceList * rate;
+                                _PriceLimit = _PriceLimit * rate;
+                                //
+                                _C_UOM_ID = Util.GetValueOfInt(dr[3].ToString());//.getInt(4);
+                                _C_Currency_ID = Util.GetValueOfInt(dr[5].ToString());//.getInt(6);
+                                _M_Product_Category_ID = Util.GetValueOfInt(dr[6].ToString());//.getInt(7);
+                                _enforcePriceLimit = "Y".Equals(dr[7].ToString());//.getString(8));                       
+                                                                                  //
+                                log.Fine("M_PriceList_ID=" + _M_PriceList_ID + "(" + plDate + ")" + " - " + _PriceStd);
+                                _calculated = true;
+                                break;
+                            }
+                        }
                     }
                 }
-                dr.Close();
             }
             catch (Exception e)
             {
-                if (dr != null)
-                {
-                    dr.Close();
-                }
-                log.Log(Level.SEVERE, sql, e);
+                //if (dr != null)
+                //{
+                //    dr.Close();
+                //}
+                log.Log(Level.SEVERE, sql.ToString(), e);
                 _calculated = false;
             }
             if (!_calculated)
@@ -443,19 +493,19 @@ namespace VAdvantage.Model
                     {
                         _C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE  M_Product_ID=" + _M_Product_ID));
                     }
-                    sql = "SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd,"	//	1
-                        + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"		//	2
-                        + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"	//	3
-                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                        + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
+                    sql = "SELECT bomPriceStdUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceStd," //	1
+                        + " bomPriceListUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceList,"     //	2
+                        + " bomPriceLimitUOM(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID , pp.C_UOM_ID) AS PriceLimit,"   //	3
+                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"  //	4..7
+                        + " pl.EnforcePriceLimit, pl.IsTaxIncluded "    // 8..9
                         + "FROM M_Product p"
                         + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
                         + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
                         + " INNER JOIN M_PriceList bpl ON (pv.M_PriceList_ID=bpl.M_PriceList_ID)"
                         + " INNER JOIN M_PriceList pl ON (bpl.M_PriceList_ID=pl.BasePriceList_ID) "
                         + "WHERE pv.IsActive='Y'"
-                        + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                        + " AND pl.M_PriceList_ID= " + _M_PriceList_ID			//	#2
+                        + " AND p.M_Product_ID=" + _M_Product_ID                //	#1
+                        + " AND pl.M_PriceList_ID= " + _M_PriceList_ID          //	#2
                         + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
                         + " AND pp.C_UOM_ID = " + _C_UOM_ID  //    #4
                         + " AND pp.IsActive='Y'"
@@ -463,19 +513,19 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    sql = "SELECT bomPriceStdAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceStd,"	//	1
-                        + " bomPriceListAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceList,"		//	2
-                        + " bomPriceLimitAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceLimit,"	//	3
-                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                        + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
+                    sql = "SELECT bomPriceStdAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceStd,"  //	1
+                        + " bomPriceListAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceList,"      //	2
+                        + " bomPriceLimitAttr(p.M_Product_ID,pv.M_PriceList_Version_ID,pp.M_AttributeSetInstance_ID) AS PriceLimit,"    //	3
+                        + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"  //	4..7
+                        + " pl.EnforcePriceLimit, pl.IsTaxIncluded "    // 8..9
                         + "FROM M_Product p"
                         + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
                         + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
                         + " INNER JOIN M_PriceList bpl ON (pv.M_PriceList_ID=bpl.M_PriceList_ID)"
                         + " INNER JOIN M_PriceList pl ON (bpl.M_PriceList_ID=pl.BasePriceList_ID) "
                         + "WHERE pv.IsActive='Y'"
-                        + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                        + " AND pl.M_PriceList_ID= " + _M_PriceList_ID			//	#2
+                        + " AND p.M_Product_ID=" + _M_Product_ID                //	#1
+                        + " AND pl.M_PriceList_ID= " + _M_PriceList_ID          //	#2
                         + " AND pp.M_AttributeSetInstance_ID = " + _M_AttributeSetInstance_ID   //	#3
                         + " ORDER BY pv.ValidFrom DESC";
                 }
@@ -483,19 +533,19 @@ namespace VAdvantage.Model
             else
             {
 
-                sql = "SELECT bomPriceStd(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceStd,"	//	1
-                    + " bomPriceList(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceList,"		//	2
-                    + " bomPriceLimit(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceLimit,"	//	3
-                    + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"	//	4..7
-                    + " pl.EnforcePriceLimit, pl.IsTaxIncluded "	// 8..9
+                sql = "SELECT bomPriceStd(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceStd,"   //	1
+                    + " bomPriceList(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceList,"       //	2
+                    + " bomPriceLimit(p.M_Product_ID,pv.M_PriceList_Version_ID) AS PriceLimit," //	3
+                    + " p.C_UOM_ID,pv.ValidFrom,pl.C_Currency_ID,p.M_Product_Category_ID,"  //	4..7
+                    + " pl.EnforcePriceLimit, pl.IsTaxIncluded "    // 8..9
                     + "FROM M_Product p"
                     + " INNER JOIN M_ProductPrice pp ON (p.M_Product_ID=pp.M_Product_ID)"
                     + " INNER JOIN  M_PriceList_Version pv ON (pp.M_PriceList_Version_ID=pv.M_PriceList_Version_ID)"
                     + " INNER JOIN M_PriceList bpl ON (pv.M_PriceList_ID=bpl.M_PriceList_ID)"
                     + " INNER JOIN M_PriceList pl ON (bpl.M_PriceList_ID=pl.BasePriceList_ID) "
                     + "WHERE pv.IsActive='Y'"
-                    + " AND p.M_Product_ID=" + _M_Product_ID				//	#1
-                    + " AND pl.M_PriceList_ID= " + _M_PriceList_ID			//	#2
+                    + " AND p.M_Product_ID=" + _M_Product_ID                //	#1
+                    + " AND pl.M_PriceList_ID= " + _M_PriceList_ID          //	#2
                     + " ORDER BY pv.ValidFrom DESC";
             }
             _calculated = false;
@@ -507,28 +557,28 @@ namespace VAdvantage.Model
                 dr = ExecuteQuery.ExecuteReader(sql, null);
                 while (!_calculated && dr.Read())
                 {
-                    DateTime? plDate = Utility.Util.GetValueOfDateTime(dr[4]);
+                    DateTime? plDate = Util.GetValueOfDateTime(dr[4]);
                     //	we have the price list
                     //	if order date is after or equal PriceList validFrom
                     if (plDate == null || !(_PriceDate < plDate))
                     {
                         //	Prices
-                        _PriceStd = Utility.Util.GetValueOfDecimal(dr[0]);
+                        _PriceStd = Util.GetValueOfDecimal(dr[0]);
                         //if (dr.wasNull())
                         if (dr[0] == null)
                             _PriceStd = Env.ZERO;
-                        _PriceList = Utility.Util.GetValueOfDecimal(dr[1]);
+                        _PriceList = Util.GetValueOfDecimal(dr[1]);
                         //if (dr.wasNull())
                         if (dr[1] == null)
                             _PriceList = Env.ZERO;
-                        _PriceLimit = Utility.Util.GetValueOfDecimal(dr[2]);
+                        _PriceLimit = Util.GetValueOfDecimal(dr[2]);
                         //if (dr.wasNull())
                         if (dr[2] == null)
                             _PriceLimit = Env.ZERO;
                         //
-                        _C_UOM_ID = Utility.Util.GetValueOfInt(dr[3].ToString());
-                        _C_Currency_ID = Utility.Util.GetValueOfInt(dr[5].ToString());
-                        _M_Product_Category_ID = Utility.Util.GetValueOfInt(dr[6].ToString());
+                        _C_UOM_ID = Util.GetValueOfInt(dr[3].ToString());
+                        _C_Currency_ID = Util.GetValueOfInt(dr[5].ToString());
+                        _M_Product_Category_ID = Util.GetValueOfInt(dr[6].ToString());
                         _enforcePriceLimit = "Y".Equals(dr[7].ToString());
                         _isTaxIncluded = "Y".Equals(dr[8].ToString());
                         //
@@ -570,8 +620,8 @@ namespace VAdvantage.Model
                 dr = ExecuteQuery.ExecuteReader(sql, null);
                 if (dr.Read())
                 {
-                    _C_UOM_ID = Utility.Util.GetValueOfInt(dr[0]);//.getInt(1);
-                    _M_Product_Category_ID = Utility.Util.GetValueOfInt(dr[1]);//.getInt(2);
+                    _C_UOM_ID = Util.GetValueOfInt(dr[0]);//.getInt(1);
+                    _M_Product_Category_ID = Util.GetValueOfInt(dr[1]);//.getInt(2);
                 }
                 dr.Close();
             }
@@ -624,14 +674,14 @@ namespace VAdvantage.Model
                     //if (dr.Read())
                     foreach (DataRow dr in dt.Rows)
                     {
-                        M_DiscountSchema_ID = Utility.Util.GetValueOfInt(dr[_isSOTrx ? 0 : 1]);
+                        M_DiscountSchema_ID = Util.GetValueOfInt(dr[_isSOTrx ? 0 : 1]);
                         if (dr[2] == DBNull.Value)
                         {
                             FlatDiscount = Env.ZERO;
                         }
                         else
                         {
-                            FlatDiscount = Utility.Util.GetValueOfDecimal(dr[2]);//.getBigDecimal(3);
+                            FlatDiscount = Util.GetValueOfDecimal(dr[2]);//.getBigDecimal(3);
                         }
                         if (FlatDiscount == null)
                         {
@@ -660,7 +710,7 @@ namespace VAdvantage.Model
                 if (M_DiscountSchema_ID == 0)
                     return;
 
-                MDiscountSchema sd = MDiscountSchema.Get(Env.GetContext(), M_DiscountSchema_ID);	//	not correct
+                MDiscountSchema sd = MDiscountSchema.Get(Env.GetContext(), M_DiscountSchema_ID);    //	not correct
                 if (sd.Get_ID() == 0)
                     return;
                 //
@@ -830,7 +880,7 @@ namespace VAdvantage.Model
         /// <returns>rounded number</returns>
         private Decimal Round(Decimal bd)
         {
-            if (_precision >= 0	//	-1 = no rounding
+            if (_precision >= 0 //	-1 = no rounding
                 && Env.Scale(bd) > _precision)
             {
                 return Decimal.Round(bd, _precision, MidpointRounding.AwayFromZero);
