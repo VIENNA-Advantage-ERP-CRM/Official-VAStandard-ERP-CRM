@@ -4337,18 +4337,12 @@ namespace VAdvantage.Model
                     }
 
                     //	Set Price if Actual = 0
-                    if (Env.IsModuleInstalled("ED011_"))
-                    {
-                    }
-                    else
-                    {
-                        if (_productPrice == null && Env.ZERO.CompareTo(GetPriceActual()) == 0
+                    if (_productPrice == null && Env.ZERO.CompareTo(GetPriceActual()) == 0
                             && Env.ZERO.CompareTo(GetPriceList()) == 0)
-                            SetPrice();
-                        //	Check if on Price list
-                        if (_productPrice == null)
-                            GetProductPricing(_M_PriceList_ID);
-                    }
+                        SetPrice();
+                    //	Check if on Price list
+                    //if (_productPrice == null)
+                    //    GetProductPricing(_M_PriceList_ID);
 
 
                     /******** Commented for ViennaCRM. Now it will not be checked whether the Product is on PriceList or Not ********/
