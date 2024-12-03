@@ -637,21 +637,21 @@ namespace VASLogic.Models
                      )})");
             sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year INNER JOIN C_Period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
             //Getting data according to Current month
-            if (ListValue == "CM")
+            if (ListValue == "01")
             {
                 sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
                             @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
                             AND CURRENT_DATE BETWEEN C_period.StartDate AND C_period.EndDate");
             }
             //Getting data according to Current Year
-            else if (ListValue == "CY")
+            else if (ListValue == "02")
             {
                 sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
                             @" AND c_year.IsActive = 'Y' AND C_period.IsActive='Y'
                             AND C_Year.CALENDARYEARS='" + CurrentYear + "'");
             }
             //Getting data according to Last Year
-            else if (ListValue == "LY")
+            else if (ListValue == "03")
             {
                 CurrentYear = CurrentYear - 1;
                 sql.Append(@" c_year.C_Calendar_ID =" + calendar_ID +
@@ -659,7 +659,7 @@ namespace VASLogic.Models
                             AND C_Year.CALENDARYEARS='" + CurrentYear + "'");
             }
             //Getting data according to Last 3 Year
-            else if (ListValue == "3Y")
+            else if (ListValue == "04")
             {
                 StartYear = CurrentYear - 3;
                 CurrentYear = CurrentYear - 1;
@@ -668,7 +668,7 @@ namespace VASLogic.Models
                             AND C_Year.CALENDARYEARS BETWEEN '" + StartYear + "' AND '" + CurrentYear + "'");
             }
             //Getting data according to Last 5 Year
-            else if (ListValue == "5Y")
+            else if (ListValue == "05")
             {
                 StartYear = CurrentYear - 5;
                 CurrentYear = CurrentYear - 1;
