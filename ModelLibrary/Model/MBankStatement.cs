@@ -151,7 +151,7 @@ namespace VAdvantage.Model
             retValue = list.ToArray();
             return retValue;
         }
-
+       
         /// <summary>
         /// Add to Description
         /// </summary>
@@ -590,8 +590,16 @@ namespace VAdvantage.Model
                         cashLine.Save(Get_TrxName());
                     }
                 }
-                ////
             }
+
+            // Create / Update Bank Account Line
+            m_processMsg = InsertOrUpdateAccountLine();
+            if (!string.IsNullOrEmpty(m_processMsg))
+            {
+                return DocActionVariables.STATUS_INVALID;
+            }
+
+
             //	Update Bank Account
             MBankAccount ba = MBankAccount.Get(GetCtx(), GetC_BankAccount_ID());
             ba.SetCurrentBalance(GetEndingBalance());
@@ -637,6 +645,131 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
+        }
+
+        /// <summary>
+        /// This function is used to Insert/Update Bank Account Line based on Statement Line Date
+        /// </summary>
+        /// <author>VIS_0045: 05-Dec-2024</author>
+        /// <returns>Error Message (if any)</returns>
+        public string InsertOrUpdateAccountLine()
+        {
+            // Get Consolidate Bank Statement Line based on Statement Line Date
+            DataSet dsline = GetLinesforBankAccount();
+            if (dsline != null && dsline.Tables.Count > 0 && dsline.Tables[0].Rows.Count > 0)
+            {
+                string sql = string.Empty;
+                DataSet dsBankAccountLine = null;
+                MBankAccountLine objBankAccountLine = null;
+                decimal endingBalance = 0;
+                for (int i = 0; i < dsline.Tables[0].Rows.Count; i++)
+                {
+                    // Check record exist on Bank Account Line with Statement Line Date
+                    sql = "SELECT * FROM C_BankAccountLine WHERE C_BankAccount_ID = "
+                                   + GetC_BankAccount_ID() + " AND StatementDate = "
+                                   + DB.TO_DATE(Convert.ToDateTime(dsline.Tables[0].Rows[i]["StatementLineDate"])) + " AND AD_Org_ID=" + GetAD_Org_ID();
+                    dsBankAccountLine = DB.ExecuteDataset(sql, null, Get_Trx());
+
+                    if (dsBankAccountLine != null && dsBankAccountLine.Tables.Count > 0 && dsBankAccountLine.Tables[0].Rows.Count > 0)
+                    {
+                        // Create Object of Bank Account Line
+                        objBankAccountLine = new MBankAccountLine(GetCtx(), dsBankAccountLine.Tables[0].Rows[0], Get_Trx());
+
+                        // Calculate Ending balance as Current ending Balance + Statement Difference on Statement Line Date
+                        endingBalance = Decimal.Add(objBankAccountLine.GetEndingBalance(), Util.GetValueOfDecimal(dsline.Tables[0].Rows[i]["StmtAmt"]));
+
+                        objBankAccountLine.SetEndingBalance(endingBalance);
+                    }
+                    else
+                    {
+                        // Create new Object of Bank Account Line
+                        objBankAccountLine = new MBankAccountLine(GetCtx(), 0, Get_Trx());
+                        objBankAccountLine.SetAD_Org_ID(GetAD_Org_ID());
+                        objBankAccountLine.SetAD_Client_ID(GetAD_Client_ID());
+                        objBankAccountLine.SetC_BankAccount_ID(GetC_BankAccount_ID());
+                        if (endingBalance == 0)
+                        {
+                            // Get Ending Balance from Bank Account Line
+                            endingBalance = GetEndingBalance(GetC_BankAccount_ID());
+                        }
+                        // Calculate Ending balance as Current ending Balance + Statement Difference on Statement Line Date
+                        endingBalance = Decimal.Add(endingBalance, Util.GetValueOfDecimal(dsline.Tables[0].Rows[i]["StmtAmt"]));
+
+                        objBankAccountLine.SetEndingBalance(endingBalance);
+                    }
+                    objBankAccountLine.SetStatementDate(Convert.ToDateTime(dsline.Tables[0].Rows[i]["StatementLineDate"]));
+
+                    // Calculate Statement Difference as Current StatemebtDifference + Statement Difference on Statement Line Date
+                    objBankAccountLine.SetStatementDifference(Decimal.Add(objBankAccountLine.GetStatementDifference(), Util.GetValueOfDecimal(dsline.Tables[0].Rows[i]["StmtAmt"])));
+
+                    if (!objBankAccountLine.Save(Get_Trx()))
+                    {
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string val = "";
+                        if (vp != null)
+                        {
+                            val = vp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = vp.GetValue();
+                            }
+                        }
+                        if (string.IsNullOrEmpty(val))
+                        {
+                            val = Msg.GetMsg(GetCtx(), "VAS_BankAccountLineNotSaved");
+                        }
+                        log.Warning("Cannot create/update bank account line.");
+                        return val;
+                    }
+                }
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// Get Bank Statement Lines
+        /// </summary>
+        /// <returns>Dataset</returns>
+        public DataSet GetLinesforBankAccount()
+        {
+            String sql = $@"SELECT SUM(StmtAmt) AS StmtAmt, StatementLineDate, AD_Org_ID, AD_Client_ID FROM C_BankStatementLine
+                            WHERE C_BankStatement_ID=@C_BankStatement_ID";
+            sql += " GROUP BY StatementLineDate, AD_Org_ID, AD_Client_ID";
+            sql += " ORDER BY StatementLineDate ASC";
+
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@C_BankStatement_ID", GetC_BankStatement_ID());
+            DataSet ds = DB.ExecuteDataset(sql, param, Get_TrxName());
+            return ds;
+        }
+
+
+        /// <summary>
+        /// This function is used to Get Ending Balance from Bank Account Line based on Bank Account
+        /// </summary>
+        /// <param name="C_BankAccount_ID">Bank Account ID</param>
+        /// <author>VIS_0045: 05-Dec-2024</author>
+        /// <returns>Ending Balance</returns>
+        public decimal GetEndingBalance(int C_BankAccount_ID)
+        {
+            decimal endingBalance = 0;
+
+            // Get Ending Balance from Bank Account Line
+            string sql = $@"SELECT EndingBalance FROM C_BankAccountLine 
+                            WHERE C_BankAccount_ID= {GetC_BankAccount_ID()} 
+                                  AND AD_Org_ID = { GetAD_Org_ID() }  
+                            ORDER BY C_BankAccountLine_ID DESC";
+            endingBalance = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_TrxName()));
+            if (endingBalance == 0)
+            {
+                // When not found, then get Ending balance as Current Balance from Bank Account Tab
+                sql = $@"SELECT CurrentBalance FROM C_BankAccount 
+                            WHERE C_BankAccount_ID= {GetC_BankAccount_ID()} 
+                                  AND AD_Org_ID = { GetAD_Org_ID() }";
+                endingBalance = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_TrxName()));
+            }
+            return endingBalance;
         }
 
         /// <summary>
