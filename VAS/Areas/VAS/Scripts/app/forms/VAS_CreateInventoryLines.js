@@ -266,7 +266,7 @@
                     if (data && data.length > 0) {
                         for (var i = 0; i < data.length; i++) {
                             $root.find("#VAS-Availcarts_" + $self.windowNo).text('(' + data.length + ')');
-                            $root.find("#InventoryCart_" + $self.windowNo).append('<div class= "VAS-cart-box">'
+                            $root.find("#InventoryCart_" + $self.windowNo).append('<div class= "VAS-cart-box" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '">'
                                 + '<div class="VAS-cartName-w-des">'
                                 + '<h1>' + data[i].CartName + '</h1>'
                                 + '<div class="VAS-cart-type">Type: ' + data[i].TransactionType + '</div>'
@@ -277,7 +277,7 @@
                                 + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
                                 + '<span class="VAS-line-lbl">Line</span>'
                                 + '</div>'
-                                + '<a href="javascript:void(0);"><i class="fa fa-caret-right" id="VAS-CartId_' + $self.windowNo + '" vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
+                               // + '<a href="javascript:void(0);"><i class="fa fa-caret-right"  vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
                                 + '</div>'
                                 + '</div>');
 
@@ -285,89 +285,94 @@
 
                         $root.find("#VAS-CartId_" + $self.windowNo).off('click');
                         $root.on('click', "#VAS-CartId_" + $self.windowNo, function () {
+                            $self.setBusy(true);
                             $root.find("#VAS-CartLines_" + $self.windowNo).css("display", "block");
                             $root.find("#VAS-CartHeader_" + $self.windowNo).css("display", "none");
 
                             var CartId = $(this).attr('vas-cart-id');
                             Reference = $(this).attr('vas-CartRef');
+                            var CartName = $(this).attr('vas-cart-name');
+                            var TransType = $(this).attr('vas-transactiontype');
+                            var CreatedBy = $(this).attr('vas-createdby');
+                          VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID }, function (data) {
 
-                            var result = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID });
+                                if (data && data.length > 0) {
+                                    $root.find("#VAS-CartName_" + $self.windowNo).text(CartName);
+                                    $root.find("#VAS-TransactionType_" + $self.windowNo).text(TransType + " | Created by:" + CreatedBy);
+                                    $root.find("#VAS-LineCount_" + $self.windowNo).text(0);
+                                    $root.find("#VAS-CartLinesDetails_" + $self.windowNo).empty();
+                                    for (var i = 0; i < data.length; i++) {
+                                        $root.find("#VAS-LineCount_" + $self.windowNo).text(data.length);
 
-                            if (result && result.length > 0) {
-                                $root.find("#VAS-CartName_" + $self.windowNo).text($(this).attr('vas-cart-name'));
-                                $root.find("#VAS-TransactionType_" + $self.windowNo).text($(this).attr('vas-transactiontype') + " | Created by:" + $(this).attr('vas-createdby'));
-                                $root.find("#VAS-LineCount_" + $self.windowNo).text(0);
-                                $root.find("#VAS-CartLinesDetails_" + $self.windowNo).empty();
-                                for (var i = 0; i < result.length; i++) {
-                                    $root.find("#VAS-LineCount_" + $self.windowNo).text(result.length);
+                                        $root.find("#VAS-CartLinesDetails_" + $self.windowNo).append('<tr cart-code="' + data[i].Code + '" product-id="' + data[i].ProductId +
+                                            '" attr-id="' + data[i].AttrId + '"uom-id="' + data[i].UomId + '" inventorycount-id="' + data[i].InventoryCountId + '" qty="' + data[i].Quantity + '">'
+                                            + '<td>'
+                                            + '<div>'
+                                            + '<input class="lineCheckbox "type="checkbox"  value="option1" aria-label="...">'
+                                            + '</div>'
+                                            + '</td>'
+                                            + '<td>' + data[i].Code + '</td>'
+                                            + '<td>' + data[i].ProductName + '</td>'
+                                            + '<td>' + data[i].AttrName + '</td>'
+                                            + '<td>' + data[i].UomName + '</td>'
+                                            + '<td class="text-right">' + data[i].Quantity + '</td>'
+                                            + '</tr>');
+                                    }
 
-                                    $root.find("#VAS-CartLinesDetails_" + $self.windowNo).append('<tr cart-code="' + result[i].Code + '" product-id="' + result[i].ProductId +
-                                        '" attr-id="' + result[i].AttrId + '"uom-id="' + result[i].UomId + '" inventorycount-id="' + result[i].InventoryCountId + '" qty="' + result[i].Quantity + '">'
-                                        + '<td>'
-                                        + '<div>'
-                                        + '<input class="lineCheckbox "type="checkbox"  value="option1" aria-label="...">'
-                                        + '</div>'
-                                        + '</td>'
-                                        + '<td>' + result[i].Code + '</td>'
-                                        + '<td>' + result[i].ProductName + '</td>'
-                                        + '<td>' + result[i].AttrName + '</td>'
-                                        + '<td>' + result[i].UomName + '</td>'
-                                        + '<td class="text-right">' + result[i].Quantity + '</td>'
-                                        + '</tr>');
-                                }
-
-                                $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
-                                    var allChecked = $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox").length === $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox:checked").length;
-                                    $root.find("#selectAllCheckbox").prop('checked', allChecked);
-                                    Fetchdata();
-                                });
+                                    $root.find("#VAS-CartLinesDetails_" + $self.windowNo).on('change', '.lineCheckbox', function () {
+                                        var allChecked = $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox").length === $root.find("#VAS-CartLinesDetails_" + $self.windowNo).find(".lineCheckbox:checked").length;
+                                        $root.find("#selectAllCheckbox").prop('checked', allChecked);
+                                        Fetchdata();
+                                    });
 
 
-                                if (WindowName == "VAS_InventoryMove") {
+                                    if (WindowName == "VAS_InventoryMove") {
 
-                                    $root.find(".VAS-Inventorymove").css("display", "flex");
-                                    $root.find("#VAS_FlocatorCtrl" + $self.windowNo).empty();
-                                    $root.find("#VAS_TolocatorCtrl" + $self.windowNo).empty();
+                                        $root.find(".VAS-Inventorymove").css("display", "flex");
+                                        $root.find("#VAS_FlocatorCtrl" + $self.windowNo).empty();
+                                        $root.find("#VAS_TolocatorCtrl" + $self.windowNo).empty();
 
-                                    _FlocatCtrl = $root.find("#VAS_FlocatorCtrl" + $self.windowNo);
-                                    _TolocatCtrl = $root.find("#VAS_TolocatorCtrl" + $self.windowNo);
+                                        _FlocatCtrl = $root.find("#VAS_FlocatorCtrl" + $self.windowNo);
+                                        _TolocatCtrl = $root.find("#VAS_TolocatorCtrl" + $self.windowNo);
 
-                                    //From warehouse
-                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + DTDSrcWarehouse;
-                                    _FromLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
-                                    $FromLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _FromLocatorLookUp, 50);
-                                    var Flocatorctrlwrap = $('<div class="vis-control-wrap">');
-                                    var Flocatorbtnwrap = $('<div class="input-group-append">');
-                                    _FlocatCtrl.append(Flocatorctrlwrap);
-                                    _FlocatCtrl.append(Flocatorbtnwrap);
-                                    Flocatorctrlwrap.append($FromLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_FromLocator") + '</label>'));
-                                    FromLoctr = VIS.Utility.Util.getValueOfInt($FromLocatorControl.getValue());
-                                    $FromLocatorControl.fireValueChanged = function () {
+                                        //From warehouse
+                                        var SqlWhere = " M_Locator.M_Warehouse_ID=" + DTDSrcWarehouse;
+                                        _FromLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
+                                        $FromLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _FromLocatorLookUp, 50);
+                                        var Flocatorctrlwrap = $('<div class="vis-control-wrap">');
+                                        var Flocatorbtnwrap = $('<div class="input-group-append">');
+                                        _FlocatCtrl.append(Flocatorctrlwrap);
+                                        _FlocatCtrl.append(Flocatorbtnwrap);
+                                        Flocatorctrlwrap.append($FromLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_FromLocator") + '</label>'));
                                         FromLoctr = VIS.Utility.Util.getValueOfInt($FromLocatorControl.getValue());
-                                    }
+                                        $FromLocatorControl.fireValueChanged = function () {
+                                            FromLoctr = VIS.Utility.Util.getValueOfInt($FromLocatorControl.getValue());
+                                        }
 
 
-                                    ////towarehouse
-                                    var SqlWhere = " M_Locator.M_Warehouse_ID=" + ToWarehouse;
-                                    _ToLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
-                                    $ToLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _ToLocatorLookUp, 50);
-                                    var Tolocatorctrlwrap = $('<div class="vis-control-wrap">');
-                                    var Tolocatorbtnwrap = $('<div class="input-group-append">');
-                                    _TolocatCtrl.append(Tolocatorctrlwrap);
-                                    _TolocatCtrl.append(Tolocatorbtnwrap);
-                                    Tolocatorctrlwrap.append($ToLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_ToLocator") + '</label>'));
-                                    ToLoctor = VIS.Utility.Util.getValueOfInt($ToLocatorControl.getValue());
-
-                                    $ToLocatorControl.fireValueChanged = function () {
+                                        ////towarehouse
+                                        var SqlWhere = " M_Locator.M_Warehouse_ID=" + ToWarehouse;
+                                        _ToLocatorLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "M_Locator_ID", 0, false, SqlWhere);
+                                        $ToLocatorControl = new VIS.Controls.VComboBox("M_Locator_ID", false, false, true, _ToLocatorLookUp, 50);
+                                        var Tolocatorctrlwrap = $('<div class="vis-control-wrap">');
+                                        var Tolocatorbtnwrap = $('<div class="input-group-append">');
+                                        _TolocatCtrl.append(Tolocatorctrlwrap);
+                                        _TolocatCtrl.append(Tolocatorbtnwrap);
+                                        Tolocatorctrlwrap.append($ToLocatorControl.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append($('<label>' + VIS.Msg.getMsg("VAS_ToLocator") + '</label>'));
                                         ToLoctor = VIS.Utility.Util.getValueOfInt($ToLocatorControl.getValue());
+
+                                        $ToLocatorControl.fireValueChanged = function () {
+                                            ToLoctor = VIS.Utility.Util.getValueOfInt($ToLocatorControl.getValue());
+                                        }
+
                                     }
 
+                                    else {
+                                        $root.find(".VAS-Inventorymove").css("display", "none");
+                                    }
                                 }
-
-                                else {
-                                    $root.find(".VAS-Inventorymove").css("display", "none");
-                                }
-                            }
+                                $self.setBusy(false);
+                            });
                         });
                     }
                     $self.setBusy(false);

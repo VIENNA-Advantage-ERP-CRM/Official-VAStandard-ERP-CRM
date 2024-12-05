@@ -205,7 +205,7 @@
 .VAS-carts-results-list {
     width: 100%;
     margin-top: 0.75rem;
-    height: calc(100vh - 204px);
+    height: calc(100vh - 335px);
     overflow: auto;
 }
 
