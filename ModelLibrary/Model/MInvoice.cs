@@ -2375,6 +2375,26 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            /*VIS_0045: 05-Dec-2024 -> Filter the records with the reference of sales order when invoicerule is Prtail delivery
+            * and OtyDelivered is ZERO then return message on Ar Invoice window*/
+            if (IsSOTrx() && !IsReturnTrx())
+            {
+                int isNotDelivered = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(inv.C_InvoiceLine_ID) FROM C_Invoice i
+                         INNER JOIN C_InvoiceLine inv ON (i.C_Invoice_ID = inv.C_Invoice_ID)
+                         INNER JOIN C_Orderline ol ON (ol.C_Orderline_ID = inv.C_Orderline_ID) 
+                         INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID) 
+                         INNER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                         WHERE p.ProductType = 'I' AND NVL(ol.M_Product_ID, 0) > 0 
+                         AND o.InvoiceRule = {GlobalVariable.TO_STRING(MOrder.INVOICERULE_AfterDelivery)}  
+                         AND 0 = ol.QtyDelivered AND inv.C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_TrxName()));
+                if (isNotDelivered > 0)
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_InvRuleMissMatch-NotPartialDel");
+                    return DocActionVariables.STATUS_INVALID;
+                }
+            }
+
+
             //	Lines
             MInvoiceLine[] lines = GetLines(true);
             if (lines.Length == 0)
@@ -3962,6 +3982,7 @@ namespace VAdvantage.Model
                                                         // update Post cost as 0 on inoutline
                                                         if (!isUpdatePostCurrentcostPriceFromMR)
                                                         {
+                                                            ///* VIS_045: 03-Dec-2024, Not to set Current Cost as ZERO as per Surya 
                                                             no = DB.ExecuteQuery(@"UPDATE M_InOutLine SET PostCurrentCostPrice = 0 WHERE M_Inoutline_id IN 
                                                                                (SELECT M_Inoutline_id FROM M_MatchInvCostTrack WHERE 
                                                                                 Rev_C_InvoiceLine_ID =  " + line.GetC_InvoiceLine_ID() + " ) ", null, Get_Trx());
@@ -3975,6 +3996,7 @@ namespace VAdvantage.Model
                                                                 transactionQuery.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                                 DB.ExecuteQuery(transactionQuery.ToString(), null, Get_Trx());
                                                             }
+                                                            //*/
                                                         }
                                                     }
 
@@ -4615,6 +4637,7 @@ namespace VAdvantage.Model
                                                 // update Post cost as 0 on inoutline
                                                 if (!isUpdatePostCurrentcostPriceFromMR)
                                                 {
+                                                    ///* VIS_045: 03-Dec-2024, Not to set Current Cost as ZERO as per Surya 
                                                     no = DB.ExecuteQuery(@"UPDATE M_InOutLine SET PostCurrentCostPrice = 0 WHERE M_Inoutline_id IN 
                                                                                (SELECT M_Inoutline_id FROM M_MatchInvCostTrack WHERE 
                                                                                 Rev_C_InvoiceLine_ID =  " + line.GetC_InvoiceLine_ID() + " ) ", null, Get_Trx());
@@ -4628,6 +4651,7 @@ namespace VAdvantage.Model
                                                         transactionQuery.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                         DB.ExecuteQuery(transactionQuery.ToString(), null, Get_Trx());
                                                     }
+                                                    //*/
                                                 }
                                             }
                                             if (inv != null && inv.GetM_MatchInv_ID() > 0 && inv.Get_ColumnIndex("CurrentCostPrice") >= 0)
