@@ -637,6 +637,12 @@ namespace VAdvantage.Model
             SetFreightCostRule(original.GetFreightCostRule());
             SetFreightAmt(original.GetFreightAmt());
             SetSalesRep_ID(original.GetSalesRep_ID());
+
+            // VIS0060: Set Locator value to new document
+            if (original.Get_ValueAsInt("M_Locator_ID") > 0)
+            {
+                Set_Value("M_Locator_ID", original.Get_ValueAsInt("M_Locator_ID"));
+            }
             //
             SetC_Activity_ID(original.GetC_Activity_ID());
             SetC_Campaign_ID(original.GetC_Campaign_ID());
