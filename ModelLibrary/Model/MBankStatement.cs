@@ -151,7 +151,7 @@ namespace VAdvantage.Model
             retValue = list.ToArray();
             return retValue;
         }
-       
+
         /// <summary>
         /// Add to Description
         /// </summary>
@@ -681,7 +681,7 @@ namespace VAdvantage.Model
                         if (IsReversalRecord)
                         {
                             statementDifference = Decimal.Add(objBankAccountLine.GetStatementDifference(), -1 * Util.GetValueOfDecimal(dsline.Tables[0].Rows[i]["StmtAmt"]));
-                            if(statementDifference == 0)
+                            if (statementDifference == 0)
                             {
                                 objBankAccountLine.Delete(true);
                                 continue;
@@ -870,7 +870,7 @@ namespace VAdvantage.Model
                         AND bs.C_BankStatement_ID !={Get_ID()} ", null, Get_Trx()));
                 if (no > 0)
                 {
-                    log.SaveError("VAS_BankStatementFutureDateRecFound", "");
+                    m_processMsg = Msg.GetMsg(GetCtx(), "VAS_BankStatementFutureDateRecFound");
                     return false;
                 }
 
