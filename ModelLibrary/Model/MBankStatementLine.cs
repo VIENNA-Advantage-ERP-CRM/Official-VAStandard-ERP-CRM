@@ -30,10 +30,10 @@ namespace VAdvantage.Model
     public class MBankStatementLine : X_C_BankStatementLine
     {
 
-        private decimal old_ebAmt;
-        private decimal old_sdAmt;
-        private decimal new_ebAmt;
-        private decimal new_sdAmt;
+        //private decimal old_ebAmt;
+        //private decimal old_sdAmt;
+        //private decimal new_ebAmt;
+        //private decimal new_sdAmt;
         private MBankStatement _parent;
 
         private bool resetAmtDim = false;
@@ -413,6 +413,12 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            if (CheckBankStatementLineAvailablity())
+            {
+                log.SaveError("VAS_BankAccountLineExistAfterDate", "");
+                return false;
+            }
+
             //	Set Line No
             if (GetLine() == 0)
             {
@@ -436,6 +442,7 @@ namespace VAdvantage.Model
                 MInvoice invoice = new MInvoice(GetCtx(), GetC_Invoice_ID(), Get_TrxName());
                 SetC_BPartner_ID(invoice.GetC_BPartner_ID());
             }
+
             //Set BPartner_ID when having Order_ID
             if (Env.IsModuleInstalled("VA012_"))
             {
@@ -445,6 +452,7 @@ namespace VAdvantage.Model
                     SetC_BPartner_ID(_bpartner_ID);
                 }
             }
+
             //	Calculate Charge = Statement - trx - Interest  
             Decimal amt = GetStmtAmt();
             amt = Decimal.Subtract(amt, GetTrxAmt());
@@ -479,6 +487,7 @@ namespace VAdvantage.Model
                     Set_Value("AmtDimChargeAmount", null);
                 }
             }
+
             //Rakesh(VA228):Check tendertype column
             if (Get_ColumnIndex("TenderType") >= 0)
             {
@@ -486,7 +495,7 @@ namespace VAdvantage.Model
                 {
                     //Rakesh:Get autocheckcontrol on 28/Sep/2021 assigned by Amit
                     string autoCheckControl = Util.GetValueOfString(DB.ExecuteScalar("SELECT B.ChkNoAutoControl FROM C_BankStatement S " +
-                        "INNER JOIN C_BankAccount B ON B.C_BankAccount_ID=S.C_BankAccount_ID WHERE S.C_BankStatement_ID=" + GetC_BankStatement_ID(), null, Get_TrxName()));
+                        "INNER JOIN C_BankAccount B ON (B.C_BankAccount_ID=S.C_BankAccount_ID) WHERE S.C_BankStatement_ID=" + GetC_BankStatement_ID(), null, Get_TrxName()));
                     //When check number not autocontrolled for selected bank account then make it manadatory
                     if (autoCheckControl.Equals("N"))
                     {
@@ -503,7 +512,26 @@ namespace VAdvantage.Model
                     }
                 }
             }
+
             return true;
+        }
+
+        /// <summary>
+        /// This function is used to check ant Bank Statement Line Exist after the Statement Date on Bank Statement Line
+        /// If Exist then system will not save the record
+        /// </summary>
+        /// <author>VIS_0045: 05-Dec-2024</author>
+        /// <returns>true, when line exist</returns>
+        public bool CheckBankStatementLineAvailablity()
+        {
+            string sql = string.Empty;
+            // Get Parent Object
+            MBankStatement parent = GetParent();
+            sql = $@"SELECT COUNT(C_BankAccountLine_ID) FROM C_BankAccountLine WHERE C_BankAccount_ID= {parent.GetC_BankAccount_ID()} 
+                    AND StatementDate > {GlobalVariable.TO_DATE(GetStatementLineDate(), true)} AND NVL(StatementDifference, 0) != 0 
+                    AND AD_Org_ID = {GetAD_Org_ID()}";
+            int no = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+            return (no > 0);
         }
 
 
@@ -536,57 +564,53 @@ namespace VAdvantage.Model
             //bool DeletingLinesFromHeader_ = DeletingLinesFromHeader;
             UpdateHeader(DeletingLinesFromHeader);
 
-            // Update BankAccount and BankAccountLine
-            MBankStatement parent = GetParent();
-            MBankAccount bankAccount = new MBankAccount(GetCtx(), parent.GetC_BankAccount_ID(), Get_TrxName());
+            //// Update BankAccount and BankAccountLine
+            //MBankStatement parent = GetParent();
+            //MBankAccount bankAccount = new MBankAccount(GetCtx(), parent.GetC_BankAccount_ID(), Get_TrxName());
 
-            // bankAccount.SetUnMatchedBalance(Decimal.Add(Decimal.Subtract(bankAccount.GetUnMatchedBalance(), old_ebAmt), new_ebAmt)); //Commented Arpit..To updated only if document gets completed..asked by Ashish
-            if (!bankAccount.Save(Get_TrxName()))
-            {
-                log.Warning("Cannot update unmatched balance.");
-                return false;
-            }
+            //// bankAccount.SetUnMatchedBalance(Decimal.Add(Decimal.Subtract(bankAccount.GetUnMatchedBalance(), old_ebAmt), new_ebAmt)); //Commented Arpit..To updated only if document gets completed..asked by Ashish
+            //if (!bankAccount.Save(Get_TrxName()))
+            //{
+            //    log.Warning("Cannot update unmatched balance.");
+            //    return false;
+            //}
 
-            DataTable dtBankAccountLine;
-            int C_BANKACCOUNTLINE_ID = 0;
+            //DataTable dtBankAccountLine;
+            //int C_BANKACCOUNTLINE_ID = 0;
 
-            string sql = "SELECT C_BANKACCOUNTLINE_ID FROM C_BANKACCOUNTLINE WHERE C_BANKACCOUNT_ID="
-                            + bankAccount.GetC_BankAccount_ID() + " AND STATEMENTDATE="
-                            + DB.TO_DATE(GetStatementLineDate()) + " AND AD_ORG_ID=" + GetAD_Org_ID();
+            //string sql = "SELECT C_BANKACCOUNTLINE_ID FROM C_BANKACCOUNTLINE WHERE C_BANKACCOUNT_ID="
+            //                + bankAccount.GetC_BankAccount_ID() + " AND STATEMENTDATE="
+            //                + DB.TO_DATE(GetStatementLineDate()) + " AND AD_ORG_ID=" + GetAD_Org_ID();
 
-            dtBankAccountLine = DB.ExecuteDataset(sql, null, Get_TrxName()).Tables[0];
+            //dtBankAccountLine = DB.ExecuteDataset(sql, null, Get_TrxName()).Tables[0];
 
-            if (dtBankAccountLine.Rows.Count > 0)
-            {
-                C_BANKACCOUNTLINE_ID = Util.GetValueOfInt(dtBankAccountLine.Rows[0][0]);
-            }
+            //if (dtBankAccountLine.Rows.Count > 0)
+            //{
+            //    C_BANKACCOUNTLINE_ID = Util.GetValueOfInt(dtBankAccountLine.Rows[0][0]);
+            //}
 
-            MBankAccountLine bankAccountLine = new MBankAccountLine(GetCtx(), C_BANKACCOUNTLINE_ID, Get_TrxName());
-            if (C_BANKACCOUNTLINE_ID == 0)
-            {
-                bankAccountLine.SetC_BankAccount_ID(bankAccount.GetC_BankAccount_ID());
-                //Arpit To set same orgnization as Bank Statement on Account Line
-                //bankAccountLine.SetAD_Org_ID(GetCtx().GetAD_Org_ID());
-                //bankAccountLine.SetAD_Client_ID(GetCtx().GetAD_Client_ID());
-                bankAccountLine.SetAD_Org_ID(parent.GetAD_Org_ID());
-                bankAccountLine.SetAD_Client_ID(parent.GetAD_Client_ID());
-                bankAccountLine.SetEndingBalance(
-                        Decimal.Add(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt), bankAccount.GetCurrentBalance()));
+            //MBankAccountLine bankAccountLine = new MBankAccountLine(GetCtx(), C_BANKACCOUNTLINE_ID, Get_TrxName());
+            //if (C_BANKACCOUNTLINE_ID == 0)
+            //{
+            //    bankAccountLine.SetC_BankAccount_ID(bankAccount.GetC_BankAccount_ID());
+            //    bankAccountLine.SetAD_Org_ID(parent.GetAD_Org_ID());
+            //    bankAccountLine.SetAD_Client_ID(parent.GetAD_Client_ID());
+            //    bankAccountLine.SetEndingBalance(
+            //            Decimal.Add(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt), bankAccount.GetCurrentBalance()));
+            //}
+            //else
+            //{
+            //    bankAccountLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt));
+            //}
+            //bankAccountLine.SetStatementDate(GetStatementLineDate());
+            //bankAccountLine.SetStatementDifference(Decimal.Add(Decimal.Subtract(bankAccountLine.GetStatementDifference(), old_sdAmt), new_sdAmt));
+            ////bankAccountLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt)); //Arpit commented because Ending Balance Already updated in above Lines
 
-            }
-            else
-            {
-                bankAccountLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt));
-            }
-            bankAccountLine.SetStatementDate(GetStatementLineDate());
-            bankAccountLine.SetStatementDifference(Decimal.Add(Decimal.Subtract(bankAccountLine.GetStatementDifference(), old_sdAmt), new_sdAmt));
-            //bankAccountLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(bankAccountLine.GetEndingBalance(), old_ebAmt), new_ebAmt)); //Arpit commented because Ending Balance Already updated in above Lines
-
-            if (!bankAccountLine.Save(Get_TrxName()))
-            {
-                log.Warning("Cannot create/update bank account line.");
-                return false;
-            }
+            //if (!bankAccountLine.Save(Get_TrxName()))
+            //{
+            //    log.Warning("Cannot create/update bank account line.");
+            //    return false;
+            //}
 
             return true;
         }
@@ -624,64 +648,45 @@ namespace VAdvantage.Model
         private void UpdateHeader(bool DeletingLinesFromHeader = false)
         {
             // Statement difference and ending balance before update in bank statement.
-            DataTable dtOldValues = GetCurrentAmounts();
+            //DataTable dtOldValues = GetCurrentAmounts();
+            //if (dtOldValues.Rows.Count > 0)
+            //{
+            //    old_ebAmt = Util.GetValueOfDecimal(dtOldValues.Rows[0][0]);
+            //    old_sdAmt = Util.GetValueOfDecimal(dtOldValues.Rows[0][1]);
+            //}
 
-            if (dtOldValues.Rows.Count > 0)
-            {
-                old_ebAmt = Util.GetValueOfDecimal(dtOldValues.Rows[0][0]);
-                old_sdAmt = Util.GetValueOfDecimal(dtOldValues.Rows[0][1]);
-            }
             try
             {
                 StringBuilder _Sql = new StringBuilder();
                 if (DeletingLinesFromHeader)
                 {
-                    //Commented the below query
-                    // _Sql.Append("UPDATE C_BankStatement bs"
-                    //+ " SET StatementDifference=(SELECT COALESCE( SUM(StmtAmt), 0 ) FROM C_BankStatementLine bsl "
-                    //    + "WHERE bsl.C_BankStatement_ID=bs.C_BankStatement_ID AND bsl.IsActive='Y' AND bsl.C_BankStatementLine_ID=" + GetC_BankStatementLine_ID()+ ") "
-                    //+ "WHERE C_BankStatement_ID=" + GetC_BankStatement_ID());
-                    //as per requirement not updating StatementDate as per DateAcct
                     _Sql.Append("UPDATE C_BankStatement bs"
                   + " SET StatementDifference=(StatementDifference-(SELECT COALESCE( SUM(StmtAmt), 0 ) FROM C_BankStatementLine bsl "
                   + " WHERE bsl.C_BankStatement_ID=bs.C_BankStatement_ID AND bsl.IsActive='Y' AND bsl.C_BankStatementLine_ID=" + GetC_BankStatementLine_ID() + ")) "
-                  //+ ", StatementDate=(SELECT MAX(DateAcct) FROM C_BankStatementLine WHERE IsActive = 'Y' AND C_BankStatement_ID = " + GetC_BankStatement_ID()+")"
                   + " WHERE C_BankStatement_ID=" + GetC_BankStatement_ID());
-
                 }
                 else
                 {
                     _Sql.Append("UPDATE C_BankStatement bs"
                    + " SET StatementDifference=(SELECT COALESCE( SUM(StmtAmt), 0 ) FROM C_BankStatementLine bsl "
                        + "WHERE bsl.C_BankStatement_ID=bs.C_BankStatement_ID AND bsl.IsActive='Y') "
-                   //+ ", StatementDate=(SELECT MAX(DateAcct) FROM C_BankStatementLine WHERE IsActive = 'Y' AND C_BankStatement_ID = " + GetC_BankStatement_ID() + ")"
                    + "WHERE C_BankStatement_ID=" + GetC_BankStatement_ID());
                 }
-
                 DB.ExecuteQuery(_Sql.ToString(), null, Get_TrxName());
 
                 _Sql.Clear();
-
                 _Sql.Append("UPDATE C_BankStatement bs"
                           + " SET EndingBalance=BeginningBalance+StatementDifference "
                           + "WHERE C_BankStatement_ID=" + GetC_BankStatement_ID());
-
-                //Commented the below query
-                //sql = "UPDATE C_BankStatement bs"
-                //    + " SET EndingBalance=BeginningBalance+StatementDifference "
-                //    + "WHERE C_BankStatement_ID=" + GetC_BankStatement_ID();
-                //DB.executeUpdate(sql, get_TrxName());
-                //DB.ExecuteQuery(sql, null, Get_TrxName());
-
                 DB.ExecuteQuery(_Sql.ToString(), null, Get_TrxName());
-                // Statement difference and ending balance after update in bank statement.
-                DataTable dtNewValues = GetCurrentAmounts();
 
-                if (dtOldValues.Rows.Count > 0)
-                {
-                    new_ebAmt = Util.GetValueOfDecimal(dtNewValues.Rows[0][0]);
-                    new_sdAmt = Util.GetValueOfDecimal(dtNewValues.Rows[0][1]);
-                }
+                // Statement difference and ending balance after update in bank statement.
+                //DataTable dtNewValues = GetCurrentAmounts();
+                //if (dtOldValues.Rows.Count > 0)
+                //{
+                //    new_ebAmt = Util.GetValueOfDecimal(dtNewValues.Rows[0][0]);
+                //    new_sdAmt = Util.GetValueOfDecimal(dtNewValues.Rows[0][1]);
+                //}
             }
             catch (Exception e)
             {
