@@ -1886,17 +1886,19 @@ namespace VIS.Models
                 ret = new Dictionary<string, object>();
                 MInOut obj = null;
                 int M_Locator_ID = 0;
-                string FetchSingleRecord = "";
-                trx = VAdvantage.DataBase.Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
+                trx = Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
                             o.AD_User_ID, o.SalesRep_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
                             ol.M_Product_ID, ol.C_Charge_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
                             (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
-                            INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID)
-                            WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID AND il.IsActive = 'Y' 
-                            AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing
+                            INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID) WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID 
+                            AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing,
+                            ol.IsDropShip, ol.Description, ol.C_Project_ID, ol.C_ProjectPhase_ID, ol.C_ProjectTask_ID,
+                            ol.C_Activity_ID, ol.C_Campaign_ID, ol.AD_OrgTrx_ID, ol.User1_ID, ol.User2_ID, ol.PrintDescription" +
+                            (Env.IsModuleInstalled("VA010_") ? ", prd.VA010_QualityPlan_ID" : "") + @"
                             FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
+                            LEFT JOIN M_Product prd ON (ol.M_Product_ID = prd.M_Product_ID)
                             WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -1968,9 +1970,53 @@ namespace VIS.Models
                             objLine.SetC_Charge_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Charge_ID"]));
                         }
                         objLine.SetQtyEntered(QtyEnetered);
-                        //objLine.SetMovementQty(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]));
                         objLine.SetMovementQty(QtyEnetered);
                         objLine.SetM_Locator_ID(M_Locator_ID);
+                        objLine.SetIsDropShip(Util.GetValueOfString(ds.Tables[0].Rows[i]["IsDropShip"]).Equals("Y"));
+                        string Description = Util.GetValueOfString(ds.Tables[0].Rows[i]["Description"]);
+                        if (Description != null && Description.Length > 255)
+                        {
+                            Description = Description.Substring(0, 255);
+                        }
+                        objLine.SetDescription(Description);
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Project_ID"]) > 0)
+                        {
+                            objLine.SetC_Project_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Project_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ProjectPhase_ID"]) > 0)
+                        {
+                            objLine.SetC_ProjectPhase_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ProjectPhase_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ProjectTask_ID"]) > 0)
+                        {
+                            objLine.SetC_ProjectTask_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ProjectTask_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Activity_ID"]) > 0)
+                        {
+                            objLine.SetC_Activity_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Activity_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Campaign_ID"]) > 0)
+                        {
+                            objLine.SetC_Campaign_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Campaign_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_OrgTrx_ID"]) > 0)
+                        {
+                            objLine.SetAD_OrgTrx_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_OrgTrx_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["User1_ID"]) > 0)
+                        {
+                            objLine.SetUser1_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["User1_ID"]));
+                        }
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["User2_ID"]) > 0)
+                        {
+                            objLine.SetUser2_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["User2_ID"]));
+                        }
+
+                        objLine.Set_Value("PrintDescription", Util.GetValueOfString(ds.Tables[0].Rows[i]["PrintDescription"]));
+
+                        if (Env.IsModuleInstalled("VA010_") && Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_QualityPlan_ID"]) > 0)
+                            objLine.Set_ValueNoCheck("VA010_QualityPlan_ID", Util.GetValueOfInt(ds.Tables[0].Rows[i]["VA010_QualityPlan_ID"]));
+
                         if (!objLine.Save())
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
@@ -1984,9 +2030,7 @@ namespace VIS.Models
                             ret["message"] = !string.IsNullOrEmpty(error) ? error : Msg.GetMsg(ctx, "VAS_GRNNotSaved");
                             return ret;
                         }
-
                         LineNo = LineNo + 10;
-
                     }
                     ret["Shipment_ID"] = obj.GetM_InOut_ID();
                     ret["message"] = Msg.GetMsg(ctx, "VAS_GRNSaved");

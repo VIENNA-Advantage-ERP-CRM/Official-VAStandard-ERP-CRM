@@ -2734,7 +2734,7 @@
 
                 //countEd011 = Util.getValueOfInt(productPrices["countEd011"]);
 
-                var params = M_Product_ID.toString().concat(",", (mTab.getValue("C_Order_ID")).toString() +
+                var params = M_Product_ID.toString().concat(",", Util.getValueOfString(mTab.getValue("C_Order_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
                     "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() +
