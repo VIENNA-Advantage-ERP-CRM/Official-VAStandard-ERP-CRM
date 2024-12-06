@@ -194,18 +194,28 @@ namespace VIS.Models
             Dictionary<string, object> retDic = null;
             if (columnName == "R_Request_ID")
             {
-                str = "SELECT R.C_BPartner_ID AS Customer FROM R_Request R INNER JOIN C_BPartner C on R.C_BPartner_ID=C.C_BPartner_ID  WHERE R.R_Request_ID= " + ID + " AND C.IsCustomer = 'Y'";
+                //VIS0336-implement the code for settignthe location on time expense line tab
+                str = " SELECT R.C_BPartner_ID AS Customer, l.C_BPartner_Location_ID AS Location FROM R_Request R " +
+                    " INNER JOIN C_BPartner C ON R.C_BPartner_ID = C.C_BPartner_ID " +
+                    " LEFT JOIN C_BPartner_Location l ON C.C_BPartner_ID = l.C_BPartner_ID WHERE R.R_Request_ID = " + ID + " AND " +
+                    " C.IsCustomer = 'Y' AND l.C_BPartner_Location_ID = ( SELECT l1.C_BPartner_Location_ID FROM C_BPartner_Location l1" +
+                    "  WHERE l1.C_BPartner_ID = C.C_BPartner_ID ORDER BY l1.Created ASC LIMIT 1 )";
             }
             else if (columnName == "C_Project_ID")
             {
-                str = "SELECT CASE WHEN p.C_BPartner_ID > 0 THEN p.C_BPartner_ID ELSE b.C_BPartner_ID END AS Customer FROM C_Project p " +
-                      "LEFT JOIN C_BPartner b ON(b.C_BPartner_ID = p.C_BPartnerSR_ID AND b.IsCustomer = 'Y') WHERE p.C_Project_ID = "+ID;
+
+                str = " SELECT DISTINCT CASE WHEN p.C_BPartner_ID > 0 THEN p.C_BPartner_ID ELSE b.C_BPartner_ID END AS Customer, CASE WHEN l.C_BPartner_Location_ID > 0" +
+                    " THEN (SELECT l1.C_BPartner_Location_ID FROM C_BPartner_Location l1 WHERE l1.C_BPartner_ID = p.C_BPartner_ID ORDER BY l1.Created ASC LIMIT 1) " +
+                    " ELSE (SELECT lc1.C_BPartner_Location_ID FROM C_BPartner_Location lc1 WHERE lc1.C_BPartner_ID = b.C_BPartner_ID ORDER BY lc1.Created ASC LIMIT 1) END " +
+                    " AS Location FROM C_Project p LEFT JOIN C_BPartner b ON b.C_BPartner_ID = p.C_BPartnerSR_ID AND b.IsCustomer = 'Y' LEFT JOIN C_BPartner_Location l" +
+                    " ON p.C_BPartner_ID = l.C_BPartner_ID LEFT JOIN C_BPartner_Location lc ON b.C_BPartner_ID = lc.C_BPartner_ID WHERE p.C_Project_ID = " + ID;
             }
             DataSet ds = DB.ExecuteDataset(str.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
-            {  
+            {
                 retDic = new Dictionary<string, object>();
                 retDic["Customer"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Customer"]);
+                retDic["Location"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["Location"]);
             }
             return retDic;
         }
