@@ -328,7 +328,8 @@
         var paramString = columnId + "," + fieldStatus;
         var res = VIS.dataContext.getJSONRecord("MExpenseReport/LoadCustomerData", paramString);
         if (res != null && res.Customer>0) {
-        mTab.setValue("C_BPartner_ID", res.Customer);
+            mTab.setValue("C_BPartner_ID", res.Customer);
+            mTab.setValue("C_BPartner_Location_ID", res.Location);
         }
         else {
         mTab.setValue("C_BPartner_ID",0);
