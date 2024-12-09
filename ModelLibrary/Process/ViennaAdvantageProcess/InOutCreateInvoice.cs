@@ -39,7 +39,7 @@ namespace ViennaAdvantage.Process
         private int _C_DocType_ID = 0;
         //Checkbox for Generating charges proportional to line quantities on Invoice line. By Sukhwnder on 14 Dec, 2017
         private bool _GenerateCharges = false;
-
+        public int C_Invoice_ID { get; set; }
 
         /// <summary>
         /// Prepare - e.g., get Parameters.
@@ -84,8 +84,33 @@ namespace ViennaAdvantage.Process
         /// <returns>document no</returns>
         protected override String DoIt()
         {
+            string msg = Generate();
+            return msg;
+        }
+        /// <summary>
+        /// This function is used to Set Values In parameter
+        /// </summary>
+        /// <param name="InvoiceDocumentNo">InvoiceDocumentNo</param>
+        /// <param name="Doctype_ID">Doctype_ID</param>
+        /// <param name="generateCharges">generateCharges</param>
+        /// <param name="grnId">grnId<param>
+        /// <author>VIS_427</author>
+        public void SetParameter(string InvoiceDocumentNo, int Doctype_ID, bool generateCharges, int grnId)
+        {
+            _InvoiceDocumentNo = InvoiceDocumentNo;
+            _C_DocType_ID = Doctype_ID;
+            _GenerateCharges = generateCharges;
+            _M_InOut_ID = grnId;
+        }
+        /// <summary>
+        /// This function is used to Generate Invoice against GRN
+        /// </summary>
+        /// <returns>Message</returns>
+        /// <author>VIS_427</author>
+        public string Generate()
+        {
             StringBuilder invDocumentNo = new StringBuilder();
-            int count = Util.GetValueOfInt(DB.ExecuteScalar(" SELECT Count(M_Inout_ID) FROM M_Inout WHERE ISSOTRX='Y' AND M_Inout_ID=" + GetRecord_ID()));
+            int count = Util.GetValueOfInt(DB.ExecuteScalar(" SELECT Count(M_Inout_ID) FROM M_Inout WHERE ISSOTRX='Y' AND M_Inout_ID=" + _M_InOut_ID));
             MInOut ship = null;
             bool isAllownonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem")).Equals("Y");
 
@@ -96,7 +121,7 @@ namespace ViennaAdvantage.Process
                                       LEFT JOIN M_InOutLine iol ON (iol.M_InOutLine_ID = pil.M_InOutLine_ID)
                                       WHERE pi.DocStatus NOT IN ( 'RE', 'VO' ) AND iol.M_InOut_ID = " + _M_InOut_ID, null, Get_Trx())) > 0)
             {
-                throw new ArgumentException(Msg.GetMsg(GetCtx() , "VIS_ProvisionalInvoiceCreated"));
+                throw new ArgumentException(Msg.GetMsg(GetCtx(), "VIS_ProvisionalInvoiceCreated"));
             }
 
             if (count > 0)
@@ -152,7 +177,7 @@ namespace ViennaAdvantage.Process
 
             // When record contain more than single order and order having different Payment term or Price List then not to generate invoices
             // JID_0976 - For conversion Type
-            if (ship.GetC_Order_ID() > 0 && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT  COUNT(DISTINCT  c_order.m_pricelist_id) +  count(distinct c_order.c_paymentterm_id) + count(distinct COALESCE( c_order.C_ConversionType_ID , " + MConversionType.GetDefault(GetAD_Client_ID()) + @"))  as recordcount
+            if (ship.GetC_Order_ID() > 0 && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT  COUNT(DISTINCT  c_order.m_pricelist_id) +  count(distinct c_order.c_paymentterm_id) + count(distinct COALESCE( c_order.C_ConversionType_ID , " + MConversionType.GetDefault(ship.GetAD_Client_ID()) + @"))  as recordcount
                             FROM m_inoutline INNER JOIN c_orderline ON m_inoutline.c_orderline_id = c_orderline.c_orderline_id
                             INNER JOIN c_order ON c_order.c_order_id = c_orderline.c_order_id
                             WHERE m_inoutline.m_inout_id = " + _M_InOut_ID + @"  GROUP BY   m_inoutline.m_inout_id ", null, Get_Trx())) > 3)
@@ -293,21 +318,21 @@ namespace ViennaAdvantage.Process
             {
                 //1052-- setcurrency type in case order reference is not present
                 int currencyType = 0;
-                currencyType= Util.GetValueOfInt(GetCtx().GetContext("#C_ConversionType_ID"));
+                currencyType = Util.GetValueOfInt(GetCtx().GetContext("#C_ConversionType_ID"));
                 if (currencyType > 0)
                 {
                     invoice.SetC_ConversionType_ID(currencyType);
                 }
                 else
                 {
-                    currencyType = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive='Y'AND AD_Org_ID IN(" + ship.GetAD_Org_ID() + ",0) AND ISDefault = 'Y' AND AD_Client_ID= "+GetAD_Client_ID()+" ORDER BY C_ConversionType_ID Desc"));
+                    currencyType = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive='Y'AND AD_Org_ID IN(" + ship.GetAD_Org_ID() + ",0) AND ISDefault = 'Y' AND AD_Client_ID= " + ship.GetAD_Client_ID() + " ORDER BY C_ConversionType_ID Desc"));
                     if (currencyType > 0)
                     {
                         invoice.SetC_ConversionType_ID(currencyType);
                     }
                     else
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(),"DefaultCurrencyTypeNotFound"));
+                        throw new ArgumentException(Msg.GetMsg(GetCtx(), "DefaultCurrencyTypeNotFound"));
                     }
                 }
             }
@@ -595,7 +620,7 @@ namespace ViennaAdvantage.Process
                     for (int index = 0; index < OrderDS.Tables[0].Rows.Count; index++)
                     {
                         ds = null;
-                        ChargesSql.Clear();                        
+                        ChargesSql.Clear();
                         ChargesSql.Append(" SELECT C_CHARGE_ID,                                             "
                                  + "   C_ORDERLINE_ID,                                                      "
                                  + "   C_ORDER_ID,                                                          "
@@ -614,7 +639,7 @@ namespace ViennaAdvantage.Process
                                  + "   )                                                                    "
                                  + " AND C_CHARGE_ID IS NOT NULL                                            "
                                  + " AND C_CHARGE_ID  > 0                                                   ");
-                       
+
 
                         ds = DB.ExecuteDataset(ChargesSql.ToString(), null, Get_Trx());
 
@@ -714,6 +739,7 @@ namespace ViennaAdvantage.Process
                 }
                 UpdateInvoiceHeader(invoice);
                 DB.ExecuteQuery("UPDATE C_Invoice SET ConditionalFlag = null WHERE C_Invoice_ID = " + invoice.GetC_Invoice_ID(), null, Get_Trx());
+                GetC_Invoice_ID(invoice);
                 return Msg.GetMsg(GetCtx(), "InvoiceNo") + ":- " + invoice.GetDocumentNo();
             }
             else
@@ -721,6 +747,17 @@ namespace ViennaAdvantage.Process
                 //Get_Trx().Rollback();
                 throw new ArgumentException(Msg.GetMsg(GetCtx(), "InvoiceExist") + ": " + invDocumentNo.ToString());
             }
+        }
+        /// <summary>
+        /// This function is used to Get InvoiceID
+        /// </summary>
+        /// <returns>Invoice ID</returns>
+        /// <author>VIS_427</author>
+        public int GetC_Invoice_ID(MInvoice inv)
+        {
+            C_Invoice_ID = inv.GetC_Invoice_ID();
+            return C_Invoice_ID;
+
         }
 
         /// <summary>

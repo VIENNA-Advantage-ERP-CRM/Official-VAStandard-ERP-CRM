@@ -1092,7 +1092,7 @@ span.vas-arwidg-cur-symbol {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: .4em;
+  /*  margin-bottom: .4em;*/
 }
 
     .vas-exinvd-expected-heading h6 {
@@ -1138,7 +1138,7 @@ span.vas-arwidg-cur-symbol {
 
 .vas-exinvd-invoices-box {
     background-color: rgba(var(--v-c-common), 1);
-    padding: 0.3em;
+    padding: 0.2em;
 }
     /*    .vas-exinvd-invoices-box.vas-exinvd-emptydiv {
         display: none;
@@ -1189,7 +1189,7 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-exinvd-invoiceTotalAmt {
-    font-size: 1.2em;
+    font-size: 1em;
 }
 
 .vas-exinvd-amtdiv {
@@ -1377,9 +1377,9 @@ span.vas-arwidg-cur-symbol {
     }
 }
 
-.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+/*.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
     margin: 0 20px 10px 0;
-}
+}*/
 
     .vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
         flex-basis: 35%;
@@ -1396,8 +1396,8 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
-    height: auto;
-    border: 0;
+  /*  height: auto;
+    border: 0;*/
 }
 
 .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
@@ -2815,6 +2815,154 @@ margin-top:-10px;
     background-color: rgb(235, 235, 235);
 }
 
-    .vas-expay-filter-flyout .vis-input-wrap input + label, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] + label {
-        background: linear-gradient(rgb(235 235 235) 50%, transparent 50%);
+    .vas-expay-filter-flyout .vas-expay-datefilter .vis-input-wrap input + label, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] + label {
+       /*background: linear-gradient(rgb(235 235 235) 50%, transparent 50%);*/
+        background: rgb(235,235,235);
     }
+
+.vas-exinvd-filter-heading {
+    display: grid;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5em;
+    grid-template-columns: repeat(1, 1fr);
+}
+.vas-exinvd-heading {
+    box-shadow: rgba(17, 17, 26, 0.2) 0px 4px 0px;
+}
+.vas-exinvd-trxtype{
+    font-size:0.9rem;
+}
+.vas-exinvd-bottomdiv {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: Verdana;
+    font-size: 0.9em;
+    /*   grid-template-columns: repeat(2, 1fr);*/
+}
+.vas-exinvd-filter-flyout {
+    position: absolute;
+    top: 42px;
+    z-index: 100;
+    /* border: 1px solid #e4e4e4; */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.8) 0px 2px 8px 0px;
+    /* max-width: 450px; */
+    /* min-width: 317px; */
+    background: white;
+    Max-height: 400px;
+    margin-left: 0;
+    width: calc(100% - 12px);
+    left: 0;
+    right: 0;
+   /* background: linear-gradient(145deg, rgb(255, 236, 236, 1) 0%, rgba(255, 236, 236, 1) 100%);*/
+    margin: auto;
+}
+.vas-exinvd-filterspn {
+    width: 35px;
+    /*border: 1px solid rgba(var(--v-c-on-secondary), .2);*/
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    color: inherit;
+    font-size: 1.2rem;
+    float: right;
+    margin-right: 10px
+}
+
+.vas-exinvd-filter .dropdown-toggle::after {
+    display: none;
+}
+
+.vas-exinvd-filter {
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
+}
+
+.vas-exinvd-srm-filterIcon {
+    font-size: 1.2rem;
+}
+
+.vas-exinvd-filterPopupWrap {
+    padding-top: 36px;
+}
+
+.vas-exinvd-main-filter-flyout {
+    position: absolute;
+    top: 42px;
+    z-index: 100;
+    /* border: 1px solid #e4e4e4; */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.8) 0px 2px 8px 0px;
+    /* max-width: 450px; */
+    /* min-width: 317px; */
+    background: white;
+    Max-height: 400px;
+    margin-left: 0;
+    width: calc(100% - 12px);
+    left: 0;
+    right: 0;
+   /*// background-color: rgb(235,235,235);*/
+    margin: auto;
+}
+.vas-exinvd-filterby-col {
+    display: flex;
+    align-items: center;
+    border-radius: 0.375em;
+    padding: 0.125em 0px 0.125em 0.5em;
+    gap: 0.375em;
+}
+
+    .vas-exinvd-filterby-col .fa {
+        font-size: 0.875em;
+    }
+
+.vas-exinvd-filter-label {
+    font-size: .75em;
+    font-weight: 600;
+}
+
+.vas-exinvd-filterby-col select {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    width: 4em;
+    font-size: 0.875em;
+}
+
+@media screen and (max-width: 1280px) {
+    .vas-expay-filtbtn {
+        font-size: 11px;
+        padding: 5px 6px;
+    }
+}
+.vas-exinvd-ovrflow {
+    width: 185px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vas-exinvd-DocTyperDiv {
+    display: inline-block;
+    width: 100%;
+}
+.vas-exinvd-createinvdiv {
+    margin: 0 0 19px;
+    display: inline-block;
+    font-size: 17px;
+    border-bottom: 1px solid;
+    width: 100%;
+    padding: 0 0 5px;
+}
+.vas-exinvd-right-ovrflow {
+    width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
