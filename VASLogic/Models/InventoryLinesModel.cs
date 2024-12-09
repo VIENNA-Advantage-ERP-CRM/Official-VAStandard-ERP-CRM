@@ -1188,7 +1188,8 @@ namespace VAS.Models
             int Org = 0;
             int Client = 0;
             int PriceList = 0;
-            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_PriceList_ID FROM M_Requisition  WHERE M_Requisition_ID =" + TransactionID);
+            DateTime? DateRequired =null;
+            sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_PriceList_ID,DateRequired FROM M_Requisition  WHERE M_Requisition_ID =" + TransactionID);
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
@@ -1196,6 +1197,7 @@ namespace VAS.Models
                 Org = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
                 Client = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Client_ID"]);
                 PriceList = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                DateRequired = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateRequired"]);
             }
 
 
@@ -1215,6 +1217,7 @@ namespace VAS.Models
                         lines.Set_ValueNoCheck("C_UOM_ID", lstInventoryLines[i].UOMId);
                         lines.SetM_Requisition_ID(TransactionID);
                         lines.SetPrice(PriceList);
+                        lines.Set_Value("DTD001_DateRequired", DateRequired);
                         if (!lines.Save(trx))
                         {
 
