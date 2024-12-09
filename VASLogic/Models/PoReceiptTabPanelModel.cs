@@ -1029,6 +1029,9 @@ namespace VASLogic.Models
         /// <param name="ListValue">ListValue</param>
         /// <param name="pageNo">pageNo</param>
         /// <param name="pageSize">pageSize</param>
+        /// <param name="C_BPartner_ID">C_BPartner_ID</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
         /// <author>VIS_427</author>
         /// <returns>List of data of Expected invoices against order and GRN</returns>
         public List<ExpectedInvoice> GetExpectedInvoiceData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string ListValue, string C_BPartner_ID, string fromDate, string toDate)
@@ -1157,32 +1160,9 @@ namespace VASLogic.Models
                 {
                     sqlmain.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
                 }
-                // If user enters a 'fromDate' but not 'toDate', and 'fromDate' is less than the current date
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                /*if dates value are not null then implemeted fucntion to fetch sql*/
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, DateTime.Now.ToString("yyyy-MM-dd")));
-                }
-
-                // If user enters both 'fromDate' and 'toDate'
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
-                }
-
-                // If user enters 'toDate' but not 'fromDate'
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", "<=", toDate));
-                }
-
-                // If 'fromDate' is greater than today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
                     sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
                 }
             }
@@ -1261,7 +1241,7 @@ namespace VASLogic.Models
                                  WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
                                  AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0)
                              )
-                             AND " + DeliveryCheck + BPCheck+" ");
+                             AND " + DeliveryCheck + BPCheck + " ");
                 sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(@" GROUP BY
                              min.M_InOut_ID,cb.Pic,o.IsSoTrx,invrule.Name, o.InvoiceRule, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
@@ -1285,37 +1265,14 @@ namespace VASLogic.Models
                               ) - coalesce(
                                   ci.qtyinvoiced, 0
                               )) > 0");
-                
+
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
                     sqlmain.Append(" AND min.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
                 }
-                // If user enters a 'fromDate' but not 'toDate', and 'fromDate' is less than the current date
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                /*if dates value are not null then implemeted fucntion to fetch sql*/
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(min.MovementDate)", fromDate, DateTime.Now.ToString("yyyy-MM-dd")));
-                }
-
-                // If user enters both 'fromDate' and 'toDate'
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(min.MovementDate)", fromDate, toDate));
-                }
-
-                // If user enters 'toDate' but not 'fromDate'
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(min.MovementDate)", "<=", toDate));
-                }
-
-                // If 'fromDate' is greater than today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    // Call GetExpInvDateSql with the TRUNC(o.DateOrdered) as the filter column
                     sqlmain.Append(GetExpInvDateSql("TRUNC(min.MovementDate)", fromDate, toDate));
                 }
             }
@@ -1335,14 +1292,14 @@ namespace VASLogic.Models
                 //DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
                 if (ISOtrx)
                 {
-                    GRNId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ShipReceiptConfirm'", null, null));
+                    GRNId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
                     OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
                     InvWindowId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ARInvoice'", null, null));
                 }
                 else
                 {
                     GRNId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_MaterialReceipt'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrde'", null, null));
+                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrder'", null, null));
                     InvWindowId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_APInvoice'", null, null));
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
@@ -1360,7 +1317,7 @@ namespace VASLogic.Models
                     obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
                     obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
-                   
+
                     if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
                     {
                         obj.Window_ID = OrderWinId;
@@ -1370,7 +1327,7 @@ namespace VASLogic.Models
                     {
                         obj.Window_ID = GRNId;
                         obj.Primary_ID = "M_InOut_ID";
-                        obj.AD_Org_ID= Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                        obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                     }
                     obj.InvWinID = InvWindowId;
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
@@ -1391,18 +1348,38 @@ namespace VASLogic.Models
         /// <param name="toDate">toDate</param>
         /// <returns>Returns Sql</returns>
         /// <author>VIS_427 </author>
-        public string GetExpInvDateSql( string FlterCol,string fromDate,string toDate)
+        public string GetExpInvDateSql(string FlterCol, string fromDate, string toDate)
         {
             StringBuilder sql = new StringBuilder();
-            if (fromDate == "<=")
+            if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
             {
-                sql.Append(@" AND " + FlterCol + fromDate + (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                return sql.ToString();
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND Current_Date");
             }
-            sql.Append(@" AND "+ FlterCol + @" BETWEEN " +
-                   (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-            sql.Append(@"AND " +
-            (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            //if user enter from date and to date then this condition will execute
+            else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+            {
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
+            //if user enter does not enter from date but enters todate then this condition will execute
+            else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+            {
+                sql.Append(@" AND " + FlterCol + " <= " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
+            //if from date greater then today's date
+            else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
+            {
+                toDate = fromDate;
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
             return sql.ToString();
         }
         /// <summary>
@@ -2287,35 +2264,9 @@ namespace VASLogic.Models
                         sqlmain.Append(" AND Current_Date > cs.DueDate");
                     }
                 }
-                //if user enter from date but not to date and from date less then Current date then this condition will execute
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND Current_Date");
-                }
-                //if user enter from date and to date then this condition will execute
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if user enter does not enter from date but enters todate then this condition will execute
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) <= " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if from date greater then today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(cs.DueDate)", fromDate, toDate));
                 }
             }
             //If Doctype Value is Null or ALL
@@ -2397,35 +2348,9 @@ namespace VASLogic.Models
                         sqlmain.Append(" AND Current_Date > ps.DueDate");
                     }
                 }
-                //if user enter from date but not to date and from date less then Current date then this condition will execute
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND Current_Date");
-                }
-                //if user enter from date and to date then this condition will execute
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if user enter does not enter from date but enters todate then this condition will execute
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) <= " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if from date greater then today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(ps.DueDate)", fromDate, toDate));
                 }
             }
             sql.Append(sqlmain);
@@ -3019,11 +2944,11 @@ namespace VASLogic.Models
         /// This function is used to Generate Invoice against GRN
         /// </summary>
         /// <param name="ctx">Context</param>
-        /// <param name="grnid">grnid</param>
-        /// <param name="invRef">grnid</param>
-        /// <param name="docId">docId<param>
-        /// <param name="IsGenCheck"></param>
-        /// <returns>Invoice ID</returns>
+        /// <param name="grnid">M_InOut_ID</param>
+        /// <param name="invRef">Invoice Reference Number</param>
+        /// <param name="docId">C_Doctype_ID<param>
+        /// <param name="IsGenCheck">Generate Chrges</param>
+        /// <returns>Dictionary</returns>
         /// <author>VIS_427</author>
         public Dictionary<string, object> GenerateInvoice(Ctx ctx, int grnid, string invRef, int docId, bool IsGenCheck)
         {

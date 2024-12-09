@@ -76,7 +76,9 @@
                 "</div>" +
                 "</div>");
             headingDiv.append(filterDiv).append(filetrDivExpectedInv);
+            /*finding the div of filter icon*/
             var FilterToClickDiv = filetrDivExpectedInv.find("#vas_exinvd_dropdownMenu_" + $self.windowNo);
+            /*Created design to filter records on click of filter icon*/
             FilterToClickDiv.on("click", function () {
                 CreateDesignForFilter();
             });
@@ -165,7 +167,8 @@
                 var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                 var $BPartnerButtonWrap = $('<div class="input-group-append">');
                 $BPartnerDiv.append($BPartnerControlWrap);
-                $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background-color: transparent;">' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');
+                $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background-color: transparent;">'
+                    + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + '</label>');
                 $BPartnerDiv.append($BPartnerControlWrap);
                 $BPartnerButtonWrap.append(vSearchBPartner.getBtn(0));
                 $BPartnerDiv.append($BPartnerButtonWrap);
@@ -196,13 +199,14 @@
                     '<button id="VAS_Apply_' + $self.windowNo + '" class="VIS_Pref_btn-2 vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Apply") + '</button>' +
                     '</div>'
                 );
-                var CloseBtn = $('<div class="vas-flyout-footer">' +
+                var ClearBtn = $('<div class="vas-flyout-footer">' +
                     '<button id="VAS_Close_' + $self.windowNo + '" class="VIS_Pref_btn-2 vas-expay-filtbtn">' + VIS.Msg.getMsg("VAS_Clear") + '</button>' +
                     '</div>'
                 );
-                ButtonDiv.append(CloseBtn).append(ApplyBtn);
+                ButtonDiv.append(ClearBtn).append(ApplyBtn);
                 $FilterHeaderforInv.append(ButtonDiv);
                 $maindiv.append($FilterHeaderforInv);
+                //Resetting the value on click of filetr button
                 if (ListValue !=null || C_BPartner_ID != null || fromDate != null || toDate != null) {
                     $self.vExpectedList.setValue(ListValue);
                     vSearchBPartner.setValue(C_BPartner_ID);
@@ -213,15 +217,16 @@
                 vSearchBPartner.fireValueChanged = function () {
                     C_BPartner_ID = vSearchBPartner.value;
                 };
+                //on click of apply button filtering the data
                 $ApplyButton.on("click", function () {
-                    $maindiv.find('#vas_listContainer_' + widgetID).remove();
-                    $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
-                    $maindiv.find('#vas_norecordcont_' + widgetID).remove();
                     if ($FromDate.getValue() > $ToDate.getValue()) {
                         VIS.ADialog.info('VAS_PlzEnterCorrectDate');
                         $ToDate.setValue(null);
                         return;
                     }
+                    $maindiv.find('#vas_listContainer_' + widgetID).remove();
+                    $maindiv.find('#vas_arrawcontainer_' + widgetID).remove();
+                    $maindiv.find('#vas_norecordcont_' + widgetID).remove();
                     ListValue = $self.vExpectedList.getValue();
                     fromDate = $FromDate.getValue();
                     toDate = $ToDate.getValue();
@@ -239,7 +244,7 @@
                     }
                     $FilterHeaderforInv[0].remove();
                 });
-                CloseBtn.on('click', function () {
+                ClearBtn.on('click', function () {
                     vSearchBPartner.setValue(null);
                     $FromDate.setValue(null);
                     $ToDate.setValue(null);
@@ -336,7 +341,7 @@
                     '</div>' +
                     '</div>' +
                     '<div class="vas-exinvd-invoice-w-amount" >' +
-                    '<div class="vas-exinvd-invoice-lbl">' + gridDataResult[i].DocumentNo + '</div>' +
+                    '<div class="vas-exinvd-invoice-lbl vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo +'">' + gridDataResult[i].DocumentNo + '</div>' +
                     '<span>' +
                     '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID + '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
                     '</span>' +
@@ -349,7 +354,7 @@
                 /*if invoice rule has value then append the same*/
                 if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true && gridDataResult[i].InvoiceRule != "") {
                     widgetDataDesign +=
-                        '<div class="vas-exinvd-com-name" title="' + VIS.Msg.getMsg("VAS_InvoiceRule") + ': ' + gridDataResult[i].InvoiceRule + '">' + gridDataResult[i].InvoiceRule + '</div>';
+                        '<div class="vas-exinvd-com-name vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("VAS_InvoiceRule") + ': ' + gridDataResult[i].InvoiceRule + '">' + gridDataResult[i].InvoiceRule + '</div>';
                 }
                 widgetDataDesign +='</div>'+
                     '</div>';
@@ -357,7 +362,7 @@
                 // Append the widget data design to the list container
                 listDesign.append(widgetDataDesign);
             }
-            //This used to generate invoice
+            //This function used to generate invoice
             $root.off('click', '#VAS_GenerateInvoice_' + widgetID);
             $root.on('click', '#VAS_GenerateInvoice_' + widgetID, function () {
                 var isFullyDelivered = VIS.Utility.Util.getValueOfString($(this).attr("data-isfullydelivered"));
@@ -517,7 +522,7 @@
             if (!IsGenInvBtnClicked && !IsFilterBtnClicked) {
                 ctx.setContext($self.windowNo, "AD_Org_ID", ad_org_id);
                 IsGenInvBtnClicked = true;
-                var headingDiv = $('<div style="padding-bottom: 10px;">' + VIS.Msg.getMsg("VAS_CreateInvoice") + '</div>');
+                var headingDiv = $('<div class="vas-exinvd-createinvdiv">' + VIS.Msg.getMsg("VAS_CreateInvoice") + '</div>');
                 //    '<div class="vas-exinvd-filter-heading">' +
                 //    '<h6>' + VIS.Msg.getMsg("VAS_DocumentNo")+':'+ documentNo + '</h6>' +
                 //    '<h6>' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + ': '+ bpName + '</h6>' +
@@ -543,7 +548,6 @@
 
                 invoiceRefDiv = $('<div class="vas-invoiceRefrDiv">');
                 var $invoiceRefDiv = $('<div class="input-group vis-input-wrap">');
-                //  var invoiceReflookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_invoiceRefTarget_ID, VIS.DisplayType.Textbox);
                 invoiceRef = new VIS.Controls.VTextBox("Name", true, false, true, VIS.DisplayType.Textbox);
                 var $invoiceRefControlWrap = $('<div class="vis-control-wrap">');
                 var $invoiceRefButtonWrap = $('<div class="input-group-append">');
@@ -557,9 +561,9 @@
                 isGenChargesdiv = $("<div class='vis-col'>");
                 var $isGenChargesDiv = $('<div class="input-group vis-input-wrap">');
                 // Parameters are: value, name, isMandatory
-                $isGenChargesLabel = new VIS.Controls.VLabel("IsActive", "IsActive", false, true);
+                $isGenChargesLabel = new VIS.Controls.VLabel("GenerateCharges", "GenerateCharges", false, true);
                 // Parameters are:  columnName, isMandatory, isReadOnly, isUpdateable, displayType, title
-                $isGenChargescheckbox = new VIS.Controls.VCheckBox("IsActive", true, false, true, VIS.DisplayType.CheckBox, "CheckBox");
+                $isGenChargescheckbox = new VIS.Controls.VCheckBox("GenerateCharges", true, false, true, VIS.DisplayType.CheckBox, "CheckBox");
                 var $isGenChargesControlWrap = $('<div class="vis-control-wrap">');
                 var $isGenChargesButtonWrap = $('<div class="input-group-append">');
                 $isGenChargesDiv.append($isGenChargesControlWrap);
@@ -587,23 +591,29 @@
                 $CreateInvoiceHeader.append(ButtonDiv);
                 $maindiv.append($CreateInvoiceHeader);
                 var $ApplyButton = ApplyBtn.find("#VAS_Apply_" + $self.windowNo);
+                //here user is generating invoice
                 $ApplyButton.on("click", function () {
-                    if (cmbDocType.getValue() == null || invoiceRef.getValue() == null) {
-                        VIS.ADialog.info("VAS_SelectAnyOneValue");
+                    if (cmbDocType.getValue() == null && (VIS.Env.getCtx().isSOTrx($self.windowNo) == false && invoiceRef.getValue() == "")) {
+                        VIS.ADialog.info("VAS_DoctypeAndInvRefIsMandatory");
+                        return;
+                    }
+                    if (cmbDocType.getValue() == null) {
+                        VIS.ADialog.info("VAS_DoctypeIsMandatory");
+                        return;
+                    }
+                    if (VIS.Env.getCtx().isSOTrx($self.windowNo) == false && invoiceRef.getValue() == "") {
+                        VIS.ADialog.info("VAS_InvoiceReferenceIsMandatory");
                         return;
                     }
                     IsGenInvBtnClicked = false;
                     var invRef = invoiceRef.getValue();
                     var docId = cmbDocType.getValue();
                     var IsGenCheck = $isGenChargescheckbox.getValue();
-                    $CreateInvoiceHeader[0].remove();
                     generateInvoice(grnid, invRef, docId, IsGenCheck, windowId);
-                    $FilterHeaderforInv.removeClass('vas-disableArrow');
                 });
                 CloseBtn.on('click', function () {
                     IsGenInvBtnClicked = false;
                     $CreateInvoiceHeader[0].remove();
-                    $FilterHeaderforInv.removeClass('vas-disableArrow');
                 });
                
             }
@@ -639,18 +649,9 @@
                         // If the Invoice_ID is greater than 0, handle zoom click and remove the filter header
                         handleZoomClick(responseData.C_Invoice_ID, windowId, "C_Invoice_ID");
                         $CreateInvoiceHeader[0].remove();
-                        //pageNo = 1;
-                        //pageNoarray = 1;
-                        //pageSize = 500;
-                        //CurrentPage = 1;
-                        //RecCount = 0;
-                        //arrayPageSize = 4;
-                        //countRecord = 4;
-                        //$self.intialLoad();
                     } else {
                         // If no invoice is created, show an info dialog
                         VIS.ADialog.info(responseData.ExceptionMessage);
-                        $CreateInvoiceHeader[0].remove();
                     }
                     // Hide the loading spinner once the operation is complete
                     $bsyDiv[0].style.visibility = "hidden";
@@ -658,7 +659,6 @@
                 error: function (xhr, status, error) {  // Callback function when the AJAX request fails
                     // In case of an error, show an info dialog and remove the filter header
                     VIS.ADialog.info(error);
-                    $CreateInvoiceHeader[0].remove();
                     // Hide the loading spinner if the request fails
                     $bsyDiv[0].style.visibility = "hidden";
                 }

@@ -2815,8 +2815,8 @@ margin-top:-10px;
     background-color: rgb(235, 235, 235);
 }
 
-    .vas-expay-filter-flyout .vis-input-wrap input + label, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] + label {
-        /*background: linear-gradient(rgb(235 235 235) 50%, transparent 50%);*/
+    .vas-expay-filter-flyout .vas-expay-datefilter .vis-input-wrap input + label, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] + label {
+       /*background: linear-gradient(rgb(235 235 235) 50%, transparent 50%);*/
         background: rgb(235,235,235);
     }
 
@@ -2943,7 +2943,7 @@ margin-top:-10px;
     }
 }
 .vas-exinvd-ovrflow {
-    width: 150px;
+    width: 185px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2951,4 +2951,18 @@ margin-top:-10px;
 .vas-exinvd-DocTyperDiv {
     display: inline-block;
     width: 100%;
+}
+.vas-exinvd-createinvdiv {
+    margin: 0 0 19px;
+    display: inline-block;
+    font-size: 17px;
+    border-bottom: 1px solid;
+    width: 100%;
+    padding: 0 0 5px;
+}
+.vas-exinvd-right-ovrflow {
+    width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

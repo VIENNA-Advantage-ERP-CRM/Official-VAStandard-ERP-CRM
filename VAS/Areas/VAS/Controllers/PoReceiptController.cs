@@ -234,10 +234,12 @@ namespace VAS.Areas.VAS.Controllers
         /// This function is Used to show Expected invoices against orders and GRN/Delivery Order
         /// </summary>
         /// <param name="ISOtrx">ISOtrx</param>
-        /// <param name="ctx">Context</param>
         /// <param name="ListValue">ListValue</param>
         /// <param name="pageNo">pageNo</param>
         /// <param name="pageSize">pageSize</param>
+        /// <param name="C_BPartner_ID">C_BPartner_ID</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
         /// <author>VIS_427</author>
         /// <returns>List of data of Expected invoices against order and GRN</returns>
         public JsonResult GetExpectedInvoiceData(bool ISOtrx,int pageNo,int pageSize,string ListValue, string C_BPartner_ID, string fromDate, string toDate)
@@ -405,11 +407,11 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// This function is used to Generate Invoice against GRN
         /// </summary>
-        /// <param name="grnid">grnid</param>
-        /// <param name="invRef">grnid</param>
-        /// <param name="docId">docId<param>
-        /// <param name="IsGenCheck"></param>
-        /// <returns>Invoice ID</returns>
+        /// <param name="grnid">M_InOut_ID</param>
+        /// <param name="invRef">Invoice Reference Number</param>
+        /// <param name="docId">C_Doctype_ID<param>
+        /// <param name="IsGenCheck">Generate Chrges</param>
+        /// <returns>Dictionary</returns>
         /// <author>VIS_427</author>
         public ActionResult GenerateInvoice(int grnid, string invRef, int docId, bool IsGenCheck )
         {
