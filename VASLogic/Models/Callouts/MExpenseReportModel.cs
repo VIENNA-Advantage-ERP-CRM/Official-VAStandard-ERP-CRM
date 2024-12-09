@@ -196,7 +196,7 @@ namespace VIS.Models
             {
                 //VIS0336-implement the code for settignthe location on time expense line tab
                 str = " SELECT R.C_BPartner_ID AS Customer, l.C_BPartner_Location_ID AS Location FROM R_Request R INNER JOIN C_BPartner C ON " +
-                    " R.C_BPartner_ID = C.C_BPartner_ID LEFT JOIN C_BPartner_Location l ON C.C_BPartner_ID = l.C_BPartner_ID WHERE R.R_Request_ID = " + ID +
+                    " ( R.C_BPartner_ID = C.C_BPartner_ID) LEFT JOIN C_BPartner_Location l ON ( C.C_BPartner_ID = l.C_BPartner_ID ) WHERE R.R_Request_ID = " + ID +
                     " AND C.IsCustomer = 'Y' ORDER by C_BPartner_Location_ID ASC";
             }
             else if (columnName == "C_Project_ID")
@@ -204,8 +204,8 @@ namespace VIS.Models
 
                 str = " SELECT  CASE WHEN p.C_BPartner_ID > 0 THEN p.C_BPartner_ID ELSE b.C_BPartner_ID END AS Customer ,CASE WHEN l.C_BPartner_Location_ID > 0 THEN  " +
                     " l.C_BPartner_Location_ID ELSE  lc.C_BPartner_Location_ID END AS Location FROM C_Project p LEFT JOIN C_BPartner b ON(b.C_BPartner_ID = p.C_BPartnerSR_ID " +
-                    " AND b.IsCustomer = 'Y') LEFT JOIN C_BPartner_Location l ON p.C_BPartner_ID = l.C_BPartner_ID LEFT JOIN C_BPartner_Location lc ON" +
-                    "  b.C_BPartnerSR_ID = lc.C_BPartner_ID WHERE p.C_Project_ID = " + ID;
+                    " AND b.IsCustomer = 'Y') LEFT JOIN C_BPartner_Location l ON ( p.C_BPartner_ID = l.C_BPartner_ID ) LEFT JOIN C_BPartner_Location lc ON" +
+                    "  ( p.C_BPartnerSR_ID = lc.C_BPartner_ID ) WHERE p.C_Project_ID = " + ID + " ORDER BY  l.C_BPartner_Location_ID , lc.C_BPartner_Location_ID ASC ";
             }
             DataSet ds = DB.ExecuteDataset(str.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
