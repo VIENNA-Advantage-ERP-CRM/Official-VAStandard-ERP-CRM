@@ -19,7 +19,7 @@ namespace VAdvantage.Process
  *  *****************************************************/
     public class CopyFromProjectLine : SvrProcess
     {
-       
+
         int ProjectID = 0, _org_ID = 0, lineNo;
         string ProjectLine = null;
         MRequisitionLine requisitionLine = null;
@@ -61,10 +61,14 @@ namespace VAdvantage.Process
         /// <returns></returns>
         protected override string DoIt()
         {
-            StringBuilder sql = new StringBuilder(@"SELECT AD_Org_ID FROM M_Requisition  WHERE M_Requisition_ID = " + GetRecord_ID());
-            _org_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-
-
+            DateTime? DateRequired = null;
+            StringBuilder sql = new StringBuilder(@"SELECT AD_Org_ID,DateRequired FROM M_Requisition  WHERE M_Requisition_ID = " + GetRecord_ID());
+            DataSet ds1 = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds1 != null && ds1.Tables[0].Rows.Count > 0)
+            {
+                _org_ID = Util.GetValueOfInt(ds1.Tables[0].Rows[0]["AD_Org_ID"]);
+                DateRequired = Util.GetValueOfDateTime(ds1.Tables[0].Rows[0]["DateRequired"]);
+            }
             sql.Clear();
             sql.Append(@"SELECT C_ProjectLine_ID FROM M_RequisitionLine  WHERE M_Requisition_ID = " + GetRecord_ID());
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -109,7 +113,7 @@ namespace VAdvantage.Process
                     requisitionLine.SetQty(Util.GetValueOfInt(ds.Tables[0].Rows[i]["PlannedQty"])); //VAI050-Set Reserved quantity
                     requisitionLine.SetPriceActual(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["PlannedPrice"]));
                     requisitionLine.SetQtyEntered(Util.GetValueOfInt(ds.Tables[0].Rows[i]["PlannedQty"]));
-                   
+                    requisitionLine.Set_Value("DTD001_DateRequired", DateRequired);//VIS0336-set date required on line
                     requisitionLine.SetLine(lineNo);
                     if (!requisitionLine.Save())
                     {
