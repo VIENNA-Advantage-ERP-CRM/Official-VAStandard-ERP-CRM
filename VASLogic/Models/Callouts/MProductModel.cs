@@ -1889,7 +1889,7 @@ namespace VIS.Models
                 trx = Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
-                            o.AD_User_ID, o.SalesRep_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
+                            o.AD_User_ID, o.SalesRep_ID, o.IsDropShip AS DropShip, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
                             ol.M_Product_ID, ol.C_Charge_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
                             (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
                             INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID) WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID 
@@ -1916,6 +1916,7 @@ namespace VIS.Models
                     obj.SetM_Warehouse_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]));
                     obj.SetC_Order_ID(Order_ID);
                     obj.SetSalesRep_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["SalesRep_ID"]));
+                    obj.SetIsDropShip(Util.GetValueOfString(ds.Tables[0].Rows[0]["DropShip"]).Equals("Y"));
                     if (Type == "CR")
                     {
                         obj.SetDateOrdered(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateOrdered"]));
