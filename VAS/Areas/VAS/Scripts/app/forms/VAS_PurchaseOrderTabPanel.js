@@ -45,11 +45,11 @@
                 },
                 success: function (data) {
                     wrapperDiv.empty();
+                    if (lblTitle != null) {
+                        lblTitle.remove();
+                    }
                     data = JSON.parse(data);
-                    if (data != null && data.length > 0) {
-                        if (lblTitle != null) {
-                            lblTitle.remove();
-                        }
+                    if (data != null && data.length > 0) {                        
                         if (data[0].OrderStatusValue == 'DE' || data[0].OrderStatusValue == 'DI') {
                             lblTitle = $('<div class="VAS-delivered-msg"><i class="fa fa-check-circle" aria-hidden="true"></i><span class="">' + data[0].OrderStatus + '</span> </div>');
                         }
