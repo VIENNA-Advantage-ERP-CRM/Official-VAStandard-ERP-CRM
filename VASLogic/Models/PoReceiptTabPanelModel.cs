@@ -1288,8 +1288,8 @@ namespace VASLogic.Models
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
                 sql.Clear();
                 //this query is returning the field of base currency
-                //sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-                //DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
                 //Getting window id for zoom 
                 if (ISOtrx)
                 {
@@ -1309,12 +1309,22 @@ namespace VASLogic.Models
                     obj = new ExpectedInvoice();
                     obj.recordCount = RecordCount;
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
-                    obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
+                    //If currency symbol not found the pick base currency symbol and precision
+                    if (!String.IsNullOrEmpty(Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"])))
+                    {
+                        obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
+                    }
+                    else
+                    {
+                        obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    }
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
                     obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
                     obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
                     obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
-                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
+
+                    obj.stdPrecision = (Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]) !=0 ? Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"])
+                        : Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]));
                     obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
                     obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
