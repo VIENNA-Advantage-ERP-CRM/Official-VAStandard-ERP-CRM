@@ -2967,12 +2967,20 @@ margin-top:-10px;
 .vas-expay-filter-flyout .vis-input-wrap input:focus ~ label.vas-exinvd-bpLabel {
     background: rgb(235,235,235);
 }
-.vas-expay-expected-invoice i {
+.vas-expay-expected-payment i {
     cursor: pointer;
 }
 .vas-exinvd-expected-invoice i {
     cursor: pointer;
 }
+
+.vas-exinvd-expected-invoice .vis-input-wrap input + label {
+    left: 10px;
+}
+.vas-expay-expected-payment .vis-input-wrap input + label {
+    left: 10px;
+}
+
 @media screen and (max-width: 1280px) {
     .vas-expay-filtbtn {
         font-size: 11px;
