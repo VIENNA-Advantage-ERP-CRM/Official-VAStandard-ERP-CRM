@@ -110,14 +110,16 @@
                     FinancialPeriodListDiv.append($FinancialPeriodListDiv);
 
                     //Created customer search control to filter out data
+                    var BPValidation = (isSOTrx == true ? "C_BPartner.IsActive='Y' AND C_BPartner.IsCustomer = 'Y' AND C_BPartner.IsSummary = 'N'"
+                        : "C_BPartner.IsActive='Y' AND C_BPartner.IsVendor = 'Y' AND C_BPartner.IsSummary = 'N'");
                     var BPartnerDiv = $('<div class="vas-BPartnerDiv">');
                     $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
-                    var BPartnerLookUp = VIS.MLookupFactory.getMLookUp(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search);
+                    var BPartnerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, BPValidation);
                     vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", false, false, true, VIS.DisplayType.Search, BPartnerLookUp);
                     var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                     var $BPartnerButtonWrap = $('<div class="input-group-append">');
                     $BPartnerDiv.append($BPartnerControlWrap);
-                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="top:-9px;background-color: rgb(235, 235, 235);color:black;">' + VIS.Msg.getMsg("VAS_BussinessPartner") + '</label>');;
+                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-exinvd-bpLabel" style="color:#000;">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + '</label>');;
                     $BPartnerDiv.append($BPartnerControlWrap);
                     $BPartnerButtonWrap.append(vSearchBPartner.getBtn(0));
                     $BPartnerDiv.append($BPartnerButtonWrap);

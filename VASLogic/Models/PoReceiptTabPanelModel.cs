@@ -17,6 +17,8 @@ using VAdvantage.Utility;
 using VAdvantage.Common;
 using VAdvantage.Model;
 using VAdvantage.DataBase;
+using VAdvantage.ProcessEngine;
+using ViennaAdvantage.Process;
 
 namespace VASLogic.Models
 {
@@ -1027,12 +1029,17 @@ namespace VASLogic.Models
         /// <param name="ListValue">ListValue</param>
         /// <param name="pageNo">pageNo</param>
         /// <param name="pageSize">pageSize</param>
+        /// <param name="C_BPartner_ID">C_BPartner_ID</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
         /// <author>VIS_427</author>
         /// <returns>List of data of Expected invoices against order and GRN</returns>
-        public List<ExpectedInvoice> GetExpectedInvoiceData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string ListValue)
+        public List<ExpectedInvoice> GetExpectedInvoiceData(Ctx ctx, bool ISOtrx, int pageNo, int pageSize, string ListValue, string C_BPartner_ID, string fromDate, string toDate)
         {
             ExpectedInvoice obj = new ExpectedInvoice();
             StringBuilder sql = new StringBuilder();
+            StringBuilder sqlOrder = new StringBuilder();
+            StringBuilder sqlGrn = new StringBuilder();
             StringBuilder sqlmain = new StringBuilder();
             List<ExpectedInvoice> invGrandTotalData = new List<ExpectedInvoice>();
             string OrderCheck = (ISOtrx == true ? " AND o.IsSOTrx='Y' " : " AND o.IsSOTrx='N' ");
@@ -1040,18 +1047,34 @@ namespace VASLogic.Models
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
             sql.Append($@"SELECT * FROM  (");
-            if (ListValue == "AL" || ListValue == "PO" || ListValue == "SO")
+            //AL=ALL ,PO=Purchase Order,SO=Sales Order
+
+            if (ListValue == null || ListValue == "AL" || ListValue == "PO" || ListValue == "SO")
             {
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                sqlOrder.Append($@"SELECT
                             'Order' AS Type,
-                             cb.Pic,
-                             o.DocumentNo,
+                             o.C_Order_ID AS Record_ID,
+                             cb.Pic,");
+                if (ISOtrx)
+                {
+                    sqlOrder.Append(@"CASE WHEN o.IsSoTrx='Y' THEN rsf.Name ELSE NULL END AS InvoiceRule,");
+                }
+                else
+                {
+                    sqlOrder.Append(@"NULL AS InvoiceRule,");
+                }
+                sqlOrder.Append(@"o.DocumentNo,
                              o.DateOrdered,
                              o.DateOrdered AS FilterDate,
                              o.DatePromised AS PromisedDate,
                              custimg.ImageExtension,
                              cb.Name,
                              o.AD_Client_ID,
+                             cy.StdPrecision,
+                             cy.CurSymbol,
+                             o.C_BPartner_ID,
+                             o.AD_Org_ID,
+                            'N' AS IsNotFullyDelivered,
                              SUM(CASE
                                     WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered > l.qtyinvoiced THEN
@@ -1072,7 +1095,6 @@ namespace VASLogic.Models
                                      CASE
                                      WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered >= l.qtyinvoiced THEN
-                                     currencyconvert(
                                          round(
                                              (COALESCE(
                                                  l.qtyordered, 0
@@ -1081,10 +1103,9 @@ namespace VASLogic.Models
                                              )) *(l.linetotalamt) / nullif(
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
-                                         ), o.c_currency_id," + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                         )
                                      WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
                                           AND l.qtydelivered < l.qtyinvoiced THEN
-                                     currencyconvert(
                                          round(
                                              (COALESCE(
                                                  l.qtyordered, 0
@@ -1093,28 +1114,31 @@ namespace VASLogic.Models
                                              )) *(l.linetotalamt) / nullif(
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
-                                         ), o.c_currency_id, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
-                                     ELSE
-                                     currencyconvert(
-                                         round(
+                                         )
+                                     ELSE  round(
                                              (COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * 
                                              (l.linetotalamt) / nullif(
                                                  l.qtyentered, 0
                                              ), cy.stdprecision
-                                         ), o.c_currency_id, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                         )
                                      END
-                                 )             AS totalvalue
+                                 )             AS totalvalue 
                          FROM
                              c_order o
                              INNER JOIN C_OrderLine l ON (o.c_order_id = l.c_order_id)
                              INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
+                             INNER JOIN AD_Ref_List rsf  ON (rsf.value = o.InvoiceRule)
+                             INNER JOIN AD_Reference ar ON (ar.AD_Reference_ID=rsf.AD_Reference_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
                              LEFT JOIN C_InvoiceLine ci ON ( ci.C_OrderLine_ID = l.C_OrderLine_ID )
-                             LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO') ");
-                sqlmain.Append(@"GROUP BY
-                             cb.Pic, o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID
+                             LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )");
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO') AND ar.Name='C_Order InvoiceRule'");
+                sqlmain.Append(@" GROUP BY
+                             o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
+                sqlmain.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID,cy.StdPrecision,
+                             cy.CurSymbol,o.C_BPartner_ID,o.AD_Org_ID
                              HAVING SUM(
                                         CASE
                                         WHEN mil.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
@@ -1130,37 +1154,69 @@ namespace VASLogic.Models
                                                     l.qtyordered, 0
                                                 ) - coalesce(
                                                     l.qtyinvoiced, 0)
-                                        ELSe                        coalesce(
-                                                    l.qtyordered, 0)
+                                        ELSe (COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0))
                                         END)  > 0 ");
+                if (Util.GetValueOfInt(C_BPartner_ID) != 0)
+                {
+                    sqlmain.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                }
+                /*if dates value are not null then implemeted fucntion to fetch sql*/
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
+                {
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
+                }
             }
-            if (ListValue == "AL")
+            if (ListValue == null || ListValue == "AL")
             {
                 sqlmain.Append(" UNION ALL ");
             }
-            if (ListValue == "AL" || ListValue == "GR" || ListValue == "DO")
+            //AL=ALL ,GR=GRN,DO=Delivery Order
+            if (ListValue == null || ListValue == "AL" || ListValue == "GR" || ListValue == "DO")
             {
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                sqlGrn.Append($@"SELECT
                              'GRN' AS Type,
-                             cb.Pic,
-                             min.DocumentNo,
+                              min.M_InOut_ID AS Record_ID,
+                             cb.Pic,");
+                if (ISOtrx)
+                {
+                    sqlGrn.Append(@"CASE WHEN o.IsSoTrx='Y' THEN invrule.Name ELSE NULL END AS InvoiceRule,");
+                }
+                else
+                {
+                    sqlGrn.Append(@"NULL AS InvoiceRule,");
+                }
+                sqlGrn.Append(@"min.DocumentNo,
                              min.MovementDate AS DateOrdered,
                              CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END AS FilterDate,
                              CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
-                             ELSE NULL
+                             ELSE min.MovementDate
                              END AS PromisedDate,
                              custimg.ImageExtension,
                              cb.Name,
                              min.AD_Client_ID,
+                             cy.StdPrecision,
+                             cy.CurSymbol,
+                             min.C_BPartner_ID,
+                             min.AD_Org_ID,
+                             CASE 
+                             WHEN o.InvoiceRule = 'O' 
+                                      AND EXISTS (
+                                          SELECT 1
+                                          FROM C_OrderLine ol
+                                          WHERE ol.C_Order_ID = o.C_Order_ID
+                                          AND ol.QtyOrdered <> ol.QtyDelivered
+                                      ) THEN 'Y'
+                                 ELSE 'N'
+                             END AS IsNotFullyDelivered,
                              SUM(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) AS RemainingQuantity,
                              SUM(
                                  CASE 
                                      WHEN l.C_OrderLine_ID IS NOT NULL THEN 
-                                         currencyConvert(ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
+                                     ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
                                          * (ol.LineTotalAmt) / NULLIF(ol.QtyEntered, 0)
-                                         ,cy.StdPrecision),o.C_Currency_ID, " + C_Currency_ID + @", o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID)
+                                         ,cy.StdPrecision)
                                      ELSE 
                                          (COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
                                  END
@@ -1172,6 +1228,9 @@ namespace VASLogic.Models
                              LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID = l.m_inoutline_ID)
                              LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
                              LEFT JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
+                             LEFT JOIN (   SELECT RSF.NAME,RSF.VALUE FROM ad_ref_list rsf 
+                             INNER JOIN ad_reference  ar ON ( ar.ad_reference_id = rsf.ad_reference_id  AND ar.name = 'C_Order InvoiceRule')
+                             WHERE rsf.IsActive='Y') invrule on (o.invoicerule=invrule.value)
                              LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
                          WHERE
@@ -1182,43 +1241,97 @@ namespace VASLogic.Models
                                  WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
                                  AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0)
                              )
-                             AND " + DeliveryCheck + BPCheck + " AND ol.qtyordered IS NOT NULL", "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                             AND " + DeliveryCheck + BPCheck + " ");
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(@" GROUP BY
-                             cb.Pic, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
+                             min.M_InOut_ID,cb.Pic,o.IsSoTrx,invrule.Name, o.InvoiceRule, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
-                             ELSE NULL END, custimg.ImageExtension, cb.Name,min.AD_Client_ID 
+                             ELSE min.MovementDate END, custimg.ImageExtension, cb.Name,min.AD_Client_ID,cy.StdPrecision,
+                             cy.CurSymbol,min.C_BPartner_ID,min.AD_Org_ID,
+                             CASE 
+                             WHEN o.InvoiceRule = 'O' 
+                                      AND EXISTS (
+                                          SELECT 1
+                                          FROM C_OrderLine ol
+                                          WHERE ol.C_Order_ID = o.C_Order_ID
+                                          AND ol.QtyOrdered <> ol.QtyDelivered
+                                      ) THEN 'Y'
+                                 ELSE 'N'
+                             END
                               HAVING
                               SUM(coalesce(
                                   l.movementqty, 0
                               ) - coalesce(
                                   ci.qtyinvoiced, 0
                               )) > 0");
+
+                if (Util.GetValueOfInt(C_BPartner_ID) != 0)
+                {
+                    sqlmain.Append(" AND min.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                }
+                /*if dates value are not null then implemeted fucntion to fetch sql*/
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
+                {
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(min.MovementDate)", fromDate, toDate));
+                }
             }
             sql.Append(sqlmain);
-            sql.Append(")T ORDER BY T.FilterDate");
+            sql.Append(")T ORDER BY T.FilterDate ASC,T.C_BPartner_ID ASC,T.DocumentNo ASC");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
+                int GRNId = 0;
+                int OrderWinId = 0;
+                int InvWindowId = 0;
                 //fetching the record count to use it for pagination
                 int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
                 sql.Clear();
                 //this query is returning the field of base currency
-                sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-                DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
-
+                //sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+                //DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+                //Getting window id for zoom 
+                if (ISOtrx)
+                {
+                    //first parameter is new screen and second parameter is old screen
+                    GRNId=GetWindowId("VAS_DeliveryOrder", "Shipment (Customer)");
+                    OrderWinId= GetWindowId("VAS_SalesOrder", "Sales Order");
+                    InvWindowId = GetWindowId("VAS_ARInvoice", "Invoice (Customer)");
+                }
+                else
+                {
+                    GRNId = GetWindowId("VAS_MaterialReceipt", "Material Receipt");
+                    OrderWinId = GetWindowId("VAS_PurchaseOrder", "Purchase Order");
+                    InvWindowId = GetWindowId("VAS_APInvoice", "Invoice (Vendor)");
+                }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
                     obj = new ExpectedInvoice();
                     obj.recordCount = RecordCount;
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
-                    obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
                     obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
                     obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
-                    obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
+                    obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
                     obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
                     obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
                     obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
+
+                    if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
+                    {
+                        obj.Window_ID = OrderWinId;
+                        obj.Primary_ID = "C_Order_ID";
+                    }
+                    else
+                    {
+                        obj.Window_ID = GRNId;
+                        obj.Primary_ID = "M_InOut_ID";
+                        obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                    }
+                    obj.InvWinID = InvWindowId;
                     if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
                     {
                         obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
@@ -1228,6 +1341,65 @@ namespace VASLogic.Models
                 }
             }
             return invGrandTotalData;
+        }
+        /// <summary>
+        /// This Method is used to return sql
+        /// </summary>
+        /// <param name="FlterCol">FlterCol</param>
+        /// <param name="fromDate">fromDate</param>
+        /// <param name="toDate">toDate</param>
+        /// <returns>Returns Sql</returns>
+        /// <author>VIS_427 </author>
+        public string GetExpInvDateSql(string FlterCol, string fromDate, string toDate)
+        {
+            StringBuilder sql = new StringBuilder();
+            if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+            {
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND Current_Date");
+            }
+            //if user enter from date and to date then this condition will execute
+            else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+            {
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
+            //if user enter does not enter from date but enters todate then this condition will execute
+            else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
+            {
+                sql.Append(@" AND " + FlterCol + " <= " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
+            //if from date greater then today's date
+            else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
+            {
+                toDate = fromDate;
+                sql.Append(@" AND " + FlterCol + " BETWEEN " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
+                sql.Append(@"AND " +
+                (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+            }
+            return sql.ToString();
+        }
+        /// <summary>
+        /// This Method is used to return Window ID for zoom functionality
+        /// </summary>
+        /// <param name="NewScreen">New Screen</param>
+        /// <param name="OldScreen">Old Screen</param>
+        /// <returns>Returns AD_Window_ID</returns>
+        /// <author>VIS_427</author>
+        public int GetWindowId(string NewScreen,string OldScreen)
+        {
+            int AD_Window_ID = 0;
+            AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(NewScreen)}", null, null));
+            if (AD_Window_ID == 0)
+            {
+                AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(OldScreen)}", null, null));
+            }
+            return AD_Window_ID;
         }
         /// <summary>
         /// This Method is used to return the refrence id 
@@ -1445,7 +1617,7 @@ namespace VASLogic.Models
                 int C_Period_ID = GetPreviousPeriod(CurrentYear, ctx.GetAD_Client_ID(), calendar_ID);
                 if (C_Period_ID > 0)
                 {
-                    sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)", " c_period.C_Period_ID="+ C_Period_ID));
+                    sql.Append(GetYearSql("Min(c_period.StartDate)", "Max(c_period.EndDate)", " c_period.C_Period_ID=" + C_Period_ID));
                 }
             }
             //Last 6 Months Data
@@ -2031,7 +2203,7 @@ namespace VASLogic.Models
             string OrderCheck = (ISOtrx == true ? " AND co.IsSOTrx='Y' " : " AND co.IsSOTrx='N' ");
             string InvoiceCheck = (ISOtrx == true ? " AND ci.IsSOTrx='Y' " : " AND ci.IsSOTrx='N' ");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
-           // string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " ");
+            // string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " ");
             sql.Append($@"SELECT * FROM  (");
             //If Doctype Value is Null or ALL or Invoice
             if (docTypeValue == null || docTypeValue == "01" || docTypeValue == "03")
@@ -2111,35 +2283,9 @@ namespace VASLogic.Models
                         sqlmain.Append(" AND Current_Date > cs.DueDate");
                     }
                 }
-                //if user enter from date but not to date and from date less then Current date then this condition will execute
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND Current_Date");
-                }
-                //if user enter from date and to date then this condition will execute
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if user enter does not enter from date but enters todate then this condition will execute
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) <= " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if from date greater then today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(cs.DueDate)", fromDate, toDate));
                 }
             }
             //If Doctype Value is Null or ALL
@@ -2221,35 +2367,9 @@ namespace VASLogic.Models
                         sqlmain.Append(" AND Current_Date > ps.DueDate");
                     }
                 }
-                //if user enter from date but not to date and from date less then Current date then this condition will execute
-                if (!String.IsNullOrEmpty(fromDate) && String.IsNullOrEmpty(toDate) && Util.GetValueOfDateTime(fromDate) < DateTime.Now)
+                if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND Current_Date");
-                }
-                //if user enter from date and to date then this condition will execute
-                else if (!String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if user enter does not enter from date but enters todate then this condition will execute
-                else if (String.IsNullOrEmpty(fromDate) && !String.IsNullOrEmpty(toDate))
-                {
-                    sqlmain.Append(@" AND TRUNC(ps.DueDate) <= " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
-                }
-                //if from date greater then today's date
-                else if (Util.GetValueOfDateTime(fromDate) > DateTime.Now)
-                {
-                    toDate = fromDate;
-                    sqlmain.Append(@" AND TRUNC(cs.DueDate) BETWEEN " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(fromDate), true)));
-                    sqlmain.Append(@"AND " +
-                    (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(ps.DueDate)", fromDate, toDate));
                 }
             }
             sql.Append(sqlmain);
@@ -2263,17 +2383,17 @@ namespace VASLogic.Models
                 //Getting windows id to zoom the records
                 if (ISOtrx)
                 {
-                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ARInvoice'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
+                    OrderWinId = GetWindowId("VAS_SalesOrder", "Sales Order");
+                    InvoiceWinId = GetWindowId("VAS_ARInvoice", "Invoice (Customer)");
                 }
                 else
                 {
-                    ExpInvID= Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ExpenseInvoice'", null, null));
-                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_APInvoice'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrder'", null, null));
+                    ExpInvID = GetWindowId("VAS_ExpenseInvoice", "Expense Invoice");
+                    OrderWinId = GetWindowId("VAS_PurchaseOrder", "Purchase Order");
+                    InvoiceWinId = GetWindowId("VAS_APInvoice", "Invoice (Vendor)");
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                {                   
+                {
                     obj = new ExpectedPayment();
                     obj.recordCount = RecordCount;
                     obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
@@ -2286,12 +2406,12 @@ namespace VASLogic.Models
                     obj.PayMethod = Util.GetValueOfString(ds.Tables[0].Rows[i]["VA009_Name"]);
                     obj.ISO_Code = Util.GetValueOfString(ds.Tables[0].Rows[i]["ISO_Code"]);
                     obj.windowType = Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]);
-                    if(Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]) == "Order")
+                    if (Util.GetValueOfString(ds.Tables[0].Rows[i]["WindowType"]) == "Order")
                     {
                         obj.Window_ID = OrderWinId;
                         obj.Primary_ID = "C_Order_ID";
                     }
-                    else if(Util.GetValueOfString(ds.Tables[0].Rows[i]["IsExInv"]) == "Y")
+                    else if (Util.GetValueOfString(ds.Tables[0].Rows[i]["IsExInv"]) == "Y")
                     {
                         obj.Window_ID = ExpInvID;
                         obj.Primary_ID = "C_Invoice_ID";
@@ -2571,8 +2691,8 @@ namespace VASLogic.Models
                              o.AD_Client_ID, 
                              o.AD_Org_ID
                          ) 
-                         ELSE 0 END AS CashInbifurcated_Amount,");            
-            if(DB.IsPostgreSQL())
+                         ELSE 0 END AS CashInbifurcated_Amount,");
+            if (DB.IsPostgreSQL())
             {
                 sqlOrder.Append(@"(o.DATEPROMISED + (CASE 
                                  WHEN ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS
@@ -2839,6 +2959,48 @@ namespace VASLogic.Models
             int Quarter = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return Quarter;
         }
+        /// <summary>
+        /// This function is used to Generate Invoice against GRN
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="grnid">M_InOut_ID</param>
+        /// <param name="invRef">Invoice Reference Number</param>
+        /// <param name="docId">C_Doctype_ID<param>
+        /// <param name="IsGenCheck">Generate Chrges</param>
+        /// <returns>Dictionary</returns>
+        /// <author>VIS_427</author>
+        public Dictionary<string, object> GenerateInvoice(Ctx ctx, int grnid, string invRef, int docId, bool IsGenCheck)
+        {
+            int C_Invoice_ID = 0;
+            string exceptionMessage = string.Empty;
+            InOutCreateInvoice obj = new InOutCreateInvoice();
+
+            try
+            {
+                // Set parameters
+                obj.SetParameter(invRef, docId, IsGenCheck, grnid);
+
+                // Call the Generate method, which might throw an exception
+                obj.Generate();
+
+                // Get the Invoice ID from the object if no exception
+                C_Invoice_ID = obj.C_Invoice_ID;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (you could log it to a file, database, or console depending on your requirements)
+                exceptionMessage = ex.Message;
+            }
+
+            // Prepare the dictionary to return the Invoice ID and Exception message
+            Dictionary<string, object> result = new Dictionary<string, object>
+            {
+                     { "C_Invoice_ID", C_Invoice_ID },
+                     { "ExceptionMessage", exceptionMessage }
+            };
+
+            return result;
+        }
 
     }
     public class TabPanel
@@ -2971,12 +3133,19 @@ namespace VASLogic.Models
         public string Symbol { get; set; }
         public string RecordType { get; set; }
         public int stdPrecision { get; set; }
+        public int Record_ID { get; set; }
+        public int InvWinID { get; set; }
+        public string Primary_ID { get; set; }
+        public int Window_ID { get; set; }
+        public string IsFullyDelivered { get; set; }
         public string ImageUrl { get; set; }
         public string Name { get; set; }
         public DateTime OrderdDate { get; set; }
         public DateTime DatePromised { get; set; }
         public string DocumentNo { get; set; }
         public int recordCount { get; set; }
+        public int AD_Org_ID { get; set; }
+        public string InvoiceRule { get; set; }
 
     }
     public class TopExpenseAmountData
