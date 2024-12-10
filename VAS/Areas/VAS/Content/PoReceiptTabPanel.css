@@ -2936,12 +2936,6 @@ margin-top:-10px;
     font-size: 0.875em;
 }
 
-@media screen and (max-width: 1280px) {
-    .vas-expay-filtbtn {
-        font-size: 11px;
-        padding: 5px 6px;
-    }
-}
 .vas-exinvd-ovrflow {
     width: 185px;
     overflow: hidden;
@@ -2965,4 +2959,23 @@ margin-top:-10px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+/*.vas-expay-filter-flyout .vis-input-wrap input:focus + label.vas-exinvd-bpLabel {
+    background-color: rgb(235,235,235);
+}*/
+
+.vas-expay-filter-flyout .vis-input-wrap input:focus ~ label.vas-exinvd-bpLabel {
+    background: rgb(235,235,235);
+}
+.vas-expay-expected-invoice i {
+    cursor: pointer;
+}
+.vas-exinvd-expected-invoice i {
+    cursor: pointer;
+}
+@media screen and (max-width: 1280px) {
+    .vas-expay-filtbtn {
+        font-size: 11px;
+        padding: 5px 6px;
+    }
 }
