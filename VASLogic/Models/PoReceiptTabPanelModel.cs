@@ -1277,7 +1277,7 @@ namespace VASLogic.Models
                 }
             }
             sql.Append(sqlmain);
-            sql.Append(")T ORDER BY T.FilterDate ASC,T.C_BPartner_ID ASC");
+            sql.Append(")T ORDER BY T.FilterDate ASC,T.C_BPartner_ID ASC,T.DocumentNo ASC");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -1290,17 +1290,19 @@ namespace VASLogic.Models
                 //this query is returning the field of base currency
                 //sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
                 //DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+                //Getting window id for zoom 
                 if (ISOtrx)
                 {
-                    GRNId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_DeliveryOrder'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
-                    InvWindowId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ARInvoice'", null, null));
+                    //first parameter is new screen and second parameter is old screen
+                    GRNId=GetWindowId("VAS_DeliveryOrder", "Shipment (Customer)");
+                    OrderWinId= GetWindowId("VAS_SalesOrder", "Sales Order");
+                    InvWindowId = GetWindowId("VAS_ARInvoice", "Invoice (Customer)");
                 }
                 else
                 {
-                    GRNId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_MaterialReceipt'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrder'", null, null));
-                    InvWindowId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_APInvoice'", null, null));
+                    GRNId = GetWindowId("VAS_MaterialReceipt", "Material Receipt");
+                    OrderWinId = GetWindowId("VAS_PurchaseOrder", "Purchase Order");
+                    InvWindowId = GetWindowId("VAS_APInvoice", "Invoice (Vendor)");
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
@@ -1381,6 +1383,23 @@ namespace VASLogic.Models
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(toDate), true)));
             }
             return sql.ToString();
+        }
+        /// <summary>
+        /// This Method is used to return Window ID for zoom functionality
+        /// </summary>
+        /// <param name="NewScreen">New Screen</param>
+        /// <param name="OldScreen">Old Screen</param>
+        /// <returns>Returns AD_Window_ID</returns>
+        /// <author>VIS_427</author>
+        public int GetWindowId(string NewScreen,string OldScreen)
+        {
+            int AD_Window_ID = 0;
+            AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(NewScreen)}", null, null));
+            if (AD_Window_ID == 0)
+            {
+                AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(OldScreen)}", null, null));
+            }
+            return AD_Window_ID;
         }
         /// <summary>
         /// This Method is used to return the refrence id 
@@ -2364,14 +2383,14 @@ namespace VASLogic.Models
                 //Getting windows id to zoom the records
                 if (ISOtrx)
                 {
-                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ARInvoice'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_SalesOrder'", null, null));
+                    OrderWinId = GetWindowId("VAS_SalesOrder", "Sales Order");
+                    InvoiceWinId = GetWindowId("VAS_ARInvoice", "Invoice (Customer)");
                 }
                 else
                 {
-                    ExpInvID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_ExpenseInvoice'", null, null));
-                    InvoiceWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_APInvoice'", null, null));
-                    OrderWinId = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE Name='VAS_PurchaseOrder'", null, null));
+                    ExpInvID = GetWindowId("VAS_ExpenseInvoice", "Expense Invoice");
+                    OrderWinId = GetWindowId("VAS_PurchaseOrder", "Purchase Order");
+                    InvoiceWinId = GetWindowId("VAS_APInvoice", "Invoice (Vendor)");
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {

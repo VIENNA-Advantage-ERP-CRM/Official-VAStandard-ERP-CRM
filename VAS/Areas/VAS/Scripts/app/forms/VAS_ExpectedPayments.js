@@ -119,7 +119,7 @@
                     var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                     var $BPartnerButtonWrap = $('<div class="input-group-append">');
                     $BPartnerDiv.append($BPartnerControlWrap);
-                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="color:black;">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + '</label>');;
+                    $BPartnerControlWrap.append(vSearchBPartner.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label class="vas-exinvd-bpLabel" style="color:#000;">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + '</label>');;
                     $BPartnerDiv.append($BPartnerControlWrap);
                     $BPartnerButtonWrap.append(vSearchBPartner.getBtn(0));
                     $BPartnerDiv.append($BPartnerButtonWrap);
