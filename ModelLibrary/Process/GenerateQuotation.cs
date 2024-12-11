@@ -305,7 +305,7 @@ namespace ViennaAdvantageServer.Process
                     DB.ExecuteQuery("UPDATE C_Order SET ConditionalFlag = null WHERE C_Order_ID = " + order.GetC_Order_ID(), null, Get_TrxName());
                 }
 
-                msg = Msg.GetMsg(GetCtx(), "QuotationGenerated");
+                msg = Msg.GetMsg(GetCtx(), "QuotationGenerated") + order.GetDocumentNo();
             }
             else
                 msg = Msg.GetMsg(GetCtx(), "NoLines");

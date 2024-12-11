@@ -69,7 +69,7 @@ namespace VAdvantage.Process
                 customer.SetEMail(mail);
                 if (!customer.Save())
                 {
-                    return Msg.GetMsg(GetCtx(), "NotSubscribed");
+                    return Msg.GetMsg(GetCtx(), "VAS_NotSubscribed");
 
                 }
                 return Msg.GetMsg(GetCtx(), "SubscribedDone");
