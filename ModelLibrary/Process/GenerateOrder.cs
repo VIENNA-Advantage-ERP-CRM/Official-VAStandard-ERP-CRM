@@ -319,7 +319,7 @@ namespace ViennaAdvantageServer.Process
                     DB.ExecuteQuery("UPDATE C_Order SET ConditionalFlag = null WHERE C_Order_ID = " + order.GetC_Order_ID(), null, Get_TrxName());
                 }
 
-                return Msg.GetMsg(GetCtx(), "VAS_OrderGenerated") + order.GetDocumentNo();
+                return Msg.GetMsg(GetCtx(), "OrderGenerationDone") + order.GetDocumentNo();
             }
             else
                 msg = Msg.GetMsg(GetCtx(), "NoLines");
