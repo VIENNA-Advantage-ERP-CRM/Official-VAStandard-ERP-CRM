@@ -449,7 +449,7 @@ namespace VAdvantage.Model
                 {
                     if (product != null)
                     {
-                        int precision = product.GetUOMPrecision();
+                        int precision = MUOM.GetPrecision(GetCtx(), Get_ValueAsInt("C_UOM_ID"));
                         SetQty(Decimal.Round(GetQty(), precision, MidpointRounding.AwayFromZero));
                     }
                 }
