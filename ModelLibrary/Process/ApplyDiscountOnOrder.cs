@@ -89,7 +89,7 @@ namespace VAdvantage.Process
                 }
 
                 // get amount on which we have to apply discount
-                subTotal = obj.GetTotalLines();
+                subTotal = obj.GetGrandTotal();               //VIS0336-set grandtotal
 
                 // when we are giving discount in terms of amount, then we have to calculate discount in term of percentage
                 discountPercentageOnTotalAmount = GetDiscountPercentageOnTotal(subTotal, _DiscountAmt, 12);
@@ -136,11 +136,11 @@ namespace VAdvantage.Process
                             // reduce discounted amount from total discount
                             _DiscountAmt -= discountAmountOnTotal;
                         }
-                        else if (i == lines.Length - 1)
-                        {
-                            // when last iteration, set remaning amount
-                            discountAmountOnTotal = _DiscountAmt;
-                        }
+                        //else if (i == lines.Length - 1)
+                        //{                                                             //VIS0336-comment the code for handle all lines case
+                        //    // when last iteration, set remaning amount
+                        //    discountAmountOnTotal = _DiscountAmt;
+                        //}
                     }
 
                     ln.SetAmountAfterApplyDiscount(Decimal.Round(Decimal.Add(ln.GetAmountAfterApplyDiscount(), discountAmountOnTotal), precision));
