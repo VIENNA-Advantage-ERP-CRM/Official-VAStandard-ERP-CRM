@@ -79,6 +79,7 @@
         //var Util=VIS.Util;
 
         if (this.isCalloutActive() || value == null || value.toString() == "") {
+            mTab.setValue("BlanketOrderType", "OO");
             return "";
         }
 
@@ -155,8 +156,7 @@
                     mTab.setValue("BlanketOrderType", DocSubTypeSO);
                 }
                 else if (Util.getValueOfString(idr["IsReleaseDocument"]).equals("Y")) {
-                    mTab.setValue("BlanketOrderType", "BO");
-                    mTab.setValue("OrderType", "BO");  //VIS0336_Changes for Blanket order field on Purchase order window.
+                    mTab.setValue("BlanketOrderType", "BO"); //VIS0336_Changes for Blanket order field on Purchase order window.
                 }
                 else {
                     ctx.setContext(windowNo, "BlanketOrderType", "OO");
