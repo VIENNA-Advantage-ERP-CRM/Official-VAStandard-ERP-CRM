@@ -38,7 +38,8 @@
             $DifferentYearDataListLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), widgetID, 0, VIS.DisplayType.List, "VAS_CashFlowWidgetList", ColumnIds.AD_Reference_ID, false, null);
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             vDifferentYearDataList = new VIS.Controls.VComboBox("VAS_CashFlowWidgetList", true, false, true, $DifferentYearDataListLookUp, 20);
-            vDifferentYearDataList.setValue("01");
+            //default value set for 6 months
+            vDifferentYearDataList.setValue("05");
             var $DifferentYearDataListControlWrap = $('<div class="vis-control-wrap">');
             $DifferentYearDataListDiv.append($DifferentYearDataListControlWrap);
             $DifferentYearDataListControlWrap.append(vDifferentYearDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
@@ -71,21 +72,18 @@
             VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetCashFlowData",
                 { "ListValue": vDifferentYearDataList.getValue() }, function (dr) {
                     var CashFlowData = dr;
-                    var cashFlowArr = [];
 
                     // Remove existing canvas if exists
                     $root.find('canvas').remove();
 
-                    if (CashFlowData.length == 0) {
+                    if (CashFlowData != null && CashFlowData.ErrorMessage != null) {
                         // If there is no data, show "No record found" message
-                        $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>')
+                        $maindiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + widgetID + '">' + VIS.Msg.getMsg("VAS_RecordNotFound") + '</div>');
                         $root.append($maindiv);
                     } else {
-                        if (CashFlowData != null) {
-                            cashFlowArr.push(CashFlowData[0].CashOutAmt);
-                            cashFlowArr.push(CashFlowData[0].CashInAmt);
-                        }
-                        precision = CashFlowData[0].stdPrecision;
+                        const precision = CashFlowData.stdPrecision;
+                        // Define static labels and colors
+                        const lstLabel = CashFlowData.labels;
                         const zeroLinePlugin = {
                             id: 'zeroLine',
                             beforeDraw: function (chart) {
@@ -107,24 +105,27 @@
                                 ctx.restore();
                             }
                         };
-                        // Define static labels and colors
-                        const lstLabel = [VIS.Msg.getMsg("VAS_CashOut"), VIS.Msg.getMsg("VAS_CashIn")]
-                        const backgroundColors = [
-                            'rgba(255, 99, 132, 0.7)',  // Red (Cash Out)
-                            'rgba(0, 187, 0, 0.7)',     // Green (Cash In)
-                        ];
 
                         // Prepare the data object for the chart
                         const data = {
                             labels: lstLabel, // Dynamic labels
                             datasets: [
                                 {
-                                    label: lstLabel,
-                                    data: cashFlowArr,  // This must be an array of numbers
+                                    label: VIS.Msg.getMsg("VAS_CashOut"),
+                                    data: CashFlowData.lstCashOutData,
                                     borderColor: 'rgba(0,0,0,0)', // Transparent border color
                                     borderWidth: 0, // No border
-                                    backgroundColor: backgroundColors, // Background colors
-                                }
+                                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                    order: 1
+                                },
+                                {
+                                    label: VIS.Msg.getMsg("VAS_CashIn"),
+                                    data: CashFlowData.lstCashInData,
+                                    borderColor: 'rgba(0,0,0,0)', // Transparent border color
+                                    borderWidth: 0, // No border
+                                    backgroundColor: 'rgba(0, 187, 0, 0.7)',
+                                    order: 1
+                                },
                             ],
                         };
 
@@ -135,7 +136,7 @@
                                 chart.legend.fit = function fit() {
                                     originalFit.bind(chart.legend)();
                                     this.height += -5; // Adjust legend height if needed
-                                }
+                                };
                             }
                         };
 
@@ -146,9 +147,6 @@
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                //layout: {
-                                //    padding: 0
-                                //},
                                 scales: {
                                     x: {
                                         grid: {
@@ -159,31 +157,32 @@
                                         grid: {
                                             display: false, // Hide grid lines on the y-axis
                                         },
-                                        beginAtZero: true,// Ensure y-axis starts at 0
+                                        beginAtZero: true, // Ensure y-axis starts at 0
                                     },
                                 },
                                 plugins: {
                                     legend: {
-                                        display: false, // Disable default legend
+                                        display: true, // Enable legend
+                                        position: 'bottom'
                                     },
                                     tooltip: {
                                         enabled: true,
-                                        mode: 'index',
+                                        mode: 'nearest',
                                         callbacks: {
                                             label: function (tooltipItem) {
                                                 const dataIndex = tooltipItem.dataIndex;
                                                 const datasetIndex = tooltipItem.datasetIndex;
                                                 const dataset = tooltipItem.chart.data.datasets[datasetIndex];
                                                 const labels = tooltipItem.chart.data.labels;
+                                                const dsLabel = dataset.label;
                                                 const value = dataset.data[dataIndex];
-                                                return labels[dataIndex] + ': ' + parseFloat(value).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+                                                return dsLabel + " - " + labels[dataIndex] + ': ' + parseFloat(value).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                                             }
                                         }
                                     },
                                 }
                             },
-                            plugins: [plugin],
-                            plugins: [zeroLinePlugin]
+                            plugins: [plugin] // Apply the plugins
                         };
 
                         // Create a new canvas element and append it to the root
@@ -199,7 +198,6 @@
                         // Initialize the chart with the new data
                         const ctx = canvas[0].getContext('2d');
                         const chart = new Chart(ctx, config);
-                        console.log("Chart initialized:", chart);
 
                         // Ensure the canvas resizes dynamically on window resize
                         function resizeChart() {

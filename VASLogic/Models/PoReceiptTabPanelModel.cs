@@ -1051,10 +1051,7 @@ namespace VASLogic.Models
 
             if (ListValue == null || ListValue == "AL" || ListValue == "PO" || ListValue == "SO")
             {
-                sqlOrder.Append($@"SELECT
-                            'Order' AS Type,
-                             o.C_Order_ID AS Record_ID,
-                             cb.Pic,");
+                sqlOrder.Append($@"SELECT 'Order' AS Type,o.C_Order_ID AS Record_ID,cb.Pic,");
                 if (ISOtrx)
                 {
                     sqlOrder.Append(@"CASE WHEN o.IsSoTrx='Y' THEN rsf.Name ELSE NULL END AS InvoiceRule,");
@@ -1064,7 +1061,6 @@ namespace VASLogic.Models
                     sqlOrder.Append(@"NULL AS InvoiceRule,");
                 }
                 sqlOrder.Append(@"o.DocumentNo,
-                             o.DateOrdered,
                              o.DateOrdered AS FilterDate,
                              o.DatePromised AS PromisedDate,
                              custimg.ImageExtension,
@@ -1075,87 +1071,42 @@ namespace VASLogic.Models
                              o.C_BPartner_ID,
                              o.AD_Org_ID,
                             'N' AS IsNotFullyDelivered,
-                             SUM(CASE
-                                    WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                          AND l.qtydelivered > l.qtyinvoiced THEN
-                                             coalesce(
-                                                 l.QtyOrdered, 0
-                                             ) - coalesce(
-                                                 l.QtyDelivered, 0)       
-                                     WHEN ci.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                          AND l.QtyDelivered < l.qtyinvoiced THEN
-                                     COALESCE(
-                                                 l.QtyOrdered, 0
-                                             ) - coalesce(
-                                                 l.qtyinvoiced, 0)
-                                     ELSE COALESCE(
-                                                 l.qtyordered, 0)
-                                     END)            AS remainingquantity,
-                                      SUM(
-                                     CASE
-                                     WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                          AND l.qtydelivered >= l.qtyinvoiced THEN
-                                         round(
-                                             (COALESCE(
-                                                 l.qtyordered, 0
-                                             ) - COALESCE(
-                                                 l.qtydelivered, 0
-                                             )) *(l.linetotalamt) / nullif(
-                                                 l.qtyentered, 0
-                                             ), cy.stdprecision
-                                         )
-                                     WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                          AND l.qtydelivered < l.qtyinvoiced THEN
-                                         round(
-                                             (COALESCE(
-                                                 l.qtyordered, 0
-                                             ) - COALESCE(
-                                                 l.qtyinvoiced, 0
-                                             )) *(l.linetotalamt) / nullif(
-                                                 l.qtyentered, 0
-                                             ), cy.stdprecision
-                                         )
-                                     ELSE  round(
-                                             (COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * 
-                                             (l.linetotalamt) / nullif(
-                                                 l.qtyentered, 0
-                                             ), cy.stdprecision
-                                         )
-                                     END
-                                 )             AS totalvalue 
-                         FROM
-                             c_order o
-                             INNER JOIN C_OrderLine l ON (o.c_order_id = l.c_order_id)
-                             INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
+                             SUM(CASE WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
+                             AND l.qtydelivered > l.qtyinvoiced THEN coalesce(l.QtyOrdered, 0) - coalesce(l.QtyDelivered, 0)       
+                             WHEN ci.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
+                             AND l.QtyDelivered < l.qtyinvoiced THEN COALESCE(l.QtyOrdered, 0) - coalesce(l.qtyinvoiced, 0)
+                             ELSE COALESCE(l.qtyordered, 0) END) AS remainingquantity,
+                             SUM(CASE WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
+                             AND l.qtydelivered >= l.qtyinvoiced THEN round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtydelivered, 0)) *(l.linetotalamt) / nullif(l.qtyentered, 0
+                             ), cy.stdprecision)
+                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
+                             round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0)) *(l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
+                             ELSE round((COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * (l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
+                             END) AS TotalValue,
+                             o.DateOrdered
+                             FROM
+                             C_Order o
+                             INNER JOIN C_OrderLine l ON (o.c_order_id=l.c_order_id)
+                             INNER JOIN C_BPartner cb ON (o.C_BPartner_ID=cb.C_BPartner_ID)
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
-                             INNER JOIN AD_Ref_List rsf  ON (rsf.value = o.InvoiceRule)
+                             INNER JOIN AD_Ref_List rsf ON (rsf.value=o.InvoiceRule)
                              INNER JOIN AD_Reference ar ON (ar.AD_Reference_ID=rsf.AD_Reference_ID)
-                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
-                             LEFT JOIN C_InvoiceLine ci ON ( ci.C_OrderLine_ID = l.C_OrderLine_ID )
-                             LEFT JOIN M_InOutLine   mil ON ( mil.C_OrderLine_ID = l.C_OrderLine_ID )");
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(OrderCheck + BPCheck + " AND o.DocStatus IN ('CO') AND ar.Name='C_Order InvoiceRule'");
-                sqlmain.Append(@" GROUP BY
-                             o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
-                sqlmain.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID,cy.StdPrecision,
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID=CAST(cb.Pic AS INTEGER))
+                             LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID)
+                             LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
+                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND ar.Name='C_Order InvoiceRule'" +OrderCheck + BPCheck + "");
+                sqlOrder.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
+                sqlOrder.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID,cy.StdPrecision,
                              cy.CurSymbol,o.C_BPartner_ID,o.AD_Org_ID
-                             HAVING SUM(
-                                        CASE
-                                        WHEN mil.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                             AND l.qtydelivered > l.qtyinvoiced THEN
-                                                coalesce(
-                                                    l.qtyordered, 0
-                                                ) - coalesce(
-                                                    l.qtydelivered, 0)
-                                                
-                                        WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                                             AND l.qtydelivered < l.qtyinvoiced THEN
-                                        coalesce(
-                                                    l.qtyordered, 0
-                                                ) - coalesce(
-                                                    l.qtyinvoiced, 0)
-                                        ELSe (COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0))
-                                        END)  > 0 ");
+                             HAVING 
+                             SUM(CASE WHEN mil.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
+                             AND l.qtydelivered > l.qtyinvoiced THEN coalesce(l.qtyordered,0) - coalesce(l.qtydelivered,0)
+                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
+                             coalesce(l.qtyordered, 0)-coalesce(l.qtyinvoiced,0)
+                             ELSE (COALESCE(l.qtyordered,0)-COALESCE(l.qtyinvoiced,0)-COALESCE(l.qtydelivered,0)
+                             ) 
+                             END ) > 0");
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
                     sqlmain.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
@@ -1173,10 +1124,7 @@ namespace VASLogic.Models
             //AL=ALL ,GR=GRN,DO=Delivery Order
             if (ListValue == null || ListValue == "AL" || ListValue == "GR" || ListValue == "DO")
             {
-                sqlGrn.Append($@"SELECT
-                             'GRN' AS Type,
-                              min.M_InOut_ID AS Record_ID,
-                             cb.Pic,");
+                sqlGrn.Append($@"SELECT 'GRN' AS Type,min.M_InOut_ID AS Record_ID,cb.Pic,");
                 if (ISOtrx)
                 {
                     sqlGrn.Append(@"CASE WHEN o.IsSoTrx='Y' THEN invrule.Name ELSE NULL END AS InvoiceRule,");
@@ -1186,7 +1134,6 @@ namespace VASLogic.Models
                     sqlGrn.Append(@"NULL AS InvoiceRule,");
                 }
                 sqlGrn.Append(@"min.DocumentNo,
-                             min.MovementDate AS DateOrdered,
                              CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END AS FilterDate,
@@ -1201,70 +1148,50 @@ namespace VASLogic.Models
                              min.C_BPartner_ID,
                              min.AD_Org_ID,
                              CASE 
-                             WHEN o.InvoiceRule = 'O' 
-                                      AND EXISTS (
-                                          SELECT 1
-                                          FROM C_OrderLine ol
-                                          WHERE ol.C_Order_ID = o.C_Order_ID
-                                          AND ol.QtyOrdered <> ol.QtyDelivered
-                                      ) THEN 'Y'
-                                 ELSE 'N'
+                             WHEN o.InvoiceRule = 'O'AND EXISTS (SELECT 1
+                             FROM C_OrderLine oline WHERE oline.C_Order_ID = o.C_Order_ID
+                             AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y'
+                             ELSE 'N'
                              END AS IsNotFullyDelivered,
                              SUM(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) AS RemainingQuantity,
-                             SUM(
-                                 CASE 
-                                     WHEN l.C_OrderLine_ID IS NOT NULL THEN 
-                                     ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
-                                         * (ol.LineTotalAmt) / NULLIF(ol.QtyEntered, 0)
-                                         ,cy.StdPrecision)
-                                     ELSE 
-                                         (COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
-                                 END
-                             ) AS TotalValue
-                         FROM
+                             SUM(CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
+                             * (ol.LineTotalAmt) / NULLIF(ol.QtyEntered, 0),cy.StdPrecision)
+                             ELSE(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
+                             END
+                             ) AS TotalValue,
+                             min.MovementDate AS DateOrdered
+                             FROM
                              M_InOut min
-                             INNER JOIN M_InOutLine l ON (l.M_InOut_ID = min.M_InOut_ID)
-                             INNER JOIN C_BPartner cb ON (min.C_BPartner_ID = cb.C_BPartner_ID)
-                             LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID = l.m_inoutline_ID)
-                             LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = l.C_OrderLine_ID)
-                             LEFT JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID)
-                             LEFT JOIN (   SELECT RSF.NAME,RSF.VALUE FROM ad_ref_list rsf 
-                             INNER JOIN ad_reference  ar ON ( ar.ad_reference_id = rsf.ad_reference_id  AND ar.name = 'C_Order InvoiceRule')
+                             INNER JOIN M_InOutLine l ON (l.M_InOut_ID=min.M_InOut_ID)
+                             INNER JOIN C_BPartner cb ON (min.C_BPartner_ID=cb.C_BPartner_ID)
+                             LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID=l.m_inoutline_ID)
+                             LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID=l.C_OrderLine_ID)
+                             LEFT JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
+                             LEFT JOIN (SELECT rsf.NAME,rsf.VALUE FROM ad_ref_list rsf 
+                             INNER JOIN ad_reference ar ON (ar.ad_reference_id=rsf.ad_reference_id AND ar.name='C_Order InvoiceRule')
                              WHERE rsf.IsActive='Y') invrule on (o.invoicerule=invrule.value)
                              LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)
-                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))
-                         WHERE
-                              min.DocStatus IN ('CO', 'CL')
-                             AND NOT EXISTS (
-                                 SELECT 1
-                                 FROM c_orderline ol2
-                                 WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
-                                 AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0)
-                             )
-                             AND " + DeliveryCheck + BPCheck + " ");
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(@" GROUP BY
+                             LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID=CAST(cb.Pic AS INTEGER))");
+                sqlGrn.Append(@" WHERE NOT EXISTS (SELECT 1 FROM c_orderline ol2
+                             WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
+                             AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0))
+                             AND min.DocStatus IN ('CO','CL')
+                             AND " + DeliveryCheck + BPCheck + "");
+                sqlGrn.Append(@" GROUP BY
                              min.M_InOut_ID,cb.Pic,o.IsSoTrx,invrule.Name, o.InvoiceRule, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
-                             ELSE min.MovementDate END, custimg.ImageExtension, cb.Name,min.AD_Client_ID,cy.StdPrecision,
-                             cy.CurSymbol,min.C_BPartner_ID,min.AD_Org_ID,
+                             ELSE min.MovementDate END,
                              CASE 
-                             WHEN o.InvoiceRule = 'O' 
-                                      AND EXISTS (
-                                          SELECT 1
-                                          FROM C_OrderLine ol
-                                          WHERE ol.C_Order_ID = o.C_Order_ID
-                                          AND ol.QtyOrdered <> ol.QtyDelivered
-                                      ) THEN 'Y'
-                                 ELSE 'N'
-                             END
-                              HAVING
-                              SUM(coalesce(
-                                  l.movementqty, 0
-                              ) - coalesce(
-                                  ci.qtyinvoiced, 0
-                              )) > 0");
+                             WHEN o.InvoiceRule = 'O' AND EXISTS (SELECT 1 FROM C_OrderLine oline WHERE oline.C_Order_ID = o.C_Order_ID
+                             AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y'
+                             ELSE 'N'
+                             END,
+                             custimg.ImageExtension, cb.Name,min.AD_Client_ID,cy.StdPrecision,
+                             cy.CurSymbol,min.C_BPartner_ID,min.AD_Org_ID
+                             HAVING
+                             SUM(coalesce(l.movementqty, 0) - coalesce(ci.qtyinvoiced, 0)) > 0");
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
@@ -2124,7 +2051,8 @@ namespace VASLogic.Models
                                ch.DateAcct AS CashAcctDate,
                                ch.DocumentNo AS CashDoc,
                                cs.C_CashLine_ID,
-                               cs.C_Payment_ID
+                               cs.C_Payment_ID,
+                               ci.DocStatus
                            FROM 
                                C_InvoicePaySchedule cs 
                            INNER JOIN 
@@ -2177,6 +2105,7 @@ namespace VASLogic.Models
                     obj.AccountNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["AcctName"]);
                     obj.stdPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]);
                     obj.C_InvoicePaySchedule_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_InvoicePaySchedule_ID"]);
+                    obj.DocStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocStatus"]);
                     InvocieTaxTabPanel.Add(obj);
                 }
             }
@@ -2530,12 +2459,14 @@ namespace VASLogic.Models
             List<VAS_InvoiceMatchingDetail> InvocieTaxTabPanel = new List<VAS_InvoiceMatchingDetail>();
             String sql = @"SELECT il.Line, p.Name AS ProductName, uom.Name AS UOMName, uom.StdPrecision AS UOMPrecision, c.StdPrecision AS CurrencyPrecision, 
                             il.C_Invoiceline_ID, il.QtyEntered, il.QtyInvoiced, il.C_OrderLine_ID, il.M_InOutLine_ID, il.PriceEntered AS InvoicePrice, i.DocStatus,
-                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced, ol.PriceEntered AS OrderPrice, 
+                            ol.QtyOrdered , ol.QtyDelivered AS OrderDelivered, ol.QtyInvoiced AS OrderInvoiced, ol.PriceEntered AS OrderPrice,
+                            ipl.PricePrecision AS InvoicePriceListPrecision,
                             (SELECT NVL(DueAmt, 0) FROM VA009_OrderPaySchedule ops WHERE ops.C_Order_ID = ol.C_Order_ID AND ops.VA009_IsPaid= 'N') AS NotPaidAdvanceOrder
                             FROM
                             C_Invoice i 
                             INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = i.C_Invoice_ID)
                             INNER JOIN M_Product p ON (p.M_Product_ID = il.M_Product_ID)
+                            INNER JOIN M_PriceList ipl ON (ipl.M_PriceList_ID=i.M_PriceList_ID)
                             INNER JOIN C_UOM uom ON (uom.C_UOM_ID = p.C_UOM_ID)
                             INNER JOIN C_Currency c ON (c.C_Currency_ID = i.C_Currency_ID) 
                             LEFT JOIN C_OrderLine ol ON (ol.C_OrderLIne_ID = il.C_OrderLine_ID)
@@ -2578,6 +2509,7 @@ namespace VASLogic.Models
                     obj.OrderPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderPrice"]);
                     obj.InvoicePrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["InvoicePrice"]);
                     obj.UOMPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["UOMPrecision"]);
+                    obj.InvoicePriceListPrecision= Util.GetValueOfInt(ds.Tables[0].Rows[i]["InvoicePriceListPrecision"]);
                     obj.CurrencyPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["CurrencyPrecision"]);
                     obj.DocStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocStatus"]);
                     obj.AdvanceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["NotPaidAdvanceOrder"]);
@@ -2632,8 +2564,11 @@ namespace VASLogic.Models
         /// <param name="ctx">Context</param>
         /// <returns>list of cash out and cash in amount</returns>
         /// <author>VIS_427</author>
-        public List<CashFlowClass> GetCashFlowData(Ctx ctx, string ListValue)
+        public CashFlowClass GetCashFlowData(Ctx ctx, string ListValue)
         {
+            string[] labels = null;
+            decimal[] lstCashOutData = null;
+            decimal[] lstCashInData = null;
             CashFlowClass obj = new CashFlowClass();
             StringBuilder sqlmain = new StringBuilder();
             StringBuilder sql = new StringBuilder();
@@ -2649,6 +2584,11 @@ namespace VASLogic.Models
             bool isNextYearQuarter = false;
             // Get Financial Year Data 
             DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                obj.ErrorMessage = errorMessage;
+                return obj;
+            }
             if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
             {
                 CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
@@ -2659,7 +2599,8 @@ namespace VASLogic.Models
             sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
             int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             sql.Clear();
-            sql.Append(@"SELECT SUM(t.CashOutbifurcated_Amount) AS CashOutAmt,SUM(t.CashInbifurcated_Amount) AS CashInAmt FROM (");
+            //sql.Append(@"SELECT SUM(t.CashOutbifurcated_Amount) AS CashOutAmt,SUM(t.CashInbifurcated_Amount) AS CashInAmt FROM (");
+            sql.Append("WITH CashData AS (");
             sqlOrder.Append($@"SELECT 
                          o.DOCUMENTNO,
                          o.DATEPROMISED AS promised_date,
@@ -2814,8 +2755,18 @@ namespace VASLogic.Models
                           o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sql.Append(sqlmain);
-            sql.Append(")t WHERE ");
+            sql.Append(")");
+            sql.Append($@",PeriodData AS (SELECT p.Name,p.StartDate,p.EndDate FROM
+                          C_Period p INNER JOIN C_Year cy on (cy.C_Year_ID=p.C_Year_ID)
+                          WHERE p.IsActive = 'Y' AND cy.C_Calendar_ID={calendar_ID})");
+            sql.Append(@"SELECT
+                         SUM(cd.cashoutbifurcated_amount) AS cashoutamt,
+                         SUM(cd.cashinbifurcated_amount)  AS cashinamt,
+                         pd.Name,pd.startdate
+                         FROM CashData cd
+                         INNER JOIN PeriodData pd on (1=1 and cd.expected_due_date BETWEEN pd.StartDate AND pd.EndDate)");
 
+            sql.Append(" WHERE ");
             // This month
             if (ListValue == "01")
             {
@@ -2828,7 +2779,7 @@ namespace VASLogic.Models
                 {
                     DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2847,7 +2798,7 @@ namespace VASLogic.Models
                 {
                     DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2861,7 +2812,7 @@ namespace VASLogic.Models
                 dsYear = DB.ExecuteDataset(quarterSql);
                 DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
                 DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
-                sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                 (GlobalVariable.TO_DATE(StartDate, true)));
                 sql.Append(@" AND " +
                  (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2891,7 +2842,7 @@ namespace VASLogic.Models
                     dsYear = DB.ExecuteDataset(quarterSql);
                     DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2904,26 +2855,44 @@ namespace VASLogic.Models
                 // Next 6 months data (current month + Next 5 months)
                 if (DB.IsPostgreSQL())
                 {
-                    sql.Append("  date_trunc('MONTH', t.expected_due_date) >= DATE_TRUNC('MONTH', CURRENT_DATE)");
-                    sql.Append(" AND date_trunc('MONTH', t.expected_due_date) <= DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '5 MONTHS'");
+                    sql.Append(" date_trunc('MONTH', cd.expected_due_date) >= DATE_TRUNC('MONTH', CURRENT_DATE)");
+                    sql.Append(" AND date_trunc('MONTH', cd.expected_due_date) <= DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '5 MONTHS'");
                 }
                 else
                 {
 
-                    sql.Append(" TRUNC(t.expected_due_date) >= TRUNC(Current_Date, 'MM')");
-                    sql.Append(" AND TRUNC(t.expected_due_date) <= TRUNC(ADD_MONTHS(TRUNC(Current_Date), 5), 'MM')");
+                    sql.Append(" TRUNC(cd.expected_due_date) >= TRUNC(Current_Date, 'MM')");
+                    sql.Append(" AND TRUNC(cd.expected_due_date) <= TRUNC(ADD_MONTHS(TRUNC(Current_Date), 5), 'MM')");
                 }
             }
+            sql.Append(@"Group BY pd.Name,pd.StartDate
+                         ORDER BY pd.StartDate");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                obj = new CashFlowClass();
-                obj.CashOutAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashOutAmt"]);
-                obj.CashInAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashInAmt"]);
+
+                lstCashInData = new decimal[ds.Tables[0].Rows.Count];
+                lstCashOutData = new decimal[ds.Tables[0].Rows.Count];
+                labels = new string[ds.Tables[0].Rows.Count];
+                DataRow dr = null;
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dr = ds.Tables[0].Rows[i];
+
+                    lstCashInData[i] = Util.GetValueOfDecimal(dr["cashinamt"]);
+                    lstCashOutData[i] = Util.GetValueOfDecimal(dr["cashoutamt"]);
+                    labels[i] = Util.GetValueOfString(dr["Name"]);
+                }
                 obj.stdPrecision = precision;
-                invGrandTotalData.Add(obj);
+                obj.labels = labels;
+                obj.lstCashOutData = lstCashOutData;
+                obj.lstCashInData = lstCashInData;
             }
-            return invGrandTotalData;
+            else
+            {
+                obj.ErrorMessage = Msg.GetMsg(ctx, "VAS_CashFlowDataNotFound");
+            }
+            return obj;
         }
         /// <summary>
         /// This function is used to get Calender Year Data
@@ -3189,6 +3158,7 @@ namespace VASLogic.Models
         public int stdPrecision { get; set; }
         public int C_InvoicePaySchedule_ID { get; set; }
         public int RecordCount { get; set; }
+        public string DocStatus { get; set; }
     }
     public class ExpectedPayment
     {
@@ -3236,11 +3206,14 @@ namespace VASLogic.Models
         public bool IsDiscrepancy { get; set; }
         public int DiscrepancyCount { get; set; }
         public int RecordCount { get; set; }
+        public int InvoicePriceListPrecision { get; set; }
     }
     public class CashFlowClass
     {
-        public decimal CashOutAmt { get; set; }
-        public decimal CashInAmt { get; set; }
+        public string ErrorMessage { get; set; }
         public int stdPrecision { get; set; }
+        public string[] labels { get; set; }
+        public decimal[] lstCashInData { get; set; }
+        public decimal[] lstCashOutData { get; set; }
     }
 }

@@ -1196,6 +1196,7 @@ span.vas-arwidg-cur-symbol {
     display: flex;
     justify-content: space-between;
     font-family: Verdana;
+    margin-bottom:-4px;
 }
 
 .vas-exinvd-invoiceTotalAmt span {
@@ -2704,7 +2705,9 @@ hr.vas-paymentData-underline {
     border-bottom-left-radius: 15px;
     border-top-right-radius: 15px;
 }
-
+.vas-invmatch-discrepancytextcolor {
+    color: #FF0000;
+}
 .vas-invmatch-DataListPaid {
     background: green;
     color: #fff;
@@ -2830,15 +2833,17 @@ margin-top:-10px;
 .vas-exinvd-heading {
     box-shadow: rgba(17, 17, 26, 0.2) 0px 4px 0px;
 }
-.vas-exinvd-trxtype{
-    font-size:0.9rem;
+.vas-exinvd-trxtype {
+    font-size: 0.875em;
+    font-family: Verdana;
+    font-weight: 600;
 }
 .vas-exinvd-bottomdiv {
     display: flex;
     align-items: center;
     justify-content: space-between;
     font-family: Verdana;
-    font-size: 0.9em;
+    /*font-size: 0.9em;*/
     /*   grid-template-columns: repeat(2, 1fr);*/
 }
 .vas-exinvd-filter-flyout {
@@ -2955,7 +2960,7 @@ margin-top:-10px;
     padding: 0 0 5px;
 }
 .vas-exinvd-right-ovrflow {
-    width: 70px;
+    width: 68px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2979,6 +2984,10 @@ margin-top:-10px;
 }
 .vas-expay-expected-payment .vis-input-wrap input + label {
     left: 10px;
+}
+.vas-exinvd-rulefont{
+    font-size:0.875em;
+    font-family:Verdana;
 }
 
 @media screen and (max-width: 1280px) {
