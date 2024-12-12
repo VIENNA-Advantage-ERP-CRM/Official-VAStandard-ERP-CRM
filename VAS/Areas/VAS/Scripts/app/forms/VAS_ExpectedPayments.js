@@ -200,6 +200,11 @@
                         if ($self.vFinancialPeriodList.oldValue == null) {
                             $self.vFinancialPeriodList.setValue(0);
                         }
+                        //Set value of list as ALL
+                        if ($self.vDocTypeExPayList.oldValue == "01") {
+                            $self.vDocTypeExPayList.setValue(null);
+                        }
+                        $self.vDocTypeExPayList.setValue("01")
                         $self.vFinancialPeriodList.setValue(null);
                         vSearchBPartner.setValue(null);
                         $FromDate.setValue(null);
@@ -312,7 +317,8 @@
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-expay-payments-box">' +
                     '<span class="VAS-expay-searchLinkIconBlock">' +
-                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID + '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
+                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID +
+                    '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '" title="' + VIS.Msg.getMsg("VAS_Zoom") + '"></i>' +
                     '</span>' +
                     '<div class="vas-expay-payments-detail">' +
                     '<div class="vas-expay-payment-w-amount">' +
