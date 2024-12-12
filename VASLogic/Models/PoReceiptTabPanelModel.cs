@@ -2564,8 +2564,11 @@ namespace VASLogic.Models
         /// <param name="ctx">Context</param>
         /// <returns>list of cash out and cash in amount</returns>
         /// <author>VIS_427</author>
-        public List<CashFlowClass> GetCashFlowData(Ctx ctx, string ListValue)
+        public CashFlowClass GetCashFlowData(Ctx ctx, string ListValue)
         {
+            string[] labels = null;
+            decimal[] lstCashOutData = null;
+            decimal[] lstCashInData = null;
             CashFlowClass obj = new CashFlowClass();
             StringBuilder sqlmain = new StringBuilder();
             StringBuilder sql = new StringBuilder();
@@ -2581,6 +2584,11 @@ namespace VASLogic.Models
             bool isNextYearQuarter = false;
             // Get Financial Year Data 
             DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                obj.ErrorMessage = errorMessage;
+                return obj;
+            }
             if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
             {
                 CurrentYear = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
@@ -2591,7 +2599,8 @@ namespace VASLogic.Models
             sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
             int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             sql.Clear();
-            sql.Append(@"SELECT SUM(t.CashOutbifurcated_Amount) AS CashOutAmt,SUM(t.CashInbifurcated_Amount) AS CashInAmt FROM (");
+            //sql.Append(@"SELECT SUM(t.CashOutbifurcated_Amount) AS CashOutAmt,SUM(t.CashInbifurcated_Amount) AS CashInAmt FROM (");
+            sql.Append("WITH CashData AS (");
             sqlOrder.Append($@"SELECT 
                          o.DOCUMENTNO,
                          o.DATEPROMISED AS promised_date,
@@ -2746,8 +2755,18 @@ namespace VASLogic.Models
                           o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sql.Append(sqlmain);
-            sql.Append(")t WHERE ");
+            sql.Append(")");
+            sql.Append($@",PeriodData AS (SELECT p.Name,p.StartDate,p.EndDate FROM
+                          C_Period p INNER JOIN C_Year cy on (cy.C_Year_ID=p.C_Year_ID)
+                          WHERE p.IsActive = 'Y' AND cy.C_Calendar_ID={calendar_ID})");
+            sql.Append(@"SELECT
+                         SUM(cd.cashoutbifurcated_amount) AS cashoutamt,
+                         SUM(cd.cashinbifurcated_amount)  AS cashinamt,
+                         pd.Name,pd.startdate
+                         FROM CashData cd
+                         INNER JOIN PeriodData pd on (1=1 and cd.expected_due_date BETWEEN pd.StartDate AND pd.EndDate)");
 
+            sql.Append(" WHERE ");
             // This month
             if (ListValue == "01")
             {
@@ -2760,7 +2779,7 @@ namespace VASLogic.Models
                 {
                     DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2779,7 +2798,7 @@ namespace VASLogic.Models
                 {
                     DateTime? StartDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsPeriod.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2793,7 +2812,7 @@ namespace VASLogic.Models
                 dsYear = DB.ExecuteDataset(quarterSql);
                 DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
                 DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
-                sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                 (GlobalVariable.TO_DATE(StartDate, true)));
                 sql.Append(@" AND " +
                  (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2823,7 +2842,7 @@ namespace VASLogic.Models
                     dsYear = DB.ExecuteDataset(quarterSql);
                     DateTime? StartDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["StartDate"]);
                     DateTime? EndDate = Util.GetValueOfDateTime(dsYear.Tables[0].Rows[0]["EndDate"]);
-                    sql.Append(@" TRUNC(t.expected_due_date) BETWEEN " +
+                    sql.Append(@" TRUNC(cd.expected_due_date) BETWEEN " +
                     (GlobalVariable.TO_DATE(StartDate, true)));
                     sql.Append(@" AND " +
                      (GlobalVariable.TO_DATE(EndDate, true)));
@@ -2836,26 +2855,44 @@ namespace VASLogic.Models
                 // Next 6 months data (current month + Next 5 months)
                 if (DB.IsPostgreSQL())
                 {
-                    sql.Append("  date_trunc('MONTH', t.expected_due_date) >= DATE_TRUNC('MONTH', CURRENT_DATE)");
-                    sql.Append(" AND date_trunc('MONTH', t.expected_due_date) <= DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '5 MONTHS'");
+                    sql.Append(" date_trunc('MONTH', cd.expected_due_date) >= DATE_TRUNC('MONTH', CURRENT_DATE)");
+                    sql.Append(" AND date_trunc('MONTH', cd.expected_due_date) <= DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '5 MONTHS'");
                 }
                 else
                 {
 
-                    sql.Append(" TRUNC(t.expected_due_date) >= TRUNC(Current_Date, 'MM')");
-                    sql.Append(" AND TRUNC(t.expected_due_date) <= TRUNC(ADD_MONTHS(TRUNC(Current_Date), 5), 'MM')");
+                    sql.Append(" TRUNC(cd.expected_due_date) >= TRUNC(Current_Date, 'MM')");
+                    sql.Append(" AND TRUNC(cd.expected_due_date) <= TRUNC(ADD_MONTHS(TRUNC(Current_Date), 5), 'MM')");
                 }
             }
+            sql.Append(@"Group BY pd.Name,pd.StartDate
+                         ORDER BY pd.StartDate");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                obj = new CashFlowClass();
-                obj.CashOutAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashOutAmt"]);
-                obj.CashInAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CashInAmt"]);
+
+                lstCashInData = new decimal[ds.Tables[0].Rows.Count];
+                lstCashOutData = new decimal[ds.Tables[0].Rows.Count];
+                labels = new string[ds.Tables[0].Rows.Count];
+                DataRow dr = null;
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dr = ds.Tables[0].Rows[i];
+
+                    lstCashInData[i] = Util.GetValueOfDecimal(dr["cashinamt"]);
+                    lstCashOutData[i] = Util.GetValueOfDecimal(dr["cashoutamt"]);
+                    labels[i] = Util.GetValueOfString(dr["Name"]);
+                }
                 obj.stdPrecision = precision;
-                invGrandTotalData.Add(obj);
+                obj.labels = labels;
+                obj.lstCashOutData = lstCashOutData;
+                obj.lstCashInData = lstCashInData;
             }
-            return invGrandTotalData;
+            else
+            {
+                obj.ErrorMessage = Msg.GetMsg(ctx, "VAS_CashFlowDataNotFound");
+            }
+            return obj;
         }
         /// <summary>
         /// This function is used to get Calender Year Data
@@ -3173,8 +3210,10 @@ namespace VASLogic.Models
     }
     public class CashFlowClass
     {
-        public decimal CashOutAmt { get; set; }
-        public decimal CashInAmt { get; set; }
+        public string ErrorMessage { get; set; }
         public int stdPrecision { get; set; }
+        public string[] labels { get; set; }
+        public decimal[] lstCashInData { get; set; }
+        public decimal[] lstCashOutData { get; set; }
     }
 }
