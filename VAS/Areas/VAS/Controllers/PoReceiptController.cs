@@ -401,7 +401,7 @@ namespace VAS.Areas.VAS.Controllers
         { 
             Ctx ctx = Session["ctx"] as Ctx;
             PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
-            List<CashFlowClass> result = objScheduleData.GetCashFlowData(ctx, ListValue);
+            CashFlowClass result = objScheduleData.GetCashFlowData(ctx, ListValue);
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
         /// <summary>
