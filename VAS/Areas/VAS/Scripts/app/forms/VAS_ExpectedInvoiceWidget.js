@@ -15,6 +15,7 @@
         var $dummDiv = null;
         var $self = this;
         var ctx = VIS.Env.getCtx();
+        var filetrDivExpectedInv = null;
         var RecCount = 0;
         var widgetID = null;
         //this pgaeno will be responsible to get data from database
@@ -66,7 +67,7 @@
             $maindiv = $('<div class="vas-exinvd-expected-invoice">')
             var headingDiv = $('<div class="vas-exinvd-expected-heading">');
             var filterDiv = $('<h6>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</h6>');
-            var filetrDivExpectedInv = $("<div class='vas-exinvd-filter dropdown'>" +
+            filetrDivExpectedInv = $("<div class='vas-exinvd-filter dropdown'>" +
                 "<div class='vas-exinvd-icondiv'>" +
                 "<span class='vas-exinvd-filterspn btn d-flex position-relative' type='button' id='vas_exinvd_dropdownMenu_" + $self.windowNo + "'>" +
                 "<i class='fa fa-filter vas-exinvd-filterIcon'></i>" +
@@ -138,7 +139,8 @@
             //Created LOV control for task which will have billable,non billable and null values
 
             if (!IsFilterBtnClicked && !IsGenInvBtnClicked) {
-                //  filetrDiv.addClass('vas-disableArrow');
+                //Disabled filter icon after clicking it
+                filetrDivExpectedInv.addClass('vas-disableArrow');
                 IsFilterBtnClicked = true;
                 $FilterHeaderforInv = $(
                     '<div class="vas-exinvd-main-filter-flyout">');
@@ -207,7 +209,7 @@
                 $FilterHeaderforInv.append(ButtonDiv);
                 $maindiv.append($FilterHeaderforInv);
                 //Resetting the value on click of filetr button
-                if (ListValue !=null || C_BPartner_ID != null || fromDate != null || toDate != null) {
+                if (ListValue != null || C_BPartner_ID != null || fromDate != null || toDate != null) {
                     $self.vExpectedList.setValue(ListValue);
                     vSearchBPartner.setValue(C_BPartner_ID);
                     $FromDate.setValue(fromDate);
@@ -245,6 +247,11 @@
                     $FilterHeaderforInv[0].remove();
                 });
                 ClearBtn.on('click', function () {
+                    //Set value of list as ALL
+                    if ($self.vExpectedList.oldValue == "AL") {
+                        $self.vExpectedList.setValue(null);
+                    }
+                    $self.vExpectedList.setValue("AL");
                     vSearchBPartner.setValue(null);
                     $FromDate.setValue(null);
                     $ToDate.setValue(null);
@@ -256,6 +263,10 @@
                         $CreateInvoiceHeader[0].remove();
                     }
                 });
+                //Enabled filter icon
+                setTimeout(function () {
+                    filetrDivExpectedInv.removeClass('vas-disableArrow');
+                }, 2000);
             }
             else {
                 $FilterHeaderforInv[0].remove();
@@ -336,27 +347,28 @@
                 widgetDataDesign +=
                     '<div class="vas-exinvd-company-w-date">' +
                     '<div class="vas-exinvd-com-name vas-exinvd-ovrflow" title="' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
-                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("DateOrdered") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + VIS.Msg.getMsg("DateOrdered") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
-                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + (isOrder == true ? VIS.Msg.getMsg("DatePromised") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '">' + (isOrder == true ? VIS.Msg.getMsg("DatePromised") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '</div>' +
+                '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
+                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '">' +  VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '</div>' +
                     '</div>' +
                     '</div>' +
                     '<div class="vas-exinvd-invoice-w-amount" >' +
-                    '<div class="vas-exinvd-invoice-lbl vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo +'">' + gridDataResult[i].DocumentNo + '</div>' +
+                    '<div class="vas-exinvd-invoice-lbl vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
                     '<span>' +
-                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID + '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '"></i>' +
+                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID +
+                    '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '" title="' + VIS.Msg.getMsg("VAS_Zoom") + '"></i>' +
                     '</span>' +
                     '</div>' +
                     '</div>';
 
-                widgetDataDesign +='<div class="vas-exinvd-bottomdiv">'+
+                widgetDataDesign += '<div class="vas-exinvd-bottomdiv">' +
                     '<div class="vas-exinvd-invoiceTotalAmt vas-exinvd-ovrflow"  title="' + VIS.Msg.getMsg("VAS_Amount") + ':' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span>' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
                     (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span>' + gridDataResult[i].Symbol + '</span>' : '') + '</div>';
                 /*if invoice rule has value then append the same*/
                 if (VIS.Env.getCtx().isSOTrx($self.windowNo) == true && gridDataResult[i].InvoiceRule != "") {
                     widgetDataDesign +=
-                        '<div class="vas-exinvd-com-name vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("VAS_InvoiceRule") + ': ' + gridDataResult[i].InvoiceRule + '">' + gridDataResult[i].InvoiceRule + '</div>';
+                        '<div class="vas-exinvd-com-name vas-exinvd-right-ovrflow vas-exinvd-rulefont" title="' + VIS.Msg.getMsg("VAS_InvoiceRule") + ': ' + gridDataResult[i].InvoiceRule + '">' + gridDataResult[i].InvoiceRule + '</div>';
                 }
-                widgetDataDesign +='</div>'+
+                widgetDataDesign += '</div>' +
                     '</div>';
 
                 // Append the widget data design to the list container
@@ -373,7 +385,7 @@
                 var grnid = VIS.Utility.Util.getValueOfInt($(this).attr("data-grnid"));
                 var windowId = VIS.Utility.Util.getValueOfInt($(this).attr("data-windowid"));
                 var documentNo = VIS.Utility.Util.getValueOfString($(this).attr("data-documentno"));
-                var totalAmt = parseFloat($(this).attr("data-totalamt")); 
+                var totalAmt = parseFloat($(this).attr("data-totalamt"));
                 var ad_org_id = VIS.Utility.Util.getValueOfInt($(this).attr("data-ad_org_id"));
                 var bpName = VIS.Utility.Util.getValueOfString($(this).attr("data-bpname"));
                 var stdPrecision = VIS.Utility.Util.getValueOfInt($(this).attr("data-stdprecision"));
@@ -615,7 +627,7 @@
                     IsGenInvBtnClicked = false;
                     $CreateInvoiceHeader[0].remove();
                 });
-               
+
             }
             else {
                 IsGenInvBtnClicked = false;
@@ -651,7 +663,7 @@
                         $CreateInvoiceHeader[0].remove();
                     } else {
                         // If no invoice is created, show an info dialog
-                        VIS.ADialog.info(responseData.ExceptionMessage);
+                        VIS.ADialog.info('','', responseData.ExceptionMessage);
                     }
                     // Hide the loading spinner once the operation is complete
                     $bsyDiv[0].style.visibility = "hidden";

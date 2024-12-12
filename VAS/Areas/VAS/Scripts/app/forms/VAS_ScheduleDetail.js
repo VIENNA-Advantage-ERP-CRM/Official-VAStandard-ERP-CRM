@@ -168,6 +168,7 @@
                 data: { InvoiceId: recordID, pageNo: pageNo, pageSize: pageSize },
                 success: function (data) {
                     wrapperDiv.find('#VAS-ScheduleData_' + $self.windowNo).empty();
+                    wrapperDiv.find('#vas_norecordcont_' + $self.windowNo).remove();
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         if (data != null && data.length > 0) {
@@ -256,7 +257,8 @@
                                     IsToAppend = true;
                                     wrapperDiv.find('#VAS-ScheduleData_' + $self.windowNo).find('.vas-scheduledatalist').find('#VAS-PaymentData_' + $self.windowNo).empty()
                                 }
-                                if (IsToAppend && paymentData[0].IsPaid == "Y") {
+                                /*Append payment details div only when invoice is paid and docstatus is not Reversed and void*/
+                                if (IsToAppend && paymentData[0].IsPaid == "Y" && paymentData[0].DocStatus != "RE" && paymentData[0].DocStatus != "VO") {
                                     $(this).find('#VAS-PaymentData_' + $self.windowNo).append(TabPaneldesign);
                                 }
                                 else if (paymentData[0].IsPaid == "Y") {
@@ -269,6 +271,7 @@
 
                     }
                     else {
+                        wrapperDiv.append('<div class="vas-igwidg-notfounddiv" id="vas_norecordcont_' + $self.windowNo + '">' + VIS.Msg.getMsg("VAS_ScheduleDataNotFound") + '</div>');
                         $root.find('.VAS-scheduledata-Paging').hide();
                     }
                 },
