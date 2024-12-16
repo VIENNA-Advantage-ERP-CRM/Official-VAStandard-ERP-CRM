@@ -2957,7 +2957,7 @@ namespace VASLogic.Models
             try
             {
                 // Set parameters
-                obj.SetParameter(invRef, docId, IsGenCheck, grnid);
+                obj.SetParameter(invRef, docId, IsGenCheck, grnid,ctx);
 
                 // Call the Generate method, which might throw an exception
                 obj.Generate();
