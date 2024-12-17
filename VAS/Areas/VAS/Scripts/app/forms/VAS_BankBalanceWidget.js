@@ -171,11 +171,10 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             ShowBusy(true);
-            initializeComponent();
             CurrentPage = 0;
             pageSize = 4;
             bankBalData = [];
-            GetBankBalanceData();
+            initializeComponent();
         };
         /**
          *This function is used to resize the widget

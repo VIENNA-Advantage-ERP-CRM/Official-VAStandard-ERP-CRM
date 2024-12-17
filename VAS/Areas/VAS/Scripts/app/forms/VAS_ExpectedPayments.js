@@ -60,15 +60,10 @@
             var value = null;
             /*Here we are getting the value for context here*/
             value = GetContextValue("ScreenName") || GetContextValue("IsReceipt") || GetContextValue("IsSOTrx");
-            if (value === "VAS_APPayment") {
+            if (value === "VAS_APPayment" || value === "N") {
                 isSOTrx = false;
-            } else if (value === "VAS_ARReceipt") {
+            } else if (value === "VAS_ARReceipt" || value === "Y") {
                 isSOTrx = true;
-            } else if (value === "Y") {
-                isSOTrx = true;
-            }
-            else if (value === "N") {
-                isSOTrx = false
             }
             
                 
