@@ -56,8 +56,17 @@
             createDummyDiv();
             createBusyIndicator();
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
-            /*If Screen is AR Receipt then IsSoTrx will be true else for AP Payment it will be false*/
-            isSOTrx = VIS.context.getWindowContext($self.windowNo, "IsReceipt") == 'Y' ? true : false;
+
+            var value = null;
+            /*Here we are getting the value for context here*/
+            value = GetContextValue("ScreenName") || GetContextValue("IsReceipt") || GetContextValue("IsSOTrx");
+            if (value === "VAS_APPayment" || value === "N") {
+                isSOTrx = false;
+            } else if (value === "VAS_ARReceipt" || value === "Y") {
+                isSOTrx = true;
+            }
+            
+                
             $maindiv = $('<div class="vas-expay-expected-payment">')
             var headingDiv = $('<div class="vas-expay-expected-heading">');
             var HeadingLabelDiv = $('<div style="font-size:1.4em">' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_ExpectedReceipt") : VIS.Msg.getMsg("VAS_ExpectedPayment")) + '</div>')
@@ -116,6 +125,8 @@
                     $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
                     var BPartnerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, BPValidation);
                     vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", false, false, true, VIS.DisplayType.Search, BPartnerLookUp);
+                    //set custom info for business partners
+                    (isSOTrx == true ? vSearchBPartner.setCustomInfo('VAS_Customer') : vSearchBPartner.setCustomInfo('VAS_VendorEmployee'));
                     var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                     var $BPartnerButtonWrap = $('<div class="input-group-append">');
                     $BPartnerDiv.append($BPartnerControlWrap);
@@ -272,6 +283,14 @@
                     '</div>' +
                     '</div>');
         };
+        /**
+        * This Function is used to value of context
+        * @param {any} contextValue
+        */
+        function GetContextValue(contextValue) {
+            var name = VIS.context.getWindowContext($self.windowNo, contextValue);
+            return name && name.trim() !== "" ? name : null;
+        }
         function bindDummyDiv(j) {
             for (var i = 0; i < j; i++) {
                 listDesign.append($dummDiv);
@@ -322,7 +341,7 @@
                     '</span>' +
                     '<div class="vas-expay-payments-detail">' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font">' + headingText + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font"  title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText+'">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +

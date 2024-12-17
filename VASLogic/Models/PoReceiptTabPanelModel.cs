@@ -416,6 +416,7 @@ namespace VASLogic.Models
             List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
             string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
             string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
+            string docBaseTypeAR_AP= ISOtrx ? "('ARI','ARC')" : "('API','APC')";
 
             sql.Append($@"WITH InvoiceData AS (
                          {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
@@ -428,7 +429,7 @@ namespace VASLogic.Models
                              C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' AND cd.IsExpenseInvoice = 'N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN " + docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' AND cd.IsExpenseInvoice = 'N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -595,6 +596,7 @@ namespace VASLogic.Models
             StringBuilder sql = new StringBuilder();
             List<InvGrandTotalData> invGrandTotalData = new List<InvGrandTotalData>();
             string BPCheck = (ISOtrx == true ? "cb.IsCustomer='Y'" : "cb.IsVendor='Y'");
+            string docBaseTypeAR_AP = ISOtrx ? "('ARI','ARC')" : "('API','APC')";
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             int calendar_ID = 0;
             int StartYear = 0;
@@ -635,7 +637,7 @@ namespace VASLogic.Models
                              INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INT))
-                             WHERE cd.DocBaseType IN ('ARI', 'ARC','API','APC') AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN "+ docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})");
             sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year INNER JOIN C_Period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
             //Getting data according to Current month
@@ -1081,6 +1083,8 @@ namespace VASLogic.Models
                              ), cy.stdprecision)
                              WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
                              round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0)) *(l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
+                             WHEN ci.C_OrderLine_id IS NOT NULL AND ci.M_InOutLine_id IS NULL AND (ci.C_Charge_ID IS NOT NULL OR cp.ProductType != 'I') THEN
+                             ROUND((l.LineTotalAmt-ci.LineTotalAmt) , cy.StdPrecision)
                              ELSE round((COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * (l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
                              END) AS TotalValue,
                              o.DateOrdered
@@ -1093,6 +1097,7 @@ namespace VASLogic.Models
                              INNER JOIN AD_Reference ar ON (ar.AD_Reference_ID=rsf.AD_Reference_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID=CAST(cb.Pic AS INTEGER))
                              LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID)
+                             LEFT JOIN M_Product cp ON (ci.M_Product_ID=cp.M_Product_ID)
                              LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
                 sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND ar.Name='C_Order InvoiceRule'" +OrderCheck + BPCheck + "");
                 sqlOrder.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
@@ -1103,6 +1108,8 @@ namespace VASLogic.Models
                              AND l.qtydelivered > l.qtyinvoiced THEN coalesce(l.qtyordered,0) - coalesce(l.qtydelivered,0)
                              WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
                              coalesce(l.qtyordered, 0)-coalesce(l.qtyinvoiced,0)
+                             WHEN ci.C_OrderLine_id IS NOT NULL AND ci.M_InOutLine_id IS NULL AND (ci.C_Charge_ID IS NOT NULL OR cp.ProductType != 'I') THEN
+                             ROUND((l.LineTotalAmt-ci.LineTotalAmt) , cy.StdPrecision)
                              ELSE (COALESCE(l.qtyordered,0)-COALESCE(l.qtyinvoiced,0)-COALESCE(l.qtydelivered,0)
                              ) 
                              END ) > 0");
@@ -2008,11 +2015,13 @@ namespace VASLogic.Models
                       fa.C_Period_ID,
                       y.CalendarYears,
                       p.Name, 
-                      c.StdPrecision 
+                      c.StdPrecision,
+                      p.PeriodNo
                       order by
                       acct.C_AcctSchema_ID, 
                       fa.AD_Client_ID,
                       y.CalendarYears,
+                      p.PeriodNo,
                       fa.C_Period_ID";
 
             DataSet dsExpRevData = DB.ExecuteDataset(sql);
@@ -2957,7 +2966,7 @@ namespace VASLogic.Models
             try
             {
                 // Set parameters
-                obj.SetParameter(invRef, docId, IsGenCheck, grnid);
+                obj.SetParameter(invRef, docId, IsGenCheck, grnid,ctx);
 
                 // Call the Generate method, which might throw an exception
                 obj.Generate();

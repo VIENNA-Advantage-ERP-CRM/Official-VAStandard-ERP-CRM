@@ -230,6 +230,20 @@ namespace VAdvantage.Model
                 SetLine(ii);
             }
 
+
+            //VIS0336-handled the roundoff issue
+            if (Is_ValueChanged("BOMQty"))
+            {
+                Decimal qtyEntered = Decimal.Round((GetBOMQty()), VAdvantage.Model.MUOM.GetPrecision(GetCtx(), Util.GetValueOfInt(Get_Value("C_UOM_ID"))));
+                if (qtyEntered.CompareTo(GetBOMQty()) != 0)
+                {
+                    log.Fine("Corrected QtyEntered Scale UOM=" + Util.GetValueOfInt(Get_Value("C_UOM_ID"))
+                            + "; QtyEntered =" + GetBOMQty() + "->" + qtyEntered);
+                    SetBOMQty(qtyEntered);
+                }
+
+            }
+
             return true;
         }
 

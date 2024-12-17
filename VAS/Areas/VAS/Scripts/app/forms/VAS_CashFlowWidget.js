@@ -157,17 +157,22 @@
                                         grid: {
                                             display: false, // Hide grid lines on the y-axis
                                         },
-                                        beginAtZero: true, // Ensure y-axis starts at 0
+                                      //beginAtZero: true, // Ensure y-axis starts at 0
                                     },
                                 },
                                 plugins: {
                                     legend: {
                                         display: true, // Enable legend
-                                        position: 'bottom'
+                                        position: 'bottom',
+                                        padding: {
+                                            top: 0,
+                                            bottom: 0
+                                        },
                                     },
                                     tooltip: {
                                         enabled: true,
                                         mode: 'nearest',
+                                        intersect: true,
                                         callbacks: {
                                             label: function (tooltipItem) {
                                                 const dataIndex = tooltipItem.dataIndex;
@@ -180,7 +185,7 @@
                                             }
                                         }
                                     },
-                                }
+                                },
                             },
                             plugins: [plugin] // Apply the plugins
                         };
@@ -200,20 +205,20 @@
                         const chart = new Chart(ctx, config);
 
                         // Ensure the canvas resizes dynamically on window resize
-                        function resizeChart() {
-                            // Set the canvas internal dimensions based on container size
-                            const container = polarChart;  // `polarChart` is the container
-                            const width = container.width();
-                            const height = container.height();
+                        //function resizeChart() {
+                        //    // Set the canvas internal dimensions based on container size
+                        //    const container = polarChart;  // `polarChart` is the container
+                        //    const width = container.width();
+                        //    const height = container.height();
 
-                            canvas[0].width = width;   // Set canvas internal width
-                            canvas[0].height = height; // Set canvas internal height
+                        //    canvas[0].width = width;   // Set canvas internal width
+                        //    canvas[0].height = height; // Set canvas internal height
 
-                            chart.resize(); // Re-render the chart to reflect the new canvas size
-                        }
+                        //    chart.resize(); // Re-render the chart to reflect the new canvas size
+                        //}
 
-                        // Initial resize to make sure the chart fits correctly when loaded
-                        resizeChart();
+                        //// Initial resize to make sure the chart fits correctly when loaded
+                        //resizeChart();
 
                         // Check if the chart was initialized correctly
                         if (!chart) {

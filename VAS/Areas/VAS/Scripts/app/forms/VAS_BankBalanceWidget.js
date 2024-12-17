@@ -171,6 +171,9 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             ShowBusy(true);
+            CurrentPage = 0;
+            pageSize = 4;
+            bankBalData = [];
             initializeComponent();
         };
         /**

@@ -166,6 +166,8 @@
                 $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
                 var BPartnerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, BPValidation);
                 vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", false, false, true, VIS.DisplayType.Search, BPartnerLookUp);
+                 //set custom info for business partners
+                (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? vSearchBPartner.setCustomInfo('VAS_Customer') : vSearchBPartner.setCustomInfo('VAS_VendorEmployee'));
                 var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                 var $BPartnerButtonWrap = $('<div class="input-group-append">');
                 $BPartnerDiv.append($BPartnerControlWrap);
@@ -320,7 +322,7 @@
                 // Create the widget data design element
                 var widgetDataDesign = '<div class="vas-exinvd-invoices-box">' +
                     '<div class="vas-exinvd-amtdiv">' +
-                    '<h6 class="vas-exinvd-trxtype vas-exinvd-ovrflow">' + headingText + '</h6>';
+                    '<h6 class="vas-exinvd-trxtype vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText + '">' + headingText + '</h6>';
                 /*if document is GRN then add generate invoice button*/
                 if (!isOrder) {
                     widgetDataDesign += '<span id="VAS_GenerateInvoice_' + widgetID + '" class="VAS-exinvd-generate-delivery-btn" data-grnid="' + gridDataResult[i].Record_ID

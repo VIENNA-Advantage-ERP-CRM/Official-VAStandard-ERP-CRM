@@ -2760,7 +2760,7 @@ margin-top:-10px;
 .vas-barline-cashFlow-container {
     padding: 0.5em;
     width: 100%;
-    height: 100%
+    height: 85%;
 }
 
 .vas-barline-cashFlow-container .input-group.vis-input-wrap {
@@ -2777,7 +2777,7 @@ margin-top:-10px;
 }
 
 .vas-expay-barline-canvas {
-    height: 85% !important
+  /*  height: 85% !important*/
 }
 
 .vas-cashFlow-heading {
