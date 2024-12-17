@@ -185,6 +185,10 @@
         this.refreshWidget = function () {
             ShowBusy(true);
             initializeComponent();
+            CurrentPage = 0;
+            pageSize = 4;
+            cashBalData = [];
+            GetCashBalanceData();
         };
         /*This function is used to intialize the design structure */
         this.Initialize = function () {

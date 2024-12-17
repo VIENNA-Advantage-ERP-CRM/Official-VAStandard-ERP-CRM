@@ -172,6 +172,10 @@
         this.refreshWidget = function () {
             ShowBusy(true);
             initializeComponent();
+            CurrentPage = 0;
+            pageSize = 4;
+            bankBalData = [];
+            GetBankBalanceData();
         };
         /**
          *This function is used to resize the widget
