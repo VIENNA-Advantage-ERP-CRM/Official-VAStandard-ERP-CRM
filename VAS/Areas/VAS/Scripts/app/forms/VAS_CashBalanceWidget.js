@@ -184,6 +184,9 @@
         /*this function is used to refresh design and data of widget*/
         this.refreshWidget = function () {
             ShowBusy(true);
+            CurrentPage = 0;
+            pageSize = 4;
+            cashBalData = [];
             initializeComponent();
         };
         /*This function is used to intialize the design structure */
