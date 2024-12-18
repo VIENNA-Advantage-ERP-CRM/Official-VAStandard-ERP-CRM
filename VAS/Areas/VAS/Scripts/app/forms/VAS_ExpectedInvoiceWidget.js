@@ -166,7 +166,7 @@
                 $BPartnerDiv = $('<div class="input-group vis-input-wrap">');
                 var BPartnerLookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, ColumnIds.C_BPartner_ID, VIS.DisplayType.Search, "C_BPartner_ID", 0, false, BPValidation);
                 vSearchBPartner = new VIS.Controls.VTextBoxButton("C_BPartner_ID", false, false, true, VIS.DisplayType.Search, BPartnerLookUp);
-                 //set custom info for business partners
+                //set custom info for business partners
                 (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? vSearchBPartner.setCustomInfo('VAS_Customer') : vSearchBPartner.setCustomInfo('VAS_VendorEmployee'));
                 var $BPartnerControlWrap = $('<div class="vis-control-wrap">');
                 var $BPartnerButtonWrap = $('<div class="input-group-append">');
@@ -349,8 +349,14 @@
                 widgetDataDesign +=
                     '<div class="vas-exinvd-company-w-date">' +
                     '<div class="vas-exinvd-com-name vas-exinvd-ovrflow" title="' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
-                '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
-                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '">' +  VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString() + '</div>' +
+                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) +
+                    ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {
+                        day: '2-digit', month: '2-digit', year: 'numeric'
+                    }) + '">' + (isOrder == true ? VIS.Msg.getMsg("DateOrdered") : VIS.Msg.getMsg("DateDelivered")) + ': '
+                    + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric' }) + '</div>' +
+                    '<div class="vas-exinvd-invoiceDate vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("DatePromised") + ': '
+                    + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString(window.navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric' }) + '">'
+                    + VIS.Msg.getMsg("DatePromised") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].DatePromised).toLocaleDateString(window.navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric' }) + '</div>' +
                     '</div>' +
                     '</div>' +
                     '<div class="vas-exinvd-invoice-w-amount" >' +
@@ -665,7 +671,7 @@
                         $CreateInvoiceHeader[0].remove();
                     } else {
                         // If no invoice is created, show an info dialog
-                        VIS.ADialog.info('','', responseData.ExceptionMessage);
+                        VIS.ADialog.info('', '', responseData.ExceptionMessage);
                     }
                     // Hide the loading spinner once the operation is complete
                     $bsyDiv[0].style.visibility = "hidden";
