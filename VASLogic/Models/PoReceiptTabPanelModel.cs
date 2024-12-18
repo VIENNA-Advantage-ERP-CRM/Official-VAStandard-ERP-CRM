@@ -453,7 +453,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                         DateInvoiced <= Current_Date AND DateInvoiced >= Current_Date - 30
+                         DateInvoiced <= TRUNC(CURRENT_DATE) AND DateInvoiced >= TRUNC(CURRENT_DATE) - 30
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -477,7 +477,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                         DateInvoiced <= Current_Date - 31 AND DateInvoiced >= Current_Date - 60
+                         DateInvoiced <= TRUNC(CURRENT_DATE) - 31 AND DateInvoiced >= TRUNC(CURRENT_DATE) - 60
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -501,7 +501,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                        DateInvoiced <= Current_Date - 61 AND  DateInvoiced >= Current_Date - 90
+                        DateInvoiced <= TRUNC(CURRENT_DATE) - 61 AND  DateInvoiced >= TRUNC(CURRENT_DATE) - 90
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -525,7 +525,7 @@ namespace VASLogic.Models
                      FROM
                          InvoiceData
                      WHERE
-                        DateInvoiced <= Current_Date - 91 AND  DateInvoiced >= Current_Date - 120
+                        DateInvoiced <= TRUNC(CURRENT_DATE) - 91 AND  DateInvoiced >= TRUNC(CURRENT_DATE) - 120
                      UNION ALL
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
@@ -548,7 +548,7 @@ namespace VASLogic.Models
                         ) AS total_dueamt
                      FROM
                          InvoiceData
-                     WHERE DateInvoiced <= Current_Date - 120");
+                     WHERE DateInvoiced <= TRUNC(CURRENT_DATE) - 120");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -1079,13 +1079,13 @@ namespace VASLogic.Models
                              AND l.QtyDelivered < l.qtyinvoiced THEN COALESCE(l.QtyOrdered, 0) - coalesce(l.qtyinvoiced, 0)
                              ELSE COALESCE(l.qtyordered, 0) END) AS remainingquantity,
                              SUM(CASE WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                             AND l.qtydelivered >= l.qtyinvoiced THEN round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtydelivered, 0)) *(l.linetotalamt) / nullif(l.qtyentered, 0
+                             AND l.qtydelivered >= l.qtyinvoiced THEN round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtydelivered, 0)) *(l.linetotalamt) / nullif(l.qtyordered, 0
                              ), cy.stdprecision)
                              WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
-                             round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0)) *(l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
+                             round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0)) *(l.linetotalamt) / nullif(l.qtyordered, 0), cy.stdprecision)
                              WHEN ci.C_OrderLine_id IS NOT NULL AND ci.M_InOutLine_id IS NULL AND (ci.C_Charge_ID IS NOT NULL OR cp.ProductType != 'I') THEN
                              ROUND((l.LineTotalAmt-ci.LineTotalAmt) , cy.StdPrecision)
-                             ELSE round((COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * (l.linetotalamt) / nullif(l.qtyentered, 0), cy.stdprecision)
+                             ELSE round((COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * (l.linetotalamt) / nullif(l.qtyordered, 0), cy.stdprecision)
                              END) AS TotalValue,
                              o.DateOrdered
                              FROM
@@ -1162,7 +1162,7 @@ namespace VASLogic.Models
                              END AS IsNotFullyDelivered,
                              SUM(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) AS RemainingQuantity,
                              SUM(CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
-                             * (ol.LineTotalAmt) / NULLIF(ol.QtyEntered, 0),cy.StdPrecision)
+                             * (ol.LineTotalAmt) / NULLIF(ol.qtyordered, 0),cy.StdPrecision)
                              ELSE(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
                              END
                              ) AS TotalValue,
@@ -2251,11 +2251,12 @@ namespace VASLogic.Models
                              cy.StdPrecision,cb.pic,custimg.ImageExtension,'Order' AS WindowType,'N' AS IsExInv
                              FROM VA009_OrderPaySchedule ps
                              INNER JOIN C_Order co ON (ps.C_Order_ID = co.C_Order_ID)
+                             INNER JOIN C_Doctype dt ON (dt.C_Doctype_ID = co.C_Doctype_ID)
                              INNER JOIN C_BPartner cb ON (co.C_BPartner_ID = cb.C_BPartner_ID)
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=co.C_Currency_ID)
                              INNER JOIN VA009_PaymentMethod pm ON (co.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "ps", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(OrderCheck + " AND co.DocStatus IN ('CO','CL') AND ps.VA009_IsPaid='N'");
+                sqlmain.Append(OrderCheck + " AND co.DocStatus IN ('CO','CL') AND dt.DocSubTypeSO NOT IN ('BO','ON', 'OB') AND ps.VA009_IsPaid='N'");
                 //Added business partner condition 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {

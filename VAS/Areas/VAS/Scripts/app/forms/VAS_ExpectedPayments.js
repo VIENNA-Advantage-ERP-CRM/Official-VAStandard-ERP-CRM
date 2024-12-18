@@ -344,7 +344,11 @@
                     '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font"  title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText+'">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate") + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString() + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate")
+                    + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {day: '2-digit', month: '2-digit', year: 'numeric'
+                    }) + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {
+                        day: '2-digit', month: '2-digit', year: 'numeric'
+                    }) + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">';
 
