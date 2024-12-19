@@ -1053,6 +1053,29 @@ namespace VASLogic.Models
 
             if (ListValue == null || ListValue == "AL" || ListValue == "PO" || ListValue == "SO")
             {
+                sqlmain.Append($@"SELECT 'Order' AS Type,Ord.Record_ID,Ord.Pic,");
+                if (ISOtrx)
+                {
+                    sqlmain.Append(@"Ord.InvoiceRule,");
+                }
+                else
+                {
+                    sqlmain.Append(@"NULL AS InvoiceRule,");
+                }
+                sqlmain.Append(@"Ord.DocumentNo,
+                             Ord.FilterDate AS FilterDate,
+                             Ord.PromisedDate AS PromisedDate,
+                             Ord.ImageExtension,
+                             Ord.Name,
+                             Ord.AD_Client_ID,
+                             Ord.StdPrecision,
+                             Ord.CurSymbol,
+                             Ord.C_BPartner_ID,
+                             Ord.AD_Org_ID,
+                             'N' AS IsNotFullyDelivered,
+                             SUM(TotalValue) AS TotalValue,
+                             Ord.DateOrdered
+                             FROM ( ");
                 sqlOrder.Append($@"SELECT 'Order' AS Type,o.C_Order_ID AS Record_ID,cb.Pic,");
                 if (ISOtrx)
                 {
@@ -1073,20 +1096,11 @@ namespace VASLogic.Models
                              o.C_BPartner_ID,
                              o.AD_Org_ID,
                             'N' AS IsNotFullyDelivered,
-                             SUM(CASE WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                             AND l.qtydelivered > l.qtyinvoiced THEN coalesce(l.QtyOrdered, 0) - coalesce(l.QtyDelivered, 0)       
-                             WHEN ci.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                             AND l.QtyDelivered < l.qtyinvoiced THEN COALESCE(l.QtyOrdered, 0) - coalesce(l.qtyinvoiced, 0)
-                             ELSE COALESCE(l.qtyordered, 0) END) AS remainingquantity,
-                             SUM(CASE WHEN mil.C_OrderLine_ID IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                             AND l.qtydelivered >= l.qtyinvoiced THEN round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtydelivered, 0)) *(l.linetotalamt) / nullif(l.qtyordered, 0
-                             ), cy.stdprecision)
-                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
-                             round((COALESCE(l.qtyordered, 0) - COALESCE(l.qtyinvoiced, 0)) *(l.linetotalamt) / nullif(l.qtyordered, 0), cy.stdprecision)
-                             WHEN ci.C_OrderLine_id IS NOT NULL AND ci.M_InOutLine_id IS NULL AND (ci.C_Charge_ID IS NOT NULL OR cp.ProductType != 'I') THEN
-                             ROUND((l.LineTotalAmt-ci.LineTotalAmt) , cy.StdPrecision)
-                             ELSE round((COALESCE(l.qtyordered, 0)-COALESCE(l.qtyinvoiced, 0)-COALESCE(l.qtydelivered, 0)) * (l.linetotalamt) / nullif(l.qtyordered, 0), cy.stdprecision)
-                             END) AS TotalValue,
+                             l.linetotalamt - SUM((case WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT null then (ci.QtyInvoiced) * (l.linetotalamt) /nullif(l.qtyordered, 0)
+                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS null AND ci.C_Charge_ID IS NULL then (ci.QtyInvoiced) * (l.linetotalamt)/nullif(l.qtyordered, 0)
+                             WHEN ci.c_orderline_id IS NULL AND ci.M_InOutLine_id IS null and mil.c_orderline_id is not null  then (mil.movementqty) * (l.linetotalamt)/nullif(l.qtyordered, 0)
+                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS null AND ci.C_Charge_ID IS NOT NULL then (ci.linetotalamt) 
+                             else 0 end)) AS TotalValue,
                              o.DateOrdered
                              FROM
                              C_Order o
@@ -1096,33 +1110,36 @@ namespace VASLogic.Models
                              INNER JOIN AD_Ref_List rsf ON (rsf.value=o.InvoiceRule)
                              INNER JOIN AD_Reference ar ON (ar.AD_Reference_ID=rsf.AD_Reference_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID=CAST(cb.Pic AS INTEGER))
-                             LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID)
+                             LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID AND ci.ReversalDoc_ID IS NULL)
                              LEFT JOIN M_Product cp ON (ci.M_Product_ID=cp.M_Product_ID)
                              LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
                 sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND ar.Name='C_Order InvoiceRule'" +OrderCheck + BPCheck + "");
-                sqlOrder.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
-                sqlOrder.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID,cy.StdPrecision,
-                             cy.CurSymbol,o.C_BPartner_ID,o.AD_Org_ID
-                             HAVING 
-                             SUM(CASE WHEN mil.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL
-                             AND l.qtydelivered > l.qtyinvoiced THEN coalesce(l.qtyordered,0) - coalesce(l.qtydelivered,0)
-                             WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT NULL AND l.qtydelivered < l.qtyinvoiced THEN
-                             coalesce(l.qtyordered, 0)-coalesce(l.qtyinvoiced,0)
-                             WHEN ci.C_OrderLine_id IS NOT NULL AND ci.M_InOutLine_id IS NULL AND (ci.C_Charge_ID IS NOT NULL OR cp.ProductType != 'I') THEN
-                             ROUND((l.LineTotalAmt-ci.LineTotalAmt) , cy.StdPrecision)
-                             ELSE (COALESCE(l.qtyordered,0)-COALESCE(l.qtyinvoiced,0)-COALESCE(l.qtydelivered,0)
-                             ) 
-                             END ) > 0");
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
-                    sqlmain.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                    sqlOrder.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
                 }
                 /*if dates value are not null then implemeted fucntion to fetch sql*/
                 if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
+                    sqlOrder.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
                 }
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
+                sqlmain.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,custimg.ImageExtension, cb.Name,o.AD_Client_ID,cy.StdPrecision,
+                             cy.CurSymbol,o.C_BPartner_ID,o.AD_Org_ID,l.linetotalamt");
+                sqlmain.Append(" )Ord ");
+                sqlmain.Append(@" GROUP BY Ord.Record_ID,Ord.Pic,Ord.InvoiceRule,
+                             Ord.DocumentNo,
+                             Ord.FilterDate,
+                             Ord.PromisedDate,
+                             Ord.ImageExtension,
+                             Ord.Name,
+                             Ord.AD_Client_ID,
+                             Ord.StdPrecision,
+                             Ord.CurSymbol,
+                             Ord.C_BPartner_ID,
+                             Ord.AD_Org_ID,
+                             Ord.DateOrdered");
             }
             if (ListValue == null || ListValue == "AL")
             {
@@ -1160,7 +1177,6 @@ namespace VASLogic.Models
                              AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y'
                              ELSE 'N'
                              END AS IsNotFullyDelivered,
-                             SUM(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) AS RemainingQuantity,
                              SUM(CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
                              * (ol.LineTotalAmt) / NULLIF(ol.qtyordered, 0),cy.StdPrecision)
                              ELSE(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
@@ -1171,7 +1187,7 @@ namespace VASLogic.Models
                              M_InOut min
                              INNER JOIN M_InOutLine l ON (l.M_InOut_ID=min.M_InOut_ID)
                              INNER JOIN C_BPartner cb ON (min.C_BPartner_ID=cb.C_BPartner_ID)
-                             LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID=l.m_inoutline_ID)
+                             LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID=l.m_inoutline_ID AND ci.ReversalDoc_ID IS NULL)
                              LEFT JOIN C_OrderLine ol ON (ol.C_OrderLine_ID=l.C_OrderLine_ID)
                              LEFT JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                              LEFT JOIN (SELECT rsf.NAME,rsf.VALUE FROM ad_ref_list rsf 
@@ -1211,7 +1227,7 @@ namespace VASLogic.Models
                 }
             }
             sql.Append(sqlmain);
-            sql.Append(")T ORDER BY T.FilterDate ASC,T.C_BPartner_ID ASC,T.DocumentNo ASC");
+            sql.Append(")T WHERE T.TotalValue > 0 ORDER BY T.FilterDate ASC,T.C_BPartner_ID ASC,T.DocumentNo ASC");
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null, pageSize, pageNo);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
@@ -1219,7 +1235,7 @@ namespace VASLogic.Models
                 int OrderWinId = 0;
                 int InvWindowId = 0;
                 //fetching the record count to use it for pagination
-                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t", null, null));
+                int RecordCount = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sqlmain.ToString() + ")t WHERE t.TotalValue > 0 ", null, null));
                 sql.Clear();
                 //this query is returning the field of base currency
                 sql.Append(@"SELECT CASE WHEN Cursymbol IS NOT NULL THEN Cursymbol ELSE ISO_Code END AS Symbol,StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
@@ -1240,49 +1256,49 @@ namespace VASLogic.Models
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
-                    obj = new ExpectedInvoice();
-                    obj.recordCount = RecordCount;
-                    obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
-                    //If currency symbol not found the pick base currency symbol and precision
-                    if (!String.IsNullOrEmpty(Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"])))
-                    {
-                        obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
-                    }
-                    else
-                    {
-                        obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
-                    }
-                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
-                    obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
-                    obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
-                    obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
+                        obj = new ExpectedInvoice();
+                        obj.recordCount = RecordCount;
+                        obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
+                        //If currency symbol not found the pick base currency symbol and precision
+                        if (!String.IsNullOrEmpty(Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"])))
+                        {
+                            obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
+                        }
+                        else
+                        {
+                            obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                        }
+                        obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                        obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
+                        obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
+                        obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
 
-                    obj.stdPrecision = (Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]) !=0 ? Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"])
-                        : Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]));
-                    obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
-                    obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
-                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
-                    obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
+                        obj.stdPrecision = (Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]) != 0 ? Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"])
+                            : Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]));
+                        obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
+                        obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
+                        obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                        obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
 
-                    if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
-                    {
-                        obj.Window_ID = OrderWinId;
-                        obj.Primary_ID = "C_Order_ID";
-                    }
-                    else
-                    {
-                        obj.Window_ID = GRNId;
-                        obj.Primary_ID = "M_InOut_ID";
-                        obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
-                    }
-                    obj.InvWinID = InvWindowId;
-                    if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
-                    {
-                        obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
+                        if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
+                        {
+                            obj.Window_ID = OrderWinId;
+                            obj.Primary_ID = "C_Order_ID";
+                        }
+                        else
+                        {
+                            obj.Window_ID = GRNId;
+                            obj.Primary_ID = "M_InOut_ID";
+                            obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                        }
+                        obj.InvWinID = InvWindowId;
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                        {
+                            obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
 
+                        }
+                        invGrandTotalData.Add(obj);
                     }
-                    invGrandTotalData.Add(obj);
-                }
             }
             return invGrandTotalData;
         }

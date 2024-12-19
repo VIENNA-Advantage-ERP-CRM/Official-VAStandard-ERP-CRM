@@ -7099,11 +7099,21 @@ namespace VAdvantage.Model
                     (SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE NVL(M_InOutLine_ID, 0) != 0 AND C_Invoice_ID = " + GetC_Invoice_ID() + ")", null, Get_TrxName());
             //}
             //}
+            /*Here the query is executed to set ReversalDoc_ID on invoice line from reversal document*/
+            string sqlreversal = $@"UPDATE C_InvoiceLine o SET ReversalDoc_ID =
+              (SELECT C_Invoiceline_ID FROM C_Invoiceline WHERE ReversalDoc_ID = o.C_InvoiceLine_ID and C_Invoice_ID ={reversal.GetC_Invoice_ID()}) 
+              WHERE C_Invoice_ID ={GetC_Invoice_ID()} AND EXISTS (SELECT 1 FROM C_InvoiceLine WHERE C_InvoiceLine_ID = o.C_InvoiceLine_ID)";
+            int countReversal=DB.ExecuteQuery(sqlreversal, null, Get_Trx());
             SetProcessed(true);
 
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
+            //set Reversal docid on header of invoice
+            if (Get_ColumnIndex("ReversalDoc_ID") >= 0)
+            {
+                SetReversalDoc_ID(reversal.GetC_Invoice_ID());
+            }
             SetIsPaid(true);
             DeAllocateTimeSheetInvoice();
             DeAllocateFieldRequest();
