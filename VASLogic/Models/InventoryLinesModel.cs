@@ -553,7 +553,11 @@ namespace VAS.Models
                 if (lstInventoryLines != null)
                 {
                     Tuple<String, String, String> mInfo = null;
-                    _charge = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Charge_ID FROM C_Charge WHERE isactive='Y' AND  DTD001_ChargeType='INV'"));
+                    //VAI050-Change in query
+                    StringBuilder queryCharge = new StringBuilder();
+                    queryCharge.Append(MRole.GetDefault(ctx).AddAccessSQL("SELECT C_Charge_ID FROM C_Charge WHERE IsActive = 'Y' AND  DTD001_ChargeType = 'INV'", "C_Charge", true, false));
+                    queryCharge.Append(" Order BY AD_Org_ID DESC, C_Charge_ID  DESC");
+                    _charge = Util.GetValueOfInt(DB.ExecuteScalar(queryCharge.ToString()));
 
                     for (int i = 0; i < lstInventoryLines.Count; i++)   //Save InventoryCountLines
                     {
@@ -1188,7 +1192,7 @@ namespace VAS.Models
             int Org = 0;
             int Client = 0;
             int PriceList = 0;
-            DateTime? DateRequired =null;
+            DateTime? DateRequired = null;
             sql.Append("SELECT AD_Client_ID,AD_Org_ID,M_PriceList_ID,DateRequired FROM M_Requisition  WHERE M_Requisition_ID =" + TransactionID);
 
             DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
