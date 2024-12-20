@@ -1745,7 +1745,15 @@ namespace VIS.Controllers
                 }
                 else
                 {
-                    MInOutLine[] lines = MInOutLine.GetOfOrderLine(ctx, C_OrderLine_ID, null, null);
+                    /*VIS_427 Here restricted user to not add refrence of shipment when qtyinvoiced is greater or equal to 
+                    movement quantity against particular orderline*/
+                    String WhereClause= $@" NOT EXISTS(SELECT 1 FROM C_InvoiceLine C_InvoiceLine INNER JOIN 
+                                            C_Invoice C_Invoice ON (C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID
+                                            AND C_Invoice.Docstatus NOT IN ('RE','VO'))  WHERE C_InvoiceLine.C_Orderline_ID = {C_OrderLine_ID} 
+                                            GROUP by C_InvoiceLine.C_Orderline_ID 
+                                            HAVING SUM(C_InvoiceLine.QtyInvoiced) >= (SELECT SUM(M_Inoutline.MovementQty) 
+                                            FROM M_Inoutline WHERE M_Inoutline.C_Orderline_ID = {C_OrderLine_ID}))";
+                    MInOutLine[] lines = MInOutLine.GetOfOrderLine(ctx, C_OrderLine_ID, WhereClause, null);
                     //s_log.fine ("Receipt Lines with OrderLine = #" + lines.length);
                     if (lines.Length > 0)
                     {
