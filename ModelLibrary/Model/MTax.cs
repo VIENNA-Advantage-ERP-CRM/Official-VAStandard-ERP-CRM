@@ -126,7 +126,7 @@ namespace VAdvantage.Model
             {
                 //	setC_Tax_ID (0);		PK
                 SetIsDefault(false);
-                SetIsDocumentLevel(true);
+                SetIsDocumentLevel(false);
                 SetIsSummary(false);
                 SetIsTaxExempt(false);
                 //	setName (null);
