@@ -33,7 +33,6 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-
                     log.Log(Level.SEVERE, "Unknown Parameter: " + name);
                 }
             }
@@ -47,9 +46,6 @@ namespace VAdvantage.Process
             }
             else
             {
-                X_R_ContactInterest customer = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
-                customer.SetR_InterestArea_ID(R_InterestArea_ID);
-                customer.SetC_BPartner_ID(_C_BPartner_ID);
                 String query = "SELECT AD_User_ID FROM AD_User WHERE C_BPartner_ID= " + _C_BPartner_ID;
                 int UserId = Util.GetValueOfInt(DB.ExecuteScalar(query));
                 //VAI050-Contact details are mandatory
@@ -57,6 +53,9 @@ namespace VAdvantage.Process
                 {
                     return Msg.GetMsg(GetCtx(), "VAS_ContactDetailsNotFound");
                 }
+                X_R_ContactInterest customer = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
+                customer.SetR_InterestArea_ID(R_InterestArea_ID);
+                customer.SetC_BPartner_ID(_C_BPartner_ID);
                 customer.SetAD_User_ID(UserId);
                 query = "SELECT C_BPartner_Location_ID FROM C_BPartner_Location WHERE C_BPartner_ID= " + _C_BPartner_ID;
 
