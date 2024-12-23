@@ -1397,6 +1397,13 @@ namespace VAdvantage.Model
                         fromLines[i].SetRef_OrderLine_ID(line.GetC_OrderLine_ID());
                         fromLines[i].Save(Get_TrxName());
                     }
+                    if (Env.IsModuleInstalled("VA075_") && line.Get_ColumnIndex("VA075_WorkOrderComponent_ID") > 0 && line.Get_ValueAsInt("VA075_WorkOrderComponent_ID") > 0)
+                    {
+                        string query = "UPDATE VA075_WorkOrderComponent SET C_OrderLine_ID=" + line.GetC_OrderLine_ID() + " WHERE VA075_WorkOrderComponent_ID=" + line.Get_ValueAsInt("VA075_WorkOrderComponent_ID");
+                        DB.ExecuteQuery(query, null, Get_Trx());
+                    }
+                    //VIS0336-changes done for FSR create task process
+
                 }
                 if (fromLines.Length != count)
                 {
