@@ -1686,6 +1686,7 @@
     CalloutOrder.prototype.Product = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if (this.isCalloutActive() || value == null || value.toString() == "") {
+            mTab.setValue("ProductType", null);
             return "";
         }
 
@@ -1734,6 +1735,7 @@
 
                     var productType = productInfo["productType"].toString();
                     ctx.setContext(windowNo, "ProductType", productType);
+                    mTab.setValue("ProductType", productType);
                     if (productType == "S") {
                         //mTab.setValue("IsContract", true);
                     }
