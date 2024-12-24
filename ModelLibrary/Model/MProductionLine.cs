@@ -103,6 +103,26 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// After Delete
+        /// </summary>
+        /// <param name="success">success</param>
+        /// <returns>deleted</returns>
+        /// 
+        protected override bool AfterDelete(bool success)
+        {
+            if (!success)
+                return success;
+
+            // VIS0060: Update IsCreated as False on Production header when all lines are deleted.
+            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_ProductionLine_ID) FROM M_ProductionLine WHERE M_Production_ID = "
+                + GetM_Production_ID(), null, Get_Trx())) == 0)
+            {
+                DB.ExecuteQuery("UPDATE M_Production SET IsCreated = 'N' WHERE M_Production_ID = " + GetM_Production_ID(), null, Get_Trx());
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Set Product - Callout
         /// </summary>
         /// <param name="oldM_Product_ID">old value</param>
