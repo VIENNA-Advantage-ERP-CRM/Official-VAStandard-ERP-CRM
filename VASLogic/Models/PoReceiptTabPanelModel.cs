@@ -1111,7 +1111,7 @@ namespace VASLogic.Models
                              LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID AND ci.ReversalDoc_ID IS NULL)
                              LEFT JOIN M_Product cp ON (ci.M_Product_ID=cp.M_Product_ID)
                              LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
-                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,'') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + "");
+                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + "");
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
                     sqlOrder.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
@@ -2267,7 +2267,7 @@ namespace VASLogic.Models
                              INNER JOIN C_Currency cy ON (cy.C_Currency_ID=co.C_Currency_ID)
                              INNER JOIN VA009_PaymentMethod pm ON (co.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
                              LEFT JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INTEGER))", "ps", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
-                sqlmain.Append(OrderCheck + " AND co.DocStatus IN ('CO','CL') AND NVL(dt.DocSubTypeSO,'') NOT IN ('BO','ON', 'OB') AND ps.VA009_IsPaid='N'");
+                sqlmain.Append(OrderCheck + " AND co.DocStatus IN ('CO','CL') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ps.VA009_IsPaid='N'");
                 //Added business partner condition 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
@@ -2683,7 +2683,7 @@ namespace VASLogic.Models
                      LEFT JOIN C_PAYSCHEDULE ps ON pt.C_PAYMENTTERM_ID = ps.C_PAYMENTTERM_ID AND ps.VA009_Advance = 'N'
                      LEFT JOIN C_InvoiceLine il ON il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.Processed = 'Y' AND il.ReversalDoc_ID IS NULL
                      WHERE 
-                         o.DOCSTATUS IN ('CO', 'CL') AND NVL(doc.DocSubTypeSO,'') NOT IN ('BO','ON', 'OB')
+                         o.DOCSTATUS IN ('CO', 'CL') AND NVL(doc.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB')
                          AND doc.DocBaseType IN ('SOO','POO')");
             sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(@" GROUP BY 
@@ -2773,7 +2773,7 @@ namespace VASLogic.Models
                      INNER JOIN VA009_OrderPaySchedule ips ON (o.C_Order_ID = ips.C_Order_ID) 
                      INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
                      WHERE 
-                          o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO') AND NVL(doc.DocSubTypeSO,'') NOT IN ('BO','ON', 'OB')
+                          o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO') AND NVL(doc.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sql.Append(sqlmain);
             sql.Append(")");
