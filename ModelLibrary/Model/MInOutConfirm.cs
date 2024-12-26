@@ -1235,7 +1235,11 @@ namespace VAdvantage.Model
                 Tuple<String, String, String> mInfo = null;
                 if (Env.HasModulePrefix("DTD001_", out mInfo))
                 {
-                    int _charge = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Charge_ID FROM C_Charge WHERE isactive='Y' AND  DTD001_ChargeType='INV'"));
+                    //VIS0336-impleemt the client check
+                    StringBuilder queryCharge = new StringBuilder();
+                    queryCharge.Append(MRole.GetDefault(GetCtx()).AddAccessSQL("SELECT C_Charge_ID FROM C_Charge WHERE IsActive = 'Y' AND  DTD001_ChargeType = 'INV'", "C_Charge", true, false));
+                    queryCharge.Append(" Order BY AD_Org_ID DESC, C_Charge_ID  DESC");
+                    int _charge = Util.GetValueOfInt(DB.ExecuteScalar(queryCharge.ToString()));
                     line.SetC_Charge_ID(_charge);
                 }
                 // End
