@@ -192,24 +192,31 @@
          * @param {any} stdPrecision
          */
         function formatLargeNumber(number, stdPrecision) {
+            var  isNegative = number < 0;
+            var number = Math.abs(number);
+            var formattedNumber = 0;
             if (number >= 1000000000000) { /* Trillion*/
                 unit = VAS.translatedTexts.VAS_Trillion;
-                return (number / 1000000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                formattedNumber= (number / 1000000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             } else if (number >= 1000000000) { /* Billion*/
                 unit = VAS.translatedTexts.VAS_Billion;;
-                return (number / 1000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                formattedNumber= (number / 1000000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             } else if (number >= 1000000) { /* Million*/
                 unit = VAS.translatedTexts.VAS_Million;
-                return (number / 1000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                formattedNumber =(number / 1000000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             else if (number >= 1000) { /* Thousand*/
                 unit = VAS.translatedTexts.VAS_Thousand;
-                return (number / 1000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                formattedNumber = (number / 1000).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             else {
                 unit = '';
-                return (number).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+                formattedNumber = (number).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
             }
+            if (isNegative) {
+                formattedNumber = '-' + formattedNumber;
+            }
+            return formattedNumber;
         }
         /**
        * This function is used to get the refernce id of list
