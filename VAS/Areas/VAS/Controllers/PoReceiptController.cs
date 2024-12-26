@@ -420,5 +420,17 @@ namespace VAS.Areas.VAS.Controllers
             return Json(JsonConvert.SerializeObject(objScheduleData.GenerateInvoice(ct, grnid, invRef, docId, IsGenCheck)), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// This function is used to Get The data for Monthly average balance
+        /// </summary>
+        /// <returns>Monthly average balance data</returns>
+        /// <author>VIS_427</author>
+        public JsonResult GetMonthlyAvBankBalData()
+        {
+            Ctx ct = Session["ctx"] as Ctx;
+            PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
+            return Json(JsonConvert.SerializeObject(objScheduleData.GetMonthlyAvBankBalData(ct)), JsonRequestBehavior.AllowGet);
+        }
+
     }
 }

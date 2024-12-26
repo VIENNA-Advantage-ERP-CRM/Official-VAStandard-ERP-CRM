@@ -3001,6 +3001,163 @@ namespace VASLogic.Models
 
             return result;
         }
+        /// <summary>
+        /// This function is used to Get The data for Monthly average balance
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <returns>Monthly average balance data</returns>
+        /// <author>VIS_427</author>
+        public MonthlyAvBankBal GetMonthlyAvBankBalData(Ctx ctx)
+        {
+            string[] labels = null;
+            decimal[] lstAPPayAmt = null;
+            decimal[] lstARPayAmt = null;
+            decimal[] lstEndingBal = null;
+            MonthlyAvBankBal obj = new MonthlyAvBankBal();
+            StringBuilder sqlmain = new StringBuilder();
+            StringBuilder sql = new StringBuilder();
+            int C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            List<MonthlyAvBankBal> payMonthlyAvBankBal = new List<MonthlyAvBankBal>();
+            string CurrentYear = "";
+            int calendar_ID = 0;
+            int currQuarter = 0;
+            decimal prevBalance = 0;
+            // Get Financial Year Data 
+            DataSet dsFinancialYear = GetFinancialYearDetail(ctx, out string errorMessage);
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                obj.ErrorMessage = errorMessage;
+                return obj;
+            }
+            if (dsFinancialYear != null && dsFinancialYear.Tables[0].Rows.Count > 0)
+            {
+                CurrentYear = Util.GetValueOfString(dsFinancialYear.Tables[0].Rows[0]["CalendarYears"]);
+                calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
+                currQuarter = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CurQuarter"]);
+            }
+            sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+            int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            sql.Clear();
+            sql.Append("WITH PaymentData AS (");
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
+                          select C_Payment.AD_Client_ID, C_Payment.AD_Org_ID, C_Payment.C_Payment_id, C_Payment.isreceipt, C_Payment.dateacct,
+                            CASE WHEN C_Payment.IsReceipt='Y' THEN CASE WHEN C_Payment.C_Currency_ID != " + C_Currency_ID + @" then ROUND(coalesce(currencyconvert(C_Payment.PayAmt,
+                         		C_Payment.C_Currency_ID,
+                         		" + C_Currency_ID + @",
+                         		C_Payment.DateAcct,
+                         		C_Payment.C_ConversionType_ID,
+                         		C_Payment.AD_Client_ID,
+                         		C_Payment.AD_Org_ID),
+                         		0),
+                         		" + precision + @")
+                         		ELSE C_Payment.PayAmt
+                         	END 
+                             ELSE 0 END as ARPayAmt,
+                            CASE WHEN C_Payment.IsReceipt='N' THEN
+                            CASE WHEN
+                         		C_Payment.C_Currency_ID != " + C_Currency_ID + @" then ROUND(COALESCE(currencyconvert(C_Payment.PayAmt,
+                         		C_Payment.C_Currency_ID,
+                         		" + C_Currency_ID + @",
+                         		C_Payment.DateAcct,
+                         		C_Payment.C_ConversionType_ID,
+                         		C_Payment.AD_Client_ID,
+                         		C_Payment.AD_Org_ID),
+                         		0),
+                         		" + precision + @")
+                         		ELSE C_Payment.PayAmt
+                         	 END ELSE 0 END as APPayAmt,
+                         	C_Payment.C_Currency_ID
+                         FROM C_Payment", "C_Payment", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            sqlmain.Append(@" AND C_Payment.IsActive = 'Y'
+                            and C_Payment.DocStatus IN ('CO','CL')");
+            sql.Append(sqlmain +")");
+            sql.Append(@",latest_bank_data AS (");
+            sqlmain.Clear();
+            sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(@"SELECT C_BankAccount.AD_Client_ID,
+                                 C_BankAccount.AD_Org_ID,
+                                 C_BankAccount.c_bank_id,
+                                 C_BankAccount.C_BankAccount_ID,
+                                 CASE WHEN C_BankAccountline.StatementDate =  MAX(C_BankAccountline.StatementDate) OVER (PARTITION BY C_BankAccount.AD_Org_ID, 
+                                 TO_CHAR(C_BankAccountline.StatementDate, 'YYYY-MM'), C_BankAccount.C_BankAccount_ID) THEN 'EndingBalance' 
+                                 ELSE NULL END AS isendingbalance,
+                                 C_BankAccountline.StatementDate,
+                                 C_BankAccountline.EndingBalance
+                             FROM C_BankAccountline
+                             INNER JOIN C_BankAccount
+                             ON (C_BankAccountline.C_BankAccount_ID = C_BankAccount.C_BankAccount_ID)", "C_BankAccountline", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+            sqlmain.Append(" AND C_BankAccount.isactive = 'Y' AND C_BankAccountline.isactive = 'Y'");
+            sql.Append(sqlmain + ")");
+            sql.Append($@",PeriodData AS (SELECT p.Name,p.StartDate,p.EndDate,p.PeriodNo FROM
+                          C_Period p INNER JOIN C_Year cy on (cy.C_Year_ID=p.C_Year_ID)
+                          WHERE p.IsActive = 'Y' AND cy.C_Calendar_ID={calendar_ID} AND cy.calendaryears={GlobalVariable.TO_STRING(CurrentYear)})");
+            sql.Append(@",PaymentPeriodData as (SELECT 
+                                                  pd.Name, 
+                                                  pd.PeriodNo,
+                                                  SUM(cd.ARPayAmt) AS ARPayAmt,
+                                                  SUM(cd.APPayAmt) AS APPayAmt
+                                              FROM 
+                                                  PeriodData pd
+                                              LEFT JOIN PaymentData cd 
+                                                  ON (TRUNC(cd.DateAcct) BETWEEN pd.StartDate AND pd.EndDate)
+                                              GROUP BY 
+                                                  pd.Name, pd.PeriodNo)
+                                              ,BankPeriodData as (
+                                              SELECT 
+                                                  pd.Name, 
+                                                  pd.PeriodNo,
+                                                  SUM(lbd.EndingBalance) AS EndingBalance
+                                              FROM 
+                                                  PeriodData pd
+                                              LEFT JOIN latest_bank_data lbd 
+                                                  ON (TRUNC(lbd.StatementDate) BETWEEN pd.StartDate AND pd.EndDate AND lbd.isendingbalance = 'EndingBalance')
+                                              GROUP BY 
+                                                  pd.Name, pd.PeriodNo)");
+            sql.Append(@"SELECT ppd.PeriodNo,COALESCE(bpd.EndingBalance,0) AS EndingBalance,ppd.ARPayAmt,ppd.APPayAmt,ppd.Name
+                         FROM BankPeriodData bpd INNER JOIN PaymentPeriodData ppd on (bpd.PeriodNo=ppd.PeriodNo)");
+            sql.Append(@"ORDER BY PeriodNo");
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            {
+                //list to store ap payment amount
+                lstAPPayAmt = new decimal[ds.Tables[0].Rows.Count];
+                //list to store ar payment amount
+                lstARPayAmt = new decimal[ds.Tables[0].Rows.Count];
+                //list to store bank account ending balance
+                lstEndingBal = new decimal[ds.Tables[0].Rows.Count];
+                //list to store period names
+                labels = new string[ds.Tables[0].Rows.Count];
+                DataRow dr = null;
+                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                {
+                    dr = ds.Tables[0].Rows[i];
+
+                    lstAPPayAmt[i] = Util.GetValueOfDecimal(dr["APPayAmt"]);
+                    lstARPayAmt[i] = Util.GetValueOfDecimal(dr["ARPayAmt"]);
+                    /*If for any month ending balance is not entered then system will pick 
+                     previous months ending balance*/
+                    if (Util.GetValueOfDecimal(dr["endingbalance"]) != 0)
+                    {
+                        prevBalance = Util.GetValueOfDecimal(dr["endingbalance"]);
+                        lstEndingBal[i] = Util.GetValueOfDecimal(dr["endingbalance"]);
+                    }
+                    else
+                    {
+                        lstEndingBal[i] = prevBalance;
+                    }
+                    labels[i] = Util.GetValueOfString(dr["Name"]);
+                }
+                obj.stdPrecision = precision;
+                obj.labels = labels;
+                obj.APPayAmt = lstAPPayAmt;
+                obj.ARPayAmt = lstARPayAmt;
+                obj.EndingBal = lstEndingBal;
+            }
+            else
+            {
+                obj.ErrorMessage = Msg.GetMsg(ctx, "VAS_CashFlowDataNotFound");
+            }
+            return obj;
+        }
 
     }
     public class TabPanel
@@ -3236,5 +3393,14 @@ namespace VASLogic.Models
         public string[] labels { get; set; }
         public decimal[] lstCashInData { get; set; }
         public decimal[] lstCashOutData { get; set; }
+    }
+    public class MonthlyAvBankBal
+    {
+        public string ErrorMessage { get; set; }
+        public int stdPrecision { get; set; }
+        public string[] labels { get; set; }
+        public decimal[] APPayAmt { get; set; }
+        public decimal[] ARPayAmt { get; set; }
+        public decimal[] EndingBal { get; set; }
     }
 }
