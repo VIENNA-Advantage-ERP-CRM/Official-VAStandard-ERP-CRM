@@ -133,7 +133,8 @@ namespace VAS
                    "~/Areas/VAS/Scripts/app/forms/VAS_ExpectedPayments.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_InvoiceMatchedTabPanel.js",
                    "~/Areas/VAS/Scripts/app/forms/VAS_CashFlowWidget.js",
-                   "~/Areas/VAS/Scripts/model/CalloutChartOfAccount.js"
+                   "~/Areas/VAS/Scripts/model/CalloutChartOfAccount.js",
+                    "~/Areas/VAS/Scripts/app/forms/VAS_MonthlyAvBankBalWidget.js"
                   );
 
 
