@@ -1048,6 +1048,7 @@ namespace VASLogic.Models
             string DeliveryCheck = (ISOtrx == true ? "min.IsSOTrx='Y'" : "min.IsSOTrx='N'");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
+            string DocBaseTypeCheck = (ISOtrx == true ? " AND dt.DocBaseType IN ('SOO')" :" AND dt.DocBaseType IN ('POO')");
             sql.Append($@"SELECT * FROM  (");
             //AL=ALL ,PO=Purchase Order,SO=Sales Order
 
@@ -1092,9 +1093,10 @@ namespace VASLogic.Models
                              cy.StdPrecision,
                              cy.CurSymbol,
                              o.C_BPartner_ID,
+                             l.C_OrderLine_ID,
                              o.AD_Org_ID,
                             'N' AS IsNotFullyDelivered,
-                             l.linetotalamt - ROUND(SUM((case WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT null then (ci.QtyInvoiced) * (l.linetotalamt) /nullif(l.qtyordered, 0)
+                             ROUND(l.linetotalamt - SUM((case WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS NOT null then (ci.QtyInvoiced) * (l.linetotalamt) /nullif(l.qtyordered, 0)
                              WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS null AND ci.C_Charge_ID IS NULL then (ci.QtyInvoiced) * (l.linetotalamt)/nullif(l.qtyordered, 0)
                              WHEN ci.c_orderline_id IS NULL AND ci.M_InOutLine_id IS null and mil.c_orderline_id is not null  then (mil.movementqty) * (l.linetotalamt)/nullif(l.qtyordered, 0)
                              WHEN ci.c_orderline_id IS NOT NULL AND ci.M_InOutLine_id IS null AND ci.C_Charge_ID IS NOT NULL then (ci.linetotalamt) 
@@ -1111,7 +1113,7 @@ namespace VASLogic.Models
                              LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID AND ci.ReversalDoc_ID IS NULL)
                              LEFT JOIN M_Product cp ON (ci.M_Product_ID=cp.M_Product_ID)
                              LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
-                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + "");
+                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + DocBaseTypeCheck + "");
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
                     sqlOrder.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
@@ -1124,7 +1126,7 @@ namespace VASLogic.Models
                 sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
                 sqlmain.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,cb.Name,o.AD_Client_ID,cy.StdPrecision,
-                             cy.CurSymbol,o.C_BPartner_ID,o.AD_Org_ID,l.linetotalamt");
+                             cy.CurSymbol,o.C_BPartner_ID,l.C_OrderLine_ID,o.AD_Org_ID,l.linetotalamt");
                 sqlmain.Append(" )Ord ");
                 sqlmain.Append(@" GROUP BY Ord.Record_ID,Ord.Pic,Ord.InvoiceRule,
                              Ord.DocumentNo,
@@ -1287,11 +1289,11 @@ namespace VASLogic.Models
                             obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
                         }
                         obj.InvWinID = InvWindowId;
-                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
-                        {
-                            obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
+                        //if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                        //{
+                        //    obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
 
-                        }
+                        //}
                         invGrandTotalData.Add(obj);
                     }
             }
