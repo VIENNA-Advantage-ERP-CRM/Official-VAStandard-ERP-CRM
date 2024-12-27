@@ -86,11 +86,10 @@ namespace VAS.Models
             Dictionary<string, object> obj = null;
             StringBuilder sql = new StringBuilder();
             string allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem"));
-
             sql.Clear();
-            sql.Append("SELECT * FROM (SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
-                " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
-                " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine l inner join M_Product p on l.M_Product_ID=p.M_Product_ID");
+            sql.Append(" SELECT c.VAICNT_ScanName,c.VAICNT_TransactionType,a.Name,c.VAICNT_InventoryCount_ID, (SELECT NAME FROM AD_Ref_List WHERE AD_Reference_ID=" +
+                             " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
+                             " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine l inner join M_Product p on l.M_Product_ID=p.M_Product_ID");
 
             if ((windowID == Util.GetValueOfInt(Windows.InternalUse) || WindowName == "VAS_InternalUseInventory"
                 || windowID == Util.GetValueOfInt(Windows.InventoryMove) || WindowName == "VAS_InventoryMove"
@@ -112,7 +111,7 @@ namespace VAS.Models
             }
 
             sql.Append(" WHERE VAICNT_InventoryCount_ID=c.VAICNT_InventoryCount_ID) AS LineCount " +
-            " FROM VAICNT_InventoryCount  c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy ");
+            " FROM VAICNT_InventoryCount c INNER JOIN AD_User a ON a.AD_User_ID=c.CreatedBy ");
 
             if (windowID == Util.GetValueOfInt(Windows.PhysicalInventory) || WindowName == "VAS_PhysicalInventory") //Inventory count
             {
@@ -182,11 +181,7 @@ namespace VAS.Models
                 (GlobalVariable.TO_DATE(Util.GetValueOfDateTime(ToDate), true)));
 
             }
-
-            sql.Append(" ) t where t.LineCount>0 ");
-
-
-            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            DataSet ds = DB.ExecuteDataset("SELECT * FROM ( " + MRole.GetDefault(ctx).AddAccessSQL(sql.ToString(), "c", true, false) + " ) t where t.LineCount > 0 ", null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 retDic = new List<Dictionary<string, object>>();
@@ -203,9 +198,6 @@ namespace VAS.Models
                     retDic.Add(obj);
                 }
             }
-
-
-
             return retDic;
         }
 
