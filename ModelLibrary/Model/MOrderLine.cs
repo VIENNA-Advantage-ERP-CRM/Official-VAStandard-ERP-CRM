@@ -2273,6 +2273,7 @@ namespace VAdvantage.Model
                 else if (Env.Scale(LineNetAmt) > GetPrecision())
                 {
                     LineNetAmt = Decimal.Round(LineNetAmt, GetPrecision(), MidpointRounding.AwayFromZero);
+
                     base.SetLineNetAmt(LineNetAmt);
                 }
                 else
@@ -4068,6 +4069,14 @@ namespace VAdvantage.Model
                     //currentcostprice = origOrderLine.GetCurrentCostPrice();
                 }
                 SetCurrentCostPrice(currentcostprice);
+
+                if (Ord.IsSOTrx())
+                {
+                    String sql = "SELECT ProductType FROM M_Product WHERE M_Product_ID=" + GetM_Product_ID();
+                    Set_Value("ProductType", DB.ExecuteScalar(sql, null, null));
+                }
+               
+
             }
 
             //	Charge
