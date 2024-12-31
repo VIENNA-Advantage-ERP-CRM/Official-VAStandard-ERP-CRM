@@ -4069,8 +4069,8 @@ namespace VAdvantage.Model
                     //currentcostprice = origOrderLine.GetCurrentCostPrice();
                 }
                 SetCurrentCostPrice(currentcostprice);
-
-                if (Ord.IsSOTrx())
+                //VIS0336-implement the code for setting the  value in product type filed when record inserts by using SQ process and Blanket Order process
+                if (Get_Value("ProductType")==null)
                 {
                     String sql = "SELECT ProductType FROM M_Product WHERE M_Product_ID=" + GetM_Product_ID();
                     Set_Value("ProductType", DB.ExecuteScalar(sql, null, null));
