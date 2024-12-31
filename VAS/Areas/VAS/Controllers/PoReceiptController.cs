@@ -423,13 +423,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <summary>
         /// This function is used to Get The data for Monthly average balance
         /// </summary>
+        /// <param name="C_BankAccount_ID">C_BankAccount_ID</param>
         /// <returns>Monthly average balance data</returns>
         /// <author>VIS_427</author>
-        public JsonResult GetMonthlyAvBankBalData()
+        public JsonResult GetMonthlyAvBankBalData(int C_BankAccount_ID)
         {
             Ctx ct = Session["ctx"] as Ctx;
             PoReceiptTabPanelModel objScheduleData = new PoReceiptTabPanelModel();
-            return Json(JsonConvert.SerializeObject(objScheduleData.GetMonthlyAvBankBalData(ct)), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(objScheduleData.GetMonthlyAvBankBalData(ct, C_BankAccount_ID)), JsonRequestBehavior.AllowGet);
         }
 
     }

@@ -3005,9 +3005,10 @@ namespace VASLogic.Models
         /// This function is used to Get The data for Monthly average balance
         /// </summary>
         /// <param name="ctx">Context</param>
+        /// <param name="C_BankAccount_ID">C_BankAccount_ID</param>
         /// <returns>Monthly average balance data</returns>
         /// <author>VIS_427</author>
-        public MonthlyAvBankBal GetMonthlyAvBankBalData(Ctx ctx)
+        public MonthlyAvBankBal GetMonthlyAvBankBalData(Ctx ctx,int C_BankAccount_ID)
         {
             string[] labels = null;
             decimal[] lstAPPayAmt = null;
@@ -3070,6 +3071,10 @@ namespace VASLogic.Models
                          FROM C_Payment", "C_Payment", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(@" AND C_Payment.IsActive = 'Y'
                             and C_Payment.DocStatus IN ('CO','CL')");
+            if(C_BankAccount_ID != 0)
+            {
+                sqlmain.Append(" AND C_Payment.C_BankAccount_ID=" + C_BankAccount_ID);
+            }
             sql.Append(sqlmain +")");
             sql.Append(@",latest_bank_data AS (");
             sqlmain.Clear();
@@ -3086,6 +3091,10 @@ namespace VASLogic.Models
                              INNER JOIN C_BankAccount
                              ON (C_BankAccountline.C_BankAccount_ID = C_BankAccount.C_BankAccount_ID)", "C_BankAccountline", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(" AND C_BankAccount.isactive = 'Y' AND C_BankAccountline.isactive = 'Y'");
+            if (C_BankAccount_ID != 0)
+            {
+                sqlmain.Append(" AND C_BankAccount.C_BankAccount_ID=" + C_BankAccount_ID);
+            }
             sql.Append(sqlmain + ")");
             sql.Append($@",PeriodData AS (SELECT p.Name,p.StartDate,p.EndDate,p.PeriodNo FROM
                           C_Period p INNER JOIN C_Year cy on (cy.C_Year_ID=p.C_Year_ID)

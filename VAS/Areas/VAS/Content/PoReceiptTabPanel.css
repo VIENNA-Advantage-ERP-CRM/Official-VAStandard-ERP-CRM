@@ -3013,8 +3013,10 @@ margin-top:-10px;
 }
 
 .vas-monAvBbal-background {
-    background: rgb(245,245,245);
-    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
-    position: relative;
+    background: rgba(255, 236, 236);
+}
+.vas-exinvd-BankAccountrDiv{
+    width:75%;
+    margin-top:0.8em;
 }
 /*Monthly Average Balance css ends here*/
