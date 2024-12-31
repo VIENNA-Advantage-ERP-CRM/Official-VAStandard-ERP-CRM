@@ -17,6 +17,9 @@
         var $self = this;
         var $maindiv = null;
         var $root = $('<div class="h-100 w-100 vas-monAvBbal-background">');
+        var BankAccountDiv = null;
+        var C_BankAccount_ID = 0;
+        var cmbBankAccount = null;
 
         /** Load Design on Load */
         this.initalize = function () {
@@ -27,15 +30,46 @@
             $maindiv = $('<div id="VAS-BarLine-MABB_' + widgetID + '" class="vas-barline-monAvBbal-container">');
             var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-monAvBbal-heading">');
             var HeadingDiv = $('<div class= "">' + VIS.Msg.getMsg("VAS_MonthlyAvBalWidget") + '</div>');
-
+            /*Created Bank Account Control*/
+            BankAccountDiv = $('<div class="vas-exinvd-BankAccountrDiv">');
+            var $BankAccountDiv = $('<div class="input-group vis-input-wrap">');
+            var BankAccountValidationCode = "C_BankAccount.AD_Org_ID = @AD_Org_ID@ AND C_BankAccount.IsActive = 'Y'";
+            var BankAccountlookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_BankAccount_ID", 0, false, BankAccountValidationCode);
+            cmbBankAccount = new VIS.Controls.VComboBox("C_BankAccount_ID", true, false, true, BankAccountlookUp, 50, VIS.DisplayType.TableDir);
+            var $BankAccountControlWrap = $('<div class="vis-control-wrap">');
+            var $BankAccountButtonWrap = $('<div class="input-group-append">');
+            $BankAccountDiv.append($BankAccountControlWrap);
+            $BankAccountControlWrap.append(cmbBankAccount.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="background: rgba(255, 236, 236)">'
+            + VIS.Msg.getMsg("VAS_BankAccount") + '</label>');
+            $BankAccountDiv.append($BankAccountControlWrap);
+            $BankAccountButtonWrap.append(cmbBankAccount.getBtn(0));
+            $BankAccountDiv.append($BankAccountButtonWrap);
+            BankAccountDiv.append($BankAccountDiv);
+            //Get lookUp Data
+            var data = BankAccountlookUp.getData(true, true, false, false);
+            if (data != null && data != undefined && data.length > 0) {
+                //Set default value
+                cmbBankAccount.setValue(data[0].Key);
+            }
+            //Get value of bank account id
+            C_BankAccount_ID = VIS.Utility.Util.getValueOfInt(cmbBankAccount.getValue());
             // Add Control into Maine Heading Div
             MainHeadingComboDiv.append(HeadingDiv);
 
-            // Add Maine Hedaeding dive into main div
+            // Add Main Hedaeding div into main div
             $maindiv.append(MainHeadingComboDiv);
+            //adding bank account control to main div
+            $maindiv.append(BankAccountDiv);
 
             // Add maine div into Root
             $root.append($maindiv)
+            /*Bank Account Change event*/
+            cmbBankAccount.fireValueChanged = function () {
+                $maindiv.find('#vas_norecordcont_' + widgetID).remove();
+                C_BankAccount_ID = cmbBankAccount.getValue();
+                $bsyDiv[0].style.visibility = "visible";
+                $self.getMonthlyAvBankBalDetails();
+            }
 
         };
 
@@ -45,7 +79,7 @@
             $bsyDiv[0].style.visibility = "visible";
 
             // Define your AJAX request
-            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetMonthlyAvBankBalData",{ "":"" }, function (dr) {
+            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetMonthlyAvBankBalData", { "C_BankAccount_ID": C_BankAccount_ID }, function (dr) {
                     var MontlyAvBalData = dr;
 
                     // Remove existing canvas if exists
