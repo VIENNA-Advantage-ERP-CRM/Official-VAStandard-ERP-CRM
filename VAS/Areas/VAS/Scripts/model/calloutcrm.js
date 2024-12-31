@@ -297,6 +297,44 @@
     };
 
 
+    /**
+    * VIS0336-handle Opportunity screen ExpectedSalesDate
+    * @param {any} ctx
+    * @param {any} windowNo
+    * @param {any} mTab
+    * @param {any} mField
+    * @param {any} value
+    * @param {any} oldValue
+    */
+    CalloutLead.prototype.ExpectedSalesDate = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+
+        if (mTab.getValue("ExpectedSalesDate") != null && mTab.getValue("C_EnquiryRdate") != null) {
+            var ExpSalesDate = new Date(mTab.getValue("ExpectedSalesDate"));
+            ExpSalesDate.setHours(0, 0, 0, 0);
+            var Enquiredate = new Date(mTab.getValue("C_EnquiryRdate"));
+            Enquiredate.setHours(0, 0, 0, 0);
+
+            if (ExpSalesDate < Enquiredate) {
+                mTab.setValue("ExpectedSalesDate", "");
+                this.setCalloutActive(false);
+                return "VAS_InCorrectExpDate";
+            }
+
+        }
+
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+
+
+
+
 
     VIS.Model.CalloutLead = CalloutLead;
     //**************CalloutLead End*************
