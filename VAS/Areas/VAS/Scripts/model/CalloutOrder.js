@@ -1870,7 +1870,23 @@
 
     };
 
+    CalloutOrder.prototype.SetProductCharge = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+
+        var dr = VIS.dataContext.getJSONRecord("MOrder/GetProductCharge", value.toString());
+        if (dr != null) {
+            if (dr["ProductType"] == "C") {
+                mTab.setValue("C_Charge_ID", dr["ID"]);
+            }
+            else {
+                mTab.setValue("M_Product_ID", dr["ID"]);
+            }
+        }
+        return "";
+    };
 
 
     /// <summary>
@@ -1939,7 +1955,7 @@
                 mTab.setValue("PriceList", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
             }
 
-            mTab.setValue("PriceLimit", VIS.Env.ZERO);            
+            mTab.setValue("PriceLimit", VIS.Env.ZERO);
             mTab.setValue("Discount", VIS.Env.ZERO);
         }
         catch (err) {

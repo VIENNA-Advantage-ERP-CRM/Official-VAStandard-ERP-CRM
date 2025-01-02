@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -119,7 +120,7 @@ namespace VIS.Models
                 retDic["VA077_TotalPurchaseAmt"] = Util.GetValueOfString(order.Get_Value("VA077_TotalPurchaseAmt"));
                 retDic["VA077_TotalSalesAmt"] = Util.GetValueOfString(order.Get_Value("VA077_TotalSalesAmt"));
                 retDic["VA077_MarginPercent"] = Util.GetValueOfString(order.Get_Value("VA077_MarginPercent"));
-             }
+            }
 
             return retDic;
         }
@@ -335,11 +336,27 @@ namespace VIS.Models
         /// <param name="fields"></param>
         /// <returns>get Percision value</returns>
 
-        public int GetPrecision(Ctx ctx,string fields)
+        public int GetPrecision(Ctx ctx, string fields)
         {
             string sql = "SELECT CC.StdPrecision FROM C_Order CO INNER JOIN C_Currency CC on CC.C_Currency_Id = Co.C_Currency_Id where CO.C_Order_Id= " + Util.GetValueOfInt(fields);
-            var stdPrecision = Util.GetValueOfInt(DB.ExecuteScalar(sql, null,null));
+            var stdPrecision = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
             return stdPrecision;
+        }
+
+        public dynamic GetProductCharge(Ctx ctx, string fields)
+        {
+            StringBuilder sql = new StringBuilder();
+            dynamic retDir = null;
+            sql.Append("SELECT ID, ProductType FROM VAS_Product_V WHERE VAS_Product_V_ID=" + fields);
+            DataSet ds = DB.ExecuteDataset(sql.ToString(), null, null);
+            sql.Clear();
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                retDir = new ExpandoObject();
+                retDir.ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["ID"]);
+                retDir.ProductType = Util.GetValueOfString(ds.Tables[0].Rows[0]["ProductType"]);
+            }
+            return retDir;
         }
     }
 }

@@ -121,12 +121,23 @@ namespace VIS.Controllers
             string retJSON = "";
             if (Session["ctx"] != null)
             {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                Ctx ctx = Session["ctx"] as Ctx;
                 MOrderModel objOrder = new MOrderModel();
                 retJSON = JsonConvert.SerializeObject(objOrder.GetPrecision(ctx, fields));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        public JsonResult GetProductCharge(string fields)
+        {
 
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                MOrderModel objOrder = new MOrderModel();
+                retJSON = JsonConvert.SerializeObject(objOrder.GetProductCharge(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
