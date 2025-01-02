@@ -45,11 +45,9 @@ namespace VAdvantage.Model
                 {
                     string _sql = @"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, 
                         t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty
-                             FROM m_transaction t " +
-                                     @" INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
-                            WHERE t.AD_Client_ID = " + GetAD_Client_ID()
-                                   + " AND T.M_LOCATOR_ID = " + Get_ValueOld("M_Locator_ID")//get previous selected value
-                                    + @" AND NVL(t.M_ProductContainer_ID, 0)    = " + GetM_ProductContainer_ID();
+                        FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
+                        WHERE t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.MovementType NOT IN ('VI', 'IR') AND T.M_LOCATOR_ID = " 
+                        + Get_ValueOld("M_Locator_ID") + " AND NVL(t.M_ProductContainer_ID, 0)    = " + GetM_ProductContainer_ID();
                     Decimal no = Util.GetValueOfDecimal(DB.ExecuteScalar(_sql, null, Get_Trx()));
                     if (no != 0)
                     {
