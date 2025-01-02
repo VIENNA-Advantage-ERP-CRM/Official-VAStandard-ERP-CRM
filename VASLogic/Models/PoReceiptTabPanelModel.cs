@@ -3018,6 +3018,9 @@ namespace VASLogic.Models
             StringBuilder sqlmain = new StringBuilder();
             StringBuilder sql = new StringBuilder();
             int C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
+            //fetched Default conversion type from context
+            int C_ConversionType_ID = ctx.GetContextAsInt("C_ConversionType_ID");
+            int precision = 2;string ISO_Code = "";
             List<MonthlyAvBankBal> payMonthlyAvBankBal = new List<MonthlyAvBankBal>();
             string CurrentYear = "";
             int calendar_ID = 0;
@@ -3036,8 +3039,20 @@ namespace VASLogic.Models
                 calendar_ID = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["C_Calendar_ID"]);
                 currQuarter = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CurQuarter"]);
             }
-            sql.Append(@"SELECT StdPrecision FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-            int precision = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
+            //if bank Account id is not zero then fetched its cuurrency
+            if(C_BankAccount_ID != 0)
+            {
+               C_Currency_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID=" + C_BankAccount_ID,null,null));
+            }
+            //Fetched the currency details 
+            sql.Append(@"SELECT StdPrecision,ISO_Code FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
+             DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+            if (dsCurrency != null && dsCurrency.Tables[0].Rows.Count > 0)
+            {
+                precision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                ISO_Code = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["ISO_Code"]);
+            }
+
             sql.Clear();
             sql.Append("WITH PaymentData AS (");
             sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL($@"
@@ -3086,6 +3101,18 @@ namespace VASLogic.Models
                                  TO_CHAR(C_BankAccountline.StatementDate, 'YYYY-MM'), C_BankAccount.C_BankAccount_ID) THEN 'EndingBalance' 
                                  ELSE NULL END AS isendingbalance,
                                  C_BankAccountline.StatementDate,
+                                 CASE WHEN C_BankAccount.C_Currency_ID !=" +C_Currency_ID+ @"then 
+                                 ROUND(COALESCE(currencyconvert(
+                                 C_BankAccountline.EndingBalance,
+	                             C_BankAccount.C_Currency_ID,
+	                             " + C_Currency_ID + @",
+	                             MAX(C_BankAccountline.StatementDate) over (partition by C_BankAccount.AD_Org_ID,
+	                             TO_CHAR(C_BankAccountline.StatementDate, 'YYYY-MM'),
+	                             C_BankAccount.C_BankAccount_ID),
+	                             " + C_ConversionType_ID + @",
+	                             C_BankAccount.AD_Client_ID,
+	                             C_BankAccount.AD_Org_ID),0),
+                                 " + precision + @") ELSE C_BankAccountline.EndingBalance END AS EndBal,
                                  C_BankAccountline.EndingBalance
                              FROM C_BankAccountline
                              INNER JOIN C_BankAccount
@@ -3114,7 +3141,7 @@ namespace VASLogic.Models
                                               SELECT 
                                                   pd.Name, 
                                                   pd.PeriodNo,
-                                                  SUM(lbd.EndingBalance) AS EndingBalance
+                                                  SUM(lbd.EndBal) AS EndingBalance
                                               FROM 
                                                   PeriodData pd
                                               LEFT JOIN latest_bank_data lbd 
@@ -3156,6 +3183,7 @@ namespace VASLogic.Models
                     labels[i] = Util.GetValueOfString(dr["Name"]);
                 }
                 obj.stdPrecision = precision;
+                obj.ISO_Code = ISO_Code;
                 obj.labels = labels;
                 obj.APPayAmt = lstAPPayAmt;
                 obj.ARPayAmt = lstARPayAmt;
@@ -3406,6 +3434,7 @@ namespace VASLogic.Models
     public class MonthlyAvBankBal
     {
         public string ErrorMessage { get; set; }
+        public string ISO_Code { get; set; }
         public int stdPrecision { get; set; }
         public string[] labels { get; set; }
         public decimal[] APPayAmt { get; set; }
