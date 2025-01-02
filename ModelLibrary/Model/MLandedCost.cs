@@ -225,7 +225,8 @@ namespace VAdvantage.Model
             {
                 log.Info("Landed Cost Allocation Line Deleted #" + no);
             }
-
+            //VIS_427 Set VAS_IsLandedCost false on deletion of Landed Cost
+            DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='N' WHERE C_InvoiceLine_ID=" + GetC_InvoiceLine_ID(), null, Get_Trx());
             return true;
         }
 
