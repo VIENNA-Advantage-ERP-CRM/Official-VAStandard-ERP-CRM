@@ -3019,4 +3019,11 @@ margin-top:-10px;
     width:75%;
     margin-top:0.8em;
 }
+    .vas-exinvd-BankAccountrDiv select {
+        background: rgba(255, 236, 236)
+    }
+.vas-monAvbal-curr {
+    margin-top: -14px;
+    margin-bottom: -8px;
+}
 /*Monthly Average Balance css ends here*/
