@@ -3088,6 +3088,67 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// This function is used to create Transaction Entry against Invoice line
+        /// </summary>
+        /// <param name="ProductCost">product Cost</param>
+        /// <param name="InOutLine">Inout Line Reference</param>
+        /// <param name="M_Locator_ID">Locator</param>
+        /// <param name="M_CostElement_ID">Defined product Cost Element ID</param>
+        /// <param name="CostingLevel">Defined Costing Level on Product</param>
+        /// <author>VIS_0045: 31-Dec-2024</author>
+        /// <returns>Error Message (if any)</returns>
+        public string CreateTransactionEntry(decimal ProductCost, MInOutLine InOutLine, int M_Locator_ID, int M_CostElement_ID, string CostingLevel)
+        {
+            if (InOutLine == null && M_Locator_ID == 0)
+            {
+                log.Log(Level.SEVERE, "Invoice Line: Locator not found for Vendor Invoice Transaction Creation " + GetC_InvoiceLine_ID());
+                return "";
+            }
+            MTransaction objTransaction = null;
+            objTransaction = new MTransaction(GetCtx(), 0, Get_Trx());
+            objTransaction.SetAD_Client_ID(GetAD_Client_ID());
+            objTransaction.SetAD_Org_ID(GetAD_Org_ID());
+            objTransaction.SetMovementDate(this._parent.GetDateInvoiced());
+            if (InOutLine != null && InOutLine.GetM_InOutLine_ID() > 0)
+            {
+                objTransaction.SetM_Locator_ID(InOutLine.GetM_Locator_ID());
+                if (InOutLine.GetM_ProductContainer_ID() > 0)
+                {
+                    objTransaction.SetM_ProductContainer_ID(InOutLine.GetM_ProductContainer_ID());
+                }
+            }
+            else if (Get_ValueAsInt("Ref_InvoiceLineOrg_ID") > 0)
+            {
+                objTransaction.SetM_Locator_ID(M_Locator_ID);
+            }
+            objTransaction.Set_ValueNoCheck("MovementType", "VI");
+            objTransaction.SetM_Product_ID(GetM_Product_ID());
+            objTransaction.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
+            objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
+            objTransaction.SetCurrentQty(0);
+            objTransaction.SetContainerCurrentQty(0);
+            objTransaction.Set_Value("CostingLevel", CostingLevel);
+            objTransaction.Set_Value("M_CostElement_ID", M_CostElement_ID);
+            objTransaction.Set_Value("ProductCost", ProductCost);
+            if (!objTransaction.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                string val = "";
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                log.Log(Level.SEVERE, "Transaction not created for Vendor Invoice" + val);
+                return Msg.GetMsg(GetCtx(), "VITrxNotSaved") + " " + (String.IsNullOrEmpty(val) ? "" : val); ;
+            }
+            return "";
+        }
+
+        /// <summary>
         /// This function is used for costing calculation
         /// It gives consolidated product cost (taxable amt + tax amount + surcharge amt) based on setting
         /// </summary>

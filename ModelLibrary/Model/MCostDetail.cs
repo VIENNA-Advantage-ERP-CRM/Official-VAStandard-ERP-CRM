@@ -735,7 +735,7 @@ namespace VAdvantage.Model
                     {
                         Decimal adjustedAmt = 0;
                         if (costingCheck != null && costingCheck.invoiceline != null && !costingCheck.invoiceline.IsCostImmediate()
-                          && !costingCheck.IsCostCalculationfromProcess)
+                          && !costingCheck.IsCostCalculationfromProcess && costingCheck.IsQunatityValidated)
                         {
                             // we have to reduce price
                             if (amt < 0 && price > 0 && cd.GetQty() < 0)
@@ -915,7 +915,7 @@ namespace VAdvantage.Model
                     #region Av Invoice
                     if (isReturnTrx && invoice != null && invoice.GetDescription() != null && !invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -928,7 +928,7 @@ namespace VAdvantage.Model
                     }
                     else if (!isReturnTrx && invoice != null && invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -977,7 +977,7 @@ namespace VAdvantage.Model
                     #region Weighted Av Invoice
                     if (isReturnTrx && invoice != null && invoice.GetDescription() != null && !invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -990,7 +990,7 @@ namespace VAdvantage.Model
                     }
                     else if (!isReturnTrx && invoice != null && invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1004,7 +1004,7 @@ namespace VAdvantage.Model
                     else
                     {
                         // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                        if (Decimal.Add(cost.GetCurrentQty(), 0) < 0)//qty
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), 0) < 0)//qty
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1066,7 +1066,7 @@ namespace VAdvantage.Model
                 else if ((isReturnTrx && invoice != null && invoice.GetDescription() != null && !invoice.GetDescription().Contains("{->"))  // if Invoice is -ve and try to complete
                     || (!isReturnTrx && invoice != null && invoice.GetDescription() != null && invoice.GetDescription().Contains("{->")))    //if Invoice become +ve after reverse and its reverse entr) 
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -1103,7 +1103,7 @@ namespace VAdvantage.Model
                     #region last Invoice
                     if (isReturnTrx && invoice != null && invoice.GetDescription() != null && !invoice.GetDescription().Contains("{->")) // -ve entry for completion
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1116,7 +1116,7 @@ namespace VAdvantage.Model
                     }
                     else if (!isReturnTrx && invoice != null && invoice.GetDescription() != null && invoice.GetDescription().Contains("{->")) // +ve Entry for reverse
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1213,7 +1213,7 @@ namespace VAdvantage.Model
                     #region Std Costing
                     if (isReturnTrx && invoice != null && invoice.GetDescription() != null && !invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1226,7 +1226,7 @@ namespace VAdvantage.Model
                     }
                     else if (!isReturnTrx && invoice != null && invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1290,6 +1290,8 @@ namespace VAdvantage.Model
                     // when expected cost already calculated, and during actual adjustment - current qty not available then no effects comes
                     if (GetExpectedCostCalculated() && cost.GetCurrentQty() == 0)
                     {
+                        costingCheck.UnAllocatedLandedCost = amt;
+                        costingCheck.RemaningQtyonFreight = 0;
                         return cost;
                     }
 
@@ -1302,6 +1304,8 @@ namespace VAdvantage.Model
                     if (qty1.CompareTo(Decimal.Zero) == 0)
                     {
                         qty1 = cost.GetCurrentQty();
+                        costingCheck.UnAllocatedLandedCost = amt;
+                        costingCheck.RemaningQtyonFreight = 0;
                     }
                     if (qty1.CompareTo(Decimal.Zero) == 0)
                     {
@@ -1435,7 +1439,7 @@ namespace VAdvantage.Model
 
                 if (windowName.Equals("PE-FinishGood"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -1460,7 +1464,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Return To Vendor"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1488,7 +1492,7 @@ namespace VAdvantage.Model
                     if (windowName.Equals("Shipment") &&
                         (inout.IsReversal() || (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1501,7 +1505,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1514,7 +1518,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1527,7 +1531,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1542,7 +1546,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1555,7 +1559,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1631,7 +1635,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -1674,7 +1678,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -1710,7 +1714,7 @@ namespace VAdvantage.Model
                         cost.SetCurrentCostPrice(0);
                     }
 
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -1728,13 +1732,13 @@ namespace VAdvantage.Model
 
                     if (windowName.Equals("Return To Vendor"))
                     {
-                        if (Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
                             return cost;
                         }
-                        else if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        else if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1770,7 +1774,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1783,7 +1787,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))// || windowName == "Return To Vendor"
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1797,7 +1801,7 @@ namespace VAdvantage.Model
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
                         // Quantity to be increased
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1817,7 +1821,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1832,7 +1836,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1877,7 +1881,7 @@ namespace VAdvantage.Model
                         }
 
                         // Quantity to be increased into Moving Org
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1894,7 +1898,7 @@ namespace VAdvantage.Model
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
 
                         // Quantity to be increased
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -1916,7 +1920,7 @@ namespace VAdvantage.Model
                     else if (windowName.Equals("Shipment"))
                     {
                         // Quantity to be decreased
-                        if (Decimal.Subtract(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Subtract(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2009,7 +2013,7 @@ namespace VAdvantage.Model
                     //    }
                     //}
 
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2023,7 +2027,7 @@ namespace VAdvantage.Model
                 else if (!windowName.Equals("Return To Vendor"))
                 {
                     // for Physical Inventory / Internal use Inventory / Inventory move / Production Execution / Asset Disposal
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2043,7 +2047,7 @@ namespace VAdvantage.Model
                 #region Av. Purchase Order
                 if (windowName.Equals("PE-FinishGood"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2066,7 +2070,7 @@ namespace VAdvantage.Model
                 }
                 else if (windowName.Equals("Return To Vendor"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2086,9 +2090,9 @@ namespace VAdvantage.Model
                 else if (addition)
                 {
                     #region when qty > 0
-                    if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
+                    if (costingCheck.IsQunatityValidated && windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2101,7 +2105,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2114,7 +2118,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2127,7 +2131,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2142,7 +2146,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2155,7 +2159,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2236,7 +2240,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2281,7 +2285,7 @@ namespace VAdvantage.Model
                 }
                 else if (!windowName.Equals("Invoice(Vendor)-Return"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2318,7 +2322,7 @@ namespace VAdvantage.Model
                         cost.SetCurrentCostPrice(0);
                     }
 
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2334,7 +2338,7 @@ namespace VAdvantage.Model
                 {
                     #region MR + PO or Independent MR
                     // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2363,13 +2367,13 @@ namespace VAdvantage.Model
                 {
                     // when we reverse  Return To Vendor then we have to increase ( Accumulation Qty & Accumulation Amt)
                     // with this impact we take an impact on current cost price 
-                    if (Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
                         return cost;
                     }
-                    else if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    else if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2403,7 +2407,7 @@ namespace VAdvantage.Model
                     if (windowName.Equals("Shipment") &&
                         (inout.GetReversalDoc_ID() > 0 || (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2417,7 +2421,7 @@ namespace VAdvantage.Model
                     else if (windowName.Equals("Shipment"))
                     {
                         // Quantity to be decreased
-                        if (Decimal.Subtract(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Subtract(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2430,7 +2434,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2444,7 +2448,7 @@ namespace VAdvantage.Model
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
                         // Quantity to be increased
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2464,7 +2468,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2480,7 +2484,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2523,7 +2527,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentCostPrice(price);
                         }
                         // Quantity to be increased into Moving Org
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2540,7 +2544,7 @@ namespace VAdvantage.Model
                         cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
 
                         // Quantity to be increased
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2601,7 +2605,7 @@ namespace VAdvantage.Model
                     {
                         cost.SetCurrentCostPrice(0);
                     }
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2615,7 +2619,7 @@ namespace VAdvantage.Model
                 else
                 {
                     // for Physical Inventory / Internal use Inventory / Inventory move / Production Execution
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2636,7 +2640,7 @@ namespace VAdvantage.Model
                 if (windowName.Equals("PE-FinishGood")
                    || windowName.Equals("Material Receipt"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2654,7 +2658,7 @@ namespace VAdvantage.Model
                     if (windowName.Equals("Return To Vendor"))
                     {
                         // when we reverse Invoice which is against Return To Vendor then we have to increase ( Accumulation Qty & Accumulation Amt)
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2679,7 +2683,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2692,7 +2696,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2705,7 +2709,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2718,7 +2722,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2733,7 +2737,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2746,7 +2750,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2784,7 +2788,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2823,7 +2827,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2869,7 +2873,7 @@ namespace VAdvantage.Model
                 #region Last Invoice
                 if (windowName.Equals("PE-FinishGood"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -2887,13 +2891,13 @@ namespace VAdvantage.Model
                     // when we reverse Invoice which is against Return To Vendor then we have to decrease ( Accumulation Qty & Accumulation Amt)
                     if (windowName.Equals("Return To Vendor"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
                             return cost;
                         }
-                        if (Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCumulatedQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2908,7 +2912,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2921,7 +2925,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2934,7 +2938,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2947,7 +2951,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2962,7 +2966,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -2975,7 +2979,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3022,7 +3026,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3061,7 +3065,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3080,7 +3084,7 @@ namespace VAdvantage.Model
                 #region Last PO
                 if (windowName.Equals("PE-FinishGood"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3095,7 +3099,7 @@ namespace VAdvantage.Model
                 }
                 else if (windowName.Equals("Return To Vendor"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3115,7 +3119,7 @@ namespace VAdvantage.Model
                         (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal")) ||
                         (windowName.Equals("Production Execution")))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3128,7 +3132,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3143,7 +3147,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3156,7 +3160,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3261,7 +3265,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3300,7 +3304,7 @@ namespace VAdvantage.Model
                 }
                 else if (!windowName.Equals("Invoice(Vendor)-Return"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3319,7 +3323,7 @@ namespace VAdvantage.Model
                 #region Std Costing
                 if (windowName.Equals("PE-FinishGood"))
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3338,7 +3342,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Return To Vendor"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3365,7 +3369,7 @@ namespace VAdvantage.Model
                 {
                     if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3378,7 +3382,7 @@ namespace VAdvantage.Model
                     }
                     if (windowName.Equals("Customer Return"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3391,7 +3395,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3404,7 +3408,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Production Execution"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3419,7 +3423,7 @@ namespace VAdvantage.Model
                     {
                         // reverse entry of Inventory Move
                         // only impact on qty 
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3432,7 +3436,7 @@ namespace VAdvantage.Model
                     }
                     else if (windowName.Equals("Inventory Move"))
                     {
-                        if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
                             costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                             IsError = true;
@@ -3497,7 +3501,7 @@ namespace VAdvantage.Model
                     // reverse entry of Inventory Move
                     //  impact on qty , cummulative qty , cumulative amt , current cost price
                     //this is to warehouse
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3542,7 +3546,7 @@ namespace VAdvantage.Model
                 }
                 else
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3564,7 +3568,7 @@ namespace VAdvantage.Model
                     cost.Add(amt, qty);
                 else
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
                         costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
                         IsError = true;
@@ -3653,8 +3657,18 @@ namespace VAdvantage.Model
             }
             else
             {
-                sql = @"SELECT  Amt as currentCostAmount  FROM T_Temp_CostDetail ced INNER JOIN m_costqueue cq ON cq.m_costqueue_id = ced.m_costqueue_id 
-                                     where  ced.IsActive = 'Y' AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
+                sql = @"SELECT";
+                if (costingCheck.IsQunatityValidated)
+                {
+                    sql += @" Amt as currentCostAmount  
+                            FROM T_Temp_CostDetail ced 
+                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id)  WHERE  ced.IsActive = 'Y'";
+                }
+                else
+                {
+                    sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced  WHERE  ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
+                }
+                sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
                                      AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
                              @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
                              @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) = 0 " +
@@ -3663,8 +3677,20 @@ namespace VAdvantage.Model
                 MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
                 if (MRPrice == 0)
                 {
-                    sql = @"SELECT  Amt as currentCostAmount  FROM T_Temp_CostDetail ced INNER JOIN m_costqueue cq ON cq.m_costqueue_id = ced.m_costqueue_id
-                                     where  ced.IsActive = 'Y' AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
+                    sql = @"SELECT";
+                    if (string.IsNullOrEmpty(costingCheck.materialCostingMethod) ||
+                                costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Fifo) ||
+                                costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))
+                    {
+                        sql += @" Amt as currentCostAmount  
+                            FROM T_Temp_CostDetail ced 
+                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id) WHERE ced.IsActive = 'Y' ";
+                    }
+                    else
+                    {
+                        sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced WHERE ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
+                    }
+                    sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
                                      AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
                              @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
                              @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) =  " + cd.GetC_OrderLine_ID() +

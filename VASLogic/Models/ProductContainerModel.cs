@@ -334,38 +334,36 @@ namespace VIS.Models
             List<MoveContainer> moveContainer = new List<MoveContainer>();
 
             string sql = @"SELECT * FROM (
-                            SELECT DISTINCT p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName,  t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
-                             First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty, 
-                            (SELECT DESCRIPTION FROM M_ATTRIBUTESETINSTANCE WHERE NVL(M_ATTRIBUTESETINSTANCE_ID, 0) = t.M_ATTRIBUTESETINSTANCE_ID) AS ASI
-                            FROM M_Transaction t
-                            INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
-                            INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
-                            WHERE t.IsActive = 'Y' AND NVL(t.M_ProductContainer_ID, 0) = " + container +
-                            @" AND t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
-                               AND t.M_Locator_ID  = " + locator + @"
-                               AND t.AD_Client_ID  = " + _ctx.GetAD_Client_ID() +
-                          //AND t.AD_Org_ID  = " + AD_Org_ID +
-                          //@" GROUP BY p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name, t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID 
-                          @" )t WHERE ContainerCurrentQty <> 0 ";
+                        SELECT DISTINCT p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName, t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
+                        First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty, 
+                        (SELECT DESCRIPTION FROM M_ATTRIBUTESETINSTANCE WHERE NVL(M_ATTRIBUTESETINSTANCE_ID, 0) = t.M_ATTRIBUTESETINSTANCE_ID) AS ASI
+                        FROM M_Transaction t
+                        INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
+                        INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
+                        WHERE t.IsActive = 'Y' AND t.MovementType NOT IN ('VI', 'IR') AND NVL(t.M_ProductContainer_ID, 0) = " + container +
+                        @" AND t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
+                        AND t.M_Locator_ID  = " + locator + " AND t.AD_Client_ID  = " + _ctx.GetAD_Client_ID() +
+                        //AND t.AD_Org_ID  = " + AD_Org_ID +
+                        //@" GROUP BY p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name, t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID 
+                        @") t WHERE ContainerCurrentQty <> 0 ";
 
 
             // count record for paging
             if (page == 1)
             {
                 string sql1 = @"SELECT COUNT(*) FROM (
-                            SELECT DISTINCT p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName,  t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
-                            First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty,  
-                            (SELECT DESCRIPTION FROM M_ATTRIBUTESETINSTANCE WHERE NVL(M_ATTRIBUTESETINSTANCE_ID, 0) = t.M_ATTRIBUTESETINSTANCE_ID) AS ASI
-                            FROM M_Transaction t
-                            INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
-                            INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
-                            WHERE t.IsActive = 'Y' AND NVL(t.M_ProductContainer_ID, 0) = " + container +
-                            @" AND t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
-                               AND t.M_Locator_ID  = " + locator + @"
-                               AND t.AD_Client_ID  = " + _ctx.GetAD_Client_ID() +
-                          //AND t.AD_Org_ID  = " + AD_Org_ID +
-                          // @" GROUP BY p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name, t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID 
-                          @" )t WHERE ContainerCurrentQty <> 0 ";
+                        SELECT DISTINCT p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName,  t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
+                        First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty,  
+                        (SELECT DESCRIPTION FROM M_ATTRIBUTESETINSTANCE WHERE NVL(M_ATTRIBUTESETINSTANCE_ID, 0) = t.M_ATTRIBUTESETINSTANCE_ID) AS ASI
+                        FROM M_Transaction t
+                        INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
+                        INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
+                        WHERE t.IsActive = 'Y' AND t.MovementType NOT IN ('VI', 'IR') AND NVL(t.M_ProductContainer_ID, 0) = " + container +
+                        @" AND t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
+                        AND t.M_Locator_ID  = " + locator + " AND t.AD_Client_ID  = " + _ctx.GetAD_Client_ID() +
+                        //AND t.AD_Org_ID  = " + AD_Org_ID +
+                        // @" GROUP BY p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name, t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID 
+                        @") t WHERE ContainerCurrentQty <> 0 ";
                 countRecord = Util.GetValueOfInt(DB.ExecuteScalar(sql1, null, null));
             }
 
@@ -648,16 +646,15 @@ namespace VIS.Models
 
             // Get All records of Parent Container and child container
             sql = @"SELECT * FROM (
-                            SELECT Distinct p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName,  t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
-                            First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_ProductContainer_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty
-                            FROM M_Transaction t
-                            INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
-                            INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
-                            WHERE t.IsActive = 'Y' AND NVL(t.M_ProductContainer_ID, 0) IN ( " + childContainerId +
-                           @" ) AND t.MovementDate <=" + GlobalVariable.TO_DATE(movement.GetMovementDate(), true) + @" 
-                               AND t.M_Locator_ID  = " + fromLocatorId + @"
-                               AND t.AD_Client_ID  = " + movement.GetAD_Client_ID() + @"
-                          ) t WHERE ContainerCurrentQty <> 0 ";
+                    SELECT Distinct p.M_PRODUCT_ID, p.NAME, p.C_UOM_ID, u.Name AS UomName,  t.M_ATTRIBUTESETINSTANCE_ID, t.M_ProductContainer_ID,
+                    First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_ProductContainer_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty
+                    FROM M_Transaction t
+                    INNER JOIN M_Product p ON p.M_Product_ID = t.M_Product_ID
+                    INNER JOIN C_UOM u ON u.C_UOM_ID = p.C_UOM_ID
+                    WHERE t.IsActive = 'Y' AND t.MovementType NOT IN ('VI', 'IR') AND NVL(t.M_ProductContainer_ID, 0) IN ( " + childContainerId +
+                    @" ) AND t.MovementDate <=" + GlobalVariable.TO_DATE(movement.GetMovementDate(), true) + @" 
+                    AND t.M_Locator_ID  = " + fromLocatorId + " AND t.AD_Client_ID  = " + movement.GetAD_Client_ID() + @"
+                    ) t WHERE ContainerCurrentQty <> 0 ";
             DataSet dsRecords = DB.ExecuteDataset(sql, null, trx);
             if (dsRecords != null && dsRecords.Tables.Count > 0 && dsRecords.Tables[0].Rows.Count > 0)
             {
