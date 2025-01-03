@@ -144,26 +144,6 @@ namespace VAdvantage.Model
             base.SetQty(Qty);
         }   //	setQty
 
-        /// <summary>
-        /// Implement AfterSave to logic To set VAS_IsLandedCost True on C_InvoiceLine Table
-        /// </summary>
-        /// <param name="success">Success</param>
-        /// <param name="newRecord">New Record</param>
-        /// <returns>true, when success</returns>
-        /// <author>VIS_427</author>
-        protected override bool AfterSave(bool newRecord, bool success)
-        {
-            if (!success)
-            {
-                return success;
-            }
-            int count = DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID=" + GetC_InvoiceLine_ID(), null, Get_Trx());
-            if (count <= 0)
-            {
-                return false;
-            }
-            return true;
-        }
 
     }
 }

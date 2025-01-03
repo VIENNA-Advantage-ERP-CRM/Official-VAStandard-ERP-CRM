@@ -58,6 +58,8 @@ using VAdvantage.ProcessEngine;namespace VAdvantage.Process
             String error = _lc.AllocateCosts();
             if (error == null || error.Length == 0)
             {
+                int count = DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID=(
+                            SELECT C_InvoiceLine_ID FROM C_LandedCost WHERE C_LandedCost_ID="+_C_LandedCost_ID+")", null, Get_Trx());
                 return "@OK@";
             }
             return error;
