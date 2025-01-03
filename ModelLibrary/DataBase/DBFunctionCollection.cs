@@ -735,51 +735,46 @@ namespace VAdvantage.DataBase
             if (DB.IsOracle())
             {
                 sql.Append(@"SELECT LTRIM(SYS_CONNECT_BY_PATH( PName, ' , '),',') PName FROM
-                             (SELECT PName, ROW_NUMBER() OVER(ORDER BY PName) RN, COUNT(*) OVER() CNT FROM(
-                               SELECT ttt.PName, tt.CurrentQty, ttt.CurrentQty
-                                  FROM(SELECT '' AS PName, m_movementline_id, (ContainerCurrentQty)CurrentQty FROM(SELECT ml.m_movementline_id,
-                                  t.ContainerCurrentQty, t.MovementDate, t.M_Transaction_ID,
-                                  row_number() OVER(PARTITION BY ml.m_movementline_id ORDER BY t.M_Transaction_ID DESC, t.MovementDate DESC) RN_
-                                FROM m_transaction T INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
-                                INNER JOIN M_movementLine ml ON(t.AD_Client_ID = ml.AD_Client_ID
-                                AND t.M_Locator_ID = ml.M_Locator_ID
-                                AND t.M_Product_ID = ml.M_Product_ID
-                                AND NVL(t.M_AttributeSetInstance_ID, 0) = NVL(ml.M_AttributeSetInstance_ID, 0)
-                                AND NVL(t.M_ProductContainer_ID, 0) = NVL(ml.M_ProductContainer_ID, 0))
-                                WHERE ml.M_Movement_ID = " + M_Movement_ID + @") WHERE RN_ = 1) tt
-                             INNER JOIN
-                              (SELECT p.Name || '_' || asi.description || '_' || ml.line AS PName, ml.m_movementline_id, ml.movementqty AS CurrentQty
-                               FROM m_movementline ml INNER JOIN m_movement m  ON m.m_movement_id = ml.m_movement_id
-                               INNER JOIN m_product p ON p.m_product_id = ml.m_product_id
-                               LEFT JOIN m_attributesetinstance asi ON NVL(asi.M_AttributeSetInstance_ID, 0) = NVL(ml.M_AttributeSetInstance_ID, 0)
-                               WHERE ml.MoveFullContainer = 'Y'
-                               AND m.M_Movement_ID = " + M_Movement_ID + @") ttt ON tt.m_movementline_id = ttt.m_movementline_id
-                               WHERE tt.CurrentQty <> ttt.CurrentQty AND ROWNUM <= 100))
-                           WHERE RN = CNT START WITH RN = 1   CONNECT BY RN = PRIOR RN + 1 ");
+                            (SELECT PName, ROW_NUMBER() OVER(ORDER BY PName) RN, COUNT(*) OVER() CNT FROM (
+                            SELECT ttt.PName, tt.CurrentQty, ttt.CurrentQty
+                            FROM(SELECT '' AS PName, m_movementline_id, (ContainerCurrentQty)CurrentQty FROM(SELECT ml.m_movementline_id,
+                            t.ContainerCurrentQty, t.MovementDate, t.M_Transaction_ID,
+                            row_number() OVER(PARTITION BY ml.m_movementline_id ORDER BY t.M_Transaction_ID DESC, t.MovementDate DESC) RN_
+                            FROM m_transaction T INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
+                            INNER JOIN M_movementLine ml ON(t.AD_Client_ID = ml.AD_Client_ID
+                            AND t.M_Locator_ID = ml.M_Locator_ID AND t.M_Product_ID = ml.M_Product_ID
+                            AND NVL(t.M_AttributeSetInstance_ID, 0) = NVL(ml.M_AttributeSetInstance_ID, 0)
+                            AND NVL(t.M_ProductContainer_ID, 0) = NVL(ml.M_ProductContainer_ID, 0) AND t.MovementType NOT IN ('VI', 'IR'))
+                            WHERE ml.M_Movement_ID = " + M_Movement_ID + @") WHERE RN_ = 1) tt
+                            INNER JOIN
+                            (SELECT p.Name || '_' || asi.description || '_' || ml.line AS PName, ml.m_movementline_id, ml.movementqty AS CurrentQty
+                            FROM m_movementline ml INNER JOIN m_movement m  ON m.m_movement_id = ml.m_movement_id
+                            INNER JOIN m_product p ON p.m_product_id = ml.m_product_id
+                            LEFT JOIN m_attributesetinstance asi ON NVL(asi.M_AttributeSetInstance_ID, 0) = NVL(ml.M_AttributeSetInstance_ID, 0)
+                            WHERE ml.MoveFullContainer = 'Y' AND m.M_Movement_ID = " + M_Movement_ID + @") ttt ON tt.m_movementline_id = ttt.m_movementline_id
+                            WHERE tt.CurrentQty <> ttt.CurrentQty AND ROWNUM <= 100)) WHERE RN = CNT START WITH RN = 1   CONNECT BY RN = PRIOR RN + 1 ");
             }
 
             else if (DB.IsPostgreSQL())
             {
                 sql.Append(@"SELECT string_agg(PName, ', ') FROM
-                                (SELECT ttt.PName , tt.CurrentQty, ttt.CurrentQty 
-                                FROM (SELECT '' AS PName, m_movementline_id, (ContainerCurrentQty) CurrentQty FROM (SELECT ml.m_movementline_id,
-                                t.ContainerCurrentQty, t.MovementDate,  t.M_Transaction_ID,
-                                row_number() OVER (PARTITION BY ml.m_movementline_id ORDER BY t.M_Transaction_ID DESC, t.MovementDate DESC) RN_
-                                FROM m_transaction T INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
-                                INNER JOIN M_movementLine ml ON ( t.AD_Client_ID = ml.AD_Client_ID
-                                AND t.M_Locator_ID = ml.M_Locator_ID
-                                AND t.M_Product_ID = ml.M_Product_ID
-                                AND NVL (t.M_AttributeSetInstance_ID, 0) = NVL (ml.M_AttributeSetInstance_ID, 0)
-                                AND NVL (t.M_ProductContainer_ID, 0) = NVL (ml.M_ProductContainer_ID, 0))
-                                WHERE ml.M_Movement_ID = " + M_Movement_ID + @" ) tt_ WHERE RN_ = 1 ) tt
-                                INNER JOIN 
-                                (SELECT p.Name || '_' || asi.description || '_'  || ml.line AS PName, ml.m_movementline_id ,  ml.movementqty AS CurrentQty
-                                FROM m_movementline ml INNER JOIN m_movement m  ON m.m_movement_id = ml.m_movement_id
-                                INNER JOIN m_product p ON p.m_product_id = ml.m_product_id
-                                LEFT JOIN m_attributesetinstance asi ON NVL (asi.M_AttributeSetInstance_ID, 0) = NVL (ml.M_AttributeSetInstance_ID, 0)
-                                WHERE ml.MoveFullContainer = 'Y'
-                                AND m.M_Movement_ID   = " + M_Movement_ID + @" ) ttt ON tt.m_movementline_id = ttt.m_movementline_id
-                                WHERE tt.CurrentQty <> ttt.CurrentQty) final_ WHERE PName IS NOT NULL AND ROWNUM <= 100");
+                            (SELECT ttt.PName , tt.CurrentQty, ttt.CurrentQty 
+                            FROM (SELECT '' AS PName, m_movementline_id, (ContainerCurrentQty) CurrentQty FROM (SELECT ml.m_movementline_id,
+                            t.ContainerCurrentQty, t.MovementDate, t.M_Transaction_ID,
+                            row_number() OVER (PARTITION BY ml.m_movementline_id ORDER BY t.M_Transaction_ID DESC, t.MovementDate DESC) RN_
+                            FROM m_transaction T INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
+                            INNER JOIN M_movementLine ml ON ( t.AD_Client_ID = ml.AD_Client_ID
+                            AND t.M_Locator_ID = ml.M_Locator_ID AND t.M_Product_ID = ml.M_Product_ID
+                            AND NVL (t.M_AttributeSetInstance_ID, 0) = NVL (ml.M_AttributeSetInstance_ID, 0)
+                            AND NVL (t.M_ProductContainer_ID, 0) = NVL (ml.M_ProductContainer_ID, 0) AND t.MovementType NOT IN ('VI', 'IR'))
+                            WHERE ml.M_Movement_ID = " + M_Movement_ID + @" ) tt_ WHERE RN_ = 1 ) tt
+                            INNER JOIN 
+                            (SELECT p.Name || '_' || asi.description || '_'  || ml.line AS PName, ml.m_movementline_id ,  ml.movementqty AS CurrentQty
+                            FROM m_movementline ml INNER JOIN m_movement m  ON m.m_movement_id = ml.m_movement_id
+                            INNER JOIN m_product p ON p.m_product_id = ml.m_product_id
+                            LEFT JOIN m_attributesetinstance asi ON NVL (asi.M_AttributeSetInstance_ID, 0) = NVL (ml.M_AttributeSetInstance_ID, 0)
+                            WHERE ml.MoveFullContainer = 'Y' AND m.M_Movement_ID   = " + M_Movement_ID + @") ttt ON tt.m_movementline_id = ttt.m_movementline_id
+                            WHERE tt.CurrentQty <> ttt.CurrentQty) final_ WHERE PName IS NOT NULL AND ROWNUM <= 100");
             }
             return sql.ToString();
         }

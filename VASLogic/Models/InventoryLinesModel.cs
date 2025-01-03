@@ -347,31 +347,30 @@ namespace VAS.Models
                     sql.Clear();
                     sql = new StringBuilder(
                     @"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty FROM
-                 (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
-                 ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
-                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
-                    @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
-                    @" AND l.M_Warehouse_ID = " + warehouese +
-                    @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID )
-                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, s.QtyOnHand, p.M_AttributeSet_ID FROM M_Product p 
-                 INNER JOIN M_Storage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
-                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0))
-                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
+                    (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
+                    ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID
+                    WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
+                    @" AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
+                    @" AND l.M_Warehouse_ID = " + warehouese + @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID)
+                    SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, s.QtyOnHand, p.M_AttributeSet_ID FROM M_Product p 
+                    INNER JOIN M_Storage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
+                    JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0))
+                    WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
                 }
                 else
                 {
                     sql.Clear();
                     sql = new StringBuilder(@"WITH mt AS (SELECT m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, SUM(CurrentQty) AS CurrentQty, M_ProductContainer_ID
-                 FROM (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, NVL(t.M_ProductContainer_ID , 0) AS M_ProductContainer_ID,
-                 FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty
-                 FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
-                 WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
-               @" AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
-               @" AND l.M_Warehouse_ID = " + warehouese + @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, M_ProductContainer_ID ) 
-                 SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, mt.M_ProductContainer_ID, p.M_AttributeSet_ID FROM M_Product p 
-                 INNER JOIN M_ContainerStorage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
-                 JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0) AND mt.M_ProductContainer_ID = NVL(s.M_ProductContainer_ID , 0))
-                 WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
+                    FROM (SELECT DISTINCT t.M_Product_ID, t.M_Locator_ID, t.M_AttributeSetInstance_ID, NVL(t.M_ProductContainer_ID , 0) AS M_ProductContainer_ID,
+                    FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty
+                    FROM m_transaction t INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID 
+                    WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Mdate), true) +
+                    @" AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + Client + " AND l.AD_Org_ID = " + Org +
+                    @" AND l.M_Warehouse_ID = " + warehouese + @") t GROUP BY m_product_id, M_Locator_ID, M_AttributeSetInstance_ID, M_ProductContainer_ID ) 
+                    SELECT DISTINCT p.C_UOM_ID,s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID, mt.currentqty AS Qty, mt.M_ProductContainer_ID, p.M_AttributeSet_ID FROM M_Product p 
+                    INNER JOIN M_ContainerStorage s ON (s.M_Product_ID=p.M_Product_ID) INNER JOIN M_Locator l ON (s.M_Locator_ID=l.M_Locator_ID) 
+                    JOIN mt ON (mt.M_Product_ID = s.M_Product_ID AND mt.M_Locator_ID = s.M_Locator_ID AND mt.M_AttriButeSetInstance_ID = NVL(s.M_AttriButeSetInstance_ID,0) AND mt.M_ProductContainer_ID = NVL(s.M_ProductContainer_ID , 0))
+                    WHERE l.M_Warehouse_ID = " + warehouese + " AND p.IsActive='Y' AND p.IsStocked='Y' and p.ProductType='I' and p.M_Product_ID IN(" + InvlinePro + ") and l.M_Locator_ID=101");
                 }
                 DataSet ds2 = DB.ExecuteDataset(sql.ToString(), null, null);
                 MInventoryLine inventorline = null;

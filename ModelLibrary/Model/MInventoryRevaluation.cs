@@ -872,18 +872,18 @@ namespace VAdvantage.Model
         {
             sql.Clear();
             sql.Append($@"SELECT AD_Client_ID, AD_Org_ID , M_Locator_ID, M_ProductContainer_ID, 
-                                 M_Product_ID, M_AttributeSetInstance_ID, CurrentQty, ContainerCurrentQty,
-                                 CostingLevel, M_CostElement_ID, ProductApproxCost, ProductCost
-                          FROM M_Transaction WHERE M_Transaction_ID IN (
-                            SELECT DISTINCT First_VALUE(t.M_Transaction_ID) OVER 
-                                 (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) 
-                                  ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS M_Transaction_ID 
-                            FROM M_Transaction t 
-                            INNER JOIN M_Locator l ON (t.M_Locator_ID = l.M_Locator_ID) 
-                            INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = l.M_Warehouse_ID)
-                            WHERE t.AD_Client_ID = {GetAD_Client_ID()} 
-                            AND t.M_Product_ID IN (SELECT M_Product_ID FROM M_RevaluationLine WHERE M_InventoryRevaluation_ID = {GetM_InventoryRevaluation_ID()})
-                            AND w.M_Warehouse_ID = {GetM_Warehouse_ID()}");
+                        M_Product_ID, M_AttributeSetInstance_ID, CurrentQty, ContainerCurrentQty,
+                        CostingLevel, M_CostElement_ID, ProductApproxCost, ProductCost
+                        FROM M_Transaction WHERE M_Transaction_ID IN (
+                        SELECT DISTINCT First_VALUE(t.M_Transaction_ID) OVER 
+                        (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) 
+                        ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS M_Transaction_ID 
+                        FROM M_Transaction t 
+                        INNER JOIN M_Locator l ON (t.M_Locator_ID = l.M_Locator_ID) 
+                        INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = l.M_Warehouse_ID)
+                        WHERE t.AD_Client_ID = {GetAD_Client_ID()} AND t.MovementType NOT IN ('VI', 'IR')
+                        AND t.M_Product_ID IN (SELECT M_Product_ID FROM M_RevaluationLine WHERE M_InventoryRevaluation_ID = {GetM_InventoryRevaluation_ID()})
+                        AND w.M_Warehouse_ID = {GetM_Warehouse_ID()}");
 
             if (!(GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Client) ||
                   GetCostingLevel().Equals(MAcctSchema.COSTINGLEVEL_Organization) ||
