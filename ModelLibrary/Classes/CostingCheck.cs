@@ -41,6 +41,9 @@ namespace ModelLibrary.Classes
         public PO po = null;
         public Decimal Price = 0, Qty = 0;
         public String costingMethod = String.Empty;
+        public string materialCostingMethod = string.Empty;
+        public int materialCostingElement = 0;
+        public bool IsQunatityValidated = true;
         public int costingElement = 0, M_CostType_ID = 0;
         public int definedCostingElement = 0; /* Costing Element ID against selected Costing Method on Product Category or Accounting Schema*/
         public int Lifo_ID = 0, Fifo_ID = 0;
@@ -61,6 +64,9 @@ namespace ModelLibrary.Classes
         public DataSet dsCostElement = null;
         public bool IsCostImmediate = false;
         public int precision = 2;
+
+        public decimal UnAllocatedLandedCost = 0;
+        public decimal RemaningQtyonFreight = 0;
 
         /// <summary>
         /// Constructor
@@ -198,6 +204,15 @@ namespace ModelLibrary.Classes
             IsCostCalculationfromProcess = false;
             currentQtyonQueue = null;
             IsCostImmediate = false;
+
+            /*31-Dec-2024*/
+            Price = 0;
+            Qty = 0;
+            materialCostingMethod = string.Empty;
+            materialCostingElement = 0;
+            IsQunatityValidated = true;
+            UnAllocatedLandedCost = 0;
+            RemaningQtyonFreight = 0;
         }
 
         /// <summary>
@@ -215,6 +230,31 @@ namespace ModelLibrary.Classes
             if (IsCommit)
             {
                 trxname.Commit();
+            }
+        }
+
+        /// <summary>
+        /// This function is used to get the linked Costing Method Details on Cost Combination
+        /// </summary>
+        /// <param name="costElementId">Cost Combination Element ID</param>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <author>VIS_0045</author>
+        public void GetMaterialCostingMethodFroCombinaton(int costElementId, int AD_Client_ID)
+        {
+            query.Clear();
+            query.Append($@"SELECT  cel.M_Ref_CostElement, refEle.costingmethod 
+                             FROM M_CostElement ce 
+                             INNER JOIN m_costelementline cel ON (ce.M_CostElement_ID = cel.M_CostElement_ID) 
+                             INNER JOIN M_CostElement refEle ON (CAST(cel.M_Ref_CostElement AS INTEGER) = refEle.M_CostElement_ID AND refEle.costingmethod IS NOT NULL) 
+                             WHERE ce.AD_Client_ID = " + AD_Client_ID + @"
+                             AND ce.IsActive = 'Y' AND ce.CostElementType = 'C'
+                             AND cel.IsActive = 'Y' AND ce.M_CostElement_ID = " + costElementId + @"
+                             ORDER BY ce.M_CostElement_ID");
+            DataSet dsMaterial = DB.ExecuteDataset(query.ToString(), null, null);
+            if (dsMaterial != null && dsMaterial.Tables.Count > 0 && dsMaterial.Tables[0].Rows.Count > 0)
+            {
+                materialCostingMethod = Util.GetValueOfString(dsMaterial.Tables[0].Rows[0]["costingmethod"]);
+                materialCostingElement = Util.GetValueOfInt(dsMaterial.Tables[0].Rows[0]["M_Ref_CostElement"]);
             }
         }
 
