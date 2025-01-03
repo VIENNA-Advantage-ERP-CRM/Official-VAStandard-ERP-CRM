@@ -33,9 +33,17 @@
             /*Created Bank Account Control*/
             BankAccountDiv = $('<div class="vas-exinvd-BankAccountrDiv">');
             var $BankAccountDiv = $('<div class="input-group vis-input-wrap">');
-            var BankAccountValidationCode = "C_BankAccount.AD_Org_ID = @AD_Org_ID@ AND C_BankAccount.IsActive = 'Y'";
+            /* If selected organisation is * then show all bank account else show bank account 
+             which are created in particular organization*/
+            var AD_Org_ID = VIS.Env.getCtx().getAD_Org_ID();
+            if (AD_Org_ID != 0) {
+                var BankAccountValidationCode = "C_BankAccount.AD_Org_ID = @AD_Org_ID@ AND C_BankAccount.IsActive = 'Y'";
+            }
+            else {
+                var BankAccountValidationCode = "C_BankAccount.IsActive = 'Y'";
+            }
             var BankAccountlookUp = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "C_BankAccount_ID", 0, false, BankAccountValidationCode);
-            cmbBankAccount = new VIS.Controls.VComboBox("C_BankAccount_ID", true, false, true, BankAccountlookUp, 50, VIS.DisplayType.TableDir);
+            cmbBankAccount = new VIS.Controls.VComboBox("C_BankAccount_ID", false, false, true, BankAccountlookUp, 50, VIS.DisplayType.TableDir);
             var $BankAccountControlWrap = $('<div class="vis-control-wrap">');
             var $BankAccountButtonWrap = $('<div class="input-group-append">');
             $BankAccountDiv.append($BankAccountControlWrap);
@@ -66,7 +74,8 @@
             /*Bank Account Change event*/
             cmbBankAccount.fireValueChanged = function () {
                 $maindiv.find('#vas_norecordcont_' + widgetID).remove();
-                C_BankAccount_ID = cmbBankAccount.getValue();
+                $maindiv.find('#vas_currencyrecord_' + widgetID).remove();
+                C_BankAccount_ID = VIS.Utility.Util.getValueOfInt(cmbBankAccount.getValue());
                 $bsyDiv[0].style.visibility = "visible";
                 $self.getMonthlyAvBankBalDetails();
             }
@@ -92,7 +101,9 @@
                     else {
                         //getting precision
                         var precision = MontlyAvBalData.stdPrecision;
-
+                        var ISO_Code = MontlyAvBalData.ISO_Code;
+                        var currencyDiv = $('<div id="vas_currencyrecord_' + widgetID + '" class="vas-monAvbal-curr">' + VIS.Msg.getMsg("VAS_AmountIsIn") + ' : '+ ISO_Code + '</div>');
+                        $maindiv.append(currencyDiv);
                         // Define static labels
                         const labels = MontlyAvBalData.labels;
 
@@ -202,7 +213,7 @@
                                                 const labels = tooltipItem.chart.data.labels;
                                                 const dsLabel = dataset.label;
                                                 const value = dataset.data[dataIndex];
-                                                return dsLabel + " - " + labels[dataIndex] + ': ' + value.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+                                                return dsLabel + " - " + ISO_Code + ': ' + value.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });
                                             }
                                         }
                                     },
@@ -255,6 +266,7 @@
         this.refreshWidget = function () {
             $bsyDiv[0].style.visibility = "visible";
             $maindiv.find('#vas_norecordcont_' + widgetID).remove();
+            $maindiv.find('#vas_currencyrecord_' + widgetID).remove();
             $self.getMonthlyAvBankBalDetails();
         };
     };
