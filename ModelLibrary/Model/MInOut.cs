@@ -3616,6 +3616,13 @@ namespace VAdvantage.Model
                                                     DB.ExecuteQuery("UPDATE M_Transaction SET ProductCost = " + currentCostPrice +
                                                         @" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID, null, Get_Trx());
                                                 }
+
+                                                // Create Transaction Entry for Vendor Invoice
+                                                _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                if (!string.IsNullOrEmpty(_processMsg))
+                                                {
+                                                    return DocActionVariables.STATUS_INVALID;
+                                                }
                                             }
                                         }
                                         #endregion

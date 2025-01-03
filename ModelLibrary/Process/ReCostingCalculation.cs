@@ -238,15 +238,19 @@ namespace VAdvantage.Process
                                 i.docstatus,i.DateAcct AS DateAcct,  mi.iscostcalculated ,  i.isreversedcostcalculated
                          FROM M_MatchInv mi INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id INNER JOIN C_Invoice i ON i.c_invoice_id       = il.c_invoice_id
                               WHERE mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
-                              AND mi.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND i.isactive        = 'Y' AND (i.docstatus       IN ('CO' , 'CL') AND mi.iscostcalculated = 'N' )
+                              AND mi.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND i.isactive        = 'Y' AND
+                              i.docstatus IN ('CO' , 'CL') AND mi.iscostcalculated = 'N' AND mi.iscostImmediate = 'N' 
 
                          UNION 
                          SELECT i.ad_client_id ,  i.ad_org_id , i.isactive ,to_char(mi.created, 'DD-MON-YY HH24:MI:SS') as  created ,  i.createdby ,  TO_CHAR(mi.updated, 'DD-MON-YY HH24:MI:SS') AS updated ,
                                 i.updatedby ,  null AS documentno ,  M_MatchInvCostTrack_Id AS Record_Id ,  i.issotrx ,  i.isreturntrx ,  ''           AS IsInternalUse,  'M_MatchInvCostTrack' AS TableName,
                                 i.docstatus, i.DateAcct AS DateAcct,  mi.iscostcalculated ,  mi.iscostimmediate AS isreversedcostcalculated
-                          FROM M_MatchInvCostTrack mi INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id INNER JOIN C_Invoice i ON i.c_invoice_id       = il.c_invoice_id
+                          FROM M_MatchInvCostTrack mi 
+                               INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id
+                               INNER JOIN C_Invoice i ON i.c_invoice_id = il.c_invoice_id
                           WHERE  mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
-                           AND mi.updated >= " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND mi.updated < " + GlobalVariable.TO_DATE(minDateRecord.Value.AddDays(1), true) + @"  AND i.isactive        = 'Y' AND (i.docstatus       IN ('RE' , 'VO') )
+                           AND mi.updated >= " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND mi.updated < " + GlobalVariable.TO_DATE(minDateRecord.Value.AddDays(1), true) +
+                           @"  AND i.isactive        = 'Y' AND (i.docstatus       IN ('RE' , 'VO') )
 
                         UNION
                          SELECT DISTINCT il.ad_client_id ,il.ad_org_id ,il.isactive ,to_char(LCA.created, 'DD-MON-YY HH24:MI:SS') as created ,   i.createdby , TO_CHAR(i.updated, 'DD-MON-YY HH24:MI:SS') AS updated ,
@@ -368,7 +372,7 @@ namespace VAdvantage.Process
                                         provisionalInvoiceLine = new MProvisionalInvoiceLine(GetCtx(), dsChildRecord.Tables[0].Rows[j], Get_Trx());
                                         if (client.IsCostImmediate() && provisionalInvoiceLine.GetM_Product_ID() > 0)
                                         {
-                                            if (!provisionalInvoice.CostingCalculation(client, provisionalInvoiceLine, true))
+                                            if (!provisionalInvoice.CostingCalculation(client, provisionalInvoiceLine, false))
                                             {
                                                 if (!conversionNotFoundProvisionalInvoice.Contains(provisionalInvoice.GetDocumentNo()))
                                                 {
@@ -387,20 +391,20 @@ namespace VAdvantage.Process
                                     }
 
                                     // update Provisional Invoice Header
-                                    sql.Clear();
-                                    sql.Append(@"SELECT COUNT(C_ProvisionalInvoiceLine_ID) FROM C_ProvisionalInvoiceLine
-                                        WHERE " + (provisionalInvoice.IsReversal() ? "IsReversedCostCalculated = 'N'" : "IsCostCalculated = 'N'") + @"
-                                         AND IsActive = 'Y' AND C_ProvisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID());
-                                    if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-                                    {
-                                        //Update  IsCostCalculated, IsReversedCostCalculated  as True on Header
-                                        DB.ExecuteQuery(@"UPDATE C_ProvisionalInvoice SET IsCostCalculated = 'Y' "
-                                          + (provisionalInvoice.IsReversal() ? ", IsReversedCostCalculated = 'Y'" : "") + @"
-                                          WHERE C_ProvisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID(), null, Get_Trx());
+                                    //sql.Clear();
+                                    //sql.Append(@"SELECT COUNT(C_ProvisionalInvoiceLine_ID) FROM C_ProvisionalInvoiceLine
+                                    //    WHERE " + (provisionalInvoice.IsReversal() ? "IsReversedCostCalculated = 'N'" : "IsCostCalculated = 'N'") + @"
+                                    //     AND IsActive = 'Y' AND C_ProvisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID());
+                                    //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+                                    //{
+                                    //    //Update  IsCostCalculated, IsReversedCostCalculated  as True on Header
+                                    //    DB.ExecuteQuery(@"UPDATE C_ProvisionalInvoice SET IsCostCalculated = 'Y' "
+                                    //      + (provisionalInvoice.IsReversal() ? ", IsReversedCostCalculated = 'Y'" : "") + @"
+                                    //      WHERE C_ProvisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID(), null, Get_Trx());
 
-                                        _log.Fine("Cost Calculation updated for C_provisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID());
-                                        Get_Trx().Commit();
-                                    }
+                                    //    _log.Fine("Cost Calculation updated for C_provisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID());
+                                    //    Get_Trx().Commit();
+                                    //}
                                 }
                                 continue;
                             }
@@ -434,6 +438,7 @@ namespace VAdvantage.Process
                                     {
                                         sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
                                                      " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                        sql.Append(@" AND IsCostimmediate = 'N' ");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -488,7 +493,8 @@ namespace VAdvantage.Process
                                                         if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null,
-                                                                0, "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                0, "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(),
+                                                                costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -501,32 +507,16 @@ namespace VAdvantage.Process
                                                             else
                                                             {
                                                                 queryTo.Clear();
-                                                                queryTo.Append(" UPDATE C_InvoiceLine SET IsCostCalculated = 'Y' ");
-                                                                //invoiceLine.SetIsCostCalculated(true);
-                                                                if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                                {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
-                                                                    //queryTo.Append(" , IsReversedCostCalculated = 'Y'");
-                                                                }
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                                {
-                                                                    queryTo.Append(" , IsCostImmediate = 'Y'");
-                                                                    //invoiceLine.SetIsCostImmediate(true);
-                                                                }
+                                                                queryTo.Append(" UPDATE C_InvoiceLine SET IsCostImmediate = 'Y' ");
+                                                                //if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                //{
+                                                                //    queryTo.Append(" , IsReversedCostCalculated = 'Y'");
+                                                                //}
+                                                                //queryTo.Append(" , IsCostCalculated = 'Y'");
                                                                 queryTo.Append($" WHERE C_InvoiceLine_ID = {invoiceLine.GetC_InvoiceLine_ID()}");
                                                                 DB.ExecuteQuery(queryTo.ToString(), null, Get_Trx());
-                                                                //if (!invoiceLine.Save(Get_Trx()))
-                                                                //{
-                                                                //    ValueNamePair pp = VLogger.RetrieveError();
-                                                                //    _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                //               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                //    Get_Trx().Rollback();
-                                                                //}
-                                                                //else
-                                                                //{
                                                                 _log.Fine("Cost Calculation updated for m_invoiceline = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                 Get_Trx().Commit();
-                                                                //}
                                                             }
                                                         }
                                                         #endregion
@@ -537,7 +527,8 @@ namespace VAdvantage.Process
                                                         if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
-                                                                 "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                 "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(),
+                                                                 costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -551,10 +542,10 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //    invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -602,7 +593,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                       "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -616,7 +607,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
                                                                     if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                     {
@@ -633,8 +624,8 @@ namespace VAdvantage.Process
                                                                             invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                         }
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -659,7 +650,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost,
-                                                                  invoiceLine.GetQtyInvoiced(), Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  invoiceLine.GetQtyInvoiced(), Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -673,7 +664,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
                                                                     if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                     {
@@ -690,8 +681,8 @@ namespace VAdvantage.Process
                                                                             invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                         }
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -723,7 +714,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                       "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                     {
                                                                         if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                         {
@@ -735,19 +726,36 @@ namespace VAdvantage.Process
                                                                     }
                                                                     else
                                                                     {
+                                                                        query.Clear();
+                                                                        query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                        DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                        int M_Locator_ID = 0;
+                                                                        int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                        if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                        {
+                                                                            M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                            if (M_Warehouse_ID == 0)
+                                                                            {
+                                                                                M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                            }
+                                                                        }
+
                                                                         if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                         {
-                                                                            invoiceLine.SetIsReversedCostCalculated(true);
+                                                                            //invoiceLine.SetIsReversedCostCalculated(true);
                                                                         }
                                                                         if (invoiceLine.Get_ColumnIndex("PostCurrentCostPrice") >= 0 && invoiceLine.GetPostCurrentCostPrice() == 0)
                                                                         {
                                                                             // get post cost after invoice cost calculation and update on invoice
                                                                             currentCostPrice = MCost.GetproductCosts(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                                                            product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx());
+                                                                                                                            product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
                                                                             invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                         }
-                                                                        invoiceLine.SetIsCostCalculated(true);
-                                                                        if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                        //invoiceLine.SetIsCostCalculated(true);
+                                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                         {
                                                                             invoiceLine.SetIsCostImmediate(true);
                                                                         }
@@ -763,6 +771,10 @@ namespace VAdvantage.Process
                                                                             _log.Fine("Cost Calculation updated for m_invoiceline = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                             Get_Trx().Commit();
                                                                         }
+
+                                                                        // Update Product Cost on Product Transaction for the Invoice Line
+                                                                        UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                                        Get_Trx().Commit();
                                                                     }
                                                                 }
                                                             }
@@ -779,7 +791,8 @@ namespace VAdvantage.Process
                                                         if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0,
-                                                                "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(), costingCheck, out conversionNotFoundInvoice))
+                                                                "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(),
+                                                                costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -792,10 +805,10 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -820,7 +833,8 @@ namespace VAdvantage.Process
                                                     if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
                                                     {
                                                         if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
-                                                            "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(), costingCheck, out conversionNotFoundInvoice))
+                                                            "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(),
+                                                            costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                         {
                                                             if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                             {
@@ -833,10 +847,10 @@ namespace VAdvantage.Process
                                                         {
                                                             if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                             {
-                                                                invoiceLine.SetIsReversedCostCalculated(true);
+                                                                //invoiceLine.SetIsReversedCostCalculated(true);
                                                             }
-                                                            invoiceLine.SetIsCostCalculated(true);
-                                                            if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                            //invoiceLine.SetIsCostCalculated(true);
+                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                             {
                                                                 invoiceLine.SetIsCostImmediate(true);
                                                             }
@@ -869,7 +883,7 @@ namespace VAdvantage.Process
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -882,7 +896,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
                                                                 if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                 {
@@ -899,8 +913,8 @@ namespace VAdvantage.Process
                                                                         invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                     }
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -925,7 +939,7 @@ namespace VAdvantage.Process
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                               "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
-                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -938,7 +952,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
                                                                 if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                 {
@@ -955,8 +969,8 @@ namespace VAdvantage.Process
                                                                         invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                     }
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -987,7 +1001,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -998,19 +1012,37 @@ namespace VAdvantage.Process
                                                                 }
                                                                 else
                                                                 {
+                                                                    query.Clear();
+                                                                    query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                    DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                    int M_Locator_ID = 0;
+                                                                    int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                    if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                    {
+                                                                        M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                        if (M_Warehouse_ID == 0)
+                                                                        {
+                                                                            M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                        }
+                                                                    }
+
+
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
                                                                     if (invoiceLine.Get_ColumnIndex("PostCurrentCostPrice") >= 0 && invoiceLine.GetPostCurrentCostPrice() == 0)
                                                                     {
                                                                         // get post cost after invoice cost calculation and update on invoice
                                                                         currentCostPrice = MCost.GetproductCosts(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                                                        product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx());
+                                                                                           product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
                                                                         invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -1026,6 +1058,10 @@ namespace VAdvantage.Process
                                                                         _log.Fine("Cost Calculation updated for m_invoiceline = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                         Get_Trx().Commit();
                                                                     }
+
+                                                                    // Update Product Cost on Product Transaction for the Invoice Line
+                                                                    UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                                    Get_Trx().Commit();
                                                                 }
                                                             }
                                                         }
@@ -1037,35 +1073,35 @@ namespace VAdvantage.Process
                                             catch { }
                                         }
                                     }
-                                    sql.Clear();
-                                    sql.Append("SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine WHERE IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                    if (invoice.IsReversal())
-                                    {
-                                        sql.Append(" AND IsReversedCostCalculated = 'N' ");
-                                    }
-                                    else
-                                    {
-                                        sql.Append(" AND IsCostCalculated = 'N' ");
-                                    }
-                                    if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-                                    {
-                                        if (invoice.IsReversal())
-                                        {
-                                            invoice.SetIsReversedCostCalculated(true);
-                                        }
-                                        invoice.SetIsCostCalculated(true);
-                                        if (!invoice.Save(Get_Trx()))
-                                        {
-                                            ValueNamePair pp = VLogger.RetrieveError();
-                                            _log.Info("Error found for saving C_Invoice for this Record ID = " + invoice.GetC_Invoice_ID() +
-                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                        }
-                                        else
-                                        {
-                                            _log.Fine("Cost Calculation updated for m_invoice = " + invoice.GetC_Invoice_ID());
-                                            Get_Trx().Commit();
-                                        }
-                                    }
+                                    //sql.Clear();
+                                    //sql.Append("SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine WHERE IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                    //if (invoice.IsReversal())
+                                    //{
+                                    //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+                                    //}
+                                    //else
+                                    //{
+                                    //    sql.Append(" AND IsCostCalculated = 'N' ");
+                                    //}
+                                    //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+                                    //{
+                                    //    if (invoice.IsReversal())
+                                    //    {
+                                    //        invoice.SetIsReversedCostCalculated(true);
+                                    //    }
+                                    //    invoice.SetIsCostCalculated(true);
+                                    //    if (!invoice.Save(Get_Trx()))
+                                    //    {
+                                    //        ValueNamePair pp = VLogger.RetrieveError();
+                                    //        _log.Info("Error found for saving C_Invoice for this Record ID = " + invoice.GetC_Invoice_ID() +
+                                    //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        _log.Fine("Cost Calculation updated for m_invoice = " + invoice.GetC_Invoice_ID());
+                                    //        Get_Trx().Commit();
+                                    //    }
+                                    //}
                                     continue;
                                 }
                             }
@@ -1088,7 +1124,7 @@ namespace VAdvantage.Process
                                 costingCheck.product = product;
 
                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), landedCostAllocation.GetAD_Client_ID(), landedCostAllocation.GetAD_Org_ID(), product,
-                                     0, "LandedCost", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                     0, "LandedCost", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                 {
                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                     {
@@ -1195,7 +1231,7 @@ namespace VAdvantage.Process
                                     if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]).Equals("N"))
                                     {
                                         SqlParameter[] param = new SqlParameter[1];
-                                        param[0] = new SqlParameter("p_Record_Id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                        param[0] = new SqlParameter("p_record_id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
                                         param[0].SqlDbType = SqlDbType.Int;
                                         param[0].Direction = ParameterDirection.Input;
 
@@ -1206,27 +1242,41 @@ namespace VAdvantage.Process
                                     // count -> is there any record having cost not available on production line except finished good
                                     // if not found, then we will calculate cost of finished good else not.
                                     CountCostNotAvialable = 1;
-                                    CountCostNotAvialable = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(*) FROM m_productionline WHERE NVL(amt ,0) = 0  AND isactive = 'Y' AND m_product_id NOT IN
-                                                         (SELECT M_product_ID FROM M_productionplan WHERE m_production_id = "
-                                                          + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"  AND isactive = 'Y' )
-                                                        AND m_production_id = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
+                                    CountCostNotAvialable = Util.GetValueOfInt(DB.ExecuteScalar($@" SELECT
+                                                        COUNT(pl.m_productionline_id)
+                                                    FROM
+                                                        M_Production p
+                                                        INNER JOIN M_ProductionPlan pp ON ( p.M_Production_ID = pp.M_Production_ID )
+                                                        INNER JOIN M_ProductionLine pl ON ( pl.M_ProductionPlan_ID = pp.M_ProductionPlan_ID )
+                                                        INNER JOIN M_Product        pr ON ( pr.M_Product_ID = pl.M_Product_ID )
+                                                    WHERE NVL(pl.Amt, 0) = 0
+                                                        AND pl.IsActive = 'Y' AND pp.IsActive = 'Y' AND pl.MovementQty < 0 AND pr.IsFocItem = 'N'
+                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
 
                                     if (CountCostNotAvialable == 0 || countGOM01 > 0)
                                     {
+                                        DataSet dsCostingMethod = null;
+                                        int v_definedcostelement_id = 0;
+                                        string v_costinglevel = string.Empty;
+                                        decimal v_productapproxcost = 0;
+                                        decimal v_productcost = 0;
+
                                         // get record from production line based on production id
                                         sql.Clear();
                                         sql.Append(@"SELECT pl.M_ProductionLine_ID, pl.AD_Client_ID, pl.AD_Org_ID, p.MovementDate,  pl.M_Product_ID, 
-                                                        pl.M_AttributeSetInstance_ID, pl.MovementQty, pl.M_Locator_ID, wh.IsDisallowNegativeInv,  pl.M_Warehouse_ID ,
-                                                        p.IsCostCalculated, p.IsReversedCostCalculated,  p.IsReversed
-                                                FROM M_Production p INNER JOIN M_ProductionPlan pp  ON pp.M_Production_id = pp.M_Production_id
-                                                     INNER JOIN M_ProductionLine pl ON pl.M_ProductionPlan_id = pp.M_ProductionPlan_id
-                                                     INNER JOIN M_Product prod  ON pl.M_Product_id = prod.M_Product_id
-                                                     INNER JOIN M_Locator loc ON loc.M_Locator_id = pl.M_Locator_id
-                                                     INNER JOIN M_Warehouse wh ON loc.M_Warehouse_id     = wh.M_Warehouse_id
-                                                WHERE p.M_Production_ID   =pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID
+                                                        t.M_AttributeSetInstance_ID, t.MovementQty, pl.M_Locator_ID, wh.IsDisallowNegativeInv,  pl.M_Warehouse_ID ,
+                                                        p.IsCostCalculated, p.IsReversedCostCalculated,  p.IsReversed, t.M_Transaction_ID, p.M_Production_ID 
+                                                FROM M_Production p 
+                                                     INNER JOIN M_ProductionPlan pp ON (pp.M_Production_id = pp.M_Production_id)
+                                                     INNER JOIN M_ProductionLine pl ON (pl.M_ProductionPlan_id = pp.M_ProductionPlan_id)
+                                                     INNER JOIN M_Product prod ON (pl.M_Product_id = prod.M_Product_id)
+                                                     INNER JOIN M_Locator loc ON (loc.M_Locator_id = pl.M_Locator_id)
+                                                     INNER JOIN M_Warehouse wh ON (loc.M_Warehouse_id = wh.M_Warehouse_id)
+                                                     INNER JOIN M_Transaction t ON (t.M_ProductionLine_ID = pl.M_ProductionLine_ID) 
+                                                WHERE p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
                                                       AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
-                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID    = wh.M_Warehouse_ID");
+                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -1241,35 +1291,82 @@ namespace VAdvantage.Process
                                         {
                                             for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
                                             {
+                                                sql.Clear();
+                                                sql.Append($@" SELECT
+	                                                            CASE
+		                                                            WHEN M_Product_Category.costingmethod is not null
+		                                                            AND M_Product_Category.costingmethod = 'C' THEN NVL(M_Product_Category.m_costelement_id,0)
+		                                                            WHEN M_Product_Category.costingmethod is not null THEN (
+		                                                                SELECT m_costelement_id FROM m_costelement
+		                                                                WHERE costingmethod = M_Product_Category.costingmethod
+			                                                                AND ad_client_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"])} )
+		                                                                WHEN C_AcctSchema.costingmethod is not null
+		                                                                AND C_AcctSchema.costingmethod = 'C' THEN NVL(C_AcctSchema.m_costelement_id,0)
+		                                                            ELSE (
+		                                                                SELECT m_costelement_id FROM m_costelement
+		                                                                WHERE costingmethod = C_AcctSchema.costingmethod 
+			                                                                  AND ad_client_id ={Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"])})
+	                                                                END AS m_costelement_id,
+	                                                            CASE
+		                                                            WHEN M_Product_Category.costinglevel is not null THEN M_Product_Category.costinglevel
+		                                                            WHEN C_AcctSchema.costinglevel is not null THEN C_AcctSchema.costinglevel
+	                                                            END AS costinglevel
+                                                            FROM
+	                                                            M_Product
+                                                            INNER JOIN M_Product_Category on ( M_Product_Category.m_product_category_id = M_Product.m_product_category_id )
+                                                            INNER JOIN C_AcctSchema ON ( C_AcctSchema.c_acctschema_id = (
+	                                                            SELECT c_acctschema1_id FROM
+		                                                            AD_ClientInfo WHERE ad_client_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"])} ) )
+                                                            WHERE
+	                                                            M_Product.M_Product_ID = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"])} ");
+                                                dsCostingMethod = DB.ExecuteDataset(sql.ToString());
+                                                if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
+                                                {
+                                                    // Assigned Costing Element with Product
+                                                    v_definedcostelement_id = Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[0]["m_costelement_id"]);
+
+                                                    // Assigned Costing Level with Product
+                                                    v_costinglevel = Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[0]["costinglevel"]);
+
+                                                    // Get Product Cost Before Transaction
+                                                    v_productapproxcost = MCost.GetproductCosts(
+                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
+                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
+                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
+                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
+                                                        Get_Trx(),
+                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
+                                                }
+
                                                 #region Create & Open connection and Execute Procedure
                                                 try
                                                 {
-                                                    SqlParameter[] param = new SqlParameter[8];
-                                                    param[0] = new SqlParameter("p_M_Product_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
+                                                    SqlParameter[] param = new SqlParameter[9];
+                                                    param[0] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
                                                     param[0].SqlDbType = SqlDbType.Int;
                                                     param[0].Direction = ParameterDirection.Input;
 
-                                                    param[1] = new SqlParameter("p_M_AttributeSetInstance_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]));
+                                                    param[1] = new SqlParameter("p_m_attributesetinstance_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]));
                                                     param[1].SqlDbType = SqlDbType.Int;
                                                     param[1].Direction = ParameterDirection.Input;
 
-                                                    param[2] = new SqlParameter("p_AD_Org_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]));
+                                                    param[2] = new SqlParameter("p_ad_org_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]));
                                                     param[2].SqlDbType = SqlDbType.Int;
                                                     param[2].Direction = ParameterDirection.Input;
 
-                                                    param[3] = new SqlParameter("p_AD_Client_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]));
+                                                    param[3] = new SqlParameter("p_ad_client_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]));
                                                     param[3].SqlDbType = SqlDbType.Int;
                                                     param[3].Direction = ParameterDirection.Input;
 
-                                                    param[4] = new SqlParameter("p_Quantity", Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]));
+                                                    param[4] = new SqlParameter("p_quantity", Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]));
                                                     param[4].SqlDbType = SqlDbType.Decimal;
                                                     param[4].Direction = ParameterDirection.Input;
 
-                                                    param[5] = new SqlParameter("p_M_ProductionLine_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"]));
+                                                    param[5] = new SqlParameter("p_m_productionline_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"]));
                                                     param[5].SqlDbType = SqlDbType.Int;
                                                     param[5].Direction = ParameterDirection.Input;
 
-                                                    param[6] = new SqlParameter("p_M_Warehouse_ID", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
+                                                    param[6] = new SqlParameter("p_m_warehouse_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
                                                     param[6].SqlDbType = SqlDbType.Int;
                                                     param[6].Direction = ParameterDirection.Input;
 
@@ -1277,15 +1374,97 @@ namespace VAdvantage.Process
                                                     param[7].SqlDbType = SqlDbType.Date;
                                                     param[7].Direction = ParameterDirection.Input;
 
+                                                    param[8] = new SqlParameter("p_ismanual", "W"); // W - Manual, P - Process
+                                                    param[8].SqlDbType = SqlDbType.Char;
+                                                    param[8].Direction = ParameterDirection.Input;
+
                                                     DB.ExecuteProcedure("createcostqueueNotFRPT", param, Get_Trx());
 
-                                                    // update prodution header 
-                                                    if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("N"))
-                                                        DB.ExecuteQuery("UPDATE M_Production SET IsCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+                                                    // get Product Cost after Assembly
+                                                    v_productcost = MCost.GetproductCosts(
+                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
+                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
+                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
+                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
+                                                       Get_Trx(),
+                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
 
-                                                    if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("Y") &&
-                                                        !Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversedCostCalculated"]).Equals("N") && Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversed"]).Equals("Y"))
-                                                        DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+
+                                                    // Update Costing detial on Transaction
+                                                    DB.ExecuteQuery($@"UPDATE M_Transaction
+                                                                            SET
+	                                                                            costinglevel = {GlobalVariable.TO_STRING(v_costinglevel)},
+	                                                                            m_costelement_id = {v_definedcostelement_id},
+	                                                                            productapproxcost = {v_productapproxcost},
+	                                                                            productcost = {v_productcost}, 
+                                                                                UpdatedBy = {GetCtx().GetAD_User_ID()}, 
+                                                                                Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)}
+                                                                            WHERE
+	                                                                            m_transaction_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"])}");
+
+                                                    // Update Differnce Value on product Plan only
+                                                    // Component Cost - Finish Good Qty
+                                                    sql.Clear();
+                                                    sql.Append($@" SELECT
+                                                                    pp.m_productionplan_id,
+                                                                    pp.m_production_id,
+                                                                    pp.productionqty,
+                                                                    pp.vas_isreverseassembly
+                                                                FROM
+                                                                    m_productionplan pp
+                                                                    INNER JOIN m_product prod ON (prod.m_product_id = pp.m_product_id)
+                                                                WHERE
+                                                                    pp.m_production_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Production_ID"])}
+                                                                    AND prod.isbom = 'Y'
+                                                                    AND prod.isverified = 'Y' 
+                                                                ORDER BY
+                                                                    pp.line,
+                                                                    pp.m_product_id");
+                                                    dsCostingMethod = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                                                    if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
+                                                    {
+                                                        for (int k = 0; k < dsCostingMethod.Tables[0].Rows.Count; k++)
+                                                        {
+                                                            if (Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[k]["vas_isreverseassembly"]).Equals("N") &&
+                                                               Util.GetValueOfDecimal(dsCostingMethod.Tables[0].Rows[k]["productionqty"]) < 0)
+                                                            {
+                                                                sql.Clear();
+                                                                sql.Append($@" WITH production_costs AS (
+                                                                    SELECT
+                                                                        NVL(ABS(SUM(CASE WHEN MaterialType = 'C' AND NVL(M_Product_ID, 0) != 0 THEN MovementQty * Amt END)), 0) AS v_component_cost,
+                                                                        NVL(ABS(SUM(CASE WHEN MaterialType = 'F' AND NVL(M_Product_ID, 0) != 0 THEN MovementQty * Amt END)), 0) AS v_finishgood_cost
+                                                                    FROM
+                                                                        m_productionline
+                                                                    WHERE
+                                                                        m_production_id = { Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[k]["m_production_id"]) }
+                                                                        AND m_productionplan_id = { Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[k]["m_productionplan_id"]) }
+                                                                )
+                                                                UPDATE
+                                                                    m_productionplan
+                                                                SET
+                                                                    VAS_DifferenceValue = (production_costs.v_component_cost - production_costs.v_finishgood_cost), 
+                                                                                UpdatedBy = {GetCtx().GetAD_User_ID()}, 
+                                                                                Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)}
+                                                                FROM
+                                                                    production_costs
+                                                                WHERE
+                                                                    m_productionplan_id = { Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[k]["m_productionplan_id"]) } ");
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // update prodution header 
+                                                    //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("N"))
+                                                    //{
+                                                    //    DB.ExecuteQuery("UPDATE M_Production SET IsCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+                                                    //}
+
+                                                    //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("Y") &&
+                                                    //    !Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversedCostCalculated"]).Equals("N") &&
+                                                    //    Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversed"]).Equals("Y"))
+                                                    //{
+                                                    //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+                                                    //}
                                                 }
                                                 catch
                                                 {
@@ -1582,6 +1761,7 @@ namespace VAdvantage.Process
                                     {
                                         sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
                                                      " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                        sql.Append(@" AND IsCostImmediate = 'N' ");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -1636,7 +1816,7 @@ namespace VAdvantage.Process
                                                         if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0, "Invoice(Vendor)",
-                                                                null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -1650,10 +1830,10 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -1679,7 +1859,8 @@ namespace VAdvantage.Process
                                                         if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
-                                                                 "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                 "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(),
+                                                                 costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -1693,10 +1874,10 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -1739,7 +1920,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                       "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -1753,7 +1934,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
                                                                     if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                     {
@@ -1770,8 +1951,8 @@ namespace VAdvantage.Process
                                                                             invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                         }
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -1796,7 +1977,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -1809,7 +1990,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
                                                                     if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                     {
@@ -1826,8 +2007,8 @@ namespace VAdvantage.Process
                                                                             invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                         }
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -1859,7 +2040,7 @@ namespace VAdvantage.Process
                                                                 {
                                                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                       "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                     {
                                                                         if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                         {
@@ -1870,12 +2051,29 @@ namespace VAdvantage.Process
                                                                     }
                                                                     else
                                                                     {
+                                                                        query.Clear();
+                                                                        query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                        DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                        int M_Locator_ID = 0;
+                                                                        int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                        if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                        {
+                                                                            M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                            if (M_Warehouse_ID == 0)
+                                                                            {
+                                                                                M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                            }
+                                                                        }
+
                                                                         if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                         {
-                                                                            invoiceLine.SetIsReversedCostCalculated(true);
+                                                                            //invoiceLine.SetIsReversedCostCalculated(true);
                                                                         }
-                                                                        invoiceLine.SetIsCostCalculated(true);
-                                                                        if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                        //invoiceLine.SetIsCostCalculated(true);
+                                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                         {
                                                                             invoiceLine.SetIsCostImmediate(true);
                                                                         }
@@ -1889,6 +2087,12 @@ namespace VAdvantage.Process
                                                                         else
                                                                         {
                                                                             _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                            Get_Trx().Commit();
+
+                                                                            // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                                                                            currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                                               product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
+                                                                            UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
                                                                             Get_Trx().Commit();
                                                                         }
                                                                     }
@@ -1907,7 +2111,8 @@ namespace VAdvantage.Process
                                                         if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0,
-                                                                "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(), costingCheck, out conversionNotFoundInvoice))
+                                                                "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(),
+                                                                costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -1920,10 +2125,10 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -1949,7 +2154,7 @@ namespace VAdvantage.Process
                                                     {
                                                         if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
                                                             "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0,
-                                                            Get_TrxName(), costingCheck, out conversionNotFoundInvoice))
+                                                            Get_TrxName(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                         {
                                                             if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                             {
@@ -1962,10 +2167,10 @@ namespace VAdvantage.Process
                                                         {
                                                             if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                             {
-                                                                invoiceLine.SetIsReversedCostCalculated(true);
+                                                                //invoiceLine.SetIsReversedCostCalculated(true);
                                                             }
-                                                            invoiceLine.SetIsCostCalculated(true);
-                                                            if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                            //invoiceLine.SetIsCostCalculated(true);
+                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                             {
                                                                 invoiceLine.SetIsCostImmediate(true);
                                                             }
@@ -1998,7 +2203,7 @@ namespace VAdvantage.Process
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -2011,7 +2216,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
                                                                 if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                 {
@@ -2028,8 +2233,8 @@ namespace VAdvantage.Process
                                                                         invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                     }
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -2054,7 +2259,7 @@ namespace VAdvantage.Process
                                                         {
                                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                               "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
-                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -2067,7 +2272,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
-                                                                    invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
                                                                 }
                                                                 if (invoiceLine.GetM_InOutLine_ID() > 0)
                                                                 {
@@ -2084,8 +2289,8 @@ namespace VAdvantage.Process
                                                                         invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
                                                                     }
                                                                 }
-                                                                invoiceLine.SetIsCostCalculated(true);
-                                                                if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                //invoiceLine.SetIsCostCalculated(true);
+                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                 {
                                                                     invoiceLine.SetIsCostImmediate(true);
                                                                 }
@@ -2116,7 +2321,7 @@ namespace VAdvantage.Process
                                                             {
                                                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                                                                   "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
@@ -2127,12 +2332,30 @@ namespace VAdvantage.Process
                                                                 }
                                                                 else
                                                                 {
+                                                                    query.Clear();
+                                                                    query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                    DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                    int M_Locator_ID = 0;
+                                                                    int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                    if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                    {
+                                                                        M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                        if (M_Warehouse_ID == 0)
+                                                                        {
+                                                                            M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                        }
+                                                                    }
+
+
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
-                                                                        invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
                                                                     }
-                                                                    invoiceLine.SetIsCostCalculated(true);
-                                                                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
@@ -2147,6 +2370,12 @@ namespace VAdvantage.Process
                                                                     {
                                                                         _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                         Get_Trx().Commit();
+
+                                                                        // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                                                                        currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                                           product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
+                                                                        UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                                        Get_Trx().Commit();
                                                                     }
                                                                 }
                                                             }
@@ -2159,34 +2388,34 @@ namespace VAdvantage.Process
                                             catch { }
                                         }
                                     }
-                                    sql.Clear();
-                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                    {
-                                        sql.Append("SELECT COUNT(*) FROM C_InvoiceLine WHERE IsReversedCostCalculated = 'N' AND IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                    }
-                                    else
-                                    {
-                                        sql.Append("SELECT COUNT(*) FROM C_InvoiceLine WHERE IsCostCalculated = 'N' AND IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                    }
-                                    if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-                                    {
-                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                        {
-                                            invoice.SetIsReversedCostCalculated(true);
-                                        }
-                                        invoice.SetIsCostCalculated(true);
-                                        if (!invoice.Save(Get_Trx()))
-                                        {
-                                            ValueNamePair pp = VLogger.RetrieveError();
-                                            _log.Info("Error found for saving C_Invoice for this Record ID = " + invoice.GetC_Invoice_ID() +
-                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                        }
-                                        else
-                                        {
-                                            _log.Fine("Cost Calculation updated for C_Invoice = " + invoice.GetC_Invoice_ID());
-                                            Get_Trx().Commit();
-                                        }
-                                    }
+                                    //sql.Clear();
+                                    //if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                    //{
+                                    //    sql.Append("SELECT COUNT(*) FROM C_InvoiceLine WHERE IsReversedCostCalculated = 'N' AND IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                    //}
+                                    //else
+                                    //{
+                                    //    sql.Append("SELECT COUNT(*) FROM C_InvoiceLine WHERE IsCostCalculated = 'N' AND IsActive = 'Y' AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                    //}
+                                    //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+                                    //{
+                                    //    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                    //    {
+                                    //        invoice.SetIsReversedCostCalculated(true);
+                                    //    }
+                                    //    invoice.SetIsCostCalculated(true);
+                                    //    if (!invoice.Save(Get_Trx()))
+                                    //    {
+                                    //        ValueNamePair pp = VLogger.RetrieveError();
+                                    //        _log.Info("Error found for saving C_Invoice for this Record ID = " + invoice.GetC_Invoice_ID() +
+                                    //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                    //    }
+                                    //    else
+                                    //    {
+                                    //        _log.Fine("Cost Calculation updated for C_Invoice = " + invoice.GetC_Invoice_ID());
+                                    //        Get_Trx().Commit();
+                                    //    }
+                                    //}
                                     continue;
                                 }
                             }
@@ -2415,7 +2644,7 @@ namespace VAdvantage.Process
 
                 // for M_Production / M_ProductionLine
                 countRecord = 0;
-                countRecord = DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0 
+                countRecord = DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0, IsCostImmediate = 'N'  
                                                  WHERE M_Product_ID IN 
                                                  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 if (countRecord > 0)
@@ -2541,7 +2770,7 @@ namespace VAdvantage.Process
 
                 // for M_Production / M_ProductionLine
                 countRecord = 0;
-                countRecord = DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0 
+                countRecord = DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0 , IsCostImmediate = 'N'  
                                                  WHERE M_Product_ID IN  (" + productID + " )", null, Get_Trx());
                 if (countRecord > 0)
                     DB.ExecuteQuery(@"UPDATE M_Production  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N'
@@ -2624,7 +2853,7 @@ namespace VAdvantage.Process
                 DB.ExecuteQuery(@"UPDATE m_movement  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
 
                 // for M_Production / M_ProductionLine
-                DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0 WHERE NVL(C_Charge_ID,0) = 0 AND AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
+                DB.ExecuteQuery(@"UPDATE m_productionline SET Amt = 0 , IsCostImmediate = 'N'  WHERE NVL(C_Charge_ID,0) = 0 AND AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
                 DB.ExecuteQuery(@"UPDATE M_Production  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' WHERE AD_client_ID =  " + GetAD_Client_ID(), null, Get_Trx());
 
                 // for M_MatchInv
@@ -2679,6 +2908,7 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -2764,7 +2994,7 @@ namespace VAdvantage.Process
                                      Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])))
                                      : Decimal.Multiply(ProductOrderPriceActual, Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]))),
                                      Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])),
-                                     Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                     Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                 {
                                     if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                     {
@@ -2794,10 +3024,10 @@ namespace VAdvantage.Process
                                     }
                                     if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                     {
-                                        inoutLine.SetIsReversedCostCalculated(true);
+                                        //inoutLine.SetIsReversedCostCalculated(true);
                                     }
-                                    inoutLine.SetIsCostCalculated(true);
-                                    if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                    //inoutLine.SetIsCostCalculated(true);
+                                    //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                     {
                                         inoutLine.SetIsCostImmediate(true);
                                     }
@@ -2833,35 +3063,35 @@ namespace VAdvantage.Process
                     catch { }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            if (inout.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inout.IsReversal())
-                {
-                    inout.SetIsReversedCostCalculated(true);
-                }
-                inout.SetIsCostCalculated(true);
-                if (!inout.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
+            //if (inout.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostCalculated = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inout.IsReversal())
+            //    {
+            //        inout.SetIsReversedCostCalculated(true);
+            //    }
+            //    inout.SetIsCostCalculated(true);
+            //    if (!inout.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -2883,6 +3113,7 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -2969,7 +3200,7 @@ namespace VAdvantage.Process
                                       Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]))
                                     : Decimal.Multiply(ProductOrderPriceActual, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])),
                                       Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
-                                      Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                      Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                 {
                                     if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                     {
@@ -2999,10 +3230,10 @@ namespace VAdvantage.Process
                                     }
                                     if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                     {
-                                        inoutLine.SetIsReversedCostCalculated(true);
+                                        //inoutLine.SetIsReversedCostCalculated(true);
                                     }
-                                    inoutLine.SetIsCostCalculated(true);
-                                    if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                    //inoutLine.SetIsCostCalculated(true);
+                                    //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                     {
                                         inoutLine.SetIsCostImmediate(true);
                                     }
@@ -3038,35 +3269,35 @@ namespace VAdvantage.Process
                     catch { }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            if (inout.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inout.IsReversal())
-                {
-                    inout.SetIsReversedCostCalculated(true);
-                }
-                inout.SetIsCostCalculated(true);
-                if (!inout.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
+            //if (inout.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostCalculated = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inout.IsReversal())
+            //    {
+            //        inout.SetIsReversedCostCalculated(true);
+            //    }
+            //    inout.SetIsCostCalculated(true);
+            //    if (!inout.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -3088,6 +3319,7 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -3172,7 +3404,7 @@ namespace VAdvantage.Process
                                     #region Return to Vendor against without Vendor RMA
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                    "Return To Vendor", null, inoutLine, null, null, null, 0,
-                                   Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])), Get_TrxName(), costingCheck, out conversionNotFoundInOut))
+                                   Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])), Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3194,10 +3426,10 @@ namespace VAdvantage.Process
                                         }
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        //inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3255,7 +3487,7 @@ namespace VAdvantage.Process
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                         "Return To Vendor", null, inoutLine, null, null, null, amt,
                                         Decimal.Negate(Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])),
-                                        Get_TrxName(), costingCheck, out conversionNotFoundInOut))
+                                        Get_TrxName(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3269,10 +3501,10 @@ namespace VAdvantage.Process
                                     {
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        //inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3309,35 +3541,35 @@ namespace VAdvantage.Process
                     catch { }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            if (inout.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inout.IsReversal())
-                {
-                    inout.SetIsReversedCostCalculated(true);
-                }
-                inout.SetIsCostCalculated(true);
-                if (!inout.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
+            //if (inout.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostCalculated = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inout.IsReversal())
+            //    {
+            //        inout.SetIsReversedCostCalculated(true);
+            //    }
+            //    inout.SetIsCostCalculated(true);
+            //    if (!inout.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -3358,7 +3590,7 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostcalculated = 'N' AND il.IsCostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -3444,7 +3676,7 @@ namespace VAdvantage.Process
                                     }
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                    "Material Receipt", null, inoutLine, null, null, null, 0, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
-                                   Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                   Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3473,10 +3705,10 @@ namespace VAdvantage.Process
                                         }
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        //inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3558,7 +3790,7 @@ namespace VAdvantage.Process
                                     _log.Info("product cost " + inoutLine.GetM_Product_ID());
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                        "Material Receipt", null, inoutLine, null, null, null, amt,
-                                       Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]), Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                       Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3588,10 +3820,10 @@ namespace VAdvantage.Process
                                         }
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        //inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3636,36 +3868,36 @@ namespace VAdvantage.Process
                     }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            if (inout.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inout.IsReversal())
-                {
-                    inout.SetIsReversedCostCalculated(true);
-                }
-                inout.SetIsCostCalculated(true);
-                if (!inout.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
+            //if (inout.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostImmediate = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inout.IsReversal())
+            //    {
+            //        inout.SetIsReversedCostCalculated(true);
+            //    }
+            //    inout.SetIsCostCalculated(true);
+            //    if (!inout.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
 
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for m_inout = " + inout.GetM_InOut_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for m_inout = " + inout.GetM_InOut_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -3687,6 +3919,7 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -3777,7 +4010,7 @@ namespace VAdvantage.Process
 
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                    "Material Receipt", null, inoutLine, null, null, null, 0, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
-                                   Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                   Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3799,10 +4032,10 @@ namespace VAdvantage.Process
                                         }
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        //inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3880,7 +4113,7 @@ namespace VAdvantage.Process
 
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                        "Material Receipt", null, inoutLine, null, null, null, amt, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
-                                       Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                                       Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                     {
                                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                                         {
@@ -3902,10 +4135,10 @@ namespace VAdvantage.Process
                                         }
                                         if (inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
                                         {
-                                            inoutLine.SetIsReversedCostCalculated(true);
+                                            //inoutLine.SetIsReversedCostCalculated(true);
                                         }
-                                        inoutLine.SetIsCostCalculated(true);
-                                        if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
+                                        // inoutLine.SetIsCostCalculated(true);
+                                        //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
                                         }
@@ -3940,35 +4173,35 @@ namespace VAdvantage.Process
                     catch { }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            if (inout.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inout.IsReversal())
-                {
-                    inout.SetIsReversedCostCalculated(true);
-                }
-                inout.SetIsCostCalculated(true);
-                if (!inout.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
+            //if (inout.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostCalculated = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inout.IsReversal())
+            //    {
+            //        inout.SetIsReversedCostCalculated(true);
+            //    }
+            //    inout.SetIsCostCalculated(true);
+            //    if (!inout.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Inout = " + inout.GetM_InOut_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -4020,7 +4253,8 @@ namespace VAdvantage.Process
                 costingCheck.IsPOCostingethodBindedonProduct = isUpdatePostCurrentcostPriceFromMR;
 
                 // calculate cost of MR first if not calculate which is linked with that invoice line
-                if (!inoutLine.IsCostCalculated())
+                //if (!inoutLine.IsCostCalculated())
+                if (!inoutLine.IsCostImmediate())
                 {
                     // Transaction Update Query
                     query.Clear();
@@ -4040,7 +4274,7 @@ namespace VAdvantage.Process
                         "Material Receipt", null, inoutLine, null, invoiceLine, null,
                         order != null && order.GetDocStatus() != "VO" ? Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), inoutLine.GetMovementQty())
                         : Decimal.Multiply(ProductOrderPriceActual, inoutLine.GetQtyEntered()),
-                inoutLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut))
+                inoutLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
                         {
@@ -4074,7 +4308,8 @@ namespace VAdvantage.Process
                         {
                             inoutLine.SetPostCurrentCostPrice(currentCostPrice);
                         }
-                        inoutLine.SetIsCostCalculated(true);
+                        //inoutLine.SetIsCostCalculated(true);
+                        inoutLine.SetIsCostImmediate(true);
                         if (!inoutLine.Save(Get_Trx()))
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
@@ -4111,7 +4346,7 @@ namespace VAdvantage.Process
                       "Invoice(Vendor)", null, inoutLine, null, invoiceLine, null,
                     isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? ProductInvoiceLineCost
                     : Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvoice.GetQty()),
-                      matchInvoice.GetQty(), Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                      matchInvoice.GetQty(), Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                 {
                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                     {
@@ -4125,7 +4360,7 @@ namespace VAdvantage.Process
                 {
                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                     {
-                        invoiceLine.SetIsReversedCostCalculated(true);
+                        //invoiceLine.SetIsReversedCostCalculated(true);
                     }
 
                     invoiceLine.SetCurrentCostPrice(currentCostPrice);
@@ -4139,8 +4374,8 @@ namespace VAdvantage.Process
                         invoiceLine.SetCurrentCostPrice(currentCostPrice);
                     }
 
-                    invoiceLine.SetIsCostCalculated(true);
-                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                    //invoiceLine.SetIsCostCalculated(true);
+                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
                         invoiceLine.SetIsCostImmediate(true);
                     }
@@ -4162,7 +4397,8 @@ namespace VAdvantage.Process
                             matchInvoice.SetPostCurrentCostPrice(currentCostPrice);
                         }
                         // set is cost calculation true on match invoice
-                        matchInvoice.SetIsCostCalculated(true);
+                        //matchInvoice.SetIsCostCalculated(true);
+                        matchInvoice.SetIsCostImmediate(true);
                         if (!matchInvoice.Save(Get_Trx()))
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
@@ -4194,10 +4430,22 @@ namespace VAdvantage.Process
                                                  @" WHERE M_MatchInv_ID = " + matchInvoice.GetM_MatchInv_ID(), null, Get_Trx());
 
                             }
+
+                            // Update Product Cost on Product Transaction for the Invoice Line
+                            UpdateTransactionCostForInvoice(matchInvoice.GetPostCurrentCostPrice(), matchInvoice.GetC_InvoiceLine_ID(), costingCheck);
+                            Get_Trx().Commit();
                         }
                     }
                 }
             }
+        }
+
+        private bool UpdateTransactionCostForInvoice(decimal ProductCost, int C_InvoiceLine_ID, CostingCheck costingCheck)
+        {
+            return DB.ExecuteQuery($@"Update M_Transaction SET ProductCost = {ProductCost},
+                                    M_CostElement_ID = {costingCheck.definedCostingElement}, 
+                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)} 
+                                WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}", null, Get_Trx()) >= 0;
         }
 
         /// <summary>
@@ -4249,7 +4497,7 @@ namespace VAdvantage.Process
                       "Invoice(Vendor)", null, inoutLine, null, invoiceLine, null,
                     isCostAdjustableOnLost && matchInvCostReverse.GetQty() < Decimal.Negate(invoiceLine.GetQtyInvoiced()) ? ProductInvoiceLineCost : Decimal.Negate(Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvCostReverse.GetQty())),
                      decimal.Negate(matchInvCostReverse.GetQty()),
-                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                 {
                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                     {
@@ -4261,9 +4509,9 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    invoiceLine.SetIsReversedCostCalculated(true);
-                    invoiceLine.SetIsCostCalculated(true);
-                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                    //invoiceLine.SetIsReversedCostCalculated(true);
+                    //invoiceLine.SetIsCostCalculated(true);
+                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
                         invoiceLine.SetIsCostImmediate(true);
                     }
@@ -4298,6 +4546,12 @@ namespace VAdvantage.Process
                         {
                             Get_Trx().Commit();
                         }
+
+                        // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                        currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                 product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
+                        UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                        Get_Trx().Commit();
                     }
                 }
             }
@@ -4321,7 +4575,9 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
+
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
                 sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -4394,7 +4650,7 @@ namespace VAdvantage.Process
                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inventory.GetAD_Client_ID(), inventory.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                            "Internal Use Inventory", inventoryLine, null, null, null, null,
                            ((quantity < 0 && !inventory.IsReversal()) || (quantity > 0 && inventory.IsReversal())) ? Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) : 0,
-                           quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
+                           quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                                 {
@@ -4424,10 +4680,10 @@ namespace VAdvantage.Process
                                 }
                                 if (inventory.IsReversal())
                                 {
-                                    inventoryLine.SetIsReversedCostCalculated(true);
+                                    //inventoryLine.SetIsReversedCostCalculated(true);
                                 }
-                                inventoryLine.SetIsCostCalculated(true);
-                                if (client.IsCostImmediate() && !inventoryLine.IsCostImmediate())
+                                //inventoryLine.SetIsCostCalculated(true);
+                                //if (client.IsCostImmediate() && !inventoryLine.IsCostImmediate())
                                 {
                                     inventoryLine.SetIsCostImmediate(true);
                                 }
@@ -4493,7 +4749,8 @@ namespace VAdvantage.Process
 
                             //VIS:045: 12-Aug-2024, DevOps Task ID - 6102, Provide Cost from the inventory line if defined
                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inventory.GetAD_Client_ID(), inventory.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
-                           "Physical Inventory", inventoryLine, null, null, null, null, Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")), quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
+                           "Physical Inventory", inventoryLine, null, null, null, null, Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")), quantity,
+                           Get_Trx(), costingCheck, out conversionNotFoundInventory, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundInventory1.Contains(conversionNotFoundInventory))
                                 {
@@ -4523,10 +4780,10 @@ namespace VAdvantage.Process
                                 }
                                 if (inventory.GetDescription() != null && inventory.GetDescription().Contains("{->"))
                                 {
-                                    inventoryLine.SetIsReversedCostCalculated(true);
+                                    //inventoryLine.SetIsReversedCostCalculated(true);
                                 }
-                                inventoryLine.SetIsCostCalculated(true);
-                                if (client.IsCostImmediate() && !inventoryLine.IsCostImmediate())
+                                //inventoryLine.SetIsCostCalculated(true);
+                                //if (client.IsCostImmediate() && !inventoryLine.IsCostImmediate())
                                 {
                                     inventoryLine.SetIsCostImmediate(true);
                                 }
@@ -4560,37 +4817,37 @@ namespace VAdvantage.Process
                     }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_InventoryLine_ID) FROM M_InventoryLine WHERE IsActive = 'Y' AND M_Inventory_ID = " + inventory.GetM_Inventory_ID());
-            if (inventory.IsReversal())
-            {
-                sql.Append(" AND IsReversedCostCalculated = 'N'  ");
-            }
-            else
-            {
-                sql.Append(" AND IsCostCalculated = 'N'  ");
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_InventoryLine_ID) FROM M_InventoryLine WHERE IsActive = 'Y' AND M_Inventory_ID = " + inventory.GetM_Inventory_ID());
+            //if (inventory.IsReversal())
+            //{
+            //    sql.Append(" AND IsReversedCostCalculated = 'N'  ");
+            //}
+            //else
+            //{
+            //    sql.Append(" AND IsCostCalculated = 'N'  ");
+            //}
 
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (inventory.IsReversal())
-                {
-                    inventory.SetIsReversedCostCalculated(true);
-                }
-                inventory.SetIsCostCalculated(true);
-                if (!inventory.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    if (pp != null)
-                        _log.Info("Error found for saving Internal Use Inventory for this Record ID = " + inventory.GetM_Inventory_ID() +
-                                   " Error Name is " + pp.GetName());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Inventory = " + inventory.GetM_Inventory_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (inventory.IsReversal())
+            //    {
+            //        inventory.SetIsReversedCostCalculated(true);
+            //    }
+            //    inventory.SetIsCostCalculated(true);
+            //    if (!inventory.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        if (pp != null)
+            //            _log.Info("Error found for saving Internal Use Inventory for this Record ID = " + inventory.GetM_Inventory_ID() +
+            //                       " Error Name is " + pp.GetName());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Inventory = " + inventory.GetM_Inventory_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -4634,7 +4891,7 @@ namespace VAdvantage.Process
                     quantity = Decimal.Negate(Util.GetValueOfDecimal(po_AssetDisposal.Get_Value("VAFAM_Qty")));
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), Util.GetValueOfInt(po_AssetDisposal.Get_Value("AD_Client_ID")), Util.GetValueOfInt(po_AssetDisposal.Get_Value("AD_Org_ID")),
                         product, Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_AttributeSetInstance_ID")), "AssetDisposal",
-                        null, null, null, null, po_AssetDisposal, 0, quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory))
+                        null, null, null, null, po_AssetDisposal, 0, quantity, Get_Trx(), costingCheck, out conversionNotFoundInventory, optionalstr: "window"))
                     {
                         _log.Info("Cost not Calculated for Asset Dispose ID = " + VAFAM_AssetDisposal_ID +
                                             " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
@@ -4644,11 +4901,12 @@ namespace VAdvantage.Process
                     {
                         if (Util.GetValueOfInt(po_AssetDisposal.Get_Value("ReversalDoc_ID")) > 0)
                         {
-                            DB.ExecuteQuery("UPDATE VAFAM_AssetDisposal SET IsReversedCostCalculated='Y' WHERE VAFAM_AssetDisposal_ID = " + VAFAM_AssetDisposal_ID, null, Get_Trx());
+                            //DB.ExecuteQuery("UPDATE VAFAM_AssetDisposal SET IsReversedCostCalculated='Y' WHERE VAFAM_AssetDisposal_ID = " + VAFAM_AssetDisposal_ID, null, Get_Trx());
                         }
                         else
                         {
-                            DB.ExecuteQuery("UPDATE VAFAM_AssetDisposal SET ISCostCalculated='Y' WHERE VAFAM_AssetDisposal_ID = " + VAFAM_AssetDisposal_ID, null, Get_Trx());
+                            //DB.ExecuteQuery("UPDATE VAFAM_AssetDisposal SET ISCostCalculated='Y' WHERE VAFAM_AssetDisposal_ID = " + VAFAM_AssetDisposal_ID, null, Get_Trx());
+                            DB.ExecuteQuery("UPDATE VAFAM_AssetDisposal SET ISCostImmediate='Y' WHERE VAFAM_AssetDisposal_ID = " + VAFAM_AssetDisposal_ID, null, Get_Trx());
                         }
 
                         // Update M_Transaction with Cost Details
@@ -4709,6 +4967,7 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.iscostcalculated = 'N' ");
+                sql.Append(" AND il.iscostImmediate = 'N' ");
             }
             if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
             {
@@ -4783,7 +5042,7 @@ namespace VAdvantage.Process
                         #region for inventory move
                         if (!MCostQueue.CreateProductCostsDetails(GetCtx(), movement.GetAD_Client_ID(), movement.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                             "Inventory Move", null, null, movementLine, null, null, 0, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
-                            Get_Trx(), costingCheck, out conversionNotFoundMovement))
+                            Get_Trx(), costingCheck, out conversionNotFoundMovement, optionalstr: "window"))
                         {
                             if (!conversionNotFoundMovement1.Contains(conversionNotFoundMovement))
                             {
@@ -4797,7 +5056,7 @@ namespace VAdvantage.Process
                         {
                             if (movement.IsReversal())
                             {
-                                movementLine.SetIsReversedCostCalculated(true);
+                                //movementLine.SetIsReversedCostCalculated(true);
                             }
                             else
                             {
@@ -4835,8 +5094,8 @@ namespace VAdvantage.Process
                                     movementLine.SetToPostCurrentCostPrice(toCurrentCostPrice);
                                 }
                             }
-                            movementLine.SetIsCostCalculated(true);
-                            if (client.IsCostImmediate() && !movementLine.IsCostImmediate())
+                            //movementLine.SetIsCostCalculated(true);
+                            //if (client.IsCostImmediate() && !movementLine.IsCostImmediate())
                             {
                                 movementLine.SetIsCostImmediate(true);
                             }
@@ -4877,35 +5136,35 @@ namespace VAdvantage.Process
                     }
                 }
             }
-            sql.Clear();
-            sql.Append("SELECT COUNT(M_MovementLine_ID) FROM M_MovementLine WHERE IsActive = 'Y' AND M_Movement_ID = " + movement.GetM_Movement_ID());
-            if (movement.IsReversal())
-            {
-                sql.Append(@" AND IsReversedCostCalculated = 'N' ");
-            }
-            else
-            {
-                sql.Append(@" AND IsCostCalculated = 'N' ");
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (movement.IsReversal())
-                {
-                    movement.SetIsReversedCostCalculated(true);
-                }
-                movement.SetIsCostCalculated(true);
-                if (!movement.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving Inventory Move for this Record ID = " + movement.GetM_Movement_ID() +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for M_Movement = " + movement.GetM_Movement_ID());
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //sql.Append("SELECT COUNT(M_MovementLine_ID) FROM M_MovementLine WHERE IsActive = 'Y' AND M_Movement_ID = " + movement.GetM_Movement_ID());
+            //if (movement.IsReversal())
+            //{
+            //    sql.Append(@" AND IsReversedCostCalculated = 'N' ");
+            //}
+            //else
+            //{
+            //    sql.Append(@" AND IsCostCalculated = 'N' ");
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (movement.IsReversal())
+            //    {
+            //        movement.SetIsReversedCostCalculated(true);
+            //    }
+            //    movement.SetIsCostCalculated(true);
+            //    if (!movement.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving Inventory Move for this Record ID = " + movement.GetM_Movement_ID() +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for M_Movement = " + movement.GetM_Movement_ID());
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -4949,6 +5208,7 @@ namespace VAdvantage.Process
             {
                 sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
                              " AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
+                sql.Append(@" AND iscostImmediate = 'N' ");
                 if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 {
                     sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -5027,7 +5287,7 @@ namespace VAdvantage.Process
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? currentCostPrice : 0,
                                 countGOM01 > 0 ? Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity"))) :
-                                Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered"))), Get_Trx(), out conversionNotFoundInOut))
+                                Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered"))), Get_Trx(), out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
                                 {
@@ -5041,7 +5301,7 @@ namespace VAdvantage.Process
                             {
                                 if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null && Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
                                 {
-                                    po_WrkOdrTrnsctionLine.Set_Value("IsReversedCostCalculated", true);
+                                    //po_WrkOdrTrnsctionLine.Set_Value("IsReversedCostCalculated", true);
                                 }
                                 if (!string.IsNullOrEmpty(costingMethod) && !(woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore)
                                      || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory)))
@@ -5057,7 +5317,8 @@ namespace VAdvantage.Process
                                     po_WrkOdrTrnsctionLine.Set_Value("CurrentCostPrice", currentCostPrice);
                                 }
 
-                                po_WrkOdrTrnsctionLine.Set_Value("IsCostCalculated", true);
+                                //po_WrkOdrTrnsctionLine.Set_Value("IsCostCalculated", true);
+                                po_WrkOdrTrnsctionLine.Set_Value("IsCostImmediate", true);
                                 if (!po_WrkOdrTrnsctionLine.Save(Get_Trx()))
                                 {
                                     ValueNamePair pp = VLogger.RetrieveError();
@@ -5082,7 +5343,7 @@ namespace VAdvantage.Process
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? currentCostPrice : 0,
                                 countGOM01 > 0 ? Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity")) :
-                                Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered")), Get_Trx(), out conversionNotFoundInOut))
+                                Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered")), Get_Trx(), out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
                                 {
@@ -5096,9 +5357,10 @@ namespace VAdvantage.Process
                             {
                                 if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null && Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
                                 {
-                                    po_WrkOdrTrnsctionLine.Set_Value("IsReversedCostCalculated", true);
+                                    //po_WrkOdrTrnsctionLine.Set_Value("IsReversedCostCalculated", true);
                                 }
-                                po_WrkOdrTrnsctionLine.Set_Value("IsCostCalculated", true);
+                                //po_WrkOdrTrnsctionLine.Set_Value("IsCostCalculated", true);
+                                po_WrkOdrTrnsctionLine.Set_Value("IsCostImmediate", true);
                                 if (!po_WrkOdrTrnsctionLine.Save(Get_Trx()))
                                 {
                                     ValueNamePair pp = VLogger.RetrieveError();
@@ -5225,38 +5487,38 @@ namespace VAdvantage.Process
             }
             #endregion
 
-            sql.Clear();
-            if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null &&
-                Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
-            {
-                sql.Append(@"SELECT COUNT(*) FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsReversedCostCalculated = 'N'
-                                                     AND IsActive = 'Y' AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
-            }
-            else
-            {
-                sql.Append(@"SELECT COUNT(*) FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsCostCalculated = 'N' AND IsActive = 'Y'
-                                           AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
-            }
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            {
-                if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null &&
-                    Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
-                {
-                    po_WrkOdrTransaction.Set_Value("IsReversedCostCalculated", true);
-                }
-                po_WrkOdrTransaction.Set_Value("IsCostCalculated", true);
-                if (!po_WrkOdrTransaction.Save(Get_Trx()))
-                {
-                    ValueNamePair pp = VLogger.RetrieveError();
-                    _log.Info("Error found for saving Production execution for this Record ID = " + VAMFG_M_WrkOdrTransaction_ID +
-                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                }
-                else
-                {
-                    _log.Fine("Cost Calculation updated for Production Execution = " + VAMFG_M_WrkOdrTransaction_ID);
-                    Get_Trx().Commit();
-                }
-            }
+            //sql.Clear();
+            //if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null &&
+            //    Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
+            //{
+            //    sql.Append(@"SELECT COUNT(*) FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsReversedCostCalculated = 'N'
+            //                                         AND IsActive = 'Y' AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
+            //}
+            //else
+            //{
+            //    sql.Append(@"SELECT COUNT(*) FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsCostCalculated = 'N' AND IsActive = 'Y'
+            //                               AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
+            //}
+            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
+            //{
+            //    if (Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")) != null &&
+            //        Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->"))
+            //    {
+            //        po_WrkOdrTransaction.Set_Value("IsReversedCostCalculated", true);
+            //    }
+            //    po_WrkOdrTransaction.Set_Value("IsCostCalculated", true);
+            //    if (!po_WrkOdrTransaction.Save(Get_Trx()))
+            //    {
+            //        ValueNamePair pp = VLogger.RetrieveError();
+            //        _log.Info("Error found for saving Production execution for this Record ID = " + VAMFG_M_WrkOdrTransaction_ID +
+            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+            //    }
+            //    else
+            //    {
+            //        _log.Fine("Cost Calculation updated for Production Execution = " + VAMFG_M_WrkOdrTransaction_ID);
+            //        Get_Trx().Commit();
+            //    }
+            //}
         }
 
         /// <summary>
@@ -5345,13 +5607,14 @@ namespace VAdvantage.Process
                 costingCheck.product = product;
                 costingCheck.IsPOCostingethodBindedonProduct = isUpdatePostCurrentcostPriceFromMR;
 
-                if (inoutLine.IsCostCalculated())
+                //if (inoutLine.IsCostCalculated())
+                if (inoutLine.IsCostImmediate())
                 {
                     // when isCostAdjustableOnLost = true on product and movement qty on MR is less than invoice qty then consider MR qty else invoice qty
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                           "Invoice(Vendor)-Return", null, inoutLine, null, invoiceLine, null,
                         isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? Decimal.Negate(ProductInvoiceLineCost) : Decimal.Negate(Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvoice.GetQty())),
-                         Decimal.Negate(matchInvoice.GetQty()), Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                         Decimal.Negate(matchInvoice.GetQty()), Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                         {
@@ -5365,10 +5628,10 @@ namespace VAdvantage.Process
                     {
                         if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                         {
-                            invoiceLine.SetIsReversedCostCalculated(true);
+                            //invoiceLine.SetIsReversedCostCalculated(true);
                         }
-                        invoiceLine.SetIsCostCalculated(true);
-                        if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                        //invoiceLine.SetIsCostCalculated(true);
+                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                         {
                             invoiceLine.SetIsCostImmediate(true);
                         }
@@ -5385,7 +5648,8 @@ namespace VAdvantage.Process
                             Get_Trx().Commit();
 
                             // set is cost calculation true on match invoice
-                            matchInvoice.SetIsCostCalculated(true);
+                            //matchInvoice.SetIsCostCalculated(true);
+                            matchInvoice.SetIsCostImmediate(true);
                             if (matchInvoice.Get_ColumnIndex("PostCurrentCostPrice") >= 0)
                             {
                                 // get cost from Product Cost after cost calculation
@@ -5413,6 +5677,10 @@ namespace VAdvantage.Process
                                        $@" WHERE M_Transaction_ID IN (SELECT M_Transaction_ID FROM M_InoutLineMA 
                                                 WHERE M_InOutLine_ID = {inoutLine.GetM_InOutLine_ID()})", null, Get_Trx());
                                 }
+
+                                // Update Product Cost on Product Transaction for the Invoice Line
+                                UpdateTransactionCostForInvoice(matchInvoice.GetPostCurrentCostPrice(), matchInvoice.GetC_InvoiceLine_ID(), costingCheck);
+                                Get_Trx().Commit();
                             }
                         }
                     }
@@ -5468,7 +5736,7 @@ namespace VAdvantage.Process
                       "Invoice(Vendor)-Return", null, inoutLine, null, invoiceLine, null,
                     isCostAdjustableOnLost && matchInvCostReverse.GetQty() < Decimal.Negate(invoiceLine.GetQtyInvoiced()) ? Decimal.Negate(ProductInvoiceLineCost) : (Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvCostReverse.GetQty())),
                      matchInvCostReverse.GetQty(),
-                      Get_Trx(), costingCheck, out conversionNotFoundInvoice))
+                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                 {
                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                     {
@@ -5480,9 +5748,9 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    invoiceLine.SetIsReversedCostCalculated(true);
-                    invoiceLine.SetIsCostCalculated(true);
-                    if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                    //invoiceLine.SetIsReversedCostCalculated(true);
+                    //invoiceLine.SetIsCostCalculated(true);
+                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
                         invoiceLine.SetIsCostImmediate(true);
                     }
@@ -5509,6 +5777,13 @@ namespace VAdvantage.Process
                         {
                             Get_Trx().Commit();
                         }
+
+                        // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                        currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                 product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
+                        UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                        Get_Trx().Commit();
+
                     }
                 }
             }
