@@ -21,25 +21,25 @@ namespace VASLogic.Models
         public List<BankDetails> GetBankBalance(Ctx ctx)
         {
             List<BankDetails> getBankDetails = new List<BankDetails>();
-            string qry = @"SELECT C_BANKACCOUNT.AD_CLIENT_ID,
-                                    C_BANKACCOUNT.AD_ORG_ID,
-                                    C_BANKACCOUNT.C_BANK_ID,
-                                    C_BANKACCOUNT.C_BANKACCOUNT_ID,
-                                    C_BANKACCOUNT.C_CURRENCY_ID,
-                                    C_BANKACCOUNT.ACCOUNTNO,
+            string qry = @"SELECT C_BankAccount.AD_CLIENT_ID,
+                                    C_BankAccount.AD_ORG_ID,
+                                    C_BankAccount.C_BANK_ID,
+                                    C_BankAccount.C_BankAccount_ID,
+                                    C_BankAccount.C_CURRENCY_ID,
+                                    C_BankAccount.ACCOUNTNO,
                                     C_CURRENCY.ISO_CODE,C_BANK.NAME,
                                     C_CURRENCY.STDPRECISION,C_CURRENCY.CURSYMBOL,
-                                    C_BANKACCOUNTLINE.ENDINGBALANCE,
-                                    C_BANKACCOUNTLINE.STATEMENTDATE,BAL.BA
-                                FROM C_BANKACCOUNT
-                                    INNER JOIN BAL ON (BAL.C_BANKACCOUNT_ID = C_BANKACCOUNT.C_BANKACCOUNT_ID AND BAL.BA=1 )            
-                                    INNER JOIN C_BANKACCOUNTLINE ON (C_BANKACCOUNTLINE.C_BANKACCOUNTLINE_ID = BAL.C_BANKACCOUNTLINE_ID AND BAL.BA=1 
-                                    AND C_BANKACCOUNTLINE.C_BANKACCOUNT_ID=C_BANKACCOUNT.C_BANKACCOUNT_ID)
-                                    INNER JOIN C_BANK ON (C_BANKACCOUNT.C_BANK_ID = C_BANK.C_BANK_ID )
-                                    INNER JOIN C_CURRENCY ON (C_BANKACCOUNT.C_CURRENCY_ID = C_CURRENCY.C_CURRENCY_ID )
+                                    C_BankAccountLine.ENDINGBALANCE,
+                                    C_BankAccountLine.STATEMENTDATE,BAL.BA
+                                FROM C_BankAccount
+                                    INNER JOIN BAL ON (BAL.C_BankAccount_ID = C_BankAccount.C_BankAccount_ID AND BAL.BA=1 )            
+                                    INNER JOIN C_BankAccountLine ON (C_BankAccountLine.C_BankAccountLine_ID = BAL.C_BankAccountLine_ID AND BAL.BA=1 
+                                    AND C_BankAccountLine.C_BankAccount_ID=C_BankAccount.C_BankAccount_ID)
+                                    INNER JOIN C_BANK ON (C_BankAccount.C_BANK_ID = C_BANK.C_BANK_ID )
+                                    INNER JOIN C_CURRENCY ON (C_BankAccount.C_CURRENCY_ID = C_CURRENCY.C_CURRENCY_ID )
                                 WHERE C_BANK.ISACTIVE = 'Y'
-                                    AND C_BANKACCOUNT.ISACTIVE = 'Y'
-                                    AND C_BANKACCOUNTLINE.ISACTIVE = 'Y'
+                                    AND C_BankAccount.ISACTIVE = 'Y'
+                                    AND C_BankAccountLine.ISACTIVE = 'Y'
                                     AND C_CURRENCY.ISACTIVE = 'Y'";
 
             qry = MRole.GetDefault(ctx).AddAccessSQL(qry, "C_BankAccount", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW);
