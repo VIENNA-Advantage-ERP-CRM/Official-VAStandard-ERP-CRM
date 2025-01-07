@@ -419,18 +419,15 @@ namespace VASLogic.Models
             string docBaseTypeAR_AP= ISOtrx ? "('ARI','ARC')" : "('API','APC')";
 
             sql.Append($@"WITH InvoiceData AS (
-                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
-                             ci.AD_Client_ID,
+                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT ci.AD_Client_ID,
                              cs.C_InvoicePaySchedule_ID,
                              cd.DocBaseType,
                              cs.DueDate AS DateInvoiced,
-                             currencyConvert(cs.DueAmt ,cs.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,cs.AD_Client_ID ,cs.AD_Org_ID ) AS DueAmt
-                         FROM
-                             C_Invoice ci
+                             currencyConvert(cs.DueAmt,cs.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct,ci.C_ConversionType_ID,cs.AD_Client_ID,cs.AD_Org_ID) AS DueAmt
+                             FROM C_Invoice ci
                              INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
-                             WHERE cd.DocBaseType IN " + docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' AND cd.IsExpenseInvoice = 'N' ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
-                     )})
+                             WHERE cd.DocBaseType IN " + docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND cs.VA009_IsPaid='N' AND cd.IsExpenseInvoice = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW)})
                      SELECT
                          COUNT(C_InvoicePaySchedule_ID) AS countrec,
                                      NVL(
@@ -624,18 +621,18 @@ namespace VASLogic.Models
             }
             sql.Clear();
             sql.Append($@"WITH InvoiceData AS (
-                        {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
+                         {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
                              cb.Name,
                              cd.DocBaseType,
                              cb.Pic,
                              custimg.ImageExtension AS custImgExtension,
                              ci.AD_Client_ID,
                              ci.DateInvoiced,
-                             currencyConvert(ci.grandtotalafterwithholding ,ci.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,ci.AD_Client_ID ,ci.AD_Org_ID ) AS DueAmt
-                         FROM
+                             currencyConvert(ci.grandtotalafterwithholding,ci.C_Currency_ID ," + C_Currency_ID + @",ci.DateAcct ,ci.C_ConversionType_ID ,ci.AD_Client_ID ,ci.AD_Org_ID) AS DueAmt
+                             FROM
                              C_Invoice ci
-                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID = ci.C_BPartner_ID)
-                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
+                             INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=ci.C_BPartner_ID)
+                             INNER JOIN C_DocType cd ON (cd.C_DocType_ID=ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INT))
                              WHERE cd.DocBaseType IN "+ docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})");
@@ -872,61 +869,23 @@ namespace VASLogic.Models
             // Query for 'Hold' ON AP invoice
             else
             {
-                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT
-                 'Hold',
-                 nvl(
-                     SUM(
-                         CASE
-                         WHEN ci.isholdpayment = 'Y' THEN
-                             CASE
-                             WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
-                             currencyconvert(
-                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
-                             )
-                             ELSE
-                             0
-                             END
-                         ELSE
-                         CASE
-                         WHEN cd.docbasetype = " + docBaseTypeARI_APT + @"
-                              AND cs.isholdpayment = 'Y' THEN
-                             currencyconvert(
-                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
-                             )
-                         ELSE
-                         0
-                         END
-                         END
-                     ) - SUM(
-                         CASE
-                         WHEN ci.isholdpayment = 'Y' THEN
-                             CASE
-                             WHEN cd.docbasetype =" + docBaseTypeARC_APC + @"THEN
-                             currencyconvert(
-                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
-                             )
-                             ELSE
-                             0
-                             END
-                         ELSE
-                         CASE
-                         WHEN cd.docbasetype = " + docBaseTypeARC_APC + @"
-                              AND cs.isholdpayment = 'Y' THEN
-                             currencyconvert(
-                                 cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id
-                             )
-                         ELSE
-                         0
-                         END
-                         END
-                     ), 0
-                 )      AS sumamount
-             FROM
-                 c_invoice ci
-                 INNER JOIN c_invoicepayschedule cs ON ( cs.c_invoice_id = ci.c_invoice_id )
-                 INNER JOIN c_doctype            cd ON ( cd.c_doctype_id = ci.c_doctypetarget_id )
-             WHERE ci.docstatus IN ( 'CO', 'CL' ) AND cs.va009_ispaid = 'N'
-             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Hold',
+                 nvl(SUM(CASE WHEN ci.isholdpayment = 'Y' THEN CASE WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
+                 currencyconvert(cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id)
+                 ELSE 0 END ELSE CASE WHEN cd.docbasetype = " + docBaseTypeARI_APT + @"
+                 AND cs.isholdpayment = 'Y' THEN currencyconvert( cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", 
+                 ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id) ELSE 0 END END) - SUM(CASE
+                 WHEN ci.isholdpayment = 'Y' THEN CASE WHEN cd.docbasetype =" + docBaseTypeARC_APC + @"THEN
+                 currencyconvert(cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id)
+                 ELSE 0 END ELSE
+                 CASE WHEN cd.docbasetype = " + docBaseTypeARC_APC + @"
+                 AND cs.isholdpayment = 'Y' THEN
+                 currencyconvert(cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id)
+                 ELSE 0 END END ), 0) AS sumamount
+                 FROM c_invoice ci
+                 INNER JOIN c_invoicepayschedule cs ON (cs.c_invoice_id = ci.c_invoice_id)
+                 INNER JOIN c_doctype cd ON (cd.c_doctype_id = ci.c_doctypetarget_id)
+                 WHERE ci.docstatus IN ('CO','CL') AND cs.va009_ispaid = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             }
 
             // Query for 'InProgress'
@@ -974,7 +933,7 @@ namespace VASLogic.Models
                         0
                     ) AS SumAmount
              FROM C_Invoice ci
-             INNER JOIN C_DocType cd ON cd.C_DocType_ID = ci.C_DocTypeTarget_ID
+             INNER JOIN C_DocType cd ON (cd.C_DocType_ID = ci.C_DocTypeTarget_ID)
              INNER JOIN PeriodDetail pd ON (pd.AD_Client_ID=ci.AD_Client_ID)
              WHERE ci.DocStatus IN ('CO', 'CL') AND ci.DateInvoiced BETWEEN pd.StartDate AND pd.EndDate
             ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
@@ -1044,10 +1003,10 @@ namespace VASLogic.Models
             StringBuilder sqlGrn = new StringBuilder();
             StringBuilder sqlmain = new StringBuilder();
             List<ExpectedInvoice> invGrandTotalData = new List<ExpectedInvoice>();
-            string OrderCheck = (ISOtrx == true ? " AND o.IsSOTrx='Y' " : " AND o.IsSOTrx='N' ");
+            string OrderCheck = (ISOtrx == true ? " AND o.IsSOTrx='Y'" : " AND o.IsSOTrx='N'");
             string DeliveryCheck = (ISOtrx == true ? "min.IsSOTrx='Y'" : "min.IsSOTrx='N'");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
-            string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y' " : " AND cb.IsVendor='Y' ");
+            string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y'" : " AND cb.IsVendor='Y'");
             string DocBaseTypeCheck = (ISOtrx == true ? " AND dt.DocBaseType IN ('SOO')" :" AND dt.DocBaseType IN ('POO')");
             sql.Append($@"SELECT * FROM  (");
             //AL=ALL ,PO=Purchase Order,SO=Sales Order
@@ -1113,17 +1072,17 @@ namespace VASLogic.Models
                              LEFT JOIN C_InvoiceLine ci ON (ci.C_OrderLine_ID=l.C_OrderLine_ID AND ci.ReversalDoc_ID IS NULL)
                              LEFT JOIN M_Product cp ON (ci.M_Product_ID=cp.M_Product_ID)
                              LEFT JOIN M_InOutLine mil ON (mil.C_OrderLine_ID=l.C_OrderLine_ID)");
-                sqlOrder.Append(" WHERE o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + DocBaseTypeCheck + "");
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(" AND o.DocStatus IN ('CO') AND NVL(dt.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB') AND ar.Name='C_Order InvoiceRule'" + OrderCheck + BPCheck + DocBaseTypeCheck + "");
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {
-                    sqlOrder.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
+                    sqlmain.Append(" AND o.C_BPartner_ID=" + Util.GetValueOfInt(C_BPartner_ID));
                 }
                 /*if dates value are not null then implemeted fucntion to fetch sql*/
                 if (!String.IsNullOrEmpty(fromDate) || !String.IsNullOrEmpty(toDate))
                 {
-                    sqlOrder.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
+                    sqlmain.Append(GetExpInvDateSql("TRUNC(o.DateOrdered)", fromDate, toDate));
                 }
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlOrder.ToString(), "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
                 sqlmain.Append(@" GROUP BY o.C_Order_ID,cb.Pic,o.IsSoTrx,rsf.Name,");
                 sqlmain.Append(@"o.DocumentNo, o.DateOrdered,o.DateOrdered,o.DatePromised,cb.Name,o.AD_Client_ID,cy.StdPrecision,
                              cy.CurSymbol,o.C_BPartner_ID,l.C_OrderLine_ID,o.AD_Org_ID,l.linetotalamt");
@@ -1173,16 +1132,12 @@ namespace VASLogic.Models
                              WHEN o.InvoiceRule = 'O'AND EXISTS (SELECT 1
                              FROM C_OrderLine oline WHERE oline.C_Order_ID = o.C_Order_ID
                              AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y'
-                             ELSE 'N'
-                             END AS IsNotFullyDelivered,
-                             SUM(CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) 
-                             * (ol.LineTotalAmt) / NULLIF(ol.qtyordered, 0),cy.StdPrecision)
-                             ELSE(COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0)) * l.CurrentCostPrice
-                             END
-                             ) AS TotalValue,
+                             ELSE 'N' END AS IsNotFullyDelivered,
+                             SUM(CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN 
+                             ROUND((COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0))*(ol.LineTotalAmt)/NULLIF(ol.qtyordered, 0),cy.StdPrecision)
+                             ELSE (COALESCE(l.movementqty, 0) - COALESCE(ci.qtyinvoiced, 0))*l.CurrentCostPrice END) AS TotalValue,
                              min.MovementDate AS DateOrdered
-                             FROM
-                             M_InOut min
+                             FROM M_InOut min
                              INNER JOIN M_InOutLine l ON (l.M_InOut_ID=min.M_InOut_ID)
                              INNER JOIN C_BPartner cb ON (min.C_BPartner_ID=cb.C_BPartner_ID)
                              LEFT JOIN C_InvoiceLine ci ON (ci.m_inoutline_ID=l.m_inoutline_ID AND ci.ReversalDoc_ID IS NULL)
@@ -1192,26 +1147,22 @@ namespace VASLogic.Models
                              INNER JOIN ad_reference ar ON (ar.ad_reference_id=rsf.ad_reference_id AND ar.name='C_Order InvoiceRule')
                              WHERE rsf.IsActive='Y') invrule on (o.invoicerule=invrule.value)
                              LEFT JOIN C_Currency cy ON (cy.C_Currency_ID=o.C_Currency_ID)");
-                sqlGrn.Append(@" WHERE NOT EXISTS (SELECT 1 FROM c_orderline ol2
+                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                sqlmain.Append(@" AND NOT EXISTS (SELECT 1 FROM c_orderline ol2
                              WHERE ol2.C_OrderLine_ID = ol.C_OrderLine_ID
                              AND COALESCE(ol2.qtyordered, 0) = COALESCE(ol2.qtyinvoiced, 0))
                              AND min.DocStatus IN ('CO','CL')
                              AND " + DeliveryCheck + BPCheck + "");
-                sqlGrn.Append(@" GROUP BY
-                             min.M_InOut_ID,cb.Pic,o.IsSoTrx,invrule.Name, o.InvoiceRule, min.DocumentNo, min.MovementDate,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
+                sqlmain.Append(@"GROUP BY min.M_InOut_ID,cb.Pic,o.IsSoTrx,invrule.Name, o.InvoiceRule, min.DocumentNo, min.MovementDate,
+                             CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DateOrdered
                              ELSE min.MovementDate
                              END,CASE WHEN l.C_OrderLine_ID IS NOT NULL THEN o.DatePromised
                              ELSE min.MovementDate END,
-                             CASE 
-                             WHEN o.InvoiceRule = 'O' AND EXISTS (SELECT 1 FROM C_OrderLine oline WHERE oline.C_Order_ID = o.C_Order_ID
-                             AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y'
-                             ELSE 'N'
-                             END,
+                             CASE WHEN o.InvoiceRule = 'O' AND EXISTS (SELECT 1 FROM C_OrderLine oline WHERE oline.C_Order_ID = o.C_Order_ID
+                             AND oline.QtyOrdered <> oline.QtyDelivered) THEN 'Y' ELSE 'N' END,
                              cb.Name,min.AD_Client_ID,cy.StdPrecision,
                              cy.CurSymbol,min.C_BPartner_ID,min.AD_Org_ID
-                             HAVING
-                             SUM(coalesce(l.movementqty, 0) - coalesce(ci.qtyinvoiced, 0)) > 0");
-                sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(sqlGrn.ToString(), "min", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
+                             HAVING SUM(coalesce(l.movementqty, 0)-coalesce(ci.qtyinvoiced, 0))>0");
 
                 if (Util.GetValueOfInt(C_BPartner_ID) != 0)
                 {

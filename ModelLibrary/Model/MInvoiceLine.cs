@@ -5064,6 +5064,7 @@ namespace VAdvantage.Model
 
                                 log.Info("Inserted " + inserted);
                                 AllocateLandedCostRounding();
+                                 SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                                 return "";
                             }
                             else
@@ -5102,6 +5103,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -5175,6 +5177,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5303,6 +5306,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5350,6 +5354,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5461,6 +5466,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         //	Single Product
@@ -5493,6 +5499,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -5975,6 +5982,7 @@ namespace VAdvantage.Model
                 #endregion
                 log.Info("Inserted " + inserted);
                 AllocateLandedCostRounding();
+                SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
             }
             catch (Exception ex)
             {
@@ -5982,7 +5990,15 @@ namespace VAdvantage.Model
             }
             return "";
         }
-
+        /// <summary>
+        /// This Function is used to set VAS_IsLandedCost true on invoice line
+        /// </summary>
+        /// <param name="C_InvoiceLine_ID">C_InvoiceLine_ID</param>
+        /// <author>VIS_427</author>
+        public void SetVAS_IsLandedCost(int C_InvoiceLine_ID)
+        {
+         DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID="+ C_InvoiceLine_ID, null, Get_Trx());
+        }
         /// <summary>
         /// This function is used to get difference value between expecetd landed cost and actual landed cost invoice
         /// </summary>

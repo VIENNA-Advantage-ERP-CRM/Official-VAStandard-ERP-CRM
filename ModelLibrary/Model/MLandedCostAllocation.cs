@@ -142,7 +142,7 @@ namespace VAdvantage.Model
         public void SetQty(Decimal Qty)
         {
             base.SetQty(Qty);
-        }	//	setQty
+        }   //	setQty
 
 
     }
