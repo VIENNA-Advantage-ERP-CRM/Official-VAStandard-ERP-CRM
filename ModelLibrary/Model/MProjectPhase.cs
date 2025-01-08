@@ -238,36 +238,39 @@ namespace VAdvantage.Model
                 if (toTask.Save())
                 {
                     //VIS0336:for binding the dms documents on task tab of project window when inserting data from project template
-                    string DOCMETAID = null;
-                    StringBuilder sql = new StringBuilder();
-                    sql.Clear();
-                    sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_ProjectTemplates'");
-                    int ProjectTempwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                    if (Env.IsModuleInstalled("VA107_") && Env.IsModuleInstalled("VADMS_"))
+                    {
+                        string DOCMETAID = null;
+                        StringBuilder sql = new StringBuilder();
+                        sql.Clear();
+                        sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_ProjectTemplates'");
+                        int ProjectTempwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
 
-                    sql.Clear();
-                    sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_Project'");
-                    int Projectwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                        sql.Clear();
+                        sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_Project'");
+                        int Projectwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
 
-                    sql.Clear();
-                    sql.Append(@"SELECT WL.VADMS_Document_ID || '-' || MD.VADMS_MetaData_ID AS DocMetaID,WL.VADMS_Document_ID,D.Name FROM VADMS_Windowdoclink WL 
+                        sql.Clear();
+                        sql.Append(@"SELECT WL.VADMS_Document_ID || '-' || MD.VADMS_MetaData_ID AS DocMetaID,WL.VADMS_Document_ID,D.Name FROM VADMS_Windowdoclink WL 
                             INNER JOIN VADMS_MetaData MD ON MD.VADMS_Document_ID = WL.VADMS_Document_ID INNER JOIN VADMS_Document D ON D.VADMS_Document_ID = WL.VADMS_Document_ID 
                             WHERE WL.Record_ID =" + Util.GetValueOfInt(toTask.GetC_Task_ID()) + " AND WL.AD_Table_ID =" + X_C_Task.Table_ID + " AND WL.AD_Window_ID =" + ProjectTempwindowid + "");
-                    DataSet DS = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                    if (DS != null && DS.Tables[0].Rows.Count > 0)
-                    {
-                        for (int j = 0; j < DS.Tables[0].Rows.Count; j++)
+                        DataSet DS = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                        if (DS != null && DS.Tables[0].Rows.Count > 0)
                         {
-                            DOCMETAID = Util.GetValueOfString(DS.Tables[0].Rows[j]["DocMetaID"]);
-
-                            //Attach Document on MBPartner
-                            string msg = AttachFrom(GetCtx(), DOCMETAID, Projectwindowid, X_C_ProjectTask.Table_ID, toTask.GetC_ProjectTask_ID());
-                            if (msg != "OK")
+                            for (int j = 0; j < DS.Tables[0].Rows.Count; j++)
                             {
-                               // return msg;
-                            }
+                                DOCMETAID = Util.GetValueOfString(DS.Tables[0].Rows[j]["DocMetaID"]);
 
+                                //Attach Document on MBPartner
+                                string msg = AttachFrom(GetCtx(), DOCMETAID, Projectwindowid, X_C_ProjectTask.Table_ID, toTask.GetC_ProjectTask_ID());
+                                if (msg != "OK")
+                                {
+                                    // return msg;
+                                }
+
+                            }
                         }
                     }
 
@@ -557,7 +560,7 @@ namespace VAdvantage.Model
                 for (int j = 0; j < strDocIds.Count(); j++)
                 {
                     strMetaId = strDocIds[j].Split('-');
-                   
+
                     VAdvantage.Model.X_VADMS_WindowDocLink wlink = null;
                     wlink = new VAdvantage.Model.X_VADMS_WindowDocLink(ctx, 0, null);
                     wlink.SetAD_Client_ID(ctx.GetAD_Client_ID());
