@@ -15,6 +15,8 @@ using VAdvantage.Classes;
 using VAdvantage.Utility;
 using VAdvantage.Logging;
 using VAdvantage.DataBase;
+using ViennaAdvantage.Model;
+using System.Linq;
 
 namespace VAdvantage.Model
 {
@@ -75,10 +77,10 @@ namespace VAdvantage.Model
         public MProjectPhase(MProject project, MProjectTypePhase phase)
             : this(project)
         {
-           
+
 
             //
-            
+
             SetC_Phase_ID(phase.GetC_Phase_ID());			//	FK
             SetName(phase.GetName());
             //SetSeqNo(phase.GetSeqNo());
@@ -235,6 +237,40 @@ namespace VAdvantage.Model
                 MProjectTask toTask = new MProjectTask(this, fromTasks[i]);
                 if (toTask.Save())
                 {
+                    //VIS0336:for binding the dms documents on task tab of project window when inserting data from project template
+                    string DOCMETAID = null;
+                    StringBuilder sql = new StringBuilder();
+                    sql.Clear();
+                    sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_ProjectTemplates'");
+                    int ProjectTempwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+
+
+                    sql.Clear();
+                    sql.Append("SELECT AD_Window_ID From AD_Window WHERE Name='VA107_Project'");
+                    int Projectwindowid = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+
+
+                    sql.Clear();
+                    sql.Append(@"SELECT WL.VADMS_Document_ID || '-' || MD.VADMS_MetaData_ID AS DocMetaID,WL.VADMS_Document_ID,D.Name FROM VADMS_Windowdoclink WL 
+                            INNER JOIN VADMS_MetaData MD ON MD.VADMS_Document_ID = WL.VADMS_Document_ID INNER JOIN VADMS_Document D ON D.VADMS_Document_ID = WL.VADMS_Document_ID 
+                            WHERE WL.Record_ID =" + Util.GetValueOfInt(toTask.GetC_Task_ID()) + " AND WL.AD_Table_ID =" + X_C_Task.Table_ID + " AND WL.AD_Window_ID =" + ProjectTempwindowid + "");
+                    DataSet DS = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                    if (DS != null && DS.Tables[0].Rows.Count > 0)
+                    {
+                        for (int j = 0; j < DS.Tables[0].Rows.Count; j++)
+                        {
+                            DOCMETAID = Util.GetValueOfString(DS.Tables[0].Rows[j]["DocMetaID"]);
+
+                            //Attach Document on MBPartner
+                            string msg = AttachFrom(GetCtx(), DOCMETAID, Projectwindowid, X_C_ProjectTask.Table_ID, toTask.GetC_ProjectTask_ID());
+                            if (msg != "OK")
+                            {
+                               // return msg;
+                            }
+
+                        }
+                    }
+
                     // check if table exists then only it will copy the task lines
                     if (PO.Get_Table_ID("C_TaskLine") > 0)
                         tasklinecount = CopyMTaskLines(fromTasks[i].GetC_Task_ID(), toTask.GetC_ProjectTask_ID());
@@ -499,6 +535,70 @@ namespace VAdvantage.Model
                 ds.Dispose();
             }
             return true;
+        }
+
+        /// <summary>
+        /// VIS0336-for attaching the dms document on project window task tab whne project template process runs from project header
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="docID"></param>
+        /// <param name="winID"></param>
+        /// <param name="tableID"></param>
+        /// <param name="recID"></param>
+        /// <returns></returns>
+        public string AttachFrom(Ctx ctx, string docID, int winID, int tableID, int recID)
+        {
+            bool isSuccessFullAttach = false;
+            string[] strDocIds = docID.Split(',');
+            string[] strMetaId = null;
+            StringBuilder sql = new StringBuilder();
+            if (strDocIds.Count() > 0)
+            {
+                for (int j = 0; j < strDocIds.Count(); j++)
+                {
+                    strMetaId = strDocIds[j].Split('-');
+                   
+                    VAdvantage.Model.X_VADMS_WindowDocLink wlink = null;
+                    wlink = new VAdvantage.Model.X_VADMS_WindowDocLink(ctx, 0, null);
+                    wlink.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                    wlink.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                    wlink.SetAD_Table_ID(tableID);
+                    wlink.SetAD_Window_ID(winID);
+                    wlink.SetRecord_ID(recID);
+                    if (strDocIds[j].Trim() != string.Empty)
+                    {
+                        wlink.SetVADMS_Document_ID(Convert.ToInt32(strMetaId[0]));
+                    }
+                    if (wlink.Save())
+                    {
+                        X_VADMS_AttachMetaData objAttachMetaData = new X_VADMS_AttachMetaData(ctx, 0, null);
+                        objAttachMetaData.SetVADMS_WindowDocLink_ID(wlink.Get_ID());
+                        objAttachMetaData.SetVADMS_Document_ID(wlink.GetVADMS_Document_ID());
+                        objAttachMetaData.SetVADMS_MetaData_ID(Convert.ToInt32(strMetaId[1]));
+                        if (objAttachMetaData.Save())
+                        {
+                            isSuccessFullAttach = true;
+                        }
+                        else
+                        {
+                            return Msg.GetMsg(GetCtx(), "NotSaved");
+                        }
+                    }
+                    else
+                    {
+                        return Msg.GetMsg(GetCtx(), "NotSaved");
+                    }
+                }
+            }
+            if (!isSuccessFullAttach)
+            {
+                return Msg.GetMsg(GetCtx(), "DocumentNotAttach");
+            }
+
+            else
+            {
+                return "OK";
+            }
         }
 
     }
