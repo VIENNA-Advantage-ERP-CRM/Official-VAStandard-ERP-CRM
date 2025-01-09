@@ -58,7 +58,7 @@ namespace VAdvantage.Model
         protected override bool BeforeSave(bool newRecord)
         {
             // amount not be ZERO
-            if(GetAmt() == 0)
+            if (GetAmt() == 0)
             {
                 log.SaveError("AmtCantbeZero", "");
                 return false;
@@ -80,6 +80,25 @@ namespace VAdvantage.Model
             }
             // end 
 
+            return true;
+        }
+
+        /// <summary>
+        /// Implement After Save method to check some conditions after saving the record
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <param name="success"></param>
+        /// <returns>true, when all condition set or passed</returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            //VAI050- On new record and currency changed check the conversion found or not of selected currency
+            if (newRecord || Is_ValueChanged("C_Currency_ID"))
+            {
+                if (!CheckConversionrate())
+                {
+                    log.SaveWarning("", Msg.GetMsg(GetCtx(), "NoCurrencyConversion"));
+                }
+            }
             return true;
         }
 
@@ -226,7 +245,7 @@ namespace VAdvantage.Model
                 }
                 _expectedDistributionlines[0].SetBase(baseValue);
                 _expectedDistributionlines[0].SetQty(orderLines[0].GetQtyOrdered());
-                _expectedDistributionlines[0].SetAmt(GetAmt() , orderLines[0].GetPrecision());
+                _expectedDistributionlines[0].SetAmt(GetAmt(), orderLines[0].GetPrecision());
                 if (!_expectedDistributionlines[0].Save())
                 {
                     pp = VLogger.RetrieveError();
@@ -307,5 +326,21 @@ namespace VAdvantage.Model
             }
         }
 
+        //VAI050-Check Currency conversion defined or not
+        public bool CheckConversionrate()
+        {
+            int BaseCurrency = GetCtx().GetContextAsInt("$C_Currency_ID");
+            if (BaseCurrency != Get_ValueAsInt("C_Currency_ID"))
+            {
+                DateTime? DateOrdered = Util.GetValueOfDateTime(DB.ExecuteScalar("SELECT DateOrdered FROM C_Order WHERE C_Order_ID = " + GetC_Order_ID()));
+                decimal ConversionRate = MConversionRate.GetRate(Get_ValueAsInt("C_Currency_ID"), BaseCurrency, DateOrdered, Get_ValueAsInt("C_ConversionType_ID"), GetAD_Client_ID(), GetAD_Org_ID());
+                if (ConversionRate > 0)
+                {
+                    return true;
+                }
+                return false;
+            }
+            return true;
+        }
     }
 }
