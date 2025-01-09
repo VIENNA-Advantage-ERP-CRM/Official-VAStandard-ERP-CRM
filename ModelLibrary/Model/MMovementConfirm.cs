@@ -688,6 +688,10 @@ namespace VAdvantage.Model
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }
+                //VAI050-Set target qty and difference qty after completion
+                confirm.SetTargetQty(Decimal.Subtract(confirm.GetTargetQty(), confirm.GetDifferenceQty()));
+                confirm.SetDifferenceQty(Env.ZERO);
+                confirm.Save(Get_TrxName());
             }	//	for all lines
 
             if (_inventoryInfo != null)
@@ -748,6 +752,7 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             Save(Get_Trx());
+            
             //Adde by Arpit To complete The Inventory Move if Move Confirmation is completed ,16th Dec,2016
             MMovement Mov = new MMovement(GetCtx(), GetM_Movement_ID(), Get_Trx());
             if (move.GetDocStatus() != DOCSTATUS_Completed)
