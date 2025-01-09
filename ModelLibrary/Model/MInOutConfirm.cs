@@ -931,6 +931,8 @@ namespace VAdvantage.Model
 
             // if we don't processed the record then shipment can't be completed
             SetProcessed(true);
+            //VAI050-Set description field after completion
+            AddDescription(Msg.ParseTranslation(GetCtx(), _processMsg));
             if (!Save(Get_Trx()))
             {
                 GetCtx().SetContext("DifferenceQty_", "0");
@@ -1062,8 +1064,7 @@ namespace VAdvantage.Model
                     throw new Exception("Cannot save Split Confirmation");
             }	//	for all confirmations
 
-            _processMsg = "Split @M_InOut_ID@=" + split.GetDocumentNo()
-                + " - @M_InOutConfirm_ID@=";
+            _processMsg = "Split @M_InOut_ID@=" + split.GetDocumentNo();
 
             //	Create Dispute Confirmation
             split.ProcessIt(DocActionVariables.ACTION_PREPARE);
@@ -1085,7 +1086,8 @@ namespace VAdvantage.Model
                 }
                 splitConfirms[index].SetIsInDispute(true);
                 splitConfirms[index].Save(Get_TrxName());
-                _processMsg += splitConfirms[index].GetDocumentNo();
+                _processMsg += " - @M_InOutConfirm_ID@=" +
+                splitConfirms[index].GetDocumentNo();
                 //	Set Lines to unconfirmed
                 MInOutLineConfirm[] splitConfirmLines = splitConfirms[index].GetLines(false);
                 for (int i = 0; i < splitConfirmLines.Length; i++)
@@ -1096,10 +1098,10 @@ namespace VAdvantage.Model
                     splitConfirmLine.Save(Get_TrxName());
                 }
             }
-            else
-            {
-                _processMsg += "??";
-            }
+            //else
+            //{
+            //    _processMsg += "??";
+            //}
 
         }
 
