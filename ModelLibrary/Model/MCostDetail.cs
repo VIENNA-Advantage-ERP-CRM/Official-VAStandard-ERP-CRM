@@ -127,6 +127,7 @@ namespace VAdvantage.Model
                 cd.SetM_Warehouse_ID(M_Warehouse_ID);
                 if (WindowName == "Physical Inventory" || WindowName == "Internal Use Inventory")
                 {
+                    cd.Set_Value("MovementDate", inventoryLine.GetParent().GetMovementDate());
                     cd.SetM_InventoryLine_ID(inventoryLine.GetM_InventoryLine_ID());
                     if (AD_Org_ID == 0)
                     {
@@ -135,6 +136,7 @@ namespace VAdvantage.Model
                 }
                 if (WindowName == "AssetDisposal")
                 {
+                    cd.Set_Value("MovementDate", Util.GetValueOfDateTime(po.Get_Value("DateAcct")));
                     cd.Set_Value("VAFAM_AssetDisposal_ID", po.Get_Value("VAFAM_AssetDisposal_ID"));
                     if (AD_Org_ID == 0)
                     {
@@ -143,6 +145,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName == "Production Execution" || WindowName.Equals("PE-FinishGood"))
                 {
+                    cd.Set_Value("MovementDate", Util.GetValueOfDateTime(po.Get_Value("VAMFG_DateAcct")));
                     cd.SetVAMFG_M_WrkOdrTrnsctionLine_ID(Util.GetValueOfInt(po.Get_Value("VAMFG_M_WrkOdrTrnsctionLine_ID")));
                     if (AD_Org_ID == 0)
                     {
@@ -151,6 +154,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName == "Inventory Move")
                 {
+                    cd.Set_Value("MovementDate", movementline.GetParent().GetMovementDate());
                     cd.SetM_MovementLine_ID(movementline.GetM_MovementLine_ID());
                     if (AD_Org_ID == 0)
                     {
@@ -159,6 +163,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName == "Material Receipt" || WindowName == "Shipment" || WindowName == "Customer Return" || WindowName == "Return To Vendor")
                 {
+                    cd.Set_Value("MovementDate", inoutline.GetParent().GetMovementDate());
                     cd.SetM_InOutLine_ID(inoutline.GetM_InOutLine_ID());
                     if (inoutline.GetC_OrderLine_ID() > 0)
                     {
@@ -179,6 +184,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName == "Invoice(Vendor)" || WindowName == "Invoice(Vendor)-Return" || WindowName == "LandedCost")
                 {
+                    cd.Set_Value("MovementDate", invoiceline.GetParent().GetDateAcct());
                     cd.SetC_InvoiceLine_ID(invoiceline.GetC_InvoiceLine_ID());
                     cd.SetIsSOTrx(false);
                     if (invoiceline.GetC_OrderLine_ID() > 0)
@@ -207,6 +213,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName == "Invoice(Customer)")
                 {
+                    cd.Set_Value("MovementDate", invoiceline.GetParent().GetDateAcct());
                     cd.SetC_InvoiceLine_ID(invoiceline.GetC_InvoiceLine_ID());
                     cd.SetIsSOTrx(true);
                     if (invoiceline.GetC_OrderLine_ID() > 0)
@@ -228,6 +235,7 @@ namespace VAdvantage.Model
                 }
                 else if (WindowName.Equals("ProvisionalInvoice"))
                 {
+                    cd.Set_Value("MovementDate", Util.GetValueOfDateTime(po.Get_Value("VAMFG_DateAcct")));
                     cd.Set_Value("C_ProvisionalInvoiceLine_ID", po.Get_Value("C_ProvisionalInvoiceLine_ID"));
                     if (AD_Org_ID == 0)
                     {
@@ -3367,7 +3375,7 @@ namespace VAdvantage.Model
                 }
                 else if (addition)
                 {
-                    if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
+                    if (windowName.Equals("Shipment") && inout.GetReversalDoc_ID() > 0)
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -3380,7 +3388,21 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    if (windowName.Equals("Customer Return"))
+                    else if (windowName.Equals("Shipment"))
+                    {
+                        // Quantity to be decreased
+                        if (costingCheck.IsQunatityValidated && Decimal.Subtract(cost.GetCurrentQty(), qty) < 0)
+                        {
+                            costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
+                            IsError = true;
+                            return cost;
+                        }
+                        else
+                        {
+                            cost.SetCurrentQty(Decimal.Subtract(cost.GetCurrentQty(), qty));
+                        }
+                    }
+                    else if (windowName.Equals("Customer Return"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {

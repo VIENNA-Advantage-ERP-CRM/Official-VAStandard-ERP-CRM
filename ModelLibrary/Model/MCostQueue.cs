@@ -3066,6 +3066,7 @@ namespace VAdvantage.Model
 
                             // handle conversion 
                             dateAcct = costingCheck.provisionalInvoice.GetDateAcct();
+                            costingCheck.movementDate = costingCheck.provisionalInvoice.GetDateAcct();
                             if (acctSchema.GetC_Currency_ID() != costingCheck.provisionalInvoice.GetC_Currency_ID())
                             {
                                 Price = MConversionRate.Convert(ctx, Price,
