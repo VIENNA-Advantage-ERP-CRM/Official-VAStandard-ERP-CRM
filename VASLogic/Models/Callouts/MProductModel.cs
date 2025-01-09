@@ -1463,6 +1463,12 @@ namespace VIS.Models
                 {
                     _shipment.SetC_IncoTerm_ID(order.GetC_IncoTerm_ID());
                 }
+                //VAI050-Set document type of Vendor return
+                if(!order.IsSOTrx() && order.IsReturnTrx())
+                {
+                    _shipment.SetC_DocType_ID(SetDocType(order.GetAD_Org_ID(), ctx.GetAD_Client_ID(), "N", "Y", "MMR"));
+
+                }
                 if (!_shipment.Save())
                 {
                     pp = VLogger.RetrieveError();
