@@ -3198,7 +3198,7 @@ namespace VAdvantage.Model
                                     if (OrderCurrency_ID != acctSchema.GetC_Currency_ID())
                                     {
                                         //VIS_045: 20/Dec/2023, Task ID - 3605, convert amount from Currency of Landed cost Allocation to accounting schema currency
-                                        expectedAmt = MConversionRate.Convert(ctx, expectedAmt, OrderCurrency_ID, acctSchema.GetC_Currency_ID(),
+                                        expectedAmt = MConversionRate.ConvertCostingPrecision(ctx, expectedAmt, OrderCurrency_ID, acctSchema.GetC_Currency_ID(),
                                                                      inout.GetDateAcct(), Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) != 0 ?
                                                                      Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) :
                                                                      order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
@@ -3344,10 +3344,17 @@ namespace VAdvantage.Model
                                         qntity = Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca]["Qty"]);
                                         amt = Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"]);
                                     }
+
+                                    //13-Jan-2025, when the freight amount is ZERO, then not to calculate cost for that
+                                    if (amt == 0)
+                                    {
+                                        continue;
+                                    }
+
                                     // conversion required
                                     if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                     {
-                                        amt = MConversionRate.Convert(ctx, amt, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                        amt = MConversionRate.ConvertCostingPrecision(ctx, amt, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                              invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                         if (amt == 0)
                                         {
@@ -3356,8 +3363,9 @@ namespace VAdvantage.Model
                                                 trxName.Rollback();
                                             }
                                             conversionNotFound = invoice.GetDocumentNo();
-                                            _log.Info("CostingEngine: Price not available for window = " + windowName +
+                                            _log.Info("CostingEngine: Landed Cost Price not available for window = " + windowName +
                                                    " - Document No  = " + conversionNotFound);
+                                            costingCheck.errorMessage += " Conversion not available or Rounding Value become ZERO";
                                             return false;
                                         }
                                     }

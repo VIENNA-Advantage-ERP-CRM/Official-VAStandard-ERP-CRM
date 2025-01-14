@@ -162,6 +162,42 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Convert an amount with Costong Precision with today's default rate
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="amt">Amount</param>
+        /// <param name="CurFrom_ID">From Currency</param>
+        /// <param name="CurTo_ID">To Currency</param>
+        /// <param name="convDate">Conversion Date</param>
+        /// <param name="C_ConversionType_ID">Conversion Type</param>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <param name="AD_Org_ID">Organization</param>
+        /// <returns>Coverted Amount</returns>
+        public static Decimal ConvertCostingPrecision(Ctx ctx, Decimal amt, int CurFrom_ID, int CurTo_ID,
+            DateTime? convDate, int C_ConversionType_ID,
+            int AD_Client_ID, int AD_Org_ID)
+        {
+            if (CurFrom_ID == CurTo_ID || amt.Equals(Env.ZERO))
+            {
+                return amt;
+            }
+            //	Get Rate
+            Decimal retValue = GetRate(CurFrom_ID, CurTo_ID, convDate, C_ConversionType_ID, AD_Client_ID, AD_Org_ID);
+            //	Get Amount in Currency Precision
+            retValue = Decimal.Multiply(retValue, amt);
+            int stdPrecision = MCurrency.Get(ctx, CurTo_ID).GetCostingPrecision();
+            if (stdPrecision == 0)
+            {
+                stdPrecision = MCurrency.GetStdPrecision(ctx, CurTo_ID);
+            }
+            if (Env.Scale(retValue) > stdPrecision)
+            {
+                retValue = Decimal.Round(retValue, stdPrecision, MidpointRounding.AwayFromZero);
+            }
+            return retValue;
+        }
+
+        /// <summary>
         ///Get Currency Conversion Rate
         /// </summary>
         /// <param name="CurFrom_ID">The C_Currency_ID FROM</param>
