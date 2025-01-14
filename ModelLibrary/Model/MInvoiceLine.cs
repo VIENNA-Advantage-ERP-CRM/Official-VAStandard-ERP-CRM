@@ -6040,7 +6040,7 @@ namespace VAdvantage.Model
                     Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != 0 &&
                     Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]))
                 {
-                    differenceAmt = MConversionRate.Convert(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
+                    differenceAmt = MConversionRate.ConvertCostingPrecision(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
                                 Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]),
                                 Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateAcct"]),
                                 Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]), lc.GetAD_Client_ID(), lc.GetAD_Org_ID());
