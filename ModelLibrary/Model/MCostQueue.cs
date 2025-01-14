@@ -1188,8 +1188,17 @@ namespace VAdvantage.Model
                                 {
                                     M_Warehouse_Id = invoice.GetM_Warehouse_ID();
                                 }
-                                costingCheck.M_Warehouse_ID = M_Warehouse_Id;
+                                if (M_Warehouse_Id != 0)
+                                {
+                                    costingCheck.M_Warehouse_ID = M_Warehouse_Id;
+                                }
+                                else
+                                {
+                                    M_Warehouse_Id = costingCheck.M_Warehouse_ID;
+                                }
                                 costingCheck.movementDate = invoice.GetDateAcct();
+
+
                             }
 
                             if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID() && Price != 0)
