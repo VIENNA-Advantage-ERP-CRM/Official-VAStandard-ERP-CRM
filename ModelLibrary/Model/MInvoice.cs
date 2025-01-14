@@ -4174,9 +4174,22 @@ namespace VAdvantage.Model
                                         if (docType.GetDocBaseType() == "APC" && line.GetC_OrderLine_ID() == 0 &&
                                             line.GetM_InOutLine_ID() == 0 && line.GetM_Product_ID() > 0 && docType.IsTreatAsDiscount())
                                         {
+                                            query.Clear();
+                                            // DevOps Task-1851
+                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                            DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                            if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                            {
+                                                costingCheck.M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() :
+                                                                    (GetM_Warehouse_ID() > 0 ? GetM_Warehouse_ID() : Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                                            }
+
                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, line.GetM_AttributeSetInstance_ID(),
-                                              "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced())
-                                              , Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                          "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced())
+                                          , Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                             {
                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                 {
@@ -4202,13 +4215,7 @@ namespace VAdvantage.Model
                                             }
                                             else
                                             {
-                                                query.Clear();
-                                                // DevOps Task-1851
-                                                query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
-                                                                INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
-                                                                INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                                                WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
-                                                DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+
                                                 int M_Locator_ID = 0;
                                                 int M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() : GetM_Warehouse_ID();
                                                 if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
@@ -4859,9 +4866,22 @@ namespace VAdvantage.Model
                                     MDocType docType = new MDocType(GetCtx(), GetC_DocTypeTarget_ID(), Get_Trx());
                                     if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && line.GetC_OrderLine_ID() == 0 && line.GetM_InOutLine_ID() == 0 && line.GetM_Product_ID() > 0)
                                     {
+                                        query.Clear();
+                                        // DevOps Task-1851
+                                        query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                            INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                            INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                        DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                        if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                        {
+                                            costingCheck.M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() :
+                                                                    (GetM_Warehouse_ID() > 0 ? GetM_Warehouse_ID() : Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                                        }
+
                                         if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, line.GetM_AttributeSetInstance_ID(),
-                                          "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced()),
-                                          Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                      "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced()),
+                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                         {
                                             if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                             {
@@ -4886,13 +4906,6 @@ namespace VAdvantage.Model
                                         }
                                         else
                                         {
-                                            query.Clear();
-                                            // DevOps Task-1851
-                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
-                                            INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
-                                            INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
-                                            DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
                                             decimal grnQty = 0;
                                             int M_Locator_ID = 0;
                                             int M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() : GetM_Warehouse_ID();
@@ -7346,7 +7359,7 @@ namespace VAdvantage.Model
             string sqlreversal = $@"UPDATE C_InvoiceLine o SET ReversalDoc_ID =
               (SELECT C_Invoiceline_ID FROM C_Invoiceline WHERE ReversalDoc_ID = o.C_InvoiceLine_ID and C_Invoice_ID ={reversal.GetC_Invoice_ID()}) 
               WHERE C_Invoice_ID ={GetC_Invoice_ID()} AND EXISTS (SELECT 1 FROM C_InvoiceLine WHERE C_InvoiceLine_ID = o.C_InvoiceLine_ID)";
-            int countReversal=DB.ExecuteQuery(sqlreversal, null, Get_Trx());
+            int countReversal = DB.ExecuteQuery(sqlreversal, null, Get_Trx());
             SetProcessed(true);
 
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
