@@ -3428,8 +3428,8 @@ namespace VAdvantage.Model
                                                 else
                                                 {
                                                     DB.ExecuteQuery($@"UPDATE C_LandedCostAllocation SET IsCostCalculated = 'Y' , 
-                                                    VAS_AllocatedCost = {Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"])}, 
-                                                    VAS_UnAllocatedCost = Amt - {Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"])}
+                                                    VAS_AllocatedCost = {Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca]["Amt"])}, 
+                                                    VAS_UnAllocatedCost = 0 
                                                     WHERE C_LandedCostAllocation_ID = " + Util.GetValueOfInt(dsLandedCostAllocation.Tables[0].Rows[lca]["C_LandedCostAllocation_ID"]), null, trxName);
                                                 }
                                             }
