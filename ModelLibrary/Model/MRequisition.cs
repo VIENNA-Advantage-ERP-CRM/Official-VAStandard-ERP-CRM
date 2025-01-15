@@ -355,7 +355,8 @@ namespace VAdvantage.Model
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MRequisitionLine line = lines[i];
-                    Decimal lineNet = Decimal.Multiply(line.GetQty(), line.GetPriceActual());
+                    //VAI050-Price set according to qty enetered value
+                    Decimal lineNet = Decimal.Multiply(line.GetQtyEntered(), line.GetPriceActual());
                     lineNet = Decimal.Round(lineNet, precision);//, MidpointRounding.AwayFromZero);
                     if (lineNet.CompareTo(line.GetLineNetAmt()) != 0)
                     {
