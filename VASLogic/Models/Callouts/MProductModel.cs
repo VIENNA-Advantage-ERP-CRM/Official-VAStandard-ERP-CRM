@@ -1006,7 +1006,7 @@ namespace VIS.Models
                     ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, p.ProductType, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
                     INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
                     WHERE NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty,
-                    NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
+                    ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),10) AS ConversionRate
                     FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
                     INNER JOIN M_Product p ON (ol.M_Product_ID=p.M_Product_ID)
                     LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)                    
@@ -1021,7 +1021,7 @@ namespace VIS.Models
                         (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
                         WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyOrdered, 
                         ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, c.Name As ProductName, 'C' AS ProductType, 0 AS OnHandQty,
-                        NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0) AS ConversionRate
+                        ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),10) AS ConversionRate
                         FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
                         INNER JOIN C_Charge c ON (ol.C_Charge_ID=c.C_Charge_ID)
                         LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)
@@ -1152,7 +1152,7 @@ namespace VIS.Models
                     atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
                     INNER JOIN M_Locator loc ON (loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=r.DTD001_MWarehouseSource_ID)
                     WHERE NVL(s.M_Product_ID,0)=NVL(rl.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(rl.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
-                    NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0) AS ConversionRate
+                   ROUND(NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0),10) AS ConversionRate
                     FROM M_RequisitionLine rl INNER JOIN  M_Requisition r ON (rl.M_Requisition_ID=r.M_Requisition_ID)
                     INNER JOIN M_Product p ON (rl.M_Product_ID=p.M_Product_ID) LEFT JOIN C_UOM u ON (rl.C_UOM_ID=u.C_UOM_ID) 
                     LEFT JOIN  M_AttributeSetInstance atr ON (rl.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
