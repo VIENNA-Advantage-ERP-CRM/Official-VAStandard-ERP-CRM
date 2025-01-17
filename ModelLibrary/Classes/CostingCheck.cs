@@ -258,5 +258,36 @@ namespace ModelLibrary.Classes
             }
         }
 
+        /// <summary>
+        /// This function is used to Insert the Data into M_CostClosing for maintaining the closing details
+        /// </summary>
+        /// <param name="trx">Transaction</param>
+        /// <returns>Error Message (if any)</returns>
+        public string InsertCostClosing(Trx trx)
+        {
+            query.Clear();
+            query.Append($@"DELETE FROM M_COSTClosing WHERE TRUNC(created) = TRUNC(current_Date)");
+            DB.ExecuteQuery(query.ToString(), null, trx);
+
+            query.Clear();
+            query.Append($@"INSERT INTO M_CostClosing(
+                M_CostClosing_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, CREATED, CREATEDBY, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY,
+                DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, UPDATED,
+                UPDATEDBY, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE,A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID)
+            SELECT
+                M_Cost_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, Current_Date, {_ctx.GetAD_User_ID()}, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY, 
+                DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, Current_Date, 
+                {_ctx.GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE, A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID           
+            FROM M_Cost");
+            query.Append($@" WHERE AD_Client_ID = {_ctx.GetAD_Client_ID()} ");
+
+            int no = DB.ExecuteQuery(query.ToString(), null, trx);
+            if (no <= 0)
+            {
+                return Msg.GetMsg(_ctx, "VAS_CostClosingNotInserted");
+            }
+            return "";
+        }
+
     }
 }
