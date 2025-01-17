@@ -1302,6 +1302,11 @@ namespace VAdvantage.Model
                         costingCheck.RemaningQtyonFreight = 0;
                         return cost;
                     }
+                    else
+                    {
+                        costingCheck.UnAllocatedLandedCost = 0;
+                        costingCheck.RemaningQtyonFreight = cost.GetCurrentQty();
+                    }
 
                     Decimal cCosts = Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt);
                     // when expected cost already calculated, then not to add qty 
