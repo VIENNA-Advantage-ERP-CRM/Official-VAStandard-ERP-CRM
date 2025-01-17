@@ -54,7 +54,7 @@ namespace ViennaAdvantageServer.Process
                 }
                 else if (name.Equals("M_Product_ID"))
                 {
-                    productId = (String)para[i].GetParameter();
+                    productId = Util.GetValueOfString(para[i].GetParameter());
                     //productCollection = productId.Split(',');
                 }
                 //else if (name.Equals("AD_Org_ID"))
@@ -122,7 +122,7 @@ namespace ViennaAdvantageServer.Process
 
                                         // update movement Qty at Transaction for the same record
                                         transaction = new VAdvantage.Model.MTransaction(GetCtx(), Util.GetValueOfInt(dsTransaction.Tables[0].Rows[i]["M_Transaction_ID"]), Get_Trx());
-                                       // transaction.SetMovementQty(Decimal.Subtract(inventoryLine.GetQtyCount(), _currentQty));
+                                        // transaction.SetMovementQty(Decimal.Subtract(inventoryLine.GetQtyCount(), _currentQty));
                                         transaction.SetMovementQty(Decimal.Negate(Decimal.Subtract(_currentQty, Util.GetValueOfDecimal(dsTransaction.Tables[0].Rows[i]["CurrentQty"]))));
                                         if (!transaction.Save())
                                         {
