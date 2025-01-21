@@ -1359,59 +1359,73 @@ namespace VIS.Models
                     }
                     bool fullLine = onHand.CompareTo(toDeliver) >= 0
                         || Env.Signum(toDeliver) < 0;
-                    ////	Complete Line
-                    if (fullLine && MOrder.DELIVERYRULE_CompleteLine.Equals(order.GetDeliveryRule()))
+                    //This check is used to check that transaction is Delivery order or Vendor Return
+                    //In Case of Vendor return there is no need to check the Delivery rule
+                    if (!order.IsReturnTrx())
                     {
-                        ////log.Fine("CompleteLine - OnHand=" + onHand
-                        ////    + " (Unconfirmed=" + unconfirmedShippedQty
-                        ////    + ", ToDeliver=" + toDeliver + " - " + line);
-                        //	
-                        obj = CreateLine(order, line, toDeliver, storages, false, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
-                        if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
+                        if (fullLine && MOrder.DELIVERYRULE_CompleteLine.Equals(order.GetDeliveryRule()))
                         {
-                            trx.Rollback();
+                            ////log.Fine("CompleteLine - OnHand=" + onHand
+                            ////    + " (Unconfirmed=" + unconfirmedShippedQty
+                            ////    + ", ToDeliver=" + toDeliver + " - " + line);
+                            //	
+                            obj = CreateLine(order, line, toDeliver, storages, false, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
+                            if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
+                            {
+                                trx.Rollback();
+                                return obj;
+                            }
+
+                        }
+                        //	Availability
+                        else if (MOrder.DELIVERYRULE_Availability.Equals(order.GetDeliveryRule())
+                            && (Env.Signum(onHand) > 0
+                                || Env.Signum(toDeliver) < 0))
+                        {
+                            Decimal deliver = toDeliver;
+                            if (deliver.CompareTo(onHand) > 0)
+                                deliver = onHand;
+                            ////log.Fine("Available - OnHand=" + onHand
+                            ////    + " (Unconfirmed=" + unconfirmedShippedQty
+                            ////    + "), ToDeliver=" + toDeliver
+                            ////    + ", Delivering=" + deliver + " - " + line);
+                            //	
+                            obj = CreateLine(order, line, deliver, storages, false, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
+                            if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
+                            {
+                                trx.Rollback();
+                                return obj;
+                            }
+                        }
+                        //	Force
+                        else if (MOrder.DELIVERYRULE_Force.Equals(order.GetDeliveryRule()))
+                        {
+                            Decimal deliver = toDeliver;
+
+                            obj = CreateLine(order, line, deliver, storages, true, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
+                            if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
+                            {
+                                trx.Rollback();
+                                return obj;
+                            }
+                        }
+                        else if (MOrder.DELIVERYRULE_Manual.Equals(order.GetDeliveryRule()))
+                        {
+
+                            obj["Shipment_ID"] = 0;
+                            obj["message"] = Msg.GetMsg(ctx, "VAS_DeliverRuleManual");
                             return obj;
                         }
-
                     }
-                    //	Availability
-                    else if (MOrder.DELIVERYRULE_Availability.Equals(order.GetDeliveryRule())
-                        && (Env.Signum(onHand) > 0
-                            || Env.Signum(toDeliver) < 0))
+                    else
                     {
                         Decimal deliver = toDeliver;
-                        if (deliver.CompareTo(onHand) > 0)
-                            deliver = onHand;
-                        ////log.Fine("Available - OnHand=" + onHand
-                        ////    + " (Unconfirmed=" + unconfirmedShippedQty
-                        ////    + "), ToDeliver=" + toDeliver
-                        ////    + ", Delivering=" + deliver + " - " + line);
-                        //	
-                        obj = CreateLine(order, line, deliver, storages, false, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
-                        if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
-                        {
-                            trx.Rollback();
-                            return obj;
-                        }
-                    }
-                    //	Force
-                    else if (MOrder.DELIVERYRULE_Force.Equals(order.GetDeliveryRule()))
-                    {
-                        Decimal deliver = toDeliver;
-
                         obj = CreateLine(order, line, deliver, storages, true, MClient.MMPOLICY_FiFo.Equals(MMPolicy), ctx, trx);
                         if (Util.GetValueOfInt(obj["Shipment_ID"]) == 0)
                         {
                             trx.Rollback();
                             return obj;
                         }
-                    }
-                    else if (MOrder.DELIVERYRULE_Manual.Equals(order.GetDeliveryRule()))
-                    {
-
-                        obj["Shipment_ID"] = 0;
-                        obj["message"] = Msg.GetMsg(ctx, "VAS_DeliverRuleManual");
-                        return obj;
                     }
                 }
             }//	for all order lines
