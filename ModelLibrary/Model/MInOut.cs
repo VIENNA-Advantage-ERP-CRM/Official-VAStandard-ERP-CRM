@@ -1755,7 +1755,7 @@ namespace VAdvantage.Model
                 Msg.GetMsg(GetCtx(), "VAS_CustomerAddress") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Address"]) + "\n" +
                 Msg.GetMsg(GetCtx(), "VAS_GrandTotal") + Util.GetValueOfString(ds.Tables[0].Rows[0]["ISO_Code"]) + " " +
                 DisplayType.GetNumberFormat(DisplayType.Amount).GetFormatAmount(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]), GetCtx().GetContext("#ClientLanguage"));
-                
+
 
                 // Generate QR code                
                 QRCodeGenerator qrGenerator = new QRCodeGenerator();
@@ -3446,6 +3446,8 @@ namespace VAdvantage.Model
                                     }
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -3520,7 +3522,8 @@ namespace VAdvantage.Model
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' ,
                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + @" 
                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
@@ -3536,6 +3539,9 @@ namespace VAdvantage.Model
                                     }
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                    query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
 
@@ -3618,7 +3624,7 @@ namespace VAdvantage.Model
                                                 }
 
                                                 // Create Transaction Entry for Vendor Invoice
-                                                _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                                 if (!string.IsNullOrEmpty(_processMsg))
                                                 {
                                                     return DocActionVariables.STATUS_INVALID;
@@ -3677,6 +3683,8 @@ namespace VAdvantage.Model
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -3759,6 +3767,8 @@ namespace VAdvantage.Model
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -4292,6 +4302,8 @@ namespace VAdvantage.Model
                         query.Append(" , ProductCost = " + currentCostPrice);
                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                     }
@@ -4370,6 +4382,8 @@ namespace VAdvantage.Model
                         query.Append(" , ProductCost = " + currentCostPrice);
                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                     }

@@ -22,6 +22,7 @@ using VAdvantage.Utility;
 using System.Data;
 using System.Data.SqlClient;
 using VAdvantage.Logging;
+using ModelLibrary.Classes;
 
 namespace VAdvantage.Model
 {
@@ -3097,8 +3098,9 @@ namespace VAdvantage.Model
         /// <param name="CostingLevel">Defined Costing Level on Product</param>
         /// <author>VIS_0045: 31-Dec-2024</author>
         /// <returns>Error Message (if any)</returns>
-        public string CreateTransactionEntry(decimal ProductCost, MInOutLine InOutLine, int M_Locator_ID, int M_CostElement_ID, string CostingLevel)
+        public string CreateTransactionEntry(decimal ProductCost, MInOutLine InOutLine, int M_Locator_ID, int M_CostElement_ID, string CostingLevel, CostingCheck costingCheck, out int ID)
         {
+            ID = 0;
             if (InOutLine == null && M_Locator_ID == 0)
             {
                 log.Log(Level.SEVERE, "Invoice Line: Locator not found for Vendor Invoice Transaction Creation " + GetC_InvoiceLine_ID());
@@ -3117,7 +3119,7 @@ namespace VAdvantage.Model
                     objTransaction.SetM_ProductContainer_ID(InOutLine.GetM_ProductContainer_ID());
                 }
             }
-            else if (Get_ValueAsInt("Ref_InvoiceLineOrg_ID") > 0)
+            else if (Get_ValueAsInt("Ref_InvoiceLineOrg_ID") > 0) /* For Treat as Discount */
             {
                 objTransaction.SetM_Locator_ID(M_Locator_ID);
             }
@@ -3125,11 +3127,24 @@ namespace VAdvantage.Model
             objTransaction.SetM_Product_ID(GetM_Product_ID());
             objTransaction.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
             objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
-            objTransaction.SetCurrentQty(0);
-            objTransaction.SetContainerCurrentQty(0);
+            if (Util.GetValueOfString(objTransaction.Get_Value("VAS_IsLandedCost")).Equals("N"))
+            {
+                objTransaction.SetMovementQty(GetQtyInvoiced());
+                objTransaction.SetCurrentQty(0);
+                objTransaction.SetContainerCurrentQty(0);
+            }
             objTransaction.Set_Value("CostingLevel", CostingLevel);
             objTransaction.Set_Value("M_CostElement_ID", M_CostElement_ID);
             objTransaction.Set_Value("ProductCost", ProductCost);
+            if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0)
+            {
+                objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+            }
+            if (costingCheck.ExpectedLandedCost != 0)
+            {
+                objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
+                objTransaction.SetMovementQty(costingCheck.Qty);
+            }
             if (!objTransaction.Save())
             {
                 ValueNamePair vp = VLogger.RetrieveError();
@@ -3144,6 +3159,65 @@ namespace VAdvantage.Model
                 }
                 log.Log(Level.SEVERE, "Transaction not created for Vendor Invoice" + val);
                 return Msg.GetMsg(GetCtx(), "VITrxNotSaved") + " " + (String.IsNullOrEmpty(val) ? "" : val); ;
+            }
+            else
+            {
+                ID = objTransaction.GetM_Transaction_ID();
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// Create Entry Landed cost (Difference value between Actual and Expected landed Cost) on Product Transaction Tab
+        /// </summary>
+        /// <param name="drLandedCost">Landed Cost Allocation line datarow</param>
+        /// <param name="CostingLevel">Product Costing Level</param>
+        /// <param name="costingCheck">Object of Costing Check Class</param>
+        /// <param name="ID">OUT Para - M_Transaction_ID</param>
+        /// <returns>error Message if any</returns>
+        public string CreateTransactionEntryForLandedCost(DataRow drLandedCost, string CostingLevel, CostingCheck costingCheck, out int ID)
+        {
+            ID = 0;
+            MTransaction objTransaction = null;
+            objTransaction = new MTransaction(GetCtx(), 0, Get_Trx());
+            objTransaction.SetAD_Client_ID(GetAD_Client_ID());
+            objTransaction.SetAD_Org_ID(GetAD_Org_ID());
+            objTransaction.SetMovementDate(this._parent.GetDateInvoiced());
+            if (Util.GetValueOfInt(drLandedCost["M_Locator_ID"]) != 0)
+            {
+                objTransaction.SetM_Locator_ID(Util.GetValueOfInt(drLandedCost["M_Locator_ID"]));
+            }
+            else
+            {
+                objTransaction.SetM_Locator_ID(MLocator.GetDefaultLocator(GetCtx(), Util.GetValueOfInt(drLandedCost["M_Warehouse_ID"])));
+            }
+            objTransaction.Set_ValueNoCheck("MovementType", "VI");
+            objTransaction.SetM_Product_ID(Util.GetValueOfInt(drLandedCost["M_Product_ID"]));
+            objTransaction.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(drLandedCost["M_AttributeSetInstance_ID"]));
+            objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
+            objTransaction.Set_Value("CostingLevel", CostingLevel);
+            objTransaction.Set_Value("M_CostElement_ID", Util.GetValueOfInt(drLandedCost["M_CostElement_ID"]));
+            objTransaction.Set_Value("ProductCost", 0);
+            objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
+            objTransaction.SetMovementQty(costingCheck.Qty);
+            if (!objTransaction.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                string val = "";
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                log.Log(Level.SEVERE, "Transaction not created for Vendor Invoice" + val);
+                return Msg.GetMsg(GetCtx(), "VITrxNotSaved") + " " + (String.IsNullOrEmpty(val) ? "" : val); ;
+            }
+            else
+            {
+                ID = objTransaction.GetM_Transaction_ID();
             }
             return "";
         }
@@ -4959,8 +5033,10 @@ namespace VAdvantage.Model
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
                                                 THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
                                                 ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
-                                              END) AS LineNetAmt , io.M_Warehouse_ID
-                            FROM C_InvoiceLine il INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
+                                              END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
+                            FROM C_InvoiceLine il 
+                            INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
+                            INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
                             INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
                             INNER JOIN c_tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID 
                             LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
@@ -4983,7 +5059,7 @@ namespace VAdvantage.Model
                             }
 
                             qry.Append(@" GROUP BY il.M_Product_ID, il.M_AttributeSetInstance_ID, io.M_Warehouse_ID 
-                                        ,  il.taxbaseamt , il.taxamt , il.surchargeamt , C_SurChargeTax.IsIncludeInCost , C_Tax.IsIncludeInCost, il.qtyinvoiced");
+                                        ,  il.taxbaseamt , il.taxamt , il.surchargeamt , C_SurChargeTax.IsIncludeInCost , C_Tax.IsIncludeInCost, il.qtyinvoiced, iol.M_Locator_ID");
 
                             ds = DB.ExecuteDataset(qry.ToString(), null, Get_TrxName());
 
@@ -5046,6 +5122,10 @@ namespace VAdvantage.Model
                                     {
                                         lca.SetM_Warehouse_ID(Util.GetValueOfInt(dr[i]["M_Warehouse_ID"]));
                                     }
+                                    if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                    {
+                                        lca.Set_Value("M_Locator_ID", Util.GetValueOfInt(dr[i]["M_Locator_ID"]));
+                                    }
 
                                     if (!lca.Save())
                                     {
@@ -5064,7 +5144,7 @@ namespace VAdvantage.Model
 
                                 log.Info("Inserted " + inserted);
                                 AllocateLandedCostRounding();
-                                 SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                                SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                                 return "";
                             }
                             else
@@ -5103,7 +5183,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -5150,6 +5230,10 @@ namespace VAdvantage.Model
                             {
                                 lca.SetM_InOutLine_ID(iol.GetM_InOutLine_ID());
                             }
+                            if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                            {
+                                lca.Set_Value("M_Locator_ID", iol.GetM_Locator_ID());
+                            }
                             // get difference of (expected - actual) landed cost allocation amount if have
                             Decimal diffrenceAmt = 0;
                             if (iol.GetC_OrderLine_ID() > 0)
@@ -5177,7 +5261,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5276,6 +5360,10 @@ namespace VAdvantage.Model
                                 {
                                     lca.SetM_InOutLine_ID(iol.GetM_InOutLine_ID());
                                 }
+                                if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                {
+                                    lca.Set_Value("M_Locator_ID", iol.GetM_Locator_ID());
+                                }
                                 // get difference of (expected - actual) landed cost allocation amount if have
                                 if (iol.GetC_OrderLine_ID() > 0)
                                 {
@@ -5306,7 +5394,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5341,7 +5429,10 @@ namespace VAdvantage.Model
                             {
                                 lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                             }
-
+                            if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                            {
+                                lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                            }
                             if (!lca.Save())
                             {
                                 pp = VLogger.RetrieveError();
@@ -5354,7 +5445,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5449,7 +5540,10 @@ namespace VAdvantage.Model
                                 {
                                     lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                                 }
-
+                                if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                {
+                                    lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                                }
                                 if (!lca.Save())
                                 {
                                     pp = VLogger.RetrieveError();
@@ -5466,7 +5560,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         //	Single Product
@@ -5499,7 +5593,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
-                             SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -5599,8 +5693,10 @@ namespace VAdvantage.Model
                                         AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
                                         THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
                                         ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
-                                      END) AS LineNetAmt , io.M_Warehouse_ID
-                            FROM C_InvoiceLine il INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
+                                      END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
+                            FROM C_InvoiceLine il 
+                            INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
+                            INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
                             INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
                             INNER JOIN C_Tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID
                             LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
@@ -5686,7 +5782,10 @@ namespace VAdvantage.Model
                         {
                             lca.SetM_Warehouse_ID(Util.GetValueOfInt(dr[i]["M_Warehouse_ID"]));
                         }
-
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", Util.GetValueOfInt(dr[i]["M_Locator_ID"]));
+                        }
                         if (!lca.Save())
                         {
                             pp = VLogger.RetrieveError();
@@ -5818,6 +5917,10 @@ namespace VAdvantage.Model
                         if (lca.Get_ColumnIndex("M_InOutLine_ID") > 0)
                         {
                             lca.SetM_InOutLine_ID(inl.GetM_InOutLine_ID());
+                        }
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", inl.GetM_Locator_ID());
                         }
                         // get difference of (expected - actual) landed cost allocation amount if have
                         Decimal diffrenceAmt = 0;
@@ -5955,7 +6058,10 @@ namespace VAdvantage.Model
                         {
                             lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                         }
-
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                        }
                         if (Env.Signum(base1) != 0)
                         {
                             //result = Decimal.ToDouble(Decimal.Multiply(GetLineNetAmt(), base1));
@@ -5997,7 +6103,7 @@ namespace VAdvantage.Model
         /// <author>VIS_427</author>
         public void SetVAS_IsLandedCost(int C_InvoiceLine_ID)
         {
-         DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID="+ C_InvoiceLine_ID, null, Get_Trx());
+            DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID=" + C_InvoiceLine_ID, null, Get_Trx());
         }
         /// <summary>
         /// This function is used to get difference value between expecetd landed cost and actual landed cost invoice

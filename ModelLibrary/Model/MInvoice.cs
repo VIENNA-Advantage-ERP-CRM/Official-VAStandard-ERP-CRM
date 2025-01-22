@@ -3943,7 +3943,8 @@ namespace VAdvantage.Model
                                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' , IsCostError = 'N', 
                                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                                     VAS_LandedCost = " + costingCheck.ExpectedLandedCost + @"  
                                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                                     // Update Cost on Product transaction
@@ -3958,6 +3959,9 @@ namespace VAdvantage.Model
                                                         }
                                                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                                        //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                                        query.Append(" , VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                                        query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                     }
                                                 }
@@ -4097,7 +4101,7 @@ namespace VAdvantage.Model
                                                     }
 
                                                     // Create Transaction Entry for Vendor Invoice
-                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                                     if (!string.IsNullOrEmpty(_processMsg))
                                                     {
                                                         return DocActionVariables.STATUS_INVALID;
@@ -4243,7 +4247,7 @@ namespace VAdvantage.Model
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
 
                                                 // Create Transaction Entry for Vendor Invoice
-                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                                 if (!string.IsNullOrEmpty(_processMsg))
                                                 {
                                                     return DocActionVariables.STATUS_INVALID;
@@ -4404,7 +4408,7 @@ namespace VAdvantage.Model
                                                     }
 
                                                     // Create Transaction Entry for Vendor Invoice
-                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                                     if (!string.IsNullOrEmpty(_processMsg))
                                                     {
                                                         return DocActionVariables.STATUS_INVALID;
@@ -4639,7 +4643,8 @@ namespace VAdvantage.Model
                                                 DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' , 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + @"  
                                                  WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                                 sLine.SetIsCostImmediate(true);
 
@@ -4655,6 +4660,9 @@ namespace VAdvantage.Model
                                                     }
                                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                                    //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                                    query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                 }
                                             }
@@ -4796,7 +4804,7 @@ namespace VAdvantage.Model
                                             }
 
                                             // Create Transaction Entry for Vendor Invoice
-                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                             if (!string.IsNullOrEmpty(_processMsg))
                                             {
                                                 return DocActionVariables.STATUS_INVALID;
@@ -4949,7 +4957,7 @@ namespace VAdvantage.Model
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
 
                                             // Create Transaction Entry for Vendor Invoice
-                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                             if (!string.IsNullOrEmpty(_processMsg))
                                             {
                                                 return DocActionVariables.STATUS_INVALID;
@@ -5112,7 +5120,7 @@ namespace VAdvantage.Model
                                                 }
 
                                                 // Create Transaction Entry for Vendor Invoice
-                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel);
+                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
                                                 if (!string.IsNullOrEmpty(_processMsg))
                                                 {
                                                     return DocActionVariables.STATUS_INVALID;

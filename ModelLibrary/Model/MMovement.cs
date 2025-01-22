@@ -22,6 +22,7 @@ using System.Data.SqlClient;
 using VAdvantage.Logging;
 using System.Reflection;//Arpit
 using ModelLibrary.Classes;
+using System.Linq;
 
 namespace VAdvantage.Model
 {
@@ -57,6 +58,8 @@ namespace VAdvantage.Model
 
         /** Reversal Indicator			*/
         public const String REVERSE_INDICATOR = "^";
+
+        private decimal postingCost = 0;
 
         /// <summary>
         /// Standard Constructor
@@ -1852,6 +1855,7 @@ namespace VAdvantage.Model
 
             StringBuilder sqlTransaction = new StringBuilder();
             StringBuilder sqlTransactionTo = new StringBuilder();
+            postingCost = 0;
 
             // is used to maintain cost of "move to" 
             Decimal toCurrentCostPrice = 0;
@@ -1866,6 +1870,16 @@ namespace VAdvantage.Model
             if (IsReversal() || (GetDescription() != null && GetDescription().Contains("{->")))
             {
                 // do not update current cost price during reversal, this time reverse doc contain same amount which are on original document
+
+                // for Posting Cost
+                if (line.GetMovementQty() > 0)
+                {
+                    postingCost = line.GetCurrentCostPrice();
+                }
+                else
+                {
+                    postingCost = line.GetToCurrentCostPrice();
+                }
             }
             else
             {
@@ -1873,6 +1887,7 @@ namespace VAdvantage.Model
                 currentCostPrice = 0;
                 currentCostPrice = MCost.GetproductCosts(line.GetAD_Client_ID(), line.GetAD_Org_ID(),
                     line.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetDTD001_MWarehouseSource_ID());
+                postingCost = currentCostPrice;
 
                 // For To Warehouse
                 toCurrentCostPrice = MCost.GetproductCosts(line.GetAD_Client_ID(), locatorTo.GetAD_Org_ID(),
@@ -1928,6 +1943,7 @@ namespace VAdvantage.Model
                                 currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), line.GetAD_Client_ID(), line.GetAD_Org_ID(),
                                                    line.GetM_Product_ID(), costingCheck.M_ASI_ID, 2, line.GetM_MovementLine_ID(), costingMethod,
                                                    GetDTD001_MWarehouseSource_ID(), true, Get_Trx());
+                                postingCost = currentCostPrice;
                             }
 
                             if (line.GetMovementQty() < 0)
@@ -1935,6 +1951,7 @@ namespace VAdvantage.Model
                                 toCurrentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), line.GetAD_Client_ID(), line.GetAD_Org_ID(),
                                                        line.GetM_Product_ID(), costingCheck.M_ASI_ID, 2, line.GetM_MovementLine_ID(), costingMethod,
                                                        locatorTo.GetM_Warehouse_ID(), true, Get_Trx());
+                                postingCost = toCurrentCostPrice;
                             }
 
                             DB.ExecuteQuery("UPDATE M_MovementLine SET CurrentCostPrice =  CASE WHEN MovementQty < 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
@@ -1962,12 +1979,16 @@ namespace VAdvantage.Model
                         sqlTransaction.Append(" , ProductCost = " + currentCostPrice);
                         sqlTransaction.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         sqlTransaction.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        sqlTransaction.Append(" , VAS_PostingCost = " + postingCost);
                         sqlTransaction.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(sqlTransaction.ToString(), null, Get_Trx());
 
                         sqlTransactionTo.Append(" , ProductCost = " + toCurrentCostPrice);
                         sqlTransactionTo.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         sqlTransactionTo.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        sqlTransactionTo.Append(" , VAS_PostingCost = " + postingCost);
                         sqlTransactionTo.Append(" WHERE M_Transaction_ID = " + costingCheck.M_TransactionTo_ID);
                         DB.ExecuteQuery(sqlTransactionTo.ToString(), null, Get_Trx());
 
@@ -1979,6 +2000,8 @@ namespace VAdvantage.Model
                         sqlTransaction.Append(" , ProductCost = " + line.GetPostCurrentCostPrice());
                         sqlTransaction.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         sqlTransaction.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        sqlTransaction.Append(" , VAS_PostingCost = " + line.GetPostCurrentCostPrice());
                         sqlTransaction.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(sqlTransaction.ToString(), null, Get_Trx());
 
@@ -1986,6 +2009,8 @@ namespace VAdvantage.Model
                         sqlTransactionTo.Append(" , ProductCost = " + line.GetToPostCurrentCostPrice());
                         sqlTransactionTo.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         sqlTransactionTo.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        sqlTransactionTo.Append(" , VAS_PostingCost = " + line.GetPostCurrentCostPrice());
                         sqlTransactionTo.Append(" WHERE M_Transaction_ID = " + costingCheck.M_TransactionTo_ID);
                         DB.ExecuteQuery(sqlTransactionTo.ToString(), null, Get_Trx());
 
