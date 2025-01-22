@@ -1141,6 +1141,13 @@ namespace VAdvantage.Model
                                     return false;
                                 }
                             }
+
+                            //22-Jan-2025, Get Order Line or GRN Price (When Independent) in Base currency
+                            if (acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
+                            {
+                                costingCheck.OrderLineAmtinBaseCurrency = decimal.Round(Price / inoutline.GetMovementQty(), acctSchema.GetCostingPrecision());
+                            }
+
                             invoice = null;
                             invoiceline = null;
                             #endregion
@@ -1229,6 +1236,13 @@ namespace VAdvantage.Model
                             //                       " - Document No  = " + conversionNotFound);
                             //    return false;
                             //}
+
+                            //22-Jan-2025, Get Order Line or GRN Price (When Independent) in Base currency
+                            if (acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
+                            {
+                                costingCheck.DifferenceAmtPOandInvInBaseCurrency = decimal.Round(Price / invoiceline.GetQtyInvoiced(), acctSchema.GetCostingPrecision());
+                            }
+
                             #endregion
                         }
 
@@ -3266,6 +3280,11 @@ namespace VAdvantage.Model
                                                                       AD_Org_ID, costingCheck, optionalStrCd: optionalstr);
                                         if (result)
                                         {
+                                            //22-Jan-2025, get Allocated Expected landed Cost, so that we can set this value on InOutLine, and Transaction 
+                                            if (acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
+                                            {
+                                                costingCheck.ExpectedLandedCost += Decimal.Round(Decimal.Divide(expectedAmt, expectedQty), acctSchema.GetCostingPrecision());
+                                            }
                                             // will mark IsCostCalculated as TRUE during last accounting schema cycle
                                             //if (i == ds.Tables[0].Rows.Count - 1)
                                             //{
@@ -3441,6 +3460,14 @@ namespace VAdvantage.Model
                                                     VAS_UnAllocatedCost = 0 
                                                     WHERE C_LandedCostAllocation_ID = " + Util.GetValueOfInt(dsLandedCostAllocation.Tables[0].Rows[lca]["C_LandedCostAllocation_ID"]), null, trxName);
                                                 }
+                                            }
+
+                                            //22-Jan-2025, Create Entry or Update Landed cost (Difference value between Actual and Expected landed Cost) on Product Transaction Tab,
+                                            if (costingCheck.UnAllocatedLandedCost == 0 && acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
+                                            {
+                                                costingCheck.Qty = qntity;
+                                                costingCheck.ExpectedLandedCost = decimal.Round(decimal.Divide(amt, qntity), acctSchema.GetCostingPrecision());
+                                                CreateOrUpdateLandedCostTransaction(costingCheck, invoiceline, dsLandedCostAllocation.Tables[0].Rows[lca], trxName);
                                             }
                                         }
                                         else
@@ -4685,6 +4712,42 @@ namespace VAdvantage.Model
                     trxName.Rollback();
                 }
                 return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Create Entry or Update Landed cost (Difference value between Actual and Expected landed Cost) on Product Transaction Tab
+        /// </summary>
+        /// <param name="costingCheck">Object of Costing Check Class</param>
+        /// <param name="InvoiceLine">Invoice Line</param>
+        /// <param name="drLandedCost">Landed Cost Allocation line datarow</param>
+        /// <param name="trxName">Trx</param>
+        /// <returns>True When Success</returns>
+        public static bool CreateOrUpdateLandedCostTransaction(CostingCheck costingCheck, MInvoiceLine InvoiceLine, DataRow drLandedCost, Trx trxName)
+        {
+            // Get Transaction ID, for checking transaction is created against this line
+            int M_Transaction_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT M_Transaction_ID FROM M_Transaction
+                WHERE C_InvoiceLine_ID = {InvoiceLine.GetC_InvoiceLine_ID()} 
+                      AND M_CostElement_ID = {Util.GetValueOfInt(drLandedCost["M_CostElement_ID"])}", null, trxName));
+            if (M_Transaction_ID == 0)
+            {
+                // create product Transaction Entry, and update landed cost and Movement Qty
+                InvoiceLine.CreateTransactionEntryForLandedCost(drLandedCost, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                DB.ExecuteQuery($@"Update C_LandedCostAllocation SET M_Transaction_ID = {M_Trx_ID}
+                                WHERE C_LandedCostAllocation_ID = {Util.GetValueOfInt(drLandedCost["C_LandedCostAllocation_ID"])}", null, trxName);
+            }
+            else
+            {
+                //update landed cost 
+                int no = DB.ExecuteQuery($@"Update M_Transaction SET VAS_LandedCost = {costingCheck.ExpectedLandedCost},
+                                    M_CostElement_ID = {Util.GetValueOfInt(drLandedCost["M_CostElement_ID"])}, 
+                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)}
+                                WHERE M_Transaction_ID = {M_Transaction_ID}", null, trxName);
+                if (no <= 0)
+                {
+                    return false;
+                }
             }
             return true;
         }

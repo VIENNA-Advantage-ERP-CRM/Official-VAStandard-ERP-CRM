@@ -210,6 +210,18 @@ namespace VAdvantage.Model
             return retValue;
         }
 
+        /// <summary>
+        /// This function is used to get the Default Locator basedon Warehouse
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="M_Warehouse_ID">M_Warehouse_ID</param>
+        /// <returns>M_Locator_ID</returns>
+        public static int GetDefaultLocator(Ctx ctx, int M_Warehouse_ID)
+        {
+            String sql = $@"SELECT l.M_Locator_ID FROM M_Locator l WHERE l.IsActive = 'Y' AND l.M_Warehouse_ID = {M_Warehouse_ID} ORDER BY IsDefault DESC";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+        }
+
         public override String ToString()
         {
             return GetValue();
@@ -282,7 +294,7 @@ namespace VAdvantage.Model
             {
                 if (checkStock(GetCtx(), Get_ID(), Get_TrxName()))
                 {
-                    log.SaveError("", Msg.GetMsg(GetCtx(), "LocatorHasStock"));  
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "LocatorHasStock"));
                     return false;
                 }
 
@@ -305,7 +317,7 @@ namespace VAdvantage.Model
                     || Is_ValueChanged("Bin"))
             {
                 MWarehouse wh = new MWarehouse(GetCtx(), GetM_Warehouse_ID(), Get_TrxName());
-                
+
                 StringBuilder combination = new StringBuilder();
                 combination.Append(GetX()).Append(wh.GetSeparator());
                 combination.Append(GetY()).Append(wh.GetSeparator());

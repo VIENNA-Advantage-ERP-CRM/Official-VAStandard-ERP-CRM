@@ -3738,6 +3738,12 @@ namespace VAdvantage.Model
                                               , precision, MidpointRounding.AwayFromZero);
                     cost.SetCurrentCostPrice(price);
                 }
+
+                //22-Jan-2025, Reduce GRN Price, for getting difference between AP Invoice and PO price 
+                if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0 && mas.GetC_Currency_ID() == cost.GetCtx().GetContextAsInt("$C_Currency_ID"))
+                {
+                    costingCheck.DifferenceAmtPOandInvInBaseCurrency = costingCheck.DifferenceAmtPOandInvInBaseCurrency - MRPrice;
+                }
             }
             return cost.Save();
             #endregion
