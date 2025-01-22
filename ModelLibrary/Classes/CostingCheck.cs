@@ -68,6 +68,10 @@ namespace ModelLibrary.Classes
         public decimal UnAllocatedLandedCost = 0;
         public decimal RemaningQtyonFreight = 0;
 
+        public decimal ExpectedLandedCost = 0;
+        public decimal OrderLineAmtinBaseCurrency = 0;
+        public decimal DifferenceAmtPOandInvInBaseCurrency = 0;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -213,6 +217,11 @@ namespace ModelLibrary.Classes
             IsQunatityValidated = true;
             UnAllocatedLandedCost = 0;
             RemaningQtyonFreight = 0;
+
+            ExpectedLandedCost = 0;
+            OrderLineAmtinBaseCurrency = 0;
+            DifferenceAmtPOandInvInBaseCurrency = 0;
+
         }
 
         /// <summary>
