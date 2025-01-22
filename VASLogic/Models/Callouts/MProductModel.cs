@@ -1006,7 +1006,7 @@ namespace VIS.Models
                     ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, p.ProductType, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
                     INNER JOIN M_Locator loc ON(loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=o.M_WareHouse_ID)
                     WHERE NVL(s.M_Product_ID,0)=NVL(ol.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(ol.M_AttributeSetInstance_ID,0)) AS OnHandQty,
-                    ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),10) AS ConversionRate
+                    ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),12) AS ConversionRate,u.StdPrecision
                     FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
                     INNER JOIN M_Product p ON (ol.M_Product_ID=p.M_Product_ID)
                     LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)                    
@@ -1021,7 +1021,7 @@ namespace VIS.Models
                         (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i INNER JOIN M_InoutLine il ON (i.M_Inout_ID = il.M_Inout_ID)
                         WHERE il.C_OrderLine_ID =ol.C_OrderLine_ID AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyOrdered, 
                         ol.C_UOM_ID, atr.Description AS AttributeName, u.Name AS Uom, c.Name As ProductName, 'C' AS ProductType, 0 AS OnHandQty,
-                        ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),10) AS ConversionRate
+                        ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),12) AS ConversionRate,u.StdPrecision
                         FROM C_OrderLine ol INNER JOIN C_Order o ON ol.C_Order_ID = o.C_Order_ID
                         INNER JOIN C_Charge c ON (ol.C_Charge_ID=c.C_Charge_ID)
                         LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)
@@ -1043,7 +1043,7 @@ namespace VIS.Models
                                 group => group.Select(row => new OrderLine
                                 {
                                     QtyEntered = Util.GetValueOfDecimal(row["ConversionRate"]) == 0 ? 0
-                                     : Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]), // Remaining qty in line uom
+                                 : Math.Round(Util.GetValueOfDecimal(row["QtyOrdered"]) / Util.GetValueOfDecimal(row["ConversionRate"]), Util.GetValueOfInt(row["StdPrecision"])),// Remaining qty in line uom
                                     M_Product_ID = Util.GetValueOfInt(row["M_Product_ID"]),
                                     C_OrderLine_ID = Util.GetValueOfInt(row["C_OrderLine_ID"]),
                                     C_Order_ID = Util.GetValueOfInt(row["C_Order_ID"]),
@@ -1152,7 +1152,7 @@ namespace VIS.Models
                     atr.Description AS AttributeName, u.Name AS Uom, p.Name As ProductName, (SELECT NVL(SUM(s.QtyOnHand),0) FROM M_Storage s 
                     INNER JOIN M_Locator loc ON (loc.M_Locator_ID=s.M_Locator_ID AND loc.M_WareHouse_ID=r.DTD001_MWarehouseSource_ID)
                     WHERE NVL(s.M_Product_ID,0)=NVL(rl.M_Product_ID,0) AND NVL(s.M_AttributeSetInstance_ID,0)=NVL(rl.M_AttributeSetInstance_ID,0)) AS OnHandQty ,
-                   ROUND(NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0),10) AS ConversionRate
+                   ROUND(NVL((rl.Qty / NULLIF(rl.QtyEntered, 0)),0),12) AS ConversionRate
                     FROM M_RequisitionLine rl INNER JOIN  M_Requisition r ON (rl.M_Requisition_ID=r.M_Requisition_ID)
                     INNER JOIN M_Product p ON (rl.M_Product_ID=p.M_Product_ID) LEFT JOIN C_UOM u ON (rl.C_UOM_ID=u.C_UOM_ID) 
                     LEFT JOIN  M_AttributeSetInstance atr ON (rl.M_AttributeSetInstance_ID=atr.M_AttributeSetInstance_ID)
@@ -1478,7 +1478,7 @@ namespace VIS.Models
                     _shipment.SetC_IncoTerm_ID(order.GetC_IncoTerm_ID());
                 }
                 //VAI050-Set document type of Vendor return
-                if(!order.IsSOTrx() && order.IsReturnTrx())
+                if (!order.IsSOTrx() && order.IsReturnTrx())
                 {
                     _shipment.SetC_DocType_ID(SetDocType(order.GetAD_Org_ID(), ctx.GetAD_Client_ID(), "N", "Y", "MMR"));
 
@@ -1910,15 +1910,17 @@ namespace VIS.Models
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
                             o.AD_User_ID, o.SalesRep_ID, o.IsDropShip AS DropShip, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
-                            ol.M_Product_ID, ol.C_Charge_ID, ol.C_UOM_ID, (ol.QtyOrdered/ol.QtyEntered) AS ConversionRate,
+                            ol.M_Product_ID, ol.C_Charge_ID, ol.C_UOM_ID,
+                            ROUND(NVL((ol.QtyOrdered / NULLIF(ol.QtyEntered, 0)),0),12) AS ConversionRate,
                             (ol.QtyOrdered-ol.QtyDelivered-(SELECT NVL(SUM(MovementQty),0) FROM M_Inout i 
                             INNER JOIN M_InoutLine il ON (i.M_Inout_ID=il.M_Inout_ID) WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID 
-                            AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing,
+                            AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing,u.StdPrecision,
                             ol.IsDropShip, ol.Description, ol.C_Project_ID, ol.C_ProjectPhase_ID, ol.C_ProjectTask_ID,
                             ol.C_Activity_ID, ol.C_Campaign_ID, ol.AD_OrgTrx_ID, ol.User1_ID, ol.User2_ID, ol.PrintDescription" +
                             (Env.IsModuleInstalled("VA010_") ? ", prd.VA010_QualityPlan_ID" : "") + @"
                             FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
                             LEFT JOIN M_Product prd ON (ol.M_Product_ID = prd.M_Product_ID)
+                            LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)  
                             WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -1973,7 +1975,7 @@ namespace VIS.Models
 
                     for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
-                        QtyEnetered = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfInt(ds.Tables[0].Rows[i]["ConversionRate"]);
+                        QtyEnetered =Math.Round( Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["ConversionRate"]), Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]));
                         objLine = new MInOutLine(ctx, 0, trx);
                         objLine.SetAD_Client_ID(ctx.GetAD_Client_ID());
                         objLine.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
@@ -2067,7 +2069,7 @@ namespace VIS.Models
                     trx.Rollback();
                 }
                 ret["Shipment_ID"] = 0;
-                ret["message"] = Msg.GetMsg(ctx, "VAS_DeliveryOrderNotSaved");
+                ret["message"] = Msg.GetMsg(ctx, "VAS_GRNNotSaved");
                 return ret;
             }
             finally
@@ -2098,7 +2100,7 @@ namespace VIS.Models
                 trx = VAdvantage.DataBase.Trx.Get("VAS_GenMaterialTransfer" + DateTime.Now.Ticks);
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT r.DateRequired, r.AD_Org_ID, r.DTD001_MWarehouseSource_ID, r.M_Warehouse_ID, r.C_IncoTerm_ID, r.C_BPartner_ID,
-                           rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID, rl.C_UOM_ID, (rl.Qty/rl.QtyEntered) AS ConversionRate,
+                           rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID, rl.C_UOM_ID, Round((rl.Qty/rl.QtyEntered),12) AS ConversionRate,
                            r.AD_OrgTrx_ID, (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyRemianing
                            FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON(r.M_Requisition_ID = rl.M_Requisition_ID)
                            WHERE rl.M_RequisitionLine_ID IN (" + M_RequisitionLines_IDs + ")");
