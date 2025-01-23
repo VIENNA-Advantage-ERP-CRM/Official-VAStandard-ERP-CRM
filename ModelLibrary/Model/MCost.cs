@@ -322,6 +322,7 @@ namespace VAdvantage.Model
                 {
                     sql += " AND VAMFG_M_WrkOdrTrnsctionLine_ID = " + RecordLine_ID;
                 }
+                sql += " GROUP BY c.CostingPrecision";
                 Cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
 
                 // added Freight Cost

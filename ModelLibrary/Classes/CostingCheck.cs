@@ -71,6 +71,7 @@ namespace ModelLibrary.Classes
         public decimal ExpectedLandedCost = 0;
         public decimal OrderLineAmtinBaseCurrency = 0;
         public decimal DifferenceAmtPOandInvInBaseCurrency = 0;
+        public bool VAS_IsDOCost = false;
 
         /// <summary>
         /// Constructor
@@ -221,6 +222,7 @@ namespace ModelLibrary.Classes
             ExpectedLandedCost = 0;
             OrderLineAmtinBaseCurrency = 0;
             DifferenceAmtPOandInvInBaseCurrency = 0;
+            VAS_IsDOCost = false;
 
         }
 
