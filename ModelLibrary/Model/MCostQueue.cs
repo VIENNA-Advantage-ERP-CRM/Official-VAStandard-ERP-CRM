@@ -3448,8 +3448,8 @@ namespace VAdvantage.Model
                                                 if (costingCheck.RemaningQtyonFreight == 0 && costingCheck.UnAllocatedLandedCost != 0)
                                                 {
                                                     DB.ExecuteQuery($@"UPDATE C_LandedCostAllocation SET IsCostCalculated = 'Y', 
-                                                             VAS_UnAllocatedCost = {Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"])},
-                                                             VAS_AllocatedCost = Amt - {Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"])}
+                                                             VAS_UnAllocatedCost = {Math.Abs(Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"]))},
+                                                             VAS_AllocatedCost = Amt - {Math.Abs(Util.GetValueOfDecimal(dsLandedCostAllocation.Tables[0].Rows[lca][isExpectedCostCalculated ? "DifferenceAmt" : "Amt"]))}
                                                             WHERE C_LandedCostAllocation_ID = "
                                                             + Util.GetValueOfInt(dsLandedCostAllocation.Tables[0].Rows[lca]["C_LandedCostAllocation_ID"]), null, trxName);
                                                 }
