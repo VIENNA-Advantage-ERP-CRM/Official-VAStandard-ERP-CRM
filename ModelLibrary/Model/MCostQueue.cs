@@ -4727,9 +4727,8 @@ namespace VAdvantage.Model
         public static bool CreateOrUpdateLandedCostTransaction(CostingCheck costingCheck, MInvoiceLine InvoiceLine, DataRow drLandedCost, Trx trxName)
         {
             // Get Transaction ID, for checking transaction is created against this line
-            int M_Transaction_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT M_Transaction_ID FROM M_Transaction
-                WHERE C_InvoiceLine_ID = {InvoiceLine.GetC_InvoiceLine_ID()} 
-                      AND M_CostElement_ID = {Util.GetValueOfInt(drLandedCost["M_CostElement_ID"])}", null, trxName));
+
+            int M_Transaction_ID = Util.GetValueOfInt(drLandedCost["M_Transaction_ID"]);
             if (M_Transaction_ID == 0)
             {
                 // create product Transaction Entry, and update landed cost and Movement Qty

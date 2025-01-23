@@ -1423,7 +1423,7 @@ namespace VAdvantage.Model
                 // In case of Invoice against Return To Vendor - impacts come with Invoice Amount
                 amt = GetAmt();
             }
-            else if (windowName.Equals("Return To Vendor") && GetC_OrderLine_ID() > 0)
+            else if ((windowName.Equals("Return To Vendor") && GetC_OrderLine_ID() > 0) || (windowName.Equals("Customer Return") && costingCheck.VAS_IsDOCost))
             {
                 amt = GetAmt();
             }
@@ -1783,22 +1783,36 @@ namespace VAdvantage.Model
                         cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                     }
                 }
+                else if (windowName.Equals("Customer Return"))
+                {
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    {
+                        costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
+                        IsError = true;
+                        return cost;
+                    }
+                    else if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                    {
+                        cost.SetCurrentQty(0);
+                    }
+                    else
+                    {
+                        //22-Jan-2025, When Customer Return will affect with Shipment Cost then cost will be added and current cost price re-calculated
+                        if (costingCheck.VAS_IsDOCost)
+                        {
+                            cost.SetCurrentCostPrice(Decimal.Round(
+                            Decimal.Divide(
+                            Decimal.Add(
+                            Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
+                            Decimal.Add(cost.GetCurrentQty(), qty))
+                            , precision, MidpointRounding.AwayFromZero));
+                        }
+                        cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
+                    }
+                }
                 else if (addition)
                 {
                     if (windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->"))
-                    {
-                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
-                        {
-                            costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
-                            IsError = true;
-                            return cost;
-                        }
-                        else
-                        {
-                            cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                        }
-                    }
-                    else if (windowName.Equals("Customer Return"))// || windowName == "Return To Vendor"
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -2414,6 +2428,33 @@ namespace VAdvantage.Model
                     cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                     //}
                 }
+                else if (windowName.Equals("Customer Return"))
+                {
+                    if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
+                    {
+                        costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
+                        IsError = true;
+                        return cost;
+                    }
+                    else if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                    {
+                        cost.SetCurrentQty(0);
+                    }
+                    else
+                    {
+                        //22-Jan-2025, When Customer Return will affect with Shipment Cost then cost will be added and current cost price re-calculated
+                        if (costingCheck.VAS_IsDOCost)
+                        {
+                            cost.SetCurrentCostPrice(Decimal.Round(
+                            Decimal.Divide(
+                            Decimal.Add(
+                            Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
+                            Decimal.Add(cost.GetCurrentQty(), qty))
+                            , precision, MidpointRounding.AwayFromZero));
+                        }
+                        cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
+                    }
+                }
                 else if (addition)
                 {
                     #region addition > 0
@@ -2443,19 +2484,6 @@ namespace VAdvantage.Model
                         else
                         {
                             cost.SetCurrentQty(Decimal.Subtract(cost.GetCurrentQty(), qty));
-                        }
-                    }
-                    else if (windowName.Equals("Customer Return"))
-                    {
-                        if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
-                        {
-                            costingCheck.errorMessage += "UpdateCost: qty goes negative for costing method " + cost.GetCostingMethod();
-                            IsError = true;
-                            return cost;
-                        }
-                        else
-                        {
-                            cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
                     else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
