@@ -4215,6 +4215,8 @@ namespace VAdvantage.Model
                 }
                 else // Customer Return
                 {
+                    costingCheck.VAS_IsDOCost = Util.GetValueOfBool(client.Get_Value("VAS_IsDOCost"));
+
                     if (sLine.GetC_OrderLine_ID() == 0)
                     {
                         currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
@@ -4224,11 +4226,25 @@ namespace VAdvantage.Model
                     {
                         //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
                         // and update it on Return Document
-                        DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + sLine.GetM_InOutLine_ID());
-                        if (dr != null && dr.Length > 0)
+                        if (!costingCheck.VAS_IsDOCost)
                         {
-                            currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                            currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                  sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID());
                         }
+                        else
+                        {
+                            DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + sLine.GetM_InOutLine_ID());
+                            if (dr != null && dr.Length > 0)
+                            {
+                                currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                            }
+                        }
+                    }
+
+                    //22-Jan-2025, When we do Customer Return then reverse the impact with the same price
+                    if (IsReversal() && costingCheck.VAS_IsDOCost)
+                    {
+                        currentCostPrice = sLine.GetCurrentCostPrice();
                     }
                 }
                 DB.ExecuteQuery("UPDATE M_InOutLine SET CurrentCostPrice = " + currentCostPrice +
@@ -4281,7 +4297,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        if (costingMethod != "")
+                        if (!string.IsNullOrEmpty(costingMethod))
                         {
                             currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                 sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, 0, sLine.GetM_InOutLine_ID(), costingMethod,
@@ -4328,7 +4344,8 @@ namespace VAdvantage.Model
 
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, costingCheck.M_ASI_ID,
                           "Customer Return", null, sLine, null, null, null,
-                          Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Qty),
+                          Decimal.Multiply(costingCheck.VAS_IsDOCost ? currentCostPrice :
+                          Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Qty),
                           Qty, Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
@@ -4355,7 +4372,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        if (costingMethod != "")
+                        if (!string.IsNullOrEmpty(costingMethod))
                         {
                             if (sLine.GetC_OrderLine_ID() == 0)
                             {

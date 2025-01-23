@@ -130,6 +130,7 @@ namespace VAdvantage.Process
         private bool IsCostUpdation = false;
 
         private decimal postingCost = 0;
+        private DataSet CostOnOriginalDoc = null;
 
         protected override void Prepare()
         {
@@ -1779,7 +1780,7 @@ namespace VAdvantage.Process
                                    Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
                                 {
 
-                                    CalculateCostForCustomerReturn(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                    CalculateCostForReturnToVendor(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
                                     continue;
                                 }
@@ -4246,6 +4247,9 @@ namespace VAdvantage.Process
                 costingCheck.inout = inout;
                 costingCheck.isReversal = inout.IsReversal();
 
+                // get Original Shipment Details
+                GetOriginalInoutDetail(inout.GetM_InOut_ID());
+
                 for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
                 {
                     try
@@ -4280,6 +4284,7 @@ namespace VAdvantage.Process
                             costingCheck.orderline = orderLine;
                             costingCheck.order = order;
                             costingCheck.product = product;
+                            costingCheck.VAS_IsDOCost = Util.GetValueOfBool(client.Get_Value("VAS_IsDOCost"));
 
                             // Transaction Update Query
                             query.Clear();
@@ -4299,9 +4304,29 @@ namespace VAdvantage.Process
                                 if (!client.IsCostImmediate() || inoutLine.GetCurrentCostPrice() == 0)
                                 {
                                     // get price from m_cost (Current Cost Price)
-                                    currentCostPrice = 0;
-                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
-                                        inoutLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), inout.GetM_Warehouse_ID(), false);
+                                    if (CostOnOriginalDoc != null && CostOnOriginalDoc.Tables.Count > 0 && CostOnOriginalDoc.Tables[0].Rows.Count > 0)
+                                    {
+                                        //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
+                                        // and update it on Return Document
+                                        if (!costingCheck.VAS_IsDOCost)
+                                        {
+                                            currentCostPrice = MCost.GetproductCosts(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
+                                                                  inoutLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), inout.GetM_Warehouse_ID());
+                                        }
+                                        else
+                                        {
+                                            DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + inoutLine.GetM_InOutLine_ID());
+                                            if (dr != null && dr.Length > 0)
+                                            {
+                                                currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        currentCostPrice = MCost.GetproductCosts(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
+                                            inoutLine.GetM_Product_ID(), inoutLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
+                                    }
 
                                     if (IsCostUpdation)
                                     {
@@ -4312,9 +4337,10 @@ namespace VAdvantage.Process
 
                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
                                       "Customer Return", null, inoutLine, null, null, null,
-                                      order.GetDocStatus() != "VO" ? Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()),
-                                      Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]))
-                                    : Decimal.Multiply(ProductOrderPriceActual, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])),
+                                      order.GetDocStatus() != "VO" ?
+                                          Decimal.Multiply(costingCheck.VAS_IsDOCost ? currentCostPrice : Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()),
+                                                            Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]))
+                                        : Decimal.Multiply(costingCheck.VAS_IsDOCost ? currentCostPrice : ProductOrderPriceActual, Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"])),
                                       Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
                                       Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                                 {
@@ -4331,15 +4357,18 @@ namespace VAdvantage.Process
                                     // when costing method is LIFO or FIFO
                                     if (!string.IsNullOrEmpty(costingMethod))
                                     {
-                                        currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), inoutLine.GetAD_Client_ID(),
+                                        if (inoutLine.GetC_OrderLine_ID() == 0)
+                                        {
+                                            currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), inoutLine.GetAD_Client_ID(),
                                             inoutLine.GetAD_Org_ID(), inoutLine.GetM_Product_ID(), costingCheck.M_ASI_ID, 0,
                                             inoutLine.GetM_InOutLine_ID(), costingMethod, inout.GetM_Warehouse_ID(), false, Get_Trx());
-                                        if (IsCostUpdation)
-                                        {
-                                            inoutLine.SetCurrentCostPrice(currentCostPrice);
+                                            if (IsCostUpdation)
+                                            {
+                                                inoutLine.SetCurrentCostPrice(currentCostPrice);
+                                            }
                                         }
                                     }
-                                    else if (inoutLine.GetCurrentCostPrice() == 0)
+                                    else if (inoutLine.GetCurrentCostPrice() == 0 && inoutLine.GetC_OrderLine_ID() == 0)
                                     {
                                         // get price from m_cost (Current Cost Price)
                                         currentCostPrice = 0;
@@ -4424,6 +4453,18 @@ namespace VAdvantage.Process
             //        Get_Trx().Commit();
             //    }
             //}
+        }
+
+        public DataSet GetOriginalInoutDetail(int M_InOut_ID)
+        {
+            CostOnOriginalDoc = DB.ExecuteDataset($@"SELECT orgiol.CurrentCostPrice , orgiol.PostCurrentCostPrice, 
+                                        retiol.C_OrderLine_ID AS RMALine_ID, retiol.M_InOutLine_ID 
+                                        FROM M_InOutLine retiol
+                                        INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
+                                        INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
+                                        INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
+                                        WHERE i.M_InOut_ID = {M_InOut_ID}");
+            return CostOnOriginalDoc;
         }
 
         /// <summary>
