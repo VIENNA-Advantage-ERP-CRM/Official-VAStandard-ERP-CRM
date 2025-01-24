@@ -1503,7 +1503,7 @@ namespace VAdvantage.Process
                                                         {
 
                                                             LineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT Amt FROM M_ProductionLine WHERE M_ProductionLine_ID = 
-                                                                {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"])}"));
+                                                                {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"])}", null , Get_Trx()));
                                                             // Update Costing detial on Transaction
                                                             DB.ExecuteQuery($@"UPDATE M_Transaction
                                                                             SET
