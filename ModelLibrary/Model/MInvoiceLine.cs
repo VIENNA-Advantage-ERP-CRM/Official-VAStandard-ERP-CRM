@@ -3127,7 +3127,7 @@ namespace VAdvantage.Model
             objTransaction.SetM_Product_ID(GetM_Product_ID());
             objTransaction.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
             objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
-            if (Util.GetValueOfBool(objTransaction.Get_Value("VAS_IsLandedCost")))
+            if (!Util.GetValueOfBool(objTransaction.Get_Value("VAS_IsLandedCost")))
             {
                 objTransaction.SetMovementQty(GetQtyInvoiced());
                 objTransaction.SetCurrentQty(0);
