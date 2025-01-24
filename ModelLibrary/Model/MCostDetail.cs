@@ -3706,54 +3706,55 @@ namespace VAdvantage.Model
             decimal price = 0;
             string sql;
 
+            sql = @"SELECT";
+            if (costingCheck.IsQunatityValidated)
+            {
+                sql += @" Amt as currentCostAmount  
+                            FROM T_Temp_CostDetail ced 
+                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id)  WHERE  ced.IsActive = 'Y'";
+            }
+            else
+            {
+                sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced  WHERE  ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
+            }
+            sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
+                                     AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
+                         @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
+                         @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) = 0 " +
+                         @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
+                                        AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
+            MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+            if (MRPrice == 0)
+            {
+                sql = @"SELECT";
+                if (string.IsNullOrEmpty(costingCheck.materialCostingMethod) ||
+                            costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Fifo) ||
+                            costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))
+                {
+                    sql += @" Amt as currentCostAmount  
+                            FROM T_Temp_CostDetail ced 
+                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id) WHERE ced.IsActive = 'Y' ";
+                }
+                else
+                {
+                    sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced WHERE ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
+                }
+                sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
+                                     AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
+                         @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
+                         @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) =  " + cd.GetC_OrderLine_ID() +
+                         @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
+                                        AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
+                MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+            }
+            MRPrice = Decimal.Round(MRPrice, mas.GetCostingPrecision(), MidpointRounding.AwayFromZero);
+
             if (ce.IsAveragePO() || ce.IsLastPOPrice() || ce.IsWeightedAveragePO())
             {
 
             }
             else
             {
-                sql = @"SELECT";
-                if (costingCheck.IsQunatityValidated)
-                {
-                    sql += @" Amt as currentCostAmount  
-                            FROM T_Temp_CostDetail ced 
-                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id)  WHERE  ced.IsActive = 'Y'";
-                }
-                else
-                {
-                    sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced  WHERE  ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
-                }
-                sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
-                                     AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
-                             @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
-                             @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) = 0 " +
-                             @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
-                                        AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
-                MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
-                if (MRPrice == 0)
-                {
-                    sql = @"SELECT";
-                    if (string.IsNullOrEmpty(costingCheck.materialCostingMethod) ||
-                                costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Fifo) ||
-                                costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))
-                    {
-                        sql += @" Amt as currentCostAmount  
-                            FROM T_Temp_CostDetail ced 
-                            INNER JOIN m_costqueue cq ON (cq.m_costqueue_id = ced.m_costqueue_id) WHERE ced.IsActive = 'Y' ";
-                    }
-                    else
-                    {
-                        sql += @" (ROUND(Amt/QTY, 12)) as currentCostAmount  FROM M_CostDetail ced WHERE ced.IsActive = 'Y' AND NVL(ced.M_CostElement_ID, 0) = 0 ";
-                    }
-                    sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
-                                     AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
-                             @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
-                             @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) =  " + cd.GetC_OrderLine_ID() +
-                             @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
-                                        AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
-                    MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
-                }
-                MRPrice = Decimal.Round(MRPrice, mas.GetCostingPrecision(), MidpointRounding.AwayFromZero);
                 cost.SetCumulatedAmt(Decimal.Subtract(cost.GetCumulatedAmt(), (MRPrice * GetQty())));
 
                 //VIS_0045: 18-July-2022 -> Reduce / Update Current Cost for Weighted Average Cost
@@ -3766,12 +3767,11 @@ namespace VAdvantage.Model
                                               , precision, MidpointRounding.AwayFromZero);
                     cost.SetCurrentCostPrice(price);
                 }
-
-                //22-Jan-2025, Reduce GRN Price, for getting difference between AP Invoice and PO price 
-                if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0 && mas.GetC_Currency_ID() == cost.GetCtx().GetContextAsInt("$C_Currency_ID"))
-                {
-                    costingCheck.DifferenceAmtPOandInvInBaseCurrency = costingCheck.DifferenceAmtPOandInvInBaseCurrency - MRPrice;
-                }
+            }
+            //22-Jan-2025, Reduce GRN Price, for getting difference between AP Invoice and PO price 
+            if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0 && mas.GetC_Currency_ID() == cost.GetCtx().GetContextAsInt("$C_Currency_ID"))
+            {
+                costingCheck.DifferenceAmtPOandInvInBaseCurrency = costingCheck.DifferenceAmtPOandInvInBaseCurrency - MRPrice;
             }
             return cost.Save();
             #endregion
