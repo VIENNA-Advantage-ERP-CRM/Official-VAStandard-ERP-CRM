@@ -999,11 +999,18 @@ namespace VAdvantage.Model
                                     }
                                 }
 
+                                if (windowName == "Customer Return" && costingCheck.VAS_IsDOCost)
+                                {
+                                    // when customer return from DO cost, accounting Schema curreny
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, ctx.GetContextAsInt("$C_Currency_ID"), order.GetC_Currency_ID(), 
+                                                                     inout.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
+                                }
+
                                 // Convert amount in Accounting Schema currency
                                 if (order.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                 {
                                     // convert amount on account date of M_Inout (discussed with Ashish, Suya, Mukesh sir)
-                                    Price = MConversionRate.Convert(ctx, Price, order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                      inout.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
 
                                     // VIS_0045: 16-Dec-2022 -- DevOps ID - 1885
@@ -1105,7 +1112,7 @@ namespace VAdvantage.Model
                                                 costingCheck.errorMessage += "Price not available";
                                             }
                                             // convert amount on account date of M_Inout (discussed with Ashish, Suya, Mukesh sir)
-                                            Price = MConversionRate.Convert(ctx, Price, Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]), acctSchema.GetC_Currency_ID(),
+                                            Price = MConversionRate.ConvertCostingPrecision(ctx, Price, Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]), acctSchema.GetC_Currency_ID(),
                                                     inout.GetDateAcct(), Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_ConversionType_ID"]), AD_Client_ID, AD_Org_ID2);
 
                                             if (Price == 0)
@@ -1210,7 +1217,7 @@ namespace VAdvantage.Model
 
                             if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID() && Price != 0)
                             {
-                                Price = MConversionRate.Convert(ctx, Price, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                Price = MConversionRate.ConvertCostingPrecision(ctx, Price, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                          invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                 if (Price == 0)
                                 {
@@ -1446,7 +1453,7 @@ namespace VAdvantage.Model
                             Decimal ProductOrderLineCost = orderline.GetProductLineCost(orderline);
                             if (order.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                             {
-                                Price = MConversionRate.Convert(ctx, Decimal.Divide(ProductOrderLineCost, orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                Price = MConversionRate.ConvertCostingPrecision(ctx, Decimal.Divide(ProductOrderLineCost, orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                     (inout != null ? inout.GetDateAcct() : order.GetDateAcct()), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                 if (Price == 0)
                                 {
@@ -2431,7 +2438,7 @@ namespace VAdvantage.Model
                                             inv = new MInvoice(ctx, Util.GetValueOfInt(ds2.Tables[0].Rows[n]["c_invoice_id"]), trxName);
                                             if (inv.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                             {
-                                                Price += MConversionRate.Convert(ctx, decimal.Multiply(PriceActualIncludedTax, Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
+                                                Price += MConversionRate.ConvertCostingPrecision(ctx, decimal.Multiply(PriceActualIncludedTax, Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
                                                                                  inv.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                  inv.GetDateAcct(), inv.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                                 if (Price == 0)
@@ -2541,7 +2548,7 @@ namespace VAdvantage.Model
                                 }
                                 if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                 {
-                                    Price = MConversionRate.Convert(ctx, Decimal.Multiply(Qty, Decimal.Round(Decimal.Divide(ProductLineCost, invoiceline.GetQtyInvoiced()), 2, MidpointRounding.AwayFromZero)), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Decimal.Multiply(Qty, Decimal.Round(Decimal.Divide(ProductLineCost, invoiceline.GetQtyInvoiced()), 2, MidpointRounding.AwayFromZero)), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                              invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                     if (Price == 0)
                                     {
@@ -2711,7 +2718,7 @@ namespace VAdvantage.Model
                                                 inv = new MInvoice(ctx, Util.GetValueOfInt(ds2.Tables[0].Rows[n]["c_invoice_id"]), trxName);
                                                 if (inv.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                                 {
-                                                    Price += MConversionRate.Convert(ctx, decimal.Multiply(PriceActualIncludedTax, Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
+                                                    Price += MConversionRate.ConvertCostingPrecision(ctx, decimal.Multiply(PriceActualIncludedTax, Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
                                                                                      inv.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                      inv.GetDateAcct(), inv.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                                     if (Price == 0)
@@ -2955,7 +2962,7 @@ namespace VAdvantage.Model
 
                                 if (C_Currency_ID != 0 && C_Currency_ID != acctSchema.GetC_Currency_ID() && Price != 0)
                                 {
-                                    Price = MConversionRate.Convert(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
                                                                             inventory.GetMovementDate(), 0, AD_Client_ID, AD_Org_ID2);
                                     cmPrice = Price;
                                     if (Price == 0)
@@ -3004,7 +3011,7 @@ namespace VAdvantage.Model
                                 // checking price for Finished Good
                                 if (acctSchema.GetC_Currency_ID() != Util.GetValueOfInt(ctx.GetContextAsInt("$C_Currency_ID")))
                                 {
-                                    price = MConversionRate.Convert(ctx, price, Util.GetValueOfInt(ctx.GetContext("$C_Currency_ID")), acctSchema.GetC_Currency_ID(),
+                                    price = MConversionRate.ConvertCostingPrecision(ctx, price, Util.GetValueOfInt(ctx.GetContext("$C_Currency_ID")), acctSchema.GetC_Currency_ID(),
                                                                         VAMFG_DateAcct, 0, AD_Client_ID, AD_Org_ID2);
                                 }
 
@@ -3092,7 +3099,7 @@ namespace VAdvantage.Model
                             costingCheck.movementDate = costingCheck.provisionalInvoice.GetDateAcct();
                             if (acctSchema.GetC_Currency_ID() != costingCheck.provisionalInvoice.GetC_Currency_ID())
                             {
-                                Price = MConversionRate.Convert(ctx, Price,
+                                Price = MConversionRate.ConvertCostingPrecision(ctx, Price,
                                     costingCheck.provisionalInvoice.GetC_Currency_ID(),
                                     acctSchema.GetC_Currency_ID(),
                                     dateAcct,
@@ -4852,7 +4859,7 @@ namespace VAdvantage.Model
                                 order = new MOrder(ctx, orderline.GetC_Order_ID(), trxName);
                                 if (order.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                 {
-                                    Price = MConversionRate.Convert(ctx, Price, order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                      order.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                     if (Price == 0)
                                     {
@@ -4888,7 +4895,7 @@ namespace VAdvantage.Model
                             invoice = new MInvoice(ctx, invoiceline.GetC_Invoice_ID(), trxName);
                             if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                             {
-                                Price = MConversionRate.Convert(ctx, Price, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                Price = MConversionRate.ConvertCostingPrecision(ctx, Price, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                          invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
 
                                 if (Price == 0)
@@ -4973,7 +4980,7 @@ namespace VAdvantage.Model
                             order = new MOrder(ctx, orderline.GetC_Order_ID(), trxName);
                             if (order.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                             {
-                                Price = MConversionRate.Convert(ctx, Decimal.Divide(orderline.GetLineNetAmt(), orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                Price = MConversionRate.ConvertCostingPrecision(ctx, Decimal.Divide(orderline.GetLineNetAmt(), orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                  order.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                 if (Price == 0)
                                 {
@@ -5499,7 +5506,7 @@ namespace VAdvantage.Model
                                             inv = new MInvoice(ctx, Util.GetValueOfInt(ds2.Tables[0].Rows[n]["c_invoice_id"]), trxName);
                                             if (inv.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                             {
-                                                Price += MConversionRate.Convert(ctx, decimal.Multiply(Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["priceactual"]), Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
+                                                Price += MConversionRate.ConvertCostingPrecision(ctx, decimal.Multiply(Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["priceactual"]), Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
                                                                                  inv.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                  inv.GetDateAcct(), inv.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                                 if (Price == 0)
@@ -5573,7 +5580,7 @@ namespace VAdvantage.Model
                                 invoice = new MInvoice(ctx, invoiceline.GetC_Invoice_ID(), trxName);
                                 if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                 {
-                                    Price = MConversionRate.Convert(ctx, Decimal.Multiply(Qty, Decimal.Round(Decimal.Divide(invoiceline.GetLineNetAmt(), invoiceline.GetQtyInvoiced()), 2, MidpointRounding.AwayFromZero)), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Decimal.Multiply(Qty, Decimal.Round(Decimal.Divide(invoiceline.GetLineNetAmt(), invoiceline.GetQtyInvoiced()), 2, MidpointRounding.AwayFromZero)), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                              invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                     if (Price == 0)
                                     {
@@ -5669,7 +5676,7 @@ namespace VAdvantage.Model
                                                 inv = new MInvoice(ctx, Util.GetValueOfInt(ds2.Tables[0].Rows[n]["c_invoice_id"]), trxName);
                                                 if (inv.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                                 {
-                                                    Price += MConversionRate.Convert(ctx, decimal.Multiply(Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["priceactual"]), Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
+                                                    Price += MConversionRate.ConvertCostingPrecision(ctx, decimal.Multiply(Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["priceactual"]), Util.GetValueOfDecimal(ds2.Tables[0].Rows[n]["qty"])),
                                                                                      inv.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                      inv.GetDateAcct(), inv.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                                     if (Price == 0)
@@ -5859,7 +5866,7 @@ namespace VAdvantage.Model
                                 inventory = new MInventory(ctx, inventoryLine.GetM_Inventory_ID(), trxName);
                                 if (C_Currency_ID != 0 && C_Currency_ID != acctSchema.GetC_Currency_ID())
                                 {
-                                    Price = MConversionRate.Convert(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
                                                                             inventory.GetMovementDate(), 0, AD_Client_ID, AD_Org_ID2);
                                     if (Price == 0)
                                     {
@@ -5874,7 +5881,7 @@ namespace VAdvantage.Model
                                 movement = new MMovement(ctx, movementline.GetM_Movement_ID(), trxName);
                                 if (C_Currency_ID != 0 && C_Currency_ID != acctSchema.GetC_Currency_ID())
                                 {
-                                    Price = MConversionRate.Convert(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, C_Currency_ID, acctSchema.GetC_Currency_ID(),
                                                                             movement.GetMovementDate(), 0, AD_Client_ID, AD_Org_ID2);
                                     if (Price == 0)
                                     {
@@ -5948,7 +5955,7 @@ namespace VAdvantage.Model
                                     // conversion required
                                     if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                     {
-                                        amt = MConversionRate.Convert(ctx, amt, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                        amt = MConversionRate.ConvertCostingPrecision(ctx, amt, invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                              invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                         if (amt == 0)
                                         {
@@ -6518,7 +6525,7 @@ namespace VAdvantage.Model
                         }
                         if (Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]) != acctSchema.GetC_Currency_ID())
                         {
-                            surchargeAmount = MConversionRate.Convert(invoiceLine.GetCtx(),
+                            surchargeAmount = MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(),
                                 isCostAdjustmentOnLost == "Y" && MRQtyConsumed < Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]) ? decimal.Multiply(PriceActual, MRQtyConsumed)
                                 : decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"])),
                                                   Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]), acctSchema.GetC_Currency_ID(),
@@ -6562,7 +6569,7 @@ namespace VAdvantage.Model
                                         // when we revrse the transaction, remove invoice amount and add mr amount
                                         if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                         {
-                                            PriceLifoOrFifo += MConversionRate.Convert(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                            PriceLifoOrFifo += MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                      invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, invoice.GetAD_Org_ID());
                                         }
                                         else
@@ -6578,7 +6585,7 @@ namespace VAdvantage.Model
                                         PriceLifoOrFifo -= price * invoiceLine.GetQtyInvoiced();
                                         if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                         {
-                                            PriceLifoOrFifo += MConversionRate.Convert(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                            PriceLifoOrFifo += MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                                      invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, invoice.GetAD_Org_ID());
                                         }
                                         else
@@ -6626,7 +6633,7 @@ namespace VAdvantage.Model
 
                         if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                         {
-                            surchargeAmount = MConversionRate.Convert(invoiceLine.GetCtx(), (ProductLineCost), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                            surchargeAmount = MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(), (ProductLineCost), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                                                      invoice.GetDateAcct(), invoice.GetC_ConversionType_ID(), AD_Client_ID, invoice.GetAD_Org_ID());
                             if (ProductLineCost > 0 && surchargeAmount == 0)
                             {
@@ -6778,7 +6785,7 @@ namespace VAdvantage.Model
                 // conversion of amount
                 if (c_currency_id != 0 && c_currency_id != CurrencyTo && amount != 0)
                 {
-                    amount = MConversionRate.Convert(inout.GetCtx(), amount, c_currency_id, CurrencyTo,
+                    amount = MConversionRate.ConvertCostingPrecision(inout.GetCtx(), amount, c_currency_id, CurrencyTo,
                                                                             inout.GetDateAcct(), 0, inout.GetAD_Client_ID(), inout.GetAD_Org_ID());
                     if (amount == 0)
                     {

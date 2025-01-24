@@ -1503,7 +1503,7 @@ namespace VAdvantage.Process
                                                         {
 
                                                             LineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT Amt FROM M_ProductionLine WHERE M_ProductionLine_ID = 
-                                                                {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"])}", null , Get_Trx()));
+                                                                {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"])}", null, Get_Trx()));
                                                             // Update Costing detial on Transaction
                                                             DB.ExecuteQuery($@"UPDATE M_Transaction
                                                                             SET
@@ -1515,7 +1515,7 @@ namespace VAdvantage.Process
                                                                                 UpdatedBy = {GetCtx().GetAD_User_ID()}, 
                                                                                 Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)}
                                                                             WHERE
-	                                                                            m_transaction_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"])}");
+	                                                                            m_transaction_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"])}", null, Get_Trx());
                                                         }
 
                                                         // Update Differnce Value on product Plan only
