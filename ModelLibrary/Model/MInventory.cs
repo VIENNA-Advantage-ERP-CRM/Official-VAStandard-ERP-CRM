@@ -2159,6 +2159,8 @@ namespace VAdvantage.Model
                             sql += " , ProductCost = " + currentCostPrice;
                             sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                             sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
+                            //22-Jan-2025, Update posting Cost on Transaction
+                            sql += " , VAS_PostingCost = " + currentCostPrice;
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
                         }
@@ -2170,7 +2172,7 @@ namespace VAdvantage.Model
                             sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                             sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
                             //22-Jan-2025, Update posting Cost on Transaction
-                            sql += " , VAS_PostingCost = " + currentCostPrice;
+                            sql += " , VAS_PostingCost = " + line.GetPostCurrentCostPrice();
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
                         }
