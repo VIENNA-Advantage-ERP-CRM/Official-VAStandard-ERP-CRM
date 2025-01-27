@@ -82,8 +82,9 @@ namespace VAdvantage.Process
                 productionTo.SetName("{->" + productionTo.GetName() + ")");
                 if (production.Get_ColumnIndex("DocumentNo") > 0)
                 {
-                    productionTo.Set_Value("DocumentNo", ("{->" + production.Get_Value("DocumentNo") + ")"));
+                    productionTo.Set_Value("DocumentNo", "{->" + production.Get_Value("DocumentNo") + ")");
                 }
+                productionTo.SetDescription("{->" + production.Get_Value("DocumentNo") + ")");
                 productionTo.SetMovementDate(production.GetMovementDate()); //SI_0662 : not to create reverse record in current date, it should be created with the same date.
                 productionTo.SetProcessed(false);
                 if (!productionTo.Save(production.Get_Trx()))
@@ -239,6 +240,7 @@ namespace VAdvantage.Process
                 //Set reversed as true, Reverse Refernce on Orignal Document
                 production.SetIsReversed(true);
                 production.SetM_Ref_Production(productionTo.GetM_Production_ID());
+                production.SetDescription("(" + productionTo.Get_Value("DocumentNo") + "<-)");
                 if (!production.Save(production.Get_Trx()))
                 {
                     production.Get_Trx().Rollback();
