@@ -356,7 +356,7 @@ namespace VAdvantage.Process
                               AND ((docstatus   IN ('CO' , 'CL') AND iscostcalculated = 'N' ) OR (docstatus IN ('RE' , 'VO') AND iscostcalculated ='Y'
                               AND ISREVERSEDCOSTCALCULATED= 'N' AND ReversalDoc_ID!= 0) )");
                     }
-                    sql.Append(@" ) t WHERE AD_Client_ID = " + GetCtx().GetAD_Client_ID() + "  order by dateacct , created");
+                    sql.Append(@" ) t WHERE AD_Client_ID = " + GetCtx().GetAD_Client_ID() + "  order by dateacct , to_date(created, 'DD-MON-YY HH24:MI:SS')");
                     dsRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
 
                     // Complete Record
@@ -4624,7 +4624,7 @@ namespace VAdvantage.Process
                                             query.Append(" , ProductCost = " + currentCostPrice);
                                             query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                             query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                            query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                            query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                             query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                             if (IsCostUpdation)
                                             {
@@ -4703,7 +4703,7 @@ namespace VAdvantage.Process
                                             query.Append(" , ProductCost = " + currentCostPrice);
                                             query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                             query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                            query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                            query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                             query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                             if (IsCostUpdation)
                                             {
