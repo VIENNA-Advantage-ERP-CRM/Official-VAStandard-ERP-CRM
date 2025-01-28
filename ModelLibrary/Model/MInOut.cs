@@ -3684,7 +3684,7 @@ namespace VAdvantage.Model
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     //22-Jan-2025, Update posting Cost on Transaction
-                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -3768,7 +3768,7 @@ namespace VAdvantage.Model
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     //22-Jan-2025, Update posting Cost on Transaction
-                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
+                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
