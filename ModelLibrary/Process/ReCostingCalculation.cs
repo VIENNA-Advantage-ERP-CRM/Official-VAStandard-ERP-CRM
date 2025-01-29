@@ -5682,11 +5682,27 @@ namespace VAdvantage.Process
         {
             if (IsCostUpdation)
             {
-                return DB.ExecuteQuery($@"Update M_Transaction SET ProductCost = {ProductCost},
+                string sql = $@"Update M_Transaction SET ProductCost = {ProductCost},
                                     M_CostElement_ID = {costingCheck.definedCostingElement}, 
                                     CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)},
-                                    VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency}
-                                WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}", null, Get_Trx()) >= 0;
+                                    VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency}";
+                if (costingCheck.invoice != null && costingCheck.invoice.Get_ID() > 0)
+                {
+                    if (Util.GetValueOfBool(costingCheck.invoice.IsReturnTrx()))
+                    {
+                        sql += ", VAS_IsCreditNote = 'Y' ";
+                    }
+                    if (Util.GetValueOfBool(costingCheck.invoice.Get_Value("TreatAsDiscount")))
+                    {
+                        sql += ", TreatAsDiscount = 'Y' ";
+                    }
+                    if (Util.GetValueOfBool(costingCheck.invoice.Get_Value("VAS_IsLandedCost")))
+                    {
+                        sql += ", VAS_IsLandedCost = 'Y' ";
+                    }
+                }
+                sql += $@" WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}";
+                return DB.ExecuteQuery(sql, null, Get_Trx()) >= 0;
             }
             return true;
         }
