@@ -3048,7 +3048,7 @@ namespace VAdvantage.Process
 
                 // Update Transaction
                 sql.Clear();
-                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0   
+                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0, VAS_PostingCost = 0    
                                 WHERE M_Product_ID IN (SELECT DISTINCT M_Product_ID FROM M_Product 
                                     WHERE M_Product_Category_ID IN ({ productCategoryID } ) ) ");
                 if (DateFrom != null)
@@ -3396,7 +3396,7 @@ namespace VAdvantage.Process
 
                 // Update Transaction
                 sql.Clear();
-                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0  WHERE M_Product_ID IN ({ productID })");
+                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0, VAS_PostingCost = 0  WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
@@ -3678,7 +3678,7 @@ namespace VAdvantage.Process
 
                 // Update Transaction
                 sql.Clear();
-                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0  WHERE AD_client_ID IN ({ GetAD_Client_ID()  })");
+                sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0, VAS_PostingCost = 0  WHERE AD_client_ID IN ({ GetAD_Client_ID()  })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
@@ -6649,6 +6649,17 @@ namespace VAdvantage.Process
                                 else
                                 {
                                     _log.Fine("Cost Calculation updated for Production Execution line ID = " + Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["VAMFG_M_WrkOdrTrnsctionLine_ID"]));
+
+                                    query.Clear();
+                                    query.Append("Update M_Transaction SET ");
+                                    query.Append(" ProductApproxCost = " + currentCostPrice);
+                                    query.Append(" , ProductCost = " + currentCostPrice);
+                                    query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                    int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+
                                     Get_Trx().Commit();
                                 }
                             }
@@ -6691,6 +6702,17 @@ namespace VAdvantage.Process
                                 else
                                 {
                                     _log.Fine("Cost Calculation updated for Production Execution line ID = " + Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["VAMFG_M_WrkOdrTrnsctionLine_ID"]));
+
+                                    query.Clear();
+                                    query.Append("Update M_Transaction SET ");
+                                    query.Append(" ProductApproxCost = " + currentCostPrice);
+                                    query.Append(" , ProductCost = " + currentCostPrice);
+                                    query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
+                                    query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                    int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+
                                     Get_Trx().Commit();
                                 }
                             }
