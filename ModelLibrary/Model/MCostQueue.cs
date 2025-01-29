@@ -4748,7 +4748,8 @@ namespace VAdvantage.Model
                 //update landed cost 
                 int no = DB.ExecuteQuery($@"Update M_Transaction SET VAS_LandedCost = {costingCheck.ExpectedLandedCost},
                                     M_CostElement_ID = {Util.GetValueOfInt(drLandedCost["M_CostElement_ID"])}, 
-                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)}
+                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)},
+                                    VAS_IsLandedCost = 'Y' 
                                 WHERE M_Transaction_ID = {M_Transaction_ID}", null, trxName);
                 if (no <= 0)
                 {
