@@ -3944,7 +3944,8 @@ namespace VAdvantage.Model
                                                                      @" END , IsCostImmediate = 'Y' , IsCostError = 'N', 
                                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
                                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
-                                                                     VAS_LandedCost = " + costingCheck.ExpectedLandedCost + @"  
+                                                                     VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@"  
+                                                                   , VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))} 
                                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                                     // Update Cost on Product transaction
@@ -4644,7 +4645,8 @@ namespace VAdvantage.Model
                                                                      @" END , IsCostImmediate = 'Y' , 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
-                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + @"  
+                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@" 
+                                                    , VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                  WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                                 sLine.SetIsCostImmediate(true);
 

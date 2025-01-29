@@ -3127,11 +3127,15 @@ namespace VAdvantage.Model
             objTransaction.SetM_Product_ID(GetM_Product_ID());
             objTransaction.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
             objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
-            if (!Util.GetValueOfBool(objTransaction.Get_Value("VAS_IsLandedCost")))
+            if (!Util.GetValueOfBool(this._parent.Get_Value("VAS_IsLandedCost")))
             {
                 objTransaction.SetMovementQty(GetQtyInvoiced());
                 objTransaction.SetCurrentQty(0);
                 objTransaction.SetContainerCurrentQty(0);
+            }
+            else
+            {
+                objTransaction.Set_Value("VAS_IsLandedCost", true);
             }
             objTransaction.Set_Value("CostingLevel", CostingLevel);
             objTransaction.Set_Value("M_CostElement_ID", M_CostElement_ID);
@@ -3145,6 +3149,19 @@ namespace VAdvantage.Model
                 objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
                 objTransaction.SetMovementQty(costingCheck.Qty);
             }
+            
+            // Is Invoice belong to treat as discount or not
+            if (Util.GetValueOfBool(this._parent.Get_Value("TreatAsDiscount")))
+            {
+                objTransaction.Set_Value("TreatAsDiscount", true);
+            }
+
+            // Is Credit Note Entry
+            if (Util.GetValueOfBool(this._parent.IsReturnTrx()))
+            {
+                objTransaction.Set_Value("VAS_IsCreditNote", true);
+            }
+
             if (!objTransaction.Save())
             {
                 ValueNamePair vp = VLogger.RetrieveError();
@@ -3200,6 +3217,7 @@ namespace VAdvantage.Model
             objTransaction.Set_Value("ProductCost", 0);
             objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
             objTransaction.SetMovementQty(costingCheck.Qty);
+            objTransaction.Set_Value("VAS_IsLandedCost", true);
             if (!objTransaction.Save())
             {
                 ValueNamePair vp = VLogger.RetrieveError();
