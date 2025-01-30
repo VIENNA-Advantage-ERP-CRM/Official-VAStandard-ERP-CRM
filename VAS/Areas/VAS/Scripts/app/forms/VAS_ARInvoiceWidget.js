@@ -40,7 +40,7 @@
                     $maindiv.append(
                         '  <div class="vas-arwidg-totalAmt-box" id="vas_arwidtotaamtContainer_' + widgetID + '">' +
                         '    <div class="vas-arwidg-totalRec-amount">' +
-                        '      <h1>' + TotalAmtArray[0] +
+                        '      <h1 class="vas-arwidg-rtl-amt">' + TotalAmtArray[0] +
                         '<span class="vas-arwidg-cur-symbol">' + TotalAmtArray[1] + '<span>' +
                         '<span class="vas-arwidg-Symbol">' + gridDataResult[4].Symbol + '</span></h1>' +
                         '      <div class="vas-arwidg-totalRecTxt">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VAS.translatedTexts.VAS_TotalRec : VAS.translatedTexts.VAS_TotalPurchase) + '</div>' +

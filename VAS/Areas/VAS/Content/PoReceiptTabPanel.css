@@ -342,11 +342,70 @@ Only index.html and style.css is for your use There is no need to copy any other
     padding-right: 7px;
     margin-top: 1.3em;
 }
+html[dir="rtl"] .VAS-expay-searchLinkIconBlock {
+    float: left;
+}
 
-    .VAS-payment-details ul li .form-check {
-        position: relative;
-        top: 2px;
-    }
+html[dir="rtl"] .vas-expay-pagespan {
+    display:flex;
+    gap:7px;
+}
+html[dir="rtl"] .vas-exinvd-pagespan {
+    display: flex;
+    gap: 7px;
+}
+html[dir="rtl"] .vas-expay-filter {
+    margin-left:0.8em;
+}
+html[dir="rtl"] .vas-exinvd-filter {
+    margin-left: 0.8em;
+}
+.VAS-payment-details ul li .form-check {
+    position: relative;
+    top: 2px;
+}
+html[dir="rtl"] .vas-exinv-zoom{
+    float:left;
+}
+html[dir="rtl"] .vas-exinvd-rightar{
+    transform: scaleX(-1)
+}
+html[dir="rtl"] .vas-exinvd-leftar {
+    transform: scaleX(-1)
+}
+html[dir="rtl"] .vas-expay-com-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+html[dir="rtl"] .vas-expay-rtl{
+    float:left;
+}
+html[dir="rtl"] .vas-expay-rightar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .vas-expay-leftar {
+    transform: scaleX(-1);
+}
+html[dir="rtl"] .vas-exinvd-invoice-lbl {
+   text-align:left;
+}
+html[dir="rtl"] .vas-expay-rtlHU{
+    text-align:center;
+}
+html[dir="rtl"] .vas-vaswidg-Symbol {
+    float: right;
+    margin-left: 0.3em;
+}
+html[dir="rtl"] .vas-expay-symbol {
+    float: right;
+    margin-left: 0.3em;
+}
+html[dir="rtl"] .vas-arwidg-rtl-amt{
+    flex-direction:row-reverse;
+}
 
 .VAS-payment-details ul li.active {
     background-color: rgba(var(--v-c-primary), 0.1);

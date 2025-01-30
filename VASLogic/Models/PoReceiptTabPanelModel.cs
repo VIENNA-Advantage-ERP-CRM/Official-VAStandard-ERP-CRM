@@ -790,7 +790,7 @@ namespace VASLogic.Models
 
             // Query for 'DueSoon'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'DueSoon',
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'DueSoon' AS Type,
                     NVL(
                         (
                             SUM(
@@ -816,7 +816,7 @@ namespace VASLogic.Models
                AND ci.DocStatus IN ('CO', 'CL') AND ci.IsInDispute = 'N'", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             // Query for 'Disputed'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Disputed',
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Disputed' AS Type,
                     NVL(
                         (
                             SUM(
@@ -843,7 +843,7 @@ namespace VASLogic.Models
             sql.Append(" UNION ALL ");
             if (ISOtrx)
             {
-                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'UnAllocated',
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'UnAllocated' AS Type,
                     NVL(
                         (
                             SUM(
@@ -869,7 +869,7 @@ namespace VASLogic.Models
             // Query for 'Hold' ON AP invoice
             else
             {
-                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Hold',
+                sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Hold' AS Type,
                  nvl(SUM(CASE WHEN ci.isholdpayment = 'Y' THEN CASE WHEN cd.docbasetype = " + docBaseTypeARI_APT + @" THEN
                  currencyconvert(cs.dueamt, ci.c_currency_id," + C_Currency_ID + @", ci.dateacct, ci.c_conversiontype_id, ci.ad_client_id, ci.ad_org_id)
                  ELSE 0 END ELSE CASE WHEN cd.docbasetype = " + docBaseTypeARI_APT + @"
@@ -890,7 +890,7 @@ namespace VASLogic.Models
 
             // Query for 'InProgress'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'InProgress',
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'InProgress' AS Type,
                     NVL(
                         (
                             SUM(
@@ -914,7 +914,7 @@ namespace VASLogic.Models
              ", "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             // Query for 'New'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'New',
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'New' AS Type,
                     NVL(
                         (
                             SUM(
@@ -940,7 +940,7 @@ namespace VASLogic.Models
 
             // Query for 'Drafted'
             sql.Append(" UNION ALL ");
-            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Drafted',
+            sql.Append(MRole.GetDefault(ctx).AddAccessSQL($@"SELECT 'Drafted' AS Type,
                     NVL(
                         (
                             SUM(
@@ -977,6 +977,7 @@ namespace VASLogic.Models
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmount"]);
                     obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
                     obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
+                    obj.Type= Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
                     invData.Add(obj);
                 }
             }
@@ -3271,6 +3272,7 @@ namespace VASLogic.Models
         public decimal TotalAmt { get; set; }
         public string Symbol { get; set; }
         public int stdPrecision { get; set; }
+        public string Type { get; set; }
     }
     public class ExpectedInvoice
     {
