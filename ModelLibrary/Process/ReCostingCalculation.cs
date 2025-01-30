@@ -4540,6 +4540,8 @@ namespace VAdvantage.Process
                             costingCheck.orderline = orderLine;
                             costingCheck.order = order;
                             costingCheck.product = product;
+                            costingCheck.IsPOCostingethodBindedonProduct = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
+                                                                        product.GetM_Product_ID(), Get_Trx());
 
                             // Transaction Update Query
                             query.Clear();
@@ -4587,12 +4589,13 @@ namespace VAdvantage.Process
                                     }
                                     else
                                     {
+                                        // get price from m_cost (Current Cost Price)
+                                        currentCostPrice = 0;
+                                        currentCostPrice = MCost.GetproductCosts(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
+                                            inoutLine.GetM_Product_ID(), inoutLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
+
                                         if (inoutLine.GetCurrentCostPrice() == 0)
                                         {
-                                            // get price from m_cost (Current Cost Price)
-                                            currentCostPrice = 0;
-                                            currentCostPrice = MCost.GetproductCosts(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
-                                                inoutLine.GetM_Product_ID(), inoutLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
                                             if (IsCostUpdation)
                                             {
                                                 inoutLine.SetCurrentCostPrice(currentCostPrice);
@@ -4606,6 +4609,10 @@ namespace VAdvantage.Process
                                         //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
+                                        }
+                                        if (costingCheck.IsPOCostingethodBindedonProduct.Value)
+                                        {
+                                            inoutLine.SetPostCurrentCostPrice(currentCostPrice);
                                         }
                                         if (!inoutLine.Save(Get_Trx()))
                                         {
@@ -4685,6 +4692,12 @@ namespace VAdvantage.Process
                                         //if (client.IsCostImmediate() && !inoutLine.IsCostImmediate())
                                         {
                                             inoutLine.SetIsCostImmediate(true);
+                                        }
+                                        if (costingCheck.IsPOCostingethodBindedonProduct.Value)
+                                        {
+                                            currentCostPrice = MCost.GetproductCosts(inoutLine.GetAD_Client_ID(), inoutLine.GetAD_Org_ID(),
+                                                         inoutLine.GetM_Product_ID(), inoutLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
+                                            inoutLine.SetPostCurrentCostPrice(currentCostPrice);
                                         }
                                         if (!inoutLine.Save(Get_Trx()))
                                         {

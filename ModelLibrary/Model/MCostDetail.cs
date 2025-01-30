@@ -324,6 +324,11 @@ namespace VAdvantage.Model
                 }
             }
 
+            if (string.IsNullOrEmpty(costingCheck.costinglevel))
+            {
+                costingCheck.costinglevel = cl;
+            }
+
             // set Organization for product costs
             if (cl == MProductCategory.COSTINGLEVEL_Client || cl == MProductCategory.COSTINGLEVEL_BatchLot)
             {
