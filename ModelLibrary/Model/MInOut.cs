@@ -3355,6 +3355,10 @@ namespace VAdvantage.Model
                         {
                             currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                 sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
+                            if (currentCostPrice != 0)
+                            {
+                                query.Append(" ProductApproxCost = " + currentCostPrice);
+                            }
                         }
                         else // Material Receipt 
                         {
@@ -3641,6 +3645,9 @@ namespace VAdvantage.Model
                         }
                         else if (!IsSOTrx() && IsReturnTrx()) // Return To Vendor
                         {
+                            costingCheck.IsPOCostingethodBindedonProduct = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
+                                                                        productCQ.GetM_Product_ID(), Get_Trx());
+
                             if (GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
                             {
                                 #region Return To Vendor -- without order refernce
@@ -3676,7 +3683,9 @@ namespace VAdvantage.Model
                                                         sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                             $@" END , IsCostImmediate = 'Y',
-                                                            VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))} 
+                                                            VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
+                                                     PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
+                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
@@ -3762,7 +3771,9 @@ namespace VAdvantage.Model
                                                       sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                         $@" END , IsCostImmediate = 'Y', 
-                                                        VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))} 
+                                                        VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
+                                                     PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
+                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
