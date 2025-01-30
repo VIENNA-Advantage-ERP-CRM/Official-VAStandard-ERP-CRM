@@ -52,12 +52,23 @@
                         '<div class="vas-psdwidg-icondiv">' + icon[0] +'</div>'+
                         '<div class="vas-psdwidg-salesYear">' + '<span>' + msgArray[0] + '</span>' + '</div>')
                     for (var i = 1; i < gridDataResult.length; i++) {
-                        $maindiv.append(
-                            '<div class="vas-psdwidg-whiteBox">' +
-                            '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + ' ': '') +
-                            formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
-                            '<div class="vas-psdwidg-icondiv">' + icon[i] + '</div>' +
-                            '<div class="vas-psdwidg-salesYear">'+ '<span>'+msgArray[i]+'</span>' + '</div>')
+                        //Added this condition because in RTL the text of unallocated receipt and Hold payment was not in centre
+                        if (gridDataResult[i].Type == "Hold" || gridDataResult[i].Type == "UnAllocated") {
+                            $maindiv.append(
+                                '<div class="vas-psdwidg-whiteBox">' +
+                                '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + ' ' : '') +
+                                formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
+                                '<div class="vas-psdwidg-icondiv">' + icon[i] + '</div>' +
+                                '<div class="vas-psdwidg-salesYear vas-expay-rtlHU">' + '<span>' + msgArray[i] + '</span>' + '</div>');
+                        }
+                        else {
+                            $maindiv.append(
+                                '<div class="vas-psdwidg-whiteBox">' +
+                                '<div class="vas-psdwidg-totalSale">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-vaswidg-Symbol">' + gridDataResult[i].Symbol + '</span>' + ' ' : '') +
+                                formatLargeNumber(gridDataResult[i].TotalAmt, gridDataResult[i].stdPrecision) + '<span class="vas-psdwidg-unit">' + unit + '</span>' + (gridDataResult[i].Symbol.length == 3 ? ' ' + gridDataResult[i].Symbol : '') + '</div>' +
+                                '<div class="vas-psdwidg-icondiv">' + icon[i] + '</div>' +
+                                '<div class="vas-psdwidg-salesYear">' + '<span>' + msgArray[i] + '</span>' + '</div>')
+                        }
                     }
                     $root.append($maindiv);
                 }

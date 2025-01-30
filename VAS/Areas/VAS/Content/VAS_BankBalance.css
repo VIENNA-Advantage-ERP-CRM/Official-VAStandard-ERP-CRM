@@ -189,3 +189,19 @@
         font-size: 5px;
     }
 }
+html[dir="rtl"] .vas-bankbalwidget-rightar {
+    transform: scaleX(-1)
+}
+html[dir="rtl"] .vas-bankbalwidget-leftar {
+    transform: scaleX(-1)
+}
+html[dir="rtl"] .VAS-bankBalarrow-control {
+    margin-left: 0.8rem;
+}
+html[dir="rtl"] .vas-bankbalwidget-pageInfo {
+    display: flex;
+    gap: 7px;
+}
+html[dir="rtl"] .VAS-bankbalISOCode{
+    margin-left:4px;
+}

@@ -362,7 +362,7 @@
                     '<div class="vas-exinvd-invoice-w-amount" >' +
                     '<div class="vas-exinvd-invoice-lbl vas-exinvd-right-ovrflow" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
                     '<span>' +
-                    '<i class="glyphicon glyphicon-zoom-in" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID +
+                    '<i class="glyphicon glyphicon-zoom-in vas-exinv-zoom" data-Record_ID="' + gridDataResult[i].Record_ID + '" data-windowId="' + gridDataResult[i].Window_ID +
                     '" data-Primary_ID="' + gridDataResult[i].Primary_ID + '" id="VAS-unAllocatedZoom_' + $self.windowNo + '" title="' + VIS.Msg.getMsg("VAS_Zoom") + '"></i>' +
                     '</span>' +
                     '</div>' +
@@ -407,9 +407,9 @@
             var arrowDiv = $(
                 '<div class="vas-exinvd-pagingdiv">' +
                 '<div class="vas-exinvd-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
-                '<i class= "fa fa-arrow-circle-left" aria-hidden="true"></i>' +
-                '<span class="vas-exinvd-pagespan">' + CurrentPage + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + TotalPagesofrecords + '</span > ' +
-                '<i class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
+                '<i class= "fa fa-arrow-circle-left vas-exinvd-leftar" aria-hidden="true"></i>' +
+                '<span class="vas-exinvd-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>'+'</span > ' +
+                '<i class="fa fa-arrow-circle-right vas-exinvd-rightar" aria-hidden="true"></i>' +
                 '</div>' +
                 '</div>');
             $maindiv.append(listDesign).append(arrowDiv);

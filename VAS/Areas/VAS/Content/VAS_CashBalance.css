@@ -189,3 +189,19 @@
         font-size: 5px;
     }
 }
+html[dir="rtl"] .VAS-cashwidget-rightar {
+    transform: scaleX(-1)
+}
+html[dir="rtl"] .VAS-cashwidget-leftar {
+    transform: scaleX(-1);
+}
+html[dir="rtl"] .VAS-casharrow-control {
+    margin-left: 0.8rem;
+}
+html[dir="rtl"] .vas-cashwidget-pageInfo {
+    display: flex;
+    gap: 7px;
+}
+html[dir="rtl"] .VAS-cashISOCode {
+    margin-left: 4px;
+}

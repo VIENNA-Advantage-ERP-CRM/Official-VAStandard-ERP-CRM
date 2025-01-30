@@ -86,8 +86,8 @@
             if (bankBalData != null) {
                 var start = CurrentPage * pageSize;
                 var end = Math.min(start + pageSize, bankBalData.length);
-                var TxtPageFooter = (CurrentPage + 1).toString() + " " + VIS.Msg.getMsg("VAS_Of") + " " + Math.ceil(bankBalData.length / pageSize).toString();
-                $pageInfo.text(TxtPageFooter);
+                var TxtPageFooter = "<span>" + (CurrentPage + 1).toString() + " " + "</span>" + "<span>" + VIS.Msg.getMsg("VAS_Of") + " " + "</span>" + "<span>" + Math.ceil(bankBalData.length / pageSize).toString() + "</span>";
+                $pageInfo.html(TxtPageFooter);
                 var width = $divBankBal.width();
                 for (var i = start; i < end; i++) {
                     $divBankBody.append('<div class="VAS-bankBalDetail-box" id="div_bankDetail_' + widgetID + '">'
@@ -202,9 +202,9 @@
                 '<div class="VAS-bankbalwidget-header">' +
                 '<h1>' + VIS.Msg.getMsg("VAS_BankBalance") + '</h1>' +
                 '<div class="VAS-bankBalarrow-control">' +
-                '<a href="#"><i id="VAS_BankBalPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left" aria-hidden="true"></i></a>' +
-                '<span id="VAS_PageInfo_' + widgetID + '" ></span>' +
-                '<a href="#"><i id="VAS_BankBalNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>' +
+                '<a href="#"><i id="VAS_BankBalPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left vas-bankbalwidget-leftar" aria-hidden="true"></i></a>' +
+                '<span id="VAS_PageInfo_' + widgetID + '" class="vas-bankbalwidget-pageInfo"></span>' +
+                '<a href="#"><i id="VAS_BankBalNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right vas-bankbalwidget-rightar" aria-hidden="true"></i></a>' +
                 '</div>' +
                 '</div><div class="VAS-bankbalwidget-body" id="VAS_divbankBody_' + widgetID + '"></div>');
             createBusyIndicator();
