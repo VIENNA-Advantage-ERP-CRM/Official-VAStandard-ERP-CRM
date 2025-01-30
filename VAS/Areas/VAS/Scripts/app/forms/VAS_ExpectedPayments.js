@@ -344,7 +344,7 @@
                     '<div class="vas-expay-payment-lbl vas-expay-com-name vas-expay-head-font"  title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText+'">' + headingText + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueDate")
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name vas-expay-rtl" title="' + VIS.Msg.getMsg("VAS_DueDate")
                     + ': ' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {day: '2-digit', month: '2-digit', year: 'numeric'
                     }) + '">' + VIS.Utility.Util.getValueOfDate(gridDataResult[i].OrderdDate).toLocaleDateString(window.navigator.language, {
                         day: '2-digit', month: '2-digit', year: 'numeric'
@@ -368,13 +368,13 @@
                     '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + (isSOTrx == true ? VIS.Msg.getMsg("VAS_CustomerPartner") : VIS.Msg.getMsg("VAS_VendorPartner")) + ': ' + gridDataResult[i].Name + '">' + gridDataResult[i].Name + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name vas-expay-rtl" title="' + VIS.Msg.getMsg("DocumentNo") + ': ' + gridDataResult[i].DocumentNo + '">' + gridDataResult[i].DocumentNo + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
                     '<div class="vas-expay-payment-lbl vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_Currency") + ': ' + gridDataResult[i].ISO_Code + '">' + gridDataResult[i].ISO_Code + '</div>' +
                     '</div>' +
                     '<div class="vas-expay-payment-w-amount">' +
-                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name" title="' + VIS.Msg.getMsg("VAS_DueAmtExPay") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
+                    '<div class="vas-expay-payment-lbl vas-expay-text-align vas-expay-com-name vas-expay-rtl" title="' + VIS.Msg.getMsg("VAS_DueAmtExPay") + ': ' + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) + '">' + (gridDataResult[i].Symbol.length != 3 ? '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + ' ' + '</span>' : '') + (gridDataResult[i].TotalAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: gridDataResult[i].stdPrecision, maximumFractionDigits: gridDataResult[i].stdPrecision }) +
                     (gridDataResult[i].Symbol.length == 3 ? ' ' + '<span class="vas-expay-symbol">' + gridDataResult[i].Symbol + '</span>' : '') + '</div>' +
                     '</div>' +
                     '</div>' +
@@ -391,9 +391,9 @@
             var arrowDiv = $(
                 '<div class="vas-expay-pagingdiv">' +
                 '<div class="vas-expay-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
-                '<i class= "fa fa-arrow-circle-left" aria-hidden="true"></i>' +
-                '<span class="vas-expay-pagespan">' + CurrentPage + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + TotalPagesofrecords + '</span > ' +
-                '<i class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
+                '<i class= "fa fa-arrow-circle-left vas-expay-leftar" aria-hidden="true"></i>' +
+                '<span class="vas-expay-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>'+ '</span > ' +
+                '<i class="fa fa-arrow-circle-right vas-expay-rightar" aria-hidden="true"></i>' +
                 '</div>' +
                 '</div>');
             $maindiv.append(listDesign).append(arrowDiv);

@@ -83,8 +83,8 @@
             if (cashBalData != null) {
                 var start = CurrentPage * pageSize;
                 var end = Math.min(start + pageSize, cashBalData.length);
-                var TxtPageFooter = (CurrentPage + 1).toString() + " " + VIS.Msg.getMsg("VAS_Of") + " " + Math.ceil(cashBalData.length / pageSize).toString();
-                $pageInfo.text(TxtPageFooter);
+                var TxtPageFooter = "<span>" + (CurrentPage + 1).toString() + " " + "</span>" + "<span>" + VIS.Msg.getMsg("VAS_Of") + " " + "</span>" + "<span>" + Math.ceil(cashBalData.length / pageSize).toString() + "</span>";
+                $pageInfo.html(TxtPageFooter);
                 var width = $divCashBal.width();
                 for (var i = start; i < end; i++) {
                     $divCashBody.append('<div class="VAS-cashDetail-box" id="div_cashDetail_' + widgetID + '">'
@@ -201,9 +201,9 @@
                 '<div class="VAS-cashwidget-header">' +
                 '<h1>' + VIS.Msg.getMsg("VAS_CashBalance") + '</h1>' +
                 '<div class="VAS-casharrow-control">' +
-                '<a href="#"><i id="VAS_CashPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left" aria-hidden="true"></i></a>' +
-                '<span id="VAS_PageInfo_' + widgetID + '" ></span>' +
-                '<a href="#"><i id="VAS_CashNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>' +
+                '<a href="#"><i id="VAS_CashPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left VAS-cashwidget-leftar" aria-hidden="true"></i></a>' +
+                '<span id="VAS_PageInfo_' + widgetID + '" class="vas-cashwidget-pageInfo"></span>' +
+                '<a href="#"><i id="VAS_CashNextArrow_' + widgetID + '" class="fa fa-arrow-circle-right VAS-cashwidget-rightar" aria-hidden="true"></i></a>' +
                 '</div>' +
                 '</div><div class="VAS-cashwidget-body" id="VAS_divCashBody_' + widgetID + '"></div>');
             initializeComponent();
