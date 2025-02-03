@@ -3070,11 +3070,9 @@ namespace VAdvantage.Process
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
                 if (DateFrom != null)
                 {
-                    //sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                    sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
 
-                //DB.ExecuteQuery(@"delete from M_CostQueueTransaction WHERE  m_product_id IN 
-                //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from M_CostQueueTransaction WHERE m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
@@ -3084,8 +3082,6 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
-                //DB.ExecuteQuery(@"delete from m_costqueue  where m_product_id IN 
-                //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from m_costqueue WHERE m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
@@ -3095,8 +3091,6 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
-                //DB.ExecuteQuery(@"delete from m_costelementdetail  where m_product_id IN 
-                //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from m_costelementdetail WHERE m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
@@ -3415,12 +3409,10 @@ namespace VAdvantage.Process
                 sql.Append($@"delete from m_costdetail WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
                 {
-                    //sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
-                    sql.Append($@" AND trunc(Created) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                    sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
-                //DB.ExecuteQuery(@"delete from M_CostQueueTransaction WHERE  m_product_id IN (" + productID + " )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from M_CostQueueTransaction WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
@@ -3429,7 +3421,6 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
-                //DB.ExecuteQuery(@"delete from m_costqueue  where m_product_id IN  (" + productID + " )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from m_costqueue WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
@@ -3438,7 +3429,6 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
-                //DB.ExecuteQuery(@"delete from m_costelementdetail  where m_product_id IN  (" + productID + " )", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from m_costelementdetail WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
@@ -3695,7 +3685,7 @@ namespace VAdvantage.Process
                 sql.Append($@"delete from m_costdetail WHERE AD_client_ID IN ({ GetAD_Client_ID() })");
                 if (DateFrom != null)
                 {
-                    //sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                    sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
