@@ -3216,7 +3216,7 @@ namespace VAdvantage.Model
             objTransaction.Set_Value("M_CostElement_ID", Util.GetValueOfInt(drLandedCost["M_CostElement_ID"]));
             objTransaction.Set_Value("ProductCost", 0);
             objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
-            objTransaction.SetMovementQty(costingCheck.Qty);
+            objTransaction.SetMovementQty(Util.GetValueOfDecimal(drLandedCost["Qty"]));
             objTransaction.Set_Value("VAS_IsLandedCost", true);
             if (!objTransaction.Save())
             {
