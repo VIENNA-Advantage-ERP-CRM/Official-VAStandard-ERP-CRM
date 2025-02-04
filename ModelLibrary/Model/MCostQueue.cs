@@ -294,34 +294,26 @@ namespace VAdvantage.Model
         /// <param name="Org_ID">costing level org</param>
         /// <param name="ce">Cost Element</param>
         /// <param name="trxName">transaction</param>
+        /// <param name="M_Warehouse_ID">WareHouse ID</param>
+        /// <param name="costingCheck">Costing Check Object</param>
         /// <returns>cost queue or null</returns>
         public static MCostQueue[] GetQueue(MProduct product, int M_ASI_ID, MAcctSchema mas,
-            int Org_ID, MCostElement ce, Trx trxName, int M_Warehouse_ID = 0)
+            int Org_ID, MCostElement ce, Trx trxName, int M_Warehouse_ID, CostingCheck costingCheck)
         {
-            //string costingLevel = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT 
-            //            CASE WHEN M_Product_Category.CostingLevel IS NOT NULL THEN M_Product_Category.CostingLevel
-            //                 WHEN C_AcctSchema.CostingLevel IS NOT NULL THEN C_AcctSchema.CostingLevel END AS CostingLevel
-            //            FROM M_Product
-            //                  INNER JOIN M_Product_Category ON M_Product_Category.M_Product_Category_ID = M_Product.M_Product_Category_ID
-            //                  INNER JOIN C_AcctSchema ON C_AcctSchema.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @"
-            //            WHERE M_Product.M_Product_ID = " + product.GetM_Product_ID()));
-            //bool attributeApplicable = (costingLevel == X_C_AcctSchema.COSTINGLEVEL_BatchLot
-            //                            || costingLevel == X_C_AcctSchema.COSTINGLEVEL_OrgPlusBatch
-            //                            || costingLevel == X_C_AcctSchema.COSTINGLEVEL_WarehousePlusBatch);
-
             List<MCostQueue> list = new List<MCostQueue>();
             String sql = "SELECT * FROM M_CostQueue "
                 + "WHERE AD_Client_ID=@client "
                 + " AND M_Product_ID=@prod"
                 + " AND M_CostType_ID=@ct AND C_AcctSchema_ID=@accs"
                 + " AND M_CostElement_ID=@ce";
-            //if (Org_ID != 0)
             sql += " AND AD_Org_ID=@org";
-            //if (M_Warehouse_ID != 0)
             sql += " AND NVL(M_Warehouse_ID, 0) = " + M_Warehouse_ID;
-            //if (attributeApplicable)//M_ASI_ID != 0 && 
             sql += " AND NVL(M_AttributeSetInstance_ID, 0)=@asi";
             sql += " AND CurrentQty<>0 ";
+            if (ce.GetCostingMethod().Equals("L") && costingCheck != null && costingCheck.movementDate != null)
+            {
+                sql += " AND MovementDate <= " + GlobalVariable.TO_DATE(costingCheck.movementDate, true);
+            }
             sql += " ORDER BY queuedate ";
             if (!ce.IsFifo())
                 sql += "DESC ";
@@ -331,40 +323,14 @@ namespace VAdvantage.Model
             try
             {
                 SqlParameter[] param = null;
-                //if (attributeApplicable && Org_ID != 0)
-                //{
                 param = new SqlParameter[7];
-                //}
-                //else if (M_ASI_ID == 0 && Org_ID == 0 && attributeApplicable)
-                //{
-                //    param = new SqlParameter[6];
-                //}
-                //else if (M_ASI_ID == 0 && Org_ID == 0 && !attributeApplicable)
-                //{
-                //    param = new SqlParameter[5];
-                //}
-                //else
-                //{
-                //    param = new SqlParameter[6];
-                //}
                 param[0] = new SqlParameter("@client", product.GetAD_Client_ID());
                 param[1] = new SqlParameter("@prod", product.GetM_Product_ID());
                 param[2] = new SqlParameter("@ct", mas.GetM_CostType_ID());
                 param[3] = new SqlParameter("@accs", mas.GetC_AcctSchema_ID());
                 param[4] = new SqlParameter("@ce", ce.GetM_CostElement_ID());
-                //if (attributeApplicable && Org_ID != 0)
-                //{
                 param[5] = new SqlParameter("@org", Org_ID);
                 param[6] = new SqlParameter("@asi", M_ASI_ID);
-                //}
-                //else if (Org_ID != 0)
-                //{
-                //    param[5] = new SqlParameter("@org", Org_ID);
-                //}
-                //else if (attributeApplicable)
-                //{
-                //    param[5] = new SqlParameter("@asi", M_ASI_ID);
-                //}
                 DataSet ds = DataBase.DB.ExecuteDataset(sql, param, trxName);
                 if (ds.Tables.Count > 0)
                 {
@@ -382,6 +348,22 @@ namespace VAdvantage.Model
             MCostQueue[] costQ = new MCostQueue[list.Count];
             costQ = list.ToArray();
             return costQ;
+        }
+
+        /// <summary>
+        /// Get Cost Queue Records in Lifo/Fifo order
+        /// </summary>
+        /// <param name="product">product</param>
+        /// <param name="M_ASI_ID">costing level ASI</param>
+        /// <param name="mas">accounting schema</param>
+        /// <param name="Org_ID">costing level org</param>
+        /// <param name="ce">Cost Element</param>
+        /// <param name="trxName">transaction</param>
+        /// <returns>cost queue or null</returns>
+        public static MCostQueue[] GetQueue(MProduct product, int M_ASI_ID, MAcctSchema mas,
+            int Org_ID, MCostElement ce, Trx trxName, int M_Warehouse_ID = 0)
+        {
+            return GetQueue(product, M_ASI_ID, mas, Org_ID, ce, trxName, M_Warehouse_ID, null);
         }
 
         /// <summary>
@@ -875,6 +857,23 @@ namespace VAdvantage.Model
                                 (windowName == "Shipment" || windowName == "Return To Vendor" ||
                                  windowName == "Physical Inventory" || windowName == "Internal Use Inventory" || windowName == "AssetDisposal"))
                             {
+                                if (windowName == "Physical Inventory" || windowName == "Internal Use Inventory")
+                                {
+                                    costingCheck.movementDate = costingCheck.inventory != null ? costingCheck.inventory.GetMovementDate() : inventoryLine.GetParent().GetMovementDate();
+                                }
+                                else if (windowName == "Material Receipt" || windowName == "Customer Return" || windowName == "Shipment" || windowName == "Return To Vendor")
+                                {
+                                    costingCheck.movementDate = inout.GetMovementDate();
+                                }
+                                else if (windowName == "AssetDisposal")
+                                {
+                                    costingCheck.movementDate = Util.GetValueOfDateTime(po.Get_Value("DateAcct"));
+                                }
+                                else if (windowName == "Inventory Move")
+                                {
+                                    costingCheck.movementDate = costingCheck.movement != null ? costingCheck.movement.GetMovementDate() : movementline.GetParent().GetMovementDate();
+                                }
+
                                 // get Locator
                                 if (windowName != "AssetDisposal")
                                 {
@@ -1002,7 +1001,7 @@ namespace VAdvantage.Model
                                 if (windowName == "Customer Return" && costingCheck.VAS_IsDOCost)
                                 {
                                     // when customer return from DO cost, accounting Schema curreny
-                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, ctx.GetContextAsInt("$C_Currency_ID"), order.GetC_Currency_ID(), 
+                                    Price = MConversionRate.ConvertCostingPrecision(ctx, Price, ctx.GetContextAsInt("$C_Currency_ID"), order.GetC_Currency_ID(),
                                                                      inout.GetDateAcct(), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                 }
 
@@ -6374,6 +6373,12 @@ namespace VAdvantage.Model
                                 AND M_CostType_ID = " + acctSchema.GetM_CostType_ID() + @"
                                 AND M_CostElement_ID = " + (costingCheck.MMPolicy.Equals(MProductCategory.MMPOLICY_FiFo) ?
                                                             costingCheck.Fifo_ID : costingCheck.Lifo_ID);
+                if (costingCheck.movementDate != null &&
+                    ((costingCheck.costingMethod != null && costingCheck.costingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo)) ||
+                    (costingCheck.materialCostingMethod != null && costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))))
+                {
+                    sql += $" AND MovementDate <= {GlobalVariable.TO_DATE(costingCheck.movementDate, true)}";
+                }
                 qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
             }
             catch { }
@@ -7263,6 +7268,10 @@ namespace VAdvantage.Model
                 if (costingCheck != null && costingCheck.movementDate != null)
                 {
                     costQueue.Set_Value("MovementDate", costingCheck.movementDate);
+                    DateTime newDateTime = new DateTime(
+                        costingCheck.movementDate.Value.Year, costingCheck.movementDate.Value.Month, costingCheck.movementDate.Value.Day,
+                        costQueue.GetQueueDate().Value.Hour, costQueue.GetQueueDate().Value.Minute, costQueue.GetQueueDate().Value.Second, costQueue.GetQueueDate().Value.Millisecond);
+                    costQueue.SetQueueDate(newDateTime);
                 }
                 if (!costQueue.Save())
                 {
@@ -7623,7 +7632,7 @@ namespace VAdvantage.Model
             //{
             //    M_Warehouse_ID = 0;
             //}
-            MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID, mas, Org_ID, ce, product.Get_Trx(), M_Warehouse_ID);
+            MCostQueue[] cQueue = MCostQueue.GetQueue(product, M_ASI_ID, mas, Org_ID, ce, product.Get_Trx(), M_Warehouse_ID, costingCheck);
             if (cQueue != null && cQueue.Length > 0)
             {
                 bool value = false;
