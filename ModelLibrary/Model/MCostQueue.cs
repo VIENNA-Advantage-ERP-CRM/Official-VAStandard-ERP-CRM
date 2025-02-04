@@ -310,7 +310,7 @@ namespace VAdvantage.Model
             sql += " AND NVL(M_Warehouse_ID, 0) = " + M_Warehouse_ID;
             sql += " AND NVL(M_AttributeSetInstance_ID, 0)=@asi";
             sql += " AND CurrentQty<>0 ";
-            if (ce.GetCostingMethod().Equals("L") && costingCheck != null && costingCheck.movementDate != null)
+            if (costingCheck != null && costingCheck.movementDate != null)
             {
                 sql += " AND MovementDate <= " + GlobalVariable.TO_DATE(costingCheck.movementDate, true);
             }
@@ -863,7 +863,7 @@ namespace VAdvantage.Model
                                 }
                                 else if (windowName == "Material Receipt" || windowName == "Customer Return" || windowName == "Shipment" || windowName == "Return To Vendor")
                                 {
-                                    costingCheck.movementDate = inout.GetMovementDate();
+                                    costingCheck.movementDate = costingCheck.inout != null ? costingCheck.inout.GetMovementDate() : inoutline.GetParent().GetMovementDate();
                                 }
                                 else if (windowName == "AssetDisposal")
                                 {
@@ -6373,9 +6373,7 @@ namespace VAdvantage.Model
                                 AND M_CostType_ID = " + acctSchema.GetM_CostType_ID() + @"
                                 AND M_CostElement_ID = " + (costingCheck.MMPolicy.Equals(MProductCategory.MMPOLICY_FiFo) ?
                                                             costingCheck.Fifo_ID : costingCheck.Lifo_ID);
-                if (costingCheck.movementDate != null &&
-                    ((costingCheck.costingMethod != null && costingCheck.costingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo)) ||
-                    (costingCheck.materialCostingMethod != null && costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))))
+                if (costingCheck.movementDate != null)
                 {
                     sql += $" AND MovementDate <= {GlobalVariable.TO_DATE(costingCheck.movementDate, true)}";
                 }
