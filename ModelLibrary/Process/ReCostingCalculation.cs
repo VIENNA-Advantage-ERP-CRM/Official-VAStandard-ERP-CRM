@@ -5940,6 +5940,7 @@ namespace VAdvantage.Process
                                     {
                                         inventoryLine.SetCurrentCostPrice(currentCostPrice);
                                     }
+                                    query.Append(" , VAS_PostingCost = " + currentCostPrice);
                                 }
 
                                 // when post current cost price is ZERO, than need to update cost here 
@@ -5979,7 +5980,10 @@ namespace VAdvantage.Process
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    if (!query.ToString().Contains("VAS_PostingCost"))
+                                    {
+                                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    }
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     if (IsCostUpdation)
                                     {

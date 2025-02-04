@@ -2080,6 +2080,7 @@ namespace VAdvantage.Model
                                                GetM_Warehouse_ID(), true, Get_Trx());
                             DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                              @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
+                            sql += " , VAS_PostingCost = " + currentCostPrice;
                         }
 
                         // Transaction Update Query
@@ -2096,8 +2097,11 @@ namespace VAdvantage.Model
                         sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                         sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
                         //22-Jan-2025, Update posting Cost on Transaction
-                        sql += " , VAS_PostingCost = " + (Util.GetValueOfDecimal(line.Get_Value("PriceCost")) != 0 ?
+                        if (!sql.Contains("VAS_PostingCost"))
+                        {
+                            sql += " , VAS_PostingCost = " + (Util.GetValueOfDecimal(line.Get_Value("PriceCost")) != 0 ?
                                         Util.GetValueOfDecimal(line.Get_Value("PriceCost")) : currentCostPrice);
+                        }
                         sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                         DB.ExecuteQuery(sql, null, Get_Trx());
                     }
@@ -2143,6 +2147,7 @@ namespace VAdvantage.Model
                                                        GetM_Warehouse_ID(), true, Get_Trx());
                                 DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                                  @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
+                                sql += " , VAS_PostingCost = " + currentCostPrice;
                             }
 
                             // Transaction Update Query
@@ -2160,7 +2165,10 @@ namespace VAdvantage.Model
                             sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                             sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
                             //22-Jan-2025, Update posting Cost on Transaction
-                            sql += " , VAS_PostingCost = " + currentCostPrice;
+                            if (!sql.ToString().Contains("VAS_PostingCost"))
+                            {
+                                sql += " , VAS_PostingCost = " + currentCostPrice;
+                            }
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
                         }
