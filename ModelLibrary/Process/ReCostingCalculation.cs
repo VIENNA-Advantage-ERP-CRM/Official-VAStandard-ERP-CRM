@@ -5940,7 +5940,14 @@ namespace VAdvantage.Process
                                     {
                                         inventoryLine.SetCurrentCostPrice(currentCostPrice);
                                     }
-                                    query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    if (query.ToString().Replace("Update M_Transaction SET ", "").Trim().Length > 0)
+                                    {
+                                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    }
+                                    else
+                                    {
+                                        query.Append("  VAS_PostingCost = " + currentCostPrice + ", ");
+                                    }
                                 }
 
                                 // when post current cost price is ZERO, than need to update cost here 

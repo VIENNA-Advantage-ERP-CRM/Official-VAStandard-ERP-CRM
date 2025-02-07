@@ -2080,7 +2080,7 @@ namespace VAdvantage.Model
                                                GetM_Warehouse_ID(), true, Get_Trx());
                             DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                              @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
-                            sql += " , VAS_PostingCost = " + currentCostPrice;
+                            sql += " VAS_PostingCost = " + currentCostPrice + " , ";
                         }
 
                         // Transaction Update Query
@@ -2147,7 +2147,7 @@ namespace VAdvantage.Model
                                                        GetM_Warehouse_ID(), true, Get_Trx());
                                 DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                                  @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
-                                sql += " , VAS_PostingCost = " + currentCostPrice;
+                                sql += "  VAS_PostingCost = " + currentCostPrice + " , "; 
                             }
 
                             // Transaction Update Query
