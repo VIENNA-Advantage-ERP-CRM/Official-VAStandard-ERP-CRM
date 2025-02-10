@@ -2360,7 +2360,7 @@ namespace VAdvantage.Model
                                         AND NVL(M_InOutLine.M_AttributeSetInstance_ID, 0) = NVL(M_Storage.M_AttributeSetInstance_ID, 0))
                                         LEFT JOIN C_OrderLine ON M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID
                                         LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
-                                        WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID());
+                                        WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID(), null, Get_Trx());
 
             //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
             if (IsSOTrx() && IsReturnTrx())
@@ -2371,7 +2371,7 @@ namespace VAdvantage.Model
                                         INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
                                         INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
                                         INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
-                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}");
+                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null , Get_Trx());
             }
 
             //	Outstanding (not processed) Incoming Confirmations ?
