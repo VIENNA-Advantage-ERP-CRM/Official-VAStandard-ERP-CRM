@@ -890,8 +890,11 @@ namespace VAdvantage.Model
                         else if (ce.IsWeightedAverageCost() || ce.IsWeightedAveragePO())
                         {
                             cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), adjustedAmt));
-                            cost.SetCurrentCostPrice(Decimal.Round(Decimal.Divide(
-                                    Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), adjustedAmt), cost.GetCurrentQty()), precision, MidpointRounding.AwayFromZero));
+                            if (cost.GetCurrentQty() != 0)
+                            {
+                                cost.SetCurrentCostPrice(Decimal.Round(Decimal.Divide(
+                                        Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), adjustedAmt), cost.GetCurrentQty()), precision, MidpointRounding.AwayFromZero));
+                            }
                         }
                         else if (ce.IsStandardCosting() || ce.IsLastInvoice() || ce.IsLastPOPrice())
                         {
