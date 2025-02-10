@@ -2181,7 +2181,7 @@ namespace VAdvantage.Model
 
                             //VIS_0045: Optimize 
                             query.Clear();
-                            query.Append(@"SELECT * FROM M_CostDetail WHERE M_CostDetail_ID 
+                            query.Append(@"SELECT * FROM M_CostDetail WHERE M_CostDetail_ID IN 
                                            (SELECT MIN(M_CostDetail_ID) FROM M_CostDetail WHERE M_InOutLine_ID = " + inoutline.GetM_InOutLine_ID() +
                                            " AND C_OrderLine_ID IS NULL  AND C_AcctSchema_ID = " + acctSchema.GetC_AcctSchema_ID() + ")");
                             DataSet dsCE = DB.ExecuteDataset(query.ToString(), null, trxName);
