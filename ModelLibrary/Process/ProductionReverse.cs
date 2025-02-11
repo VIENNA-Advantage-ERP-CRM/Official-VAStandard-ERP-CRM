@@ -85,6 +85,7 @@ namespace VAdvantage.Process
                     productionTo.Set_Value("DocumentNo", "{->" + production.Get_Value("DocumentNo") + ")");
                 }
                 productionTo.SetDescription("{->" + production.Get_Value("DocumentNo") + ")");
+                productionTo.Set_Value("IsCostCalculated", production.Get_Value("IsCostCalculated"));
                 productionTo.SetMovementDate(production.GetMovementDate()); //SI_0662 : not to create reverse record in current date, it should be created with the same date.
                 productionTo.SetProcessed(false);
                 if (!productionTo.Save(production.Get_Trx()))

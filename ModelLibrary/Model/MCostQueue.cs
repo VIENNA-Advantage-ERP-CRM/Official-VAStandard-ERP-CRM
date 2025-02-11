@@ -4411,12 +4411,13 @@ namespace VAdvantage.Model
                                 else if (windowName.Equals("Invoice(Vendor)-Return") && invoiceline.GetM_InOutLine_ID() > 0)
                                 {
                                     // For APC, which linked with RMA and return --> Update difference price on Cost Queue
-                                    if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetC_AcctSchema_ID(),
-                                        acctSchema.GetCostingPrecision(), trxName))
-                                    {
-                                        _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
-                                        return false;
-                                    }
+                                    // 11-Feb-2025, After discussion with Ashish, we are not taking impact on Current Cost on Cost Queue
+                                    //if (!UpdateCostQueuePrice(0, 0, 1, cd.GetAmt(), invoiceline.GetM_InOutLine_ID(), acctSchema.GetC_AcctSchema_ID(),
+                                    //    acctSchema.GetCostingPrecision(), trxName))
+                                    //{
+                                    //    _log.Severe("Cost Queue Cost not updated for GRN Line= " + inoutline.GetM_InOutLine_ID());
+                                    //    return false;
+                                    //}
                                 }
                             }
                         }
@@ -6669,7 +6670,7 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
-        /// This Method is used to update urrent Cost Price on Cos Queue
+        /// This Method is used to update Current Cost Price on Cost Queue
         /// </summary>
         /// <param name="CostQueue_ID">Cost Queue ID</param>
         /// <param name="oldPrice">Old Price</param>
@@ -7797,9 +7798,10 @@ namespace VAdvantage.Model
                         if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
                         {
                             // Currenct Cost price on Cost Queue will be affected when return against RMA
-                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
-                                       Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) + Qty),
-                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                            //11-Feb-2025, After discussion with Ashish, we are not taking impact on Current Cost on Cost Queue
+                            //sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
+                            //           Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) + Qty),
+                            //            costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
 
                         }
                         //TaskID:2144 When ActualQty is greater than or equal to the sum of  CurrentQty and return Qty
@@ -7854,11 +7856,12 @@ namespace VAdvantage.Model
                         if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
                         {
                             // Currenct Cost price on Cost Queue will be affected when return against RMA
-                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
-                                        ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"]))))
-                                        / (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
-                                        Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"])),
-                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                            //11-Feb-2025, After discussion with Ashish, we are not taking impact on Current Cost on Cost Queue
+                            //sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) +
+                            //            ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"]))))
+                            //            / (Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
+                            //            Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"])),
+                            //            costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
                         }
                         sql += " CurrentQty = CurrentQty + " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
                             @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
@@ -7982,9 +7985,10 @@ namespace VAdvantage.Model
                             && Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) - Qty != 0)
                         {
                             // Currenct Cost price on Cost Queue will be affected when return against RMA
-                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
-                                       Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) - Qty),
-                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                            //11-Feb-2025, After discussion with Ashish, we are not taking impact on Current Cost on Cost Queue
+                            //sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
+                            //           Math.Abs(cd.GetAmt())) / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) - Qty),
+                            //            costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
                         }
                         sql += " CurrentQty = CurrentQty - " + Qty +
                              @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);
@@ -8007,11 +8011,12 @@ namespace VAdvantage.Model
                         if (windowName.Equals("Return To Vendor") && cd.GetC_OrderLine_ID() > 0)
                         {
                             // Currenct Cost price on Cost Queue will be affected when return against RMA
-                            sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
-                                        ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))
-                                        / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) -
-                                            Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))),
-                                        costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
+                            // 11-Feb-2025, After discussion with Ashish, we are not taking impact on Current Cost on Cost Queue
+                            //sql += $@" CurrentCostPrice = {Decimal.Round((Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["TotalCost"]) -
+                            //            ((cd.GetAmt() / cd.GetQty()) * Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))
+                            //            / (Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["CurrentQty"]) -
+                            //                Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])))),
+                            //            costingCheck.precision, MidpointRounding.AwayFromZero) } , ";
                         }
                         sql += " CurrentQty = CurrentQty - " + Math.Abs(Util.GetValueOfDecimal(dsCostQueue.Tables[0].Rows[i]["MovementQty"])) +
                             @" WHERE M_CostQueue_ID = " + Util.GetValueOfInt(dsCostQueue.Tables[0].Rows[i]["M_CostQueue_ID"]);

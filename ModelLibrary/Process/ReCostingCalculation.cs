@@ -6570,9 +6570,16 @@ namespace VAdvantage.Process
                 {
                     try
                     {
+                        /*Costing Object*/
+                        costingCheck = new CostingCheck(GetCtx());
+                        costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
+
                         po_WrkOdrTrnsctionLine = tbl_WrkOdrTrnsctionLine.GetPO(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["VAMFG_M_WrkOdrTrnsctionLine_ID"]), Get_Trx());
+                        costingCheck.M_Transaction_ID = GetTransactionIDForProduction(VAMFG_M_WrkOdrTransaction_ID, Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["VAMFG_M_WrkOdrTrnsctionLine_ID"]));
 
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
+                        costingCheck.product = product;
+
                         costingMethod = MCostElement.CheckLifoOrFifoMethod(GetCtx(), GetAD_Client_ID(), product.GetM_Product_ID(), Get_Trx());
 
                         #region get price from m_cost (Current Cost Price)
@@ -6634,7 +6641,7 @@ namespace VAdvantage.Process
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? currentCostPrice : 0,
                                 countGOM01 > 0 ? Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity"))) :
-                                Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered"))), Get_Trx(), out conversionNotFoundInOut, optionalstr: "window"))
+                                Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered"))), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
                                 {
@@ -6704,7 +6711,7 @@ namespace VAdvantage.Process
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? currentCostPrice : 0,
                                 countGOM01 > 0 ? Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity")) :
-                                Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered")), Get_Trx(), out conversionNotFoundInOut, optionalstr: "window"))
+                                Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered")), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
                                 {
@@ -6891,6 +6898,34 @@ namespace VAdvantage.Process
             //        Get_Trx().Commit();
             //    }
             //}
+        }
+
+        /// <summary>
+        /// This function is used to get the Product transaction id against production execution
+        /// </summary>
+        /// <param name="VAMFG_M_WrkOdrTransaction_ID">Production Execution ID</param>
+        /// <param name="VAMFG_M_WrkOdrTrnsctionLine_ID">Execution Line ID</param>
+        /// <Author>VIS_0045: 11 Feb,2025</Author>
+        /// <returns>M_TransactionID</returns>
+        private int GetTransactionIDForProduction(int VAMFG_M_WrkOdrTransaction_ID, int VAMFG_M_WrkOdrTrnsctionLine_ID)
+        {
+            int M_TransactionID = 0;
+            sql.Clear();
+            sql.Append($@"SELECT M_Transaction_ID FROM M_Transaction WHERE VAMFG_M_WrkOdrTransaction_ID = {VAMFG_M_WrkOdrTransaction_ID}");
+            if (VAMFG_M_WrkOdrTrnsctionLine_ID > 0)
+            {
+                sql.Append($@" AND VAMFG_M_WrkOdrTrnsctionLine_ID = {VAMFG_M_WrkOdrTrnsctionLine_ID}");
+            }
+            M_TransactionID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+
+            if (M_TransactionID == 0 && VAMFG_M_WrkOdrTrnsctionLine_ID == 0)
+            {
+                sql.Clear();
+                sql.Append($@"SELECT M_Transaction_ID FROM M_Transaction WHERE VAMFG_M_WrkOdrTransaction_ID = {VAMFG_M_WrkOdrTransaction_ID}");
+                sql.Append($@" AND VAMFG_M_WrkOdrTrnsctionLine_ID = 0 ");
+                M_TransactionID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+            }
+            return M_TransactionID;
         }
 
         /// <summary>
