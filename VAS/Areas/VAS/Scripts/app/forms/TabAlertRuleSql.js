@@ -1610,9 +1610,9 @@
                 if (sql !== '' && sortColumn !== '') {
                     // Create sort string based on current sortValuesArray
                     if (sortValuesArray.length === 0) {
-                        sortQuery = " ORDER BY " + sortColumn + " " + $sortElements.val();
+                        sortQuery = " ORDER BY LOWER(" + sortColumn + ") " + $sortElements.val();
                     } else {
-                        sortQuery = ", " + sortColumn + " " + $sortElements.val();
+                        sortQuery = ", LOWER(" + sortColumn + ") " + $sortElements.val();
                     }
 
                     var sortObject = {
