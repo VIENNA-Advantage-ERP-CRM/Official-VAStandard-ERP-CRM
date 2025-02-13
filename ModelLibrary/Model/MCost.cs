@@ -2534,7 +2534,9 @@ namespace VAdvantage.Model
             SetCumulatedQty(Decimal.Add(GetCumulatedQty(), qty));
             if (Decimal.Add(GetCurrentQty(), qty) < 0)
             {
-                SetCurrentQty(0);
+                SetCurrentQty(Decimal.Add(GetCurrentQty(), qty));
+                //SetCurrentQty(0);
+                _log.Info("Costing Engine: Current Qty goes negative for Product ID : " + GetM_Product_ID());
             }
             else
             {
