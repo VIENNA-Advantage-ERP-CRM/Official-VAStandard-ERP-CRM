@@ -3982,7 +3982,7 @@ namespace VAdvantage.Model
             {
                 if (cd.GetC_OrderLine_ID() > 0)
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
+                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
                     {
                         cost.SetCurrentQty(0);
                     }
@@ -4010,7 +4010,7 @@ namespace VAdvantage.Model
             {
                 if (cd.GetC_OrderLine_ID() > 0)
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
+                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
                     {
                         cost.SetCurrentQty(0);
                     }
@@ -4028,7 +4028,7 @@ namespace VAdvantage.Model
             else if (ce.IsWeightedAverageCost())
             {
                 // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
+                if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
                 {
                     cost.SetCurrentQty(0);
                     cost.SetCurrentCostPrice(0);
@@ -4050,7 +4050,7 @@ namespace VAdvantage.Model
             {
                 if (cd.GetC_OrderLine_ID() > 0)
                 {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
+                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
                     {
                         cost.SetCurrentQty(0);
                     }
