@@ -4070,12 +4070,12 @@ namespace VAdvantage.Model
                 }
                 SetCurrentCostPrice(currentcostprice);
                 //VIS0336-implement the code for setting the  value in product type filed when record inserts by using SQ process and Blanket Order process
-                if (Get_Value("ProductType")==null)
+                if (Get_Value("ProductType") == null)
                 {
                     String sql = "SELECT ProductType FROM M_Product WHERE M_Product_ID=" + GetM_Product_ID();
                     Set_Value("ProductType", DB.ExecuteScalar(sql, null, null));
                 }
-               
+
 
             }
 
@@ -4412,7 +4412,11 @@ namespace VAdvantage.Model
                 int ii = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, Get_TrxName()));
                 SetLine(ii);
             }
-
+            //VAI050-Set List price if it is zero
+            if (Is_ValueChanged("PriceEntered") && GetPriceList() == 0)
+            {
+                SetPriceList(GetPriceEntered());
+            }
 
             //Calculations & Rounding            	    
             SetLineNetAmt(); //extended Amount with or without tax
