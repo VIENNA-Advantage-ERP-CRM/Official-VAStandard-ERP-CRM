@@ -6064,6 +6064,15 @@ namespace VAdvantage.Process
                                     {
                                         inventoryLine.SetCurrentCostPrice(currentCostPrice);
                                     }
+
+                                    if (query.ToString().Replace("Update M_Transaction SET ", "").Trim().Length > 0)
+                                    {
+                                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
+                                    }
+                                    else
+                                    {
+                                        query.Append("  VAS_PostingCost = " + currentCostPrice + ", ");
+                                    }
                                 }
 
                                 // when post current cost price is ZERO, than need to update cost here 
@@ -6103,8 +6112,11 @@ namespace VAdvantage.Process
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
-                                    query.Append(" , VAS_PostingCost = " + (Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) != 0 ?
+                                    if (!query.ToString().Contains("VAS_PostingCost"))
+                                    {
+                                        query.Append(" , VAS_PostingCost = " + (Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) != 0 ?
                                                         Util.GetValueOfDecimal(inventoryLine.Get_Value("PriceCost")) : currentCostPrice));
+                                    }
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     if (IsCostUpdation)
                                     {
