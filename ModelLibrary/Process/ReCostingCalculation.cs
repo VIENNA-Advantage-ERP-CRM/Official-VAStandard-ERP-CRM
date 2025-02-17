@@ -5687,8 +5687,22 @@ namespace VAdvantage.Process
             {
                 string sql = $@"Update M_Transaction SET ProductCost = {ProductCost},
                                     M_CostElement_ID = {costingCheck.definedCostingElement}, 
-                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)},
-                                    VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency}";
+                                    CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)}";
+
+                if (costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Fifo) ||
+                   costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Lifo))
+                {
+                    if (costingCheck.currentQtyonQueue != 0)
+                    {
+                        sql += $", VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency} ";
+                    }
+                }
+                else if(costingCheck.onHandQty != 0)
+                {
+                    sql += $", VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency} ";
+                }
+
+
                 if (costingCheck.invoice != null && costingCheck.invoice.Get_ID() > 0)
                 {
                     if (Util.GetValueOfBool(costingCheck.invoice.IsReturnTrx()))
