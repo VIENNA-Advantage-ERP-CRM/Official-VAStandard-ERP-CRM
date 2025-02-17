@@ -2639,6 +2639,7 @@ namespace VAdvantage.Model
                                         {
                                             for (int b = 0; b < ds2.Tables[0].Rows.Count; b++)
                                             {
+                                                costingCheck.currentQtyonQueue = Util.GetValueOfDecimal(ds2.Tables[0].Rows[b]["CurrentQty"]);
                                                 //change 4-5-2016
                                                 costElementID = Util.GetValueOfInt(ds2.Tables[0].Rows[b]["M_CostElement_ID"]);
                                                 if (costElementID == ceFifo)

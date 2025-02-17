@@ -3142,7 +3142,18 @@ namespace VAdvantage.Model
             objTransaction.Set_Value("ProductCost", ProductCost);
             if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0)
             {
-                objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+                if (costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Fifo) ||
+                    costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Lifo))
+                {
+                    if (costingCheck.currentQtyonQueue != 0)
+                    {
+                        objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+                    }
+                }
+                else if (costingCheck.onHandQty != 0)
+                {
+                    objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+                }
             }
             if (costingCheck.ExpectedLandedCost != 0)
             {
