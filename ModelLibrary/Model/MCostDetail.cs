@@ -581,8 +581,13 @@ namespace VAdvantage.Model
             //this region is used for reducing MR price from Accumulation Amount on Product costs
             if (windowName == "Match IV")
             {
-
                 #region Match IV
+                // Check Qty availablity or not 
+                if (cost.GetCurrentQty() == 0 )
+                {
+                    costingCheck.onHandQty = 0;
+                }
+
                 return MatchInvoice(cost, mas, product, ce, Org_ID, M_ASI_ID, A_Asset_ID, cq_AD_Org_ID, windowName, cd, costingCheck,
                                     costingMethod, costCominationelement, M_Warehouse_ID, precision);
                 #endregion
@@ -601,12 +606,24 @@ namespace VAdvantage.Model
 
             if (windowName == "Product Cost IV")
             {
+                // Check Qty availablity or not 
+                if (cost.GetCurrentQty() == 0 )
+                {
+                    costingCheck.onHandQty = 0;
+                }
+
                 return ProductCostIV(cost, mas, product, ce, Org_ID, M_ASI_ID, A_Asset_ID, cq_AD_Org_ID, windowName, cd, costingCheck, costingMethod,
                                      costCominationelement, M_Warehouse_ID, precision, QueueOrganizationID, qty, price);
             }
 
             if (windowName == "Product Cost IV Form")
             {
+                // Check Qty availablity or not 
+                if (cost.GetCurrentQty() == 0 )
+                {
+                    costingCheck.onHandQty = 0;
+                }
+
                 return ProductCostIVForm(cost, mas, product, ce, Org_ID, M_ASI_ID, A_Asset_ID, cq_AD_Org_ID,
                                            windowName, cd, costingCheck, costingMethod, costCominationelement, M_Warehouse_ID, precision, QueueOrganizationID, qty, price);
             }
@@ -738,6 +755,12 @@ namespace VAdvantage.Model
             bool isProvisnalInvcalculated = invoiceline != null ? !((invoiceline.Get_ColumnIndex("C_ProvisionalInvoiceLine_ID") >= 0 &&
                                invoiceline.Get_ValueAsInt("C_ProvisionalInvoiceLine_ID") <= 0)
                                || invoiceline.Get_ColumnIndex("C_ProvisionalInvoiceLine_ID") < 0) : false;
+
+            // Check Qty availablity or not 
+            if (cost.GetCurrentQty() == 0 )
+            {
+                costingCheck.onHandQty = 0;
+            }
 
             if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_LandedCostAllocation_ID) FROM C_LandedCostAllocation WHERE  C_InvoiceLine_ID = " + GetC_InvoiceLine_ID(), null, Get_Trx())) <= 0)
             {
