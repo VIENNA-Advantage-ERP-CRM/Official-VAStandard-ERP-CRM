@@ -63,8 +63,10 @@ namespace VIS.Models
         public int GetPrecision(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
-            int C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(paramValue[0])));
-            return MUOM.GetPrecision(ctx, C_UOM_ID);
+            int StdPrecision = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT u.StdPrecision FROM C_UOM  u
+                                                                     INNER JOIN M_Product p ON(u.C_UOM_ID = p.C_UOM_ID)
+                                                                     WHERE p.M_Product_ID = " + Util.GetValueOfInt(paramValue[0])));
+            return StdPrecision;
         }
     }
 }
