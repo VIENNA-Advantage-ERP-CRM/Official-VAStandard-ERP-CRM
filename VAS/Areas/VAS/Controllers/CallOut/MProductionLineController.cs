@@ -47,5 +47,17 @@ namespace VIS.Controllers
             MProductionLineModel productionLine = new MProductionLineModel();
             return Json(JsonConvert.SerializeObject(productionLine.GetBOM(ct, fields)), JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        ///  VAI050-Get precision value of uom
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public JsonResult GetPrecision(string fields)
+        {
+            Ctx ct = Session["ctx"] as Ctx;
+            MProductionLineModel productionLine = new MProductionLineModel();
+            return Json(JsonConvert.SerializeObject(productionLine.GetPrecision(ct, fields)), JsonRequestBehavior.AllowGet);
+        }
     }
 }

@@ -120,6 +120,8 @@ namespace VAdvantage.Process
                             }
                             toProdPlan.SetM_Production_ID(productionTo.GetM_Production_ID());
                             toProdPlan.SetProcessed(false);
+                            //VAI050-set reverse assembly column value because its not a copy record
+                            toProdPlan.Set_Value("VAS_IsReverseAssembly", fromProdPlan.Get_Value("VAS_IsReverseAssembly"));
                             if (!toProdPlan.Save(production.Get_Trx()))
                             {
                                 production.Get_Trx().Rollback();
@@ -154,6 +156,8 @@ namespace VAdvantage.Process
                                             toProdline.SetM_ProductContainer_ID(fromProdline.GetM_ProductContainer_ID()); // bcz not a copy record
                                             toProdline.SetReversalDoc_ID(fromProdline.GetM_ProductionLine_ID()); //maintain refernce of Orignal record on reversed record
                                             toProdline.SetProcessed(false);
+                                            //VAI050-set ProportionateCost column value because its not a copy record
+                                            toProdline.Set_Value("VAS_IsProportionateCost", fromProdline.Get_Value("VAS_IsProportionateCost"));
                                             if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(), toProdline.GetM_ProductContainer_ID(), toProdline.GetM_Product_ID(), toProdline.GetM_AttributeSetInstance_ID(), toProdline.GetMovementQty(), Get_Trx()))
                                             {
                                                 production.Get_Trx().Rollback();
