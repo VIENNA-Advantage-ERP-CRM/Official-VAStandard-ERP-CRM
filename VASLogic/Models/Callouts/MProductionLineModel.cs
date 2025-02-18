@@ -53,5 +53,18 @@ namespace VIS.Models
                  + Convert.ToInt32(paramValue[1])));
             return BOM_ID;
         }
+
+        /// <summary>
+        /// VAI050-Get precision value of uom
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public int GetPrecision(Ctx ctx, string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int C_UOM_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(paramValue[0])));
+            return MUOM.GetPrecision(ctx, C_UOM_ID);
+        }
     }
 }
