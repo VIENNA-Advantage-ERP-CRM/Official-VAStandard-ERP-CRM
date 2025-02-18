@@ -2498,7 +2498,7 @@ namespace VAdvantage.Model
                             if (IsSOTrx() && pc.GetA_Asset_Group_ID() > 0 && sLine.GetA_Asset_ID() == 0)
                             {
                                 _processMsg = "AssetNotSetONShipmentLine: LineNo" + sLine.GetLine() + " :-->" + sLine.GetDescription();
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                         else
@@ -2506,7 +2506,7 @@ namespace VAdvantage.Model
                             if (IsSOTrx() && !IsReturnTrx() && pc.GetA_Asset_Group_ID() > 0 && sLine.GetA_Asset_ID() == 0 && !Env.IsModuleInstalled("VA077_"))
                             {
                                 _processMsg = "AssetNotSetONShipmentLine: LineNo" + sLine.GetLine() + " :-->" + sLine.GetDescription();
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                     }
@@ -2516,7 +2516,7 @@ namespace VAdvantage.Model
                         {
                             if (!UpdateAssetValues(sLine))
                             {
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                     }
@@ -2536,7 +2536,7 @@ namespace VAdvantage.Model
                         {
                             log.Warning("Warehouse , quantity allocated is not saved");
                             _processMsg = "Warehouse , quantity allocated is not saved";
-                            return DocActionVariables.STATUS_INPROGRESS;
+                            return DocActionVariables.STATUS_INVALID;
                         }
                     }
                 }
