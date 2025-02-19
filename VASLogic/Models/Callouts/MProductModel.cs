@@ -1303,7 +1303,7 @@ namespace VIS.Models
             DateTime? minGuaranteeDate = _movementDate;
 
             //	Deadlock Prevention - Order by M_Product_ID
-            MOrderLine[] lines = order.GetLines("AND C_OrderLine_ID IN (" + OrderLinesIDs + ")", "ORDER BY C_BPartner_Location_ID, M_Product_ID");
+            MOrderLine[] lines = order.GetLines(" AND C_OrderLine_ID IN (" + OrderLinesIDs + ")", " ORDER BY C_BPartner_Location_ID, M_Product_ID");
             for (int i = 0; i < lines.Length; i++)
             {
                 MOrderLine line = lines[i];
