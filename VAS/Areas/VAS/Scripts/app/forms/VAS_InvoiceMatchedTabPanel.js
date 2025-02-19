@@ -250,7 +250,8 @@
                                         '<span class="vas-invmatch-DataElementValue">' + VIS.Msg.getMsg("VAS_Order") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_OrderedQty") + '">' + (data[i].ExpectedOrder).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_OrderedQty") + '">' +
+                                        (data[i].ExpectedOrder + ((data[i].DocStatus == 'CO' || data[i].DocStatus == 'CL') ? data[i].QtyInvoiced : 0)).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_InvoicedQty") + '">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
@@ -271,7 +272,8 @@
                                         '<span class="vas-invmatch-DataElementValue">' + VIS.Msg.getMsg("VAS_GRN") + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
-                                        '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_MovementQty") + '">' + (data[i].ExpectedGRN).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
+                                        '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_MovementQty") + '">' +
+                                        (data[i].ExpectedGRN + ((data[i].DocStatus == 'CO' || data[i].DocStatus == 'CL') ? data[i].QtyInvoiced : 0)).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
                                         '</div>' +
                                         '<div class="vas-scheduleDataElement vas-invmatch-setCol1Width">' +
                                         '<span class="' + dataElementValueClass + '" title="' + VIS.Msg.getMsg("VAS_InvoicedQty") + '">' + (data[i].QtyInvoiced).toLocaleString(window.navigator.language, { minimumFractionDigits: data[i].UOMPrecision, maximumFractionDigits: data[i].UOMPrecision }) + '</span>' +
