@@ -1039,8 +1039,8 @@ namespace VAdvantage.Model
             //	Get Line No
             if (GetLine() == 0)
             {
-                String sql = "SELECT COALESCE(MAX(Line),0)+10 FROM M_InOutLine WHERE M_InOut_ID=" + GetM_InOut_ID();
-                int ii = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, null));
+                string sql = "SELECT COALESCE(MAX(Line),0)+10 FROM M_InOutLine WHERE M_InOut_ID=" + GetM_InOut_ID();
+                int ii = Utility.Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sql, null, Get_Trx()));
                 SetLine(ii);
             }
             // Costing column updation
@@ -1377,7 +1377,7 @@ namespace VAdvantage.Model
                             {
                                 //log.SaveError("FillMandatory", Msg.GetElement(GetCtx(), "DTD001_AttributeNumber"));
                                 //ShowMessage.Info("a", true, "Product is not of Attribute Type", null); 
-                                log.SaveError("DTD001_NonAttributeTypeProduct","");   //VIS_0336:Message and label change
+                                log.SaveError("DTD001_NonAttributeTypeProduct", "");   //VIS_0336:Message and label change
                                 return false;
                             }
                         }

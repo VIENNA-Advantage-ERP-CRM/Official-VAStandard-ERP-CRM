@@ -973,12 +973,12 @@ namespace VAdvantage.Model
                 line.Set_ValueNoCheck("M_InOutLine_ID", I_ZERO);	//	new
                 //	Reset
                 if (!setOrder)
-                    line.SetC_OrderLine_ID(0);
+                    line.SetC_OrderLine_ID(0);                
                 // SI_0642 : when we reverse MR or Customer Return, at that tym - on Save - system also check - qty availablity agaisnt same attribute 
                 // on storage. If we set ASI as 0, then system not find qty and not able to save record
                 if (!counter && !IsReversal())
                     line.SetM_AttributeSetInstance_ID(0);
-                //	line.setS_ResourceAssignment_ID(0);
+                //	line.setS_ResourceAssignment_ID(0);                
                 line.SetRef_InOutLine_ID(0);
                 line.SetIsInvoiced(false);
                 //
@@ -995,6 +995,7 @@ namespace VAdvantage.Model
                 //
                 if (counter)
                 {
+                    line.SetLine(fromLine.GetLine());
                     line.SetC_OrderLine_ID(0);
                     line.SetRef_InOutLine_ID(fromLine.GetM_InOutLine_ID());
                     if (fromLine.GetC_OrderLine_ID() != 0)
@@ -1007,12 +1008,18 @@ namespace VAdvantage.Model
                 //
                 if (IsReversal())
                 {
+                    line.SetLine(fromLine.GetLine());
+                    if (line.Get_ColumnIndex("IsFutureCostCalculated") > 0)
+                    {
+                        line.SetIsFutureCostCalculated(false);
+                    }
                     line.SetQtyEntered(Decimal.Negate(line.GetQtyEntered()));
                     line.SetMovementQty(Decimal.Negate(line.GetMovementQty()));
                     if (line.Get_ColumnIndex("ReversalDoc_ID") > 0)
                     {
                         line.SetReversalDoc_ID(fromLine.GetM_InOutLine_ID());
                     }
+                    line.SetM_AttributeSetInstance_ID(fromLine.GetM_AttributeSetInstance_ID());
                     // to set OrderLine in case of reversal if it is available 
                     line.SetC_OrderLine_ID(fromLine.GetC_OrderLine_ID());
                     //set container reference(if, not a copy record)
@@ -6134,20 +6141,20 @@ namespace VAdvantage.Model
                 MInOutLine rLine = rLines[i];
                 //rLine.SetQtyEntered(Decimal.Negate(rLine.GetQtyEntered()));
                 //rLine.SetMovementQty(Decimal.Negate(rLine.GetMovementQty()));
-                rLine.SetM_AttributeSetInstance_ID(sLines[i].GetM_AttributeSetInstance_ID());
-                if (rLine.Get_ColumnIndex("IsFutureCostCalculated") > 0)
-                {
-                    rLine.SetIsFutureCostCalculated(false);
-                }
-                if (!rLine.Save(Get_TrxName()))
-                {
-                    pp = VLogger.RetrieveError();
-                    if (!String.IsNullOrEmpty(pp.GetName()))
-                        _processMsg = "Could not create Ship Reversal Line , " + pp.GetName();
-                    else
-                        _processMsg = "Could not create Ship Reversal Line";
-                    return false;
-                }
+                //rLine.SetM_AttributeSetInstance_ID(sLines[i].GetM_AttributeSetInstance_ID());
+                //if (rLine.Get_ColumnIndex("IsFutureCostCalculated") > 0)
+                //{
+                //    rLine.SetIsFutureCostCalculated(false);
+                //}
+                //if (!rLine.Save(Get_TrxName()))
+                //{
+                //    pp = VLogger.RetrieveError();
+                //    if (!String.IsNullOrEmpty(pp.GetName()))
+                //        _processMsg = "Could not create Ship Reversal Line , " + pp.GetName();
+                //    else
+                //        _processMsg = "Could not create Ship Reversal Line";
+                //    return false;
+                //}
                 //	We need to copy MA (bcz want to copy of material policy line from the actual record)
                 MInOutLineMA[] mas = MInOutLineMA.Get(GetCtx(), rLine.GetReversalDoc_ID(), Get_TrxName());
                 for (int j = 0; j < mas.Length; j++)
