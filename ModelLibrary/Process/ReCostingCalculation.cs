@@ -1138,7 +1138,7 @@ namespace VAdvantage.Process
                                                                          (costingCheck.currentQtyonQueue.Value < Math.Abs(invoiceLine.GetQtyInvoiced()) ?
                                                                          costingCheck.currentQtyonQueue.Value : invoiceLine.GetQtyInvoiced())
                                                                          * ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
-                                                                        invoiceLine.Set_Value("TotalCogsAdjustment", Math.Sign(invoiceLine.GetQtyInvoiced()) * Decimal.Round
+                                                                        invoiceLine.Set_Value("TotalCOGSAdjustment", Math.Sign(invoiceLine.GetQtyInvoiced()) * Decimal.Round
                                                                             ((costingCheck.currentQtyonQueue.Value < Math.Abs(invoiceLine.GetQtyInvoiced()) ?
                                                                             (Math.Abs(invoiceLine.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
                                                                             ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
@@ -1147,7 +1147,7 @@ namespace VAdvantage.Process
                                                                     {
                                                                         if (costingCheck.onHandQty == 0)
                                                                         {
-                                                                            invoiceLine.Set_Value("TotalCogsAdjustment", Decimal.Round(
+                                                                            invoiceLine.Set_Value("TotalCOGSAdjustment", Decimal.Round(
                                                                             ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
                                                                         }
                                                                         else
