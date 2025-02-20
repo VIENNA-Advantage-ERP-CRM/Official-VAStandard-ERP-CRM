@@ -4952,6 +4952,19 @@ namespace VAdvantage.Model
                                                     (Math.Abs(line.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
                                             }
+                                            else if (line.Get_ColumnIndex("Ref_InvoiceLineOrg_ID") >= 0)
+                                            {
+                                                if (costingCheck.onHandQty == 0)
+                                                {
+                                                    query.Append($@" , TotalCogsAdjustment = {Decimal.Round(
+                                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                }
+                                                else
+                                                {
+                                                    query.Append($@" , TotalInventoryAdjustment = {Decimal.Round(
+                                                                   ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                }
+                                            }
 
                                             // VIS_045: 29-May-2023 -> DevOps Task ID: 2146
                                             query.Append(@" , M_Transaction_ID = (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID) ");

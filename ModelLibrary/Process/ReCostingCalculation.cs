@@ -1131,6 +1131,33 @@ namespace VAdvantage.Process
                                                                     {
                                                                         invoiceLine.SetIsCostImmediate(true);
                                                                     }
+
+                                                                    if (invoiceLine.Get_ColumnIndex("Ref_InvoiceLineOrg_ID") >= 0 && costingCheck.currentQtyonQueue != null)
+                                                                    {
+                                                                        invoiceLine.Set_Value("TotalInventoryAdjustment", Math.Sign(invoiceLine.GetQtyInvoiced()) * Decimal.Round(
+                                                                         (costingCheck.currentQtyonQueue.Value < Math.Abs(invoiceLine.GetQtyInvoiced()) ?
+                                                                         costingCheck.currentQtyonQueue.Value : invoiceLine.GetQtyInvoiced())
+                                                                         * ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                        invoiceLine.Set_Value("TotalCogsAdjustment", Math.Sign(invoiceLine.GetQtyInvoiced()) * Decimal.Round
+                                                                            ((costingCheck.currentQtyonQueue.Value < Math.Abs(invoiceLine.GetQtyInvoiced()) ?
+                                                                            (Math.Abs(invoiceLine.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
+                                                                            ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                    }
+                                                                    else if (invoiceLine.Get_ColumnIndex("Ref_InvoiceLineOrg_ID") >= 0)
+                                                                    {
+                                                                        if (costingCheck.onHandQty == 0)
+                                                                        {
+                                                                            invoiceLine.Set_Value("TotalCogsAdjustment", Decimal.Round(
+                                                                            ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            invoiceLine.Set_Value("TotalInventoryAdjustment", Decimal.Round(
+                                                                            ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                        }
+                                                                    }
+
+
                                                                     if (!invoiceLine.Save(Get_Trx()))
                                                                     {
                                                                         ValueNamePair pp = VLogger.RetrieveError();
@@ -5697,7 +5724,7 @@ namespace VAdvantage.Process
                         sql += $", VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency} ";
                     }
                 }
-                else if(costingCheck.onHandQty != 0)
+                else if (costingCheck.onHandQty != 0)
                 {
                     sql += $", VAS_PostingCost = {costingCheck.DifferenceAmtPOandInvInBaseCurrency} ";
                 }
