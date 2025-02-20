@@ -583,7 +583,7 @@ namespace VAdvantage.Model
             {
                 #region Match IV
                 // Check Qty availablity or not 
-                if (cost.GetCurrentQty() == 0 )
+                if (cost.GetCurrentQty() == 0)
                 {
                     costingCheck.onHandQty = 0;
                 }
@@ -607,7 +607,7 @@ namespace VAdvantage.Model
             if (windowName == "Product Cost IV")
             {
                 // Check Qty availablity or not 
-                if (cost.GetCurrentQty() == 0 )
+                if (cost.GetCurrentQty() == 0)
                 {
                     costingCheck.onHandQty = 0;
                 }
@@ -619,7 +619,7 @@ namespace VAdvantage.Model
             if (windowName == "Product Cost IV Form")
             {
                 // Check Qty availablity or not 
-                if (cost.GetCurrentQty() == 0 )
+                if (cost.GetCurrentQty() == 0)
                 {
                     costingCheck.onHandQty = 0;
                 }
@@ -757,7 +757,7 @@ namespace VAdvantage.Model
                                || invoiceline.Get_ColumnIndex("C_ProvisionalInvoiceLine_ID") < 0) : false;
 
             // Check Qty availablity or not 
-            if (cost.GetCurrentQty() == 0 )
+            if (cost.GetCurrentQty() == 0)
             {
                 costingCheck.onHandQty = 0;
             }
@@ -1867,12 +1867,26 @@ namespace VAdvantage.Model
                         }
                         else
                         {
-                            // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                            price = Decimal.Round(Decimal.Divide(
+                            if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                            {
+                                if (qty != 0)
+                                {
+                                    price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+                                }
+                                else
+                                {
+                                    price = 0;
+                                }
+                            }
+                            else
+                            {
+                                // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
+                                price = Decimal.Round(Decimal.Divide(
                                               Decimal.Add(
                                               Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
                                               Decimal.Add(cost.GetCurrentQty(), qty))
                                               , precision, MidpointRounding.AwayFromZero);
+                            }
                             cost.SetCurrentCostPrice(price);
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
@@ -1964,12 +1978,25 @@ namespace VAdvantage.Model
                         }
                         else
                         {
-                            // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                            price = Decimal.Round(Decimal.Divide(
-                                              Decimal.Add(
-                                              Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
-                                              Decimal.Add(cost.GetCurrentQty(), qty))
-                                              , precision, MidpointRounding.AwayFromZero);
+                            if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                            {
+                                if (qty != 0)
+                                {
+                                    price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+                                }
+                                else
+                                {
+                                    price = 0;
+                                }
+                            }
+                            else
+                            {                             // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
+                                price = Decimal.Round(Decimal.Divide(
+                                                  Decimal.Add(
+                                                  Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
+                                                  Decimal.Add(cost.GetCurrentQty(), qty))
+                                                  , precision, MidpointRounding.AwayFromZero);
+                            }
                             cost.SetCurrentCostPrice(price);
 
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
@@ -2528,12 +2555,26 @@ namespace VAdvantage.Model
                         }
                         else
                         {
-                            // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                            price = Decimal.Round(Decimal.Divide(
+                            if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                            {
+                                if (qty != 0)
+                                {
+                                    price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+                                }
+                                else
+                                {
+                                    price = 0;
+                                }
+                            }
+                            else
+                            {
+                                // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
+                                price = Decimal.Round(Decimal.Divide(
                                               Decimal.Add(
                                               Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
                                               Decimal.Add(cost.GetCurrentQty(), qty))
                                               , precision, MidpointRounding.AwayFromZero);
+                            }
                             cost.SetCurrentCostPrice(price);
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
@@ -2624,12 +2665,26 @@ namespace VAdvantage.Model
                         }
                         else
                         {
-                            // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                            price = Decimal.Round(Decimal.Divide(
+                            if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
+                            {
+                                if (qty != 0)
+                                {
+                                    price = Decimal.Round(Decimal.Divide(amt, qty), precision, MidpointRounding.AwayFromZero);
+                                }
+                                else
+                                {
+                                    price = 0;
+                                }
+                            }
+                            else
+                            {
+                                // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
+                                price = Decimal.Round(Decimal.Divide(
                                               Decimal.Add(
                                               Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt),
                                               Decimal.Add(cost.GetCurrentQty(), qty))
                                               , precision, MidpointRounding.AwayFromZero);
+                            }
                             cost.SetCurrentCostPrice(price);
 
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
