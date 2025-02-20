@@ -469,7 +469,14 @@ namespace VAdvantage.Model
         private bool UpdateproductCost(MRevaluationLine objRevaluationLine, int M_CostType_ID, DataRow drAcctSchema, out decimal productCost)
         {
             sql.Clear();
-            productCost = Decimal.Round(GetProductCost(objRevaluationLine, drAcctSchema), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
+            if (GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) || GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
+            {
+                productCost = Decimal.Round(GetProductCost(objRevaluationLine, drAcctSchema), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
+            }
+            else
+            {
+                productCost = objRevaluationLine.GetNewCostPrice();
+            }
             sql.Clear();
             sql.Append($@"UPDATE M_Cost SET CurrentCostPrice = {productCost}, 
                             CumulatedAmt  = NVL(CumulatedAmt, 0) + {objRevaluationLine.GetTotalDifference() * Util.GetValueOfDecimal(drAcctSchema["Rate"])}, 
@@ -610,49 +617,52 @@ namespace VAdvantage.Model
         /// <returns>true, when updated lines</returns>
         private bool UpdateCostQueue(MRevaluationLine objRevaluationLine, DataRow drAcctSchema)
         {
-            sql.Clear();
-            #region Update Cost Queue
-            sql.Append($@" UPDATE M_CostQueue SET CurrentCostPrice= {objRevaluationLine.GetNewCostPrice() * Util.GetValueOfDecimal(drAcctSchema["Rate"])}, 
+            if (GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) || GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
+            {
+                sql.Clear();
+                #region Update Cost Queue
+                sql.Append($@" UPDATE M_CostQueue SET CurrentCostPrice= {objRevaluationLine.GetNewCostPrice() * Util.GetValueOfDecimal(drAcctSchema["Rate"])}, 
                             Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)},
                             UpdatedBy = {GetCtx().GetAD_User_ID()}
                            WHERE C_AcctSchema_ID = {Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"])} 
                             AND M_Product_ID = {objRevaluationLine.GetM_Product_ID()}
                             AND AD_Client_ID = {GetAD_Client_ID()}");
-            sql.Append($@" AND CurrentQty <> 0 ");
+                sql.Append($@" AND CurrentQty <> 0 ");
 
-            if (GetCostingLevel().Equals(COSTINGLEVEL_Organization) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_OrgPlusBatch) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_Warehouse) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch))
-            {
-                sql.Append($" AND AD_Org_ID = {GetAD_Org_ID()}");
-            }
-            if (GetCostingLevel().Equals(COSTINGLEVEL_OrgPlusBatch) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_BatchLot) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch))
-            {
-                sql.Append($@" AND NVL(M_AttributeSetInstance_ID , 0) = {objRevaluationLine.GetM_AttributeSetInstance_ID()}");
-            }
-            if (GetCostingLevel().Equals(COSTINGLEVEL_Warehouse) ||
-                GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch) ||
-                GetM_Warehouse_ID() > 0)
-            {
-                sql.Append($@" AND NVL(M_Warehouse_ID , 0) = {GetM_Warehouse_ID()}");
-            }
-            no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
-            if (no < 0)
-            {
-                log.Log(Level.WARNING, $@"Cost Queue not updated, 
+                if (GetCostingLevel().Equals(COSTINGLEVEL_Organization) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_OrgPlusBatch) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_Warehouse) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch))
+                {
+                    sql.Append($" AND AD_Org_ID = {GetAD_Org_ID()}");
+                }
+                if (GetCostingLevel().Equals(COSTINGLEVEL_OrgPlusBatch) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_BatchLot) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch))
+                {
+                    sql.Append($@" AND NVL(M_AttributeSetInstance_ID , 0) = {objRevaluationLine.GetM_AttributeSetInstance_ID()}");
+                }
+                if (GetCostingLevel().Equals(COSTINGLEVEL_Warehouse) ||
+                    GetCostingLevel().Equals(COSTINGLEVEL_WarehousePlusBatch) ||
+                    GetM_Warehouse_ID() > 0)
+                {
+                    sql.Append($@" AND NVL(M_Warehouse_ID , 0) = {GetM_Warehouse_ID()}");
+                }
+                no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                if (no < 0)
+                {
+                    log.Log(Level.WARNING, $@"Cost Queue not updated, 
                                           Inventory Revaluation ID = {GetM_InventoryRevaluation_ID()},  
                                           Revlaution Line ID = {objRevaluationLine.GetM_RevaluationLine_ID()},
                                           C_AcctSchema_ID = {Util.GetValueOfInt(drAcctSchema["C_AcctSchema_ID"])},  
                                           M_Product_ID = {objRevaluationLine.GetM_Product_ID()}");
-                return false;
-            }
-            #endregion 
+                    return false;
+                }
+                #endregion
 
-            // Update temp Table with the revaluated cost
-            no = DB.ExecuteQuery(sql.ToString().Replace("M_CostQueue", "T_Temp_CostDetail"), null, Get_Trx());
+                // Update temp Table with the revaluated cost
+                no = DB.ExecuteQuery(sql.ToString().Replace("M_CostQueue", "T_Temp_CostDetail"), null, Get_Trx());
+            }
 
             return true;
         }

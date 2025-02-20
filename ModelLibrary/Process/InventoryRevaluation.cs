@@ -625,7 +625,8 @@ namespace VAdvantage.Process
                 sql.Append(@" , manPrd.CurrentCostPrice AS ManufauctureCost ");
             }
 
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(" ,CASE WHEN SUM(cq.CurrentQty) = 0 THEN 0 ELSE ROUND(SUM(cq.CurrentQty * cq.currentcostprice) / SUM(cq.CurrentQty) , 10) END AS CurrentCostPrice");
             }
@@ -684,7 +685,8 @@ namespace VAdvantage.Process
                 sql.Append($@" INNER JOIN M_CostType ct ON (ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID)");
             }
             sql.Append($@" INNER JOIN CostElement CE ON (CST.M_CostElement_ID = CE.M_CostElement_ID AND CE.M_Product_Category_ID = PC.M_Product_Category_ID)");
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(@"  LEFT JOIN M_CostElement ceMethod ON (ceMethod.CostingMethod = ce.MMPolicy and ceMethod.AD_Client_ID = cst.AD_Client_ID) ");
                 sql.Append($@" INNER JOIN M_CostQueue cq ON (cq.M_Product_ID = CST.M_Product_ID 
@@ -822,7 +824,8 @@ namespace VAdvantage.Process
             }
 
             // Group By Clause
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(@" GROUP BY P.M_Product_Category_ID, 
                                  P.M_Product_ID,
