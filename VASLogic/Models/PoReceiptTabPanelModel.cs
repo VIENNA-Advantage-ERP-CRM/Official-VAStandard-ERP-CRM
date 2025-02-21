@@ -2627,13 +2627,12 @@ namespace VASLogic.Models
             {
                 sqlOrder.Append("o.DATEPROMISED + case when ps.C_PaySchedule_ID IS NULL THEN pt.NETDAYS ELSE ps.NETDAYS END  AS expected_due_date");
             }
-            sqlOrder.Append(@" FROM 
-                         C_Order o
-                     INNER JOIN C_OrderLine ol ON o.C_Order_ID = ol.C_Order_ID
-                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
-                     INNER JOIN C_PAYMENTTERM pt ON o.C_PAYMENTTERM_ID = pt.C_PAYMENTTERM_ID AND pt.VA009_Advance = 'N'
-                     LEFT JOIN C_PAYSCHEDULE ps ON pt.C_PAYMENTTERM_ID = ps.C_PAYMENTTERM_ID AND ps.VA009_Advance = 'N'
-                     LEFT JOIN C_InvoiceLine il ON il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.Processed = 'Y' AND il.ReversalDoc_ID IS NULL
+            sqlOrder.Append(@" FROM C_Order o
+                     INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
+                     INNER JOIN C_DocType doc ON (doc.C_DocType_ID = o.C_DocTypeTarget_ID)
+                     INNER JOIN C_PAYMENTTERM pt ON (o.C_PAYMENTTERM_ID = pt.C_PAYMENTTERM_ID AND pt.VA009_Advance = 'N')
+                     LEFT JOIN C_PAYSCHEDULE ps ON (pt.C_PAYMENTTERM_ID = ps.C_PAYMENTTERM_ID AND ps.VA009_Advance = 'N')
+                     LEFT JOIN C_InvoiceLine il ON (il.C_OrderLine_ID = ol.C_OrderLine_ID AND il.Processed = 'Y' AND il.ReversalDoc_ID IS NULL)
                      WHERE 
                          o.DOCSTATUS IN ('CO', 'CL') AND NVL(doc.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB')
                          AND doc.DocBaseType IN ('SOO','POO')");
@@ -2687,7 +2686,7 @@ namespace VASLogic.Models
                      FROM 
                          C_Invoice o
                      INNER JOIN C_InvoicePaySchedule ips ON (o.C_Invoice_ID = ips.C_Invoice_ID) 
-                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
+                     INNER JOIN C_DocType doc ON (doc.C_DocType_ID = o.C_DocTypeTarget_ID)
                      WHERE 
                           o.DOCSTATUS IN ( 'CO', 'CL')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
@@ -2723,7 +2722,7 @@ namespace VASLogic.Models
                      FROM 
                          C_Order o
                      INNER JOIN VA009_OrderPaySchedule ips ON (o.C_Order_ID = ips.C_Order_ID) 
-                     INNER JOIN C_DocType doc ON doc.C_DocType_ID = o.C_DocTypeTarget_ID
+                     INNER JOIN C_DocType doc ON (doc.C_DocType_ID = o.C_DocTypeTarget_ID)
                      WHERE 
                           o.DOCSTATUS IN ( 'CO', 'CL') AND doc.DocBaseType IN ('SOO','POO') AND NVL(doc.DocSubTypeSO,' ') NOT IN ('BO','ON', 'OB')
                           AND ips.VA009_IsPaid = 'N'", "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
@@ -3053,7 +3052,7 @@ namespace VASLogic.Models
                                  TO_CHAR(C_BankAccountline.StatementDate, 'YYYY-MM'), C_BankAccount.C_BankAccount_ID) THEN 'EndingBalance' 
                                  ELSE NULL END AS isendingbalance,
                                  C_BankAccountline.StatementDate,
-                                 CASE WHEN C_BankAccount.C_Currency_ID !=" +C_Currency_ID+ @"then 
+                                 CASE WHEN C_BankAccount.C_Currency_ID !=" +C_Currency_ID+ @" THEN 
                                  ROUND(COALESCE(currencyconvert(
                                  C_BankAccountline.EndingBalance,
 	                             C_BankAccount.C_Currency_ID,
