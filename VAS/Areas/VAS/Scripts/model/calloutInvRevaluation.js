@@ -103,7 +103,7 @@
      * @param {any} oldValue
      */
     calloutInvRevaluation.prototype.updateCostAndDiffrences = function (ctx, windowNo, mTab, mField, value, oldValue) {
-        if (this.isCalloutActive() || value == null || value == 0) {
+        if (this.isCalloutActive() || value == null) {
             return;
         }
         this.setCalloutActive(true);
