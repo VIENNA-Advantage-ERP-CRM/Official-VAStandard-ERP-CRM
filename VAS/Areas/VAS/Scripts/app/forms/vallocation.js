@@ -2708,11 +2708,15 @@
                         $OrgFilter.empty();
                         //$OrgFilter.addClass('vis-ev-col-mandatory');
                         //$OrgFilter.addClass('vis-ev-col-mandatory');
-                        if (VIS.Env.getCtx().getAD_Org_ID() != 0) {
+                        //VIS_427 Added the condition of name not equal to null so that null dont set in organization field
+                        if (VIS.Env.getCtx().getAD_Org_ID() != 0 && VIS.Env.getCtx().ctx["#AD_Org_Name"] != null) {
                             $OrgFilter.append("<option value=" + VIS.Env.getCtx().getAD_Org_ID() + ">" + VIS.Env.getCtx().ctx["#AD_Org_Name"] + "</option>");
                         }
                         for (var i = 0; i < result.length; i++) {
-                            if (result[i].Value != VIS.Env.getCtx().getAD_Org_ID()) {
+                            /*Added  condition if value organization id in context and from server side is same/not same and name from serverside and context 
+                            not equal then set organization field*/
+                            if ((result[i].Value != VIS.Env.getCtx().getAD_Org_ID() && VIS.Env.getCtx().ctx["#AD_Org_Name"] != result[i].Name) || 
+                                (result[i].Value == VIS.Env.getCtx().getAD_Org_ID() && VIS.Env.getCtx().ctx["#AD_Org_Name"] != result[i].Name)) {
                                 OrgName = VIS.Utility.Util.getValueOfString(result[i].Name);
                                 AD_Org_ID = VIS.Utility.Util.getValueOfInt(result[i].Value);
                                 $OrgFilter.append(" <option value=" + AD_Org_ID + ">" + OrgName + "</option>");
