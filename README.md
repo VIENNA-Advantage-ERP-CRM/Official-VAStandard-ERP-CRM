@@ -15,7 +15,8 @@
 
 5.	After download the code, Open the application in Visual Studio 2019 or latest version and go to the ViennaAdvantageWeb folder in the project shown as below.
  
-  ![image](https://github.com/user-attachments/assets/eda06370-c176-45ac-9e3e-83a376815484)
+  ![image](https://github.com/user-attachments/assets/1d932229-6d2a-4c1c-8ff0-17b018515940)
+
 
 
 5.	Copy the mentioned below Areas and their corresponding DLL files from the FTP into the respective Areas and DLL folders (Create DLL and Areas folders under ViennaAdvantageWeb folder if it doesn't exist). The FTP details are as follows:
@@ -31,7 +32,8 @@
 
 7.	Go to the path /Required Files for Partner-kit Setup/5.x and copy all DLLs from “CommonDlls” folder and paste them into the “DLL” folder within ViennaAdvantageWeb. As shown in below pic.
 
- ![image](https://github.com/user-attachments/assets/3b840123-79d3-423d-abd8-4dd7216ded9d)
+ ![image](https://github.com/user-attachments/assets/afb00e13-422c-49ed-97e5-0380631bab0d)
+
 
 
 7.	Navigate to /Required Files for Partner-kit Setup/5.x/ViennaBase in FTP and select the version that matches the Vienna Advantage Base Files module version in database that you setup in step 3.  
@@ -48,10 +50,12 @@
     Under a particular version it will show two folder Htmlbin and Area as show in below screen. Copy the DLLs from the Htmlbin folder and paste them into the DLL folder in ViennaAdvantageWeb. Similarly, copy the folders from the Areas folder and paste them into the Areas folder in ViennaAdvantageWeb. As shown in below pics.
 
 •	Copy dll from Htmlbin folder
- ![image](https://github.com/user-attachments/assets/4229cffa-80e6-4e95-9155-1c1647acdf21)
+![image](https://github.com/user-attachments/assets/094b66dd-dfef-4828-bfd1-d03a58635f4e)
+
 
 •	Copy Area folder files
- ![image](https://github.com/user-attachments/assets/1950008d-c5f6-4cfc-809b-589330b9722e)
+![image](https://github.com/user-attachments/assets/05627381-466b-4908-8660-14bb6d196154)
+
 
 
 9.	Navigate to folder “/Required Files for Partner-kit Setup/5.x/VIS” in FTP, and select the version based on the Vienna Advantage Framework module version in your database.
@@ -63,12 +67,14 @@
 
   •	Copy dll from Htmlbin folder
 
-   ![image](https://github.com/user-attachments/assets/8ff74ebb-4a66-4ea1-9764-127cee4869d5)
+   ![image](https://github.com/user-attachments/assets/394fc6a6-0911-43c4-bb45-ff5cc80d3a51)
+
 
 
   •	Copy Area folder files
 
-   ![image](https://github.com/user-attachments/assets/99aafc89-31e5-4b38-bf9a-eb389798e5a6)
+   ![image](https://github.com/user-attachments/assets/e07497c0-f306-401f-8b41-b8a26c5b4a6d)
+
 
 
 
