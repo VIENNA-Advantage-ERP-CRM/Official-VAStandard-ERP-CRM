@@ -88,5 +88,25 @@ namespace VAdvantage.Model
 
             return true;
         }
+
+        /// <summary>
+        /// After Delete
+        /// </summary>
+        /// <param name="success">success</param>
+        /// <returns>deleted</returns>
+        /// 
+        protected override bool AfterDelete(bool success)
+        {
+            if (!success)
+                return success;
+
+            // VIS0060: Update IsCreated as False on Production header when all plans are deleted.
+            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_ProductionPlan_ID) FROM M_ProductionPlan WHERE M_Production_ID = "
+                + GetM_Production_ID(), null, Get_Trx())) == 0)
+            {
+                DB.ExecuteQuery("UPDATE M_Production SET IsCreated = 'N' WHERE M_Production_ID = " + GetM_Production_ID(), null, Get_Trx());
+            }
+            return true;
+        }
     }
 }

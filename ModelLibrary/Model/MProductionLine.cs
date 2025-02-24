@@ -103,6 +103,46 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// Before Delete
+        /// </summary>
+        /// <returns>true if can be deleted</returns>       
+        protected override bool BeforeDelete()
+        {
+            DataSet ds = DB.ExecuteDataset("SELECT M_Product_ID, M_AttributeSetInstance_ID FROM M_ProductionPlan WHERE M_ProductionPlan_ID = "
+                + GetM_ProductionPlan_ID(), null, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                if (Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Product_ID"]) == GetM_Product_ID() &&
+                    Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]) == GetM_AttributeSetInstance_ID())
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "AccessCannotDelete"));
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// After Delete
+        /// </summary>
+        /// <param name="success">success</param>
+        /// <returns>deleted</returns>
+        /// 
+        protected override bool AfterDelete(bool success)
+        {
+            if (!success)
+                return success;
+
+            // VIS0060: Update IsCreated as False on Production header when all lines are deleted.
+            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(M_ProductionLine_ID) FROM M_ProductionLine WHERE M_Production_ID = "
+                + GetM_Production_ID(), null, Get_Trx())) == 0)
+            {
+                DB.ExecuteQuery("UPDATE M_Production SET IsCreated = 'N' WHERE M_Production_ID = " + GetM_Production_ID(), null, Get_Trx());
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Set Product - Callout
         /// </summary>
         /// <param name="oldM_Product_ID">old value</param>

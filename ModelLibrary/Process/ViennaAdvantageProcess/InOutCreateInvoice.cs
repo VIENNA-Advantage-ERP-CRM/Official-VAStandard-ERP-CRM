@@ -39,8 +39,9 @@ namespace ViennaAdvantage.Process
         private int _C_DocType_ID = 0;
         //Checkbox for Generating charges proportional to line quantities on Invoice line. By Sukhwnder on 14 Dec, 2017
         private bool _GenerateCharges = false;
-
-
+        public int C_Invoice_ID { get; set; }
+        /*defined variable to store context details*/
+        public Ctx ctx = null;
         /// <summary>
         /// Prepare - e.g., get Parameters.
         /// </summary>
@@ -75,6 +76,7 @@ namespace ViennaAdvantage.Process
                     //log.log(Level.SEVERE, "Unknown Parameter: " + name);
                 }
             }
+            ctx = GetCtx();
             _M_InOut_ID = GetRecord_ID();
         }
 
@@ -84,10 +86,37 @@ namespace ViennaAdvantage.Process
         /// <returns>document no</returns>
         protected override String DoIt()
         {
+            string msg = Generate();
+            return msg;
+        }
+        /// <summary>
+        /// This function is used to Set Values In parameter
+        /// </summary>
+        /// <param name="InvoiceDocumentNo">InvoiceDocumentNo</param>
+        /// <param name="Doctype_ID">Doctype_ID</param>
+        /// <param name="generateCharges">generateCharges</param>
+        /// <param name="ct">Context<param>
+        /// 
+        /// <author>VIS_427</author>
+        public void SetParameter(string InvoiceDocumentNo, int Doctype_ID, bool generateCharges, int grnId,Ctx ct)
+        {
+            _InvoiceDocumentNo = InvoiceDocumentNo;
+            _C_DocType_ID = Doctype_ID;
+            _GenerateCharges = generateCharges;
+            _M_InOut_ID = grnId;
+            ctx = ct;
+        }
+        /// <summary>
+        /// This function is used to Generate Invoice against GRN
+        /// </summary>
+        /// <returns>Message</returns>
+        /// <author>VIS_427</author>
+        public string Generate()
+        {
             StringBuilder invDocumentNo = new StringBuilder();
-            int count = Util.GetValueOfInt(DB.ExecuteScalar(" SELECT Count(M_Inout_ID) FROM M_Inout WHERE ISSOTRX='Y' AND M_Inout_ID=" + GetRecord_ID()));
+            int count = Util.GetValueOfInt(DB.ExecuteScalar(" SELECT Count(M_Inout_ID) FROM M_Inout WHERE ISSOTRX='Y' AND M_Inout_ID=" + _M_InOut_ID));
             MInOut ship = null;
-            bool isAllownonItem = Util.GetValueOfString(GetCtx().GetContext("$AllowNonItem")).Equals("Y");
+            bool isAllownonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
 
             // check if reference found on Provisional Invoice, then not to create Invoice
             if (_M_InOut_ID > 0 && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(iol.M_InOut_ID)
@@ -96,7 +125,7 @@ namespace ViennaAdvantage.Process
                                       LEFT JOIN M_InOutLine iol ON (iol.M_InOutLine_ID = pil.M_InOutLine_ID)
                                       WHERE pi.DocStatus NOT IN ( 'RE', 'VO' ) AND iol.M_InOut_ID = " + _M_InOut_ID, null, Get_Trx())) > 0)
             {
-                throw new ArgumentException(Msg.GetMsg(GetCtx() , "VIS_ProvisionalInvoiceCreated"));
+                throw new ArgumentException(Msg.GetMsg(ctx, "VIS_ProvisionalInvoiceCreated"));
             }
 
             if (count > 0)
@@ -106,7 +135,7 @@ namespace ViennaAdvantage.Process
                     throw new ArgumentException("No Shipment");
                 }
                 //
-                ship = new MInOut(GetCtx(), _M_InOut_ID, Get_Trx());
+                ship = new MInOut(ctx, _M_InOut_ID, Get_Trx());
                 if (ship.Get_ID() == 0)
                 {
                     throw new ArgumentException("Shipment not found");
@@ -116,11 +145,11 @@ namespace ViennaAdvantage.Process
                     // JID_0750: done by Bharat on 05 Feb 2019 if Customer Return document and status is not complete it should give message "Customer Return Not Completed".
                     if (ship.IsReturnTrx())
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(), "CustomerReturnNotCompleted"));
+                        throw new ArgumentException(Msg.GetMsg(ctx, "CustomerReturnNotCompleted"));
                     }
                     else
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(), "ShipmentNotCompleted"));
+                        throw new ArgumentException(Msg.GetMsg(ctx, "ShipmentNotCompleted"));
                     }
                 }
             }
@@ -131,7 +160,7 @@ namespace ViennaAdvantage.Process
                     throw new ArgumentException("No Material Receipt");
                 }
                 //
-                ship = new MInOut(GetCtx(), _M_InOut_ID, Get_Trx());
+                ship = new MInOut(ctx, _M_InOut_ID, Get_Trx());
                 if (ship.Get_ID() == 0)
                 {
                     throw new ArgumentException("Material Receipt not found");
@@ -141,18 +170,18 @@ namespace ViennaAdvantage.Process
                     // JID_0750: done by Bharat on 05 Feb 2019 if Return to vendor document and status is not complete it should give message "Return To Vendor Not Completed".
                     if (ship.IsReturnTrx())
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(), "VendorReturnNotCompleted"));
+                        throw new ArgumentException(Msg.GetMsg(ctx, "VendorReturnNotCompleted"));
                     }
                     else
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(), "MRNotCompleted"));
+                        throw new ArgumentException(Msg.GetMsg(ctx, "MRNotCompleted"));
                     }
                 }
             }
 
             // When record contain more than single order and order having different Payment term or Price List then not to generate invoices
             // JID_0976 - For conversion Type
-            if (ship.GetC_Order_ID() > 0 && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT  COUNT(DISTINCT  c_order.m_pricelist_id) +  count(distinct c_order.c_paymentterm_id) + count(distinct COALESCE( c_order.C_ConversionType_ID , " + MConversionType.GetDefault(GetAD_Client_ID()) + @"))  as recordcount
+            if (ship.GetC_Order_ID() > 0 && Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT  COUNT(DISTINCT  c_order.m_pricelist_id) +  count(distinct c_order.c_paymentterm_id) + count(distinct COALESCE( c_order.C_ConversionType_ID , " + MConversionType.GetDefault(ship.GetAD_Client_ID()) + @"))  as recordcount
                             FROM m_inoutline INNER JOIN c_orderline ON m_inoutline.c_orderline_id = c_orderline.c_orderline_id
                             INNER JOIN c_order ON c_order.c_order_id = c_orderline.c_order_id
                             WHERE m_inoutline.m_inout_id = " + _M_InOut_ID + @"  GROUP BY   m_inoutline.m_inout_id ", null, Get_Trx())) > 3)
@@ -160,12 +189,12 @@ namespace ViennaAdvantage.Process
                 if (ship.IsSOTrx())
                 {
                     //Different Payment Terms, Price list found against the selected orders, use "Generate Invoice" process to create multiple invoices.
-                    throw new ArgumentException(Msg.GetMsg(GetCtx(), "VIS_SoDifferentPayAndPrice"));
+                    throw new ArgumentException(Msg.GetMsg(ctx, "VIS_SoDifferentPayAndPrice"));
                 }
                 else
                 {
                     //Different Payment Terms, Price list found against the selected orders
-                    throw new ArgumentException(Msg.GetMsg(GetCtx(), "VIS_DifferentPayAndPrice"));
+                    throw new ArgumentException(Msg.GetMsg(ctx, "VIS_DifferentPayAndPrice"));
                 }
             }
 
@@ -251,7 +280,7 @@ namespace ViennaAdvantage.Process
                         if (ship.GetC_Order_ID() >= 0)
                         {
                             int C_DocType_ID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocType_ID From C_Order Where C_Order_ID=" + ship.GetC_Order_ID(), null, Get_Trx()));
-                            MDocType dt = MDocType.Get(GetCtx(), C_DocType_ID);
+                            MDocType dt = MDocType.Get(ctx, C_DocType_ID);
                             if (dt.GetC_DocTypeInvoice_ID() != 0)
                                 invoice.SetC_DocTypeTarget_ID(dt.GetC_DocTypeInvoice_ID(), true);
                             else
@@ -293,21 +322,21 @@ namespace ViennaAdvantage.Process
             {
                 //1052-- setcurrency type in case order reference is not present
                 int currencyType = 0;
-                currencyType= Util.GetValueOfInt(GetCtx().GetContext("#C_ConversionType_ID"));
+                currencyType = Util.GetValueOfInt(ctx.GetContext("#C_ConversionType_ID"));
                 if (currencyType > 0)
                 {
                     invoice.SetC_ConversionType_ID(currencyType);
                 }
                 else
                 {
-                    currencyType = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive='Y'AND AD_Org_ID IN(" + ship.GetAD_Org_ID() + ",0) AND ISDefault = 'Y' AND AD_Client_ID= "+GetAD_Client_ID()+" ORDER BY C_ConversionType_ID Desc"));
+                    currencyType = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_ConversionType_ID FROM C_ConversionType WHERE IsActive='Y'AND AD_Org_ID IN(" + ship.GetAD_Org_ID() + ",0) AND ISDefault = 'Y' AND AD_Client_ID= " + ship.GetAD_Client_ID() + " ORDER BY C_ConversionType_ID Desc"));
                     if (currencyType > 0)
                     {
                         invoice.SetC_ConversionType_ID(currencyType);
                     }
                     else
                     {
-                        throw new ArgumentException(Msg.GetMsg(GetCtx(),"DefaultCurrencyTypeNotFound"));
+                        throw new ArgumentException(Msg.GetMsg(ctx, "DefaultCurrencyTypeNotFound"));
                     }
                 }
             }
@@ -379,7 +408,7 @@ namespace ViennaAdvantage.Process
                         {
                             if (line.GetM_Product_ID() > 0)
                             {
-                                //MProduct pro = new MProduct(GetCtx(), sLine.GetM_Product_ID(), Get_TrxName());
+                                //MProduct pro = new MProduct(ctx, sLine.GetM_Product_ID(), Get_TrxName());
                                 int VA038_AmortizationTemplate_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT VA038_AmortizationTemplate_ID 
                                      FROM M_Product WHERE M_Product_ID = " + sLine.GetM_Product_ID(), null, Get_Trx()));
                                 if (VA038_AmortizationTemplate_ID > 0)
@@ -415,7 +444,7 @@ namespace ViennaAdvantage.Process
                             }
                             if (line.GetC_Charge_ID() > 0)
                             {
-                                //MCharge charge = new MCharge(GetCtx(), sLine.GetC_Charge_ID(), Get_TrxName());
+                                //MCharge charge = new MCharge(ctx, sLine.GetC_Charge_ID(), Get_TrxName());
                                 int VA038_AmortizationTemplate_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT VA038_AmortizationTemplate_ID 
                                      FROM C_Charge WHERE C_Charge_ID = " + sLine.GetC_Charge_ID(), null, Get_Trx()));
                                 if (VA038_AmortizationTemplate_ID > 0)
@@ -484,7 +513,7 @@ namespace ViennaAdvantage.Process
                     {
                         if (line.GetM_Product_ID() > 0)
                         {
-                            //MProduct pro = new MProduct(GetCtx(), sLine.GetM_Product_ID(), Get_TrxName());
+                            //MProduct pro = new MProduct(ctx, sLine.GetM_Product_ID(), Get_TrxName());
                             int VA038_AmortizationTemplate_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT VA038_AmortizationTemplate_ID 
                                      FROM M_Product WHERE M_Product_ID = " + sLine.GetM_Product_ID(), null, Get_Trx()));
                             if (VA038_AmortizationTemplate_ID > 0)
@@ -520,7 +549,7 @@ namespace ViennaAdvantage.Process
                         }
                         if (line.GetC_Charge_ID() > 0)
                         {
-                            //MCharge charge = new MCharge(GetCtx(), sLine.GetC_Charge_ID(), Get_TrxName());
+                            //MCharge charge = new MCharge(ctx, sLine.GetC_Charge_ID(), Get_TrxName());
                             int VA038_AmortizationTemplate_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT VA038_AmortizationTemplate_ID 
                                      FROM C_Charge WHERE C_Charge_ID = " + sLine.GetC_Charge_ID(), null, Get_Trx()));
                             if (VA038_AmortizationTemplate_ID > 0)
@@ -595,7 +624,7 @@ namespace ViennaAdvantage.Process
                     for (int index = 0; index < OrderDS.Tables[0].Rows.Count; index++)
                     {
                         ds = null;
-                        ChargesSql.Clear();                        
+                        ChargesSql.Clear();
                         ChargesSql.Append(" SELECT C_CHARGE_ID,                                             "
                                  + "   C_ORDERLINE_ID,                                                      "
                                  + "   C_ORDER_ID,                                                          "
@@ -614,7 +643,7 @@ namespace ViennaAdvantage.Process
                                  + "   )                                                                    "
                                  + " AND C_CHARGE_ID IS NOT NULL                                            "
                                  + " AND C_CHARGE_ID  > 0                                                   ");
-                       
+
 
                         ds = DB.ExecuteDataset(ChargesSql.ToString(), null, Get_Trx());
 
@@ -626,7 +655,7 @@ namespace ViennaAdvantage.Process
                                 line.SetQty(1);
                                 line.SetQtyEntered(1);
                                 line.SetQtyInvoiced(1);
-                                line.SetOrderLine(new MOrderLine(GetCtx(), Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ORDERLINE_ID"]), Get_Trx()));
+                                line.SetOrderLine(new MOrderLine(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_ORDERLINE_ID"]), Get_Trx()));
                                 line.SetC_Charge_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_CHARGE_ID"]));
                                 line.SetC_UOM_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_UOM_ID"]));
                                 line.SetC_Tax_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_TAX_ID"]));
@@ -653,7 +682,7 @@ namespace ViennaAdvantage.Process
                                 {
                                     if (line.GetC_Charge_ID() > 0)
                                     {
-                                        MCharge charge = new MCharge(GetCtx(), line.GetC_Charge_ID(), Get_TrxName());
+                                        MCharge charge = new MCharge(ctx, line.GetC_Charge_ID(), Get_TrxName());
                                         if (Util.GetValueOfInt(charge.Get_Value("VA038_AmortizationTemplate_ID")) > 0)
                                         {
                                             line.Set_Value("VA038_AmortizationTemplate_ID", Util.GetValueOfInt(charge.Get_Value("VA038_AmortizationTemplate_ID")));
@@ -710,17 +739,29 @@ namespace ViennaAdvantage.Process
             {
                 if (!invoice.CalculateTaxTotal())   //	setTotals
                 {
-                    throw new ArgumentException(Msg.GetMsg(GetCtx(), "ErrorCalculateTax") + ": " + invDocumentNo.ToString());
+                    throw new ArgumentException(Msg.GetMsg(ctx, "ErrorCalculateTax") + ": " + invDocumentNo.ToString());
                 }
                 UpdateInvoiceHeader(invoice);
                 DB.ExecuteQuery("UPDATE C_Invoice SET ConditionalFlag = null WHERE C_Invoice_ID = " + invoice.GetC_Invoice_ID(), null, Get_Trx());
-                return Msg.GetMsg(GetCtx(), "InvoiceNo") + ":- " + invoice.GetDocumentNo();
+                GetC_Invoice_ID(invoice);
+                return Msg.GetMsg(ctx, "InvoiceNo") + ":- " + invoice.GetDocumentNo();
             }
             else
             {
                 //Get_Trx().Rollback();
-                throw new ArgumentException(Msg.GetMsg(GetCtx(), "InvoiceExist") + ": " + invDocumentNo.ToString());
+                throw new ArgumentException(Msg.GetMsg(ctx, "InvoiceExist") + ": " + invDocumentNo.ToString());
             }
+        }
+        /// <summary>
+        /// This function is used to Get InvoiceID
+        /// </summary>
+        /// <returns>Invoice ID</returns>
+        /// <author>VIS_427</author>
+        public int GetC_Invoice_ID(MInvoice inv)
+        {
+            C_Invoice_ID = inv.GetC_Invoice_ID();
+            return C_Invoice_ID;
+
         }
 
         /// <summary>
@@ -767,7 +808,7 @@ namespace ViennaAdvantage.Process
                 {
                     if (!invoice.SetWithholdingAmount(invoice))
                     {
-                        log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "WrongBackupWithholding"));
+                        log.SaveWarning("Warning", Msg.GetMsg(ctx, "WrongBackupWithholding"));
                     }
                     else
                     {

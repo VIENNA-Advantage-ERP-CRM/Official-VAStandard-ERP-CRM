@@ -79,6 +79,7 @@
         //var Util=VIS.Util;
 
         if (this.isCalloutActive() || value == null || value.toString() == "") {
+            mTab.setValue("BlanketOrderType", "OO");
             return "";
         }
 
@@ -155,8 +156,7 @@
                     mTab.setValue("BlanketOrderType", DocSubTypeSO);
                 }
                 else if (Util.getValueOfString(idr["IsReleaseDocument"]).equals("Y")) {
-                    mTab.setValue("BlanketOrderType", "BO");
-                    mTab.setValue("OrderType", "BO");  //VIS0336_Changes for Blanket order field on Purchase order window.
+                    mTab.setValue("BlanketOrderType", "BO"); //VIS0336_Changes for Blanket order field on Purchase order window.
                 }
                 else {
                     ctx.setContext(windowNo, "BlanketOrderType", "OO");
@@ -1686,6 +1686,7 @@
     CalloutOrder.prototype.Product = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if (this.isCalloutActive() || value == null || value.toString() == "") {
+            mTab.setValue("ProductType", null);
             return "";
         }
 
@@ -1734,11 +1735,12 @@
 
                     var productType = productInfo["productType"].toString();
                     ctx.setContext(windowNo, "ProductType", productType);
+                    mTab.setValue("ProductType", productType);
                     if (productType == "S") {
-                        mTab.setValue("IsContract", true);
+                        //mTab.setValue("IsContract", true);
                     }
                     else {
-                        mTab.setValue("IsContract", false);
+                        //mTab.setValue("IsContract", false);
                         mTab.setValue("NoofCycle", null);
                         mTab.setValue("QtyPerCycle", null);
                         mTab.setValue("StartDate", null);
@@ -1936,10 +1938,10 @@
                 mTab.setValue("PriceEntered", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
                 mTab.setValue("PrintDescription", Util.getValueOfString(dr["PrintDescription"]));
                 mTab.setValue("PriceActual", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
+                mTab.setValue("PriceList", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
             }
 
-            mTab.setValue("PriceLimit", VIS.Env.ZERO);
-            mTab.setValue("PriceList", VIS.Env.ZERO);
+            mTab.setValue("PriceLimit", VIS.Env.ZERO);            
             mTab.setValue("Discount", VIS.Env.ZERO);
         }
         catch (err) {
@@ -2318,6 +2320,11 @@
                     + " -> PriceEntered=" + PriceEntered);
                 mTab.setValue("PriceEntered", PriceEntered);
                 mTab.setValue("PriceActual", PriceActual);
+
+                if (PriceList == 0) {
+                    PriceList = PriceActual;
+                    mTab.setValue("PriceList", PriceList);
+                }
             }
             else if (mField.getColumnName() == "PriceEntered") {
                 PriceEntered = Util.getValueOfDecimal(value.toFixed(PriceListPrecision));
@@ -2331,17 +2338,19 @@
 
             //  Discount entered - Calculate Actual/Entered
             if (mField.getColumnName() == "Discount") {
-                PriceActual = Util.getValueOfDecimal((100.0 - Discount)
-                    / 100.0 * PriceList);
+                if (PriceList > 0) {
+                    PriceActual = Util.getValueOfDecimal((100.0 - Discount)
+                        / 100.0 * PriceList);
 
-                if (Util.scale(PriceActual) > PriceListPrecision)
-                    PriceActual = PriceActual.toFixed(PriceListPrecision);
+                    if (Util.scale(PriceActual) > PriceListPrecision)
+                        PriceActual = PriceActual.toFixed(PriceListPrecision);
 
-                PriceEntered = PriceActual;
-                if (PriceEntered == null)
                     PriceEntered = PriceActual;
-                mTab.setValue("PriceActual", PriceActual);
-                mTab.setValue("PriceEntered", PriceEntered);
+                    if (PriceEntered == null)
+                        PriceEntered = PriceActual;
+                    mTab.setValue("PriceActual", PriceActual);
+                    mTab.setValue("PriceEntered", PriceEntered);
+                }
             }
             //	calculate Discount
             else {
@@ -2727,7 +2736,7 @@
 
                 //countEd011 = Util.getValueOfInt(productPrices["countEd011"]);
 
-                var params = M_Product_ID.toString().concat(",", (mTab.getValue("C_Order_ID")).toString() +
+                var params = M_Product_ID.toString().concat(",", Util.getValueOfString(mTab.getValue("C_Order_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("M_AttributeSetInstance_ID")) +
                     "," + Util.getValueOfString(mTab.getValue("C_UOM_ID")) + "," + ctx.getAD_Client_ID().toString() +
                     "," + Util.getValueOfString(C_BPartner_ID) + "," + QtyEntered.toString() +
@@ -3030,7 +3039,7 @@
 
                     QtyOrdered = Util.getValueOfDecimal(mTab.getValue("QtyOrdered"));
                     if (shippedQty < QtyOrdered) {
-                        if (ctx.isSOTrx()) {
+                        if (ctx.isSOTrx(windowNo)) {
                             //mTab.fireDataStatusEEvent("QtyShippedLessThanQtyReturned", shippedQty.toString(), false);
                             VIS.ADialog.info("QtyShippedAndReturned", null, shippedQty.toString(), "");
                         }
@@ -3138,7 +3147,7 @@
             //}
             //	Storage
             if (M_Product_ID != 0
-                && ctx.isSOTrx()
+                && ctx.isSOTrx(windowNo)
                 && QtyOrdered > 0
                 && !isReturnTrx)		//	no negative (returns)
             {
@@ -3251,7 +3260,7 @@
             if (order["Bill_User_ID"] != 0)
                 mTab.setValue("Bill_User_ID", Util.getValueOfInt(order["Bill_User_ID"]));
 
-            if (ctx.isSOTrx())
+            if (ctx.isSOTrx(windowNo))
                 mTab.setValue("M_ReturnPolicy_ID", Util.getValueOfInt(bpartner["M_ReturnPolicy_ID"]));
             else
                 mTab.setValue("M_ReturnPolicy_ID", Util.getValueOfInt(bpartner["PO_ReturnPolicy_ID"]));

@@ -618,7 +618,7 @@ namespace VAdvantage.Model
                             sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) 
                                         ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                        " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + inLine.GetM_Locator_ID() +
+                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + inLine.GetM_Locator_ID() +
                                         " AND t.M_Product_ID = " + inLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + inLine.GetM_AttributeSetInstance_ID() +
                                         " AND NVL(t.M_ProductContainer_ID, 0) = " + inLine.GetM_ProductContainer_ID());
                         }
@@ -652,7 +652,7 @@ namespace VAdvantage.Model
                             sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) 
                                         ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                        " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + inLine.GetM_Locator_ID() +
+                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + inLine.GetM_Locator_ID() +
                                         " AND t.M_Product_ID = " + inLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + inLine.GetM_AttributeSetInstance_ID() +
                                         " AND NVL(t.M_ProductContainer_ID, 0) = " + inLine.GetM_ProductContainer_ID());
                         }
@@ -783,8 +783,8 @@ namespace VAdvantage.Model
                 nvl(mt.CurrentQty, 0) as CurrentQty FROM M_InventoryLine m LEFT JOIN (SELECT DISTINCT t.M_Locator_ID, t.M_Product_ID, t.M_AttributeSetInstance_ID, 
                 FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM M_Transaction t
                 INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-               " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() +
-               @") mt ON m.M_Product_ID = mt.M_Product_ID AND nvl(m.M_AttributeSetInstance_ID, 0) = nvl(mt.M_AttributeSetInstance_ID, 0) 
+                " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() +
+                @") mt ON m.M_Product_ID = mt.M_Product_ID AND nvl(m.M_AttributeSetInstance_ID, 0) = nvl(mt.M_AttributeSetInstance_ID, 0) 
                 AND m.M_Locator_ID = mt.M_Locator_ID WHERE m.M_Inventory_ID = " + Get_ID() + " ORDER BY m.Line");
                 }
                 else
@@ -793,7 +793,7 @@ namespace VAdvantage.Model
                 nvl(mt.CurrentQty, 0) as CurrentQty FROM M_InventoryLine m LEFT JOIN (SELECT DISTINCT t.M_Locator_ID, t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_ProductContainer_ID, 
                 FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID , NVL(t.m_productcontainer_id, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM M_Transaction t
                 INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                " AND t.AD_Client_ID = " + GetAD_Client_ID() + @") mt ON m.M_Product_ID = mt.M_Product_ID AND nvl(m.M_AttributeSetInstance_ID, 0) = nvl(mt.M_AttributeSetInstance_ID, 0) 
+                " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + @") mt ON m.M_Product_ID = mt.M_Product_ID AND nvl(m.M_AttributeSetInstance_ID, 0) = nvl(mt.M_AttributeSetInstance_ID, 0) 
                 AND m.M_Locator_ID = mt.M_Locator_ID AND nvl(m.M_ProductContainer_ID, 0) = nvl(mt.M_ProductContainer_ID, 0) WHERE m.M_Inventory_ID = " + Get_ID() + " ORDER BY m.Line");
                 }
                 DataSet ds = null;
@@ -1094,8 +1094,8 @@ namespace VAdvantage.Model
                             sql.Clear();
                             sql.Append(@"SELECT DISTINCT First_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                    " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
-                                " AND t.M_Product_ID = " + line.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + ma.GetM_AttributeSetInstance_ID());
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
+                            " AND t.M_Product_ID = " + line.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + ma.GetM_AttributeSetInstance_ID());
                             trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
                             if (isContainerApplicable && line.Get_ColumnIndex("M_ProductContainer_ID") >= 0)
@@ -1334,7 +1334,7 @@ namespace VAdvantage.Model
                             sql.Clear();
                             sql.Append(@"SELECT DISTINCT FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                            " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
                             " AND t.M_Product_ID = " + line.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + ma.GetM_AttributeSetInstance_ID());
                             trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
@@ -1454,7 +1454,7 @@ namespace VAdvantage.Model
                                         _processMsg = Msg.GetMsg(GetCtx(), "ReqLineNotSaved");
                                         return DocActionVariables.STATUS_INVALID;
                                     }
-                                }                                
+                                }
                                 #endregion
                             }
 
@@ -1533,7 +1533,7 @@ namespace VAdvantage.Model
                             sql.Clear();
                             sql.Append(@"SELECT DISTINCT FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                            " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
                             " AND t.M_Product_ID = " + line.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + line.GetM_AttributeSetInstance_ID());
                             trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
@@ -1734,7 +1734,7 @@ namespace VAdvantage.Model
                     sql.Clear();
                     sql.Append(@"SELECT DISTINCT FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                            " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND l.AD_Org_ID = " + GetAD_Org_ID() + " AND t.M_Locator_ID = " + line.GetM_Locator_ID() +
                             " AND t.M_Product_ID = " + line.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + line.GetM_AttributeSetInstance_ID());
                     trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
@@ -2080,6 +2080,7 @@ namespace VAdvantage.Model
                                                GetM_Warehouse_ID(), true, Get_Trx());
                             DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                              @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
+                            sql += " VAS_PostingCost = " + currentCostPrice + " , ";
                         }
 
                         // Transaction Update Query
@@ -2095,6 +2096,12 @@ namespace VAdvantage.Model
                         sql += " , ProductCost = " + currentCostPrice;
                         sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                         sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        if (!sql.Contains("VAS_PostingCost"))
+                        {
+                            sql += " , VAS_PostingCost = " + (Util.GetValueOfDecimal(line.Get_Value("PriceCost")) != 0 ?
+                                        Util.GetValueOfDecimal(line.Get_Value("PriceCost")) : currentCostPrice);
+                        }
                         sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                         DB.ExecuteQuery(sql, null, Get_Trx());
                     }
@@ -2140,6 +2147,7 @@ namespace VAdvantage.Model
                                                        GetM_Warehouse_ID(), true, Get_Trx());
                                 DB.ExecuteQuery("UPDATE M_InventoryLine SET CurrentCostPrice =  " + currentCostPrice +
                                                  @"  , IsCostImmediate = 'Y' WHERE M_InventoryLine_ID = " + line.GetM_InventoryLine_ID(), null, Get_Trx());
+                                sql += "  VAS_PostingCost = " + currentCostPrice + " , "; 
                             }
 
                             // Transaction Update Query
@@ -2156,6 +2164,11 @@ namespace VAdvantage.Model
                             sql += " , ProductCost = " + currentCostPrice;
                             sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                             sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
+                            //22-Jan-2025, Update posting Cost on Transaction
+                            if (!sql.ToString().Contains("VAS_PostingCost"))
+                            {
+                                sql += " , VAS_PostingCost = " + currentCostPrice;
+                            }
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
                         }
@@ -2166,6 +2179,8 @@ namespace VAdvantage.Model
                             sql += " , ProductCost = " + line.GetPostCurrentCostPrice();
                             sql += " , M_CostElement_ID = " + costingCheck.definedCostingElement;
                             sql += " , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel);
+                            //22-Jan-2025, Update posting Cost on Transaction
+                            sql += " , VAS_PostingCost = " + line.GetPostCurrentCostPrice();
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
                         }
@@ -2394,14 +2409,14 @@ namespace VAdvantage.Model
                 {
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty, NVL(ContainerCurrentQty, 0) AS ContainerCurrentQty  ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id , MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(trxM.GetMovementDate().Value.AddDays(1), true)
-                               + " AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + line.GetM_AttributeSetInstance_ID()
+                               + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + line.GetM_AttributeSetInstance_ID()
                                + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
                 else
                 {
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty ,NVL(ContainerCurrentQty, 0) AS ContainerCurrentQty  ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id , MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(trxM.GetMovementDate().Value.AddDays(1), true)
-                               + " AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
+                               + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
                                + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
 
@@ -2612,7 +2627,7 @@ namespace VAdvantage.Model
                     //     + " AND M_AttributeSetInstance_ID = " + line.GetM_AttributeSetInstance_ID();
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id , MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(trxM.GetMovementDate().Value.AddDays(1), true)
-                               + " AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + line.GetM_AttributeSetInstance_ID()
+                               + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + line.GetM_AttributeSetInstance_ID()
                                + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
                 else
@@ -2621,7 +2636,7 @@ namespace VAdvantage.Model
                     //    + " AND M_AttributeSetInstance_ID = 0 ";
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id , MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(trxM.GetMovementDate().Value.AddDays(1), true)
-                               + " AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
+                               + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + line.GetM_Product_ID() + " AND M_Locator_ID = " + line.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
                                + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
 
@@ -2904,11 +2919,10 @@ namespace VAdvantage.Model
             string sql = @"SELECT DISTINCT FIRST_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty
                            FROM M_Transaction t
                            WHERE t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
-                           AND t.AD_Client_ID                       = " + line.GetAD_Client_ID() + @"
-                           AND t.M_Locator_ID                       = " + line.GetM_Locator_ID() + @"
-                           AND t.M_Product_ID                       = " + line.GetM_Product_ID() + @"
+                           AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + line.GetAD_Client_ID() + @"
+                           AND t.M_Locator_ID = " + line.GetM_Locator_ID() + " AND t.M_Product_ID = " + line.GetM_Product_ID() + @"
                            AND NVL(t.M_AttributeSetInstance_ID , 0) = COALESCE(" + line.GetM_AttributeSetInstance_ID() + @",0)
-                           AND NVL(t.M_ProductContainer_ID, 0)              = " + line.GetM_ProductContainer_ID();
+                           AND NVL(t.M_ProductContainer_ID, 0) = " + line.GetM_ProductContainer_ID();
             result = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             return result;
         }

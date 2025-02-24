@@ -625,7 +625,8 @@ namespace VAdvantage.Process
                 sql.Append(@" , manPrd.CurrentCostPrice AS ManufauctureCost ");
             }
 
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(" ,CASE WHEN SUM(cq.CurrentQty) = 0 THEN 0 ELSE ROUND(SUM(cq.CurrentQty * cq.currentcostprice) / SUM(cq.CurrentQty) , 10) END AS CurrentCostPrice");
             }
@@ -684,7 +685,8 @@ namespace VAdvantage.Process
                 sql.Append($@" INNER JOIN M_CostType ct ON (ct.M_CostType_ID = acc.M_CostType_ID AND ct.M_CostType_ID = cst.M_CostType_ID)");
             }
             sql.Append($@" INNER JOIN CostElement CE ON (CST.M_CostElement_ID = CE.M_CostElement_ID AND CE.M_Product_Category_ID = PC.M_Product_Category_ID)");
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(@"  LEFT JOIN M_CostElement ceMethod ON (ceMethod.CostingMethod = ce.MMPolicy and ceMethod.AD_Client_ID = cst.AD_Client_ID) ");
                 sql.Append($@" INNER JOIN M_CostQueue cq ON (cq.M_Product_ID = CST.M_Product_ID 
@@ -822,7 +824,8 @@ namespace VAdvantage.Process
             }
 
             // Group By Clause
-            if (!objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_StandardCosting))
+            if (objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Lifo) ||
+                objInventoryRevaluation.GetCostingMethod().Equals(MInventoryRevaluation.COSTINGMETHOD_Fifo))
             {
                 sql.Append(@" GROUP BY P.M_Product_Category_ID, 
                                  P.M_Product_ID,
@@ -1192,16 +1195,16 @@ namespace VAdvantage.Process
 
             if (objInventoryRevaluation.GetRevaluationType().Equals(MInventoryRevaluation.REVALUATIONTYPE_OnSoldConsumedQuantity))
             {
-                sql.Append($@" AND mi.DateAcct BETWEEN prd.StartDate AND prd.EndDate  ");
+                sql.Append($@" AND mi.DateAcct BETWEEN prd.StartDate AND prd.EndDate ");
             }
             else
             {
-                sql.Append($@" AND mi.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
-                               OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID,
-                              it.m_attributesetinstance_id , loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC , it.MovementDate, M_Transaction_ID ASC) AS MovementDate
+                sql.Append($@" AND mi.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN ADDDAYS(it.MovementDate, 1) ELSE it.MovementDate END) 
+                            OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID, it.m_attributesetinstance_id, loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, 
+                            it.MovementDate, M_Transaction_ID ASC) AS MovementDate
                             FROM M_Transaction it INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
-                            WHERE it.M_Product_ID = p.M_Product_ID AND l.AD_Org_ID = loc.AD_Org_ID AND i.M_Warehouse_ID = loc.M_Warehouse_ID 
-                            AND it.M_AttributeSetInstance_ID = t.M_AttributeSetInstance_ID  FETCH FIRST ROW ONLY )  ");
+                            WHERE it.M_Product_ID = p.M_Product_ID AND it.MovementType NOT IN ('VI') AND l.AD_Org_ID = loc.AD_Org_ID 
+                            AND i.M_Warehouse_ID = loc.M_Warehouse_ID AND it.M_AttributeSetInstance_ID = t.M_AttributeSetInstance_ID FETCH FIRST ROW ONLY)");
             }
 
             if (objInventoryRevaluation.GetM_Product_Category_ID() > 0)
@@ -1322,20 +1325,20 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    sql.Append($@" AND wot.VAMFG_DateAcct >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
-                                                    (PARTITION BY l.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id, 0) , loc.M_Warehouse_ID
-                                                      ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
-                                                      INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
-                        WHERE it.M_Product_ID = wot.M_Product_ID AND l.AD_Org_ID = loc.AD_Org_ID AND l.M_Warehouse_ID = loc.M_Warehouse_ID 
-                        AND NVL(it.M_AttributeSetInstance_ID , 0) = NVL(wot.M_AttributeSetInstance_ID, 0) FETCH FIRST ROW ONLY) ");
+                    sql.Append($@" AND wot.VAMFG_DateAcct >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN ADDDAYS(it.MovementDate, 1) ELSE it.MovementDate END) OVER 
+                        (PARTITION BY l.AD_Org_ID, it.M_Product_ID, NVL(it.m_attributesetinstance_id, 0), loc.M_Warehouse_ID
+                        ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
+                        INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
+                        WHERE it.M_Product_ID = wot.M_Product_ID AND it.MovementType NOT IN ('VI') AND l.AD_Org_ID = loc.AD_Org_ID 
+                        AND l.M_Warehouse_ID = loc.M_Warehouse_ID AND NVL(it.M_AttributeSetInstance_ID , 0) = NVL(wot.M_AttributeSetInstance_ID, 0) FETCH FIRST ROW ONLY)");
                 }
             }
             else if (Env.IsModuleInstalled("VA073_"))
             {
-                sql.Append($@" select pcpw.ActualCost AS CurrentCostPrice , pcpw.VA073_Quantity AS QtyEntered
-                        , pcpw.M_Product_ID , pcpw.M_AttributeSetInstance_ID, pcpw.AD_Org_ID ,0 AS M_Warehouse_ID , 
-                    NVL(pc.CostingLevel , asch.CostingLevel) AS CostingLevel, p.M_Product_Category_ID 
-                        from VA073_ProductCostPeriodWise  pcpw
+                sql.Append($@" select pcpw.ActualCost AS CurrentCostPrice, pcpw.VA073_Quantity AS QtyEntered, 
+                        pcpw.M_Product_ID, pcpw.M_AttributeSetInstance_ID, pcpw.AD_Org_ID, 0 AS M_Warehouse_ID, 
+                        NVL(pc.CostingLevel, asch.CostingLevel) AS CostingLevel, p.M_Product_Category_ID 
+                        from VA073_ProductCostPeriodWise pcpw
                         INNER JOIN M_Product p ON (p.M_Product_ID = pcpw.M_Product_ID)
                         INNER JOIN M_Product_Category pc ON (pc.M_Product_Category_ID = p.M_Product_Category_ID)
                         INNER JOIN AD_ClientInfo cinfo ON (cinfo.AD_Client_ID = pcpw.AD_Client_ID)
@@ -1347,11 +1350,11 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-                    sql.Append($@" WHERE pcpw.Created >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
-                                                    (PARTITION BY it.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id , 0)
-                                                      ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
-                                                      INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
-                        WHERE it.M_Product_ID = pcpw.M_Product_ID AND pcpw.AD_Org_ID = loc.AD_Org_ID 
+                    sql.Append($@" WHERE pcpw.Created >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN ADDDAYS(it.MovementDate, 1) ELSE it.MovementDate END) OVER 
+                        (PARTITION BY it.AD_Org_ID, it.M_Product_ID, NVL(it.m_attributesetinstance_id , 0)
+                        ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
+                        INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
+                        WHERE it.M_Product_ID = pcpw.M_Product_ID AND it.MovementType NOT IN ('VI') AND pcpw.AD_Org_ID = loc.AD_Org_ID 
                         AND NVL(it.M_AttributeSetInstance_ID, 0) = NVL(pcpw.M_AttributeSetInstance_ID, 0) FETCH FIRST ROW ONLY) ");
                 }
             }
@@ -1359,9 +1362,9 @@ namespace VAdvantage.Process
             {
                 sql.Append($@" UNION ");
             }
-            sql.Append($@" select pl.Amt AS CurrentCostPrice , pl.MovementQty AS QtyEntered 
-                        , pl.M_Product_ID , pl.M_AttributeSetInstance_ID, pl.AD_Org_ID ,pl.M_Warehouse_ID , 
-                        NVL(pc.CostingLevel , asch.CostingLevel) AS CostingLevel, pr.M_Product_Category_ID 
+            sql.Append($@" select pl.Amt AS CurrentCostPrice , pl.MovementQty AS QtyEntered, pl.M_Product_ID, 
+                        pl.M_AttributeSetInstance_ID, pl.AD_Org_ID, pl.M_Warehouse_ID, 
+                        NVL(pc.CostingLevel, asch.CostingLevel) AS CostingLevel, pr.M_Product_Category_ID 
                         from M_ProductionLine pl
                         INNER JOIN M_Production p ON (pl.M_Production_ID = p.M_Production_ID)
                         INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
@@ -1379,12 +1382,12 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append($@" AND p.MovementDate >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate , 1) ELSE it.MovementDate END) OVER 
-                                                      (PARTITION BY loc.AD_Org_ID, it.M_Product_ID , NVL(it.m_attributesetinstance_id, 0) , loc.M_Warehouse_ID
-                                                      ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
-                                                      INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
-                        WHERE it.M_Product_ID = pl.M_Product_ID  AND loc.AD_Org_ID = pl.AD_Org_ID AND loc.M_Warehouse_ID = pl.M_Warehouse_ID  
-                        AND NVL(it.M_AttributeSetInstance_ID, 0) = NVL(pl.M_AttributeSetInstance_ID, 0) FETCH FIRST ROW ONLY) ");
+                sql.Append($@" AND p.MovementDate >=  (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN ADDDAYS(it.MovementDate, 1) ELSE it.MovementDate END) OVER 
+                        (PARTITION BY loc.AD_Org_ID, it.M_Product_ID, NVL(it.m_attributesetinstance_id, 0), loc.M_Warehouse_ID
+                        ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, it.MovementDate, it.M_Transaction_ID ASC) AS MovementDate FROM M_Transaction it 
+                        INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
+                        WHERE it.M_Product_ID = pl.M_Product_ID AND it.MovementType NOT IN ('VI') AND loc.AD_Org_ID = pl.AD_Org_ID AND loc.M_Warehouse_ID = pl.M_Warehouse_ID  
+                        AND NVL(it.M_AttributeSetInstance_ID, 0) = NVL(pl.M_AttributeSetInstance_ID, 0) FETCH FIRST ROW ONLY)");
             }
             sql.Append($@" ) t WHERE t.CostingLevel = {GlobalVariable.TO_STRING(objInventoryRevaluation.GetCostingLevel())} ");
 
@@ -1504,12 +1507,12 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append($@" AND i.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN  ADDDAYS(it.MovementDate ,1) ELSE it.MovementDate END) 
-                               OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID,
-                              it.m_attributesetinstance_id , loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC , it.MovementDate, M_Transaction_ID ASC) AS MovementDate
+                sql.Append($@" AND i.DateAcct >= (SELECT First_VALUE(CASE WHEN NVL(it.M_RevaluationLine_ID, 0) != 0 THEN ADDDAYS(it.MovementDate, 1) ELSE it.MovementDate END) 
+                            OVER (PARTITION BY loc.AD_Org_ID, it.M_Product_ID, it.m_attributesetinstance_id, loc.M_Warehouse_ID ORDER BY NVL(it.M_RevaluationLine_ID, 0) DESC, 
+                            it.MovementDate, it.M_Transaction_ID ASC) AS MovementDate
                             FROM M_Transaction it INNER JOIN M_Locator loc ON (loc.M_Locator_ID = it.M_Locator_ID)
-                            WHERE it.M_Product_ID = p.M_Product_ID AND l.AD_Org_ID = loc.AD_Org_ID AND io.M_Warehouse_ID = loc.M_Warehouse_ID 
-                            AND it.M_AttributeSetInstance_ID = il.M_AttributeSetInstance_ID  FETCH FIRST ROW ONLY )  ");
+                            WHERE it.M_Product_ID = p.M_Product_ID AND it.MovementType NOT IN ('VI') AND l.AD_Org_ID = loc.AD_Org_ID AND io.M_Warehouse_ID = loc.M_Warehouse_ID 
+                            AND it.M_AttributeSetInstance_ID = il.M_AttributeSetInstance_ID  FETCH FIRST ROW ONLY)");
             }
 
             if (objInventoryRevaluation.GetM_Product_Category_ID() > 0)

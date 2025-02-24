@@ -22,6 +22,7 @@ using VAdvantage.Utility;
 using System.Data;
 using System.Data.SqlClient;
 using VAdvantage.Logging;
+using ModelLibrary.Classes;
 
 namespace VAdvantage.Model
 {
@@ -298,7 +299,7 @@ namespace VAdvantage.Model
                 M_AttributeSetInstance_ID = sLine.GetM_AttributeSetInstance_ID();
                 SetM_InOutLine_ID(sLine.GetM_InOutLine_ID());
                 SetC_OrderLine_ID(sLine.GetC_OrderLine_ID());
-                
+
                 //
                 SetLine(sLine.GetLine());
                 SetIsDescription(sLine.IsDescription());
@@ -316,7 +317,7 @@ namespace VAdvantage.Model
                 {
                     MOrderLine oLine = new MOrderLine(GetCtx(), C_OrderLine_ID, Get_TrxName());
                     MOrder ord = new MOrder(GetCtx(), oLine.GetC_Order_ID(), Get_TrxName());          //Added By Bharat
-                 //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
+                                                                                                      //VAI082 12/22/2023  DevOps Task ID:-3579,Set "ContractLine_ID" When user create the invoice with the reference of shipment.
                     if (oLine.Get_ValueAsInt("VAS_ContractLine_ID") > 0)
                     {
                         Set_Value("VAS_ContractLine_ID", oLine.Get_Value("VAS_ContractLine_ID"));
@@ -777,7 +778,7 @@ namespace VAdvantage.Model
                                 // if Tax Preference is Location
                                 else if (pref == "L")
                                 {
-                                    c_tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                    c_tax_ID = GetTaxFromLocation(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                     if (c_tax_ID > 0)
                                     {
                                         SetC_Tax_ID(c_tax_ID);
@@ -801,7 +802,7 @@ namespace VAdvantage.Model
                                             }
                                             else
                                             {
-                                                c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                                c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                                 if (c_tax_ID > 0)
                                                 {
                                                     SetC_Tax_ID(c_tax_ID);
@@ -811,7 +812,7 @@ namespace VAdvantage.Model
                                         }
                                         else
                                         {
-                                            c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                            c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                             if (c_tax_ID > 0)
                                             {
                                                 SetC_Tax_ID(c_tax_ID);
@@ -821,7 +822,7 @@ namespace VAdvantage.Model
                                     }
                                     else
                                     {
-                                        c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal);
+                                        c_tax_ID = GetTaxFromRegion(inv.IsSOTrx(), taxCategory, Country_ID, Region_ID, Postal, orgRegion);
                                         if (c_tax_ID > 0)
                                         {
                                             SetC_Tax_ID(c_tax_ID);
@@ -947,22 +948,33 @@ namespace VAdvantage.Model
             return C_Tax_ID;
         }
 
-        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromLocation(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
             if (String.IsNullOrEmpty(Postal))
             {
-                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
-                    " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                    " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                         LEFT JOIN C_Tax tx ON (tcr.C_Tax_ID = tx.C_Tax_ID)
+                         WHERE tcr.C_TaxCategory_ID ={taxCategory }
+                         AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' 
+                         AND tcr.C_Country_ID = { Country_ID } AND NVL(tcr.C_Region_ID,0) = { Region_ID }
+                         AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
-                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
-                    " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
-                    " AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" +
-                    " END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr
+                         LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID 
+                         WHERE tcr.C_TaxCategory_ID = { taxCategory }
+                         AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = { Country_ID } 
+                         AND NVL(tcr.C_Region_ID,0) = { Region_ID }
+                         AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" +
+                        " END ELSE CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1" +
+                        " AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
             if (C_Tax_ID > 0)
@@ -973,16 +985,24 @@ namespace VAdvantage.Model
             {
                 if (String.IsNullOrEmpty(Postal))
                 {
-                    sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
-                        " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                             LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                            " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID +
+                            " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
-                    sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
-                        " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal +
-                        "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" + " END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                             LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID 
+                             WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                            " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID +
+                            " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '" + Postal +
+                            "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2" + " END ELSE CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
+                            + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                 if (C_Tax_ID > 0)
@@ -993,37 +1013,79 @@ namespace VAdvantage.Model
                 {
                     if (!String.IsNullOrEmpty(Postal))
                     {
-                        sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
-                            " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID IS NULL " + " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '"
-                            + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                            + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                                 LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID 
+                                 WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                                " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID IS NULL " +
+                                " AND tcr.C_Region_ID IS NULL AND (CASE WHEN (tcr.vatax_ispostal = 'Y') THEN CASE WHEN tcr.postal <= '"
+                                + Postal + "' AND tcr.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE CASE WHEN tcr.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
+                                + (isSoTrx ? 'S' : 'P') + "') ";
+                        sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                     }
                     if (C_Tax_ID > 0)
                     {
                         return C_Tax_ID;
                     }
+                    else
+                    {
+                        // VIS0045: Changes done to get Tax Rate when not available with Postal code.
+                        sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                            " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND NVL(tcr.C_Region_ID,0) = " + Region_ID +
+                            " AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ";
+                        sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
+                        C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                        if (C_Tax_ID > 0)
+                        {
+                            return C_Tax_ID;
+                        }
+                        else
+                        {
+                            sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID =" + taxCategory +
+                                " AND tcr.IsActive = 'Y' AND tcr.VATAX_TaxBase = 'L' AND tcr.C_Country_ID = " + Country_ID + " AND tcr.C_Region_ID IS NULL AND tcr.Postal IS NULL AND tx.SOPOType IN ('B','"
+                                + (isSoTrx ? 'S' : 'P') + "') ";
+                            sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
+                            C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                            if (C_Tax_ID > 0)
+                            {
+                                return C_Tax_ID;
+                            }
+                        }
+                    }
                 }
             }
             return C_Tax_ID;
         }
 
-        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal)
+        private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int OrgRegion_ID)
         {
             string sql = "";
             int C_Tax_ID = 0;
             if (String.IsNullOrEmpty(Postal))
             {
-                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
-                + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                        LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID 
+                        LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                        + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID +
+                        " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
+                        " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             else
             {
-                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
-                + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
-                " AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '" + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '"
-                + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                        LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID 
+                        LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                        + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID +
+                        " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
+                        " AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '" + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '"
+                        + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                sql += " ORDER BY tx.SOPOType DESC";
             }
             C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
             if (C_Tax_ID > 0)
@@ -1034,16 +1096,22 @@ namespace VAdvantage.Model
             {
                 if (String.IsNullOrEmpty(Postal))
                 {
-                    sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                    sql = $@"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr 
+                            LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID 
+                            LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID +
-                    " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "')";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 else
                 {
                     sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                     + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '"
                     + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                    + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                    + (isSoTrx ? 'S' : 'P') + "') ";
+                    sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                    sql += " ORDER BY tx.SOPOType DESC";
                 }
                 C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                 if (C_Tax_ID > 0)
@@ -1057,17 +1125,70 @@ namespace VAdvantage.Model
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
                         + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID IS NULL AND trl.C_Region_ID IS NULL AND (CASE WHEN (trl.vatax_ispostal = 'Y') THEN CASE WHEN trl.postal <= '"
                         + Postal + "' AND trl.postal_to >= '" + Postal + "' THEN 1 ELSE 2 END ELSE  CASE WHEN trl.postal = '" + Postal + "' THEN 1 ELSE 2 END END) = 1 AND tx.SOPOType IN ('B','"
-                        + (isSoTrx ? 'S' : 'P') + "') ORDER BY tx.SOPOType DESC";
+                        + (isSoTrx ? 'S' : 'P') + "') ";
+                        sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                        sql += " ORDER BY tx.SOPOType DESC";
                         C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
 
                         if (C_Tax_ID > 0)
                         {
                             return C_Tax_ID;
                         }
+                        else
+                        {
+                            // VIS0045: Changes done to get Tax Rate when not available with Postal code.
+                            sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                            + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND NVL(trl.C_Region_ID,0) = " + Region_ID +
+                            " AND trl.Postal IS NULL AND tx.SOPOType IN ('B','" + (isSoTrx ? 'S' : 'P') + "') ";
+                            sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                            sql += " ORDER BY tx.SOPOType DESC";
+                            C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                            if (C_Tax_ID > 0)
+                            {
+                                return C_Tax_ID;
+                            }
+                            else
+                            {
+                                sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxCatRate tcr LEFT JOIN VATAX_TaxRegionLine trl ON tcr.VATAX_TaxRegion_ID = trl.VATAX_TaxRegion_ID LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.C_TaxCategory_ID = "
+                                + taxCategory + " AND tcr.VATAX_TaxBase = 'R' AND tcr.IsActive = 'Y' AND trl.C_Country_ID = " + Country_ID + " AND trl.C_Region_ID IS NULL AND trl.Postal IS NULL AND tx.SOPOType IN ('B','"
+                                + (isSoTrx ? 'S' : 'P') + "') ";
+                                sql += TaxWhereClauseIndianLoc(Region_ID, OrgRegion_ID);
+                                sql += " ORDER BY tx.SOPOType DESC";
+                                C_Tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                                if (C_Tax_ID > 0)
+                                {
+                                    return C_Tax_ID;
+                                }
+                            }
+                        }
                     }
                 }
             }
             return C_Tax_ID;
+        }
+
+        /// <summary>
+        /// This function is used to create Where Clause for Indian Localization for Tax category
+        /// </summary>
+        /// <param name="Region_ID">Business Partner Region ID</param>
+        /// <param name="OrgRegion_ID">Organization Region ID</param>
+        /// <author>VIS_0045</author>
+        /// <returns>Where Clause</returns>
+        public static string TaxWhereClauseIndianLoc(int Region_ID, int OrgRegion_ID)
+        {
+            string whereClause = string.Empty;
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                if (Region_ID != 0 && OrgRegion_ID != 0 && Region_ID != OrgRegion_ID)
+                {
+                    whereClause = " AND tx.VA106_GSTTaxType = '03'";
+                }
+                else if (Region_ID != 0 && OrgRegion_ID != 0 && Region_ID == OrgRegion_ID)
+                {
+                    whereClause = " AND NVL(tx.VA106_GSTTaxType, ' ') != '03'";
+                }
+            }
+            return whereClause;
         }
 
         private int GetTaxFromRegion(bool isSoTrx, int taxCategory, int Country_ID, int Region_ID, string Postal, int taxRegion, int toCountry)
@@ -2968,6 +3089,176 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// This function is used to create Transaction Entry against Invoice line
+        /// </summary>
+        /// <param name="ProductCost">product Cost</param>
+        /// <param name="InOutLine">Inout Line Reference</param>
+        /// <param name="M_Locator_ID">Locator</param>
+        /// <param name="M_CostElement_ID">Defined product Cost Element ID</param>
+        /// <param name="CostingLevel">Defined Costing Level on Product</param>
+        /// <author>VIS_0045: 31-Dec-2024</author>
+        /// <returns>Error Message (if any)</returns>
+        public string CreateTransactionEntry(decimal ProductCost, MInOutLine InOutLine, int M_Locator_ID, int M_CostElement_ID, string CostingLevel, CostingCheck costingCheck, out int ID)
+        {
+            ID = 0;
+            if (InOutLine == null && M_Locator_ID == 0)
+            {
+                log.Log(Level.SEVERE, "Invoice Line: Locator not found for Vendor Invoice Transaction Creation " + GetC_InvoiceLine_ID());
+                return "";
+            }
+            MTransaction objTransaction = null;
+            objTransaction = new MTransaction(GetCtx(), 0, Get_Trx());
+            objTransaction.SetAD_Client_ID(GetAD_Client_ID());
+            objTransaction.SetAD_Org_ID(GetAD_Org_ID());
+            objTransaction.SetMovementDate(this._parent.GetDateInvoiced());
+            if (InOutLine != null && InOutLine.GetM_InOutLine_ID() > 0)
+            {
+                objTransaction.SetM_Locator_ID(InOutLine.GetM_Locator_ID());
+                if (InOutLine.GetM_ProductContainer_ID() > 0)
+                {
+                    objTransaction.SetM_ProductContainer_ID(InOutLine.GetM_ProductContainer_ID());
+                }
+            }
+            else if (Get_ValueAsInt("Ref_InvoiceLineOrg_ID") > 0) /* For Treat as Discount */
+            {
+                objTransaction.SetM_Locator_ID(M_Locator_ID);
+            }
+            objTransaction.Set_ValueNoCheck("MovementType", "VI");
+            objTransaction.SetM_Product_ID(GetM_Product_ID());
+            objTransaction.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
+            objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
+            if (!Util.GetValueOfBool(this._parent.Get_Value("VAS_IsLandedCost")))
+            {
+                objTransaction.SetMovementQty(GetQtyInvoiced());
+                objTransaction.SetCurrentQty(0);
+                objTransaction.SetContainerCurrentQty(0);
+            }
+            else
+            {
+                objTransaction.Set_Value("VAS_IsLandedCost", true);
+            }
+            objTransaction.Set_Value("CostingLevel", CostingLevel);
+            objTransaction.Set_Value("M_CostElement_ID", M_CostElement_ID);
+            objTransaction.Set_Value("ProductCost", ProductCost);
+            if (costingCheck.DifferenceAmtPOandInvInBaseCurrency != 0)
+            {
+                if (costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Fifo) ||
+                    costingCheck.materialCostingMethod.Equals(MProductCategory.COSTINGMETHOD_Lifo))
+                {
+                    if (costingCheck.currentQtyonQueue != 0)
+                    {
+                        objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+                    }
+                }
+                else if (costingCheck.onHandQty != 0)
+                {
+                    objTransaction.Set_Value("VAS_PostingCost", costingCheck.DifferenceAmtPOandInvInBaseCurrency);
+                }
+            }
+            if (costingCheck.ExpectedLandedCost != 0)
+            {
+                objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
+                objTransaction.SetMovementQty(costingCheck.Qty);
+            }
+            
+            // Is Invoice belong to treat as discount or not
+            if (Util.GetValueOfBool(this._parent.Get_Value("TreatAsDiscount")))
+            {
+                objTransaction.Set_Value("TreatAsDiscount", true);
+            }
+
+            // Is Credit Note Entry
+            if (Util.GetValueOfBool(this._parent.IsReturnTrx()))
+            {
+                objTransaction.Set_Value("VAS_IsCreditNote", true);
+            }
+
+            if (!objTransaction.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                string val = "";
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                log.Log(Level.SEVERE, "Transaction not created for Vendor Invoice" + val);
+                return Msg.GetMsg(GetCtx(), "VITrxNotSaved") + " " + (String.IsNullOrEmpty(val) ? "" : val); ;
+            }
+            else
+            {
+                ID = objTransaction.GetM_Transaction_ID();
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// Create Entry Landed cost (Difference value between Actual and Expected landed Cost) on Product Transaction Tab
+        /// </summary>
+        /// <param name="drLandedCost">Landed Cost Allocation line datarow</param>
+        /// <param name="CostingLevel">Product Costing Level</param>
+        /// <param name="costingCheck">Object of Costing Check Class</param>
+        /// <param name="ID">OUT Para - M_Transaction_ID</param>
+        /// <returns>error Message if any</returns>
+        public string CreateTransactionEntryForLandedCost(DataRow drLandedCost, string CostingLevel, CostingCheck costingCheck, out int ID)
+        {
+            ID = 0;
+            MTransaction objTransaction = null;
+            objTransaction = new MTransaction(GetCtx(), 0, Get_Trx());
+            objTransaction.SetAD_Client_ID(GetAD_Client_ID());
+            objTransaction.SetAD_Org_ID(GetAD_Org_ID());
+            objTransaction.SetMovementDate(this._parent.GetDateInvoiced());
+            if (Util.GetValueOfInt(drLandedCost["M_Locator_ID"]) != 0)
+            {
+                objTransaction.SetM_Locator_ID(Util.GetValueOfInt(drLandedCost["M_Locator_ID"]));
+            }
+            else
+            {
+                objTransaction.SetM_Locator_ID(MLocator.GetDefaultLocator(GetCtx(), Util.GetValueOfInt(drLandedCost["M_Warehouse_ID"])));
+            }
+            objTransaction.Set_ValueNoCheck("MovementType", "VI");
+            objTransaction.SetM_Product_ID(Util.GetValueOfInt(drLandedCost["M_Product_ID"]));
+            objTransaction.SetM_AttributeSetInstance_ID(Util.GetValueOfInt(drLandedCost["M_AttributeSetInstance_ID"]));
+            objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
+            objTransaction.Set_Value("CostingLevel", CostingLevel);
+            objTransaction.Set_Value("M_CostElement_ID", Util.GetValueOfInt(drLandedCost["M_CostElement_ID"]));
+            objTransaction.Set_Value("ProductCost", 0);
+            objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
+            if (GetReversalDoc_ID() > 0)
+            {
+                objTransaction.SetMovementQty(Util.GetValueOfDecimal(drLandedCost["Qty"]) > 0 ? -1 * Util.GetValueOfDecimal(drLandedCost["Qty"]) : Util.GetValueOfDecimal(drLandedCost["Qty"]));
+            }
+            else
+            {
+                objTransaction.SetMovementQty(Util.GetValueOfDecimal(drLandedCost["Qty"]));
+            }
+            objTransaction.Set_Value("VAS_IsLandedCost", true);
+            if (!objTransaction.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                string val = "";
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                log.Log(Level.SEVERE, "Transaction not created for Vendor Invoice" + val);
+                return Msg.GetMsg(GetCtx(), "VITrxNotSaved") + " " + (String.IsNullOrEmpty(val) ? "" : val); ;
+            }
+            else
+            {
+                ID = objTransaction.GetM_Transaction_ID();
+            }
+            return "";
+        }
+
+        /// <summary>
         /// This function is used for costing calculation
         /// It gives consolidated product cost (taxable amt + tax amount + surcharge amt) based on setting
         /// </summary>
@@ -3746,6 +4037,10 @@ namespace VAdvantage.Model
                     SetQtyInvoiced(GetQtyInvoiced());
 
                 //JID_1744 PriceList Precision should as per Price List Precision --> rather than currency precision
+                if (GetPriceList() == 0)
+                {
+                    SetPriceList(GetPriceActual());
+                }
                 if (newRecord || Is_ValueChanged("PriceList"))
                     SetPriceList(Decimal.Round(GetPriceList(), priceListPrcision, MidpointRounding.AwayFromZero));
 
@@ -4774,8 +5069,10 @@ namespace VAdvantage.Model
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
                                                 THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
                                                 ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
-                                              END) AS LineNetAmt , io.M_Warehouse_ID
-                            FROM C_InvoiceLine il INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
+                                              END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
+                            FROM C_InvoiceLine il 
+                            INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
+                            INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
                             INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
                             INNER JOIN c_tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID 
                             LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
@@ -4798,7 +5095,7 @@ namespace VAdvantage.Model
                             }
 
                             qry.Append(@" GROUP BY il.M_Product_ID, il.M_AttributeSetInstance_ID, io.M_Warehouse_ID 
-                                        ,  il.taxbaseamt , il.taxamt , il.surchargeamt , C_SurChargeTax.IsIncludeInCost , C_Tax.IsIncludeInCost, il.qtyinvoiced");
+                                        ,  il.taxbaseamt , il.taxamt , il.surchargeamt , C_SurChargeTax.IsIncludeInCost , C_Tax.IsIncludeInCost, il.qtyinvoiced, iol.M_Locator_ID");
 
                             ds = DB.ExecuteDataset(qry.ToString(), null, Get_TrxName());
 
@@ -4861,6 +5158,10 @@ namespace VAdvantage.Model
                                     {
                                         lca.SetM_Warehouse_ID(Util.GetValueOfInt(dr[i]["M_Warehouse_ID"]));
                                     }
+                                    if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                    {
+                                        lca.Set_Value("M_Locator_ID", Util.GetValueOfInt(dr[i]["M_Locator_ID"]));
+                                    }
 
                                     if (!lca.Save())
                                     {
@@ -4879,6 +5180,7 @@ namespace VAdvantage.Model
 
                                 log.Info("Inserted " + inserted);
                                 AllocateLandedCostRounding();
+                                SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                                 return "";
                             }
                             else
@@ -4917,6 +5219,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -4963,6 +5266,10 @@ namespace VAdvantage.Model
                             {
                                 lca.SetM_InOutLine_ID(iol.GetM_InOutLine_ID());
                             }
+                            if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                            {
+                                lca.Set_Value("M_Locator_ID", iol.GetM_Locator_ID());
+                            }
                             // get difference of (expected - actual) landed cost allocation amount if have
                             Decimal diffrenceAmt = 0;
                             if (iol.GetC_OrderLine_ID() > 0)
@@ -4990,6 +5297,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5088,6 +5396,10 @@ namespace VAdvantage.Model
                                 {
                                     lca.SetM_InOutLine_ID(iol.GetM_InOutLine_ID());
                                 }
+                                if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                {
+                                    lca.Set_Value("M_Locator_ID", iol.GetM_Locator_ID());
+                                }
                                 // get difference of (expected - actual) landed cost allocation amount if have
                                 if (iol.GetC_OrderLine_ID() > 0)
                                 {
@@ -5118,6 +5430,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5152,7 +5465,10 @@ namespace VAdvantage.Model
                             {
                                 lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                             }
-
+                            if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                            {
+                                lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                            }
                             if (!lca.Save())
                             {
                                 pp = VLogger.RetrieveError();
@@ -5165,6 +5481,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
 
@@ -5259,7 +5576,10 @@ namespace VAdvantage.Model
                                 {
                                     lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                                 }
-
+                                if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                                {
+                                    lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                                }
                                 if (!lca.Save())
                                 {
                                     pp = VLogger.RetrieveError();
@@ -5276,6 +5596,7 @@ namespace VAdvantage.Model
                             }
                             log.Info("Inserted " + inserted);
                             AllocateLandedCostRounding();
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         //	Single Product
@@ -5308,6 +5629,7 @@ namespace VAdvantage.Model
                                     return Msg.GetMsg(GetCtx(), "LandedCostAllocNotSaved");
                                 }
                             }
+                            SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
                             return "";
                         }
                         else
@@ -5407,8 +5729,10 @@ namespace VAdvantage.Model
                                         AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
                                         THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
                                         ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
-                                      END) AS LineNetAmt , io.M_Warehouse_ID
-                            FROM C_InvoiceLine il INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
+                                      END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
+                            FROM C_InvoiceLine il 
+                            INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
+                            INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
                             INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
                             INNER JOIN C_Tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID
                             LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
@@ -5494,7 +5818,10 @@ namespace VAdvantage.Model
                         {
                             lca.SetM_Warehouse_ID(Util.GetValueOfInt(dr[i]["M_Warehouse_ID"]));
                         }
-
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", Util.GetValueOfInt(dr[i]["M_Locator_ID"]));
+                        }
                         if (!lca.Save())
                         {
                             pp = VLogger.RetrieveError();
@@ -5626,6 +5953,10 @@ namespace VAdvantage.Model
                         if (lca.Get_ColumnIndex("M_InOutLine_ID") > 0)
                         {
                             lca.SetM_InOutLine_ID(inl.GetM_InOutLine_ID());
+                        }
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", inl.GetM_Locator_ID());
                         }
                         // get difference of (expected - actual) landed cost allocation amount if have
                         Decimal diffrenceAmt = 0;
@@ -5763,7 +6094,10 @@ namespace VAdvantage.Model
                         {
                             lca.SetM_Warehouse_ID(mov.GetM_Warehouse_ID() > 0 ? mov.GetM_Warehouse_ID() : loc.GetM_Warehouse_ID());
                         }
-
+                        if (lca.Get_ColumnIndex("M_Locator_ID") > 0)
+                        {
+                            lca.Set_Value("M_Locator_ID", loc.GetM_Locator_ID());
+                        }
                         if (Env.Signum(base1) != 0)
                         {
                             //result = Decimal.ToDouble(Decimal.Multiply(GetLineNetAmt(), base1));
@@ -5790,6 +6124,7 @@ namespace VAdvantage.Model
                 #endregion
                 log.Info("Inserted " + inserted);
                 AllocateLandedCostRounding();
+                SetVAS_IsLandedCost(GetC_InvoiceLine_ID());
             }
             catch (Exception ex)
             {
@@ -5797,7 +6132,15 @@ namespace VAdvantage.Model
             }
             return "";
         }
-
+        /// <summary>
+        /// This Function is used to set VAS_IsLandedCost true on invoice line
+        /// </summary>
+        /// <param name="C_InvoiceLine_ID">C_InvoiceLine_ID</param>
+        /// <author>VIS_427</author>
+        public void SetVAS_IsLandedCost(int C_InvoiceLine_ID)
+        {
+            DB.ExecuteQuery(@"UPDATE C_InvoiceLine SET VAS_IsLandedCost='Y' WHERE C_InvoiceLine_ID=" + C_InvoiceLine_ID, null, Get_Trx());
+        }
         /// <summary>
         /// This function is used to get difference value between expecetd landed cost and actual landed cost invoice
         /// </summary>
@@ -5835,11 +6178,11 @@ namespace VAdvantage.Model
                 differenceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["Amt"]);
 
                 // Convert Expected landed cost amount from his currency to invoice currency
-                if (dsInvoice != null && dsInvoice.Tables[0].Rows.Count > 0 && 
+                if (dsInvoice != null && dsInvoice.Tables[0].Rows.Count > 0 &&
                     Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != 0 &&
                     Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]) != Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]))
                 {
-                    differenceAmt = MConversionRate.Convert(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
+                    differenceAmt = MConversionRate.ConvertCostingPrecision(GetCtx(), differenceAmt, Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]),
                                 Util.GetValueOfInt(dsInvoice.Tables[0].Rows[0]["C_Currency_ID"]),
                                 Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateAcct"]),
                                 Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]), lc.GetAD_Client_ID(), lc.GetAD_Org_ID());

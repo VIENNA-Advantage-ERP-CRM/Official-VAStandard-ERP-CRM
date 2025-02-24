@@ -29,6 +29,7 @@ using System.Net.Http.Headers;
 using com.sun.xml.@internal.bind.v2.schemagen.xmlschema;
 using VAdvantage.ProcessEngine;
 using ModelLibrary.Classes;
+using QRCoder;
 
 namespace VAdvantage.Model
 {
@@ -636,6 +637,12 @@ namespace VAdvantage.Model
             SetFreightCostRule(original.GetFreightCostRule());
             SetFreightAmt(original.GetFreightAmt());
             SetSalesRep_ID(original.GetSalesRep_ID());
+
+            // VIS0060: Set Locator value to new document
+            if (original.Get_ValueAsInt("M_Locator_ID") > 0)
+            {
+                Set_Value("M_Locator_ID", original.Get_ValueAsInt("M_Locator_ID"));
+            }
             //
             SetC_Activity_ID(original.GetC_Activity_ID());
             SetC_Campaign_ID(original.GetC_Campaign_ID());
@@ -966,12 +973,12 @@ namespace VAdvantage.Model
                 line.Set_ValueNoCheck("M_InOutLine_ID", I_ZERO);	//	new
                 //	Reset
                 if (!setOrder)
-                    line.SetC_OrderLine_ID(0);
+                    line.SetC_OrderLine_ID(0);                
                 // SI_0642 : when we reverse MR or Customer Return, at that tym - on Save - system also check - qty availablity agaisnt same attribute 
                 // on storage. If we set ASI as 0, then system not find qty and not able to save record
                 if (!counter && !IsReversal())
                     line.SetM_AttributeSetInstance_ID(0);
-                //	line.setS_ResourceAssignment_ID(0);
+                //	line.setS_ResourceAssignment_ID(0);                
                 line.SetRef_InOutLine_ID(0);
                 line.SetIsInvoiced(false);
                 //
@@ -988,6 +995,7 @@ namespace VAdvantage.Model
                 //
                 if (counter)
                 {
+                    line.SetLine(fromLine.GetLine());
                     line.SetC_OrderLine_ID(0);
                     line.SetRef_InOutLine_ID(fromLine.GetM_InOutLine_ID());
                     if (fromLine.GetC_OrderLine_ID() != 0)
@@ -1000,12 +1008,18 @@ namespace VAdvantage.Model
                 //
                 if (IsReversal())
                 {
+                    line.SetLine(fromLine.GetLine());
+                    if (line.Get_ColumnIndex("IsFutureCostCalculated") > 0)
+                    {
+                        line.SetIsFutureCostCalculated(false);
+                    }
                     line.SetQtyEntered(Decimal.Negate(line.GetQtyEntered()));
                     line.SetMovementQty(Decimal.Negate(line.GetMovementQty()));
                     if (line.Get_ColumnIndex("ReversalDoc_ID") > 0)
                     {
                         line.SetReversalDoc_ID(fromLine.GetM_InOutLine_ID());
                     }
+                    line.SetM_AttributeSetInstance_ID(fromLine.GetM_AttributeSetInstance_ID());
                     // to set OrderLine in case of reversal if it is available 
                     line.SetC_OrderLine_ID(fromLine.GetC_OrderLine_ID());
                     //set container reference(if, not a copy record)
@@ -1706,7 +1720,72 @@ namespace VAdvantage.Model
                 }
             }
 
+            // VIS0060: Work done to save QR code information on Delivery Order header for Delivery Order Print.
+            if (newRecord && IsSOTrx() && GetC_Order_ID() > 0)
+            {
+                int ImageID = GenerateQRImage();
+                if (ImageID > 0)
+                {
+                    if (DB.ExecuteQuery("UPDATE M_InOut SET AD_Image_ID = " + ImageID + " WHERE M_InOut_ID = " + GetM_InOut_ID()) < 0)
+                    {
+                        log.Info(Msg.GetMsg(GetCtx(), "VAS_QRImageNotUpdated"));
+                    }
+                }
+            }
             return success;
+        }
+
+        /// <summary>
+        /// Genarate QR Code Image from Sales Order Information.
+        /// </summary>
+        /// <returns>Image ID</returns>
+        private int GenerateQRImage()
+        {
+            string sql = @"SELECT o.DocumentNo, o.DateOrdered, o.DatePromised, cb.Name, cl.Name AS Location, o.GrandTotal, cy.ISO_Code,
+                    (CASE WHEN l.Address1 IS NOT NULL THEN l.Address1 ||', ' END || CASE WHEN l.Address2 IS NOT NULL THEN l.Address2 ||', ' END 
+                    || CASE WHEN l.City IS NOT NULL THEN l.City || ', ' END || CASE WHEN l.Postal IS NOT NULL THEN l.Postal ||', ' END
+                    || CASE WHEN l.RegionName IS NOT NULL THEN l.RegionName || ', ' END || c.Name) AS Address
+                    FROM C_Order o INNER JOIN C_BPartner cb ON (o.C_BPartner_ID = cb.C_BPartner_ID)
+                    INNER JOIN C_BPartner_Location cl ON (o.C_BPartner_Location_ID = cl.C_BPartner_Location_ID)
+                    INNER JOIN C_Location l ON (cl.C_Location_ID = l.C_Location_ID)
+                    INNER JOIN C_Country c ON (l.C_Country_ID = c.C_Country_ID)
+                    INNER JOIN C_Currency cy ON (cy.C_Currency_ID = o.C_Currency_ID)
+                    WHERE o.C_Order_ID = " + GetC_Order_ID();
+            DataSet ds = DB.ExecuteDataset(sql, null, Get_Trx());
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                string Value = Msg.GetMsg(GetCtx(), "VAS_OrderDetails") + "\n\n" +
+                Msg.GetMsg(GetCtx(), "VAS_OrderNO") + Util.GetValueOfString(ds.Tables[0].Rows[0]["DocumentNo"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_OrderDate") + Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateOrdered"]).Value.ToShortDateString() + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_PromiseDate") + Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DatePromised"]).Value.ToShortDateString() + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_CustomerName") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Name"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_CustomerAddress") + Util.GetValueOfString(ds.Tables[0].Rows[0]["Address"]) + "\n" +
+                Msg.GetMsg(GetCtx(), "VAS_GrandTotal") + Util.GetValueOfString(ds.Tables[0].Rows[0]["ISO_Code"]) + " " +
+                DisplayType.GetNumberFormat(DisplayType.Amount).GetFormatAmount(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["GrandTotal"]), GetCtx().GetContext("#ClientLanguage"));
+
+
+                // Generate QR code                
+                QRCodeGenerator qrGenerator = new QRCodeGenerator();
+                QRCodeData qrCodeData = qrGenerator.CreateQrCode(Value, QRCodeGenerator.ECCLevel.Q);
+                PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
+                byte[] qrCodeImage = qrCode.GetGraphic(20);
+                if (qrCodeImage != null)
+                {
+                    MImage img = new MImage(GetCtx(), 0, Get_Trx());
+                    img.SetClientOrg(this);
+                    img.ByteArray = qrCodeImage;
+                    img.ImageFormat = ".png";
+                    img.SetBinaryData(qrCodeImage);
+                    img.SetName(GetDocumentNo());
+                    img.SetImageURL(string.Empty);
+                    if (!img.Save())
+                    {
+                        return 0;
+                    }
+                    return img.GetAD_Image_ID();
+                }
+            }
+            return 0;
         }
 
         /****
@@ -2050,9 +2129,9 @@ namespace VAdvantage.Model
                                 {
                                     sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                            " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
-                                            " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
-                                            " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
+                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                        " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
+                                        " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
                                 decimal qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
                                 decimal qtyToMove = iol.GetMovementQty();
@@ -2075,7 +2154,7 @@ namespace VAdvantage.Model
                                 {
                                     sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                            " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
                                             " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
                                             " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
@@ -2288,7 +2367,7 @@ namespace VAdvantage.Model
                                         AND NVL(M_InOutLine.M_AttributeSetInstance_ID, 0) = NVL(M_Storage.M_AttributeSetInstance_ID, 0))
                                         LEFT JOIN C_OrderLine ON M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID
                                         LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
-                                        WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID());
+                                        WHERE M_InOut.M_InOut_ID = " + GetM_InOut_ID(), null, Get_Trx());
 
             //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
             if (IsSOTrx() && IsReturnTrx())
@@ -2299,7 +2378,7 @@ namespace VAdvantage.Model
                                         INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
                                         INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
                                         INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
-                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}");
+                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null , Get_Trx());
             }
 
             //	Outstanding (not processed) Incoming Confirmations ?
@@ -2426,7 +2505,7 @@ namespace VAdvantage.Model
                             if (IsSOTrx() && pc.GetA_Asset_Group_ID() > 0 && sLine.GetA_Asset_ID() == 0)
                             {
                                 _processMsg = "AssetNotSetONShipmentLine: LineNo" + sLine.GetLine() + " :-->" + sLine.GetDescription();
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                         else
@@ -2434,7 +2513,7 @@ namespace VAdvantage.Model
                             if (IsSOTrx() && !IsReturnTrx() && pc.GetA_Asset_Group_ID() > 0 && sLine.GetA_Asset_ID() == 0 && !Env.IsModuleInstalled("VA077_"))
                             {
                                 _processMsg = "AssetNotSetONShipmentLine: LineNo" + sLine.GetLine() + " :-->" + sLine.GetDescription();
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                     }
@@ -2444,7 +2523,7 @@ namespace VAdvantage.Model
                         {
                             if (!UpdateAssetValues(sLine))
                             {
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                         }
                     }
@@ -2464,7 +2543,7 @@ namespace VAdvantage.Model
                         {
                             log.Warning("Warehouse , quantity allocated is not saved");
                             _processMsg = "Warehouse , quantity allocated is not saved";
-                            return DocActionVariables.STATUS_INPROGRESS;
+                            return DocActionVariables.STATUS_INVALID;
                         }
                     }
                 }
@@ -2692,8 +2771,8 @@ namespace VAdvantage.Model
                             sql.Clear();
                             sql.Append(@"SELECT DISTINCT First_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                   " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + sLine.GetM_Locator_ID() +
-                               " AND t.M_Product_ID = " + sLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + ma.GetM_AttributeSetInstance_ID());
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + sLine.GetM_Locator_ID() +
+                            " AND t.M_Product_ID = " + sLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + ma.GetM_AttributeSetInstance_ID());
                             trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
                             // get container Current qty from transaction
@@ -2903,8 +2982,8 @@ namespace VAdvantage.Model
                         sql.Clear();
                         sql.Append(@"SELECT DISTINCT FIRST_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                             INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                               " AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + sLine.GetM_Locator_ID() +
-                           " AND t.M_Product_ID = " + sLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + sLine.GetM_AttributeSetInstance_ID());
+                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + sLine.GetM_Locator_ID() +
+                            " AND t.M_Product_ID = " + sLine.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + sLine.GetM_AttributeSetInstance_ID());
                         trxQty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
 
                         if (isContainrApplicable && sLine.Get_ColumnIndex("M_ProductContainer_ID") >= 0)
@@ -3283,6 +3362,10 @@ namespace VAdvantage.Model
                         {
                             currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                 sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
+                            if (currentCostPrice != 0)
+                            {
+                                query.Append(" ProductApproxCost = " + currentCostPrice);
+                            }
                         }
                         else // Material Receipt 
                         {
@@ -3358,7 +3441,8 @@ namespace VAdvantage.Model
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                       @" END , IsCostImmediate = 'Y' , 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END, 
+                                                     VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                 WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
@@ -3374,6 +3458,8 @@ namespace VAdvantage.Model
                                     }
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -3448,7 +3534,9 @@ namespace VAdvantage.Model
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' ,
                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                      @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@"
+                                                     ,VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
@@ -3464,6 +3552,9 @@ namespace VAdvantage.Model
                                     }
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                    query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
 
@@ -3544,6 +3635,13 @@ namespace VAdvantage.Model
                                                     DB.ExecuteQuery("UPDATE M_Transaction SET ProductCost = " + currentCostPrice +
                                                         @" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID, null, Get_Trx());
                                                 }
+
+                                                // Create Transaction Entry for Vendor Invoice
+                                                _processMsg = invoiceLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                if (!string.IsNullOrEmpty(_processMsg))
+                                                {
+                                                    return DocActionVariables.STATUS_INVALID;
+                                                }
                                             }
                                         }
                                         #endregion
@@ -3554,6 +3652,9 @@ namespace VAdvantage.Model
                         }
                         else if (!IsSOTrx() && IsReturnTrx()) // Return To Vendor
                         {
+                            costingCheck.IsPOCostingethodBindedonProduct = MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(),
+                                                                        productCQ.GetM_Product_ID(), Get_Trx());
+
                             if (GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
                             {
                                 #region Return To Vendor -- without order refernce
@@ -3588,7 +3689,11 @@ namespace VAdvantage.Model
                                     currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                                         sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                                      @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                            $@" END , IsCostImmediate = 'Y',
+                                                            VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
+                                                     PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
+                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
+                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
                                     if (!query.ToString().Contains("ProductApproxCost"))
@@ -3598,6 +3703,8 @@ namespace VAdvantage.Model
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -3670,7 +3777,11 @@ namespace VAdvantage.Model
                                     currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                                       sLine.GetM_Product_ID(), sLine.GetM_AttributeSetInstance_ID(), Get_Trx(), GetM_Warehouse_ID());
                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
-                                                 @" END , IsCostImmediate = 'Y' WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                        $@" END , IsCostImmediate = 'Y', 
+                                                        VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}, 
+                                                     PostCurrentCostPrice = CASE WHEN 1 = " + (costingCheck.IsPOCostingethodBindedonProduct.Value ? 1 : 0) +
+                                                     @" THEN " + currentCostPrice + $@" ELSE PostCurrentCostPrice END 
+                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                     // Transaction Update Query
                                     if (!query.ToString().Contains("ProductApproxCost"))
@@ -3680,6 +3791,8 @@ namespace VAdvantage.Model
                                     query.Append(" , ProductCost = " + currentCostPrice);
                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                    //22-Jan-2025, Update posting Cost on Transaction
+                                    query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                 }
@@ -4126,6 +4239,8 @@ namespace VAdvantage.Model
                 }
                 else // Customer Return
                 {
+                    costingCheck.VAS_IsDOCost = Util.GetValueOfBool(client.Get_Value("VAS_IsDOCost"));
+
                     if (sLine.GetC_OrderLine_ID() == 0)
                     {
                         currentCostPrice = MCost.GetproductCostAndQtyMaterial(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
@@ -4135,11 +4250,25 @@ namespace VAdvantage.Model
                     {
                         //VIS_045: 04/Oct/2023, DevOps Task ID:2495 --> Get Cost Detail from the Original Document of Ship/Receipt
                         // and update it on Return Document
-                        DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + sLine.GetM_InOutLine_ID());
-                        if (dr != null && dr.Length > 0)
+                        if (!costingCheck.VAS_IsDOCost)
                         {
-                            currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                            currentCostPrice = MCost.GetproductCosts(sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
+                                                  sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, Get_Trx(), GetM_Warehouse_ID());
                         }
+                        else
+                        {
+                            DataRow[] dr = CostOnOriginalDoc.Tables[0].Select("M_InOutLine_ID = " + sLine.GetM_InOutLine_ID());
+                            if (dr != null && dr.Length > 0)
+                            {
+                                currentCostPrice = Util.GetValueOfDecimal(dr[0]["CurrentCostPrice"]);
+                            }
+                        }
+                    }
+
+                    //22-Jan-2025, When we do Customer Return then reverse the impact with the same price
+                    if (IsReversal() && costingCheck.VAS_IsDOCost)
+                    {
+                        currentCostPrice = sLine.GetCurrentCostPrice();
                     }
                 }
                 DB.ExecuteQuery("UPDATE M_InOutLine SET CurrentCostPrice = " + currentCostPrice +
@@ -4192,7 +4321,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        if (costingMethod != "")
+                        if (!string.IsNullOrEmpty(costingMethod))
                         {
                             currentCostPrice = MCost.GetLifoAndFifoCurrentCostFromCostQueueTransaction(GetCtx(), sLine.GetAD_Client_ID(), sLine.GetAD_Org_ID(),
                                 sLine.GetM_Product_ID(), costingCheck.M_ASI_ID, 0, sLine.GetM_InOutLine_ID(), costingMethod,
@@ -4213,6 +4342,8 @@ namespace VAdvantage.Model
                         query.Append(" , ProductCost = " + currentCostPrice);
                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                     }
@@ -4237,7 +4368,8 @@ namespace VAdvantage.Model
 
                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ, costingCheck.M_ASI_ID,
                           "Customer Return", null, sLine, null, null, null,
-                          Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Qty),
+                          Decimal.Multiply(costingCheck.VAS_IsDOCost ? currentCostPrice :
+                          Decimal.Divide(ProductOrderLineCost, orderLine.GetQtyOrdered()), Qty),
                           Qty, Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                     {
                         if (!conversionNotFoundInOut1.Contains(conversionNotFoundInOut))
@@ -4264,7 +4396,7 @@ namespace VAdvantage.Model
                     }
                     else
                     {
-                        if (costingMethod != "")
+                        if (!string.IsNullOrEmpty(costingMethod))
                         {
                             if (sLine.GetC_OrderLine_ID() == 0)
                             {
@@ -4291,6 +4423,8 @@ namespace VAdvantage.Model
                         query.Append(" , ProductCost = " + currentCostPrice);
                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                        //22-Jan-2025, Update posting Cost on Transaction
+                        query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                     }
@@ -4711,14 +4845,14 @@ namespace VAdvantage.Model
                 {
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty , NVL(ContainerCurrentQty, 0) AS ContainerCurrentQty  ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id ,  MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true)
-                              + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + sLine.GetM_AttributeSetInstance_ID()
+                              + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + sLine.GetM_AttributeSetInstance_ID()
                               + " ORDER BY movementdate ASC , m_transaction_id ASC, created ASC";
                 }
                 else
                 {
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty, NVL(ContainerCurrentQty, 0) AS ContainerCurrentQty ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id ,  MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true)
-                              + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
+                              + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
                               + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
                 ds = DB.ExecuteDataset(sql, null, Get_TrxName());
@@ -4928,7 +5062,7 @@ namespace VAdvantage.Model
                     //sql = "UPDATE M_Transaction SET CurrentQty = MovementQty + " + Qty + " WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true) + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + sLine.GetM_AttributeSetInstance_ID();
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id ,  MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true)
-                              + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + sLine.GetM_AttributeSetInstance_ID()
+                              + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = " + sLine.GetM_AttributeSetInstance_ID()
                               + " ORDER BY movementdate ASC , m_transaction_id ASC, created ASC";
                 }
                 else
@@ -4936,7 +5070,7 @@ namespace VAdvantage.Model
                     //sql = "UPDATE M_Transaction SET CurrentQty = MovementQty + " + Qty + " WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true) + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 ";
                     sql = @"SELECT M_AttributeSetInstance_ID ,  M_Locator_ID ,  M_Product_ID ,  movementqty ,  currentqty ,  movementdate ,  TO_CHAR(Created, 'DD-MON-YY HH24:MI:SS') , m_transaction_id ,  MovementType , M_InventoryLine_ID
                               FROM m_transaction WHERE movementdate >= " + GlobalVariable.TO_DATE(mtrx.GetMovementDate().Value.AddDays(1), true)
-                              + " AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
+                              + " AND MovementType NOT IN ('VI', 'IR') AND M_Product_ID = " + sLine.GetM_Product_ID() + " AND M_Locator_ID = " + sLine.GetM_Locator_ID() + " AND M_AttributeSetInstance_ID = 0 "
                               + " ORDER BY movementdate ASC , m_transaction_id ASC , created ASC";
                 }
                 //int countUpd = Util.GetValueOfInt(DB.ExecuteQuery(sql, null, Get_TrxName()));
@@ -5217,11 +5351,10 @@ namespace VAdvantage.Model
             Decimal result = 0;
             string sql = @"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS ContainerCurrentQty                           FROM M_Transaction t
                            WHERE t.MovementDate <=" + GlobalVariable.TO_DATE(movementDate, true) + @" 
-                           AND t.AD_Client_ID                       = " + line.GetAD_Client_ID() + @"
-                           AND t.M_Locator_ID                       = " + line.GetM_Locator_ID() + @"
-                           AND t.M_Product_ID                       = " + line.GetM_Product_ID() + @"
+                           AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + line.GetAD_Client_ID() + @"
+                           AND t.M_Locator_ID = " + line.GetM_Locator_ID() + " AND t.M_Product_ID = " + line.GetM_Product_ID() + @"
                            AND NVL(t.M_AttributeSetInstance_ID , 0) = COALESCE(" + line.GetM_AttributeSetInstance_ID() + @",0)
-                           AND NVL(t.M_ProductContainer_ID, 0)              = " + line.GetM_ProductContainer_ID();
+                           AND NVL(t.M_ProductContainer_ID, 0) = " + line.GetM_ProductContainer_ID();
             result = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             return result;
         }
@@ -6008,20 +6141,20 @@ namespace VAdvantage.Model
                 MInOutLine rLine = rLines[i];
                 //rLine.SetQtyEntered(Decimal.Negate(rLine.GetQtyEntered()));
                 //rLine.SetMovementQty(Decimal.Negate(rLine.GetMovementQty()));
-                rLine.SetM_AttributeSetInstance_ID(sLines[i].GetM_AttributeSetInstance_ID());
-                if (rLine.Get_ColumnIndex("IsFutureCostCalculated") > 0)
-                {
-                    rLine.SetIsFutureCostCalculated(false);
-                }
-                if (!rLine.Save(Get_TrxName()))
-                {
-                    pp = VLogger.RetrieveError();
-                    if (!String.IsNullOrEmpty(pp.GetName()))
-                        _processMsg = "Could not create Ship Reversal Line , " + pp.GetName();
-                    else
-                        _processMsg = "Could not create Ship Reversal Line";
-                    return false;
-                }
+                //rLine.SetM_AttributeSetInstance_ID(sLines[i].GetM_AttributeSetInstance_ID());
+                //if (rLine.Get_ColumnIndex("IsFutureCostCalculated") > 0)
+                //{
+                //    rLine.SetIsFutureCostCalculated(false);
+                //}
+                //if (!rLine.Save(Get_TrxName()))
+                //{
+                //    pp = VLogger.RetrieveError();
+                //    if (!String.IsNullOrEmpty(pp.GetName()))
+                //        _processMsg = "Could not create Ship Reversal Line , " + pp.GetName();
+                //    else
+                //        _processMsg = "Could not create Ship Reversal Line";
+                //    return false;
+                //}
                 //	We need to copy MA (bcz want to copy of material policy line from the actual record)
                 MInOutLineMA[] mas = MInOutLineMA.Get(GetCtx(), rLine.GetReversalDoc_ID(), Get_TrxName());
                 for (int j = 0; j < mas.Length; j++)

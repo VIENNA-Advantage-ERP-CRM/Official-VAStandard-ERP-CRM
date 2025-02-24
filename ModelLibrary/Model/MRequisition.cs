@@ -248,6 +248,16 @@ namespace VAdvantage.Model
                 }
             }
 
+            // VIS0060: Date Required should be greater than or equal to Document date.
+            if (GetDateDoc() != null && GetDateRequired() != null)
+            {
+                if (GetDateDoc().Value.Date > GetDateRequired().Value.Date)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_OrderDateGrtRequired"));
+                    return false;
+                }
+            }
+
             if (GetM_PriceList_ID() == 0)
             {
                 SetM_PriceList_ID();
@@ -324,7 +334,6 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_INVALID;
 
 
-
                 //	Std Period open?
                 if (!MPeriod.IsOpen(GetCtx(), GetDateDoc(), MDocBaseType.DOCBASETYPE_PURCHASEREQUISITION, GetAD_Org_ID()))
                 {
@@ -340,15 +349,14 @@ namespace VAdvantage.Model
                     return DocActionVariables.STATUS_INVALID;
                 }
 
-
-
                 //	Add up Amounts
                 int precision = MPriceList.GetStandardPrecision(GetCtx(), GetM_PriceList_ID());
                 Decimal totalLines = Env.ZERO;
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MRequisitionLine line = lines[i];
-                    Decimal lineNet = Decimal.Multiply(line.GetQty(), line.GetPriceActual());
+                    //VAI050-Price set according to qty enetered value
+                    Decimal lineNet = Decimal.Multiply(line.GetQtyEntered(), line.GetPriceActual());
                     lineNet = Decimal.Round(lineNet, precision);//, MidpointRounding.AwayFromZero);
                     if (lineNet.CompareTo(line.GetLineNetAmt()) != 0)
                     {
@@ -478,6 +486,20 @@ namespace VAdvantage.Model
 
                 if (Env.IsModuleInstalled("DTD001_"))
                 {
+                    int Sourcewhloc_id = GetSwhLocation(GetDTD001_MWarehouseSource_ID());
+                    int loc_id = GetLocation(GetM_Warehouse_ID());
+                    if (Sourcewhloc_id == 0)
+                    {
+                        _processMsg = Msg.GetMsg(GetCtx(), "DTD001_DefineSrcLocator"); //"Define Locator For That SourceWarehouse";
+                        return DocActionVariables.STATUS_INVALID;
+                    }
+                    
+                    if (loc_id == 0)
+                    {
+                        _processMsg = Msg.GetMsg(GetCtx(), "DTD001_DefineLocator"); //"Define Locator For That Warehouse";
+                        return DocActionVariables.STATUS_INVALID;
+                    }
+
                     MRequisitionLine[] lines = GetLines();
                     for (int i = 0; i < lines.Length; i++)
                     {
@@ -486,24 +508,7 @@ namespace VAdvantage.Model
                         if (line.GetM_Product_ID() > 0)
                             product = MProduct.Get(GetCtx(), line.GetM_Product_ID());
 
-                        int loc_id = GetLocation(GetM_Warehouse_ID());
-                        //new 6jan 1
-                        int Sourcewhloc_id = GetSwhLocation(GetDTD001_MWarehouseSource_ID());
-                        if (Sourcewhloc_id == 0)
-                        {       // JID_1098: done by Bharat on 31 Jan 2019, need to correct these messages
-                            _processMsg = Msg.GetMsg(GetCtx(), "DTD001_DefineSrcLocator"); //"Define Locator For That SourceWarehouse";
-                            return DocActionVariables.STATUS_INVALID;
-                        }
-                        //End
-                        if (loc_id == 0)
-                        {
-                            //return Msg.GetMsg(GetCtx(),"MMPM_DefineLocator");
-                            _processMsg = Msg.GetMsg(GetCtx(), "DTD001_DefineLocator"); //"Define Locator For That Warehouse";
-                            return DocActionVariables.STATUS_INVALID;
-                        }
-
                         Decimal difference = 0;
-
                         if (line.Get_ColumnIndex("QtyReserved") > 0)
                         {
                             difference = Decimal.Subtract(line.GetQty(), line.GetQtyReserved());
@@ -536,7 +541,6 @@ namespace VAdvantage.Model
                             storage = MStorage.Get(GetCtx(), loc_id, line.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(), Get_Trx());
                             if (storage == null)
                             {
-                                //MStorage.Add(GetCtx(), GetM_Warehouse_ID(), loc_id, line.GetM_Product_ID(), 0, 0, 0, 0, line.GetQty(), null);
                                 MStorage.Add(GetCtx(), GetM_Warehouse_ID(), loc_id, line.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(),
                                     line.GetM_AttributeSetInstance_ID(), (Decimal)0, (Decimal)0, (Decimal)0, difference, Get_Trx());
                             }

@@ -282,12 +282,15 @@ namespace VAdvantage.Model
             String sql = "";
             try
             {
+                //22-Jan-2025, handle Precision based on Costing Precision
                 sql = @"SELECT  
                             ROUND(SUM(ABS(M_CostQueueTransaction.MovementQty) * M_CostQueue.CurrentCostPrice) / 
-                                  SUM(ABS(M_CostQueueTransaction.MovementQty)), 10) As currentCost
-                            FROM M_CostQueue inner join M_CostQueueTransaction
-                            ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
+                                  SUM(ABS(M_CostQueueTransaction.MovementQty)), c.CostingPrecision) As currentCost
+                            FROM M_CostQueue 
+                            INNER JOIN M_CostQueueTransaction ON M_CostQueue.M_CostQueue_ID = m_costQueuetransaction.M_CostQueue_ID
                             INNER JOIN M_CostElement ON M_CostQueue.M_CostElement_ID = M_CostElement.M_CostElement_ID
+                            INNER JOIN C_AcctSchema asch ON (asch.C_AcctSchema_ID = M_CostQueue.C_AcctSchema_ID) 
+                            INNER JOIN C_Currency c ON (c.C_Currency_ID = asch.C_Currency_ID)
                             WHERE M_CostElement.costingMethod = '" + costingMethod + @"' AND M_CostQueueTransaction.MovementQty <> 0 
                             AND M_CostQueue.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM AD_ClientInfo WHERE AD_Client_ID =M_CostQueue.AD_Client_ID)";
                 if (WindowName == (int)windowName.M_InventoryLine_ID)
@@ -319,6 +322,7 @@ namespace VAdvantage.Model
                 {
                     sql += " AND VAMFG_M_WrkOdrTrnsctionLine_ID = " + RecordLine_ID;
                 }
+                sql += " GROUP BY c.CostingPrecision";
                 Cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
 
                 // added Freight Cost
@@ -2530,7 +2534,9 @@ namespace VAdvantage.Model
             SetCumulatedQty(Decimal.Add(GetCumulatedQty(), qty));
             if (Decimal.Add(GetCurrentQty(), qty) < 0)
             {
-                SetCurrentQty(0);
+                SetCurrentQty(Decimal.Add(GetCurrentQty(), qty));
+                //SetCurrentQty(0);
+                _log.Info("Costing Engine: Current Qty goes negative for Product ID : " + GetM_Product_ID());
             }
             else
             {

@@ -130,6 +130,7 @@
     <Compile Include="Models\Callouts\MVASContractModel.cs" />
     <Compile Include="Models\Callouts\MWarehouseModel.cs" />
     <Compile Include="Models\ForecastFormModel.cs" />
+    <Compile Include="Models\InventoryLinesModel.cs" />
     <Compile Include="Models\MChart.cs" />
     <Compile Include="Models\OrderLineTabPanelModel.cs" />
     <Compile Include="Models\PaymentAllocation.cs" />
@@ -140,6 +141,7 @@
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
+    <Compile Include="Models\VAS_PaymentWidgetModel.cs" />
     <Compile Include="Models\VAS_TimeSheetInvoice.cs" />
     <Compile Include="Models\VBOMDropModel.cs" />
     <Compile Include="Models\VChargeModel.cs" />

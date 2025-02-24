@@ -41,6 +41,9 @@ namespace ModelLibrary.Classes
         public PO po = null;
         public Decimal Price = 0, Qty = 0;
         public String costingMethod = String.Empty;
+        public string materialCostingMethod = string.Empty;
+        public int materialCostingElement = 0;
+        public bool IsQunatityValidated = true;
         public int costingElement = 0, M_CostType_ID = 0;
         public int definedCostingElement = 0; /* Costing Element ID against selected Costing Method on Product Category or Accounting Schema*/
         public int Lifo_ID = 0, Fifo_ID = 0;
@@ -61,6 +64,14 @@ namespace ModelLibrary.Classes
         public DataSet dsCostElement = null;
         public bool IsCostImmediate = false;
         public int precision = 2;
+
+        public decimal UnAllocatedLandedCost = 0;
+        public decimal RemaningQtyonFreight = 0;
+
+        public decimal ExpectedLandedCost = 0;
+        public decimal OrderLineAmtinBaseCurrency = 0;
+        public decimal DifferenceAmtPOandInvInBaseCurrency = 0;
+        public bool VAS_IsDOCost = false;
 
         /// <summary>
         /// Constructor
@@ -198,6 +209,21 @@ namespace ModelLibrary.Classes
             IsCostCalculationfromProcess = false;
             currentQtyonQueue = null;
             IsCostImmediate = false;
+
+            /*31-Dec-2024*/
+            Price = 0;
+            Qty = 0;
+            materialCostingMethod = string.Empty;
+            materialCostingElement = 0;
+            IsQunatityValidated = true;
+            UnAllocatedLandedCost = 0;
+            RemaningQtyonFreight = 0;
+
+            ExpectedLandedCost = 0;
+            OrderLineAmtinBaseCurrency = 0;
+            DifferenceAmtPOandInvInBaseCurrency = 0;
+            VAS_IsDOCost = false;
+
         }
 
         /// <summary>
@@ -216,6 +242,62 @@ namespace ModelLibrary.Classes
             {
                 trxname.Commit();
             }
+        }
+
+        /// <summary>
+        /// This function is used to get the linked Costing Method Details on Cost Combination
+        /// </summary>
+        /// <param name="costElementId">Cost Combination Element ID</param>
+        /// <param name="AD_Client_ID">Client ID</param>
+        /// <author>VIS_0045</author>
+        public void GetMaterialCostingMethodFroCombinaton(int costElementId, int AD_Client_ID)
+        {
+            query.Clear();
+            query.Append($@"SELECT  cel.M_Ref_CostElement, refEle.costingmethod 
+                             FROM M_CostElement ce 
+                             INNER JOIN m_costelementline cel ON (ce.M_CostElement_ID = cel.M_CostElement_ID) 
+                             INNER JOIN M_CostElement refEle ON (CAST(cel.M_Ref_CostElement AS INTEGER) = refEle.M_CostElement_ID AND refEle.costingmethod IS NOT NULL) 
+                             WHERE ce.AD_Client_ID = " + AD_Client_ID + @"
+                             AND ce.IsActive = 'Y' AND ce.CostElementType = 'C'
+                             AND cel.IsActive = 'Y' AND ce.M_CostElement_ID = " + costElementId + @"
+                             ORDER BY ce.M_CostElement_ID");
+            DataSet dsMaterial = DB.ExecuteDataset(query.ToString(), null, null);
+            if (dsMaterial != null && dsMaterial.Tables.Count > 0 && dsMaterial.Tables[0].Rows.Count > 0)
+            {
+                materialCostingMethod = Util.GetValueOfString(dsMaterial.Tables[0].Rows[0]["costingmethod"]);
+                materialCostingElement = Util.GetValueOfInt(dsMaterial.Tables[0].Rows[0]["M_Ref_CostElement"]);
+            }
+        }
+
+        /// <summary>
+        /// This function is used to Insert the Data into M_CostClosing for maintaining the closing details
+        /// </summary>
+        /// <param name="trx">Transaction</param>
+        /// <returns>Error Message (if any)</returns>
+        public string InsertCostClosing(Trx trx)
+        {
+            query.Clear();
+            query.Append($@"DELETE FROM M_COSTClosing WHERE TRUNC(created) = TRUNC(current_Date)");
+            DB.ExecuteQuery(query.ToString(), null, trx);
+
+            query.Clear();
+            query.Append($@"INSERT INTO M_CostClosing(
+                M_CostClosing_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, CREATED, CREATEDBY, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY,
+                DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, UPDATED,
+                UPDATEDBY, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE,A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID)
+            SELECT
+                M_Cost_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, Current_Date, {_ctx.GetAD_User_ID()}, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY, 
+                DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, Current_Date, 
+                {_ctx.GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE, A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID           
+            FROM M_Cost");
+            query.Append($@" WHERE AD_Client_ID = {_ctx.GetAD_Client_ID()} ");
+
+            int no = DB.ExecuteQuery(query.ToString(), null, trx);
+            if (no <= 0)
+            {
+                return Msg.GetMsg(_ctx, "VAS_CostClosingNotInserted");
+            }
+            return "";
         }
 
     }

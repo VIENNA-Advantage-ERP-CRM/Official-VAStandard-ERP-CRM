@@ -2375,6 +2375,26 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            /*VIS_0045: 05-Dec-2024 -> Filter the records with the reference of sales order when invoicerule is Prtail delivery
+            * and OtyDelivered is ZERO then return message on Ar Invoice window*/
+            if (IsSOTrx() && !IsReturnTrx())
+            {
+                int isNotDelivered = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(inv.C_InvoiceLine_ID) FROM C_Invoice i
+                         INNER JOIN C_InvoiceLine inv ON (i.C_Invoice_ID = inv.C_Invoice_ID)
+                         INNER JOIN C_Orderline ol ON (ol.C_Orderline_ID = inv.C_Orderline_ID) 
+                         INNER JOIN C_Order o ON (o.C_Order_ID = ol.C_Order_ID) 
+                         INNER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                         WHERE p.ProductType = 'I' AND NVL(ol.M_Product_ID, 0) > 0 
+                         AND o.InvoiceRule = {GlobalVariable.TO_STRING(MOrder.INVOICERULE_AfterDelivery)}  
+                         AND 0 = ol.QtyDelivered AND inv.C_Invoice_ID = " + GetC_Invoice_ID(), null, Get_TrxName()));
+                if (isNotDelivered > 0)
+                {
+                    _processMsg = Msg.GetMsg(GetCtx(), "VAS_InvRuleMissMatch-NotPartialDel");
+                    return DocActionVariables.STATUS_INVALID;
+                }
+            }
+
+
             //	Lines
             MInvoiceLine[] lines = GetLines(true);
             if (lines.Length == 0)
@@ -3170,7 +3190,24 @@ namespace VAdvantage.Model
 
                             if (!ol.Save(Get_TrxName()))
                             {
-                                _processMsg = "Could not update Order Line";
+                                ValueNamePair vp = VLogger.RetrieveError();
+                                string val = "";
+                                if (vp != null)
+                                {
+                                    val = vp.GetName();
+                                    if (String.IsNullOrEmpty(val))
+                                    {
+                                        val = vp.GetValue();
+                                    }
+                                }
+                                if (string.IsNullOrEmpty(val))
+                                {
+                                    _processMsg = "Could not update Order Line";
+                                }
+                                else
+                                {
+                                    _processMsg = val;
+                                }
                                 return DocActionVariables.STATUS_INVALID;
                             }
                         }
@@ -3203,7 +3240,24 @@ namespace VAdvantage.Model
 
                             if (!po.Save(Get_TrxName()))
                             {
-                                _processMsg = "Could not create PO Matching";
+                                ValueNamePair vp = VLogger.RetrieveError();
+                                string val = "";
+                                if (vp != null)
+                                {
+                                    val = vp.GetName();
+                                    if (String.IsNullOrEmpty(val))
+                                    {
+                                        val = vp.GetValue();
+                                    }
+                                }
+                                if (string.IsNullOrEmpty(val))
+                                {
+                                    _processMsg = "Could not create PO Matching";
+                                }
+                                else
+                                {
+                                    _processMsg = val;
+                                }
                                 return DocActionVariables.STATUS_INVALID;
                             }
                             else
@@ -3354,7 +3408,24 @@ namespace VAdvantage.Model
 
                             if (!inv.Save(Get_TrxName()))
                             {
-                                _processMsg = "Could not create Invoice Matching";
+                                ValueNamePair vp = VLogger.RetrieveError();
+                                string val = "";
+                                if (vp != null)
+                                {
+                                    val = vp.GetName();
+                                    if (String.IsNullOrEmpty(val))
+                                    {
+                                        val = vp.GetValue();
+                                    }
+                                }
+                                if (string.IsNullOrEmpty(val))
+                                {
+                                    _processMsg = "Could not create Invoice Matching";
+                                }
+                                else
+                                {
+                                    _processMsg = val;
+                                }
                                 return DocActionVariables.STATUS_INVALID;
                             }
                             else
@@ -3404,7 +3475,24 @@ namespace VAdvantage.Model
                                     }
                                     if (!asset.Save(Get_TrxName()))
                                     {
-                                        _processMsg = "Could not create Asset";
+                                        ValueNamePair vp = VLogger.RetrieveError();
+                                        string val = "";
+                                        if (vp != null)
+                                        {
+                                            val = vp.GetName();
+                                            if (String.IsNullOrEmpty(val))
+                                            {
+                                                val = vp.GetValue();
+                                            }
+                                        }
+                                        if (string.IsNullOrEmpty(val))
+                                        {
+                                            _processMsg = "Could not create Asset";
+                                        }
+                                        else
+                                        {
+                                            _processMsg = val;
+                                        }
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                     else
@@ -3423,7 +3511,24 @@ namespace VAdvantage.Model
                                     MAsset asset = new MAsset(this, line, noAssets);
                                     if (!asset.Save(Get_TrxName()))
                                     {
-                                        _processMsg = "Could not create Asset";
+                                        ValueNamePair vp = VLogger.RetrieveError();
+                                        string val = "";
+                                        if (vp != null)
+                                        {
+                                            val = vp.GetName();
+                                            if (String.IsNullOrEmpty(val))
+                                            {
+                                                val = vp.GetValue();
+                                            }
+                                        }
+                                        if (string.IsNullOrEmpty(val))
+                                        {
+                                            _processMsg = "Could not create Asset";
+                                        }
+                                        else
+                                        {
+                                            _processMsg = val;
+                                        }
                                         return DocActionVariables.STATUS_INVALID;
                                     }
                                     else
@@ -3838,7 +3943,9 @@ namespace VAdvantage.Model
                                                     DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' , IsCostError = 'N', 
                                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                                     VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@"  
+                                                                   , VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))} 
                                                                      WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
                                                     // Update Cost on Product transaction
@@ -3853,6 +3960,9 @@ namespace VAdvantage.Model
                                                         }
                                                         query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                                         query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                                        //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                                        query.Append(" , VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                                        query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                     }
                                                 }
@@ -3962,6 +4072,7 @@ namespace VAdvantage.Model
                                                         // update Post cost as 0 on inoutline
                                                         if (!isUpdatePostCurrentcostPriceFromMR)
                                                         {
+                                                            /* VIS_045: 03-Dec-2024, Not to set Current Cost as ZERO as per Surya 
                                                             no = DB.ExecuteQuery(@"UPDATE M_InOutLine SET PostCurrentCostPrice = 0 WHERE M_Inoutline_id IN 
                                                                                (SELECT M_Inoutline_id FROM M_MatchInvCostTrack WHERE 
                                                                                 Rev_C_InvoiceLine_ID =  " + line.GetC_InvoiceLine_ID() + " ) ", null, Get_Trx());
@@ -3975,6 +4086,7 @@ namespace VAdvantage.Model
                                                                 transactionQuery.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                                 DB.ExecuteQuery(transactionQuery.ToString(), null, Get_Trx());
                                                             }
+                                                            */
                                                         }
                                                     }
 
@@ -3987,6 +4099,13 @@ namespace VAdvantage.Model
                                                         DB.ExecuteQuery("UPDATE M_MatchInv SET CurrentCostPrice = " + currentCostPrice +
                                                                          @" WHERE M_MatchInv_ID = " + inv.GetM_MatchInv_ID(), null, Get_Trx());
 
+                                                    }
+
+                                                    // Create Transaction Entry for Vendor Invoice
+                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                    if (!string.IsNullOrEmpty(_processMsg))
+                                                    {
+                                                        return DocActionVariables.STATUS_INVALID;
                                                     }
                                                 }
                                             }
@@ -4060,9 +4179,22 @@ namespace VAdvantage.Model
                                         if (docType.GetDocBaseType() == "APC" && line.GetC_OrderLine_ID() == 0 &&
                                             line.GetM_InOutLine_ID() == 0 && line.GetM_Product_ID() > 0 && docType.IsTreatAsDiscount())
                                         {
+                                            query.Clear();
+                                            // DevOps Task-1851
+                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                            DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                            if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                            {
+                                                costingCheck.M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() :
+                                                                    (GetM_Warehouse_ID() > 0 ? GetM_Warehouse_ID() : Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                                            }
+
                                             if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, line.GetM_AttributeSetInstance_ID(),
-                                              "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced())
-                                              , Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                          "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced())
+                                          , Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                             {
                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                 {
@@ -4088,6 +4220,18 @@ namespace VAdvantage.Model
                                             }
                                             else
                                             {
+
+                                                int M_Locator_ID = 0;
+                                                int M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() : GetM_Warehouse_ID();
+                                                if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                {
+                                                    M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                    if (M_Warehouse_ID == 0)
+                                                    {
+                                                        M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                    }
+                                                }
+
                                                 query.Clear();
                                                 query.Append(@"UPDATE C_InvoiceLine SET IsCostImmediate= 'Y' ");
 
@@ -4095,13 +4239,20 @@ namespace VAdvantage.Model
                                                 {
                                                     // get post cost after invoice cost calculation and update on invoice
                                                     currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), line.GetAD_Org_ID(),
-                                                                                                    product1.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(), Get_Trx());
+                                                                                                    product1.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
                                                     line.SetPostCurrentCostPrice(currentCostPrice);
                                                     query.Append(" , PostCurrentCostPrice =" + currentCostPrice);
                                                 }
                                                 line.SetIsCostImmediate(true);
                                                 query.Append(@" WHERE C_Invoiceline_ID = " + line.GetC_InvoiceLine_ID());
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+
+                                                // Create Transaction Entry for Vendor Invoice
+                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                if (!string.IsNullOrEmpty(_processMsg))
+                                                {
+                                                    return DocActionVariables.STATUS_INVALID;
+                                                }
                                             }
                                         }
                                         #endregion
@@ -4255,6 +4406,13 @@ namespace VAdvantage.Model
                                                         DB.ExecuteQuery("UPDATE C_InvoiceLine SET CurrentCostPrice = " + currentCostPrice +
                                                                    @" WHERE C_InvoiceLine_ID = " + line.GetC_InvoiceLine_ID(), null, Get_Trx());
 
+                                                    }
+
+                                                    // Create Transaction Entry for Vendor Invoice
+                                                    _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                    if (!string.IsNullOrEmpty(_processMsg))
+                                                    {
+                                                        return DocActionVariables.STATUS_INVALID;
                                                     }
 
                                                 }
@@ -4486,7 +4644,9 @@ namespace VAdvantage.Model
                                                 DB.ExecuteQuery("UPDATE M_InoutLine SET CurrentCostPrice = CASE WHEN CurrentCostPrice <> 0 THEN CurrentCostPrice ELSE " + currentCostPrice +
                                                                      @" END , IsCostImmediate = 'Y' , 
                                                      PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
-                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
+                                                     @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END, 
+                                                      VAS_LandedCost = " + costingCheck.ExpectedLandedCost + $@" 
+                                                    , VAS_IsStandardCosting = {(costingCheck.materialCostingMethod.Equals("S") ? GlobalVariable.TO_STRING("Y") : GlobalVariable.TO_STRING("N"))}
                                                  WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
                                                 sLine.SetIsCostImmediate(true);
 
@@ -4502,6 +4662,9 @@ namespace VAdvantage.Model
                                                     }
                                                     query.Append(" , M_CostElement_ID = " + costingCheck.definedCostingElement);
                                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
+                                                    //22-Jan-2025, Update posting Cost / Expected Landed Cost on Transaction
+                                                    query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
+                                                    query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                 }
                                             }
@@ -4615,6 +4778,7 @@ namespace VAdvantage.Model
                                                 // update Post cost as 0 on inoutline
                                                 if (!isUpdatePostCurrentcostPriceFromMR)
                                                 {
+                                                    /* VIS_045: 03-Dec-2024, Not to set Current Cost as ZERO as per Surya 
                                                     no = DB.ExecuteQuery(@"UPDATE M_InOutLine SET PostCurrentCostPrice = 0 WHERE M_Inoutline_id IN 
                                                                                (SELECT M_Inoutline_id FROM M_MatchInvCostTrack WHERE 
                                                                                 Rev_C_InvoiceLine_ID =  " + line.GetC_InvoiceLine_ID() + " ) ", null, Get_Trx());
@@ -4628,6 +4792,7 @@ namespace VAdvantage.Model
                                                         transactionQuery.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                                         DB.ExecuteQuery(transactionQuery.ToString(), null, Get_Trx());
                                                     }
+                                                    */
                                                 }
                                             }
                                             if (inv != null && inv.GetM_MatchInv_ID() > 0 && inv.Get_ColumnIndex("CurrentCostPrice") >= 0)
@@ -4638,6 +4803,13 @@ namespace VAdvantage.Model
                                                 DB.ExecuteQuery("UPDATE M_MatchInv SET CurrentCostPrice = " + currentCostPrice +
                                                                  @" WHERE M_MatchInv_ID = " + inv.GetM_MatchInv_ID(), null, Get_Trx());
 
+                                            }
+
+                                            // Create Transaction Entry for Vendor Invoice
+                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                            if (!string.IsNullOrEmpty(_processMsg))
+                                            {
+                                                return DocActionVariables.STATUS_INVALID;
                                             }
                                         }
                                     }
@@ -4704,9 +4876,22 @@ namespace VAdvantage.Model
                                     MDocType docType = new MDocType(GetCtx(), GetC_DocTypeTarget_ID(), Get_Trx());
                                     if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && line.GetC_OrderLine_ID() == 0 && line.GetM_InOutLine_ID() == 0 && line.GetM_Product_ID() > 0)
                                     {
+                                        query.Clear();
+                                        // DevOps Task-1851
+                                        query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                            INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                            INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                        DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                        if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                        {
+                                            costingCheck.M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() :
+                                                                    (GetM_Warehouse_ID() > 0 ? GetM_Warehouse_ID() : Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]));
+                                        }
+
                                         if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), product1, line.GetM_AttributeSetInstance_ID(),
-                                          "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced()),
-                                          Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                      "Invoice(Vendor)", null, null, null, line, null, Decimal.Negate(ProductLineCost), Decimal.Negate(line.GetQtyInvoiced()),
+                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                         {
                                             if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                             {
@@ -4731,12 +4916,18 @@ namespace VAdvantage.Model
                                         }
                                         else
                                         {
-                                            query.Clear();
-                                            // DevOps Task-1851
-                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) FROM C_InvoiceLine il
-                                            INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
-                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
-                                            decimal grnQty = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString(), null, Get_Trx()));
+                                            decimal grnQty = 0;
+                                            int M_Locator_ID = 0;
+                                            int M_Warehouse_ID = line.GetM_Warehouse_ID() > 0 ? line.GetM_Warehouse_ID() : GetM_Warehouse_ID();
+                                            if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                            {
+                                                grnQty = Util.GetValueOfDecimal(dsRefInOut.Tables[0].Rows[0]["MovementQty"]);
+                                                M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                if (M_Warehouse_ID == 0)
+                                                {
+                                                    M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                }
+                                            }
 
                                             query.Clear();
                                             query.Append(@" UPDATE C_InvoiceLine SET IsCostImmediate = 'Y'");
@@ -4744,7 +4935,7 @@ namespace VAdvantage.Model
                                             {
                                                 // get post cost after invoice cost calculation and update on invoice
                                                 currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), line.GetAD_Org_ID(),
-                                                                                                product1.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(), Get_Trx());
+                                                                                                product1.GetM_Product_ID(), line.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
                                                 line.SetPostCurrentCostPrice(currentCostPrice);
                                                 query.Append(@" , PostCurrentCostPrice = " + currentCostPrice);
                                             }
@@ -4761,11 +4952,31 @@ namespace VAdvantage.Model
                                                     (Math.Abs(line.GetQtyInvoiced()) - costingCheck.currentQtyonQueue.Value) : 0) *
                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
                                             }
+                                            else if (line.Get_ColumnIndex("Ref_InvoiceLineOrg_ID") >= 0)
+                                            {
+                                                if (costingCheck.onHandQty == 0)
+                                                {
+                                                    query.Append($@" , TotalCogsAdjustment = {Decimal.Round(
+                                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                }
+                                                else
+                                                {
+                                                    query.Append($@" , TotalInventoryAdjustment = {Decimal.Round(
+                                                                   ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                }
+                                            }
 
                                             // VIS_045: 29-May-2023 -> DevOps Task ID: 2146
                                             query.Append(@" , M_Transaction_ID = (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID) ");
                                             query.Append(@" WHERE C_Invoiceline_ID = " + line.GetC_InvoiceLine_ID());
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+
+                                            // Create Transaction Entry for Vendor Invoice
+                                            _processMsg = line.CreateTransactionEntry(currentCostPrice, null, M_Locator_ID, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                            if (!string.IsNullOrEmpty(_processMsg))
+                                            {
+                                                return DocActionVariables.STATUS_INVALID;
+                                            }
                                         }
                                     }
                                     #endregion
@@ -4922,6 +5133,13 @@ namespace VAdvantage.Model
                                                                     @" WHERE C_InvoiceLine_ID = " + line.GetC_InvoiceLine_ID(), null, Get_Trx());
 
                                                 }
+
+                                                // Create Transaction Entry for Vendor Invoice
+                                                _processMsg = line.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                if (!string.IsNullOrEmpty(_processMsg))
+                                                {
+                                                    return DocActionVariables.STATUS_INVALID;
+                                                }
                                             }
                                         }
                                     }
@@ -4964,7 +5182,24 @@ namespace VAdvantage.Model
                                 po.SetPriceLastInv(line.GetPriceEntered());
                                 if (!po.Save())
                                 {
-                                    _processMsg = Msg.GetMsg(GetCtx(), "NotUpdateInvPrice");
+                                    ValueNamePair vp = VLogger.RetrieveError();
+                                    string val = "";
+                                    if (vp != null)
+                                    {
+                                        val = vp.GetName();
+                                        if (String.IsNullOrEmpty(val))
+                                        {
+                                            val = vp.GetValue();
+                                        }
+                                    }
+                                    if (string.IsNullOrEmpty(val))
+                                    {
+                                        _processMsg = Msg.GetMsg(GetCtx(), "NotUpdateInvPrice");
+                                    }
+                                    else
+                                    {
+                                        _processMsg = val;
+                                    }
                                     return DocActionVariables.STATUS_INVALID;
                                 }
                             }
@@ -5091,7 +5326,24 @@ namespace VAdvantage.Model
                     bp.SetSOCreditStatus();
                     if (!bp.Save(Get_TrxName()))
                     {
-                        _processMsg = "Could not update Business Partner";
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string val = "";
+                        if (vp != null)
+                        {
+                            val = vp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = vp.GetValue();
+                            }
+                        }
+                        if (string.IsNullOrEmpty(val))
+                        {
+                            _processMsg = "Could not update Business Partner";
+                        }
+                        else
+                        {
+                            _processMsg = val;
+                        }
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }
@@ -5185,7 +5437,24 @@ namespace VAdvantage.Model
                     {
                         if (!bpl.Save(Get_TrxName()))
                         {
-                            _processMsg = "Could not update Business Partner and Location";
+                            ValueNamePair vp = VLogger.RetrieveError();
+                            string val = "";
+                            if (vp != null)
+                            {
+                                val = vp.GetName();
+                                if (String.IsNullOrEmpty(val))
+                                {
+                                    val = vp.GetValue();
+                                }
+                            }
+                            if (string.IsNullOrEmpty(val))
+                            {
+                                _processMsg = "Could not update Business Partner and Location";
+                            }
+                            else
+                            {
+                                _processMsg = val;
+                            }
                             return DocActionVariables.STATUS_INVALID;
                         }
                     }
@@ -5202,7 +5471,24 @@ namespace VAdvantage.Model
                     user.SetLastResult(Msg.Translate(GetCtx(), "C_Invoice_ID") + ": " + GetDocumentNo());
                     if (!user.Save(Get_TrxName()))
                     {
-                        _processMsg = "Could not update Business Partner User";
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string val = "";
+                        if (vp != null)
+                        {
+                            val = vp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = vp.GetValue();
+                            }
+                        }
+                        if (string.IsNullOrEmpty(val))
+                        {
+                            _processMsg = "Could not update Business Partner User";
+                        }
+                        else
+                        {
+                            _processMsg = val;
+                        }
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }   //	user
@@ -5232,7 +5518,24 @@ namespace VAdvantage.Model
                     project.SetInvoicedAmt(newAmt);
                     if (!project.Save(Get_TrxName()))
                     {
-                        _processMsg = "Could not update Project";
+                        ValueNamePair vp = VLogger.RetrieveError();
+                        string val = "";
+                        if (vp != null)
+                        {
+                            val = vp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = vp.GetValue();
+                            }
+                        }
+                        if (string.IsNullOrEmpty(val))
+                        {
+                            _processMsg = "Could not update Project";
+                        }
+                        else
+                        {
+                            _processMsg = val;
+                        }
                         return DocActionVariables.STATUS_INVALID;
                     }
                 }   //	project
@@ -7075,11 +7378,21 @@ namespace VAdvantage.Model
                     (SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE NVL(M_InOutLine_ID, 0) != 0 AND C_Invoice_ID = " + GetC_Invoice_ID() + ")", null, Get_TrxName());
             //}
             //}
+            /*Here the query is executed to set ReversalDoc_ID on invoice line from reversal document*/
+            string sqlreversal = $@"UPDATE C_InvoiceLine o SET ReversalDoc_ID =
+              (SELECT C_Invoiceline_ID FROM C_Invoiceline WHERE ReversalDoc_ID = o.C_InvoiceLine_ID and C_Invoice_ID ={reversal.GetC_Invoice_ID()}) 
+              WHERE C_Invoice_ID ={GetC_Invoice_ID()} AND EXISTS (SELECT 1 FROM C_InvoiceLine WHERE C_InvoiceLine_ID = o.C_InvoiceLine_ID)";
+            int countReversal = DB.ExecuteQuery(sqlreversal, null, Get_Trx());
             SetProcessed(true);
 
             SetDocStatus(DOCSTATUS_Reversed);   //	may come from void
             SetDocAction(DOCACTION_None);
             SetC_Payment_ID(0);
+            //set Reversal docid on header of invoice
+            if (Get_ColumnIndex("ReversalDoc_ID") >= 0)
+            {
+                SetReversalDoc_ID(reversal.GetC_Invoice_ID());
+            }
             SetIsPaid(true);
             DeAllocateTimeSheetInvoice();
             DeAllocateFieldRequest();
@@ -7153,6 +7466,22 @@ namespace VAdvantage.Model
         {
             if (Env.IsModuleInstalled("VA075_"))
             {
+                //VIS_427 Bug id 6154 Set field request status to open on invoice reverse
+                string sql = "SELECT VA075_FieldServiceReq_ID FROM VA075_WorkOrderOperation WHERE C_Invoice_ID=" + GetC_Invoice_ID();
+                int VA075_FieldServiceReq_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                if (VA075_FieldServiceReq_ID == 0)
+                {
+                    sql = @"SELECT wop.VA075_FieldServiceReq_ID
+                                   FROM VA075_WorkOrderComponent woc
+                                   INNER JOIN VA075_WorkOrderOperation wop ON (woc.VA075_WorkOrderOperation_ID = wop.VA075_WorkOrderOperation_ID)
+                                   WHERE woc.C_Invoice_ID = " + GetC_Invoice_ID();
+                    VA075_FieldServiceReq_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                }
+                if (VA075_FieldServiceReq_ID > 0)
+                {
+                    sql = "UPDATE VA075_FieldServiceReq SET VA075_SRStatus= '01' WHERE VA075_FieldServiceReq_ID = " + VA075_FieldServiceReq_ID;
+                    int count = DB.ExecuteQuery(sql, null, Get_Trx());
+                }
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderComponent SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }

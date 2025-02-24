@@ -54,7 +54,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="pageSize">page Size</param>
         /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName)
+        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName, int recordCount)
         {
             if (Session["Ctx"] != null)
             {
@@ -62,7 +62,7 @@ namespace VAS.Areas.VAS.Controllers
                 AlertSqlGenerate obj = new AlertSqlGenerate();
                 if (!string.IsNullOrEmpty(query))
                     query = SecureEngineBridge.DecryptByClientKey(query, ctx.GetSecureKey());
-                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize, tableName)), JsonRequestBehavior.AllowGet);
+                var jsonResult = Json(JsonConvert.SerializeObject(obj.GetResult(ctx, query, pageNo, pageSize, tableName, recordCount)), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }
@@ -136,14 +136,14 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tableName">Table Name</param>
         /// <param name="displayType"> Dispaly type</param>
         /// <returns>Names</returns>
-        public JsonResult GetIdsName(string columnName,string tableName, int displayType,string whereClause,bool isNameExist)
+        public JsonResult GetIdsName(string columnName,string tableName, int displayType,string whereClause,bool isNameExist,int columnID, int refrenceValueID,int windowNo)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType, whereClause, isNameExist));
+                retJSON = JsonConvert.SerializeObject(obj.GetIdsName(ctx, columnName, tableName, displayType, whereClause, isNameExist, columnID, refrenceValueID, windowNo));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

@@ -426,6 +426,23 @@ namespace VIS.Controllers
             return Json(new { result = "ok" }, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>
+        /// Get Reference ID from Name
+        /// </summary>
+        /// <param name="Name"></param>
+        /// <returns>Reference ID</returns>
+        public JsonResult GetReference(string Name)
+        {
+            int result = 0;
+            if (Session["Ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                CommonModel objCommonModel = new CommonModel();
+                result = objCommonModel.GetReference(ctx, Name);
+            }
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
     }
 
     public class AttributeGrid
@@ -1596,7 +1613,7 @@ namespace VIS.Controllers
                     //VAI082 12/22/2023 DevOps Task ID:-3579,Set "ContractMaster_ID" When user create the invoice with the reference of shipment.
                     if (_inout.GetC_Order_ID() > 0)
                     {
-                        int ContractMaster_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_ContractMaster_ID FROM C_Order WHERE C_Order_ID=" + _inout.GetC_Order_ID()+" AND IsActive='Y'"));
+                        int ContractMaster_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT VAS_ContractMaster_ID FROM C_Order WHERE C_Order_ID=" + _inout.GetC_Order_ID() + " AND IsActive='Y'"));
                         if (ContractMaster_ID > 0)
                         {
                             _invoice.Set_Value("VAS_ContractMaster_ID", ContractMaster_ID);
@@ -1728,7 +1745,15 @@ namespace VIS.Controllers
                 }
                 else
                 {
-                    MInOutLine[] lines = MInOutLine.GetOfOrderLine(ctx, C_OrderLine_ID, null, null);
+                    /*VIS_427 Here restricted user to not add refrence of shipment when qtyinvoiced is greater or equal to 
+                    movement quantity against particular orderline*/
+                    String WhereClause= $@" NOT EXISTS(SELECT 1 FROM C_InvoiceLine C_InvoiceLine INNER JOIN 
+                                            C_Invoice C_Invoice ON (C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID
+                                            AND C_Invoice.Docstatus NOT IN ('RE','VO'))  WHERE C_InvoiceLine.C_Orderline_ID = {C_OrderLine_ID} 
+                                            GROUP by C_InvoiceLine.C_Orderline_ID 
+                                            HAVING SUM(C_InvoiceLine.QtyInvoiced) >= (SELECT SUM(M_Inoutline.MovementQty) 
+                                            FROM M_Inoutline WHERE M_Inoutline.C_Orderline_ID = {C_OrderLine_ID}))";
+                    MInOutLine[] lines = MInOutLine.GetOfOrderLine(ctx, C_OrderLine_ID, WhereClause, null);
                     //s_log.fine ("Receipt Lines with OrderLine = #" + lines.length);
                     if (lines.Length > 0)
                     {
@@ -3685,7 +3710,15 @@ namespace VIS.Controllers
             return retRes;
         }
 
-
+        /// <summary>
+        /// Get Reference ID from Name
+        /// </summary>
+        /// <param name="Name"></param>
+        /// <returns>Reference ID</returns>
+        public int GetReference(Ctx ctx, string Name)
+        {
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Reference_ID FROM AD_Reference WHERE Name = '" + Name + "'", null, null));
+        }
 
         /// <summary>
         /// Get Version information for changed columns

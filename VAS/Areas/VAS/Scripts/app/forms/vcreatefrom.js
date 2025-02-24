@@ -5,7 +5,7 @@
     function VCreateFrom(mTab) {
 
         //call parent function on close
-        this.onClose = null;
+        this.onClose;
         this.dGrid = null;
         var SELECT_DESELECT_ALL = "SelectDeselectAll";
         //select all button status
@@ -764,11 +764,29 @@
                     if (obj.dGrid != null) {
                         obj.dGrid.destroy();
                     }
+                    /* VIS_0045: DevOps Bug 6189 -> 08/Oct/2024 -> OnClose function is used to refresh the Grid and to display lines in bottom*/
+                    if (obj.onClose) {
+                        obj.onClose();
+                    }
                     $self = null;
                     obj.$root.dialog("destroy");
                     obj.$root = null;
                 }
             });
+
+            /*VIS_0060: 13-Nov-2024, Set Order in case of delivery Order*/
+            if ("Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsSOTrx")) || "Y".equals(VIS.Env.getCtx().getWindowContext(obj.windowNo, "IsReturnTrx"))) {
+                if (VIS.Env.getCtx().getContextAsInt(obj.windowNo, "C_Order_ID") > 0) {
+                    obj.cmbOrder.setValue(VIS.Env.getCtx().getContextAsInt(obj.windowNo, "C_Order_ID"));
+
+                    // Change event for Order
+                    var eventnew = { propertyName: "C_Order_ID" }
+                    obj.vetoablechange(eventnew);
+                }
+            }
+            else if (obj.locatorField) {
+                obj.locatorField.setValue(VIS.Env.getCtx().getContextAsInt(obj.windowNo, "M_Locator_ID"));
+            }
         };
 
         // function to check comma or dot from given value and return new value
@@ -958,7 +976,7 @@
         }
 
 
-        var OrgId = VIS.Env.getCtx().getContextAsInt(this.windowNo, "AD_Org_ID")
+        var OrgId = VIS.Env.getCtx().getContextAsInt(this.windowNo, "AD_Org_ID");
         // Added by Vivek on 09/10/2017 advised by Pradeep
         var _isdrop = "Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsDropShip"));
         var _isSoTrx = "Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsSOTrx"));
@@ -970,7 +988,7 @@
         if (OrgId > 0) {
             sql += " AND C_Order.AD_Org_ID = " + OrgId;
         }
-        
+
         if (C_BPartner_ID > 0) {
             if (forInvoice) {
                 sql += " AND (C_Order.C_BPartner_ID = " + C_BPartner_ID + " OR C_Order.Bill_BPartner_ID = " + C_BPartner_ID + ")";
@@ -979,7 +997,7 @@
                 sql += " AND C_Order.C_BPartner_ID = " + C_BPartner_ID;
             }
         }
-       
+
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
                 { "columns": column, "forInvoices": forInvoice, "recordID": recordId, "Table": "C_Order" }, null);
@@ -1236,7 +1254,12 @@
 
         this.lblBankAccount.getControl().text(VIS.Msg.getMsg("BankAcctCurrency"));
         this.lblBPartner.getControl().text(VIS.Msg.getMsg("BusinessPartner"));
-        this.lblOrder.getControl().text(VIS.Msg.getMsg("Order"));
+        if ("Y".equals(VIS.Env.getCtx().getWindowContext(this.windowNo, "IsReturnTrx"))) {
+            this.lblOrder.getControl().text(VIS.Msg.getMsg("RMA"));
+        }
+        else {
+            this.lblOrder.getControl().text(VIS.Msg.getMsg("Order"));
+        }
         this.lblInvoice.getControl().text(VIS.Msg.getMsg("Invoice"));
         this.lblShipment.getControl().text(VIS.Msg.getMsg("Shipment/Receipt"));
         this.lblLocator.getControl().text(VIS.Msg.getMsg("M_Locator_ID"));
@@ -1683,6 +1706,12 @@
         if ($self.mTab.keyColumnName == "C_ProvisionalInvoice_ID") {
             this.middelDiv.css('height', '64%');
         }
+        else if ($self.mTab.keyColumnName == "C_Invoice_ID") {
+            this.middelDiv.css('height', '62%');
+        }
+        else if ($self.mTab.keyColumnName == "M_InOut_ID") {
+            this.middelDiv.css('height', '54%');
+        }
 
         this.topDiv.append(line);
         line.append(col);
@@ -1840,6 +1869,9 @@
 
             //if (window.DTD001) {
             DivInputCtrlWrap.append(this.relatedToOrg.getControl());
+
+            /*VIS_045 - 13-Nov-2024, Hide Related to Organization, assign by (Surya)*/
+            line.hide();
         }
         //End Fifth Row
         /******************************/

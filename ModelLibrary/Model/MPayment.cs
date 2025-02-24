@@ -533,6 +533,14 @@ namespace VAdvantage.Model
                     }
                 }
 
+                /*VIS_427 Bug Id 6192 if record exsist in allocate and user change Transaction date then not to 
+                 save record*/
+                if (Is_ValueChanged("DateAcct") &&
+                    Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(C_PaymentAllocate_ID) FROM C_PaymentAllocate WHERE C_Invoice_ID IS NOT NULL AND C_Payment_ID=" + GetC_Payment_ID(), null, Get_Trx())) > 0)
+                {
+                    log.SaveError("VAS_DeleteLineFirst", "");
+                    return false;
+                }
                 // Handle PaymentDocTypeInvoiceInconsistent
                 if (GetC_Order_ID() != 0 || GetC_Invoice_ID() != 0)
                 {
@@ -659,7 +667,7 @@ namespace VAdvantage.Model
                     SetIsPrepayment(GetC_Charge_ID() == 0
                         && GetC_BPartner_ID() != 0
                         && (GetC_Order_ID() != 0
-                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0 && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) ==0)));
+                            || (GetC_Project_ID() != 0 && GetC_Invoice_ID() == 0 && Util.GetValueOfInt(Get_Value("GL_JournalLine_ID")) == 0)));
 
                 // In Case of Advance Charge, set Prepayment as True
                 if (GetC_Charge_ID() != 0)
@@ -1274,7 +1282,7 @@ namespace VAdvantage.Model
             bool change = test != IsAllocated();
             //VIS_427 DevopsId 4680 get unallocated amount By subtracting allocated amount from total amount
             decimal unallocatedAmt = Math.Abs(total) - Math.Abs(Util.GetValueOfDecimal(alloc)) - (Get_ColumnIndex("WithholdingAmt") >= 0 ? Math.Abs(GetBackupWithholdingAmount() + GetWithholdingAmt()) : 0);
-            if (change || unallocatedAmt == 0) 
+            if (change || unallocatedAmt == 0)
             {
                 SetIsAllocated(true);
                 Set_Value("VAS_UnAllocatedAmount", 0);
@@ -2684,7 +2692,7 @@ namespace VAdvantage.Model
                 }
 
                 if (skipBase)
-                {                    
+                {
                     return DocActionVariables.STATUS_INPROGRESS;
                 }
             }
@@ -2935,7 +2943,7 @@ namespace VAdvantage.Model
                 if (!DocActionVariables.STATUS_INPROGRESS.Equals(status))
                     return status;
             }
-           
+
             // Set Document Date based on setting on Document Type
             SetCompletedDocumentDate();
 
@@ -3050,9 +3058,9 @@ namespace VAdvantage.Model
                 //	MProject project = new MProject(GetCtx(), GetC_Project_ID());
             }
             // Update Paid on Provisional Invoice
-            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID"))  > 0 && GetReversalDoc_ID()==0)            
+            if (Get_ColumnIndex("C_ProvisionalInvoice_ID") >= 0 && Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")) > 0 && GetReversalDoc_ID() == 0)
             {
-               //TaskID:1135 When Payment is created with Provisional Invoice reference then  checked isPaid checkbox on Provisional Invoice window
+                //TaskID:1135 When Payment is created with Provisional Invoice reference then  checked isPaid checkbox on Provisional Invoice window
                 UpdatePaymentStatus(Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")));
             }
 
@@ -3063,7 +3071,7 @@ namespace VAdvantage.Model
                 _processMsg += " @CounterDoc@: @C_Payment_ID@=" + counter.GetDocumentNo();
             }
 
-            
+
 
             // change by Amit 27-5-2016 // Letter Of Credit module
             if (Env.IsModuleInstalled("VA026_"))
@@ -3513,11 +3521,11 @@ namespace VAdvantage.Model
         /// <summary>
         /// TaskID:1135 Update Payment Status when reverse and  payment the provisional invoice.
         /// </summary>
-        private void UpdatePaymentStatus( int C_ProvisionalInvoice_ID)
+        private void UpdatePaymentStatus(int C_ProvisionalInvoice_ID)
         {
 
             DB.ExecuteQuery("UPDATE C_ProvisionalInvoice SET IsPaid = " + (GetReversalDoc_ID() == 0 ? "'Y'" : "'N'") +
-                   @" WHERE C_ProvisionalInvoice_ID = " + C_ProvisionalInvoice_ID, null, Get_Trx());                   
+                   @" WHERE C_ProvisionalInvoice_ID = " + C_ProvisionalInvoice_ID, null, Get_Trx());
         }
 
         /// <summary>
@@ -4775,7 +4783,7 @@ namespace VAdvantage.Model
             //	Create invoice Allocation for Payment incase of prepay Order
             if (GetC_Order_ID() != 0)
             {
-                string orderType = Util.GetValueOfString(DB.ExecuteScalar("SELECT DocSubTypeSO FROM C_Order o INNER JOIN C_DocType dt ON o.C_DocTypeTarget_ID = dt.C_DocType_ID WHERE o.IsActive='Y' AND  C_Order_ID = " + GetC_Order_ID(), null, Get_Trx()));
+                string orderType = Util.GetValueOfString(DB.ExecuteScalar("SELECT dt.DocSubTypeSO FROM C_Order o INNER JOIN C_DocType dt ON o.C_DocTypeTarget_ID = dt.C_DocType_ID WHERE o.IsActive='Y' AND  o.C_Order_ID = " + GetC_Order_ID(), null, Get_Trx()));
                 if (orderType.Equals(X_C_DocType.DOCSUBTYPESO_PrepayOrder))
                 {
                     return AllocateOrder();
@@ -5511,7 +5519,7 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
 
-            
+
 
             return true;
             //  }
@@ -5552,7 +5560,7 @@ namespace VAdvantage.Model
                 return false;
             }
 
-           
+
 
             //VIS-383: 03/04/2024 User Validation After Close
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_CLOSE);
@@ -5608,7 +5616,7 @@ namespace VAdvantage.Model
                 _processMsg = Msg.GetMsg(GetCtx(), "PaymentAlreadyReconciled");
                 return false;
             }
-            
+
 
             // JID_1276
             if (GetC_Order_ID() > 0 && GetVA009_OrderPaySchedule_ID() > 0)
@@ -5651,7 +5659,7 @@ namespace VAdvantage.Model
                     _processMsg = _msg;
                     return false;
                 }
-            }           
+            }
             //	Create Reversal
             MPayment reversal = new MPayment(GetCtx(), 0, Get_Trx());
             CopyValues(this, reversal);
@@ -5671,6 +5679,9 @@ namespace VAdvantage.Model
             reversal.SetDiscountAmt(Decimal.Negate(GetDiscountAmt()));
             reversal.SetWriteOffAmt(Decimal.Negate(GetWriteOffAmt()));
             reversal.SetOverUnderAmt(Decimal.Negate(GetOverUnderAmt()));
+            //VIS_427 On reversal Set the value of check date and check number to reversal document
+            reversal.SetCheckNo(GetCheckNo());
+            reversal.SetCheckDate(GetCheckDate());
             //Remove PDC reference
             if (Env.IsModuleInstalled("VA027_"))
             {

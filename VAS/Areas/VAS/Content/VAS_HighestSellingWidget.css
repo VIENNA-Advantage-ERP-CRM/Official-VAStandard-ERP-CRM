@@ -1,0 +1,240 @@
+﻿
+.VAS-org-unitsales-col {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: rgb(249,253,169);
+    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%);
+    padding: 0.75em;
+}
+
+.VAS-org-lowest-unitsales-col {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 0.75em;
+}
+
+.VAS-sales-heading {
+    font-size: 0.875em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    padding-bottom: 5px;
+}
+
+
+.VAS-sales-dropdown {
+    width: 100%;
+    margin-bottom: 0.75em;
+}
+
+    .VAS-sales-dropdown select {
+        width: 50%;
+        border: 0;
+        outline: 0;
+        font-size: 0.875em;
+        padding: .5em;
+    }
+
+.VAS-graph-details {
+    width: 100%;
+    height: calc(100% - 5.75em);
+    background-color: rgba(var(--v-c-common), 1);
+    border-radius: 6px;
+    padding: 0.5em;
+}
+
+.VAS-salesGraph-heading {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+}
+
+.VAS-totalSales-col {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-startSale-box, .VAS-endSale-box {
+    background-color: #797F1E;
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+    color: rgba(var(--v-c-common), 1);
+    min-width: 6em;
+}
+
+.VAS-endSale-box {
+    background-color: #156195;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-org-lowest-unitsales-col .VAS-startSale-box {
+    background-color: #EEB645;
+}
+
+
+.VAS-org-unitsales-col .VAS-startSale-box {
+    background-color: #797F1E;
+}
+
+.VAS-org-lowest-unitsales-col .VAS-endSale-box {
+    background-color: #F83D3D;
+}
+
+
+.VAS-org-unitsales-col .VAS-endSale-box {
+    background-color: #156195;
+}
+
+.VAS-yearTxt {
+    font-size: 0.875em;
+}
+
+.VAS-totalSale {
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.VAS-graph-result {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+}
+
+    .VAS-graph-result .vis {
+        font-size: 0.875em;
+    }
+
+.repfix-resultTxt {
+    font-size: 0.75em;
+}
+
+.VAS-pagination-col {
+    position: relative;
+    width: 50px;
+    text-align: center;
+ /*   margin: 12px auto auto;*/
+}
+
+.VAS-arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .VAS-arrow-col a {
+        color: rgba(var(--v-c-on-secondary), .8);
+        text-decoration: none !important;
+        font-size: 1em;
+    }
+
+.VAS-page-count {
+    font-size: 0.875em;
+}
+
+.VAS-graph-col {
+    margin-top: 0.75em;
+    height: calc(100% - 5.25em);
+}
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-org-unitsales-col {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .VAS-org-unitsales-col {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+.input-group.vis-input-wrap.VAS_Input_wrap {
+    background-color: #fff;
+    width: 50%;
+}
+
+.VAS-organization-block .VAS_OrgUnitControl {
+    width: 50%;
+    display: inline-block;
+}
+
+.VAS-organization-block .VAS_OrgUnitControl > .input-group {
+    width: 100%;
+}
+
+.VAS-organization-block .VAS-pagination-container {
+    width: 44%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.VAS-organization-block .VAS-pagination-col {
+    float: right;
+}
+

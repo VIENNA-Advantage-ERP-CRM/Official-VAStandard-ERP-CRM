@@ -29,7 +29,7 @@ namespace ViennaAdvantageServer.Process
         /**BPartner Prospect        */
         private int C_BPartnerSR_ID = 0;
         /*Order                   	*/
-       // private int C_Order_ID = 0;
+        // private int C_Order_ID = 0;
         /**ProjectLine       */
         private int C_ProjectLine_ID = 0;
 
@@ -86,7 +86,7 @@ namespace ViennaAdvantageServer.Process
             C_Bpartner_id = fromProject.GetC_BPartner_ID();
             C_Bpartner_Location_id = fromProject.GetC_BPartner_Location_ID();
             C_BPartnerSR_ID = fromProject.GetC_BPartnerSR_ID();
-            
+
             MBPartnerLocation bpartnerloc = new MBPartnerLocation(GetCtx(), C_Bpartner_Location_id, Get_TrxName());
             //String currentdate = DateTime.Now.ToString();
             String sqlprjln = "SELECT COUNT(C_ProjectLine_ID) FROM C_ProjectLine WHERE C_Project_ID=" + _C_Project_ID;
@@ -139,7 +139,7 @@ namespace ViennaAdvantageServer.Process
 
                 order.SetC_Project_ID(GetRecord_ID());
                 if (fromProject.GetSalesRep_ID() > 0)
-                order.SetSalesRep_ID(fromProject.GetSalesRep_ID());
+                    order.SetSalesRep_ID(fromProject.GetSalesRep_ID());
                 order.SetC_Currency_ID(fromProject.GetC_Currency_ID());
                 if (C_Bpartner_id != 0)
                 {
@@ -296,7 +296,7 @@ namespace ViennaAdvantageServer.Process
                     fromProject.SetC_BPartner_ID(fromProject.GetC_BPartnerSR_ID());
                     fromProject.SetC_BPartnerSR_ID(0);
                 }
-               
+
                 fromProject.SetGenerate_Order("Y");
 
                 if (!fromProject.Save())
@@ -319,7 +319,7 @@ namespace ViennaAdvantageServer.Process
                     DB.ExecuteQuery("UPDATE C_Order SET ConditionalFlag = null WHERE C_Order_ID = " + order.GetC_Order_ID(), null, Get_TrxName());
                 }
 
-                return Msg.GetMsg(GetCtx(), "OrderGenerationDone");
+                return Msg.GetMsg(GetCtx(), "OrderGenerationDone") + order.GetDocumentNo();
             }
             else
                 msg = Msg.GetMsg(GetCtx(), "NoLines");

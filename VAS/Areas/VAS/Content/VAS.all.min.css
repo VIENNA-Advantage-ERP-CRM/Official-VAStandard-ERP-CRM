@@ -1,5 +1,4 @@
-﻿/*version 1.5.4.0*/
-
+﻿/*version 1.5.7.0*/
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -747,6 +746,8 @@
     float: left;
     padding: 15px 10px 7px;
     width: 100%;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
     .vas-sortby-dropdown .vas-column-list-item:hover, .vas-single-selection-dropdown .vas-column-list-item:hover {
@@ -835,7 +836,7 @@
 .vis-ad-w-p-actionpanel-r .vas-windowtab.vas-columnval {
     display: flex;
     position: relative;
-    margin-bottom: 10px;
+    /*margin-bottom: 10px;*/
 }
 
 .vas-filterofMultipleCols {
@@ -1722,6 +1723,146 @@ html[dir="rtl"] .vas-sql-result-msg {
     float: left;
 }
 
+.vas-dateBlock .vis-advancedSearchInput1 {
+    display: flex;
+    align-items: center;
+    float: none;
+    width: auto;
+}
+
+.vas-dateBlock .vis-advancedSearchInput {
+    flex-basis: 33%;
+    margin-right: 0;
+    padding-right: 10px;
+}
+
+.vas-dateBlock .vis-advancedSearchHorigontal {
+    display: flex;
+    position: relative;
+    width: 14%;
+}
+
+.vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] {
+    margin-right: 4px;
+}
+
+    .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
+        margin-right: 7px;
+    }
+
+.vas-dateBlock .vis-advancedSearchInput select {
+    margin: 0;
+}
+
+.vas-sortCollection {
+    display: inline-block;
+    width: 100%;
+}
+
+.VAS-sortedItem {
+    margin-bottom: 10px;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+    .VAS-sortedItem:last-child {
+        margin-bottom: 0;
+    }
+
+.vas-join-multiselect {
+    padding: 12px 10px 7px;
+}
+
+.vis-advanedSearch-InputsWrap.vis-advancedSearchMrgin {
+    margin-top: 15px;
+}
+
+.VAS-pagingDiv {
+    margin-top: 10px;
+    /*display: flex;
+    justify-content: space-between;
+    align-items: center;*/
+}
+
+    .VAS-pagingDiv li:first-child {
+        background: rgba(var(--v-c-common), 1);
+        border: 1px solid rgba(0, 0, 0, .18);
+        min-width: 24px;
+        justify-content: center;
+        border-bottom-left-radius: 5px;
+        border-top-left-radius: 5px;
+    }
+
+    .VAS-pagingDiv li:nth-child(2) {
+        margin: 0;
+        border-radius: 0;
+        border-left: 0;
+        padding: 0px;
+    }
+
+    .VAS-pagingDiv li i {
+        font-size: 12px;
+    }
+
+    .VAS-pagingDiv li select {
+        font-size: 15px;
+    }
+
+        .VAS-pagingDiv li select:focus {
+            border-color: transparent;
+        }
+
+    .VAS-pagingDiv li:last-child {
+        min-width: 24px;
+    }
+
+html[dir=rtl] .vas-filters-editdelete-btns {
+    float: left;
+}
+
+html[dir=rtl] .vas-filters-block {
+    float: right;
+}
+
+    html[dir=rtl] .vas-filters-block .vas-selecttable {
+        float: right;
+    }
+
+html[dir=rtl] .vas-multiselect .vas-arrow-down, html[dir=rtl] .vas-joinfielddropdown .vas-arrow-down, html[dir=rtl] .vas-single-input .vas-arrow-down {
+    right: auto;
+    left: 10px;
+}
+
+html[dir=rtl] .vas-filterofMultipleCols i.fa.fa-exchange {
+    right: auto;
+    left: 0;
+}
+
+html[dir=rtl] .vas-checkboxes .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-sortby-dropdown {
+    float: none;
+}
+
+html[dir=rtl] .vas-add-label-content.vas-sortByDropdown {
+    display: flex;
+    flex-direction: column;
+}
+
+html[dir=rtl] .vas-filter-text-input.vas-single-selection-dropdown .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-column-list-item {
+    float: none;
+}
+
+html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
+    margin-left: 7px;
+}
+
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
 /*Read the instructions before start..
 1. Ignore the fonts folder its already in framework
@@ -1966,6 +2107,2887 @@ Only index.html and style.css is for your use There is no need to copy any other
     height: auto
 }
 
+.VAS-unallocated-flyout {
+    /*box-shadow: 0 0 5px #cccccc;
+    position: absolute;*/
+    right: 0;
+    top: 0;
+}
+
+.VAS-flyout-header {
+    background-color: rgba(var(--v-c-primary), 1);
+    font-size: 1rem;
+    color: rgba(var(--v-c-common), 1);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+    .VAS-flyout-header .vis {
+        cursor: pointer;
+    }
+
+.VAS-payment-details {
+    margin: 0.5rem;
+    height: calc(100% - 6px);
+    overflow-y: auto;
+}
+
+    .VAS-payment-details ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+        .VAS-payment-details ul li {
+            border-radius: 6px;
+            background-color: rgba(var(--v-c-secondary), 1);
+            display: flex;
+            width: 100%;
+            gap: 0.5rem;
+            padding: 0.875rem;
+            position: relative;
+        }
+
+.VAS-paymentDetail {
+    display: grid;
+    grid-template-columns: 27% 28% auto;
+    gap: 0.3rem;
+    margin: 0 0 5px;
+}
+
+    .VAS-paymentDetail.VAS-grid-col1 {
+        margin-bottom: 0;
+        line-height: 19px;
+    }
+
+.VAS-grid-col1 {
+    grid-template-columns: repeat(1, 1fr) !important;
+}
+
+.VAS-payment-val label {
+    font-size: 0.75rem;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 70px;
+    overflow: hidden;
+}
+
+.VAS-payment-val span {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+}
+
+.VAS-totalPrice {
+    /*font-weight: 600;*/
+    font-size: 0.875rem !important;
+}
+
+.VAS-search-link {
+    position: absolute;
+    right: 6px;
+    top: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    padding-right: 7px;
+}
+
+.VAS-expay-searchLinkIconBlock {
+    position: unset;
+    float: right;
+    right: 6px;
+    top: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    padding-right: 7px;
+    margin-top: 1.3em;
+}
+
+html[dir="rtl"] .VAS-expay-searchLinkIconBlock {
+    float: left;
+}
+
+html[dir="rtl"] .vas-expay-pagespan {
+    display: flex;
+    gap: 7px;
+}
+
+html[dir="rtl"] .vas-exinvd-pagespan {
+    display: flex;
+    gap: 7px;
+}
+
+html[dir="rtl"] .vas-expay-filter {
+    margin-left: 0.8em;
+}
+
+html[dir="rtl"] .vas-exinvd-filter {
+    margin-left: 0.8em;
+}
+
+.VAS-payment-details ul li .form-check {
+    position: relative;
+    top: 2px;
+}
+
+html[dir="rtl"] .vas-exinv-zoom {
+    float: left;
+}
+
+html[dir="rtl"] .vas-exinvd-rightar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .vas-exinvd-leftar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .vas-expay-com-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+html[dir="rtl"] .vas-expay-rtl {
+    float: left;
+}
+
+html[dir="rtl"] .vas-expay-rightar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .vas-expay-leftar {
+    transform: scaleX(-1);
+}
+
+html[dir="rtl"] .vas-exinvd-invoice-lbl {
+    text-align: left;
+}
+
+html[dir="rtl"] .vas-expay-rtlHU {
+    text-align: center;
+}
+
+html[dir="rtl"] .vas-vaswidg-Symbol {
+    float: right;
+    margin-left: 0.3em;
+}
+
+html[dir="rtl"] .vas-expay-symbol {
+    float: right;
+    margin-left: 0.3em;
+}
+
+html[dir="rtl"] .vas-arwidg-rtl-amt {
+    flex-direction: row-reverse;
+}
+
+.VAS-payment-details ul li.active {
+    background-color: rgba(var(--v-c-primary), 0.1);
+}
+
+.VAS-payment-details input[type="checkbox"]:checked:before {
+    bottom: auto;
+    right: auto;
+    top: 7px;
+    left: 4px;
+}
+
+.vas-ualdocno {
+    font-size: 0.875rem;
+    display: block;
+    color: rgba(var(--v-c-on-common), 1);
+    width: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+:root {
+    --width-100: calc(1366px/3);
+    --width-70: calc(768px*0.7/6);
+}
+
+.vas-arwidg-receivable-container {
+    background: rgb(251,251,251);
+    background: linear-gradient(160deg, rgba(251,251,251,1) 0%, rgba(223,223,223,1) 100%);
+    height: 100%;
+    width: 100%;
+    padding: 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.vas-arwidg-totalAmt-box {
+    /*background: rgb(79,217,150);
+    background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);*/
+    background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
+    padding: 1.4em 0.75em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0 0;
+}
+
+.vas-arwidg-totalRec-amount h1 {
+    color: rgba(var(--v-c-common),1);
+    font-weight: 600;
+    display: flex;
+    align-items: flex-end;
+    margin: 0;
+    font-size: 1.6em;
+}
+
+.vas-arwidg-cur-symbol {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    font-size: 0.5em;
+    line-height: 1.3000em;
+    position: relative;
+    top: 0.1em;
+}
+
+    .vas-arwidg-cur-symbol span {
+        font-size: 1.4em;
+    }
+
+.vas-arwidg-totalRecTxt {
+    font-size: 1.4em;
+    text-align: center;
+    color: rgba(var(--v-c-common),1);
+    font-family: Verdana;
+    font-weight: 600
+}
+
+.vas-arwidg-rec-listing {
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    grid-row-gap: 0.75em;
+}
+
+.vas-arwidg-receiveTxt-box {
+    background-color: rgba(var(--v-c-common),1);
+    padding: 0.75em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-arwidg-recBox-amt {
+    font-weight: 600;
+    font-size: 1.2em;
+    font-family: Verdana;
+}
+
+    .vas-arwidg-recBox-amt span {
+        color: rgba(var(--v-c-primary));
+    }
+
+@media screen and (max-width: 1920px) {
+    .vas-arwidg-receivable-container {
+        font-size: 0.7em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-arwidg-receivable-container {
+        font-size: 0.6em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 1200px) {
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 12px;
+    }
+
+    .vas-arwidg-recBox-amt {
+        font-size: 8px;
+    }
+
+    .vas-arwidg-receivable-container {
+        font-size: 0.6em;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-arwidg-receivable-container {
+        font-size: 0.5em;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 8px;
+    }
+
+    .vas-arwidg-totalAmt-box {
+        padding: 0.75em 0.875em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 4px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 7px;
+    }
+
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-arwidg-totalRec-amount {
+        font-size: 9px;
+    }
+
+    .vas-arwidg-receivable-container {
+        font-size: 0.6em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 7px;
+    }
+
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-arwidg-receivable-container {
+        font-size: 7px;
+    }
+
+    .vas-arwidg-totalRecTxt {
+        font-size: 1em;
+    }
+
+    .vis-editModeWidget .vas-arwidg-receivable-container {
+        font-size: 3px;
+    }
+
+    .vis-editModeWidget .vas-arwidg-totalRec-amount {
+        font-size: 4px;
+    }
+
+    .vas-arwidg-totalRec-amount h1 {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-arwidg-receivable-container {
+        font-size: 5px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 6px;
+    }
+
+        .vas-arwidg-totalRec-amount h1 {
+            font-size: 8px;
+        }
+
+    .vas-arwidg-totalRecTxt {
+        font-size: 6px;
+    }
+
+    .vas-arwidg-recBox-amt {
+        font-weight: 600;
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-arwidg-receivable-container {
+        font-size: 9px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 375px) {
+    .vas-arwidg-receivable-container {
+        font-size: 8px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-arwidg-receivable-container {
+        font-size: 7px;
+    }
+
+    .vas-arwidg-totalRec-amount {
+        font-size: 7px;
+    }
+}
+
+span.vas-arwidg-cur-symbol {
+    display: flex;
+    /*gap: 4px;*/
+    margin-left: 5px;
+}
+
+:root {
+    --width-100: calc(1920px/9);
+    --width-70: calc(1366px*0.7/9);
+}
+
+.vas-igtwidg-vendors-heading {
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    font-family: 'Verdana';
+}
+
+.vas-igtwidg-top-vendors-col {
+    background-color: rgba(var(--v-c-readonly), 1);
+    padding: 0.5em;
+    height: 100%;
+}
+
+.vas-igtwidg-vendors-listing {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.5em;
+    height: calc(100% - 1.75em);
+    overflow: hidden;
+}
+
+.vas-igtwidg-invoices-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.5em;
+}
+
+.vas-igtwidg-invoices-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-igtwidg-thumb-w-txt img {
+    width: 2.5em;
+    height: 2.5em;
+    border-radius: 100%;
+}
+
+.vas-igtwidg-thumb-w-txt {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+}
+
+.vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+    font-size: 0.875em;
+    font-weight: 600;
+    font-family: 'Verdana';
+}
+
+.vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-secondary), 0.5);
+}
+
+.vas-igwidg-notfounddiv {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-igtwidg-cur-symbol {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    font-size: 0.875em;
+    line-height: 1.3000em;
+    position: relative;
+    top: -0.78em;
+    /* // font-weight: 600;*/
+    color: #093756;
+}
+
+    .vas-igtwidg-cur-symbol span {
+        font-size: 1.4em;
+        color: #093756;
+        /*font-weight: 600;*/
+    }
+
+
+.vas-igtwidg-invoiceTotalAmt {
+    display: flex;
+    align-items: center;
+    gap: 0.2em;
+}
+
+.vas-igtwidg-amt-val {
+    font-size: 1em;
+    font-weight: 600;
+    color: #093756;
+    font-family: 'Verdana';
+}
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-igtwidg-top-vendors-col {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendors-listing {
+        gap: 0.1em;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-top-vendors-col {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-invoiceTotalAmt {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+        font-size: 1.2em;
+    }
+
+    .vas-igtwidg-vendors-heading {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-igtwidg-vendors-listing {
+        height: calc(100% - 2.4em);
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-igtwidg-vendors-listing {
+        gap: 0.1em;
+    }
+
+    .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
+        font-size: 0.75em;
+    }
+
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+
+    .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
+        font-size: 0.75em;
+    }
+
+    .vas-igtwidg-thumb-w-txt img {
+        width: 2.125em;
+        height: 2.125em;
+    }
+
+    .vas-igtwidg-invoiceTotalAmt {
+        font-size: 7px;
+    }
+    /* .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
+}
+
+@media screen and (max-width:900px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 14px;
+    }
+
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }
+    /*.vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
+}
+
+@media screen and (max-width: 768px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }
+
+    .vas-igtwidg-cur-symbol {
+        font-size: 1.1em;
+    }
+    /* .vas-vaswidg-Symbol {
+        font-size: 7px;
+    }*/
+}
+
+@media screen and (max-width: 680px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 17px;
+    }
+
+    .vas-igtwidg-amt-val {
+        font-size: 2.5em;
+    }
+
+    .vas-igtwidg-cur-symbol {
+        font-size: 1.6em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 15px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-igtwidg-top-vendors-col {
+        font-size: 10px;
+    }
+
+    .vas-igtwidg-invoiceTotalAmt {
+        font-size: 5px;
+    }
+}
+
+.vas-igtwiginvmillion {
+    font-size: 1em;
+    color: #093756;
+    font-weight: 600;
+}
+
+:root {
+    --width-100: calc(1920px/9);
+    --width-70: calc(1920px*0.7/9);
+}
+
+.vas-psdwidg-purchase-state-col {
+    /* background: rgb(9,55,86);*/
+    /*background: linear-gradient(145deg, rgba(9,55,86,1) 0%, rgba(0,132,196,1) 100%);*/
+    background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
+    height: 100%;
+    display: grid;
+    /*grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);*/
+    gap: 0.4em;
+    padding: 0.4em;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.vas-psdwidg-whiteBox {
+    background-color: rgba(var(--v-c-common), 1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    /* justify-content: center; */
+    flex-direction: column;
+    padding: 24px 0 0;
+    text-align: center;
+}
+
+.vas-psdwidg-totalSale {
+    font-size: 1em;
+    font-weight: 600;
+    color: #083959;
+    line-height: 1.2em;
+    font-family: 'Verdana';
+}
+
+.vas-psdwidg-salesYear {
+    color: #083959;
+    font-size: 1em;
+    font-family: Verdana;
+    max-width: 120px;
+    text-align: center;
+}
+
+.vas-psdwidg-tile-heading {
+    background-color: transparent !important;
+}
+
+    .vas-psdwidg-tile-heading h1 {
+        margin: 0;
+        font-size: 2.0em;
+        color: rgba(var(--v-c-common), 1);
+        line-height: 1.1em;
+        font-family: Verdana;
+        font-weight: 600;
+    }
+
+        .vas-psdwidg-tile-heading h1 span {
+            display: block;
+            /*text-align: right;*/
+        }
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-psdwidg-salesYear {
+        color: #083959;
+        font-size: 0.5em;
+    }
+
+    .vis-editModeWidget .vas-psdwidg-totalSale {
+        font-size: 0.5em;
+    }
+
+    .vis-editModeWidget .vas-psdwidg-tile-heading h1 {
+        font-size: 1.0em;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
+        font-size: 10px;
+    }
+    /* .vas-psdwidg-sales-comparison-col {
+        font-size: 10px;
+    }*/
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
+        font-size: 8px;
+    }
+
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 0.6em;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 12px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 9px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 0.6em;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 0.8em;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 13px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-psdwidg-sales-comparison-col {
+        font-size: 9px;
+    }
+
+    .vas-psdwidg-tile-heading {
+        font-size: 7px;
+    }
+}
+
+.vas-psdwidg-heading-item {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+}
+
+.vas-psdwidg-whiteBoxhead {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.vas-psdwidg-icondiv {
+    padding-top: 5px;
+}
+
+.vas-psdwidg-itme2 {
+    grid-column: 3;
+}
+
+.vas-psdwidg-stateheading {
+    position: absolute;
+}
+
+.vas-psdwidg-unit {
+    padding-left: 1px;
+}
+
+.vas-igtwidg-img-icon {
+    align-items: center;
+    background-color: rgba(var(--v-c-primary), .4);
+    border-radius: 100%;
+    display: inline-flex;
+    height: 2.5em;
+    justify-content: center;
+    /* margin: 0 .4rem; */
+    /*min-height: 32px;
+    min-width: 32px;*/
+    overflow: hidden;
+    width: 2.5em;
+}
+
+.vas-igtwidg-vendor-bgColor {
+    background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);
+}
+
+.vas-igtwidg-customer-bgColor {
+    background: rgb(249,253,169);
+    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%)
+}
+
+.vas-exinvd-expected-invoice {
+    /* background-color: rgba(var(--v-c-primary), .1);*/
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
+    padding: 0.5em;
+    height: 100%;
+}
+
+.vas-exinvd-expected-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /*  margin-bottom: .4em;*/
+}
+
+    .vas-exinvd-expected-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 600;
+        font-family: Verdana;
+    }
+
+.vas-exinvd-filterby-col {
+    display: flex;
+    align-items: center;
+    border-radius: 0.375em;
+    padding: 0.125em 0px 0.125em 0.5em;
+    gap: 0.375em;
+}
+
+    .vas-exinvd-filterby-col .fa {
+        font-size: 0.875em;
+    }
+
+.vas-exinvd-filter-label {
+    font-size: .75em;
+    font-weight: 600;
+}
+
+.vas-exinvd-filterby-col select {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    width: 4em;
+    font-size: 0.875em;
+}
+
+.vas-exinvd-invoicesListing {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.3em;
+    height: calc(100% - 60px);
+    overflow: hidden;
+    grid-template-rows: repeat(4, 1fr);
+}
+
+.vas-exinvd-invoices-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.2em;
+}
+    /*    .vas-exinvd-invoices-box.vas-exinvd-emptydiv {
+        display: none;
+    }*/
+    .vas-exinvd-invoices-box > h6 {
+        font-size: 0.875em;
+        font-weight: 600;
+        margin: 0 0 .4em 0;
+    }
+
+.vas-exinvd-invoices-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-exinvd-thumb-w-txt {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    font-family: Verdana;
+}
+
+    .vas-exinvd-thumb-w-txt img {
+        width: 3.125em;
+        height: 3.125em;
+        border-radius: 100%;
+    }
+
+.vas-exinvd-company-w-date .vas-exinvd-com-name {
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-exinvd-company-w-date .vas-exinvd-invoiceDate {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-secondary), 0.5);
+}
+
+.vas-exinvd-invoice-w-amount {
+    text-align: right;
+}
+
+.vas-exinvd-invoice-lbl {
+    font-size: 0.875em;
+    font-weight: 600;
+    font-family: Verdana;
+}
+
+.vas-exinvd-invoiceTotalAmt {
+    font-size: 1em;
+}
+
+.vas-exinvd-amtdiv {
+    display: flex;
+    justify-content: space-between;
+    font-family: Verdana;
+    margin-bottom: -4px;
+}
+
+.vas-exinvd-invoiceTotalAmt span {
+    color: #EEB645;
+    font-weight: 600;
+}
+
+.vas-exinvd-slider-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    /*padding: 0.6em 0.875em 0;
+    border-top: 1px solid #846291;*/
+}
+
+    .vas-exinvd-slider-arrows .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+        color: rgba(var(--v-c-on-common), 0.9);
+    }
+
+/* .vas-exinvd-slider-arrows span {
+        font-size: 1.1em;
+    }*/
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 12px;
+    }
+
+        .vis-editModeWidget.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+            margin: 7px 4px 10px;
+        }
+
+    .vis-editModeWidget .vas-exinvd-slider-arrows {
+        margin-top: 4px;
+    }
+
+        .vis-editModeWidget .vas-exinvd-slider-arrows i.fa {
+            font-size: 13px;
+        }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
+
+    /*   .vas-exinvd-invoicesListing {
+        height: calc(100% - 6em);
+    }*/
+
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vas-exinvd-expected-heading h6 {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 8px;
+    }
+
+    .vas-exinvd-expected-heading h6 {
+        font-size: 1em;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-exinvd-expected-invoice {
+        font-size: 9px;
+    }
+
+    .vas-exinvd-expected-heading {
+        font-size: 11px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-heading {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-invoice {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-expected-heading {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-exinvd-invoices-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-exinvd-invoices-box {
+        font-size: 14px;
+    }
+
+    .vas-exinvd-expected-heading {
+        font-size: 12px;
+    }
+
+    .vas-exinvd-invoicesListing {
+        height: calc(100% - 7em);
+    }
+
+    .vas-exinvd-slider-arrows span {
+        font-size: 1.4em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-exinvd-invoices-box {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-exinvd-expected-heading {
+        font-size: 10px;
+    }
+
+    .vas-exinvd-invoices-box {
+        font-size: 10px;
+    }
+}
+
+/*.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
+    margin: 0 20px 10px 0;
+}*/
+
+.vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
+    flex-basis: 35%;
+    justify-content: flex-end;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv {
+    /*flex-basis: 33%;*/
+}
+
+.vas-exinvd-expected-invoice .vas-exinvd-slider-arrows {
+    margin-top: 7px;
+    font-size: 8px;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv select, .vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    /*  height: auto;
+    border: 0;*/
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    padding: 0;
+}
+
+.vas-exinvd-expected-invoice .VAS-ExpectedListDiv .vis-input-wrap {
+    margin: 0;
+}
+
+.vas-disableArrow {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.vas-exinvd-pagespan {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: Verdana;
+}
+
+.vas-exinvd-lablecolor {
+    background-color: rgba(var(--v-c-primary), .1)
+}
+
+.vas-exinvd-expected-invoice .vis-input-wrap select ~ label {
+    background: transparent;
+    top: -9px;
+}
+
+.vas-arwidg-orderTxt {
+    font-weight: 600;
+    font-family: Verdana;
+    font-size: 1.2em
+}
+
+.vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv > .input-group.vis-input-wrap {
+    margin: -4.2px 0 5px;
+}
+
+.vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+    height: auto;
+    /*width: calc(100% - 20px);*/
+    font-size: 14px;
+    border: 0;
+}
+
+.vas-vaswidg-Symbol {
+    font-family: Gill Sans MT;
+    font-size: 1.1em;
+}
+
+.vas-arwidg-Symbol {
+    font-family: Gill Sans MT;
+}
+
+.VAS-YearBasedDataListDiv {
+    margin-right: 9px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) select {
+    font-size: 10px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-vendors-heading {
+    font-size: 9px;
+    letter-spacing: -0.8px;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon span {
+    font-size: 10px !important;
+}
+
+.vis-editModeWidget .vis-widget-item :not(.vis-widgetDelete) .vas-igtwidg-img-icon {
+    height: auto;
+    width: auto;
+    min-height: 22px;
+    min-width: 22px;
+}
+
+
+@media (max-width: 1300px) {
+    .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+        font-size: 8px;
+    }
+    /*  .vas-vaswidg-Symbol {
+        font-size: 10px;
+    }*/
+}
+
+/*@media (max-width: 1024px) {
+    .vas-igtwidg-vendors-heading {
+        font-size: 8px;
+    }
+    .vas-vaswidg-Symbol {
+        font-size: 8px;
+    }
+}
+
+@media(max-width: 1600px){
+    .vas-igtwidg-vendors-listing{
+        height: calc(100% - 25px);
+        overflow-y: auto;
+    }
+}*/
+
+.vas-idtwidg-emptydiv {
+    background-color: unset;
+    user-select: none;
+    color: transparent;
+}
+
+.vas-igtwidg-thumb-w-txt img.vas-igtwidg-emptyimg {
+    width: 0px;
+}
+/*.vas-piechartexpense-container {
+    padding: 0.5em;
+}*/
+.vas-piechartexpense-container .input-group.vis-input-wrap {
+    margin-bottom: -15px;
+    width: 10.5rem;
+}
+
+.vas-piechartexpense-container select.vis-ev-col-mandatory {
+    width: 100%;
+    height: auto;
+}
+
+.vas-t10exp-heading {
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    font-family: 'Verdana';
+}
+
+.vas-piechartexpense-container {
+    /*background: linear-gradient(145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);*/
+    height: 100%;
+}
+
+    .vas-piechartexpense-container select {
+        border: 0;
+        width: 28%;
+        float: right;
+        margin-right: 20px;
+        outline: none;
+    }
+
+/**Expense Revenue Profit Widget CSS*/
+
+.vas-barline-ExRePr-container {
+    padding: 0.5em;
+    width: 100%;
+    height: 100%
+}
+
+    .vas-barline-ExRePr-container .input-group.vis-input-wrap {
+        /*margin-bottom: -15px;*/
+        width: 9rem;
+        padding-right: 10px;
+    }
+
+    .vas-barline-ExRePr-container select.vis-ev-col-mandatory {
+        width: 100%;
+        height: auto;
+        border: none;
+    }
+
+.vas-barline-ExRePr-canvas {
+    /*height: 100% !important*/
+}
+
+.vas-ExRePr-heading {
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    font-family: 'Verdana';
+    /*color: rgba(var(--v-c-common), 1);*/
+    font-size: 1.1em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    /*padding: 1em;*/
+}
+
+.vas-ExRePr-background {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+}
+
+.vas-fdi-marquee {
+    overflow: hidden;
+    /*background: rgba(145,150,190, 0.7);*/
+    height: 100%;
+}
+
+    .vas-fdi-marquee p {
+        height: auto;
+        width: 100%;
+        display: inline-block;
+        animation: vas-fdi-marquee 30s linear infinite;
+    }
+
+        .vas-fdi-marquee p:hover {
+            cursor: pointer;
+            animation-play-state: paused;
+            color: #fff;
+        }
+
+@keyframes vas-fdi-marquee {
+    from {
+        transform: translateY(25%);
+    }
+
+    to {
+        transform: translateY(-100%);
+    }
+}
+
+.vas-fdi-feed-container {
+    background: rgb(145,150,190);
+    background: linear-gradient(to left, #36454F, rgba(var(--v-c-primary)));
+    width: 100%;
+    height: 100%;
+    padding-bottom: 0.8em;
+}
+
+.vas-fdi-widget-head {
+    color: #ffffff;
+    font-size: 1.5em;
+    /* box-shadow: 0 8px 6px -6px #ffffff;*/
+    padding: 1em;
+    font-weight: 600;
+}
+
+.vas-fdi-req-generated {
+    display: flex;
+    align-items: center;
+    width: 95%;
+    gap: 0.875em;
+    margin-bottom: 15px;
+    padding: 0 6px;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: 0.5rem;
+}
+
+    .vas-fdi-req-generated i {
+        color: #fff;
+    }
+
+.vas-fdi-req-count {
+    font-size: 6em;
+    font-weight: 600;
+    color: rgba(var(--v-c-common), 1);
+}
+
+.vas-fdi-reqGen-Txt, .vas-fdi-woGen-Txt {
+    font-size: 1.5em;
+    color: rgba(var(--v-c-common), 1);
+}
+
+/*.vas-fdi-reqGen-Txt span {
+        //display: block;
+    }*/
+
+.vas-fdi-spaceBetween {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.vas-fdi-req-generated:last-child {
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 2560px) {
+    .vas-fdi-widget-head {
+        margin: 0;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 14px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+    }
+}
+
+@media screen and (max-width: 2000px) {
+    .vas-fdi-feed-container {
+        font-size: 13px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 1920px) {
+    .vas-fdi-req-generated {
+        font-size: 12px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-fdi-feed-container {
+        font-size: 12px;
+    }
+
+    .vas-fdi-widget-head {
+        margin: 0;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 9px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 7px;
+    }
+
+    .vas-fdi-reqGen-Txt {
+        font-size: 1.8em;
+        color: rgba(var(--v-c-common), 1);
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 8px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 5px;
+    }
+
+    .vas-fdi-req-count {
+        line-height: normal;
+        font-size: 6em;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-fdi-feed-container {
+        font-size: 13px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .widgetEditMode .vas-fdi-req-generated {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 8px;
+    }
+
+    .widgetEditMode .vas-fdi-feed-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-fdi-feed-container {
+        font-size: 14px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-fdi-feed-container {
+        font-size: 12px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 375px) {
+    .vas-fdi-feed-container {
+        font-size: 10px;
+    }
+
+    .vas-fdi-req-generated {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-fdi-req-generated {
+        font-size: 6px;
+    }
+}
+
+.vas-custom-link {
+    text-decoration: none;
+    color: rgba(var(--v-c-on-secondary),1);
+}
+
+    .vas-custom-link:hover {
+        color: rgba(var(--v-c-on-secondary),1);
+        text-decoration: none;
+    }
+
+.vas-fdi-notfounddiv {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 258px;
+    font-size: 1.8rem;
+}
+
+.vas-t10exp-background {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+}
+
+.vas-t10exp-div {
+    padding: 5px 10px 0;
+    box-shadow: 0 8px 6px -6px #0000001f;
+}
+
+canvas.vas-t10exp-canvas {
+    height: 100% !important;
+    width: 100% !important;
+}
+
+.vas-exinvd-emptydiv {
+    background-color: rgba(var(--v-c-primary), 0);
+}
+/*Schedule Data CSS*/
+.vas-scheduleDataWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+    /*min-height: calc(100vh - 300px);
+    max-height: calc(100vh - 300px);*/
+    height: calc(100% - 48px);
+}
+
+.vas-scheduleData-ttl {
+    color: rgba(var(--v-c-primary),1);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+
+.vas-scheduleDataListItem {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    margin: auto;
+    width: 96%;
+}
+
+.vas-scheduleData-sglItem {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.vas-scheduleData-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.vas-scheduleDatacheckbox-label {
+    font-weight: normal;
+    font-size: 12px;
+    margin-bottom: 0;
+}
+
+.vas-scheduleDataElementTTl, .vas-scheduleDataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-scheduleDataElementValue, .vas-singleRequesitionValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-scheduleDataElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-paymentDataListItem {
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    border: 1px solid;
+    background: linear-gradient(145deg, rgb(245 245 245) 0%, rgba(255, 236, 236, 1) 100%);
+}
+
+.vas-paymentData-sglItem {
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.vas-paymentData-sgl1Item1_First {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.vas-paymentDatacheckbox-label {
+    font-weight: normal;
+    font-size: 12px;
+    margin-bottom: 0;
+}
+
+.vas-paymentDataElementTTl, .vas-paymentDataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-paymentDataElementValue, .vas-singleRequesitionValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-paymentDataElementTTl {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-scheduleData-Active {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+}
+
+.vas-paymentDataListItem {
+    pointer-events: none;
+}
+
+.VAS-PaymentData {
+    margin-top: 19px
+}
+
+.vas-newListItem {
+    position: relative;
+    margin: auto;
+    width: 96%;
+}
+
+    .vas-newListItem::before {
+        content: "";
+        background-image: url("Images/arrow.png");
+        position: absolute;
+        left: 0;
+        right: 0;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 20px;
+        width: 30px;
+        height: 30px;
+        top: -25px;
+        margin: auto;
+    }
+
+.vas-paymentheading {
+    width: 100%;
+    padding-bottom: 8px;
+    font-weight: 600;
+}
+
+hr.vas-paymentData-underline {
+    border: 1px solid black;
+    margin-top: 1px;
+}
+
+.vas-scheduleDataListItem-block {
+    position: relative;
+}
+
+.vas-scheduleDataListClosed {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.vas-scheduleDataListPaid {
+    background: green;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.vas-scheduleDataListNotPaid {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+/*.VAS-ScheduleData {*/
+/*max-height: calc(100vh - 320px);*/
+/*overflow-y: auto;*/
+/*}*/
+
+.vas-scheduleData-root {
+    height: 100%
+}
+
+.VAS-scheduledata-Paging {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    margin-top: 10px;
+    position: sticky;
+    bottom: 0px;
+    background: #fff;
+}
+
+.vas-scheduleDataListGroup {
+    overflow: auto;
+}
+
+.vas-scheduledatalist {
+    margin-top: 1px;
+}
+/*Schedule Data CSS End*/
+
+/*Expected Payments css start*/
+.vas-expay-expected-payment {
+    /* background-color: rgba(var(--v-c-primary), .1);*/
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
+    padding: 0.5em;
+    height: 100%;
+    position: relative;
+}
+
+.vas-expay-expected-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .vas-expay-expected-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 600;
+        font-family: Verdana;
+    }
+
+.vas-expay-filterby-col {
+    display: flex;
+    align-items: center;
+    border-radius: 0.375em;
+    padding: 0.125em 0px 0.125em 0.5em;
+    gap: 0.375em;
+}
+
+    .vas-expay-filterby-col .fa {
+        font-size: 0.875em;
+    }
+
+.vas-expay-filter-label {
+    font-size: .75em;
+    font-weight: 600;
+}
+
+.vas-expay-filterby-col select {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    width: 4em;
+    font-size: 0.875em;
+}
+
+.vas-expay-paymentsListing {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.4em;
+    height: calc(100% - 60px);
+    overflow: hidden;
+    grid-template-rows: repeat(6, 1fr);
+}
+
+.vas-expay-payments-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.3em;
+}
+
+    .vas-expay-payments-box.vas-expay-emptydiv {
+        display: none;
+    }
+
+    .vas-expay-payments-box > h6 {
+        font-size: 0.875em;
+        font-weight: 600;
+        margin: 0 0 .4em 0;
+    }
+
+.vas-expay-payments-detail {
+    display: grid;
+    align-items: center;
+    justify-content: space-between;
+    grid-template-columns: repeat(2, 1fr);
+    width: 90%;
+}
+
+.vas-expay-thumb-w-txt {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    font-family: Verdana;
+}
+
+    .vas-expay-thumb-w-txt img {
+        width: 3.125em;
+        height: 3.125em;
+        border-radius: 100%;
+    }
+
+.vas-expay-company-w-date .vas-expay-com-name {
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-expay-company-w-date .vas-expay-paymentDate {
+    font-size: 0.875em;
+    /*    color: rgba(var(--v-c-on-secondary), 0.5);*/
+}
+
+/*.vas-expay-payment-w-amount {
+    text-align: right;
+}*/
+
+.vas-expay-payment-lbl {
+    font-size: 0.985em;
+    /*font-weight: 600;*/
+    font-family: Verdana;
+}
+
+.vas-expay-paymentTotalAmt {
+    font-size: 1.2em;
+}
+
+.vas-expay-amtdiv {
+    display: flex;
+    justify-content: space-between;
+    font-family: Verdana;
+}
+
+.vas-expay-paymentTotalAmt span {
+    color: #EEB645;
+    font-weight: 600;
+}
+
+.vas-expay-slider-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    /*padding: 0.6em 0.875em 0;
+    border-top: 1px solid #846291;*/
+}
+
+    .vas-expay-slider-arrows .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+        color: rgba(var(--v-c-on-common), 0.9);
+    }
+
+/* .vas-expay-slider-arrows span {
+        font-size: 1.1em;
+    }*/
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-expay-expected-payment {
+        font-size: 12px;
+    }
+
+        .vis-editModeWidget.vas-expay-expected-payment .vas-expay-expected-heading {
+            margin: 7px 4px 10px;
+        }
+
+    .vis-editModeWidget .vas-expay-slider-arrows {
+        margin-top: 4px;
+    }
+
+        .vis-editModeWidget .vas-expay-slider-arrows i.fa {
+            font-size: 13px;
+        }
+
+    .vas-expay-expected-payment {
+        font-size: 12px
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-expay-expected-payment {
+        font-size: 9px;
+    }
+
+    /*   .vas-expay-paymentsListing {
+        height: calc(100% - 6em);
+    }*/
+
+    .vas-expay-payments-box {
+        font-size: 10px;
+    }
+
+    .vas-expay-expected-heading h6 {
+        font-size: 1.2em;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-payment {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-expay-payments-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-expay-expected-payment {
+        font-size: 7px;
+    }
+
+    .vas-expay-payments-box {
+        font-size: 8px;
+    }
+
+    .vas-expay-expected-heading h6 {
+        font-size: 1em;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-payment {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .vas-expay-expected-payment {
+        font-size: 7px;
+    }
+
+    .vas-expay-payments-box {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-payment {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-expay-payments-box {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-expay-expected-payment {
+        font-size: 9px;
+    }
+
+    .vas-expay-expected-heading {
+        font-size: 11px;
+    }
+
+    .vas-expay-payments-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-heading {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-expay-payments-box {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-expay-payments-box {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-payment {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .vas-expay-expected-heading {
+        font-size: 7px;
+    }
+
+    .vis-editModeWidget .vas-expay-payments-box {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .vas-expay-payments-box {
+        font-size: 14px;
+    }
+
+    .vas-expay-expected-heading {
+        font-size: 12px;
+    }
+
+    .vas-expay-paymentsListing {
+        height: calc(100% - 7em);
+    }
+
+    .vas-expay-slider-arrows span {
+        font-size: 1.4em;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-expay-payments-box {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-expay-expected-heading {
+        font-size: 10px;
+    }
+
+    .vas-expay-payments-box {
+        font-size: 10px;
+    }
+}
+
+/*.vas-expay-expected-payment .vas-expay-expected-heading {
+    margin: 0 20px 10px 0;
+}*/
+
+.vas-expay-expected-payment .vas-expay-expected-heading .vas-expay-filterby-col {
+    flex-basis: 35%;
+    justify-content: flex-end;
+}
+
+.vas-expay-expected-payment .VAS-ExpectedListDiv {
+    /*flex-basis: 33%;*/
+}
+
+.vas-expay-expected-payment .vas-expay-slider-arrows {
+    margin-top: 7px;
+    font-size: 8px;
+}
+
+.vas-expay-expected-payment .VAS-ExpectedListDiv select, .vas-expay-expected-payment .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    height: auto;
+    border: 0;
+}
+
+.vas-expay-expected-payment .VAS-ExpectedListDiv .input-group-append .input-group-text {
+    padding: 0;
+}
+
+.vas-expay-expected-payment .VAS-ExpectedListDiv .vis-input-wrap {
+    margin: 0;
+}
+
+.vas-disableArrow {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.vas-expay-pagespan {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: Verdana;
+}
+
+.vas-expay-lablecolor {
+    background-color: rgba(var(--v-c-primary), .1)
+}
+
+.vas-expay-expected-payment .vis-input-wrap select ~ label {
+    background: transparent;
+    top: -9px;
+}
+
+.vas-expay-filterspn {
+    width: 35px;
+    /*border: 1px solid rgba(var(--v-c-on-secondary), .2);*/
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    color: inherit;
+    font-size: 1.2rem;
+    float: right;
+    margin-right: 10px
+}
+
+.vas-expay-filter .dropdown-toggle::after {
+    display: none;
+}
+
+.vas-expay-filter {
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
+}
+
+.vas-expay-srm-filterIcon {
+    font-size: 1.2rem;
+}
+
+.vas-expay-filterPopupWrap {
+    padding-top: 36px;
+}
+
+.vas-expay-filter-flyout {
+    position: absolute;
+    top: 42px;
+    z-index: 100;
+    /* border: 1px solid #e4e4e4; */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.8) 0px 2px 8px 0px;
+    /* max-width: 450px; */
+    /* min-width: 317px; */
+    background: white;
+    Max-height: 400px;
+    margin-left: 0;
+    width: calc(100% - 12px);
+    left: 0;
+    right: 0;
+    background-color: rgb(235,235,235);
+    margin: auto;
+}
+
+.vas-expay-flyout-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #dddddd;
+    padding-bottom: 8px;
+}
+
+.vas-expay-headingFilDiv {
+    font-size: 10px;
+}
+
+.vas-expay-expected-payment .vas-expay-slider-arrows {
+    margin-top: 4px;
+    font-size: 8px;
+}
+
+.vas-expay-btndiv {
+    display: flex;
+    gap: 0.5em;
+    float: right;
+    margin-top: -20px;
+}
+
+.vas-expay-headDiv {
+    font-size: 1em
+}
+
+.vas-expay-com-name {
+    /*padding-top: 5px;*/
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-expay-filtbtn {
+    background-color: rgba(var(--v-c-primary), 1);
+    border-radius: 7px;
+    color: #ffffff;
+}
+
+.vas-expay-text-align {
+    text-align: right;
+}
+
+.vas-expay-lablels {
+    /* background: #fff;*/
+    top: -9px;
+    background: rgb(235, 235, 235);
+    color: black;
+}
+
+.vas-expay-dateWidth {
+    width: 48%;
+}
+
+.vas-expay-datefilter {
+    display: flex;
+    gap: 0.5em
+}
+
+.vas-expay-symbol {
+    font-weight: 600;
+    font-family: Verdana;
+}
+
+.vas-expay-head-font {
+    font-weight: 600;
+}
+/*Expected Payments css End*/
+
+
+/** Invoice Match Detail Tab Panel CSS Start*/
+.vas-invmatch-DataItem {
+    background-color: #EDF5FA;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    /* width: 90%;
+    max-width: 400px;*/
+    text-align: left;
+}
+
+.vas-invmatch-headerRow {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.vas-invmatch-Qty {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-size: 10px;
+}
+
+.vas-invmatch-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 0;
+}
+
+    .vas-invmatch-info-row span {
+        display: inline-block;
+        font-size: 14px;
+    }
+
+.vas-invmatch-uom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    margin-top: 8px;
+}
+
+.vas-invmatch-matched {
+    color: #4caf50;
+}
+
+.vas-invmatch-unmatched {
+    color: #f44336;
+}
+
+.vas-invmatch-Data-root {
+    height: 100%
+}
+
+.vas-invmatch-DataWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+    height: calc(100% - 48px);
+}
+
+.vas-invmatch-data-Paging {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    margin-top: 10px;
+    position: sticky;
+    bottom: 0px;
+    background: #fff;
+}
+
+.vas-invmatch-DataListGroup {
+    overflow: auto;
+}
+
+.vas-invmatch-datalist {
+    margin-top: 1px;
+}
+
+.vas-invmatch-DataElementTTl, .vas-invmatch-DataElementValue {
+    font-size: 14px;
+    display: block;
+}
+
+.vas-invmatch-DataElementValue {
+    font-weight: normal;
+    width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.vas-invmatch-DataListItem {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    border-radius: 1.15rem;
+    padding: 0.85rem;
+    margin: auto;
+    width: 96%;
+}
+
+.vas-invmatch-DataListItem-block {
+    position: relative;
+}
+
+.vas-invmatch-DataListNotPaid {
+    background: red;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.vas-invmatch-discrepancytextcolor {
+    color: #FF0000;
+}
+
+.vas-invmatch-DataListPaid {
+    background: green;
+    color: #fff;
+    padding: 3px 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-bottom-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.vas-invmatch-Data-sglItem {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.vas-invmatch-setCol1Width {
+    width: 33%;
+}
+
+.vas-invmatch-DataRow {
+    background-color: #F9F9F9;
+    padding: 0.2rem;
+    margin-top: 5px;
+}
+
+.vas-invmatch-ExpectedMargin {
+    margin-top: -10px;
+}
+
+.vas-invmatch-DiscrepancyFont {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.vas-invmatch-notMatched {
+    color: red;
+}
+
+/** Invoice Match Detail CSS End*/
+
+/**Cash Flow Widget CSS*/
+.vas-barline-cashFlow-container {
+    padding: 0.5em;
+    width: 100%;
+    height: 85%;
+}
+
+    .vas-barline-cashFlow-container .input-group.vis-input-wrap {
+        /*margin-bottom: -15px;*/
+        width: 9rem;
+        padding-right: 10px;
+    }
+
+    .vas-barline-cashFlow-container select.vis-ev-col-mandatory {
+        width: 100%;
+        height: auto;
+        border: none;
+        /* padding: 0px;*/
+    }
+
+.vas-expay-barline-canvas {
+    /*  height: 85% !important*/
+}
+
+.vas-cashFlow-heading {
+    font-weight: 600;
+    margin-bottom: 0.3em;
+    font-family: 'Verdana';
+    /*color: rgba(var(--v-c-common), 1);*/
+    font-size: 0.9em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    padding-top: 0.2em;
+}
+
+.vas-cashFlow-background {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+}
+/*.vas-barline-cashFlow-container{
+    height:100%;
+}*/
+
+.vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] {
+    background-image: linear-gradient(45deg, transparent 50%, #000 50%), linear-gradient(135deg, #000 50%, transparent 50%);
+}
+
+    .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn]:focus, .vas-expay-filter-flyout .vis-input-wrap input:focus {
+        border-color: rgba(var(--v-c-on-secondary),.2);
+    }
+
+.vas-expay-filter-flyout .input-group:focus-within .input-group-append .input-group-text {
+    border-color: rgba(var(--v-c-on-secondary),.2);
+}
+
+.vas-cf-heading {
+    padding-left: 5px;
+}
+
+.vas-expay-filter-flyout .vis-input-wrap input, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] {
+    background-color: rgb(235, 235, 235);
+}
+
+    .vas-expay-filter-flyout .vas-expay-datefilter .vis-input-wrap input + label, .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] + label {
+        /*background: linear-gradient(rgb(235 235 235) 50%, transparent 50%);*/
+        background: rgb(235,235,235);
+    }
+
+.vas-exinvd-filter-heading {
+    display: grid;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5em;
+    grid-template-columns: repeat(1, 1fr);
+}
+
+.vas-exinvd-heading {
+    box-shadow: rgba(17, 17, 26, 0.2) 0px 4px 0px;
+}
+
+.vas-exinvd-trxtype {
+    font-size: 0.875em;
+    font-family: Verdana;
+    font-weight: 600;
+}
+
+.vas-exinvd-bottomdiv {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: Verdana;
+    /*font-size: 0.9em;*/
+    /*   grid-template-columns: repeat(2, 1fr);*/
+}
+
+.vas-exinvd-filter-flyout {
+    position: absolute;
+    top: 42px;
+    z-index: 100;
+    /* border: 1px solid #e4e4e4; */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.8) 0px 2px 8px 0px;
+    /* max-width: 450px; */
+    /* min-width: 317px; */
+    background: white;
+    Max-height: 400px;
+    margin-left: 0;
+    width: calc(100% - 12px);
+    left: 0;
+    right: 0;
+    /* background: linear-gradient(145deg, rgb(255, 236, 236, 1) 0%, rgba(255, 236, 236, 1) 100%);*/
+    margin: auto;
+}
+
+.vas-exinvd-filterspn {
+    width: 35px;
+    /*border: 1px solid rgba(var(--v-c-on-secondary), .2);*/
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    color: inherit;
+    font-size: 1.2rem;
+    float: right;
+    margin-right: 10px
+}
+
+.vas-exinvd-filter .dropdown-toggle::after {
+    display: none;
+}
+
+.vas-exinvd-filter {
+    margin: -9px;
+    display: inline-block;
+    float: right;
+    margin: 0;
+    font-size: 20px;
+}
+
+.vas-exinvd-srm-filterIcon {
+    font-size: 1.2rem;
+}
+
+.vas-exinvd-filterPopupWrap {
+    padding-top: 36px;
+}
+
+.vas-exinvd-main-filter-flyout {
+    position: absolute;
+    top: 42px;
+    z-index: 100;
+    /* border: 1px solid #e4e4e4; */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.8) 0px 2px 8px 0px;
+    /* max-width: 450px; */
+    /* min-width: 317px; */
+    background: white;
+    Max-height: 400px;
+    margin-left: 0;
+    width: calc(100% - 12px);
+    left: 0;
+    right: 0;
+    /*// background-color: rgb(235,235,235);*/
+    margin: auto;
+}
+
+.vas-exinvd-filterby-col {
+    display: flex;
+    align-items: center;
+    border-radius: 0.375em;
+    padding: 0.125em 0px 0.125em 0.5em;
+    gap: 0.375em;
+}
+
+    .vas-exinvd-filterby-col .fa {
+        font-size: 0.875em;
+    }
+
+.vas-exinvd-filter-label {
+    font-size: .75em;
+    font-weight: 600;
+}
+
+.vas-exinvd-filterby-col select {
+    background-color: transparent;
+    border: 0;
+    outline: 0;
+    width: 4em;
+    font-size: 0.875em;
+}
+
+.vas-exinvd-ovrflow {
+    width: 185px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-exinvd-DocTyperDiv {
+    display: inline-block;
+    width: 100%;
+}
+
+.vas-exinvd-createinvdiv {
+    margin: 0 0 19px;
+    display: inline-block;
+    font-size: 17px;
+    border-bottom: 1px solid;
+    width: 100%;
+    padding: 0 0 5px;
+}
+
+.vas-exinvd-right-ovrflow {
+    width: 68px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/*.vas-expay-filter-flyout .vis-input-wrap input:focus + label.vas-exinvd-bpLabel {
+    background-color: rgb(235,235,235);
+}*/
+
+.vas-expay-filter-flyout .vis-input-wrap input:focus ~ label.vas-exinvd-bpLabel {
+    background: rgb(235,235,235);
+}
+
+.vas-expay-expected-payment i {
+    cursor: pointer;
+}
+
+.vas-exinvd-expected-invoice i {
+    cursor: pointer;
+}
+
+.vas-exinvd-expected-invoice .vis-input-wrap input + label {
+    left: 10px;
+}
+
+.vas-expay-expected-payment .vis-input-wrap input + label {
+    left: 10px;
+}
+
+.vas-exinvd-rulefont {
+    font-size: 0.875em;
+    font-family: Verdana;
+}
+
+@media screen and (max-width: 1280px) {
+    .vas-expay-filtbtn {
+        font-size: 11px;
+        padding: 5px 6px;
+    }
+}
+/*Monthly Average Balance css*/
+.vas-barline-monAvBbal-container {
+    padding: 0.5em;
+    width: 100%;
+    height: 100%
+}
+
+.vas-monAvBbal-heading {
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    font-family: 'Verdana';
+    /*color: rgba(var(--v-c-common), 1);*/
+    font-size: 1.1em;
+    box-shadow: 0 8px 6px -6px #ffffff;
+    /*padding: 1em;*/
+}
+
+.vas-monAvBbal-background {
+    background: rgba(255, 236, 236);
+}
+
+.vas-exinvd-BankAccountrDiv {
+    width: 75%;
+    margin-top: 0.8em;
+}
+
+    .vas-exinvd-BankAccountrDiv select {
+        background: rgba(255, 236, 236)
+    }
+
+.vas-monAvbal-curr {
+    margin-top: -14px;
+    margin-bottom: -8px;
+}
+/*Monthly Average Balance css ends here*/
 
 .vis-pSelectInfo {
     width: 320px;
@@ -2387,12 +5409,14 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 
 .VAS-PO-list-col {
     width: 100%;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.4rem;
+    /*display: flex;
+    flex-direction: column;
     max-height: calc(100% - 68px);
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;*/
 }
 
 .VAS-polist-box {
@@ -2401,6 +5425,8 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
     display: flex;
     gap: 0.625rem;
     position: relative;
+    border: 1px solid rgba(var(--v-c-secondary), .8);
+    border-radius: 6px;
 }
 
 .VAS-product-thumbnail {
@@ -2494,6 +5520,39 @@ span.vis.vis-info.vas-openItem {
     min-width: auto;
 }
 
+.VAS-summary-details {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.VAS-summary-header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+    .VAS-summary-header span {
+        height: 22px;
+    }
+
+.VAS-summary-info {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+.VAS-summary-amount {
+    height: 22px;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    text-align: right;
+}
+
+
 .firstRow {
     padding: 15px;
 }
@@ -2529,4 +5588,1950 @@ span.vis.vis-info.vas-openItem {
     text-align: right;
 }
 
+
+.VAS-selling-container {
+    width: 100%;
+    height: 100%;
+    padding: 0.75em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+}
+
+.VAS-highest-selling-prod {
+    background: rgb(245,245,245);
+    /*background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(243,254,243,1) 100%);*/
+    background: linear-gradient(145deg, rgba(249, 253, 169, 1) 0%, rgba(186, 224, 248, 1) 100%);
+}
+
+.VAS-lowest-selling-prod {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+}
+
+.VAS-container-heading {
+    position: absolute;
+    top: 0.3em;
+}
+
+.VAS-org-col {
+    display: grid;
+    grid-template-columns: auto 6.25em;
+    width: 100%;
+    align-items: center;
+}
+
+.VAS-orgName-col {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding-top: 0.5em;
+}
+
+    .VAS-orgName-col h1 {
+        font-size: 5em;
+        margin: 0;
+        font-weight: 600;
+    }
+
+.VAS-org-name {
+    font-size: 2em;
+    line-height: 1.1em;
+}
+
+    .VAS-org-name span {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+
+.VAS-org-col img {
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+}
+
+.VAS-yearly-revenue {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    padding-right: 3em;
+    position: relative;
+    gap: 0.75em;
+}
+
+.VAS-lastRevenue h1, .VAS-currentRevenue h1 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.75em;
+    justify-content: center;
+    align-items: center;
+}
+
+    .VAS-lastRevenue h1 .VAS-sale-Qty, .VAS-currentRevenue h1 .VAS-sale-Qty {
+        font-size: 0.6em;
+        margin-left: 0.2em;
+    }
+
+.VAS-lastRevenue span, .VAS-currentRevenue span {
+    display: block;
+    text-align: center;
+}
+
+.VAS-pagination-sell {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+}
+
+.VAS-arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .VAS-arrow-col a {
+        color: rgba(var(--v-c-on-secondary), .8);
+        text-decoration: none !important;
+        font-size: 1em;
+    }
+
+.VAS-page-count {
+    font-size: 0.875em;
+}
+
+.VAS-highest-selling-prod .VAS-lastRevenue h1 {
+    color: #8AC96B;
+    display: flex;
+}
+
+.VAS-highest-selling-prod .VAS-currentRevenue h1 {
+    color: #296B29;
+    display: flex;
+}
+
+.VAS-highest-selling-prod .VAS-orgName-col h1 {
+    color: #343A3F;
+}
+
+.VAS-highest-selling-prod .VAS-org-name {
+    color: #9F9E9E;
+}
+
+.VAS-lowest-selling-prod .VAS-lastRevenue h1 {
+    color: #EEB645;
+    display: flex;
+}
+
+.VAS-lowest-selling-prod .VAS-currentRevenue h1 {
+    color: #F83D3D;
+    display: flex;
+}
+
+.VAS-lowest-selling-prod .VAS-orgName-col h1 {
+    color: #343A3F;
+}
+
+.VAS-lowest-selling-prod .VAS-org-name {
+    color: #9F9E9E;
+}
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-selling-container {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .VAS-selling-container {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-selling-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .VAS-selling-container {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-selling-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+
+    .VAS-org-col, .VAS-yearly-revenue {
+        font-size: 8px;
+    }
+}
+
+.VAS-bankBalroot {
+    height: 100%;
+    width: 100%;
+}
+
+.VAS-bankbalance-container {
+    background: linear-gradient(145deg, rgba(216, 234, 235, 1) 0%, rgb(116 144 188) 100%);
+    height: 100%;
+    padding: 0.75em;
+}
+
+.VAS-bankbalwidget-header h1 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.VAS-bankbalwidget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75em;
+}
+
+.VAS-bankBalDetail-box {
+    background-color: #EAF3FC;
+    border-radius: 6px;
+    padding: 0.50em;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.VAS-bankbal-name {
+    font-size: 1.0em;
+    font-weight: 600;
+    max-width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-bankbalISOCode {
+    font-size: 1em;
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+.VAS-totalbankbal-amount {
+    font-size: 1em;
+}
+
+.VAS-BankBaldata {
+    display: flex;
+}
+
+.VAS-bankbalwidget-body {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.70em;
+    height: calc(100% - 2.125em);
+}
+
+.VAS-bankBalarrow-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-right: 0.8rem;
+}
+
+    .VAS-bankBalarrow-control a {
+        color: #1C75AF;
+        display: flex;
+        font-size: 1.4em;
+        text-decoration: none !important;
+    }
+
+    .VAS-bankBalarrow-control span {
+        font-size: 1.1em;
+    }
+
+    .VAS-bankBalarrow-control .fa.disabled {
+        cursor: not-allowed;
+        opacity: 0;
+    }
+
+    .VAS-bankBalarrow-control a:hover {
+        color: #fcfcfc;
+    }
+
+.VAS-bankDummy-div {
+    background-color: unset;
+    user-select: none;
+    color: transparent;
+}
+
+.VAS_noBankData {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 1.30em);
+    width: 100%;
+    color: #000000;
+    font-size: 23px;
+    background-color: #EAF3FC;
+}
+
+.VAS-bank-container {
+    padding: 1.2em;
+    display: flex;
+    justify-content: space-between;
+    height: 100%;
+    flex-direction: column;
+    color: #000000;
+    position: relative;
+    background-image: linear-gradient(140deg, #D7E9EA 0%, #A1C5FF 80%);
+}
+
+.VAS-bank-container {
+    padding: 1em;
+    height: 100%;
+}
+
+/* all claims css */
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-bankbalance-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-bankbalance-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-bankbalance-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-bankbalance-container {
+        font-size: 8px;
+        padding: 0.45em;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 5.5px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-bankbalance-container {
+        font-size: 11.5px;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-bankbalance-container {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .VAS-bankbalance-container {
+        font-size: 5px;
+    }
+}
+
+html[dir="rtl"] .vas-bankbalwidget-rightar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .vas-bankbalwidget-leftar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .VAS-bankBalarrow-control {
+    margin-left: 0.8rem;
+}
+
+html[dir="rtl"] .vas-bankbalwidget-pageInfo {
+    display: flex;
+    gap: 7px;
+}
+
+html[dir="rtl"] .VAS-bankbalISOCode {
+    margin-left: 4px;
+}
+
+.VAS-cashroot {
+    height: 100%;
+    width: 100%;
+}
+
+.VAS-cashbalance-container {
+    background: linear-gradient(145deg, rgb(220 197 223) 0%, rgb(236 184 104) 100%);
+    height: 100%;
+    padding: 0.75em;
+}
+
+.VAS-cashwidget-header h1 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.VAS-cashwidget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75em;
+}
+
+.VAS-cashDetail-box {
+    background-color: #FCFCFC;
+    border-radius: 6px;
+    padding: 0.50em;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.VAS-cashbook-name {
+    font-size: 1.0em;
+    font-weight: 600;
+    max-width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-cashISOCode {
+    font-size: 1em;
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+.VAS-cashbook-amount {
+    font-size: 1em;
+}
+
+.VAS-CashBaldata {
+    display: flex;
+}
+
+.VAS-cashwidget-body {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.70em;
+    height: calc(100% - 2.125em);
+}
+
+.VAS-casharrow-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-right: 0.8rem;
+}
+
+    .VAS-casharrow-control a {
+        color: #FCFCFC;
+        display: flex;
+        font-size: 1.4em;
+        text-decoration: none !important;
+    }
+
+    .VAS-casharrow-control span {
+        font-size: 1.1em;
+    }
+
+    .VAS-casharrow-control .fa.disabled {
+        cursor: not-allowed;
+        opacity: 0;
+    }
+
+    .VAS-casharrow-control a:hover {
+        color: #2e9feb;
+    }
+
+.VAS-cashDummy-div {
+    background-color: unset;
+    user-select: none;
+    color: transparent;
+}
+
+.VAS_noCashData {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 1.30em);
+    width: 100%;
+    color: #000000;
+    font-size: 23px;
+    background-color: #fcfcfc;
+}
+
+.VAS-bank-container {
+    padding: 1.2em;
+    display: flex;
+    justify-content: space-between;
+    height: 100%;
+    flex-direction: column;
+    color: #000000;
+    position: relative;
+    background-image: linear-gradient(140deg, #D7E9EA 0%, #A1C5FF 80%);
+}
+
+.VAS-bank-container {
+    padding: 1em;
+    height: 100%;
+}
+
+/* all claims css */
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-cashbalance-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-cashbalance-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-cashbalance-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-cashbalance-container {
+        font-size: 8px;
+        padding: 0.45em;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 5.5px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-cashbalance-container {
+        font-size: 11.5px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-cashbalance-container {
+        font-size: 8px;
+    }
+
+    .vis-editModeWidget .VAS-cashbalance-container {
+        font-size: 5px;
+    }
+}
+
+html[dir="rtl"] .VAS-cashwidget-rightar {
+    transform: scaleX(-1)
+}
+
+html[dir="rtl"] .VAS-cashwidget-leftar {
+    transform: scaleX(-1);
+}
+
+html[dir="rtl"] .VAS-casharrow-control {
+    margin-left: 0.8rem;
+}
+
+html[dir="rtl"] .vas-cashwidget-pageInfo {
+    display: flex;
+    gap: 7px;
+}
+
+html[dir="rtl"] .VAS-cashISOCode {
+    margin-left: 4px;
+}
+
+.VAS-cart-flyout {
+    background-color: #fff;
+    min-width: 700px;
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    border: 1px solid #e4e4e4;
+    padding: 0px;
+    border-radius: 5px;
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    /*max-width: 450px;*/
+    width: 100%;
+    height: 100%;
+}
+
+.VAS-flyout-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: rgba(var(--v-c-primary), 1);
+    border-radius: 5px 5px 0 0;
+    padding: 12px 16px;
+    color: #ffffff;
+}
+
+.VAS-filter-btn .ui-button-outline {
+    border: 1px solid rgba(var(--v-c-primary), 1);
+    background: #ffffff;
+    padding: 0.5rem 1.5rem;
+    color: rgba(var(--v-c-primary), 1);
+}
+
+.VAS-cart-opt .form-check .form-check-input {
+    margin-top: .3rem;
+    margin-left: -1.25rem;
+}
+
+.VAS-flyout-header h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.VAS-flyout-header span {
+    color: #ffffff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.VAS-flyout-body {
+    padding: 0px;
+}
+
+.VAS-filters-container {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    grid-template-columns: 30% 70%;
+}
+/*
+    /////////////////////////////////////////////*/
+.VAS_resourceInput {
+    background: rgba(var(--v-c-secondary), .2) !important;
+    border: none !important;
+}
+
+.VAS-srm-filterSearchFeild i {
+    position: absolute;
+    left: 10px;
+}
+
+.VAS-srm-filterSearchFeild {
+    border: 1px solid rgba(var(--v-c-on-secondary), .1);
+    /*padding: 4px 14px;*/
+    border-radius: 0.15rem;
+    position: relative;
+}
+
+    .VAS-srm-filterSearchFeild input {
+        border: none;
+        outline: none;
+        font-size: 0.75rem;
+    }
+
+    .VAS-srm-filterSearchFeild input {
+        padding-left: 30px !important;
+    }
+
+.VAS-AutoComp {
+    z-index: 1100;
+}
+
+.VAS-Datefileter .vas-tis-lablels {
+    background: rgba(var(--v-c-readonly), 1) !important;
+}
+
+.VAS-filterBadge {
+    color: #fff;
+    padding: .2rem .5rem;
+    font-size: 0.75rem;
+    min-width: fit-content;
+}
+
+    .VAS-filterBadge:hover {
+        background: rgba(var(--v-c-on-secondary), 1);
+        color: #fff;
+    }
+
+    .VAS-filterBadge i {
+        font-size: 0.65rem;
+        cursor: pointer;
+    }
+/*
+    /////////////////////////////////////////////*/
+.VAS-Datefileter {
+    gap: 0.5rem;
+}
+
+.VAS-left-filters {
+    background-color: rgba(var(--v-c-readonly), 1);
+    padding: 0.75rem;
+    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 13px);
+}
+
+.VAS-filters-heading {
+    color: rgba(var(--v-c-on-common), 0.6);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.VAS-filter-btn {
+    display: flex;
+    width: 100%;
+}
+
+.VAS-form-field {
+    width: 100%;
+    margin-bottom: 0.75rem;
+}
+
+    .VAS-form-field > label {
+        font-size: 0.875rem;
+        margin-bottom: 0.3rem;
+        font-weight: 500;
+    }
+
+.VAS-input-w-icon {
+    background-color: rgba(var(--v-c-common), 1);
+    border: 1px solid rgba(var(--v-c-on-secondary), 0.4);
+    border-radius: 6px;
+    position: relative;
+}
+
+    .VAS-input-w-icon input {
+        border: 0;
+        outline: 0;
+        background-color: transparent;
+        width: 100%;
+        padding: 6px 8px 6px 34px;
+        font-size: 0.875rem;
+        height: 32px;
+    }
+
+    .VAS-input-w-icon .vis, .VAS-input-w-icon .fa {
+        position: absolute;
+        top: 50%;
+        transform: translate(0, -50%);
+        left: 10px;
+        color: rgba(var(--v-c-on-secondary), 0.6);
+    }
+
+.VAS-cart-opt .form-check .form-check-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.VAS-avail-cart-col {
+    width: 100%;
+    padding: 0.75rem 0 0.75rem 0.75rem;
+}
+
+.VAS-cartCountW-input {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 1.5rem;
+}
+
+    .VAS-cartCountW-input > label {
+        font-size: 0.875rem;
+        margin: 0;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .VAS-cartCountW-input .VAS-input-w-icon {
+        width: 100%;
+    }
+
+.VAS-carts-results-list {
+    width: 100%;
+    margin-top: 0.75rem;
+    height: calc(100vh - 335px);
+    overflow: auto;
+}
+
+.VAS-carts-box-col {
+    width: 100%;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.VAS-cart-box {
+    background-color: rgba(var(--v-c-primary), 0.1);
+    border-radius: 4px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 74% 26%;
+    padding: 0.5rem;
+    align-items: center;
+}
+
+.VAS-cartName-w-des h1 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 0.2rem;
+}
+
+.VAS-cart-type, .VAS-cart-created {
+    font-size: 0.75rem;
+}
+
+.VAS-linesdetail-col {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: space-between;
+}
+
+.VAS-total-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    align-items: center;
+}
+
+    .VAS-total-lines .VAS-lineCount {
+        display: inline-block;
+        width: 34px;
+        background-color: rgba(var(--v-c-common), 1);
+        border-radius: 4px;
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .VAS-total-lines .perfix-line-lbl {
+        font-size: 0.75rem;
+    }
+
+.VAS-cart-list-header {
+    background-color: rgba(var(--v-c-primary), 0.1);
+    width: 100%;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+}
+
+    .VAS-cart-list-header a {
+        text-decoration: none !important;
+    }
+
+.VAS-space-between {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.VAS-heading-w-lbl-col .VAS-createName-heading {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.VAS-heading-w-lbl-col .VAS-cartAct-lbl {
+    font-size: 0.75rem;
+}
+
+.VAS-filter-list-table-col {
+    margin-top: 0.5rem;
+    height: calc(100% - 0px);
+    overflow-y: auto;
+}
+
+    .VAS-filter-list-table-col tr th, .VAS-filter-list-table-col tr td {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .VAS-filter-list-table-col thead tr {
+        background-color: rgba(var(--v-c-primary), 0.1);
+    }
+
+        .VAS-filter-list-table-col thead tr th {
+            border-top: 0;
+            border-bottom: 0;
+        }
+
+    /* .VAS-filter-list-table-col tr th .form-check {
+        padding-left: 0;
+    }*/
+
+    .VAS-filter-list-table-col tr th .form-check .form-check-input {
+        margin-left: 0;
+    }
+
+.VAS-hgt-spaceBetween {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+/*.vas-FromdateDiv {
+ 
+    display: flex;
+    gap: 5px;
+
+}*/
+
+.VAS-footerBtn-w-opt {
+    padding: 0.75rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+    .VAS-footerBtn-w-opt .form-check .form-check-label {
+        font-size: 0.875rem;
+    }
+
+.VAS-lblChip-container {
+    width: 100%;
+    display: flex;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+    flex-wrap: wrap;
+    max-height: 86px;
+    overflow: auto;
+}
+
+.VAS-filter-list-table-col .form-check-input, .VAS-footerBtn-w-opt .form-check-input {
+    margin-top: .3rem !important;
+    margin-left: -1.25rem !important;
+}
+
+.VAS-LineDetails {
+    height: calc(100% - 63px);
+}
+
+
+.VAS-lbl-chip {
+    background-color: rgba(var(--v-c-on-secondary), 0.4);
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    color: rgba(var(--v-c-common), 1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+
+    .VAS-lbl-chip .VAS-chipTxt {
+        font-size: 0.75rem;
+        max-width: 90px;
+        display: block;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .VAS-lbl-chip .vis {
+        font-size: 0.65rem;
+        cursor: pointer;
+    }
+
+.VAS-linesdetail-col a {
+    margin-right: 5px;
+}
+
+
+.VAS-org-unitsales-col {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: rgb(249,253,169);
+    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%);
+    padding: 0.75em;
+}
+
+.VAS-org-lowest-unitsales-col {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 0.75em;
+}
+
+.VAS-sales-heading {
+    font-size: 0.875em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    padding-bottom: 5px;
+}
+
+
+.VAS-sales-dropdown {
+    width: 100%;
+    margin-bottom: 0.75em;
+}
+
+    .VAS-sales-dropdown select {
+        width: 50%;
+        border: 0;
+        outline: 0;
+        font-size: 0.875em;
+        padding: .5em;
+    }
+
+.VAS-graph-details {
+    width: 100%;
+    height: calc(100% - 5.75em);
+    background-color: rgba(var(--v-c-common), 1);
+    border-radius: 6px;
+    padding: 0.5em;
+}
+
+.VAS-salesGraph-heading {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+}
+
+.VAS-totalSales-col {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-startSale-box, .VAS-endSale-box {
+    background-color: #797F1E;
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+    color: rgba(var(--v-c-common), 1);
+    min-width: 6em;
+}
+
+.VAS-endSale-box {
+    background-color: #156195;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-org-lowest-unitsales-col .VAS-startSale-box {
+    background-color: #EEB645;
+}
+
+
+.VAS-org-unitsales-col .VAS-startSale-box {
+    background-color: #797F1E;
+}
+
+.VAS-org-lowest-unitsales-col .VAS-endSale-box {
+    background-color: #F83D3D;
+}
+
+
+.VAS-org-unitsales-col .VAS-endSale-box {
+    background-color: #156195;
+}
+
+.VAS-yearTxt {
+    font-size: 0.875em;
+}
+
+.VAS-totalSale {
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.VAS-graph-result {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+}
+
+    .VAS-graph-result .vis {
+        font-size: 0.875em;
+    }
+
+.repfix-resultTxt {
+    font-size: 0.75em;
+}
+
+.VAS-pagination-col {
+    position: relative;
+    width: 50px;
+    text-align: center;
+    /*   margin: 12px auto auto;*/
+}
+
+.VAS-arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .VAS-arrow-col a {
+        color: rgba(var(--v-c-on-secondary), .8);
+        text-decoration: none !important;
+        font-size: 1em;
+    }
+
+.VAS-page-count {
+    font-size: 0.875em;
+}
+
+.VAS-graph-col {
+    margin-top: 0.75em;
+    height: calc(100% - 5.25em);
+}
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-org-unitsales-col {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-org-unitsales-col {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .VAS-org-unitsales-col {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-org-unitsales-col {
+        font-size: 13px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-org-unitsales-col {
+        font-size: 11px;
+    }
+}
+
+.input-group.vis-input-wrap.VAS_Input_wrap {
+    background-color: #fff;
+    width: 50%;
+}
+
+.VAS-organization-block .VAS_OrgUnitControl {
+    width: 50%;
+    display: inline-block;
+}
+
+    .VAS-organization-block .VAS_OrgUnitControl > .input-group {
+        width: 100%;
+    }
+
+.VAS-organization-block .VAS-pagination-container {
+    width: 44%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.VAS-organization-block .VAS-pagination-col {
+    float: right;
+}
+
+
+
+.VAS-deliveries-container {
+    background: rgb(177,167,198);
+    background: linear-gradient(145deg, rgba(177,167,198,1) 0%, rgba(70,26,81,1) 100%);
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-deliveries-container-pending {
+    background: #FDC3C3;
+    background: #F76464;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-due-fulfilment-container {
+    background: transparent linear-gradient(146deg, #F9F1ED 0%, #FAD2C0 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-Expected-fulfilment-container {
+    background: transparent linear-gradient(146deg, #DBFFFE 0%, #EDEDFF 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-Expected-Order-container {
+    background: transparent linear-gradient(146deg, #F4FFEA 0%, #D4F8DE 100%) 0% 0% no-repeat padding-box;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-grn-container {
+    background: #A8D8EA;
+    background: #2CA6A4;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-grn-container-pending {
+    background: #FFE0B2;
+    background: #FF7043;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-customer-container-pending {
+    background: #3F6F95;
+    background: #9AB5CB;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+.VAS-vendor-container-pending {
+    background: #EDB96F;
+    background: #EDB96F;
+    padding: 0.5em;
+    height: 100%;
+    font-family: Verdana;
+}
+
+
+.VAS-deliveries-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .4em;
+}
+
+    .VAS-deliveries-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        color: rgba(var(--v-c-common), 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+    }
+
+        .VAS-deliveries-heading h6 .vis {
+            font-size: 0.875em;
+        }
+
+.VAS-orders-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .4em;
+}
+
+    .VAS-orders-heading h6 {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+    }
+
+        .VAS-orders-heading h6 .vis {
+            font-size: 0.875em;
+        }
+
+.VAS-deliveries-listing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.VAS-delivery-count {
+    width: 100%;
+    display: flex;
+    margin-bottom: 0.75em;
+}
+
+.VAS-count-lbl {
+    background-color: #4A1F55;
+    border-radius: 6px;
+    font-size: 0.875em;
+    display: flex;
+    padding: 2px 6px;
+    color: rgba(var(--v-c-common), 1);
+    gap: 0.5em;
+}
+
+    .VAS-count-lbl span {
+        display: flex;
+        background-color: rgba(var(--v-c-common), 1);
+        border-radius: 4px;
+        color: rgba(var(--v-c-on-common), 1);
+        height: 18px;
+        margin: auto;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2px;
+        font-size: 0.875em;
+    }
+
+.VAS-height-container {
+    height: calc(100% - 8em);
+    overflow: hidden;
+}
+
+.VAS-delivery-box {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.5em 0.75em 0.5em 0.75em; /* top right bottom left */
+    width: 100%;
+    /* font-family: verdana;*/
+}
+
+.VAS-box-heading {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.2em;
+}
+
+.VAS-icon-w-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+    .VAS-icon-w-name .fa {
+        color: #491954;
+        font-size: 1.1em;
+    }
+
+    .VAS-icon-w-name .VAS-doc-no {
+        font-size: 0.875em;
+        font-weight: 600;
+        color: rgba(var(--v-c-on-common), 1);
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+        overflow: hidden;
+    }
+
+.VAS-orders-text-white {
+    color: rgba(var(--v-c-common), 1) !important;
+}
+
+.VAS-total-items-count {
+    font-weight: 600;
+    color: rgba(var(--v-c-on-common), 1);
+    font-size: 0.875em;
+    text-align: right;
+}
+
+.VAS-spaceBetween-col {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+}
+
+
+.VAS-lbl-text {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-common), 0.6);
+}
+
+.VAS-spaceBetween-col .VAS-lbl-text {
+    flex: 1; /* Makes each div take equal space */
+    width: 50%; /* Ensures each div takes up 50% width */
+    overflow: hidden; /* Hides overflow content */
+    white-space: nowrap; /* Prevents content from wrapping to the next line */
+    text-overflow: ellipsis; /* Adds the ellipsis (...) */
+    box-sizing: border-box; /* Includes padding and border in the width */
+}
+
+.VAS-lbl-text span {
+    font-weight: 600;
+    color: #491954;
+}
+
+.grid-3-col {
+    display: grid;
+    align-items: center;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.VAS-qtyProd-text {
+    font-weight: 600;
+    font-size: 0.875em;
+}
+
+.VAS-expected-col {
+    width: 70%;
+}
+
+.VAS-expectedTxt {
+    font-size: 0.875em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+}
+
+
+.VAS-arrow-col {
+    width: 100%;
+}
+
+.arrow-line {
+    width: 100%;
+    border-top: 1px dashed #88719A;
+    position: relative;
+}
+
+    .arrow-line::after {
+        content: " ";
+        position: absolute;
+        border: solid #88719A;
+        border-width: 0 1px 1px 0;
+        display: inline-block;
+        padding: 3px;
+        transform: rotate(-45deg);
+        -webkit-transform: rotate(-45deg);
+        right: 0;
+        top: -4px;
+    }
+
+.VAS-slider-arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    padding: 0.6em 0.875em 0;
+    border-top: 1px solid #846291;
+}
+
+    .VAS-slider-arrows .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+    }
+
+    .VAS-slider-arrows span {
+        font-size: 1.1em;
+    }
+
+.VAS-slider-arrows-order-details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6em;
+    /* padding: 0.6em 0.875em 0; */
+    border-top: 1px solid #846291;
+}
+
+    .VAS-slider-arrows-order-details .fa {
+        font-size: 2.6em;
+        cursor: pointer;
+    }
+
+    .VAS-slider-arrows-order-details span {
+        font-size: 1.1em;
+    }
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-endService-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+}
+
+@media screen and (max-width: 1024px) {
+}
+
+@media screen and (max-width:900px) {
+}
+
+@media screen and (max-width: 768px) {
+}
+
+@media screen and (max-width: 680px) {
+}
+
+@media screen and (max-width: 600px) {
+}
+
+@media screen and (max-width: 480px) {
+}
+
+@media screen and (max-width: 320px) {
+}
+
+.VAS-info-span {
+    font-weight: bold;
+    font-style: italic;
+    position: absolute;
+    /* width: 100%; */
+    height: calc(100% - 5.375em);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, .8);
+    border-radius: 6px;
+    font-size: 1rem;
+    left: 0.5em;
+    top: 2.625em;
+    right: 0.5em;
+    z-index: 2;
+}
+
+
+
+.VAS-pointer-cursor {
+    cursor: pointer;
+}
+
+.VAS-delivery-box.no-stock {
+    background-color: #f8d7da; /* Light red background for no stock */
+    border: 1px solid #f5c6cb; /* Light red border */
+}
+
+.VAS-selection-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.6; /* Make disabled checkboxes appear grayed out */
+}
+
+
+/*.VAS-deliveries-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}*/
+
+.VAS-generate-delivery-btn {
+    padding-right: 20px;
+    padding-top: 10px;
+    color: white;
+    cursor: pointer;
+    font-size: 1.75rem;
+    /* top: -1px; */
+    display: inline-block;
+    right: 5px;
+    position: absolute;
+}
+
+
+.VAS-data-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #888;
+    font-size: 16px;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+    background-color: rgba(255, 255, 255, 0.8); /* Optional: background color with transparency */
+    border-radius: 5px; /* Optional: rounded corners */
+}
+
+
+
+.badge-green {
+    background-color: green;
+    font-size: 12px;
+    color: white;
+}
+
+.badge-red {
+    background-color: red;
+    font-size: 12px;
+    color: white;
+}
+
+.badge-orange {
+    background-color: orange;
+    font-size: 12px;
+    color: white;
+}
+
+/*-------------------------------------------- Credit Utilization Widget CSS ------------------------------------------------------*/
+
+.VAS-creditLimit-container {
+    background: linear-gradient(145deg, rgba(237,245,250,1) 0%, rgba(240,240,240,1) 100%);
+    padding: 0.75em;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75em;
+    font-family: Verdana;
+}
+
+    .VAS-creditLimit-container .nav {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+    }
+
+.VAS-LeftTabs-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 0.5em;
+}
+
+    .VAS-LeftTabs-container .nav {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        height: 100%;
+        row-gap: 0.5em;
+    }
+
+.VAS-tab-heading {
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.VAS-credit-limit-nav {
+    background-color: rgba(var(--v-c-common), 1);
+    padding: 0.3em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+    justify-content: space-evenly;
+    border-radius: 6px;
+    position: relative;
+}
+
+.VAS-credit-des {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 3.125em auto;
+    gap: 0.3em;
+    align-items: center;
+}
+
+.VAS-credit-img {
+    width: 3em;
+    height: 3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 100%;
+}
+
+    .VAS-credit-img span {
+        font-weight: bold;
+        font-size: 1.2em;
+    }
+
+.VAS-userCredit-detail .VAS-userCredit-name {
+    /*font-size: 0.875em;*/
+    color: rgba(var(--v-c-on-common), 1);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+}
+
+.VAS-userCredit-detail .VAS-userCreditStatus {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-common), 1);
+}
+
+.VAS-redStatusColor {
+    color: rgba(var(--v-c-mandatory), 1);
+}
+
+.VAS-credit-limit-nav .progress {
+    background-color: #A7DB6C;
+    height: 0.5em;
+    width: 100%;
+}
+
+.VAS-credit-limit-nav.active::after {
+    display: inline-flex;
+    content: " ";
+    width: 2em;
+    background-color: rgba(var(--v-c-common), 1);
+    top: 0;
+    bottom: 0;
+    right: -1.5em;
+    position: absolute;
+}
+
+.VAS-tiles-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1em;
+}
+
+    .VAS-tiles-pagination .fa {
+        font-size: 1.6em;
+        color: rgba(var(--v-c-primary), 1);
+        cursor: pointer;
+    }
+
+.VAS-total-count {
+    font-size: 0.875em;
+    color: rgba(var(--v-c-on-common), 1);
+    text-align: center;
+}
+
+.VAS-inputWbtn {
+    text-align: center;
+}
+
+    .VAS-inputWbtn .ui-widget {
+        padding: 0.2rem 1.2rem !important;
+    }
+
+.VAS-creditLimit-container .tab-content .tab-pane {
+    height: 100%;
+}
+
+    .VAS-creditLimit-container .tab-content .tab-pane.fade {
+        transition: none;
+    }
+
+.VAS-creditLimit-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    height: 100%;
+    justify-content: space-evenly;
+    background-color: rgba(var(--v-c-common), 1);
+    border-radius: 6px;
+    padding: 0.75em;
+}
+
+.VAS-inputWbtn .vis-input-wrap {
+    padding: 0 1.2em;
+}
+
+    .VAS-inputWbtn .vis-input-wrap select {
+        font-size: 0.875em;
+    }
+
+.VAS-chart-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-creditLimit-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-creditLimit-container {
+        font-size: 11px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-creditLimit-container {
+        font-size: 9px;
+    }
+
+    .VAS-credit-limit-nav .progress {
+        font-size: 0.5em;
+    }
+
+    .VAS-credit-img span {
+        width: 2em;
+        height: 2em;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .VAS-creditLimit-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-creditLimit-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-creditLimit-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .VAS-creditLimit-container {
+        font-size: 16px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-creditLimit-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-creditLimit-container {
+        font-size: 9px;
+    }
+
+    .VAS-LeftTabs-container .nav {
+        row-gap: 0.1em;
+    }
+}
 

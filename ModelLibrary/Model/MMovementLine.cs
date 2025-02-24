@@ -36,6 +36,13 @@ namespace VAdvantage.Model
         private MStorage storage = null;
         //private decimal qtyAvailable = 0;
         private int _mvlOldAttId = 0, _mvlNewAttId = 0;
+        private bool CreateInventoryCartForm = false;
+
+        public bool CartInventoryForm
+        {
+            get { return CreateInventoryCartForm; }
+            set { CreateInventoryCartForm = value; }
+        }
         /// <summary>
         /// Standard Constructor
         /// </summary>
@@ -241,11 +248,19 @@ namespace VAdvantage.Model
                              Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["DTD001_DeliveredQty"]);
                     if (newRecord)
                     {
-                        if (GetMovementQty() > RemainingQty)
+                        if (GetMovementQty() > RemainingQty && !CreateInventoryCartForm)
                         {
                             log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_RequistionQuantity"));
                             return false;
                         }
+                        //VIS0336:implement check for create line from cart form for cretaing line with pending qty
+
+                        else if (CreateInventoryCartForm)
+                        {
+                            SetMovementQty(RemainingQty);
+                            SetQtyEntered(RemainingQty);
+                        }
+
                     }
                     else
                     {
@@ -476,9 +491,9 @@ namespace VAdvantage.Model
                         qry.Clear();
                         qry.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                     INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(mov.GetMovementDate(), true) +
-                                    " AND t.AD_Client_ID = " + GetAD_Client_ID() +
-                                    @" AND t.M_Locator_ID = " + GetM_Locator_ID() +
-                                    " AND t.M_Product_ID = " + GetM_Product_ID() + " AND NVL(t.M_ProductContainer_ID, 0) = " + GetM_ProductContainer_ID());
+                                    " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() +
+                                    " AND t.M_Locator_ID = " + GetM_Locator_ID() + " AND t.M_Product_ID = " + GetM_Product_ID() + 
+                                    " AND NVL(t.M_ProductContainer_ID, 0) = " + GetM_ProductContainer_ID());
 
                         // In Case of Attribute Number do not check qty with attribute from storage
                         if (GetDTD001_AttributeNumber() == null || GetM_AttributeSetInstance_ID() > 0)
@@ -490,9 +505,9 @@ namespace VAdvantage.Model
                         qry.Clear();
                         qry.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC)  AS CurrentQty FROM m_transaction t 
                                    INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(mov.GetMovementDate(), true) +
-                                   " AND t.AD_Client_ID = " + GetAD_Client_ID() +
-                                   @" AND t.M_Locator_ID = " + GetM_LocatorTo_ID() +
-                                   " AND t.M_Product_ID = " + GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + GetM_AttributeSetInstance_ID() +
+                                   " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() +
+                                   " AND t.M_Locator_ID = " + GetM_LocatorTo_ID() + " AND t.M_Product_ID = " + GetM_Product_ID() + 
+                                   " AND NVL(t.M_AttributeSetInstance_ID,0) = " + GetM_AttributeSetInstance_ID() +
                                    " AND NVL(t.M_ProductContainer_ID, 0) = " + GetRef_M_ProductContainerTo_ID());
                         containerQtyTo = Util.GetValueOfDecimal(DB.ExecuteScalar(qry.ToString(), null, null));  // dont use Transaction here - otherwise impact goes wrong on completion
 

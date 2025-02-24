@@ -1397,6 +1397,14 @@ namespace VAdvantage.Model
                         fromLines[i].SetRef_OrderLine_ID(line.GetC_OrderLine_ID());
                         fromLines[i].Save(Get_TrxName());
                     }
+                    //VIS0336-changes done for FSR Generate Sales Quotation process 
+                    if (Env.IsModuleInstalled("VA075_") && line.Get_ColumnIndex("VA075_WorkOrderComponent_ID") > 0 && line.Get_ValueAsInt("VA075_WorkOrderComponent_ID") > 0 && line.GetC_OrderLine_ID()>0)
+                    {
+                        string query = "UPDATE VA075_WorkOrderComponent SET C_OrderLine_ID=" + line.GetC_OrderLine_ID() + " WHERE VA075_WorkOrderComponent_ID=" + line.Get_ValueAsInt("VA075_WorkOrderComponent_ID");
+                        DB.ExecuteQuery(query, null, Get_Trx());
+                    }
+                 
+
                 }
                 if (fromLines.Length != count)
                 {
@@ -2557,6 +2565,16 @@ namespace VAdvantage.Model
                     if (GetDateOrdered().Value.Date > GetDatePromised().Value.Date)
                     {
                         log.SaveError("Error", Msg.GetMsg(GetCtx(), "VIS_OrderDateGrtrThanPromisedDate"));
+                        return false;
+                    }
+                }
+
+                // VIS0060: Quotation Valit Till date should be greater than or equal to Quote date.
+                if (IsSalesQuotation() && GetDateOrdered() != null && Get_Value("ValidTillDate") != null)
+                {
+                    if (GetDateOrdered().Value.Date > Util.GetValueOfDateTime(Get_Value("ValidTillDate")).Value.Date)
+                    {
+                        log.SaveError("Error", Msg.GetMsg(GetCtx(), "VAS_QuoteDateGrtValid"));
                         return false;
                     }
                 }
@@ -5205,10 +5223,13 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <param name="C_Order_ID"></param>
         public static void UpdateOrderStatus(Ctx ctx, int C_Order_ID, Trx trx)
         {
-            string qry = @"UPDATE C_Order o SET o.VAS_OrderStatus = 
+            string qry = @"UPDATE C_Order o SET VAS_OrderStatus = 
                             (SELECT CASE WHEN (SUM(QtyInvoiced) = 0 AND SUM(QtyDelivered) = 0) THEN 'OP' 
-                            WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN 'IN' 
-                            WHEN (SUM(QtyInvoiced) > 0 AND SUM(QtyInvoiced) < SUM(QtyOrdered)) THEN 'PI' 
+                            WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered) AND SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DI'
+                            WHEN (SUM(QtyInvoiced) = SUM(QtyOrdered)) THEN CASE WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered))
+                            THEN 'PF' ELSE 'IN' END 
+                            WHEN (SUM(QtyInvoiced) > 0 AND SUM(QtyInvoiced) < SUM(QtyOrdered)) THEN CASE WHEN (SUM(QtyDelivered) = SUM(QtyOrdered))
+                            THEN 'FP' ELSE 'PI' END
                             WHEN (SUM(QtyDelivered) = SUM(QtyOrdered)) THEN 'DE'
                             WHEN (SUM(QtyDelivered) > 0 AND SUM(QtyDelivered) < SUM(QtyOrdered)) THEN 'PD' END AS Status
                             FROM C_OrderLine WHERE C_Order_ID = o.C_Order_ID GROUP BY C_Order_ID) 
@@ -6486,9 +6507,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 StringBuilder Info = new StringBuilder();
                 // JID_0216: System void/reverse the Shipment and invoice related to SO and voided document number will be displayed with the document name. 
                 //	Reverse All *Shipments*
-                //Info.Append("@M_InOut_ID@:");
-                Info.Append(Msg.GetMsg(GetCtx(), "Shipment") + ":");
+                //Info.Append("@M_InOut_ID@:");                
                 MInOut[] shipments = GetShipments(false);   //	get all (line based)
+                if (shipments.Length > 0)
+                {
+                    Info.Append(Msg.GetMsg(GetCtx(), "Shipment") + ":");
+                }
                 for (int i = 0; i < shipments.Length; i++)
                 {
                     MInOut ship = shipments[i];
@@ -6536,10 +6560,13 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     ship.Save(Get_TrxName());
                 }   //	for all shipments
 
-                //	Reverse All *Invoices*
-                Info.Append(" - @C_Invoice_ID@:");
+                //	Reverse All *Invoices*               
                 //Info.Append(Msg.GetMsg(GetCtx(), "SalesOrder"));
                 MInvoice[] invoices = GetInvoices(false);   //	get all (line based)
+                if (invoices.Length > 0)
+                {
+                    Info.Append(" - @C_Invoice_ID@:");
+                }
                 for (int i = 0; i < invoices.Length; i++)
                 {
                     MInvoice invoice = invoices[i];
@@ -6581,9 +6608,12 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                 }   //	for all shipments
 
                 //	Reverse All *RMAs*
-                //Info.Append("@C_Order_ID@:");
-                Info.Append(" - " + Msg.GetMsg(GetCtx(), "RMA") + ":");
+                //Info.Append("@C_Order_ID@:");               
                 MOrder[] rmas = GetRMAs();
+                if (rmas.Length > 0)
+                {
+                    Info.Append(" - " + Msg.GetMsg(GetCtx(), "RMA") + ":");
+                }
                 for (int i = 0; i < rmas.Length; i++)
                 {
                     MOrder rma = rmas[i];

@@ -17,7 +17,7 @@
         this.panelWidth;
         var lblTitle = null;
         var ctx = this.ctx;
-
+        var $self = this
         var elements = [
             "VAS_InvoiceTaxTitleTabPanel",
             "VAS_InvoiceTax",
@@ -40,12 +40,12 @@
         function InvoiceTaxPanel() {
             wrapperDiv.append(
                 '<div class="vas-aptaxListGroup">' +
-                '<div id="VAS-TaxDetail_' + this.windowNo + '" class= "VAS-TaxDetail mb-2" > ' +
+                '<div id="VAS-TaxDetail_' + $self.windowNo + '" class= "VAS-TaxDetail mb-2" > ' +
                 '</div>' +
                 '</div>');
         };
         /*This function is used to get invoice tax data*/
-        this.getInvoiceTaxData = function (recordID) {
+        this.getInvoiceTaxData = function (recordID) {            
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS/PoReceipt/GetTaxData",
                 type: "GET",
@@ -53,6 +53,7 @@
                 contentType: "application/json; charset=utf-8",
                 data: { InvoiceId: recordID },
                 success: function (data) {
+                    wrapperDiv.find('#VAS-TaxDetail_' + $self.windowNo).empty();
                     if (JSON.parse(data) != "") {
                         data = JSON.parse(data);
                         console.log(data);
@@ -79,7 +80,7 @@
                                     '</div>' +
                                     '</div>'
                                  //Appending design to wrapperDiv
-                                 wrapperDiv.find('#VAS-TaxDetail_' + this.windowNo).append(TabPaneldesign);
+                                wrapperDiv.find('#VAS-TaxDetail_' + $self.windowNo).append(TabPaneldesign);
                             }
 
                         }
@@ -98,6 +99,7 @@
         VAS.InvoiceTaxTabPanel.prototype.startPanel = function (windowNo, curTab) {
             this.windowNo = windowNo;
             this.curTab = curTab;
+            $self.windowNo = windowNo;
             this.init();
         };
         /* This function to update tab panel based on selected record */

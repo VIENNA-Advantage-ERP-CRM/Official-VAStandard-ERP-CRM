@@ -33,27 +33,31 @@ namespace VAdvantage.Process
                 }
                 else
                 {
-
                     log.Log(Level.SEVERE, "Unknown Parameter: " + name);
                 }
             }
 
         }
         protected override String DoIt()
-        {           
+        {
             if (!(R_InterestArea_ID > 0))
             {
                 return Msg.GetMsg(GetCtx(), "NoInterestAreaIsSelected");
             }
             else
             {
+                String query = "SELECT AD_User_ID FROM AD_User WHERE C_BPartner_ID= " + _C_BPartner_ID;
+                int UserId = Util.GetValueOfInt(DB.ExecuteScalar(query));
+                //VAI050-Contact details are mandatory
+                if (UserId == 0)
+                {
+                    return Msg.GetMsg(GetCtx(), "VAS_ContactDetailsNotFound");
+                }
                 X_R_ContactInterest customer = new X_R_ContactInterest(GetCtx(), 0, Get_TrxName());
                 customer.SetR_InterestArea_ID(R_InterestArea_ID);
                 customer.SetC_BPartner_ID(_C_BPartner_ID);
-                String query = "Select ad_user_id from ad_user where c_bpartner_id= " + _C_BPartner_ID;
-                int UserId = Util.GetValueOfInt(DB.ExecuteScalar(query));
                 customer.SetAD_User_ID(UserId);
-                query = "Select C_BPartner_Location_id from C_BPartner_Location where c_bpartner_id= " + _C_BPartner_ID;
+                query = "SELECT C_BPartner_Location_ID FROM C_BPartner_Location WHERE C_BPartner_ID= " + _C_BPartner_ID;
 
                 int Id = Util.GetValueOfInt(DB.ExecuteScalar(query));
                 VAdvantage.Model.X_C_BPartner_Location loc = new VAdvantage.Model.X_C_BPartner_Location(GetCtx(), Id, Get_TrxName());
@@ -64,12 +68,12 @@ namespace VAdvantage.Process
                 VAdvantage.Model.X_AD_User us = new VAdvantage.Model.X_AD_User(GetCtx(), UserId, Get_TrxName());
                 customer.SetC_Job_ID(us.GetC_Job_ID());
                 customer.SetSubscribeDate(DateTime.Today);
-                query = "Select Email from ad_user where ad_user_id= " + UserId;
+                query = "SELECT Email FROM AD_User WHERE AD_User_ID= " + UserId;
                 String mail = Util.GetValueOfString(DB.ExecuteScalar(query));
                 customer.SetEMail(mail);
                 if (!customer.Save())
                 {
-                    return Msg.GetMsg(GetCtx(), "NotSubscribed");
+                    return Msg.GetMsg(GetCtx(), "VAS_NotSubscribed");
 
                 }
                 return Msg.GetMsg(GetCtx(), "SubscribedDone");

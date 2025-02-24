@@ -106,6 +106,40 @@
         return "";
     }
 
+    /// <summary>
+    /// VAI050-set qty acc to precision defined on UOM
+    /// </summary>
+    /// <param name="ctx">Context</param>
+    /// <param name="windowNo">current Window No</param>
+    /// <param name="mTab">Model Tab</param>
+    /// <param name="mField">Model Field</param>
+    /// <param name="value">The new value</param>
+    /// <returns>Error message or ""</returns>
+    CalloutProduction.prototype.setQtyPrecision = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive() || value == null || value.toString() == "") {
+            return "";
+        }
+        this.setCalloutActive(true);
+        if (mField.getColumnName() == "BOMQty") {
+            var C_UOM_To_ID = mTab.getValue("C_UOM_ID");
+            paramStr = C_UOM_To_ID.toString().concat(","); 
+            var gp = VIS.dataContext.getJSONRecord("MUOM/GetPrecision", paramStr);
+            var QtyEntered = Util.getValueOfDecimal(value).toFixed(Util.getValueOfInt(gp));
+            mTab.setValue("BOMQty", QtyEntered);
+        }
+        else {
+            var productID = mTab.getValue("M_Product_ID");
+            paramStr = productID.toString().concat(","); 
+            var gp = VIS.dataContext.getJSONRecord("MProductionLine/GetPrecision", paramStr);
+            var QtyEntered = Util.getValueOfDecimal(value).toFixed(Util.getValueOfInt(gp));
+            mTab.setValue("ProductionQty", QtyEntered);
+        }
+        this.setCalloutActive(false);
+        return "";
+    }
+
+
+
     VIS.Model.CalloutProduction = CalloutProduction;
 
 

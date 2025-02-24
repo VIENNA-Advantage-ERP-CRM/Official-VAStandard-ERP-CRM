@@ -1,0 +1,221 @@
+.VAS-selling-container {
+    width: 100%;
+    height: 100%;
+    padding: 0.75em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+}
+
+.VAS-highest-selling-prod {
+    background: rgb(245,245,245);
+    /*background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(243,254,243,1) 100%);*/
+    background: linear-gradient(145deg, rgba(249, 253, 169, 1) 0%, rgba(186, 224, 248, 1) 100%);
+}
+
+.VAS-lowest-selling-prod {
+    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+}
+
+.VAS-container-heading {
+    position: absolute;
+    top: 0.3em;
+}
+
+.VAS-org-col {
+    display: grid;
+    grid-template-columns: auto 6.25em;
+    width: 100%;
+    align-items: center;
+}
+
+.VAS-orgName-col {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding-top: 0.5em;
+}
+
+    .VAS-orgName-col h1 {
+        font-size: 5em;
+        margin: 0;
+        font-weight: 600;
+    }
+
+.VAS-org-name {
+    font-size: 2em;
+    line-height: 1.1em;
+}
+
+    .VAS-org-name span {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+
+.VAS-org-col img {
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+}
+
+.VAS-yearly-revenue {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    padding-right: 3em;
+    position: relative;
+    gap: 0.75em;
+}
+
+.VAS-lastRevenue h1, .VAS-currentRevenue h1 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.75em;
+    justify-content: center;
+    align-items: center;
+}
+
+    .VAS-lastRevenue h1 .VAS-sale-Qty, .VAS-currentRevenue h1 .VAS-sale-Qty {
+        font-size: 0.6em;
+        margin-left: 0.2em;
+    }
+
+.VAS-lastRevenue span, .VAS-currentRevenue span {
+    display: block;
+    text-align: center;
+}
+
+.VAS-pagination-sell {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+}
+
+.VAS-arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .VAS-arrow-col a {
+        color: rgba(var(--v-c-on-secondary), .8);
+        text-decoration: none !important;
+        font-size: 1em;
+    }
+
+.VAS-page-count {
+    font-size: 0.875em;
+}
+
+.VAS-highest-selling-prod .VAS-lastRevenue h1 {
+    color: #8AC96B;
+    display: flex;
+}
+
+.VAS-highest-selling-prod .VAS-currentRevenue h1 {
+    color: #296B29;
+    display: flex;
+}
+
+.VAS-highest-selling-prod .VAS-orgName-col h1 {
+    color: #343A3F;
+}
+
+.VAS-highest-selling-prod .VAS-org-name {
+    color: #9F9E9E;
+}
+
+.VAS-lowest-selling-prod .VAS-lastRevenue h1 {
+    color: #EEB645;
+    display: flex;
+}
+
+.VAS-lowest-selling-prod .VAS-currentRevenue h1 {
+    color: #F83D3D;
+    display: flex;
+}
+
+.VAS-lowest-selling-prod .VAS-orgName-col h1 {
+    color: #343A3F;
+}
+
+.VAS-lowest-selling-prod .VAS-org-name {
+    color: #9F9E9E;
+}
+
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-selling-container {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width:900px) {
+    .VAS-selling-container {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-selling-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-selling-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .VAS-selling-container {
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-selling-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .VAS-selling-container {
+        font-size: 9px;
+    }
+
+    .VAS-org-col, .VAS-yearly-revenue {
+        font-size: 8px;
+    }
+}
