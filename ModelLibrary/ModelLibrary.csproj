@@ -581,6 +581,7 @@
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\CopyFromProjectLine.cs" />
+    <Compile Include="Process\CostClosing.cs" />
     <Compile Include="Process\CreateRecurringFromGLJournalBatch.cs" />
     <Compile Include="Process\CreateRecurringFromGLJournal.cs" />
     <Compile Include="Process\CreateRecurringFromInvoice.cs" />
