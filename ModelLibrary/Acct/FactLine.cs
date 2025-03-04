@@ -1141,6 +1141,19 @@ namespace VAdvantage.Acct
             }
             else if (_doc is Doc_GLJournal)
             {
+                //VIS_045: 04-Mar-2025: Get Conversion rate during segment balance (Coversion rate not found on Doc and Doscument Line is null)
+                if (_docLine == null && GetConversionRate() == 0 && GetC_Currency_ID() != _acctSchema.GetC_Currency_ID())
+                {
+                    //  get conversion rate from Assigned accounting schema tab 
+                    Decimal conversionRate = Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT CurrencyRate FROM GL_AssignAcctSchema WHERE 
+                                     C_AcctSchema_ID = " + _acctSchema.GetC_AcctSchema_ID() + " AND GL_Journal_ID = " + Get_ID(), null, null));
+                    if (conversionRate == 0)
+                    {
+                        //  get conversion rate from convsersion
+                        conversionRate = MConversionRate.GetRate(GetC_Currency_ID(), _acctSchema.GetC_Currency_ID(), convDate, C_ConversionType_ID, _doc.GetAD_Client_ID(), AD_Org_ID);
+                    }
+                    SetConversionRate(conversionRate);
+                }
                 SetAmtAcctDr(Decimal.Round(Decimal.Multiply(GetAmtSourceDr(), _docLine != null ? Util.GetValueOfDecimal(_docLine.GetConversionRate()) : Util.GetValueOfDecimal(GetConversionRate())), _acctSchema.GetStdPrecision()));
                 SetAmtAcctCr(Decimal.Round(Decimal.Multiply(GetAmtSourceCr(), _docLine != null ? Util.GetValueOfDecimal(_docLine.GetConversionRate()) : Util.GetValueOfDecimal(GetConversionRate())), _acctSchema.GetStdPrecision()));
                 return true;
