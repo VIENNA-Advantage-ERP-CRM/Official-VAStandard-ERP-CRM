@@ -4047,6 +4047,12 @@ namespace VAdvantage.Model
                                                             inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
                                                             inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
                                                         }
+                                                        else if (costingCheck.onHandQty == 0)
+                                                        { 
+                                                            // 03-Mar-2025, for Costing Method other than LIFO / FIFO 
+                                                            // and all stock out before receiving Invoice
+                                                            inv.Set_Value("ConsumedQty", inv.GetQty());
+                                                        }
                                                         inv.Save(Get_Trx());
 
                                                         // update the Post current price after Invoice receving on inoutline
@@ -4752,6 +4758,12 @@ namespace VAdvantage.Model
                                                     inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
                                                     inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
                                                 }
+                                                else if (costingCheck.onHandQty == 0)
+                                                {
+                                                    // 03-Mar-2025, for Costing Method other than LIFO / FIFO 
+                                                    // and all stock out before receiving Invoice
+                                                    inv.Set_Value("ConsumedQty", inv.GetQty());
+                                                }
                                                 inv.Save(Get_Trx());
 
                                                 // update the Post current price after Invoice receving on inoutline
@@ -4957,12 +4969,12 @@ namespace VAdvantage.Model
                                                 if (costingCheck.onHandQty == 0)
                                                 {
                                                     query.Append($@" , TotalCogsAdjustment = {Decimal.Round(
-                                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                                     (( line.GetQtyEntered()) * line.GetPriceActual()), GetPrecision())}");
                                                 }
                                                 else
                                                 {
                                                     query.Append($@" , TotalInventoryAdjustment = {Decimal.Round(
-                                                                   ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                                   (( line.GetQtyEntered()) * line.GetPriceActual()), GetPrecision())}");
                                                 }
                                             }
 
