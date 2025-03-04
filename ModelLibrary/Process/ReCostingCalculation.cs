@@ -1148,12 +1148,12 @@ namespace VAdvantage.Process
                                                                         if (costingCheck.onHandQty == 0)
                                                                         {
                                                                             invoiceLine.Set_Value("TotalCOGSAdjustment", Decimal.Round(
-                                                                            ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                            ((invoiceLine.GetQtyEntered()) * invoiceLine.GetPriceActual()), costingCheck.precision));
                                                                         }
                                                                         else
                                                                         {
                                                                             invoiceLine.Set_Value("TotalInventoryAdjustment", Decimal.Round(
-                                                                            ((invoiceLine.GetQtyEntered() / invoiceLine.GetQtyInvoiced()) * invoiceLine.GetPriceActual()), costingCheck.precision));
+                                                                            ((invoiceLine.GetQtyEntered()) * invoiceLine.GetPriceActual()), costingCheck.precision));
                                                                         }
                                                                     }
 
@@ -2669,8 +2669,8 @@ namespace VAdvantage.Process
         public string GetClosingInfo()
         {
             sql.Clear();
-            sql.Append($@"SELECT COUNT(Distinct M_Product_ID) FROM M_CostClosing 
-                            WHERE TRUNC(Created) = {GlobalVariable.TO_DATE(DateFrom.Value.AddDays(-1), true)} ");
+            sql.Append($@"SELECT MAX(Created) FROM M_CostClosing 
+                            WHERE TRUNC(Created) < {GlobalVariable.TO_DATE(DateFrom.Value, true)} ");
             if (!string.IsNullOrEmpty(productID))
             {
                 sql.Append($@" AND M_Product_ID IN ({productID})");
@@ -2679,10 +2679,14 @@ namespace VAdvantage.Process
             {
                 sql.Append($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
             }
-            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-            if (count == 0)
+            DateTime? LastClosingDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+            if (LastClosingDate == null)
             {
                 return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotFound");
+            }
+            else
+            {
+                DateFrom = LastClosingDate.Value.AddDays(1);
             }
             return "";
         }
@@ -2698,7 +2702,9 @@ namespace VAdvantage.Process
             SELECT
                 M_COSTClosing_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, Current_Date, {GetAD_User_ID()}, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY, 
                 DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, Current_Date, 
-                {GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE, A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID           
+                {GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE,
+                CASE WHEN NVL(A_ASSET_ID , 0) = 0 THEN 0 ELSE A_ASSET_ID END AS A_ASSET_ID, ISASSETCOST, 
+                CASE WHEN NVL(M_WAREHOUSE_ID , 0) = 0 THEN 0 ELSE M_WAREHOUSE_ID END M_WAREHOUSE_ID           
             FROM M_COSTClosing ");
             sql.Append($@" WHERE Created = {GlobalVariable.TO_DATE(DateFrom.Value.AddDays(-1), true)} ");
             if (!string.IsNullOrEmpty(productID))
@@ -2737,47 +2743,9 @@ namespace VAdvantage.Process
                 }
                 if (DateFrom != null)
                 {
-                    sql.Append($" AND trunc(movementdate) >= {GlobalVariable.TO_DATE(DateFrom, true)}");
+                    sql.Append($" AND trunc(movementdate) > {GlobalVariable.TO_DATE(DateFrom, true)}");
                 }
                 minDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-
-                //sql.Clear();
-                //sql.Append("SELECT Min(DateAcct) FROM m_matchinv WHERE isactive = 'Y' AND iscostcalculated = 'N'  AND AD_Client_ID = " + GetCtx().GetAD_Client_ID());
-                //tempDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                //if (minDate == null || (Util.GetValueOfDateTime(minDate) > Util.GetValueOfDateTime(tempDate) && tempDate != null))
-                //{
-                //    minDate = tempDate;
-                //}
-
-                //try
-                //{
-                //    sql.Clear();
-                //    sql.Append("SELECT Min(Updated) FROM M_MatchInvCostTrack WHERE isactive = 'Y'  AND AD_Client_ID = " + GetCtx().GetAD_Client_ID());
-                //    tempDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                //    if (minDate == null || (Util.GetValueOfDateTime(minDate) > Util.GetValueOfDateTime(tempDate) && tempDate != null))
-                //    {
-                //        minDate = tempDate;
-                //    }
-                //}
-                //catch { }
-
-                //sql.Clear();
-                //sql.Append("SELECT Min(DateAcct) FROM C_Invoice WHERE isactive = 'Y' AND ((docstatus IN ('CO' , 'CL') AND iscostcalculated = 'N') OR (docstatus IN ('RE') AND iscostcalculated = 'Y' AND ISREVERSEDCOSTCALCULATED= 'N' AND description like '%{->%'))  AND AD_Client_ID = " + GetCtx().GetAD_Client_ID());
-                //tempDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                //if (minDate == null || (Util.GetValueOfDateTime(minDate) > Util.GetValueOfDateTime(tempDate) && tempDate != null))
-                //{
-                //    minDate = tempDate;
-                //}
-
-                //sql.Clear();
-                //sql.Append(@"SELECT Min(DateAcct) FROM C_ProvisionalInvoice WHERE isactive = 'Y' AND
-                //((docstatus IN ('CO' , 'CL') AND iscostcalculated = 'N') OR 
-                //(docstatus IN ('RE') AND iscostcalculated = 'Y' AND ISREVERSEDCOSTCALCULATED= 'N' AND IsReversal ='Y'))  AND AD_Client_ID = " + GetCtx().GetAD_Client_ID());
-                //tempDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-                //if (minDate == null || (Util.GetValueOfDateTime(minDate) > Util.GetValueOfDateTime(tempDate) && tempDate != null))
-                //{
-                //    minDate = tempDate;
-                //}
             }
             catch (Exception ex)
             {
@@ -5667,6 +5635,23 @@ namespace VAdvantage.Process
                         // set is cost calculation true on match invoice
                         //matchInvoice.SetIsCostCalculated(true);
                         matchInvoice.SetIsCostImmediate(true);
+
+                        if (matchInvoice.Get_ColumnIndex("QueueQty") >= 0 && costingCheck != null && costingCheck.currentQtyonQueue != null)
+                        {
+                            matchInvoice.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
+                            matchInvoice.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(matchInvoice.GetQty()), costingCheck.currentQtyonQueue.Value));
+                        }
+                        else if (costingCheck.onHandQty == 0)
+                        {
+                            // 03-Mar-2025, for Costing Method other than LIFO / FIFO 
+                            // and all stock out before receiving Invoice
+                            matchInvoice.Set_Value("ConsumedQty", matchInvoice.GetQty());
+                        }
+                        else if (costingCheck != null && costingCheck.currentQtyonQueue == null && costingCheck.onHandQty == null)
+                        {
+                            matchInvoice.Set_Value("ConsumedQty", 0);
+                        }
+
                         if (!matchInvoice.Save(Get_Trx()))
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
