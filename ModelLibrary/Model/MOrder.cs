@@ -6440,6 +6440,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                     line.SetQty(Env.ZERO);
                     line.SetLineNetAmt(Env.ZERO);
                     line.SetLineTotalAmt(Env.ZERO);//VAI050-Set Line Total Amount zero
+                    line.SetTaxAmt(Env.ZERO);
 
                     // Remove Reference of Requisition from PO line after Void.
                     line.Set_Value("M_RequisitionLine_ID", 0);
@@ -6489,6 +6490,9 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
             }
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
+            //VAI050-Set Amount zero when document voided
+            SetTotalLines(Env.ZERO);
+            SetGrandTotal(Env.ZERO);
             return true;
         }
 
