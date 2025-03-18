@@ -643,12 +643,6 @@ namespace VAdvantage.Model
                     }
                 }
             }
-            //VIS_427 Applied check of module in case of Charge in order to get the charge type
-            string ChargeType = "";
-            if (GetC_Charge_ID() > 0 && Env.IsModuleInstalled("DTD001_"))
-            {
-                ChargeType = Util.GetValueOfString(DB.ExecuteScalar("SELECT DTD001_ChargeType FROM C_Charge WHERE C_Charge_ID=" + GetC_Charge_ID(), null, Get_Trx()));
-            }
             bool verify = newRecord
                 || Is_ValueChanged("CashType")
                 || Is_ValueChanged("C_Invoice_ID")
@@ -686,7 +680,7 @@ namespace VAdvantage.Model
                     // Not to change currency with cashbook currency when Order selected 
                 }
                 //VIS_427 bypass the condition when cash type is charge and charge is contra
-                else if(CASHTYPE_Charge.Equals(GetCashType()) && ChargeType.Equals("CON"))
+                else if(CASHTYPE_Charge.Equals(GetCashType()) && Env.IsModuleInstalled("VA012_") && Util.GetValueOfBool(Get_Value("VA012_IsContra")))
                 {
                     // Not to change currency with cashbook currency when  selected Charge is Contra
                 }
