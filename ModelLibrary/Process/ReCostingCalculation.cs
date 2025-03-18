@@ -3100,12 +3100,16 @@ namespace VAdvantage.Process
 
         public int GetStandardCostElement()
         {
+            int M_CostElement_ID = 0;
             // get Costing element id where Costing Method is Standard Costing
-            sql.Clear();
-            sql.Append(@"SELECT M_CostElement_ID FROM M_CostElement ce ");
-            sql.Append($@" WHERE CostingMethod IN ('{X_M_Product_Category.COSTINGMETHOD_StandardCosting}')");
-            sql.Append($" AND AD_Client_ID = {GetCtx().GetAD_Client_ID()}");
-            int M_CostElement_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString()));
+            if (DateFrom == null)
+            {
+                sql.Clear();
+                sql.Append(@"SELECT M_CostElement_ID FROM M_CostElement ce ");
+                sql.Append($@" WHERE CostingMethod IN ('{X_M_Product_Category.COSTINGMETHOD_StandardCosting}')");
+                sql.Append($" AND AD_Client_ID = {GetCtx().GetAD_Client_ID()}");
+                M_CostElement_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString()));
+            }
             return M_CostElement_ID;
         }
 
