@@ -1077,7 +1077,7 @@ namespace VAdvantage.Model
                                 {
                                     Price = GetPrice(inout, inoutline, acctSchema.GetC_Currency_ID(), costingCheck);
                                 }
-                                if (Price == 0)
+                                if (Price == 0 || windowName == "Material Receipt")
                                 {
                                     // when we not find price on product cost and price list then we check invoice price
                                     // check any invoice is created with this MR if yes then consider first invoice price for this MR costing
@@ -1101,25 +1101,55 @@ namespace VAdvantage.Model
                                         DataSet dsInv = DB.ExecuteDataset(@"SELECT C_Currency_ID , C_ConversionType_ID FROM C_Invoice 
                                                          WHERE C_Invoice_ID = (SELECT C_Invoice_ID FROM C_InvoiceLine 
                                                          WHERE C_InvoiceLine_ID = " + invoiceLineId + ")", null, trxName);
+                                        Decimal InvoicePrice = 0;
+                                        InvoicePrice = invoiceline.GetProductLineCost(invoiceline);
+                                        if (!(product != null && product.Get_ID() > 0 && product.IsCostAdjustmentOnLost()))
+                                        {
+                                            InvoicePrice = Decimal.Divide(invoiceline.GetProductLineCost(invoiceline), invoiceline.GetQtyInvoiced());
+                                            InvoicePrice = InvoicePrice * inoutline.GetMovementQty();
+                                        }
 
-                                        Price = Decimal.Divide(invoiceline.GetProductLineCost(invoiceline), invoiceline.GetQtyInvoiced());
-                                        Price = Price * inoutline.GetMovementQty();
                                         if (Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]) != acctSchema.GetC_Currency_ID())
                                         {
-                                            if (Price == 0)
+                                            if (InvoicePrice == 0)
                                             {
-                                                costingCheck.errorMessage += "Price not available";
+                                                //costingCheck.errorMessage += "Price not available";
                                             }
                                             // convert amount on account date of M_Inout (discussed with Ashish, Suya, Mukesh sir)
-                                            Price = MConversionRate.ConvertCostingPrecision(ctx, Price, Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]), acctSchema.GetC_Currency_ID(),
+                                            InvoicePrice = MConversionRate.ConvertCostingPrecision(ctx, InvoicePrice, Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_Currency_ID"]), acctSchema.GetC_Currency_ID(),
                                                     inout.GetDateAcct(), Util.GetValueOfInt(dsInv.Tables[0].Rows[0]["C_ConversionType_ID"]), AD_Client_ID, AD_Org_ID2);
 
-                                            if (Price == 0)
+                                            if (InvoicePrice == 0)
                                             {
-                                                costingCheck.errorMessage += "Conversion not available";
+                                                //costingCheck.errorMessage += "Conversion not available";
                                             }
                                         }
+
                                         invoiceline = null;
+                                        if (InvoicePrice != 0)
+                                        {
+                                            Price = InvoicePrice;
+                                            cmPrice = Price;
+                                            costingCheck.isInvoiceLinkedwithGRN = true;
+                                            costingCheck.errorMessage = string.Empty;
+                                        }
+                                    }
+
+                                    if (costingCheck.isReversal.Value)
+                                    {
+                                        // get price from Cost Details
+                                        // When MR is created with Invoice Reference and Invoice is reversed then system will get the price from Cost Detail
+                                        Decimal InvoicePrice = 0;
+                                        InvoicePrice = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT Amt  
+                                        FROM M_CostDetail WHERE m_InOutLine_ID = {inoutline.GetReversalDoc_ID()} 
+                                        AND C_AcctSchema_ID = {acctSchema.GetC_AcctSchema_ID()} AND NVL(C_InvoiceLine_ID, 0) = 0 AND NVL(C_OrderLine_ID, 0) = 0 "));
+                                        if (InvoicePrice != 0)
+                                        {
+                                            Price = Math.Sign(inoutline.GetMovementQty()) * InvoicePrice;
+                                            cmPrice = Price;
+                                            costingCheck.isInvoiceLinkedwithGRN = true;
+                                            costingCheck.errorMessage = string.Empty;
+                                        }
                                     }
                                 }
 
