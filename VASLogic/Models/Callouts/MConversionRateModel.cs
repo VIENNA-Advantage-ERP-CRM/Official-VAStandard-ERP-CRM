@@ -104,7 +104,7 @@ namespace VIS.Models
             try
             {
                 // VIS_045: 26/02/2024 -> Handle UTC time issue
-                convDate = Util.GetValueOfDateTime(paramValue[3].ToString());
+                convDate = DateTime.Parse(paramValue[3].ToString());
             }
             catch
             {

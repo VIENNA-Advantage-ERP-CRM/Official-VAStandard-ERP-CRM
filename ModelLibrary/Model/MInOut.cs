@@ -3450,7 +3450,8 @@ namespace VAdvantage.Model
                                     {
                                         query.Append(" ProductApproxCost = " + currentCostPrice);
                                     }
-                                    if (isUpdatePostCurrentcostPriceFromMR)
+                                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then update Product cost also on product trx record 
+                                    if (isUpdatePostCurrentcostPriceFromMR || costingCheck.isInvoiceLinkedwithGRN)
                                     {
                                         // when selected costing method is average po, weighted average po, last po
                                         // else to be updated from invoice

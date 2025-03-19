@@ -73,6 +73,8 @@ namespace ModelLibrary.Classes
         public decimal DifferenceAmtPOandInvInBaseCurrency = 0;
         public bool VAS_IsDOCost = false;
 
+        public bool isInvoiceLinkedwithGRN = false;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -223,6 +225,8 @@ namespace ModelLibrary.Classes
             OrderLineAmtinBaseCurrency = 0;
             DifferenceAmtPOandInvInBaseCurrency = 0;
             VAS_IsDOCost = false;
+
+            isInvoiceLinkedwithGRN = false;
 
         }
 
