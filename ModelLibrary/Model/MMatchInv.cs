@@ -321,6 +321,12 @@ namespace VAdvantage.Model
                 }
             }
 
+            //VIS_0045: 18-Mar-2025, set is PO Costing Method linked to Product or not 
+            if (Get_ColumnIndex("VAS_IsPOCostingMethod") >= 0)
+            {
+                Set_Value("VAS_IsPOCostingMethod", MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(), GetM_Product_ID(), Get_Trx()));
+            }
+
             if (GetM_AttributeSetInstance_ID() == 0 && GetM_InOutLine_ID() != 0)
             {
                 if (iol == null || iol.Get_ID() <= 0 || iol.Get_ID() != GetM_InOutLine_ID())

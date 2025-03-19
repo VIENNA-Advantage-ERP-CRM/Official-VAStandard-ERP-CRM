@@ -1642,7 +1642,8 @@ namespace VAdvantage.Model
                         // if current cost price avialble then add that amount else the same scenario
                         // VIS_0045: 28-June-2022 -> When MR + PO, amt will be picked from cost detail + surcharge if applicable
                         // When Physical Inventory, Price Cost defined then cost will be impacted with PriceCost
-                        if (cost.GetCurrentCostPrice() != 0 && !(windowName.Equals("Material Receipt") && GetC_OrderLine_ID() != 0)
+                        // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
+                        if (cost.GetCurrentCostPrice() != 0 && !(windowName.Equals("Material Receipt") && (GetC_OrderLine_ID() != 0 || costingCheck.isInvoiceLinkedwithGRN))
                             && !(windowName.Equals("Physical Inventory") && Util.GetValueOfDecimal(costingCheck.inventoryLine.Get_Value("PriceCost")) != 0))
                         {
                             amt = cost.GetCurrentCostPrice() * qty;
@@ -1658,7 +1659,8 @@ namespace VAdvantage.Model
                 else if (windowName.Equals("Material Receipt"))
                 {
                     // if current cost price avialble then add that amount else the same scenario
-                    if (cost.GetCurrentCostPrice() != 0 && GetC_OrderLine_ID() == 0)
+                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
+                    if (cost.GetCurrentCostPrice() != 0 && GetC_OrderLine_ID() == 0 && !costingCheck.isInvoiceLinkedwithGRN)
                     {
                         amt = cost.GetCurrentCostPrice() * qty;
                     }
@@ -2288,7 +2290,9 @@ namespace VAdvantage.Model
                     else if (!windowName.Equals("Invoice(Vendor)-Return"))
                     {
                         // if current cost price avialble then add that amount else the same scenario
+                        // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
                         if (cost.GetCurrentCostPrice() != 0
+                            && !(windowName.Equals("Material Receipt") && (GetC_OrderLine_ID() != 0 || costingCheck.isInvoiceLinkedwithGRN))
                             && !(windowName.Equals("Physical Inventory") && Util.GetValueOfDecimal(costingCheck.inventoryLine.Get_Value("PriceCost")) != 0))
                         {
                             amt = cost.GetCurrentCostPrice() * qty;
@@ -2305,7 +2309,9 @@ namespace VAdvantage.Model
                 else if (windowName.Equals("Material Receipt"))
                 {
                     // if current cost price avialble then add that amount else the same scenario
-                    if (cost.GetCurrentCostPrice() != 0 && GetC_OrderLine_ID() == 0)
+                    // VIS_045: amt is received from Invoice
+                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
+                    if (cost.GetCurrentCostPrice() != 0 && (GetC_OrderLine_ID() == 0 && !costingCheck.isInvoiceLinkedwithGRN))
                     {
                         amt = cost.GetCurrentCostPrice() * qty;
                     }
@@ -3607,7 +3613,8 @@ namespace VAdvantage.Model
                     else
                     {
                         // if current cost price avialble then add that amount else the same scenario
-                        if (cost.GetCurrentCostPrice() != 0 && !(windowName.Equals("Material Receipt") && GetC_OrderLine_ID() != 0)
+                        // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
+                        if (cost.GetCurrentCostPrice() != 0 && !(windowName.Equals("Material Receipt") && (GetC_OrderLine_ID() != 0 || costingCheck.isInvoiceLinkedwithGRN))
                             && !(windowName.Equals("Physical Inventory") && Util.GetValueOfDecimal(costingCheck.inventoryLine.Get_Value("PriceCost")) != 0))
                         {
                             amt = cost.GetCurrentCostPrice() * qty;
@@ -3621,7 +3628,8 @@ namespace VAdvantage.Model
                 else if (windowName.Equals("Material Receipt"))
                 {
                     // if current cost price avialble then add that amount else the same scenario
-                    if (cost.GetCurrentCostPrice() != 0 && GetC_OrderLine_ID() == 0)
+                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then 'amt' will not be the Currentcostprice 
+                    if (cost.GetCurrentCostPrice() != 0 && GetC_OrderLine_ID() == 0 && !costingCheck.isInvoiceLinkedwithGRN)
                     {
                         amt = cost.GetCurrentCostPrice() * qty;
                     }
@@ -3809,7 +3817,7 @@ namespace VAdvantage.Model
                          @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) = 0 " +
                          @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
                                         AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
-            MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+            MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             if (MRPrice == 0)
             {
                 sql = @"SELECT";
@@ -3831,7 +3839,7 @@ namespace VAdvantage.Model
                          @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) =  " + cd.GetC_OrderLine_ID() +
                          @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
                                         AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
-                MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+                MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             }
             MRPrice = Decimal.Round(MRPrice, mas.GetCostingPrecision(), MidpointRounding.AwayFromZero);
 
