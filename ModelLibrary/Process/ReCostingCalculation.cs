@@ -3127,7 +3127,7 @@ namespace VAdvantage.Process
                 var pc = "(SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )";
                 sql.Clear();
                 sql.Append($@"UPDATE M_CostQueue cq
-                            SET cq.CurrentQty =  (
+                            SET CurrentQty =  (
                                 SELECT ABS(SUM(cqt.MovementQty))
                                 FROM M_CostQueueTransaction cqt
                                 WHERE cq.M_CostQueue_ID = cqt.M_CostQueue_ID
