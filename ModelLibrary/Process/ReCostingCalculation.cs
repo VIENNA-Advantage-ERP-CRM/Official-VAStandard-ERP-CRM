@@ -2088,7 +2088,7 @@ namespace VAdvantage.Process
                 CASE WHEN NVL(A_ASSET_ID , 0) = 0 THEN 0 ELSE A_ASSET_ID END AS A_ASSET_ID, ISASSETCOST, 
                 CASE WHEN NVL(M_WAREHOUSE_ID , 0) = 0 THEN 0 ELSE M_WAREHOUSE_ID END M_WAREHOUSE_ID           
             FROM M_COSTClosing ");
-            sql.Append($@" WHERE Created = {GlobalVariable.TO_DATE(DateFrom.Value.AddDays(-1), true)} ");
+            sql.Append($@" WHERE TRUNC(Created) = {GlobalVariable.TO_DATE(DateFrom.Value.AddDays(-1), true)} ");
             if (!string.IsNullOrEmpty(productID))
             {
                 sql.Append($@" AND M_Product_ID IN ({productID})");
