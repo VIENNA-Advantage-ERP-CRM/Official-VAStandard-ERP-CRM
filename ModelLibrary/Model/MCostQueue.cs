@@ -1394,6 +1394,8 @@ namespace VAdvantage.Model
                             bool isRecordFromForm = false;
 
                             #region get costing level and costing method
+                            //if (costingCheck == null || (costingCheck != null && string.IsNullOrEmpty(costingCheck.materialCostingMethod)))
+                            //{
                             pca = MProductCategory.Get(product.GetCtx(), product.GetM_Product_Category_ID());
                             if (pca != null)
                             {
@@ -1432,6 +1434,12 @@ namespace VAdvantage.Model
                             {
                                 costingMethodMatchPO = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, trxName));
                             }
+                            //}
+                            //else
+                            //{
+                            //    cl = costingCheck.costinglevel;
+                            //    costingMethodMatchPO = costingCheck.materialCostingMethod;
+                            //}
                             #endregion
 
                             if (costingCheck != null)
@@ -1516,7 +1524,7 @@ namespace VAdvantage.Model
                             if (client.IsCostImmediate())
                             {
                                 #region cost detail creation or not
-                                if (costingMethodMatchPO == "A" || costingMethodMatchPO == "p" ||
+                                if (costingMethodMatchPO == MCostElement.COSTINGMETHOD_AveragePO || costingMethodMatchPO == MCostElement.COSTINGMETHOD_LastPOPrice ||
                                     costingMethodMatchPO == MCostElement.COSTINGMETHOD_WeightedAveragePO)
                                 {
                                     // not to create cost detail by this section if costing method is either Average PO or Last PO oe We AV PO
@@ -1529,11 +1537,13 @@ namespace VAdvantage.Model
                                 else
                                 {
                                     // created cost detail with orderline ref 
-                                    cd = new MCostDetail(acctSchema, AD_Org_ID, product.GetM_Product_ID(), M_ASI_ID,
+                                    cd = new MCostDetail(acctSchema, inoutline.GetAD_Org_ID(), product.GetM_Product_ID(), M_ASI_ID,
                                                           0, Decimal.Round(Decimal.Multiply(Qty, Price), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero), Qty, null, trxName);
                                     cd.SetM_InOutLine_ID(inoutline.GetM_InOutLine_ID());
                                     cd.SetC_OrderLine_ID(orderLineId);
                                     cd.SetM_Warehouse_ID(inout.GetM_Warehouse_ID());
+                                    cd.Set_Value("MovementDate", inout.GetMovementDate());
+                                    cd.SetIsSOTrx(inout.IsSOTrx());
                                     if (!cd.Save(trxName))
                                     {
                                         if (optionalstr != "window")
@@ -1567,6 +1577,8 @@ namespace VAdvantage.Model
                                 cd.SetM_AttributeSetInstance_ID(M_ASI_ID);
                                 cd.SetC_AcctSchema_ID(acctSchema.GetC_AcctSchema_ID());
                                 cd.SetM_Warehouse_ID(inout.GetM_Warehouse_ID());
+                                cd.Set_Value("MovementDate", inout.GetMovementDate());
+                                cd.SetIsSOTrx(inout.IsSOTrx());
                             }
 
                             // MR costing calculated before matching PO with MR
@@ -1636,22 +1648,20 @@ namespace VAdvantage.Model
                             }
 
                             // match PO with MR before MR costing calculation
-                            else if (!inoutline.IsCostCalculated())
+                            else if (!inoutline.IsCostCalculated() && !client.IsCostImmediate())
                             {
                                 #region when costing calculation is on completion no need to create cost queue
-                                if (!client.IsCostImmediate())
+                                if (!CreateCostQueueForMatchPO(ctx, acctSchema, product, M_ASI_ID, AD_Client_ID, AD_Org_ID,
+                                    Price, inoutline.GetMovementQty(), inoutline, trxName, inout.GetM_Warehouse_ID(), optionalStrPO: optionalstr))
                                 {
-                                    if (!CreateCostQueueForMatchPO(ctx, acctSchema, product, M_ASI_ID, AD_Client_ID, AD_Org_ID,
-                                        Price, inoutline.GetMovementQty(), inoutline, trxName, inout.GetM_Warehouse_ID(), optionalStrPO: optionalstr))
-                                    {
-                                        _log.Severe("Error occured during craetion of cost queue -> MatchPO. M_Inoutline_ID is " + inoutline.GetM_InOutLine_ID());
-                                        return false;
-                                    }
-                                    else
-                                    {
-                                        isRecordFromForm = true;
-                                    }
+                                    _log.Severe("Error occured during craetion of cost queue -> MatchPO. M_Inoutline_ID is " + inoutline.GetM_InOutLine_ID());
+                                    return false;
                                 }
+                                else
+                                {
+                                    isRecordFromForm = true;
+                                }
+
                                 #endregion
                             }
 
@@ -1686,10 +1696,17 @@ namespace VAdvantage.Model
 
                             if (client.IsCostImmediate())
                             {
-                                #region Get MR price from t_temp_CostDetail  costing calculation on completion
+                                #region Get MR price from t_temp_CostDetail/Cost Detail  costing calculation on completion
                                 MRPriceAvPo = 0;
                                 MRPriceLastPO = 0;
                                 query.Clear();
+                                //query.Append($@"SELECT ROUND(amt/qty, 12) FROM M_CostDetail WHERE IsActive = 'Y' 
+                                //                 AND AD_Client_ID = { AD_Client_ID }
+                                //                 AND AD_Org_ID IN ( { AD_Org_ID }, {inoutline.GetAD_Org_ID()} ) 
+                                //                 AND C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID() }
+                                //                 AND M_Product_ID = { product.GetM_Product_ID() } AND NVL(C_OrderLine_ID , 0) = 0  
+                                //                 AND M_InOutLine_ID = { inoutline.GetM_InOutLine_ID()} ORDER BY AD_Org_ID ASC ");
+                                //MRPriceAvPo = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString(), null, trxName));
                                 query.Append(@"SELECT amt FROM T_Temp_CostDetail WHERE IsActive = 'Y' AND AD_Client_ID = " + AD_Client_ID +
                                              " AND AD_Org_ID = " + AD_Org_ID + " AND C_AcctSchema_ID = " + acctSchema.GetC_AcctSchema_ID() +
                                              " AND M_Product_ID = " + product.GetM_Product_ID() + " AND NVL(C_OrderLine_ID , 0) = 0  " +
@@ -1714,23 +1731,30 @@ namespace VAdvantage.Model
                                 int costElementId = 0;
                                 // when iscostimmediate = true
                                 // if mr line cost already calculated then during match PO with MR we have to calculate both Average PO and Last PO
-                                if ((optionalstr == "window" && (costingMethodMatchPO == "A")) || optionalstr == "process")
+                                if ((optionalstr == "window" && costingMethodMatchPO == "A") || optionalstr == "process")
                                 {
                                     query.Clear();
-                                    query.Append(@"SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID +
-                                                 @" AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
-                                    costElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
+                                    if (costingCheck == null || string.IsNullOrEmpty(costingCheck.materialCostingMethod))
+                                    {
+                                        query.Append(@"SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID +
+                                                     @" AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
+                                        costElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
+                                    }
+                                    else
+                                    {
+                                        costElementId = costingCheck.materialCostingElement;
+                                    }
 
                                     costElement = MCostElement.Get(ctx, costElementId);
 
                                     #region Av. PO
                                     if (cl == MProductCategory.COSTINGLEVEL_Client || cl == MProductCategory.COSTINGLEVEL_Organization) //(cl != "B")
                                     {
-                                        cost = MCost.Get(product, 0, acctSchema, AD_Org_ID, costElementId);
+                                        cost = MCost.Get(product, 0, acctSchema, AD_Org_ID, costElementId, 0);
                                     }
                                     else if (cl == MProductCategory.COSTINGLEVEL_BatchLot || cl == MProductCategory.COSTINGLEVEL_OrgPlusBatch)
                                     {
-                                        cost = MCost.Get(product, M_ASI_ID, acctSchema, AD_Org_ID, costElementId);
+                                        cost = MCost.Get(product, M_ASI_ID, acctSchema, AD_Org_ID, costElementId, 0);
                                     }
                                     else if (cl == MProductCategory.COSTINGLEVEL_Warehouse || cl == MProductCategory.COSTINGLEVEL_WarehousePlusBatch)
                                     {
@@ -1796,20 +1820,20 @@ namespace VAdvantage.Model
                                     }
                                     else
                                     {
-                                        if (cl == MProductCategory.COSTINGLEVEL_Client || cl == MProductCategory.COSTINGLEVEL_Warehouse
-                                            || cl == MProductCategory.COSTINGLEVEL_Organization)//(cl != "B")
-                                        {
-                                            MCostElementDetail.CreateCostElementDetail(ctx, AD_Client_ID, AD_Org_ID, product, 0,
+                                        //if (cl == MProductCategory.COSTINGLEVEL_Client || cl == MProductCategory.COSTINGLEVEL_Warehouse
+                                        //    || cl == MProductCategory.COSTINGLEVEL_Organization)//(cl != "B")
+                                        //{
+                                        //    MCostElementDetail.CreateCostElementDetail(ctx, AD_Client_ID, AD_Org_ID, product, 0,
+                                        //                         acctSchema, costElementId, windowName, cd,
+                                        //                         Decimal.Round(Decimal.Multiply(cost.GetCurrentCostPrice(), Qty), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero), Qty, costingCheck);
+                                        //}
+                                        //else if (cl == MProductCategory.COSTINGLEVEL_BatchLot || cl == MProductCategory.COSTINGLEVEL_OrgPlusBatch
+                                        //    || cl == MProductCategory.COSTINGLEVEL_WarehousePlusBatch)
+                                        //{
+                                        MCostElementDetail.CreateCostElementDetail(ctx, AD_Client_ID, AD_Org_ID, product, M_ASI_ID,
                                                                  acctSchema, costElementId, windowName, cd,
                                                                  Decimal.Round(Decimal.Multiply(cost.GetCurrentCostPrice(), Qty), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero), Qty, costingCheck);
-                                        }
-                                        else if (cl == MProductCategory.COSTINGLEVEL_BatchLot || cl == MProductCategory.COSTINGLEVEL_OrgPlusBatch
-                                            || cl == MProductCategory.COSTINGLEVEL_WarehousePlusBatch)
-                                        {
-                                            MCostElementDetail.CreateCostElementDetail(ctx, AD_Client_ID, AD_Org_ID, product, M_ASI_ID,
-                                                                     acctSchema, costElementId, windowName, cd,
-                                                                     Decimal.Round(Decimal.Multiply(cost.GetCurrentCostPrice(), Qty), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero), Qty, costingCheck);
-                                        }
+                                        //}
                                     }
                                     #endregion
 
@@ -2352,6 +2376,15 @@ namespace VAdvantage.Model
                                     MRPriceFifo = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString()));
                                 }
                             }
+
+                            //query.Clear();
+                            //query.Append($@"SELECT  ROUND( Amt/Qty, 10) as currentCostAmount  FROM M_CostDetail ced  
+                            //                 WHERE ced.IsActive = 'Y' AND ced.M_Product_ID = { product.GetM_Product_ID() } 
+                            //                 AND ced.C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID() } AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (0, { M_ASI_ID }) 
+                            //                 AND ced.M_InOutLine_ID =  { inoutline.GetM_InOutLine_ID() } AND NVL(ced.C_OrderLIne_ID , 0) IN ( 0 , {MatchPO_OrderLineId})
+                            //                 AND NVL(ced.C_InvoiceLine_ID , 0) = 0 AND ced.AD_Client_ID = { inoutline.GetAD_Client_ID()} 
+                            //                 ORDER BY ced.M_AttributeSetInstance_ID ASC, ced.C_OrderLIne_ID DESC");
+                            //MRPriceLifo = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString()));
                             #endregion
 
                             // not execute this if section
@@ -2698,9 +2731,14 @@ namespace VAdvantage.Model
                                                     }
                                                     return false;
                                                 }
-                                                query.Clear();
-                                                query.Append("UPDATE m_costqueue SET CurrentCostPrice = " + price + " WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds2.Tables[0].Rows[b]["M_CostQueue_ID"]));
-                                                DB.ExecuteQuery(query.ToString(), null, trxName);
+
+                                                // VIS_045: 20-Mar-2025, Cost Queue Price updated only when Current Qty != 0 on Queue
+                                                if (costingCheck.currentQtyonQueue != 0)
+                                                {
+                                                    query.Clear();
+                                                    query.Append("UPDATE m_costqueue SET CurrentCostPrice = " + price + " WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds2.Tables[0].Rows[b]["M_CostQueue_ID"]));
+                                                    DB.ExecuteQuery(query.ToString(), null, trxName);
+                                                }
                                             }
                                         }
                                         #endregion
@@ -4429,9 +4467,13 @@ namespace VAdvantage.Model
                                                     }
                                                 }
 
-                                                query.Clear();
-                                                query.Append("UPDATE m_costqueue SET CurrentCostPrice = " + price + " WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostQueue_ID"]));
-                                                DB.ExecuteQuery(query.ToString(), null, trxName);
+                                                //VIS_045: 19-Mar-2025, When Current Qty become ZERO then no need to update price on Cost Queue
+                                                if (Util.GetValueOfDecimal(ds1.Tables[0].Rows[k]["CurrentQty"]) != 0)
+                                                {
+                                                    query.Clear();
+                                                    query.Append("UPDATE m_costqueue SET CurrentCostPrice = " + price + " WHERE M_CostQueue_ID = " + Util.GetValueOfInt(ds1.Tables[0].Rows[k]["M_CostQueue_ID"]));
+                                                    DB.ExecuteQuery(query.ToString(), null, trxName);
+                                                }
                                             }
                                         }
                                         ds1.Dispose();
