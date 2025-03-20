@@ -2450,6 +2450,12 @@ namespace VAdvantage.Process
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
 
+                // Update Current Stock which is affected after the from date on Cost Queue
+                if (DateFrom != null)
+                {
+                    UpdateCostQueue();
+                }
+
                 sql.Clear();
                 sql.Append($@"delete from M_CostQueueTransaction WHERE m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
@@ -2790,6 +2796,12 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
+                // Update Current Stock which is affected after the from date on Cost Queue
+                if (DateFrom != null)
+                {
+                    UpdateCostQueue();
+                }
+
                 sql.Clear();
                 sql.Append($@"delete from M_CostQueueTransaction WHERE M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
@@ -3066,6 +3078,12 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
+                // Update Current Stock which is affected after the from date on Cost Queue
+                if (DateFrom != null)
+                {
+                    UpdateCostQueue();
+                }
+
                 sql.Clear();
                 sql.Append($@"delete from M_CostQueueTransaction WHERE AD_client_ID IN ({ GetAD_Client_ID() })");
                 if (DateFrom != null)
@@ -3096,6 +3114,37 @@ namespace VAdvantage.Process
 
             Get_Trx().Commit();
 
+        }
+
+        /// <summary>
+        /// This function is used to update the Current Qunatity on Cost Queue when Re-Costing calculation process run with From data Parameter
+        /// </summary>
+        /// <returns></returns>
+        public bool UpdateCostQueue()
+        {
+            if (DateFrom != null)
+            {
+                var pc = "(SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )";
+                sql.Clear();
+                sql.Append($@"UPDATE M_CostQueue cq
+                            SET cq.CurrentQty =  (
+                                SELECT ABS(SUM(cqt.MovementQty))
+                                FROM M_CostQueueTransaction cqt
+                                WHERE cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                  AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
+                                  AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
+                                  AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)}
+                            )
+                            WHERE EXISTS (
+                                SELECT 1
+                                FROM M_CostQueueTransaction cqt
+                                WHERE cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                  AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
+                                  AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
+                                  AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)})");
+                int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+            }
+            return true;
         }
 
         public int GetStandardCostElement()
