@@ -7078,6 +7078,14 @@ namespace VAdvantage.Model
 
             }
 
+            //VIS_045: 20-Mar-2025, Check any treat as Discount record found against this Invoice then not to reverse this record
+            if (Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine 
+                WHERE NVL(Ref_InvoiceOrg_ID , 0) = {GetC_Invoice_ID()} AND NVL(ReversalDoc_ID, 0) = 0", null, Get_Trx())) > 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_TreatAsDiscountRecordFound");
+                return false;
+            }
+
             //VIS_045: DevOps Task ID: 5701 - When IRN/E-Way bill exist then user can't be reverse the document.
             if (Env.IsModuleInstalled("VA106_"))
             {
