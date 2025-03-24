@@ -7,6 +7,7 @@ using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.DataBase;
 using VAdvantage.ProcessEngine;
+using VAdvantage.Model;
 //using ViennaAdvantage.Model;
 
 
@@ -61,6 +62,16 @@ namespace ViennaAdvantage.Process
                 opp.SetIsOpportunity(true);
                 /*Vivek*/
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
+                //VAI050-Set below coulum if VA061 module install
+                if (Env.IsModuleInstalled("VA061_"))
+                {
+                    opp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                    opp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                    opp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                    opp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                    opp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                }
                 if (lead.GetC_ProposalDdate() != null)
                 {
                     /** Fix for Proposal Due Date issue ** Dt: 05/12/2021 ** Modified By: Kumar **/
@@ -75,8 +86,15 @@ namespace ViennaAdvantage.Process
                 }
                 if (opp.Save())
                 {
+                    //VAI050-To Save history data on opportunity window
+                    int FromTableID = PO.Get_Table_ID("C_Lead");
+                    int ToTableID = PO.Get_Table_ID("C_Project");
+
+                    LeadBPartner obj = new LeadBPartner();
+                    obj.CopyTabPanelData(FromTableID, ToTableID,opp.GetC_Project_ID(),lead.GetC_Lead_ID());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
+
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
 
                 }
@@ -112,6 +130,16 @@ namespace ViennaAdvantage.Process
                 opp.SetName(bp.GetName());
                 opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
                 opp.SetIsOpportunity(true);
+                //VAI050-Set below coulum if VA061 module install
+                if (Env.IsModuleInstalled("VA061_"))
+                {
+                    opp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                    opp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                    opp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                    opp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                    opp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                }
                 /*Vivek*/
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
                 if (lead.GetC_ProposalDdate() != null)
@@ -128,6 +156,11 @@ namespace ViennaAdvantage.Process
                 }
                 if (opp.Save())
                 {
+                    //VAI050-Save history chat data form lead window to opportunity window
+                    int FromTableID = PO.Get_Table_ID("C_Lead");
+                    int ToTableID = PO.Get_Table_ID("C_Project");
+                    LeadBPartner obj = new LeadBPartner();
+                    obj.CopyTabPanelData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
