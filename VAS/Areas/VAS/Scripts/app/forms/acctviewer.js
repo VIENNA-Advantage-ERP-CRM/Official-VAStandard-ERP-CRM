@@ -1957,6 +1957,10 @@
             _data.Query(AD_Client_ID, callbackGetDataModel, resetPageCtrls, pNo);
             //if (dataValues != null) {
             if (_data.C_AcctSchema_ID > 0) {
+                //Here set the null to filter if old value and new value of control is same
+                if (_data.C_AcctSchema_ID == cmbAccSchemaFilter.oldValue) {
+                    cmbAccSchemaFilter.setValue(null);
+                }
                 cmbAccSchemaFilter.setValue(_data.C_AcctSchema_ID);
             }
             //setModel(dataValues);
