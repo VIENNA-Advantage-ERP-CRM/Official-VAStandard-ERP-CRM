@@ -925,7 +925,9 @@
             mTab.setValue("C_Tax_ID", null);
         }
         //VIS_427 This function is used to clear the fields according to value of cash type
-        ClearValueOfFields(ctx, windowNo, mTab, mField, value, oldValue);
+        if (mField.getColumnName() == "CashType") {
+            ClearValueOfFields(ctx, windowNo, mTab, mField, value, oldValue);
+        }
 
         if (Util.getValueOfString(mTab.getValue("VSS_PAYMENTTYPE")) == "P" ||
             Util.getValueOfString(mTab.getValue("VSS_PAYMENTTYPE")) == "E") {/*Receipt Return and Payment*/
