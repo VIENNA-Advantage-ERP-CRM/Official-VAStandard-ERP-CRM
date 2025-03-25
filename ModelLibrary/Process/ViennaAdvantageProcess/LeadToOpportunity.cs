@@ -8,6 +8,7 @@ using VAdvantage.Logging;
 using VAdvantage.DataBase;
 using VAdvantage.ProcessEngine;
 using VAdvantage.Model;
+using ModelLibrary.Classes;
 //using ViennaAdvantage.Model;
 
 
@@ -88,10 +89,8 @@ namespace ViennaAdvantage.Process
                 {
                     //VAI050-To Save history data on opportunity window
                     int FromTableID = PO.Get_Table_ID("C_Lead");
-                    int ToTableID = PO.Get_Table_ID("C_Project");
-
-                    LeadBPartner obj = new LeadBPartner();
-                    obj.CopyTabPanelData(FromTableID, ToTableID,opp.GetC_Project_ID(),lead.GetC_Lead_ID());
+                    int ToTableID = PO.Get_Table_ID("C_Project");                
+                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
 
@@ -159,8 +158,7 @@ namespace ViennaAdvantage.Process
                     //VAI050-Save history chat data form lead window to opportunity window
                     int FromTableID = PO.Get_Table_ID("C_Lead");
                     int ToTableID = PO.Get_Table_ID("C_Project");
-                    LeadBPartner obj = new LeadBPartner();
-                    obj.CopyTabPanelData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID());
+                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
