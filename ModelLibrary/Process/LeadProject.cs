@@ -23,6 +23,9 @@ using System.Data;
 using VAdvantage.Logging;
 
 using VAdvantage.ProcessEngine;
+using ViennaAdvantage.Process;
+using ModelLibrary.Classes;
+
 namespace VAdvantage.Process
 {
     public class LeadProject : ProcessEngine.SvrProcess
@@ -99,6 +102,16 @@ namespace VAdvantage.Process
                     _cbp.SetC_IndustryCode_ID(lead.GetC_IndustryCode_ID());
                     _cbp.SetEMail(lead.GetEMail());
                     _cbp.SetMobile(lead.GetMobile());
+                    //VAI050-Set below coulum if VA061 module install
+                    if (Env.IsModuleInstalled("VA061_"))
+                    {
+                        _cbp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                        _cbp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                        _cbp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                        _cbp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                        _cbp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                    }
                     if (!_cbp.Save())
                         log.SaveError("ERROR:", "Error in Saving Bpartner");
                 }
@@ -153,6 +166,17 @@ namespace VAdvantage.Process
                     bp.SetDescription(Util.GetValueOfString(lead.Get_Value("Description")));
                     bp.Set_Value("C_Lead_Target", val);
                     bp.Set_Value("Created", lead.GetCreated());
+                    //VAI050-Set below coulum if VA061 module install
+                    if (Env.IsModuleInstalled("VA061_"))
+                    {
+                        bp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                        bp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                        bp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                        bp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                        bp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                    }
+
                     //C_Location_ID
 
                     bp.Save();
@@ -328,7 +352,25 @@ namespace VAdvantage.Process
 
                 project.SetIsOpportunity(true);
                 project.Set_Value("Created", lead.GetCreated());
-                project.Save();
+                //VAI050-Set below coulum if VA061 module install
+                if (Env.IsModuleInstalled("VA061_"))
+                {
+                    project.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                    project.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                    project.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                    project.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                    project.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                }
+
+                if (project.Save())
+                {
+                    //VAI050-Save History from lead window to opportunity window
+                    int FromTableID = PO.Get_Table_ID("C_Lead");
+                    int ToTableID = PO.Get_Table_ID("C_Project");
+                    VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, project.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+
+                };
             }
             //
             return "@C_Project_ID@ " + project.GetName();

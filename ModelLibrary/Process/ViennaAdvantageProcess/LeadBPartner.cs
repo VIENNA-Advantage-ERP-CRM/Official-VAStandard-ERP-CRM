@@ -21,6 +21,7 @@ using VAdvantage.Utility;
 using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.ProcessEngine;
+using ModelLibrary.Classes;
 
 //namespace VAdvantage.Process
 namespace ViennaAdvantage.Process
@@ -143,8 +144,17 @@ namespace ViennaAdvantage.Process
                     _cbp.SetC_IndustryCode_ID(lead.GetC_IndustryCode_ID());
                     _cbp.SetEMail(lead.GetEMail());
                     _cbp.SetMobile(lead.GetMobile());
+                    if (Env.IsModuleInstalled("VA061_"))
+                    {
+                        _cbp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                        _cbp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                        _cbp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                        _cbp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                        _cbp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
 
-                    if (!_cbp.Save())
+                    }
+
+                        if (!_cbp.Save())
                         log.SaveError("ERROR:", "Error in Saving Bpartner");
                 }
                 if (lead.GetAD_User_ID() > 0)
@@ -193,6 +203,15 @@ namespace ViennaAdvantage.Process
                     bp.SetC_Greeting_ID(Util.GetValueOfInt(lead.Get_Value("C_Greeting_ID")));
                     bp.SetC_BP_Status_ID(Util.GetValueOfInt(lead.Get_Value("C_BP_Status_ID")));
                     bp.Set_Value("VA047_LinkedIn", Util.GetValueOfString(lead.Get_Value("VA047_LinkedIn")));
+                    if (Env.IsModuleInstalled("VA061_"))
+                    {
+                        bp.Set_Value("VA061_ThreadID", lead.Get_Value("VA061_ThreadID"));
+                        bp.Set_Value("VA061_SheetURL", lead.Get_Value("VA061_SheetURL"));
+                        bp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
+                        bp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
+                        bp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+
+                    }
 
                     //C_Location_ID
 
@@ -302,110 +321,12 @@ namespace ViennaAdvantage.Process
                 C_BpID = lead.GetRef_BPartner_ID();
             }
 
-            #region Copy Mail
             int tableID = PO.Get_Table_ID("C_Lead");
             int c_bpTableID = PO.Get_Table_ID("C_BPartner");
 
-            if (tableID > 0)
-            {
-                int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
-                if (RecordIDS.Length > 0)
-                {
-                    MMailAttachment1 hist = null;
-                    MMailAttachment1 Oldhist = null;
-                    for (int i = 0; i < RecordIDS.Length; i++)
-                    {
-                        Oldhist = new MMailAttachment1(GetCtx(), RecordIDS[i], Get_TrxName());
-                        hist = new MMailAttachment1(GetCtx(), 0, Get_TrxName());
-                        Oldhist.CopyTo(hist);
-                        if (C_BpID != 0)
-                            hist.SetRecord_ID(C_BpID);
-                        if (c_bpTableID > 0)
-                            hist.SetAD_Table_ID(c_bpTableID);
-                        if (!hist.Save())
-                            log.SaveError("ERROR:", "Error in Copy Email");
+            VAS_CommonMethod.CopyHistorRecordData(tableID, c_bpTableID, C_BpID,lead.GetC_Lead_ID(),Get_TrxName(),GetCtx());
 
-                    }
 
-                }
-
-            }
-            #endregion
-
-            #region Copy History Records
-            if (tableID > 0)
-            {
-                int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
-                if (RecordsIDS.Length > 0)
-                {
-                    MAppointmentsInfo hist = null;
-                    MAppointmentsInfo Oldhist = null;
-                    for (int i = 0; i < RecordsIDS.Length; i++)
-                    {
-                        Oldhist = new MAppointmentsInfo(GetCtx(), RecordsIDS[i], Get_TrxName());
-                        hist = new MAppointmentsInfo(GetCtx(), 0, Get_TrxName());
-                        Oldhist.CopyTo(hist);
-                        hist.SetStartDate(Oldhist.GetStartDate().Value.ToLocalTime());
-                        hist.SetEndDate(Oldhist.GetEndDate().Value.ToLocalTime());
-                        if (C_BpID != 0)
-                            hist.SetRecord_ID(C_BpID);
-                        if (c_bpTableID > 0)
-                            hist.SetAD_Table_ID(c_bpTableID);
-                        if (!hist.Save())
-                            log.SaveError("ERROR:", "Error in Copy HistoryRecords");
-                    }
-                }
-            }
-
-            #endregion
-
-            //Copy chat data from Lead window to prospect window
-            #region Copy Chat Data
-            if (tableID > 0)
-            {
-                int[] chatID = MChat.GetAllIDs("CM_Chat", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
-                if (chatID.Length > 0)
-                {
-                    MChatEntry chatEntry = null;
-                    MChatEntry oldChatEntry = null;
-                    MChat oldchat = new MChat(GetCtx(), chatID[0], Get_TrxName());
-                    MChat newchat = new MChat(GetCtx(), 0, Get_TrxName());
-                    oldchat.CopyTo(newchat);
-                    if (C_BpID != 0)
-                        newchat.SetRecord_ID(C_BpID);
-                    if (c_bpTableID > 0)
-                        newchat.SetAD_Table_ID(c_bpTableID);
-
-                    if (newchat.Save())
-                    {
-                        string sql = ("SELECT CM_ChatEntry_ID FROM CM_ChatEntry WHERE IsActive='Y' AND CM_Chat_ID=" + chatID[0]);
-                        DataSet ds = DB.ExecuteDataset(sql, null, Get_TrxName());
-
-                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                        {
-                            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                            {
-                                oldChatEntry = new MChatEntry(GetCtx(), Util.GetValueOfInt(ds.Tables[0].Rows[i]["CM_ChatEntry_ID"]), Get_TrxName());
-                                chatEntry = new MChatEntry(GetCtx(), 0, Get_TrxName());
-                                oldChatEntry.CopyTo(chatEntry);
-                                chatEntry.SetCM_Chat_ID(newchat.GetCM_Chat_ID());
-                                chatEntry.SetCharacterData(oldChatEntry.GetCharacterData());
-                                if (!chatEntry.Save())
-                                {
-                                    log.Severe("VIS_ErrorCopyChatData");
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        log.Severe("VIS_ErrorCopyChatData");
-                    }
-                }
-            }
-
-            #endregion
-            //
             if (lead.GetRef_BPartner_ID() != 0)
             {
                 return Msg.GetMsg(GetCtx(), "ProspectGenerated");
@@ -413,7 +334,8 @@ namespace ViennaAdvantage.Process
             else
                 return Msg.GetMsg(GetCtx(), "ProspectNotGenerated");
 
-        }	//	doIt
+        }   
+
 
     }
 
