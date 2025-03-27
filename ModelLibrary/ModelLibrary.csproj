@@ -166,6 +166,7 @@
     <Compile Include="Classes\BudgetCheck.cs" />
     <Compile Include="Classes\CostingCheck.cs" />
     <Compile Include="Classes\MyModelValidator.cs" />
+    <Compile Include="Classes\VAS_CommonMethod.cs" />
     <Compile Include="CM\CacheClearAll.cs" />
     <Compile Include="CM\CacheClearServer.cs" />
     <Compile Include="CM\CacheHandler.cs" />
@@ -579,6 +580,7 @@
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\CopyFromProjectLine.cs" />
+    <Compile Include="Process\CostClosing.cs" />
     <Compile Include="Process\CreateRecurringFromGLJournalBatch.cs" />
     <Compile Include="Process\CreateRecurringFromGLJournal.cs" />
     <Compile Include="Process\CreateRecurringFromInvoice.cs" />

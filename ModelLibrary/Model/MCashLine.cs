@@ -643,7 +643,6 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
             bool verify = newRecord
                 || Is_ValueChanged("CashType")
                 || Is_ValueChanged("C_Invoice_ID")
@@ -656,15 +655,15 @@ namespace VAdvantage.Model
                 else if (CASHTYPE_Invoice.Equals(GetCashType()))
                 {
                     // Added by Amit 1-8-2015 VAMRP
-                    if (Env.HasModulePrefix("VAMRP_", out mInfo))
-                    {
-                        // SetC_Currency_ID(GetInvoice().GetC_Currency_ID());
-                    }
-                    else
-                    {
-                        // Commented To Get the Invoice Open Amount Right in case of Diff Currencies
-                        // SetC_Currency_ID(GetInvoice().GetC_Currency_ID());
-                    }
+                    //if (Env.HasModulePrefix("VAMRP_", out mInfo))
+                    //{
+                    //    // SetC_Currency_ID(GetInvoice().GetC_Currency_ID());
+                    //}
+                    //else
+                    //{
+                    //    // Commented To Get the Invoice Open Amount Right in case of Diff Currencies
+                    //    // SetC_Currency_ID(GetInvoice().GetC_Currency_ID());
+                    //}
                     //end
                 }
                 // Added by Bharat on 16/12/2016 handle the case of Multicurrency in Cash Book Transfer
@@ -679,6 +678,11 @@ namespace VAdvantage.Model
                 else if (CASHTYPE_Order.Equals(GetCashType()))
                 {
                     // Not to change currency with cashbook currency when Order selected 
+                }
+                //VIS_427 bypass the condition when cash type is charge and charge is contra
+                else if(CASHTYPE_Charge.Equals(GetCashType()) && Env.IsModuleInstalled("VA012_") && Util.GetValueOfBool(Get_Value("VA012_IsContra")))
+                {
+                    // Not to change currency with cashbook currency when  selected Charge is Contra
                 }
                 else	//	Cash 
                     SetC_Currency_ID(GetCashBook().GetC_Currency_ID());

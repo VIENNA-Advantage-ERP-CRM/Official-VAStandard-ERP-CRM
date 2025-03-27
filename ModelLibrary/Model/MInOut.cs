@@ -3450,7 +3450,8 @@ namespace VAdvantage.Model
                                     {
                                         query.Append(" ProductApproxCost = " + currentCostPrice);
                                     }
-                                    if (isUpdatePostCurrentcostPriceFromMR)
+                                    // VIS_0045: 18-Mar-2025, When GRN created with Invoice reference then update Product cost also on product trx record 
+                                    if (isUpdatePostCurrentcostPriceFromMR || costingCheck.isInvoiceLinkedwithGRN)
                                     {
                                         // when selected costing method is average po, weighted average po, last po
                                         // else to be updated from invoice
@@ -3462,6 +3463,11 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+
+                                    // VIS_045: 19-Mar-2025, Update Match Invoice record (Differenec Price of (AP - PO))
+                                    DB.ExecuteQuery($@"UPDATE M_MatchInv 
+                                    SET PriceDifferenceAPPO = CASE WHEN PricePO = 0 THEN PriceDifferenceAPPO - {costingCheck.OrderLineAmtinBaseCurrency}
+                                        ELSE PriceDifferenceAPPO END WHERE M_InOutLine_ID = {sLine.GetM_InOutLine_ID()}", null, Get_Trx());
                                 }
                                 #endregion
                             }

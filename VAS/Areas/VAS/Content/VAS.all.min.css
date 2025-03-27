@@ -1,4 +1,5 @@
 ﻿/*version 1.5.7.0*/
+
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
@@ -6288,6 +6289,10 @@ html[dir="rtl"] .VAS-cashISOCode {
     cursor: pointer;
 }
 
+.VAS-Cursor {
+    cursor: pointer;
+}
+
 .VAS-flyout-body {
     padding: 0px;
 }
@@ -6385,7 +6390,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     .VAS-form-field > label {
         font-size: 0.875rem;
         margin-bottom: 0.3rem;
-        font-weight: 500;
+        font-weight: 600;
     }
 
 .VAS-input-w-icon {
@@ -6403,6 +6408,7 @@ html[dir="rtl"] .VAS-cashISOCode {
         padding: 6px 8px 6px 34px;
         font-size: 0.875rem;
         height: 32px;
+        cursor: pointer;
     }
 
     .VAS-input-w-icon .vis, .VAS-input-w-icon .fa {
@@ -6417,6 +6423,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     font-size: 0.875rem;
     font-weight: 500;
 }
+
 
 .VAS-avail-cart-col {
     width: 100%;
@@ -6463,6 +6470,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     grid-template-columns: 74% 26%;
     padding: 0.5rem;
     align-items: center;
+    cursor: pointer;
 }
 
 .VAS-cartName-w-des h1 {
@@ -6510,6 +6518,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     display: flex;
     align-items: center;
     gap: 0.875rem;
+    cursor: pointer;
 }
 
     .VAS-cart-list-header a {

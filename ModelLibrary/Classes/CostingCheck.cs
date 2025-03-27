@@ -73,6 +73,8 @@ namespace ModelLibrary.Classes
         public decimal DifferenceAmtPOandInvInBaseCurrency = 0;
         public bool VAS_IsDOCost = false;
 
+        public bool isInvoiceLinkedwithGRN = false;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -224,6 +226,8 @@ namespace ModelLibrary.Classes
             DifferenceAmtPOandInvInBaseCurrency = 0;
             VAS_IsDOCost = false;
 
+            isInvoiceLinkedwithGRN = false;
+
         }
 
         /// <summary>
@@ -274,7 +278,7 @@ namespace ModelLibrary.Classes
         /// </summary>
         /// <param name="trx">Transaction</param>
         /// <returns>Error Message (if any)</returns>
-        public string InsertCostClosing(Trx trx)
+        public string InsertCostClosing(string ProductCategoryID, string Product_ID, Trx trx)
         {
             query.Clear();
             query.Append($@"DELETE FROM M_COSTClosing WHERE TRUNC(created) = TRUNC(current_Date)");
@@ -288,10 +292,19 @@ namespace ModelLibrary.Classes
             SELECT
                 M_Cost_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, Current_Date, {_ctx.GetAD_User_ID()}, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY, 
                 DESCRIPTION, FUTURECOSTPRICE, ISACTIVE, M_ATTRIBUTESETINSTANCE_ID, M_COSTELEMENT_ID, M_COSTTYPE_ID, M_PRODUCT_ID, PERCENTCOST, Current_Date, 
-                {_ctx.GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE, A_ASSET_ID, ISASSETCOST, M_WAREHOUSE_ID           
+                {_ctx.GetAD_User_ID()}, BASISTYPE, ISTHISLEVEL, ISUSERDEFINED, LASTCOSTPRICE, 
+                CASE WHEN NVL(A_ASSET_ID, 0) = 0 THEN NULL ELSE A_ASSET_ID END AS A_ASSET_ID, ISASSETCOST, 
+                 CASE WHEN NVL(M_WAREHOUSE_ID, 0) = 0 THEN NULL ELSE M_WAREHOUSE_ID END AS M_WAREHOUSE_ID           
             FROM M_Cost");
             query.Append($@" WHERE AD_Client_ID = {_ctx.GetAD_Client_ID()} ");
-
+            if (!string.IsNullOrEmpty(Product_ID))
+            {
+                query.Append($@" AND M_Product_ID IN ({Product_ID}) ");
+            }
+            if (!string.IsNullOrEmpty(ProductCategoryID))
+            {
+                query.Append($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ProductCategoryID}))");
+            }
             int no = DB.ExecuteQuery(query.ToString(), null, trx);
             if (no <= 0)
             {

@@ -593,7 +593,7 @@ namespace VAdvantage.Model
                 AD_Org_ID = 0;
 
             //	Create/Update Costs
-            MCostDetail.ProcessProduct(product, trxName);
+            // MCostDetail.ProcessProduct(product, trxName);
 
             return Util.GetValueOfDecimal(GetCurrentCost(
                 product, M_AttributeSetInstance_ID,

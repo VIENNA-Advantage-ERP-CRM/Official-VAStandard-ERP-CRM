@@ -159,10 +159,10 @@ namespace VIS.Controllers
             }
 
             StringBuilder sql = new StringBuilder("SELECT "
-               + "ROUND((l.QtyOrdered-SUM(COALESCE(m.Qty,0))) * "
-               + "(CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") as QUANTITY,"
-               + "ROUND((l.QtyOrdered-SUM(COALESCE(m.Qty,0))) * "
-               + "(CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") as QTYENTER,"
+               + " ROUND((l.QtyOrdered-CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) * "
+               + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QUANTITY,"
+               + " ROUND((l.QtyOrdered-CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0) ELSE SUM(COALESCE(m.qty, 0)) END) * "
+               + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QTYENTER,"
                + " l.C_UOM_ID  as C_UOM_ID  ,COALESCE(uom.UOMSymbol,uom.Name) as UOM,"
                + " COALESCE(l.M_Product_ID,0) as M_PRODUCT_ID ,p.Name as PRODUCT, p.Value as PRODUCTSEARCHKEY,"
                + " l.M_AttributeSetInstance_ID AS M_ATTRIBUTESETINSTANCE_ID ,"
@@ -219,7 +219,7 @@ namespace VIS.Controllers
             //    sql.Append(" AND l.QtyDelivered != 0 ");
             //}
 
-            sql.Append(" GROUP BY l.QtyOrdered,CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END, "
+            sql.Append(" GROUP BY l.QtyOrdered,l.QtyDelivered ,o.IsSoTrx,CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END, "
                     + "l.C_UOM_ID,COALESCE(uom.UOMSymbol,uom.Name), "
                         + "l.M_Product_ID,p.Name,p.Value, l.M_AttributeSetInstance_ID, l.Line,l.C_OrderLine_ID, ins.description,  " + precision + ",l.IsDropShip, o.C_PaymentTerm_ID , t.Name, l.PriceEntered  "); //Arpit on  20th Sept,2017"	            
 
@@ -262,7 +262,7 @@ namespace VIS.Controllers
                     sql.Append(DelivDates);
                 }
 
-                sql.Append(" GROUP BY l.QtyOrdered,CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END, "
+                sql.Append(" GROUP BY l.QtyOrdered,l.QtyDelivered ,o.IsSoTrx,CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END, "
                       + "l.C_UOM_ID,COALESCE(uom.UOMSymbol,uom.Name), "
                       + "l.M_Product_ID,c.Name,c.Value,l.M_AttributeSetInstance_ID, l.Line,l.C_OrderLine_ID, ins.description, " + precision + ", l.IsDropShip , o.C_PaymentTerm_ID , t.Name, l.PriceEntered");
             }

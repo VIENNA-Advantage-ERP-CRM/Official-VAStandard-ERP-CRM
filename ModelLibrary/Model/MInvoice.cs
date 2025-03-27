@@ -3161,6 +3161,14 @@ namespace VAdvantage.Model
                                      GROUP BY M_Product_ID HAVING COUNT(M_Product_ID) > 1", null, Get_Trx());
                 }
 
+                //VIS_045: 13-Mar-2025, Get Original Invoice Lines
+                DataSet dsOriginalInvoiceLines = null;
+                if (IsReversal())
+                {
+                    dsOriginalInvoiceLines = DB.ExecuteDataset($@"SELECT * FROM C_InvoiceLine 
+                                    WHERE C_Invoice_ID= {GetReversalDoc_ID()}", null, Get_Trx());
+                }
+
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MInvoiceLine line = lines[i];
@@ -3655,8 +3663,19 @@ namespace VAdvantage.Model
                                         (SELECT MAX(M_Transaction_ID) FROM M_Transaction WHERE M_Product_ID = C_InvoiceLine.M_Product_ID)
                                        WHERE C_Invoiceline_ID = {line.GetC_InvoiceLine_ID()} ", null, Get_Trx());
 
+                    //VIS_0045: 13-Mar-2025, check Original Invoice Cost is calculated or not, if not calculated then not to calculate cost for reversal document as well
+                    bool IsCostCalcualtionRequired = true;
+                    if (IsReversal() && dsOriginalInvoiceLines != null && dsOriginalInvoiceLines.Tables.Count > 0 && dsOriginalInvoiceLines.Tables[0].Rows.Count > 0)
+                    {
+                        DataRow[] dr = dsOriginalInvoiceLines.Tables[0].Select("C_InvoiceLine_ID =" + line.GetReversalDoc_ID());
+                        if (dr != null && dr.Length > 0)
+                        {
+                            IsCostCalcualtionRequired = (Util.GetValueOfString(dr[0]["IsCostImmediate"]).Equals("Y") || Util.GetValueOfString(dr[0]["IsCostCalculated"]).Equals("Y"));
+                        }
+                    }
+
                     //Enhaced by amit 16-12-2015 for Cost Queue
-                    if (client.IsCostImmediate())
+                    if (client.IsCostImmediate() && IsCostCalcualtionRequired)
                     {
                         ModelLibrary.Classes.CostingCheck costingCheck = new ModelLibrary.Classes.CostingCheck(GetCtx());
                         costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
@@ -4046,6 +4065,12 @@ namespace VAdvantage.Model
                                                         {
                                                             inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
                                                             inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
+                                                        }
+                                                        else if (costingCheck.onHandQty == 0)
+                                                        {
+                                                            // 03-Mar-2025, for Costing Method other than LIFO / FIFO 
+                                                            // and all stock out before receiving Invoice
+                                                            inv.Set_Value("ConsumedQty", inv.GetQty());
                                                         }
                                                         inv.Save(Get_Trx());
 
@@ -4752,6 +4777,12 @@ namespace VAdvantage.Model
                                                     inv.Set_Value("QueueQty", costingCheck.currentQtyonQueue);
                                                     inv.Set_Value("ConsumedQty", Decimal.Subtract(Util.GetValueOfDecimal(inv.GetQty()), costingCheck.currentQtyonQueue.Value));
                                                 }
+                                                else if (costingCheck.onHandQty == 0)
+                                                {
+                                                    // 03-Mar-2025, for Costing Method other than LIFO / FIFO 
+                                                    // and all stock out before receiving Invoice
+                                                    inv.Set_Value("ConsumedQty", inv.GetQty());
+                                                }
                                                 inv.Save(Get_Trx());
 
                                                 // update the Post current price after Invoice receving on inoutline
@@ -4957,12 +4988,12 @@ namespace VAdvantage.Model
                                                 if (costingCheck.onHandQty == 0)
                                                 {
                                                     query.Append($@" , TotalCogsAdjustment = {Decimal.Round(
-                                                                     ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                                     ((line.GetQtyEntered()) * line.GetPriceActual()), GetPrecision())}");
                                                 }
                                                 else
                                                 {
                                                     query.Append($@" , TotalInventoryAdjustment = {Decimal.Round(
-                                                                   ((line.GetQtyEntered() / line.GetQtyInvoiced()) * line.GetPriceActual()), GetPrecision())}");
+                                                                   ((line.GetQtyEntered()) * line.GetPriceActual()), GetPrecision())}");
                                                 }
                                             }
 
@@ -7045,6 +7076,14 @@ namespace VAdvantage.Model
 
                 }
 
+            }
+
+            //VIS_045: 20-Mar-2025, Check any treat as Discount record found against this Invoice then not to reverse this record
+            if (Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT COUNT(C_InvoiceLine_ID) FROM C_InvoiceLine 
+                WHERE NVL(Ref_InvoiceOrg_ID , 0) = {GetC_Invoice_ID()} AND NVL(ReversalDoc_ID, 0) = 0", null, Get_Trx())) > 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_TreatAsDiscountRecordFound");
+                return false;
             }
 
             //VIS_045: DevOps Task ID: 5701 - When IRN/E-Way bill exist then user can't be reverse the document.

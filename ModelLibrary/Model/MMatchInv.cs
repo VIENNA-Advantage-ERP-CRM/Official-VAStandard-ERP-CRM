@@ -288,19 +288,21 @@ namespace VAdvantage.Model
                             M_InOut.IsSOTrx, M_InOut.IsReturnTrx,
                             C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID,
                             M_InOutLine.M_AttributeSetInstance_ID, 
-                            M_PriceList.PricePrecision 
+                            M_PriceList.PricePrecision, 
+                            t.VAS_PostingCost
                             FROM M_InOutLine
-                            INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
-                            INNER JOIN M_Storage ON(M_InOutLine.M_Locator_ID = M_Storage.M_Locator_ID
+                            INNER JOIN M_InOut ON (M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID)
+                            INNER JOIN M_Transaction t ON (t.M_InoutLine_ID = M_InOutLine.M_InOutLine_ID)
+                            INNER JOIN M_Storage ON (M_InOutLine.M_Locator_ID = M_Storage.M_Locator_ID
                             AND M_InOutLine.M_Product_ID = M_Storage.M_Product_ID
                             AND NVL(M_InOutLine.M_AttributeSetInstance_ID, 0) = NVL(M_Storage.M_AttributeSetInstance_ID, 0))
-                            INNER JOIN C_InvoiceLine ON C_InvoiceLine.C_InvoiceLine_ID = " + GetC_InvoiceLine_ID() + @"
-                            INNER JOIN C_Invoice ON C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID
-                            INNER JOIN M_PriceList ON M_PriceList.M_PriceList_ID = C_Invoice.M_PriceList_ID 
-                            LEFT JOIN C_OrderLine ON M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID
-                            LEFT JOIN C_Order ON C_Order.C_Order_ID = C_OrderLine.C_Order_ID
-                            LEFT JOIN C_ProvisionalInvoiceline ON C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID = C_InvoiceLine.C_ProvisionalInvoiceline_ID
-                            LEFT JOIN C_ProvisionalInvoice ON C_ProvisionalInvoice.C_ProvisionalInvoice_ID = C_ProvisionalInvoiceline.C_ProvisionalInvoice_ID
+                            INNER JOIN C_InvoiceLine ON (C_InvoiceLine.C_InvoiceLine_ID = " + GetC_InvoiceLine_ID() + @")
+                            INNER JOIN C_Invoice ON (C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID)
+                            INNER JOIN M_PriceList ON (M_PriceList.M_PriceList_ID = C_Invoice.M_PriceList_ID)
+                            LEFT JOIN C_OrderLine ON (M_InOutLine.C_OrderLine_ID = C_OrderLine.C_OrderLine_ID)
+                            LEFT JOIN C_Order ON (C_Order.C_Order_ID = C_OrderLine.C_Order_ID)
+                            LEFT JOIN C_ProvisionalInvoiceline ON (C_ProvisionalInvoiceline.C_ProvisionalInvoiceline_ID = C_InvoiceLine.C_ProvisionalInvoiceline_ID)
+                            LEFT JOIN C_ProvisionalInvoice ON (C_ProvisionalInvoice.C_ProvisionalInvoice_ID = C_ProvisionalInvoiceline.C_ProvisionalInvoice_ID)
                             WHERE M_InOutLine.M_InOutLine_ID = " + GetM_InOutLine_ID(), null, Get_TrxName());
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
@@ -314,11 +316,17 @@ namespace VAdvantage.Model
                 SetC_ProvisionalInvoiceLine_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ProvisionalInvoiceline_ID"]));
                 SetPriceDifferenceAPPI(Decimal.Subtract(GetInvoicedAmt(), GetProvisionalInvPrice()));
                 SetPriceDifferencePIPO(Decimal.Subtract(GetProvisionalInvPrice(), GetPricePO()));
-                SetPriceDifferenceAPPO(Decimal.Subtract(GetInvoicedAmt(), GetPricePO()));
+                SetPriceDifferenceAPPO(Decimal.Subtract(GetInvoicedAmt(), (GetPricePO() == 0 ? Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["VAS_PostingCost"]) : GetPricePO())));
                 if (GetM_AttributeSetInstance_ID() == 0 && GetM_InOutLine_ID() != 0)
                 {
                     SetM_AttributeSetInstance_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_AttributeSetInstance_ID"]));
                 }
+            }
+
+            //VIS_0045: 18-Mar-2025, set is PO Costing Method linked to Product or not 
+            if (Get_ColumnIndex("VAS_IsPOCostingMethod") >= 0)
+            {
+                Set_Value("VAS_IsPOCostingMethod", MCostElement.IsPOCostingmethod(GetCtx(), GetAD_Client_ID(), GetM_Product_ID(), Get_Trx()));
             }
 
             if (GetM_AttributeSetInstance_ID() == 0 && GetM_InOutLine_ID() != 0)

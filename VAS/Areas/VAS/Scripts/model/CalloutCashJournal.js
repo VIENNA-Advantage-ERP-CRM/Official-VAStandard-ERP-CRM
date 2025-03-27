@@ -924,6 +924,10 @@
         if (Util.getValueOfString(mTab.getValue("CashType")) != "C") {
             mTab.setValue("C_Tax_ID", null);
         }
+        //VIS_427 This function is used to clear the fields according to value of cash type
+        if (mField.getColumnName() == "CashType") {
+            ClearValueOfFields(ctx, windowNo, mTab, mField, value, oldValue);
+        }
 
         if (Util.getValueOfString(mTab.getValue("VSS_PAYMENTTYPE")) == "P" ||
             Util.getValueOfString(mTab.getValue("VSS_PAYMENTTYPE")) == "E") {/*Receipt Return and Payment*/
@@ -940,7 +944,368 @@
         this.setCalloutActive(false);
         return "";
     }
-
+    /**
+     * This function is used to clear the fields according to value of cash type
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    function ClearValueOfFields(ctx, windowNo, mTab, mField, value, oldValue) {
+        //charge
+        if (Util.getValueOfString(mTab.getValue("CashType")) == "C") {
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012 && !mTab.getValue("VA012_IsContra")) {
+                mTab.setValue("CheckNo", null);
+                if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                    mTab.setValue("C_BankAccount_ID", null);
+                }
+            }
+        }
+        //Difference
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "D") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //business partner
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "B") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //cash book transfer
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "A") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //General Expense
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "E") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //General Receipts
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "R") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //Invoice
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "I") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //order
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "O") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashBook_ID")) != 0) {
+                mTab.setValue("C_CashBook_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_CashLine_ID_1")) != 0) {
+                mTab.setValue("C_CashLine_ID_1", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+            //Cash Received From
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "F") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BankAccount_ID")) != 0) {
+                mTab.setValue("C_BankAccount_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            mTab.setValue("TransferType", null);
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+        //Bank Account Transfer
+        else if (Util.getValueOfString(mTab.getValue("CashType")) == "T") {
+            mTab.setValue("CheckNo", null);
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_ID")) != 0) {
+                mTab.setValue("C_BPartner_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_BPartner_Location_ID")) != 0) {
+                mTab.setValue("C_BPartner_Location_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Invoice_ID")) != 0) {
+                mTab.setValue("C_Invoice_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_InvoicePaySchedule_ID")) != 0) {
+                mTab.setValue("C_InvoicePaySchedule_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Charge_ID")) != 0) {
+                mTab.setValue("C_Charge_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("C_Order_ID")) != 0) {
+                mTab.setValue("C_Order_ID", null);
+            }
+            if (Util.getValueOfInt(mTab.getValue("VA009_OrderPaySchedule_ID")) != 0) {
+                mTab.setValue("VA009_OrderPaySchedule_ID", null);
+            }
+            if (Util.getValueOfDecimal(mTab.getValue("Amount")) != 0) {
+                mTab.setValue("Amount", null);
+            }
+            if (window.VA012) {
+                mTab.setValue("VA012_IsContra", false);
+            }
+        }
+    }
 
     CalloutSetReadOnly.prototype.SetAmountValue = function (ctx, windowNo, mTab, mField, value, oldValue) {
 

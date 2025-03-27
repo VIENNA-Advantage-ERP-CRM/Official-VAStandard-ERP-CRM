@@ -58,7 +58,7 @@
                 + '<div class="VAS-lblChip-container VAS_UserTag">'
                 + '</div>'
                 + '</div>'
-                + '<div class="VAS-input-w-icon">'
+                + '<div class="VAS-input-w-icon mb-3">'
                 + ' <i class="fa fa-search" aria-hidden="true"></i>'
                 + '<input type="text" id="VAS-Refnumber_' + $self.windowNo + '" placeholder="Reference No.">'
                 + '</div>'
@@ -190,6 +190,7 @@
             InputRefSearch = $root.find('#VAS-Refnumber_' + $self.windowNo);
 
             /* autocompletion on user input for loading user*/
+            $(Userinput).on("focus", function () {  //VIS0336:handled the dropdown serach issue
             Userinput.autocomplete({
                 classes: {
                     'ui-autocomplete': 'VAS-AutoComp'
@@ -199,12 +200,11 @@
                     if (request.term.trim().length == 0) {
                         return;
                     }
-                    GetUsers(response, request.term)
+                    GetUsers(response, request.term);
                 },
                 select: function (ev, ui) {
-
                     tag = $('<div class="VAS-lbl-chip" item-id="' + ui.item.ids + '">'
-                        + '<span class= "VAS-chipTxt">' + ui.item.label + '</span><span class="vis vis-cross"></span>'
+                        + '<span class="VAS-chipTxt">' + ui.item.label + '</span><span class="vis vis-cross"></span>'
                         + '</div>');
 
                     tag.find('.vis-cross').on('click', function () {
@@ -227,25 +227,29 @@
                         itemId = $(this).parent().attr('item-id');
                         $root.find('.VAS_UserTag').append(tag);
                         this.value = "";
+                        $(this).focus();  
                         return false;
                     }
                 },
 
-            })
+            });
+            });
+           ;
+
 
             //VIS0336-Date fileters
             $FromDatewrapDiv = $('<div class="input-group vis-input-wrap">');
             $FromDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
             var $FromDateWrap = $('<div class="vis-control-wrap">');
             $FromDatewrapDiv.append($FromDateWrap);
-            $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', ''));
+            $FromDateWrap.append($FromDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '').addClass("VAS-Cursor"));
             FromDatediv.append($FromDatewrapDiv);
 
             $toDatewrapDiv = $('<div class="input-group vis-input-wrap">');
             $ToDate = new VIS.Controls.VDate("DateReport", true, false, true, VIS.DisplayType.Date, "DateReport");
             var $toDateWrap = $('<div class="vis-control-wrap">');
             $toDatewrapDiv.append($toDateWrap);
-            $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', ''));
+            $toDateWrap.append($ToDate.getControl().attr('placeholder', ' ').attr('data-placeholder', '').addClass("VAS-Cursor"));
             toDatediv.append($toDatewrapDiv);
 
 
@@ -277,7 +281,7 @@
                                 + '<span class="VAS-lineCount">' + data[i].CartLineCount + '</span>'
                                 + '<span class="VAS-line-lbl">Line</span>'
                                 + '</div>'
-                               // + '<a href="javascript:void(0);"><i class="fa fa-caret-right"  vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
+                                // + '<a href="javascript:void(0);"><i class="fa fa-caret-right"  vas-cart-id = "' + data[i].CartId + '"  vas-cart-name = "' + data[i].CartName + '"  vas-transactiontype = "' + data[i].TransactionType + '"  vas-createdby = "' + data[i].CreatedBy + '" vas-CartRef = "' + data[i].ReferenceNo + '" aria-hidden="true" ></i></a> '
                                 + '</div>'
                                 + '</div>');
 
@@ -294,7 +298,7 @@
                             var CartName = $(this).attr('vas-cart-name');
                             var TransType = $(this).attr('vas-transactiontype');
                             var CreatedBy = $(this).attr('vas-createdby');
-                          VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID }, function (data) {
+                            VIS.dataContext.getJSONData(VIS.Application.contextUrl + "InventoryLines/GetIventoryCartLines", { "CartId": CartId, "RefNo": Reference, "ScreenName": WindowName, "RecordId": $self.Record_ID }, function (data) {
 
                                 if (data && data.length > 0) {
                                     $root.find("#VAS-CartName_" + $self.windowNo).text(CartName);
@@ -410,6 +414,7 @@
 
             ClearFilter.on("click touchstart", function (ev) {
                 UserIds = "";
+                userid = [];
                 RefNo = "";
                 InputRefSearch.val("");
                 CartName = "";
@@ -421,8 +426,10 @@
                 $ToDate.oldValue = null;
                 $ToDate.setValue("");
                 $ToDate.setValue(null);
-
-                $root.find('.VAS_UserTag').find('span').remove();
+                $root.find("#VAS_UserSearch_" + $self.windowNo).val("");
+                if ($root.find('.VAS_UserTag').find('div').length > 0) {
+                    $root.find('.VAS_UserTag').find('div').remove();
+                }
                 LoadCartData();
             });
             $root.find('.VAS-CartLineDetails').find('#VAS-BackArrow_' + $self.windowNo).click(function () {
@@ -552,7 +559,6 @@
                 url: VIS.Application.contextUrl + "InventoryLines/GetUsers",
                 type: "GET",
                 datatype: "json",
-
                 data: {
                     SearchKey: value
                 },
@@ -564,13 +570,17 @@
                             label: item.Name,
                             value: item.Name,
                             ids: item.Key
-                        }
+                        };
                     }));
+
+
                     $($self.div).autocomplete("search", "");
                     $($self.div).trigger("focus");
                 }
-            })
-        };
+            });
+        }
+
+
         this.getRoot = function () {
             return $root;
         };
