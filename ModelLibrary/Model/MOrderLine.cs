@@ -584,7 +584,7 @@ namespace VAdvantage.Model
                     if (taxCat.GetVATAX_Preference1() == "R" || taxCat.GetVATAX_Preference2() == "R" || taxCat.GetVATAX_Preference3() == "R")
                     {
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxRegion tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.IsDefault = 'Y' AND tcr.IsActive = 'Y' 
-                                AND tx.SOPOType IN ('B','" + (inv.IsSOTrx() ? 'S' : 'P') + "') ORDER BY tcr.Updated";
+                                AND tx.SOPOType IN ('B','" + (inv.IsSOTrx() ? 'S' : 'P') + "') AND tcr.AD_Client_ID =" + GetAD_Client_ID() + " ORDER BY tcr.Updated";
                         c_tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                         if (c_tax_ID > 0)
                         {
