@@ -81,8 +81,8 @@ namespace ViennaAdvantage.Process
                         {
                             //VAI050-Save history chat data form prospect window to opportunity window
 
-                            int FromTableID = PO.Get_Table_ID("C_BPartner");
-                            int ToTableID = PO.Get_Table_ID("C_Project");
+                            int FromTableID = partner.Get_Table_ID();
+                            int ToTableID = opp.Get_Table_ID();
                             VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), GetRecord_ID(), Get_TrxName(), GetCtx());
                             lead.SetC_Project_ID(opp.GetC_Project_ID());
                             lead.SetProcessed(true);
@@ -131,8 +131,8 @@ namespace ViennaAdvantage.Process
 
                     }
                     //VAI050-Save history chat data form prospect window to opportunity window
-                    int FromTableID = PO.Get_Table_ID("C_BPartner");
-                    int ToTableID = PO.Get_Table_ID("C_Project");
+                    int FromTableID = partner.Get_Table_ID();
+                    int ToTableID = opp.Get_Table_ID();
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), GetRecord_ID(), Get_TrxName(), GetCtx());
                     partner.SetCreateProject("Y");
                     if (partner.Save())
@@ -146,6 +146,8 @@ namespace ViennaAdvantage.Process
                 }
             }
             return _retVal;
+
+
         }
     }
 }
