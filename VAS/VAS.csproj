@@ -215,6 +215,7 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
@@ -237,6 +238,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\Images\AI.png" />
     <Content Include="Areas\VAS\Content\Images\arrow.png" />
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
@@ -249,6 +251,7 @@
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
+    <Content Include="Areas\VAS\Content\VAS_LeadConversation.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
@@ -304,6 +307,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
