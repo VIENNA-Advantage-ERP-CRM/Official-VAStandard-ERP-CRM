@@ -293,7 +293,6 @@
                     });
                 }
                 catch (error) {
-                    alert(error);
                     SetBusy(false);
                 }
             }
@@ -389,9 +388,8 @@
                     }
                 });
             }
-            catch
-            {
-
+            catch (error) {
+                SetBusy(false);
             }
         };
 
@@ -438,8 +436,9 @@
 
                     success: function (response) {
                         if (response != null) {
-                            var data = response.data.filter((record) =>
-                                record.run_id === r_id && record.role === "assistant");
+                            var data = jQuery.grep(response.data, function (record) {
+                                return record.run_id === r_id && record.role === "assistant";
+                            });
                             if (data != null) {
                                 appendMessageOutput(data[0].content[0].text.value);
                                 if (newThread) {
@@ -580,8 +579,7 @@
                     else {
 
                     };
-                }
-                ,
+                },
                 error: function () {
                     //SetBusy(false);
                 }
