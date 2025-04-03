@@ -1,4 +1,4 @@
-﻿/*version 1.5.7.0*/
+﻿/*version 1.6.4.0*/
 
 .vis-payment-table {
     width: 100%;
@@ -7543,4 +7543,181 @@ html[dir="rtl"] .VAS-cashISOCode {
         row-gap: 0.1em;
     }
 }
+
+.VAS-chatboat-container {
+    height: 100%;
+    background-color: rgba(var(--v-c-common), 1);
+    box-shadow: 0 0 10px 1px rgba(var(--v-c-on-secondary), 0.4);
+    padding: 0.5rem 0.5rem 0 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.VAS-chatbaot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .VAS-chatbaot-header a {
+        text-decoration: none;
+    }
+
+        .VAS-chatbaot-header a .vis-cross {
+            font-size: 0.875rem;
+        }
+
+.VAS-aura-img {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #093756;
+}
+
+.VAS-thumbImg {
+    background-color: #093756;
+    border-radius: 100%;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #093756;
+}
+
+    .VAS-thumbImg img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+.VAS-chat-body {
+    background-color: rgba(var(--v-c-readonly), 1);
+    height: 100%;
+    overflow: auto;
+}
+
+.VAS-justify-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-chat-body .fa-comments {
+    font-size: 8rem;
+    color: rgba(var(--v-c-primary), 0.3);
+}
+
+.VAS-startChat-section {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+    .VAS-startChat-section p {
+        font-size: 0.875rem;
+        text-align: center;
+        color: #093756;
+        margin: 0;
+    }
+
+        .VAS-startChat-section p span {
+            display: block;
+        }
+
+.VAS-chatbtn {
+    display: flex;
+    align-items: center;
+    margin: auto;
+    background: rgb(9,158,213);
+    background: linear-gradient(140deg, rgba(9,158,213,1) 0%, rgba(198,208,7,1) 100%);
+    color: rgba(var(--v-c-common), 1);
+    border: 0;
+    outline: 0;
+    padding: 0.5rem 0.875rem;
+    border-radius: 50px;
+}
+
+.VAS-userChat-comment {
+    padding: 1rem;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.VAS-chat-comments-col {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+    .VAS-chat-comments-col .VAS-chatuser-name {
+        font-size: 0.875rem;
+        color: rgba(var(--v-c-on-common), 1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+.VAS-chatuser-name span {
+    font-size: 0.75rem;
+    color: rgba(var(--v-c-on-secondary), 1);
+}
+
+.VAS-chat-comments-col .VAS-chatBox {
+    background-color: #093756;
+    color: rgba(var(--v-c-common), 1);
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0 0.75rem 0.75rem 0.75rem;
+}
+
+.VAS-row-reverse {
+    flex-direction: row-reverse;
+}
+
+.VAS-chat-radius {
+    border-radius: 0.75rem 0 0.75rem 0.75rem !important;
+}
+
+.VAS-chat-comments-col.VAS-chatBox-white .VAS-chatBox {
+    background-color: rgba(var(--v-c-common), 1);
+    color: rgba(var(--v-c-on-common), 1);
+    box-shadow: 0 0 5px rgba(var(--v-c-on-secondary), 0.1);
+}
+
+.VAS-sendBtn {
+    background-color: #093756;
+    width: 30px;
+    height: 30px;
+    border-radius: 100%;
+    border: 0;
+    outline: 0;
+}
+
+    .VAS-sendBtn .fa {
+        color: rgba(var(--v-c-common), 1);
+        font-size: 0.875rem;
+    }
+
+.VAS-chatTextarea-col {
+    display: flex;
+    align-items: center;
+    border: 1px solid rgba(var(--v-c-readonly), 1);
+    gap: 0.75rem;
+    padding: 0.5rem 0.5rem 0 0.5rem;
+}
+
+    .VAS-chatTextarea-col textarea {
+        border: 0;
+        outline: 0;
+        font-size: 0.875rem;
+        width: 92%;
+        height: 45px;
+        resize: none;
+    }
 
