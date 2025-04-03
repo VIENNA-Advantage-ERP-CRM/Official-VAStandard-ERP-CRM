@@ -96,7 +96,7 @@
                     type: 'POST',
                     contentType: 'application/json',
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -129,7 +129,7 @@
                     contentType: 'application/json',
                     //async: false,
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -165,7 +165,7 @@
                     contentType: 'application/json',
                     //async: false,
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -207,7 +207,7 @@
                     contentType: 'application/json',
                     async: false,
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -361,7 +361,7 @@
                     contentType: 'application/json',
                     async: false,
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -430,7 +430,7 @@
                     contentType: 'application/json',
                     //async: false,
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
@@ -473,7 +473,7 @@
                     type: 'GET',
                     contentType: 'application/json',
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': "Bearer " + apiKey,
                         'OpenAI-Beta': 'assistants=v2'
 
                         // Add your OpenAI API key here
