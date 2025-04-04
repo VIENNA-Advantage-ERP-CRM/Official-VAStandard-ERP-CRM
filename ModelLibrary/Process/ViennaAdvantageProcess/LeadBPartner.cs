@@ -151,6 +151,7 @@ namespace ViennaAdvantage.Process
                         _cbp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                         _cbp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                         _cbp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                        _cbp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
 
                     }
 
@@ -210,6 +211,7 @@ namespace ViennaAdvantage.Process
                         bp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                         bp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                         bp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                        bp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
 
                     }
 
