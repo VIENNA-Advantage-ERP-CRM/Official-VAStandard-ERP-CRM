@@ -74,6 +74,8 @@ namespace ViennaAdvantage.Process
                             opp.Set_Value("VA061_SheetName", partner.Get_Value("VA061_SheetName"));
                             opp.Set_Value("VA061_SheetID", partner.Get_Value("VA061_SheetID"));
                             opp.Set_Value("VA061_SheetPDFURL", partner.Get_Value("VA061_SheetPDFURL"));
+                            opp.Set_Value("VA061_ProcessStage", partner.Get_Value("VA061_ProcessStage"));
+
 
                         }
 
@@ -128,6 +130,8 @@ namespace ViennaAdvantage.Process
                         opp.Set_Value("VA061_SheetName", partner.Get_Value("VA061_SheetName"));
                         opp.Set_Value("VA061_SheetID", partner.Get_Value("VA061_SheetID"));
                         opp.Set_Value("VA061_SheetPDFURL", partner.Get_Value("VA061_SheetPDFURL"));
+                        opp.Set_Value("VA061_ProcessStage", partner.Get_Value("VA061_ProcessStage"));
+
 
                     }
                     //VAI050-Save history chat data form prospect window to opportunity window

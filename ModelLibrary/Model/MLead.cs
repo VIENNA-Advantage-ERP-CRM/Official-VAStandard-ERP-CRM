@@ -414,6 +414,12 @@ namespace VAdvantage.Model
                     _bp.Set_Value("C_LeadQualification_ID", GetC_LeadQualification_ID());
                     _bp.Set_Value("R_Status_ID", GetR_Status_ID());
                     _bp.Set_Value("Created", GetCreated());
+                    _bp.Set_Value("VA061_ThreadID", Get_Value("VA061_ThreadID"));
+                    _bp.Set_Value("VA061_SheetURL", Get_Value("VA061_SheetURL"));
+                    _bp.Set_Value("VA061_SheetName", Get_Value("VA061_SheetName"));
+                    _bp.Set_Value("VA061_SheetID", Get_Value("VA061_SheetID"));
+                    _bp.Set_Value("VA061_SheetPDFURL", Get_Value("VA061_SheetPDFURL"));
+                    _bp.Set_Value("VA061_ProcessStage", Get_Value("VA061_ProcessStage"));
                 }
                 if (!_bp.Save())
                 {

@@ -71,6 +71,8 @@ namespace ViennaAdvantage.Process
                     opp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                     opp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                     opp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                    opp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
+
 
                 }
                 if (lead.GetC_ProposalDdate() != null)
@@ -137,6 +139,7 @@ namespace ViennaAdvantage.Process
                     opp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                     opp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                     opp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                    opp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
 
                 }
                 /*Vivek*/
