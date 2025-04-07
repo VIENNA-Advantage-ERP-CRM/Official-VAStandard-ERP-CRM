@@ -4796,7 +4796,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
         /// <returns>DataSet of Posting Records</returns>
         private DataSet BudgetControlling()
         {
-            int ad_window_id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE  Export_ID = 'VIS_181'")); // Purchase Order
+            int ad_window_id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND Name = 'VAS_Requisition' OR Export_ID = 'VIS_181' ORDER BY AD_Window_ID DESC ")); // Purchase Order
             DataSet result = new DataSet();
             Type type = null;
             MethodInfo methodInfo = null;

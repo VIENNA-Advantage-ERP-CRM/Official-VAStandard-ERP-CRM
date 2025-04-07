@@ -120,7 +120,7 @@ namespace VAdvantage.Process
         /// <returns>DataSet of Posting Records</returns>
         private DataSet BudgetControlling(MRequisition req)
         {
-            int ad_window_id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE  Export_ID = 'VIS_322'"));
+            int ad_window_id = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Window_ID FROM AD_Window WHERE IsActive = 'Y' AND  Name = 'VAS_Requisition' OR Export_ID = 'VIS_322' ORDER BY AD_Window_ID DESC"));
             DataSet result = new DataSet();
             Type type = null;
             MethodInfo methodInfo = null;
