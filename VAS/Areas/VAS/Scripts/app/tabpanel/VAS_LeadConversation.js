@@ -259,6 +259,7 @@
         function prepareData(data) {
             data = JSON.parse(data[0].function.arguments);
             if (data != null && data.products != null && data.products.length > 0) {
+                console.log(data.products);
                 for (var i = 0; i < data.products.length; i++) {
                     var pdata = {};
                     pdata["M_Product_ID"] = data.products[i].m_product_id;
@@ -267,6 +268,9 @@
                     pdata["Price"] = data.products[i].price;
                     oppData.push(pdata);
                 }
+            }
+            else {
+                console.log("No Product Data received from Assistant");
             }
         }
 
