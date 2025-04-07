@@ -3014,6 +3014,19 @@ namespace VAdvantage.Model
                                 _processMsg = "Could not create Material Transaction";
                             return DocActionVariables.STATUS_INVALID;
                         }
+                        else
+                        {
+                            //VIS_0045: Reset Class parameters
+                            if (costingCheck != null)
+                            {
+                                costingCheck.ResetProperty();
+
+                                if (costingCheck != null)
+                                {
+                                    costingCheck.M_Transaction_ID = mtrx.GetM_Transaction_ID();
+                                }
+                            }
+                        }
 
                         //Update Transaction for Current Quantity
                         if (isContainrApplicable && mtrx.Get_ColumnIndex("M_ProductContainer_ID") >= 0)
