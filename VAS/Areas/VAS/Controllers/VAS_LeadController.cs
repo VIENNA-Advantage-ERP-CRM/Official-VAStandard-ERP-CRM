@@ -18,10 +18,10 @@ namespace VAS.Controllers
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
-        public JsonResult GetThreadID(string rec_ID)
+        public JsonResult GetThreadID(int Table_ID, int rec_ID)
         {
             VAS_LeadModel model = new VAS_LeadModel();
-            var result = model.GetThreadID(rec_ID);
+            var result = model.GetThreadID(Table_ID, rec_ID);
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 

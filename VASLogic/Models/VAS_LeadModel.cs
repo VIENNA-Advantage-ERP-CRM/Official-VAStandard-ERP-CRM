@@ -24,11 +24,18 @@ namespace VASLogic.Models
             return imgurl;
         }
 
-        public dynamic GetThreadID(string rec_ID)
+        public dynamic GetThreadID(int tableID, int rec_ID)
         {
             dynamic retObj = new ExpandoObject();
             retObj.APiKey = Util.GetValueOfString(System.Web.Configuration.WebConfigurationManager.AppSettings["OpenAIAPIKey"]);
-            retObj.ThreadID = Util.GetValueOfString(DB.ExecuteScalar("SELECT VA061_ThreadID FROM C_Lead WHERE C_Lead_ID=" + Util.GetValueOfInt(rec_ID)));
+            if (tableID == 923)
+            {
+                retObj.ThreadID = Util.GetValueOfString(DB.ExecuteScalar("SELECT VA061_ThreadID FROM C_Lead WHERE C_Lead_ID=" + rec_ID));
+            }
+            else
+            {
+                retObj.ThreadID = Util.GetValueOfString(DB.ExecuteScalar("SELECT VA061_ThreadID FROM C_Project WHERE C_Project_ID=" + rec_ID));                
+            }
             return retObj;
         }
 
@@ -65,15 +72,14 @@ namespace VASLogic.Models
                 }
             }
             else
-            {
-                int PriceList_ID = 0;
+            {                
                 sql.Append(@"SELECT c.C_Lead_ID, l.DocumentNo, c.C_Project_ID, c.Value, c.Name, CASE WHEN c.C_BPartner_ID > 0 
                         THEN cb.Name ELSE ps.Name END AS CompName, u.Name AS UserName, c.M_PriceList_ID 
                         FROM C_Project c LEFT JOIN C_Lead l ON (c.C_Lead_ID=l.C_Lead_ID)
                         LEFT JOIN C_BPartner cb ON (c.C_BPartner_ID=cb.C_BPartner_ID)
                         LEFT JOIN C_BPartner ps ON (c.C_BPartnerSR_ID=ps.C_BPartner_ID)
                         LEFT JOIN AD_User u ON (c.AD_User_ID=u.AD_User_ID)
-                        WHERE c.C_Project_ID=" + Util.GetValueOfInt(recordID));
+                        WHERE c.C_Project_ID=" + recordID);
                 ds = DB.ExecuteDataset(sql.ToString());
                 if (ds != null && ds.Tables[0].Rows.Count > 0)
                 {
@@ -86,8 +92,7 @@ namespace VASLogic.Models
                     {
                         result.Append(" Lead ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Lead_ID"]) +
                         " Lead No. = " + Util.GetValueOfString(ds.Tables[0].Rows[0]["DocumentNo"]));
-                    }
-                    PriceList_ID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_PriceList_ID"]);
+                    }                    
                 }
 
                 //sql.Clear();
