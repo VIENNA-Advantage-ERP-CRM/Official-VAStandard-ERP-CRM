@@ -202,7 +202,7 @@ namespace VIS.Models
                 }
                 else
                 {
-                    return null;
+                    return results;
                 }
             }
             return null;
