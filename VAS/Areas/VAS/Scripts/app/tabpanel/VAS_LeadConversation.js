@@ -545,7 +545,7 @@
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_Lead/GetThreadID",
                 type: "POST",
-                data: { rec_ID: rec_ID },
+                data: { Table_ID: $self.table_ID, rec_ID: rec_ID },
                 success: function (data) {
                     if (data != null) {
                         data = JSON.parse(data);
@@ -556,6 +556,7 @@
                             GetPromptMessage();
                         }
                         else {
+                            console.log("Thread ID -- " + data.ThreadID);
                             thread_id = data.ThreadID;
                             $ResTxt.empty();
                             getThreadMessage();
