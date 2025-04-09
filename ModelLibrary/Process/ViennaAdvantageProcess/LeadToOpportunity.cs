@@ -20,6 +20,7 @@ namespace ViennaAdvantage.Process
     class LeadToOpportunity : SvrProcess
     {
         int _C_Lead_ID;
+        bool IsProspectCreated = false;
         protected override void Prepare()
         {
             _C_Lead_ID = GetRecord_ID();
@@ -33,8 +34,6 @@ namespace ViennaAdvantage.Process
             //  lead.GetRef_BPartner_ID()))
             int ExCustomer = lead.GetC_BPartner_ID();
             int Pospect = lead.GetRef_BPartner_ID();
-
-
 
             if (ExCustomer != 0)
             {
@@ -58,7 +57,7 @@ namespace ViennaAdvantage.Process
                 VAdvantage.Model.X_C_BPartner bp = new VAdvantage.Model.X_C_BPartner(GetCtx(), ExCustomer, Get_TrxName());
                 //VAdvantage.Model.X_C_BPartner_Location loc=new VAdvantage.Model.X_C_BPartner_Location (GetCtx(),ExCustomer,Get_TrxName());
 
-                opp.SetName(bp.GetName()); ;
+                opp.SetName(bp.GetName());
                 opp.SetC_BPartner_Location_ID(lead.GetC_BPartner_Location_ID());
                 opp.SetIsOpportunity(true);
                 /*Vivek*/
@@ -91,7 +90,7 @@ namespace ViennaAdvantage.Process
                 {
                     //VAI050-To Save history data on opportunity window
                     int FromTableID = PO.Get_Table_ID("C_Lead");
-                    int ToTableID = PO.Get_Table_ID("C_Project");                
+                    int ToTableID = PO.Get_Table_ID("C_Project");
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
@@ -159,9 +158,14 @@ namespace ViennaAdvantage.Process
                 if (opp.Save())
                 {
                     //VAI050-Save history chat data form lead window to opportunity window
-                    int FromTableID = PO.Get_Table_ID("C_Lead");
-                    int ToTableID = PO.Get_Table_ID("C_Project");
+                    int FromTableID = lead.Get_Table_ID();
+                    int ToTableID = opp.Get_Table_ID();
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                    //VAI050-Save history chat data form lead window to prospect window
+                    if (IsProspectCreated)
+                    {
+                        VAS_CommonMethod.CopyHistorRecordData(FromTableID, bp.Get_Table_ID(), bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                    }
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     lead.Save();
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
@@ -175,12 +179,15 @@ namespace ViennaAdvantage.Process
             }
             if (ExCustomer == 0 && Pospect == 0)
             {
+
                 //CallProcess(_C_Lead_ID);
                 if (lead.GetBPName() == null)
                 {
                     return Msg.GetMsg(GetCtx(), "Company Name, Prospect or Bpartner is Mandatory to fill");
                 }
                 callprospect();
+                //VAI050-This flag used to check the status of prospect
+                IsProspectCreated = true;
                 return DoIt();
 
             }
