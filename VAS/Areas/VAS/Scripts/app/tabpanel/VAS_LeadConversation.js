@@ -67,23 +67,20 @@
                 SetBusy(true);
                 var txt = $InputTxt.val();
                 $InputTxt.val("");
-                if (txt != '' || txt != null) {
-                    if (txt != '' || txt != null) {
-                        $ResTxt.append(' <div class= "VAS-userChat-comment VAS-row-reverse" > ' +
-                            '  <div class="VAS-thumbImg"><img src="' + VIS.Application.contextFullUrl + imgUrl + '" alt=""></div>' +
-                            ' <div class="VAS-chat-comments-col ">' +
-                            '   <div class="VAS-chatuser-name VAS-row-reverse">' + VIS.context.getAD_User_Name() + '<span>12:00PM</span></div>' +
-                            '  <div class="VAS-chatBox VAS-chat-radius">' + txt + '</div>' +
-                            '</div>' +
-                            ' </div>');
-                        scrollToBottom();
-
-                    };
+                if (txt != '') {
+                    $ResTxt.append(' <div class= "VAS-userChat-comment VAS-row-reverse" > ' +
+                        '  <div class="VAS-thumbImg"><img src="' + VIS.Application.contextUrl + imgUrl + '" alt=""></div>' +
+                        ' <div class="VAS-chat-comments-col ">' +
+                        '   <div class="VAS-chatuser-name VAS-row-reverse">' + VIS.context.getAD_User_Name() + '<span></span></div>' +
+                        '  <div class="VAS-chatBox VAS-chat-radius">' + txt + '</div>' +
+                        '</div>' +
+                        ' </div>');
+                    scrollToBottom();
                     AddMessage(txt);
-                } else {
+                }
+                else {
                     SetBusy(false);
                 }
-
             });
         }
 
@@ -506,6 +503,7 @@
                 else if (response.data[i].role == "assistant")
                     appendMessageOutput(response.data[i].content[0].text.value);
             }
+            scrollToBottom();
             SetBusy(false);
         };
 
@@ -518,7 +516,7 @@
             $ResTxt.append(' <div class= "VAS-userChat-comment" > ' +
                 '<div class="VAS-thumbImg"><img src="Areas/VAS/Content/Images/AI.png" alt=""></div>' +
                 '<div class="VAS-chat-comments-col VAS-chatBox-white">' +
-                '  <div class="VAS-chatuser-name">AURA<span>12:00PM</span></div>' +
+                '  <div class="VAS-chatuser-name">AURA<span></span></div>' +
                 ' <div class="VAS-chatBox">' + txt + '</div>' +
                 '</div>' +
                 '</div>');
@@ -527,9 +525,9 @@
 
         function addUserMessage(txt) {
             $ResTxt.append(' <div class= "VAS-userChat-comment VAS-row-reverse" > ' +
-                '  <div class="VAS-thumbImg"><img src="' + VIS.Application.contextFullUrl + imgUrl + '" alt=""></div>' +
+                '  <div class="VAS-thumbImg"><img src="' + VIS.Application.contextUrl + imgUrl + '" alt=""></div>' +
                 ' <div class="VAS-chat-comments-col ">' +
-                '   <div class="VAS-chatuser-name VAS-row-reverse">' + VIS.context.getAD_User_Name() + '<span>12:00PM</span></div>' +
+                '   <div class="VAS-chatuser-name VAS-row-reverse">' + VIS.context.getAD_User_Name() + '<span></span></div>' +
                 '  <div class="VAS-chatBox VAS-chat-radius">' + txt + '</div>' +
                 '</div>' +
                 ' </div>');
@@ -580,6 +578,9 @@
                 success: function (data) {
                     if (data != null) {
                         imgUrl = JSON.parse(data);
+                        if (imgUrl == "") {
+                            imgUrl = "Areas/VAS/Content/Images/dummy.jpg";
+                        }
                     }
                     else {
 
