@@ -92,6 +92,8 @@ namespace ViennaAdvantage.Process
                     int ToTableID = PO.Get_Table_ID("C_Project");                
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
+                    // VIS0060: Set Lead status to Converted.
+                    lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.Save();
 
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
@@ -160,6 +162,8 @@ namespace ViennaAdvantage.Process
                     int ToTableID = PO.Get_Table_ID("C_Project");
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
+                    // VIS0060: Set Lead status to Converted.
+                    lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.Save();
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
