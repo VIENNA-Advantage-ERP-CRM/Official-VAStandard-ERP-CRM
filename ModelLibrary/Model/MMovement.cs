@@ -3481,6 +3481,11 @@ namespace VAdvantage.Model
             }
 
             reversal.AddDescription("{->" + GetDocumentNo() + ")");
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            {
+                reversal.SetMovementDate(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save())
             {
                 pp = VLogger.RetrieveError();
