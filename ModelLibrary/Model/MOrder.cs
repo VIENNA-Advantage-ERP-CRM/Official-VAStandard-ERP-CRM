@@ -6526,13 +6526,18 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         || MInOut.DOCSTATUS_Voided.Equals(ship.GetDocStatus()))
                         continue;
                     ship.Set_TrxName(Get_TrxName());
-
+                    //VIS_427 10/04/2025 Set date of shipment with reversal date of order if column exist
+                    if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                    {
+                        ship.Set_Value("VAS_ReversedDate", (Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
+                    }
                     //	If not completed - void - otherwise reverse it
                     if (!MInOut.DOCSTATUS_Completed.Equals(ship.GetDocStatus()))
                     {
                         if (ship.VoidIt())
                             ship.SetDocStatus(MInOut.DOCSTATUS_Voided);
                     }
+                  
                     //	Create new Reversal with only that order
                     else if (!ship.IsOnlyForOrder(this))
                     {
@@ -6580,7 +6585,14 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         || MInvoice.DOCSTATUS_Voided.Equals(invoice.GetDocStatus()))
                         continue;
                     invoice.Set_TrxName(Get_TrxName());
-
+                    //VIS_427 10/04/2025 Set revesal date of invoice with order reversal date if column exist
+                    if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                    {
+                        string sql = @"UPDATE C_Invoice SET VAS_ReversedDate=" + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")), true) +
+                            " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
+                        int count = DB.ExecuteQuery(sql, null, Get_Trx());
+                        invoice.Set_Value("VAS_ReversedDate", (Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
+                    }
                     //	If not completed - void - otherwise reverse it
                     if (!MInvoice.DOCSTATUS_Completed.Equals(invoice.GetDocStatus()))
                     {

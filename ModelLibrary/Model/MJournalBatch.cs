@@ -795,6 +795,11 @@ namespace VAdvantage.Model
                 description += " ** " + GetDocumentNo() + " **";
                 reverse.SetDescription(description);
             }
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            {
+                reverse.SetDateAcct(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reverse.Save())
             {
                 ValueNamePair pp = VLogger.RetrieveError();
@@ -817,6 +822,11 @@ namespace VAdvantage.Model
                 if (!journal.IsActive())
                 {
                     continue;
+                }
+                //set reversal date for journal on reversal of gl journal batch
+                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                {
+                    journal.Set_Value("VAS_ReversedDate",(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
                 }
                 if (journal.ReverseCorrectIt(reverse.GetGL_JournalBatch_ID()) == null)
                 {

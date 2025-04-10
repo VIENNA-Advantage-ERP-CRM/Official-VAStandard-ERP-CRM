@@ -7229,6 +7229,11 @@ namespace VAdvantage.Model
             catch (Exception) { }
             //On Reversal Marked checkbox true to identify that Invoice is generated from this form
             reversal.Set_Value("VAS_IsTEMInvoice", this.Get_Value("VAS_IsTEMInvoice"));
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            {
+                reversal.SetDateAcct(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save(Get_TrxName()))
             {
                 ValueNamePair vp = VLogger.RetrieveError();
