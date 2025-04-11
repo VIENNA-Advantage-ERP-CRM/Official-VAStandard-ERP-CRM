@@ -1094,10 +1094,27 @@ namespace VAdvantage.Acct
         /// <returns>true if all lines were saved</returns>
         public bool Save(Trx trxName)
         {
+            //VIS_045, 11-Apr-2025, When reversal document then Set Account Date / Period of based on Reversed Account Date
+            // rather thna Account Date
+            DateTime? _acctDate = null;
+            int _Period_ID = 0;
+            if (_doc != null && _doc.IsReversalDoc())
+            {
+                _acctDate = _doc.GetReversalDateAcct();
+                _Period_ID = _doc.GetC_Period_ID();
+            }
             //  save Lines
             for (int i = 0; i < _lines.Count; i++)
             {
                 FactLine fl = (FactLine)_lines[i];
+                if (_acctDate != null)
+                {
+                    fl.SetDateAcct(_acctDate);
+                }
+                if (_Period_ID > 0)
+                {
+                    fl.SetC_Period_ID(_Period_ID);
+                }
                 //	log.Fine("save - " + fl);
                 if (!fl.Save(trxName))  //  abort on first error
                 {
