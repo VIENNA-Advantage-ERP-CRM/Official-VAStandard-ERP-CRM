@@ -449,7 +449,16 @@ namespace VAdvantage.Model
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
 
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            //VIS_427 if document is reversed thn the period open should be check with reverse date
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 m_processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
@@ -457,7 +466,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 m_processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -798,7 +807,7 @@ namespace VAdvantage.Model
             //VIS_427 10/04/2025 Set date with reversal date if column exist
             if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
             {
-                reverse.SetDateAcct(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+                reverse.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
             }
             if (!reverse.Save())
             {
