@@ -1320,7 +1320,9 @@
 
                     //$(chk[i]).change(e);
                     $gridInvoice.editChange.call($gridInvoice, chk[i], i, 0, e);
-                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": i, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                    //trigger the event based on recid
+                    var recid = $gridInvoice.records[i].recid;
+                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": recid, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
                     $gridInvoice.trigger(eData);
                 }
 
@@ -1343,7 +1345,9 @@
 
                     //$(chk[i]).change(e);
                     $gridPayment.editChange.call($gridPayment, chk[i], i, 0, e);
-                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": i, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                    //trigger the event based on recid
+                    var recid = $gridPayment.records[i].recid;
+                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": recid, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
                     $gridPayment.trigger(eData);
                 }
                 if ($paymentSelctAll.prop("checked") == false)
@@ -1363,7 +1367,9 @@
 
                     //$(chk[i]).change(e);
                     $gridCashline.editChange.call($gridCashline, chk[i], i, 0, e);
-                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": i, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                   //trigger the event based on recid                     
+                    var recid = $gridCashline.records[i].recid;
+                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": recid, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
                     $gridCashline.trigger(eData);
                 }
                 if ($cashSelctAll.prop("checked") == false)
@@ -1421,7 +1427,9 @@
 
                     //$(chk[i]).change(e);
                     $glLineGrid.editChange.call($glLineGrid, chk[i], i, 0, e);
-                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": i, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                    //trigger the event based on recid
+                    var recid = $glLineGrid.records[i].recid;
+                    var eData = { "type": "click", "phase": "before", "target": "grid", "recid": recid, "index": i, "isStopped": false, "isCan//celled": false, "onComplete": null };
                     $glLineGrid.trigger(eData);
                 }
                 if ($glSelectAll.prop("checked") == false)
@@ -4887,9 +4895,9 @@
                 });
                 if (element == null || element[0] == undefined || element.length == 0 || element[0].SelectRow == undefined) {
                     //Set value to 0 when element is null
-                    $gridInvoice.records[event.recid]["AppliedAmt"] = 0;
-                    $gridInvoice.records[event.recid]["Writeoff"] = 0;
-                    $gridInvoice.records[event.recid]["Discount"] = 0;
+                    $gridInvoice.get(event.recid)["AppliedAmt"] = 0;
+                    $gridInvoice.get(event.recid)["Writeoff"] = 0;
+                    $gridInvoice.get(event.recid)["Discount"] = 0;
                     $gridInvoice.refreshCell(event.recid, "AppliedAmt");
                     $gridInvoice.refreshCell(event.recid, "Writeoff");
                     $gridInvoice.refreshCell(event.recid, "Discount");
@@ -4899,7 +4907,7 @@
                     if (element[0].SelectRow == true) {
                         // when we select a record, check conversion type is same or not.
                         // if not then not to select this record
-                        if (C_ConversionType_ID == 0) {
+                        if (VIS.Utility.Util.getValueOfInt(C_ConversionType_ID) == 0) {
                             C_ConversionType_ID = $gridInvoice.get(event.recid).C_ConversionType_ID;
                         }
                         /*VIS_0045: conversion type matched when allocate with GL and Cash*/
@@ -4963,7 +4971,7 @@
                 }
                 //check weather someone clicked on select column checkbox in grid
                 if ((selectColIndex == event.column || event.column == null) && ((element[0] != undefined) && !(element[0].SelectRow == undefined))) {
-                    $gridInvoice.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
+                    $gridInvoice.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
                 }
                 tableChanged(event.recid, event.column, true, false);
             }
@@ -4984,7 +4992,7 @@
                 });
                 if (element == null || element[0] == undefined || element.length == 0 || element[0].SelectRow == undefined) {
                     //Set value to 0 when element is null
-                    $gridPayment.records[event.recid]["AppliedAmt"] = 0;
+                    $gridPayment.get(event.recid)["AppliedAmt"] = 0;
                     //$gridPayment.records[event.recid]["Writeoff"] = 0;
                     //$gridPayment.records[event.recid]["Discount"] = 0;
                     $gridPayment.refreshCell(event.recid, "AppliedAmt");
@@ -5006,7 +5014,7 @@
                         }
                         // when we select a record, check conversion type is same or not.
                         // if not then not to select this record
-                        if (C_ConversionType_ID == 0) {
+                        if (VIS.Utility.Util.getValueOfInt(C_ConversionType_ID) == 0) {
                             C_ConversionType_ID = $gridPayment.get(event.recid).C_ConversionType_ID;
                         }
                         else if (C_ConversionType_ID != $gridPayment.get(event.recid).C_ConversionType_ID) {
@@ -5044,7 +5052,7 @@
                                 return false;
                             }
 
-                            var DATEACCT = $gridPayment.records[event.recid].DATEACCT;
+                            var DATEACCT = $gridPayment.get(event.recid).DATEACCT;
                             var ConversnDate = Globalize.format(new Date($conversionDate.val()), "yyyy-MM-dd");
                             DATEACCT = Globalize.format(new Date(DATEACCT), "yyyy-MM-dd");
                             if (ConversnDate != DATEACCT) {
@@ -5075,7 +5083,7 @@
                 }
                 //check weather someone clicked on select column checkbox in grid
                 if ((selectColIndex == event.column || event.column == null) && ((element[0] != undefined) && !(element[0].SelectRow == undefined))) {
-                    $gridPayment.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridPayment.get(event.recid).OpenAmt);
+                    $gridPayment.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridPayment.get(event.recid).OpenAmt);
                 }
                 tableChanged(event.recid, event.column, false, false);
             }
@@ -5096,7 +5104,7 @@
                 });
                 if (element == null || element[0] == undefined || element.length == 0 || element[0].SelectRow == undefined) {
                     //Set value to 0 when element is null
-                    $gridCashline.records[event.recid]["AppliedAmt"] = 0;
+                    $gridCashline.get(event.recid)["AppliedAmt"] = 0;
                     //$gridCashline.records[event.recid]["Writeoff"] = 0;
                     //$gridCashline.records[event.recid]["Discount"] = 0;
                     $gridCashline.refreshCell(0, "AppliedAmt");
@@ -5105,7 +5113,7 @@
                     if (element[0].SelectRow == true) {
                         // when we select a record, check conversion type is same or not.
                         // if not then not to select this record
-                        if (C_ConversionType_ID == 0) {
+                        if (VIS.Utility.Util.getValueOfInt(C_ConversionType_ID) == 0) {
                             C_ConversionType_ID = $gridCashline.get(event.recid).C_ConversionType_ID;
                         }
                         else if (C_ConversionType_ID != $gridCashline.get(event.recid).C_ConversionType_ID) {
@@ -5143,7 +5151,7 @@
                                 $gridCashline.trigger(eData);
                                 return false;
                             }
-                            var DATEACCT = $gridCashline.records[event.recid].DATEACCT;
+                            var DATEACCT = $gridCashline.get(event.recid).DATEACCT;
                             var ConversnDate = Globalize.format(new Date($conversionDate.val()), "yyyy-MM-dd");
                             DATEACCT = Globalize.format(new Date(DATEACCT), "yyyy-MM-dd");
                             if (ConversnDate != DATEACCT) {
@@ -5172,7 +5180,7 @@
                 //check weather someone clicked on select column checkbox in grid
                 if ((selectColIndex == event.column || event.column == null) && ((element[0] != undefined) && !(element[0].SelectRow == undefined))) {
                     //$gridCashline.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridCashline.get(event.recid).Amount);
-                    $gridCashline.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridCashline.get(event.recid).OpenAmt);
+                    $gridCashline.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridCashline.get(event.recid).OpenAmt);
                 }
                 tableChanged(event.recid, event.column, false, true);
             }
@@ -5194,7 +5202,7 @@
                 });
                 if (element == null || element[0] == undefined || element.length == 0 || element[0].SelectRow == undefined) {
                     //Set value to 0 when element is null
-                    $glLineGrid.records[event.recid]["AppliedAmt"] = 0;
+                    $glLineGrid.get(event.recid)["AppliedAmt"] = 0;
                     $glLineGrid.refreshCell(event.recid, "AppliedAmt");
                     getMaxDate();
                     //when unselect the record it will remove that record in getGLChanges list.
@@ -5208,7 +5216,7 @@
                     if (element[0].SelectRow == true) {
                         // when we select a record, check conversion type is same or not.
                         // if not then not to select this record
-                        if (C_ConversionType_ID == 0) {
+                        if (VIS.Utility.Util.getValueOfInt(C_ConversionType_ID) == 0) {
                             C_ConversionType_ID = $glLineGrid.get(event.recid).C_ConversionType_ID;
                         }
                         else if (C_ConversionType_ID != $glLineGrid.get(event.recid).C_ConversionType_ID) {
@@ -5241,13 +5249,13 @@
                                 $glLineGrid.get(event.recid).changes.AppliedAmt = "0";
                                 $glLineGrid.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $glLineGrid.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $glLineGrid.editChange.call($glLineGrid, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $glLineGrid.editChange.call($glLineGrid, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $glLineGrid.trigger(eData);
                                 return false;
                             }
-                            var DATEACCT = $glLineGrid.records[event.recid].DATEACCT;
+                            var DATEACCT = $glLineGrid.get(event.recid).DATEACCT;
                             var ConversnDate = Globalize.format(new Date($conversionDate.val()), "yyyy-MM-dd");
                             DATEACCT = Globalize.format(new Date(DATEACCT), "yyyy-MM-dd");
                             if (ConversnDate != DATEACCT) {
@@ -5259,9 +5267,9 @@
                                 $glLineGrid.get(event.recid).changes.AppliedAmt = "0";
                                 $glLineGrid.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $glLineGrid.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $glLineGrid.editChange.call($glLineGrid, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $glLineGrid.editChange.call($glLineGrid, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $glLineGrid.trigger(eData);
                                 return false;
                             }
@@ -5284,9 +5292,9 @@
                                 $glLineGrid.get(event.recid).changes.AppliedAmt = "0";
                                 $glLineGrid.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $glLineGrid.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $glLineGrid.editChange.call($glLineGrid, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $glLineGrid.editChange.call($glLineGrid, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $glLineGrid.trigger(eData);
                                 for (var x = 0; x < getGLChanges.length; x++) {
                                     if (getGLChanges[x].recid == event.recid) {
@@ -5309,7 +5317,7 @@
                 }
                 //check weather someone clicked on select column checkbox in grid
                 if ((selectColIndex == event.column || event.column == null) && ((element[0] != undefined) && !(element[0].SelectRow == undefined))) {
-                    $glLineGrid.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($glLineGrid.get(event.recid).OpenAmount);
+                    $glLineGrid.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($glLineGrid.get(event.recid).OpenAmount);
                 }
                 glTableChanged(event.recid, event.column);
             }
@@ -5410,7 +5418,7 @@
             }
             //when AppliedAmt cell changed then only this function will call
             if (colIndex == event.column) {
-                tableChanged(event.index, event.column, false, false);
+                tableChanged(event.recid, event.column, false, false);
             }
         };
 
@@ -5462,7 +5470,7 @@
                     $glLineGrid.set(0, { "AppliedAmt": $glLineGrid.get(event.recid).OpenAmount });
 
                 }
-                glTableChanged(event.index, event.column);
+                glTableChanged(event.recid, event.column);
             }
             //calculate();
         };
@@ -5757,11 +5765,11 @@
                         return;
                     }
                     else {
-                        $gridInvoice.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
+                        $gridInvoice.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
                     }
                 }
                 else {
-                    $gridInvoice.records[event.recid]["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
+                    $gridInvoice.get(event.recid)["AppliedAmt"] = VIS.Utility.Util.getValueOfDecimal($gridInvoice.get(event.recid).Amount);
                 }
             }
 
@@ -5796,7 +5804,7 @@
 
                     if (colPayCheck) {
                         // prepared same array for grid when we select any payment from payment grid and push that object into selected payment array.
-                        var record = $gridPayment.records[row];
+                        var record = $gridPayment.get(row);
                         var rcdRow = {
                             SelectRow: record.SelectRow,
                             //InvoiceRecord: changes.InvoiceRecord,
@@ -5854,7 +5862,7 @@
                         //    }
                         //}
                         for (var x = 0; x < selectedPayments.length; x++) {
-                            if (selectedPayments[x].CpaymentID == $gridPayment.records[row].CpaymentID) {
+                            if (selectedPayments[x].CpaymentID == $gridPayment.get(row).CpaymentID) {
                                 selectedPayments.splice(x, 1);
                             }
 
@@ -5862,7 +5870,7 @@
                         if (payemntCol == "AppliedAmt") {
                             if (changes != null && changes != undefined) {
                                 changes.AppliedAmt = amount;
-                                $gridPayment.records[row]["AppliedAmt"] = 0;
+                                $gridPayment.get(row)["AppliedAmt"] = 0;
                                 $gridPayment.refreshCell(row, "AppliedAmt");
                             }
                             else {
@@ -5914,7 +5922,7 @@
                     //  selected - set payment amount
                     if (colCashCheck) {
                         // prepared same array for grid when we select any cash line from cash line grid and push that object into selected cash line array.
-                        var record = $gridCashline.records[row];
+                        var record = $gridCashline.get(row);
                         //debugger;
                         var rcdRow = {
                             SelectRow: record.SelectRow,
@@ -5970,7 +5978,7 @@
                         //    }
                         //}
                         for (var x = 0; x < selectedCashlines.length; x++) {
-                            if (selectedCashlines[x].CcashlineiID == $gridCashline.records[row].CcashlineiID) {
+                            if (selectedCashlines[x].CcashlineiID == $gridCashline.get(row).CcashlineiID) {
                                 selectedCashlines.splice(x, 1);
                             }
                         }
@@ -5978,7 +5986,7 @@
                         if (payemntCol == "AppliedAmt") {
                             if (changes != null && changes != undefined) {
                                 changes.AppliedAmt = amount;
-                                $gridCashline.records[row]["AppliedAmt"] = 0;
+                                $gridCashline.get(row)["AppliedAmt"] = 0;
                                 $gridCashline.refreshCell(row, "AppliedAmt");
                             }
                             else {
@@ -6035,7 +6043,7 @@
 
                     // prepared same array for grid when we select any invoice from invoice grid and push that object into selected invoice array.
 
-                    var record = $gridInvoice.records[row];
+                    var record = $gridInvoice.get(row);
                     var rcdRow = {
                         SelectRow: record.SelectRow,
                         InvoiceRecord: record.InvoiceRecord,
@@ -6094,7 +6102,7 @@
                 {
                     // remove invoice schedule from array when we de-select any schedule from invoice grid.
                     for (var x = 0; x < selectedInvoices.length; x++) {
-                        if (selectedInvoices[x].C_InvoicePaySchedule_ID == $gridInvoice.records[row].C_InvoicePaySchedule_ID) {
+                        if (selectedInvoices[x].C_InvoicePaySchedule_ID == $gridInvoice.get(row).C_InvoicePaySchedule_ID) {
                             selectedInvoices.splice(x, 1);
                         }
                     }
@@ -6105,7 +6113,7 @@
                             changes.Discount = amount;                            //Discount---//get column index from grid
                             _discount = getIndexFromArray(columns, "Discount");
                             //changes.Discount = parseFloat($gridInvoice.get(row)[columns[_discount].field]);
-                            $gridInvoice.records[row]["AppliedAmt"] = 0;
+                            $gridInvoice.get(row)["AppliedAmt"] = 0;
                             $gridInvoice.refreshCell(row, "Writeoff");
 
 
@@ -6196,7 +6204,7 @@
                             break;
                         }
                     }
-                    //var record = glLineGrid.records[row];
+                    //var record = glLineGrid.get(row);
                     var rcdRow = {
                         SelectRow: record.SelectRow,
                         GLRecords: changes.GLRecords,
@@ -6241,14 +6249,14 @@
                 {
                     //de-select from SelectedGL list.
                     for (var x = 0; x < SelectedGL.length; x++) {
-                        if (SelectedGL[x].GL_JOURNALLINE_ID == $glLineGrid.records[row].GL_JOURNALLINE_ID) {
+                        if (SelectedGL[x].GL_JOURNALLINE_ID == $glLineGrid.get(row).GL_JOURNALLINE_ID) {
                             SelectedGL.splice(x, 1);
                         }
                     }
                     if (payemntCol == "AppliedAmt") {
                         if (changes != null && changes != undefined) {
                             changes.AppliedAmt = amount;
-                            $glLineGrid.records[row]["AppliedAmt"] = 0;
+                            $glLineGrid.get(row)["AppliedAmt"] = 0;
                             $glLineGrid.refreshCell(row, "AppliedAmt");
 
 
@@ -6377,9 +6385,9 @@
                 }
                 else {
                     if ($gridPayment.getChanges()[i].SelectRow == true) {
-                        var row = $gridPayment.records[$gridPayment.getChanges()[i].recid].DATEACCT;
+                        var row = $gridPayment.get($gridPayment.getChanges()[i].recid).DATEACCT;
                         _allDates.push(new Date(row));
-                        var DATEACCT = $gridPayment.records[$gridPayment.getChanges()[i].recid].DATEACCT;
+                        var DATEACCT = $gridPayment.get($gridPayment.getChanges()[i].recid).DATEACCT;
                         _dateAcct.push(new Date(DATEACCT));
                         $dateAcct.val(Globalize.format(new Date(Math.max.apply(null, _dateAcct)), "yyyy-MM-dd"));
                         //_dateAcct = [];
@@ -6391,10 +6399,10 @@
                 }
                 else {
                     if ($gridInvoice.getChanges()[i].SelectRow == true) {
-                        var row = $gridInvoice.records[$gridInvoice.getChanges()[i].recid].Date1; //changed schedule date to invoice date suggested by Mukesh sir, ravi and amit.
+                        var row = $gridInvoice.get($gridInvoice.getChanges()[i].recid).Date1; //changed schedule date to invoice date suggested by Mukesh sir, ravi and amit.
                         _allDates.push(new Date(row));
                         if ($gridPayment.getChanges().length == 0 && $gridCashline.getChanges().length == 0 && $glLineGrid.getChanges().length == 0) {
-                            var DATEACCT = $gridInvoice.records[$gridInvoice.getChanges()[i].recid].DATEACCT;
+                            var DATEACCT = $gridInvoice.get($gridInvoice.getChanges()[i].recid).DATEACCT;
                             _dateAcct.push(new Date(DATEACCT));
                             $dateAcct.val(Globalize.format(new Date(Math.max.apply(null, _dateAcct)), "yyyy-MM-dd"));
 
@@ -6407,10 +6415,10 @@
                 }
                 else {
                     if ($gridCashline.getChanges()[i].SelectRow == true) {
-                        var row = $gridCashline.records[$gridCashline.getChanges()[i].recid].DATEACCT;
+                        var row = $gridCashline.get($gridCashline.getChanges()[i].recid).DATEACCT;
                         _allDates.push(new Date(row));
                         if ($gridPayment.getChanges().length == 0 && $gridInvoice.getChanges().length == 0 && $glLineGrid.getChanges().length == 0) {
-                            var DATEACCT = $gridCashline.records[$gridCashline.getChanges()[i].recid].DATEACCT;
+                            var DATEACCT = $gridCashline.get($gridCashline.getChanges()[i].recid).DATEACCT;
                             _dateAcct.push(new Date(DATEACCT));
                             $dateAcct.val(Globalize.format(new Date(Math.max.apply(null, _dateAcct)), "yyyy-MM-dd"));
 
@@ -6583,9 +6591,9 @@
                 }
                 else {
                     if ($gridPayment.getChanges()[i].SelectRow == true) {
-                        var row = $gridPayment.records[$gridPayment.getChanges()[i].recid].DATEACCT;
+                        var row = $gridPayment.get($gridPayment.getChanges()[i].recid).DATEACCT;
                         // check org matched or not 
-                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridPayment.records[$gridPayment.getChanges()[i].recid].AD_Org_ID)) {
+                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridPayment.get($gridPayment.getChanges()[i].recid).AD_Org_ID)) {
                             isOrgMatched = false;
 
 
@@ -6599,9 +6607,9 @@
                 }
                 else {
                     if ($gridInvoice.getChanges()[i].SelectRow == true) {
-                        var row = $gridInvoice.records[$gridInvoice.getChanges()[i].recid].Date1; //changed schedule date to invoice date suggested by Mukesh sir, ravi and amit.
+                        var row = $gridInvoice.get($gridInvoice.getChanges()[i].recid).Date1; //changed schedule date to invoice date suggested by Mukesh sir, ravi and amit.
                         // check org matched or not 
-                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridInvoice.records[$gridInvoice.getChanges()[i].recid].AD_Org_ID)) {
+                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridInvoice.get($gridInvoice.getChanges()[i].recid).AD_Org_ID)) {
                             isOrgMatched = false;
                         }
                         _allDates.push(new Date(row));
@@ -6613,9 +6621,9 @@
                 }
                 else {
                     if ($gridCashline.getChanges()[i].SelectRow == true) {
-                        var row = $gridCashline.records[$gridCashline.getChanges()[i].recid].DATEACCT;
+                        var row = $gridCashline.get($gridCashline.getChanges()[i].recid).DATEACCT;
                         // check org matched or not 
-                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridCashline.records[$gridCashline.getChanges()[i].recid].AD_Org_ID)) {
+                        if (isOrgMatched && parseInt($cmbOrg.val()) != parseInt($gridCashline.get($gridCashline.getChanges()[i].recid).AD_Org_ID)) {
                             isOrgMatched = false;
                         }
                         _allDates.push(new Date(row));
@@ -6628,7 +6636,7 @@
                 }
                 else {
                     if ($glLineGrid.getChanges()[i].SelectRow == true) {
-                        var row = $glLineGrid.records[$glLineGrid.getChanges()[i].recid].DATEACCT;
+                        var row = $glLineGrid.get($glLineGrid.getChanges()[i].recid).DATEACCT;
                         _allDates.push(new Date(row));
                     }
                 }
@@ -6851,7 +6859,7 @@
                         }
                         else {
                             bd = 0;
-                            console.log("GL Row: " + rowsInvoice[i][keys[keys.indexOf("AppliedAmt")]] + ", RowNo:-" + i);
+                            console.log("GL Row: " + rowsGL[i][keys[keys.indexOf("AppliedAmt")]] + ", RowNo:-" + i);
                         }
                         totalGL = totalGL + (isNaN(bd) ? 0 : bd);  //  Applied GL
                         _noGL++;

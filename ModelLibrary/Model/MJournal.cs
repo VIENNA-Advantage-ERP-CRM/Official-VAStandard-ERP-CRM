@@ -926,7 +926,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
             check will be considered*/
             DateTime? DateForPeriodCheck = GetDateAcct();
             if (GetReversalDoc_ID() > 0 && IsReversal()
-                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
             }
@@ -1387,7 +1387,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 reverse.SetTempDocumentNo("");
             }
             //VIS_427 10/04/2025 Set date with reversal date if column exist
-            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 reverse.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
             }

@@ -454,7 +454,7 @@ namespace VAdvantage.Model
             DateTime? DateForPeriodCheck = GetDateAcct();
             //VIS_427 if document is reversed thn the period open should be check with reverse date
             if (GetReversalDoc_ID() > 0 && IsReversal()
-                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
             }
@@ -805,7 +805,7 @@ namespace VAdvantage.Model
                 reverse.SetDescription(description);
             }
             //VIS_427 10/04/2025 Set date with reversal date if column exist
-            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 reverse.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
             }
@@ -833,7 +833,7 @@ namespace VAdvantage.Model
                     continue;
                 }
                 //set reversal date for journal on reversal of gl journal batch
-                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
                 {
                     journal.Set_Value("VAS_ReversedDate",(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
                 }

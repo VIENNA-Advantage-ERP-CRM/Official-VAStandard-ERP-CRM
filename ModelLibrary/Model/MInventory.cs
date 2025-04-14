@@ -411,7 +411,7 @@ namespace VAdvantage.Model
             check will be considered*/
             DateTime? DateForPeriodCheck = GetMovementDate();
             if (GetReversalDoc_ID() > 0 && IsReversal()
-                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
             }
@@ -3239,7 +3239,7 @@ namespace VAdvantage.Model
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
             check will be considered*/
-            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
                ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetMovementDate();
             if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
@@ -3282,7 +3282,7 @@ namespace VAdvantage.Model
                 reversal.SetTempDocumentNo("");
             }
             //VIS_427 10/04/2025 Set date with reversal date if column exist
-            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) != null)
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 reversal.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
             }
