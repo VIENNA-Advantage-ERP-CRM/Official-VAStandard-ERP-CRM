@@ -4943,9 +4943,9 @@
                                 $gridInvoice.get(event.recid).changes.AppliedAmt = "0";
                                 $gridInvoice.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $gridInvoice.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $gridInvoice.editChange.call($gridInvoice, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $gridInvoice.editChange.call($gridInvoice, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $gridInvoice.trigger(eData);
                                 return false;
                             }
@@ -5045,9 +5045,9 @@
                                 $gridPayment.get(event.recid).changes.AppliedAmt = "0";
                                 $gridPayment.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $gridPayment.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $gridPayment.editChange.call($gridPayment, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $gridPayment.editChange.call($gridPayment, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.index, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $gridPayment.trigger(eData);
                                 return false;
                             }
@@ -5064,9 +5064,9 @@
                                 $gridPayment.get(event.recid).changes.AppliedAmt = "0";
                                 $gridPayment.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $gridPayment.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $gridPayment.editChange.call($gridPayment, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $gridPayment.editChange.call($gridPayment, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $gridPayment.trigger(eData);
                                 return false;
 
@@ -5145,9 +5145,9 @@
                                 $gridCashline.columns[colIndex].editable = false;
                                 $gridCashline.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $gridCashline.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $gridCashline.editChange.call($gridCashline, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $gridCashline.editChange.call($gridCashline, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $gridCashline.trigger(eData);
                                 return false;
                             }
@@ -5162,9 +5162,9 @@
                                 $gridCashline.columns[colIndex].editable = false;
                                 $gridCashline.refreshCell(event.recid, "AppliedAmt");
                                 var chk = $('#grid_' + $gridCashline.name + '_records td[col="0"]').find('input[type="checkbox"]');
-                                $(chk[event.recid]).prop('checked', false);
-                                $gridCashline.editChange.call($gridCashline, chk[event.recid], event.recid, 0, event);
-                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.recid, "isStopped": false, "isCan//celled": false, "onComplete": null };
+                                $(chk[event.index]).prop('checked', false);
+                                $gridCashline.editChange.call($gridCashline, chk[event.index], event.index, 0, event);
+                                var eData = { "type": "click", "phase": "before", "target": "grid", "recid": event.recid, "index": event.index, "isStopped": false, "isCan//celled": false, "onComplete": null };
                                 $gridCashline.trigger(eData);
                                 return false;
                             }
@@ -5558,7 +5558,7 @@
             }
             //when AppliedAmt cell changed then only this function will call
             if (colIndex == event.column) {
-                tableChanged(event.index, event.column, false, true);
+                tableChanged(event.recid, event.column, false, true);
 
             }
         };
@@ -5777,7 +5777,7 @@
                 || event.column == $gridInvoice.getColumn('Writeoff', true)
                 || event.column == $gridInvoice.getColumn('AppliedAmt', true)) {
 
-                tableChanged(event.index, event.column, true, false);
+                tableChanged(event.recid, event.column, true, false);
             }
         };
 
