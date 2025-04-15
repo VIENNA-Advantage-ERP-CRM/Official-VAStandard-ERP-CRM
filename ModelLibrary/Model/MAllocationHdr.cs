@@ -663,10 +663,10 @@ namespace VAdvantage.Model
                             MPaySchedule psched = null;
                             if (paySch.GetC_PaySchedule_ID() > 0)
                             {
-                              psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
+                                psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
                             }
                             //get the discount percentage
-                            decimal discountPer = psched !=null ? psched.GetDiscount() : pterm.GetDiscount();
+                            decimal discountPer = psched != null ? psched.GetDiscount() : pterm.GetDiscount();
                             decimal discountPer2 = pterm.GetDiscount2();
                             //PO.CopyValues(paySch, newPaySch, paySch.GetAD_Client_ID(), paySch.GetAD_Org_ID());
 
@@ -984,12 +984,16 @@ namespace VAdvantage.Model
             if (!IsActive())
                 throw new Exception("Allocation already reversed (not active)");
 
+            /*VIS_045 - 15-Apr-2025,  Allocation Document reversal on Reversed Date rather than on Acct Date */
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+              ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
+
             //	Can we delete posting
-            if (!MPeriod.IsOpen(GetCtx(), GetDateTrx(), MDocBaseType.DOCBASETYPE_PAYMENTALLOCATION, GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, MDocBaseType.DOCBASETYPE_PAYMENTALLOCATION, GetAD_Org_ID()))
                 throw new Exception("@PeriodClosed@");
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateTrx(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 throw new Exception(Common.Common.NONBUSINESSDAY);
             }
@@ -1026,10 +1030,10 @@ namespace VAdvantage.Model
                 line.SetWithholdingAmt(Env.ZERO);
                 line.SetBackupWithholdingAmount(Env.ZERO);
                 line.Save();
-                
-                
+
+
                 // Added by Amit for Payment Management 5-11-2015   
-                if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID()>0)
+                if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID() > 0)
                 {
                     MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), line.GetC_InvoicePaySchedule_ID(), Get_Trx());
                     paySch.SetVA009_IsPaid(false);

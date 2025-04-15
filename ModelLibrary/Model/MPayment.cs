@@ -5325,6 +5325,11 @@ namespace VAdvantage.Model
             log.Fine("#" + allocations.Length);
             for (int i = 0; i < allocations.Length; i++)
             {
+                // VIS_045, 15-Apr-2025, Set Reversal Date on Allocation Document for back date document reversal on Reversal Date rather than on Acct Date
+                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+                {
+                    allocations[i].Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+                }
                 allocations[i].Set_TrxName(Get_Trx());
                 allocations[i].SetDocAction(DocActionVariables.ACTION_REVERSE_CORRECT);
                 allocations[i].ProcessIt(DocActionVariables.ACTION_REVERSE_CORRECT);
