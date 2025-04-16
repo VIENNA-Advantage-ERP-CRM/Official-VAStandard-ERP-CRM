@@ -692,14 +692,14 @@ namespace VAdvantage.Model
                 SetDateAcct(GetDateDoc());
             }
             //VIS_427 15/1/2024 Bug_ID 3353 Handled Query to check if period belongs to year selected on header of GL Journal window
-            if(GetGL_JournalBatch_ID() > 0)
+            if (GetGL_JournalBatch_ID() > 0)
             {
                 string sql = @"SELECT COUNT(C_Period_ID) FROM C_Period WHERE 
-                             C_Year_ID = (SELECT C_Year_ID FROM GL_JournalBatch WHERE GL_JournalBatch_ID=" + GetGL_JournalBatch_ID()+") AND C_Period_ID = " + GetC_Period_ID();
+                             C_Year_ID = (SELECT C_Year_ID FROM GL_JournalBatch WHERE GL_JournalBatch_ID=" + GetGL_JournalBatch_ID() + ") AND C_Period_ID = " + GetC_Period_ID();
                 int count = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
                 if (count == 0)
                 {
-                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_PeriodMisMatch")); 
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_PeriodMisMatch"));
                     return false;
                 }
             }
@@ -829,25 +829,20 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
         /// <returns>true if ok</returns>
         private Boolean UpdateBatch()
         {
-            // Manish 18/7/2016 ..  check gl_journalbatch_id is in window or not.
-            string sqlquery = @"SELECT gl_journalbatch_id FROM gl_journal WHERE gl_journal_id =" + GetGL_Journal_ID();
-            int nooo = Util.GetValueOfInt(DataBase.DB.ExecuteScalar(sqlquery, null, null));
-            if (nooo <= 0)
+            if (GetGL_JournalBatch_ID() != 0)
             {
-                return true;
+                String sql = "UPDATE GL_JournalBatch jb"
+                    + " SET (TotalDr, TotalCr) = (SELECT SUM(TotalDr), SUM(TotalCr)"
+                        + " FROM GL_Journal j WHERE j.IsActive='Y' AND jb.GL_JournalBatch_ID=j.GL_JournalBatch_ID) "
+                    + "WHERE GL_JournalBatch_ID =" + GetGL_JournalBatch_ID();
+                int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
+                if (no != 1)
+                {
+                    log.Warning("afterSave - Update Batch #" + no);
+                }
+                return no == 1;
             }
-            // end 18/7/2016
-
-            String sql = "UPDATE GL_JournalBatch jb"
-                + " SET (TotalDr, TotalCr) = (SELECT SUM(TotalDr), SUM(TotalCr)" //jz hard coded ", "
-                    + " FROM GL_Journal j WHERE j.IsActive='Y' AND jb.GL_JournalBatch_ID=j.GL_JournalBatch_ID) "
-                + "WHERE GL_JournalBatch_ID=" + GetGL_JournalBatch_ID();
-            int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
-            if (no != 1)
-            {
-                log.Warning("afterSave - Update Batch #" + no);
-            }
-            return no == 1;
+            return true;
         }	//	updateBatch
 
 
