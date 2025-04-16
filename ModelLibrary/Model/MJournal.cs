@@ -1327,6 +1327,14 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 return false;
             }
 
+            MJournal reversal = ReverseCorrectIt(GetGL_JournalBatch_ID());
+            if (reversal == null)
+            {
+                return false;
+            }
+
+            m_processMsg = Msg.GetMsg(GetCtx(), "VIS_DocumentReversed") + reversal.GetDocumentNo();
+
             //VIS-383: 29/04/2024 User Validation After ReverseCorrect
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_REVERSECORRECT);
             if (valid != null)
@@ -1335,7 +1343,7 @@ AND CA.C_AcctSchema_ID != " + GetC_AcctSchema_ID();
                 return false;
             }
 
-            return ReverseCorrectIt(GetGL_JournalBatch_ID()) != null;
+            return true;
         }	//	reverseCorrectIt
 
         /// <summary>
