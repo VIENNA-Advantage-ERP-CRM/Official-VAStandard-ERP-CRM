@@ -6309,7 +6309,7 @@ namespace VAdvantage.Model
                 //VIS_045, 16-Apr-2025, Set Reversal Date on Drop Shipment Record
                 if (Get_Value("VAS_ReversedDate") != null)
                 {
-                    DB.ExecuteQuery($@"UPDATE M_InOut SET VAS_ReversedDate = {Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))} WHERE M_InOut_ID = {GetRef_ShipMR_ID()} ", null, Get_Trx());
+                    DB.ExecuteQuery($@"UPDATE M_InOut SET VAS_ReversedDate = {GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")), true)} WHERE M_InOut_ID = {GetRef_ShipMR_ID()} ", null, Get_Trx());
                 }
                 MInOut ino = new MInOut(GetCtx(), GetRef_ShipMR_ID(), Get_Trx());
                 ino.VoidIt();
