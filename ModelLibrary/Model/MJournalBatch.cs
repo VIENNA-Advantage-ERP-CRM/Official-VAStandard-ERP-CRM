@@ -835,6 +835,12 @@ namespace VAdvantage.Model
                 //set reversal date for journal on reversal of gl journal batch
                 if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
                 {
+                    // When Reversal date is less than Account date if journal then not to reverse the document
+                    if (journal.GetDateAcct().Value.Date > Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")))
+                    {
+                        m_processMsg = Msg.GetMsg(GetCtx(), "VIS_AcctDateGTthanReversalDate") + reverse.GetDocumentNo();
+                        return false;
+                    }
                     journal.Set_Value("VAS_ReversedDate",(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
                 }
                 if (journal.ReverseCorrectIt(reverse.GetGL_JournalBatch_ID()) == null)
@@ -844,8 +850,31 @@ namespace VAdvantage.Model
                 }
                 journal.Save();
             }
+
+            AddDescription("(" + reverse.GetDocumentNo() + "<-)");
+            reverse.SetDocAction(DOCACTION_None);
+            reverse.SetDocStatus(DOCSTATUS_Reversed);
+            reverse.SetProcessed(true);
+            reverse.Save(Get_TrxName());
+
+            //JID_0889: show on void full message Reversal Document created
+            m_processMsg = Msg.GetMsg(GetCtx(), "VIS_DocumentReversed") + reverse.GetDocumentNo();
+
             return true;
         }	//	reverseCorrectionIt
+
+        /// <summary>
+        /// Add to Description
+        /// </summary>
+        /// <param name="description">text</param>
+        public void AddDescription(String description)
+        {
+            String desc = GetDescription();
+            if (desc == null)
+                SetDescription(description);
+            else
+                SetDescription(desc + " | " + description);
+        }
 
         /// <summary>
         /// Reverse Accrual.	Flip Dr/Cr - Use Today's date
