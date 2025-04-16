@@ -973,7 +973,7 @@ namespace VAdvantage.Model
                 line.Set_ValueNoCheck("M_InOutLine_ID", I_ZERO);	//	new
                 //	Reset
                 if (!setOrder)
-                    line.SetC_OrderLine_ID(0);                
+                    line.SetC_OrderLine_ID(0);
                 // SI_0642 : when we reverse MR or Customer Return, at that tym - on Save - system also check - qty availablity agaisnt same attribute 
                 // on storage. If we set ASI as 0, then system not find qty and not able to save record
                 if (!counter && !IsReversal())
@@ -1873,7 +1873,7 @@ namespace VAdvantage.Model
             /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
              check will be considered*/
             DateTime? DateForPeriodCheck = GetDateAcct();
-            if(GetReversalDoc_ID() > 0 && IsReversal() 
+            if (GetReversalDoc_ID() > 0 && IsReversal()
                 && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
             {
                 DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
@@ -2387,7 +2387,7 @@ namespace VAdvantage.Model
                                         INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
                                         INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
                                         INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
-                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null , Get_Trx());
+                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null, Get_Trx());
             }
 
             //	Outstanding (not processed) Incoming Confirmations ?
@@ -6049,7 +6049,7 @@ namespace VAdvantage.Model
             string ss = ToString();
             /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
             check will be considered*/
-            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >=0 && 
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 &&
                 Get_Value("VAS_ReversedDate") != null
                 ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
@@ -6305,6 +6305,12 @@ namespace VAdvantage.Model
             {
                 // Not getting DocAction and Docstatus values during reversal in case of shipment reversal
                 Save(Get_TrxName());
+
+                //VIS_045, 16-Apr-2025, Set Reversal Date on Drop Shipment Record
+                if (Get_Value("VAS_ReversedDate") != null)
+                {
+                    DB.ExecuteQuery($@"UPDATE M_InOut SET VAS_ReversedDate = {Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))} WHERE M_InOut_ID = {GetRef_ShipMR_ID()} ", null, Get_Trx());
+                }
                 MInOut ino = new MInOut(GetCtx(), GetRef_ShipMR_ID(), Get_Trx());
                 ino.VoidIt();
                 ino.SetProcessed(true);
