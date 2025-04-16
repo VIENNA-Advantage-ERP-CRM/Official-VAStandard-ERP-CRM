@@ -810,7 +810,7 @@ namespace ViennaAdvantage.Process
             //        throw new ArgumentException("Could not update Shipment Line. " + pp.GetName());
             //    throw new Exception("Could not update Shipment Line");
             //}
-            DB.ExecuteQuery("UPDATE M_InOutLine SET IsInvoiced = 'Y', Updated = SYSDATE WHERE M_InOutLine_ID = " + sLine.IsInvoiced(), null, Get_Trx());
+            DB.ExecuteQuery("UPDATE M_InOutLine SET IsInvoiced = 'Y', Updated = SYSDATE WHERE M_InOutLine_ID = " + sLine.GetM_InOutLine_ID(), null, Get_Trx());
 
             log.Fine(line1.ToString());
         }
