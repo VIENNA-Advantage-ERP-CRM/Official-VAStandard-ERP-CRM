@@ -235,7 +235,14 @@ namespace VIS.Models
 
                     if (alloca.Get_ID() != 0)
                     {
-                        CompleteOrReverse(ctx, alloca.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                        //VIS_427 Handled to return message if the allocation is not completed
+                        string[] result = new string[2];
+                        result = CompleteOrReverse(ctx, alloca.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                        if (!string.IsNullOrEmpty(result[0]))
+                        {
+                            Isprocess(null, rowsCash, rowsInvoice, null, trx);
+                            return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                        }
                         //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                         if (alloca.Save())
                         {
@@ -1640,7 +1647,14 @@ namespace VIS.Models
             //	Should start WF
             if (alloc.Get_ID() != 0)
             {
-                CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                //VIS_427 Handled to return message if the allocation is not completed
+                string[] result = new string[2];
+                result = CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                if (!string.IsNullOrEmpty(result[0]))
+                {
+                    Isprocess(null, rowsCash, rowsInvoice, null, trx);
+                    return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                }
                 //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                 if (!alloc.Save())
                 {
@@ -3287,8 +3301,17 @@ namespace VIS.Models
                 //	Should start WF
                 if (alloc.Get_ID() != 0)
                 {
+                    string[] result = new string[2];
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
-                    CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                    //VIS_427 Handled to return message if the allocation is not completed
+                    result = CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                    if (!string.IsNullOrEmpty(result[0]))
+                    {
+                        Isprocess(rowsPayment, null, rowsInvoice, null, trx);
+                        trx.Commit();
+                        return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+
+                    }
                     if (!alloc.Save())
                     {
                         //Get Error Message.
@@ -6088,7 +6111,14 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
 
                 if (alloc.Get_ID() != 0)
                 {
-                    CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                    //VIS_427 Handled to return message if the allocation is not completed
+                    string[] result = new string[2];
+                    result=CompleteOrReverse(ctx, alloc.Get_ID(), 150, DocActionVariables.ACTION_COMPLETE, trx);
+                    if (!string.IsNullOrEmpty(result[0]))
+                    {
+                        Isprocess(rowsPayment, rowsCash, rowsInvoice, rowsGL, trx);
+                        return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                    }
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (alloc.Save())
                     {
