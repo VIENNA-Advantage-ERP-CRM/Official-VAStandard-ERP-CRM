@@ -84,6 +84,15 @@ namespace VAdvantage.Model
                 log.SaveError("TrxDateGreater", "");
                 return false;
             }
+
+            // VIS_045: 23-Apr-2025, Account Date must be of Current month or Future Month
+            if (!(GetDateAcct().Value.Year > DateTime.Now.Year ||
+                (GetDateAcct().Value.Year == DateTime.Now.Year && GetDateAcct().Value.Month >= DateTime.Now.Month)))
+            {
+                log.SaveError("VAS_ForecastAcctDateMustbeFuture", "");
+                return false;
+            }
+
             return true;
         }
 
