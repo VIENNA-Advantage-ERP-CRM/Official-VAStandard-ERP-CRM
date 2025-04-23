@@ -25,7 +25,12 @@ namespace VIS.Models
             int period_ID;
 
             int AD_Client_ID = Util.GetValueOfInt(paramValue[0]);
+            // VIS_045: 23-Apr-2025, change the kind with Unspecified, otherwsie system was not picking period for last day of the month
             DateTime? dateAcct = Util.GetValueOfDateTime(paramValue[1]);
+            if (dateAcct != null)
+            {
+                dateAcct = DateTime.SpecifyKind(dateAcct.Value, DateTimeKind.Unspecified);
+            }
             int AD_Org_ID = Util.GetValueOfInt(paramValue[2]);
 
             period_ID = MPeriod.GetC_Period_ID(ctx, dateAcct, AD_Org_ID);

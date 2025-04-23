@@ -605,6 +605,11 @@ namespace VAdvantage.Model
 
                         // work done to set cashline ID on payschedule tab of invoice if allocation done by cash
                         paySch.SetC_CashLine_ID(line.GetC_CashLine_ID());
+                        //VIS_427 Seet the value of gl_journalline_id
+                        if(line.GetGL_JournalLine_ID() > 0)
+                        {
+                            paySch.Set_Value("GL_JournalLine_ID", line.GetGL_JournalLine_ID());                        
+                        }
 
                         // when schedule is paid from cash journal then Payment Execution status = Received
                         // when schedule is paid from Payment then Payment Execution status = In-Progress
@@ -696,6 +701,8 @@ namespace VAdvantage.Model
                             newPaySch.SetVA009_Variance(0);
                             newPaySch.SetC_Payment_ID(0);
                             newPaySch.SetC_CashLine_ID(0);
+                            //cleared value for new schedule
+                            newPaySch.Set_Value("GL_JournalLine_ID",null);
                             newPaySch.SetVA009_ExecutionStatus("A");
                             newPaySch.SetIsValid(true);
                             newPaySch.SetVA009_IsPaid(false);
@@ -1002,7 +1009,7 @@ namespace VAdvantage.Model
             SetIsActive(false);
             SetDocumentNo(GetDocumentNo() + "^");
             SetApprovalAmt(Env.ZERO);
-            SetDocStatus(DOCSTATUS_Reversed);	//	for direct calls
+            SetDocStatus(DOCSTATUS_Reversed);   //	for direct calls
             if (!Save() || IsActive())
                 throw new Exception("Cannot de-activate allocation");
 
