@@ -3300,7 +3300,8 @@ namespace VAdvantage.Model
                                 {
                                     if (IsSOTrx())
                                     {
-                                        lineBlanket1.SetQtyInvoiced(Decimal.Subtract(lineBlanket1.GetQtyInvoiced(), line.GetQtyInvoiced()));
+                                        //VIS_045, 23-Apr-2025, need to update Qty Invoiced with Postive value on Blanket sales order screen
+                                        lineBlanket1.SetQtyInvoiced(Decimal.Add(lineBlanket1.GetQtyInvoiced(), line.GetQtyInvoiced()));
                                     }
                                     else
                                     {
