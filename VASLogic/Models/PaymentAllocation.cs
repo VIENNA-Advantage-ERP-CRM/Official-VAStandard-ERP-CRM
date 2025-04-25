@@ -242,7 +242,8 @@ namespace VIS.Models
                             if (!string.IsNullOrEmpty(result[0]))
                             {
                                 Isprocess(null, rowsCash, rowsInvoice, null, trx);
-                                return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                                return Msg.GetMsg(ctx, "AllocationIsCreated") + alloca.GetDocumentNo() + " " +
+                              Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + " " + result[0];
                             }
                             //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                             if (alloca.Save())
@@ -1654,7 +1655,8 @@ namespace VIS.Models
                     if (!string.IsNullOrEmpty(result[0]))
                     {
                         Isprocess(null, rowsCash, rowsInvoice, null, trx);
-                        return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                        return Msg.GetMsg(ctx, "AllocationIsCreated") + alloc.GetDocumentNo() + " " +
+                              Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + " " + result[0];
                     }
                     //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                     if (!alloc.Save())
@@ -3330,7 +3332,8 @@ namespace VIS.Models
                     {
                         Isprocess(rowsPayment, null, rowsInvoice, null, trx);
                         trx.Commit();
-                        return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                        return Msg.GetMsg(ctx, "AllocationIsCreated") + alloc.GetDocumentNo() + " " +
+                              Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + " " + result[0];
 
                     }
                     if (!alloc.Save())
@@ -5148,7 +5151,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 aLine.SetDateTrx(DateTrx);
                                 aLine.SetC_CashLine_ID(Util.GetValueOfInt(rowsCash[i]["ccashlineid"]));
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_CashLine", Util.GetValueOfInt(rowsCash[j]["ccashlineid"])));
-                                aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[j]["ccashlineid"]))[0]["Description"]);
+                                aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[i]["ccashlineid"]))[0]["Description"]);
 
                                 if (!aLine.Save())
                                 {
@@ -5175,7 +5178,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                                 aLine.SetDateTrx(DateTrx);
                                 aLine.SetRef_CashLine_ID(Util.GetValueOfInt(rowsCash[i]["ccashlineid"]));
                                 //aLine.Set_ValueNoCheck("Description", GetDescription("C_CashLine", Util.GetValueOfInt(rowsCash[j]["ccashlineid"])));
-                                aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[j]["ccashlineid"]))[0]["Description"]);
+                                aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[i]["ccashlineid"]))[0]["Description"]);
 
                                 if (!aLine.Save())
                                 {
@@ -5251,7 +5254,7 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                             aLine.SetDateTrx(DateTrx);
                             aLine.SetC_CashLine_ID(Util.GetValueOfInt(rowsCash[i]["ccashlineid"]));
                             // aLine.Set_ValueNoCheck("Description", GetDescription("C_CashLine", Util.GetValueOfInt(rowsCash[j]["ccashlineid"])));
-                            aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[j]["ccashlineid"]))[0]["Description"]);
+                            aLine.Set_ValueNoCheck("Description", dsCash.Tables[0].Select("C_CashLine_ID=" + Util.GetValueOfInt(rowsCash[i]["ccashlineid"]))[0]["Description"]);
 
                             if (!aLine.Save())
                             {
@@ -6139,7 +6142,8 @@ currencyConvert(invoiceOpen * MultiplierAP, C_Currency_ID, " + _C_Currency_ID + 
                         if (!string.IsNullOrEmpty(result[0]))
                         {
                             Isprocess(rowsPayment, rowsCash, rowsInvoice, rowsGL, trx);
-                            return Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + ":" + result[0];
+                            return Msg.GetMsg(ctx, "AllocationIsCreated") +  alloc.GetDocumentNo() + " " +
+                              Msg.GetMsg(ctx, "VAS_AllocationNotCompDueTo") + " " + result[0];
                         }
                         //alloc.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                         if (alloc.Save())
