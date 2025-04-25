@@ -414,8 +414,9 @@ namespace VAdvantage.Process
                                 documentno , VAFAM_AssetDisposal_ID AS Record_Id , '' AS issotrx , '' AS isreturntrx ,'' AS IsInternalUse ,'VAFAM_AssetDisposal' AS TableName,
                                 docstatus , vafam_trxdate AS DateAcct ,  iscostcalculated ,  isreversedcostcalculated 
                          FROM VAFAM_AssetDisposal WHERE vafam_trxdate = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND isactive = 'Y'
+                              AND M_PRODUCT_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
                               AND ((docstatus   IN ('CO' , 'CL') AND iscostcalculated = 'N' ) OR (docstatus IN ('RE' , 'VO') AND iscostcalculated ='Y'
-                              AND ISREVERSEDCOSTCALCULATED= 'N' AND ReversalDoc_ID!= 0) )");
+                              AND ISREVERSEDCOSTCALCULATED= 'N' AND ReversalDoc_ID != 0) )");
                     }
                     sql.Append(@" ) t WHERE AD_Client_ID = " + GetCtx().GetAD_Client_ID() + "  order by dateacct , to_date(created, 'DD-MON-YY HH24:MI:SS')");
                     dsRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
