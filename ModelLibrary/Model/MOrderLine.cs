@@ -4957,12 +4957,22 @@ namespace VAdvantage.Model
                         }
                     }
                 }
+
                 if (!(!String.IsNullOrEmpty(Ord.GetConditionalFlag()) &&
                     Ord.GetConditionalFlag().Equals(MOrder.CONDITIONALFLAG_PrepareIt)))
                 {
                     if (!UpdateHeaderTax())
                         return false;
+
+                    // VIS0060: Set maximum promise date from line to header tab.
+                    if (Is_ValueChanged("DatePromised") && GetDatePromised() != null && Ord.GetDatePromised().Value.Date < GetDatePromised().Value.Date)
+                    {
+                        string sql = "UPDATE C_Order SET DatePromised=" + GlobalVariable.TO_DATE(GetDatePromised(), true) + 
+                            " WHERE C_Order_ID=" + GetC_Order_ID();
+                        int no = DB.ExecuteQuery(sql, null, Get_TrxName());
+                    }
                 }
+
                 // Warning message needs to display in case Entered Price is less than Cost of the Product on Sales Order                
                 if (Ord.IsSOTrx() && !Ord.IsReturnTrx() && GetM_Product_ID() > 0)
                 {
