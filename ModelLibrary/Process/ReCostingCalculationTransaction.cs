@@ -241,7 +241,7 @@ namespace VAdvantage.Process
                 _log.Info("RE Cost Calculation Start for " + minDateRecord);
                 var pc = "(SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )";
                 sql.Clear();
-                sql.Append($@"SELECT * FROM (");
+
                 sql.Append($@"WITH trx AS (
                        SELECT t.AD_Client_ID, t.AD_Org_ID , t.M_Product_ID, t.M_AttributeSetInstance_ID ,t.movementdate, t.created ,t.M_Transaction_ID ,
                         t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_productionline_ID, ");
@@ -338,7 +338,7 @@ namespace VAdvantage.Process
                 sql.Append($@" LEFT JOIN C_Invoiceline invl ON (t.C_Invoiceline_ID = invl.C_Invoiceline_ID)
                                 LEFT JOIN C_Invoice hinvl ON (hinvl.C_Invoice_ID = invl.C_Invoice_ID)
                                 LEFT JOIN M_MatchInv mit ON (mit.C_Invoiceline_ID = t.C_Invoiceline_ID AND mit.C_Invoiceline_ID = invl.C_Invoiceline_ID)
-                                LEFT JOIN C_LANDEDCOSTALLOCATION LCA ON (t.C_INVOICELINE_ID = LCA.C_INVOICELINE_ID AND t.vas_islandedcost = 'Y')
+                                LEFT JOIN C_LandedCostAllocation LCA ON (t.C_InvoiceLine_ID = LCA.C_InvoiceLine_ID AND t.vas_islandedcost = 'Y' AND LCA.M_Product_ID = t.M_Product_ID)
                                 WHERE t.IsActive = 'Y'  AND t.AD_Client_ID = {GetCtx().GetAD_Client_ID()}");
                 if (!string.IsNullOrEmpty(productCategoryID) || !string.IsNullOrEmpty(productID))
                 {
@@ -391,7 +391,7 @@ namespace VAdvantage.Process
                          INNER JOIN c_invoiceline il ON il.C_Invoiceline_ID = lca.C_Invoiceline_ID 
                          INNER JOIN C_Invoice i ON i.c_invoice_ID       = il.c_invoice_ID 
                          where not EXISTS (SELECT 1 FROM M_transaction mt 
-                                   WHERE mt.AD_client_ID = {GetCtx().GetAD_Client_ID()} AND mt.C_Invoiceline_ID = lca.C_Invoiceline_ID AND mt.treatasdiscount = 'Y') ");
+                                   WHERE mt.AD_client_ID = {GetCtx().GetAD_Client_ID()} AND mt.C_Invoiceline_ID = lca.C_Invoiceline_ID AND mt.vas_islandedcost = 'Y') ");
                 if (!string.IsNullOrEmpty(productCategoryID) || !string.IsNullOrEmpty(productID))
                 {
                     sql.Append(@" AND lca.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )");
@@ -415,170 +415,178 @@ namespace VAdvantage.Process
                               UNION ALL 
                               SELECT * from LandedCost");
                 sql.Append($@")t WHERE t.AD_Client_ID = {GetCtx().GetAD_Client_ID()} ");
-                sql.Append(@" ORDER BY t.movementdate, t.created");
-                dsRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                int totalRecord = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM (" + sql.ToString(), null, Get_Trx()));
 
-
-                if (dsRecord != null && dsRecord.Tables.Count > 0 && dsRecord.Tables[0].Rows.Count > 0)
+                if (totalRecord > 0)
                 {
-                    for (int z = 0; z < dsRecord.Tables[0].Rows.Count; z++)
+                    int pazeSize = 500;
+                    int TotalPage = (totalRecord % pazeSize) == 0 ? (totalRecord / pazeSize) : ((totalRecord / pazeSize) + 1);
+                    string Query = "SELECT * FROM (" + sql.ToString() + " ORDER BY t.movementdate, t.created";
+                    for (int pageNo = 1; pageNo <= TotalPage; pageNo++)
                     {
-                        if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]).Equals("RE"))
-                        {
-                            continue;
-                        }
 
-                        #region Cost Calculation For Material Receipt --
-                        try
+                        dsRecord = DB.GetDatabase().ExecuteDatasetPaging(Query, pageNo, pazeSize, 0);
+
+                        if (dsRecord != null && dsRecord.Tables.Count > 0 && dsRecord.Tables[0].Rows.Count > 0)
                         {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                            for (int z = 0; z < dsRecord.Tables[0].Rows.Count; z++)
                             {
+                                if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]).Equals("RE"))
+                                {
+                                    continue;
+                                }
 
-                                CalculateCostForMaterial(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                #region Cost Calculation For Material Receipt --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
 
-                                CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                        CalculateCostForMaterial(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                        #region Cost Calculation for SO / CRMA / VRMA
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "C_Invoice" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
-                            {
-                                CalculateCostForInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                        #region Cost Calculation for Landed cost Allocation
-                        if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "LandedCost")
-                        {
-                            CalculateLandedCost(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-                            continue;
-                        }
-                        #endregion
+                                #region Cost Calculation for SO / CRMA / VRMA
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "C_Invoice" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
+                                        CalculateCostForInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                        #region Cost Calculation for  PO Cycle --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInv" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N"))
-                            {
+                                #region Cost Calculation for Landed cost Allocation
+                                if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "LandedCost")
+                                {
+                                    CalculateLandedCost(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                    continue;
+                                }
+                                #endregion
 
-                                CalculateCostForMatchInvoiced(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                #region Cost Calculation for  PO Cycle --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInv" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N"))
+                                    {
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        CalculateCostForMatchInvoiced(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                        #region Cost Calculation for Physical Inventory --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL") &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "N")
-                            {
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                                CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                #region Cost Calculation for Physical Inventory --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL") &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "N")
+                                    {
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                        #region Cost Calculation for  Internal use inventory --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL") &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "Y")
-                            {
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                                CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                #region Cost Calculation for  Internal use inventory --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL") &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "Y")
+                                    {
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                        #region Cost Calculation for Asset Disposal
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]).Equals("VAFAM_AssetDisposal"))
-                            {
-                                CalculateCostForAssetDisposal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                #region Cost Calculation for Asset Disposal
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]).Equals("VAFAM_AssetDisposal"))
+                                    {
+                                        CalculateCostForAssetDisposal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
 
-                        #region Cost Calculation for Inventory Move --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Movement" &&
-                               (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
-                            {
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
 
-                                CalculateCostForMovement(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                #region Cost Calculation for Inventory Move --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Movement" &&
+                                       (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
 
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
+                                        CalculateCostForMovement(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
 
-                        #region Cost Calculation for Production
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Production")
-                            {
-                                sql.Clear();
-                                sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for Production
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Production")
+                                    {
+                                        sql.Clear();
+                                        sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
                                                    INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
                                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                                    $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
-                                if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
-                                {
-                                    sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                                }
-                                else
-                                {
-                                    sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
-                                }
-                                if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) > 0)
-                                {
-                                    DataSet dsCostingMethod = null;
-                                    int v_definedcostelement_id = 0;
-                                    string v_costinglevel = string.Empty;
-                                    decimal v_productapproxcost = 0;
-                                    decimal v_productcost = 0;
-                                    decimal LineAmt = 0;
+                                                            $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
+                                        if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                        {
+                                            sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                        }
+                                        else
+                                        {
+                                            sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
+                                        }
+                                        if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) > 0)
+                                        {
+                                            DataSet dsCostingMethod = null;
+                                            int v_definedcostelement_id = 0;
+                                            string v_costinglevel = string.Empty;
+                                            decimal v_productapproxcost = 0;
+                                            decimal v_productcost = 0;
+                                            decimal LineAmt = 0;
 
-                                    // get record from production line based on production id
-                                    sql.Clear();
-                                    sql.Append(@"SELECT pl.M_ProductionLine_ID, pl.AD_Client_ID, pl.AD_Org_ID, p.MovementDate,  pl.M_Product_ID, 
+                                            // get record from production line based on production id
+                                            sql.Clear();
+                                            sql.Append(@"SELECT pl.M_ProductionLine_ID, pl.AD_Client_ID, pl.AD_Org_ID, p.MovementDate,  pl.M_Product_ID, 
                                                         t.M_AttributeSetInstance_ID, t.MovementQty, pl.M_Locator_ID, wh.IsDisallowNegativeInv,  pl.M_Warehouse_ID ,
                                                         p.IsCostCalculated, p.IsReversedCostCalculated,  p.IsReversed, t.M_Transaction_ID, p.M_Production_ID, pl.Amt 
                                                 FROM M_Production p 
@@ -589,44 +597,44 @@ namespace VAdvantage.Process
                                                      INNER JOIN M_Warehouse wh ON (loc.M_Warehouse_id = wh.M_Warehouse_id)
                                                      INNER JOIN M_Transaction t ON (t.M_ProductionLine_ID = pl.M_ProductionLine_ID) 
                                                 WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                                     @"p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
+                                                             @"p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
                                                       AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
                                                       AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
-                                    if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
-                                    {
-                                        sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                                    }
-                                    else
-                                    {
-                                        sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
-                                    }
-                                    sql.Append(" ORDER BY  pp.Line,  pl.Line");
-                                    dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                                    if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
-                                    {
-                                        for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
-                                        {
-                                            #region calculate/update cost of components (Here IsSotrx means IsReversed --> on production header)
-                                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]).Equals("N") && IsCostUpdation)
+                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                             {
-                                                SqlParameter[] param = new SqlParameter[2];
-                                                param[0] = new SqlParameter("p_record_id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-                                                param[0].SqlDbType = SqlDbType.Int;
-                                                param[0].Direction = ParameterDirection.Input;
-
-                                                param[1] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
-                                                param[1].SqlDbType = SqlDbType.Int;
-                                                param[1].Direction = ParameterDirection.Input;
-
-                                                DB.ExecuteProcedure("updateproductionlinewithcostreversal", param, Get_Trx());
+                                                sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
                                             }
-                                            #endregion
+                                            else
+                                            {
+                                                sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
+                                            }
+                                            sql.Append(" ORDER BY  pp.Line,  pl.Line");
+                                            dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                                            if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
+                                            {
+                                                for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
+                                                {
+                                                    #region calculate/update cost of components (Here IsSotrx means IsReversed --> on production header)
+                                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]).Equals("N") && IsCostUpdation)
+                                                    {
+                                                        SqlParameter[] param = new SqlParameter[2];
+                                                        param[0] = new SqlParameter("p_record_id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                                        param[0].SqlDbType = SqlDbType.Int;
+                                                        param[0].Direction = ParameterDirection.Input;
 
-                                            // count -> is there any record having cost not available on production line except finished good
-                                            // if not found, THEN we will calculate cost of finished good else not.
-                                            CountCostNotAvialable = 1;
-                                            CountCostNotAvialable = Util.GetValueOfInt(DB.ExecuteScalar($@" SELECT
+                                                        param[1] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
+                                                        param[1].SqlDbType = SqlDbType.Int;
+                                                        param[1].Direction = ParameterDirection.Input;
+
+                                                        DB.ExecuteProcedure("updateproductionlinewithcostreversal", param, Get_Trx());
+                                                    }
+                                                    #endregion
+
+                                                    // count -> is there any record having cost not available on production line except finished good
+                                                    // if not found, THEN we will calculate cost of finished good else not.
+                                                    CountCostNotAvialable = 1;
+                                                    CountCostNotAvialable = Util.GetValueOfInt(DB.ExecuteScalar($@" SELECT
                                                         COUNT(pl.m_productionline_id)
                                                     FROM
                                                         M_Production p
@@ -637,13 +645,13 @@ namespace VAdvantage.Process
                                                         AND pl.IsActive = 'Y' AND pp.IsActive = 'Y' AND pl.MovementQty < 0 AND pr.IsFocItem = 'N'
                                                         AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
 
-                                            if ((CountCostNotAvialable == 0 && Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) > 0) ||
-                                                Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) < 0)
-                                            {
+                                                    if ((CountCostNotAvialable == 0 && Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) > 0) ||
+                                                        Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) < 0)
+                                                    {
 
-                                                #region Get Costing Method, Level and Approx Cost
-                                                sql.Clear();
-                                                sql.Append($@" SELECT
+                                                        #region Get Costing Method, Level and Approx Cost
+                                                        sql.Clear();
+                                                        sql.Append($@" SELECT
 	                                                            CASE
 		                                                            WHEN M_Product_Category.costingmethod is not null
 		                                                            AND M_Product_Category.costingmethod = 'C' THEN NVL(M_Product_Category.m_costelement_id,0)
@@ -670,85 +678,85 @@ namespace VAdvantage.Process
 		                                                            AD_ClientInfo WHERE ad_client_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"])} ) )
                                                             WHERE
 	                                                            M_Product.M_Product_ID = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"])} ");
-                                                dsCostingMethod = DB.ExecuteDataset(sql.ToString());
-                                                if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
-                                                {
-                                                    // Assigned Costing Element with Product
-                                                    v_definedcostelement_id = Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[0]["m_costelement_id"]);
+                                                        dsCostingMethod = DB.ExecuteDataset(sql.ToString());
+                                                        if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
+                                                        {
+                                                            // Assigned Costing Element with Product
+                                                            v_definedcostelement_id = Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[0]["m_costelement_id"]);
 
-                                                    // Assigned Costing Level with Product
-                                                    v_costinglevel = Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[0]["costinglevel"]);
+                                                            // Assigned Costing Level with Product
+                                                            v_costinglevel = Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[0]["costinglevel"]);
 
-                                                    // Get Product Cost Before Transaction
-                                                    v_productapproxcost = MCost.GetproductCosts(
-                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
-                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
-                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
-                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
-                                                        Get_Trx(),
-                                                        Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
-                                                }
-                                                #endregion
+                                                            // Get Product Cost Before Transaction
+                                                            v_productapproxcost = MCost.GetproductCosts(
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
+                                                                Get_Trx(),
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
+                                                        }
+                                                        #endregion
 
-                                                #region Create & Open connection and Execute Procedure
-                                                try
-                                                {
-                                                    SqlParameter[] param = new SqlParameter[9];
-                                                    param[0] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
-                                                    param[0].SqlDbType = SqlDbType.Int;
-                                                    param[0].Direction = ParameterDirection.Input;
+                                                        #region Create & Open connection and Execute Procedure
+                                                        try
+                                                        {
+                                                            SqlParameter[] param = new SqlParameter[9];
+                                                            param[0] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
+                                                            param[0].SqlDbType = SqlDbType.Int;
+                                                            param[0].Direction = ParameterDirection.Input;
 
-                                                    param[1] = new SqlParameter("p_m_attributesetinstance_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]));
-                                                    param[1].SqlDbType = SqlDbType.Int;
-                                                    param[1].Direction = ParameterDirection.Input;
+                                                            param[1] = new SqlParameter("p_m_attributesetinstance_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]));
+                                                            param[1].SqlDbType = SqlDbType.Int;
+                                                            param[1].Direction = ParameterDirection.Input;
 
-                                                    param[2] = new SqlParameter("p_ad_org_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]));
-                                                    param[2].SqlDbType = SqlDbType.Int;
-                                                    param[2].Direction = ParameterDirection.Input;
+                                                            param[2] = new SqlParameter("p_ad_org_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]));
+                                                            param[2].SqlDbType = SqlDbType.Int;
+                                                            param[2].Direction = ParameterDirection.Input;
 
-                                                    param[3] = new SqlParameter("p_ad_client_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]));
-                                                    param[3].SqlDbType = SqlDbType.Int;
-                                                    param[3].Direction = ParameterDirection.Input;
+                                                            param[3] = new SqlParameter("p_ad_client_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]));
+                                                            param[3].SqlDbType = SqlDbType.Int;
+                                                            param[3].Direction = ParameterDirection.Input;
 
-                                                    param[4] = new SqlParameter("p_quantity", Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]));
-                                                    param[4].SqlDbType = SqlDbType.Decimal;
-                                                    param[4].Direction = ParameterDirection.Input;
+                                                            param[4] = new SqlParameter("p_quantity", Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]));
+                                                            param[4].SqlDbType = SqlDbType.Decimal;
+                                                            param[4].Direction = ParameterDirection.Input;
 
-                                                    param[5] = new SqlParameter("p_m_productionline_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"]));
-                                                    param[5].SqlDbType = SqlDbType.Int;
-                                                    param[5].Direction = ParameterDirection.Input;
+                                                            param[5] = new SqlParameter("p_m_productionline_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"]));
+                                                            param[5].SqlDbType = SqlDbType.Int;
+                                                            param[5].Direction = ParameterDirection.Input;
 
-                                                    param[6] = new SqlParameter("p_m_warehouse_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
-                                                    param[6].SqlDbType = SqlDbType.Int;
-                                                    param[6].Direction = ParameterDirection.Input;
+                                                            param[6] = new SqlParameter("p_m_warehouse_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
+                                                            param[6].SqlDbType = SqlDbType.Int;
+                                                            param[6].Direction = ParameterDirection.Input;
 
-                                                    param[7] = new SqlParameter("p_movementdate", Util.GetValueOfDateTime(dsChildRecord.Tables[0].Rows[j]["MovementDate"]));
-                                                    param[7].SqlDbType = SqlDbType.Date;
-                                                    param[7].Direction = ParameterDirection.Input;
+                                                            param[7] = new SqlParameter("p_movementdate", Util.GetValueOfDateTime(dsChildRecord.Tables[0].Rows[j]["MovementDate"]));
+                                                            param[7].SqlDbType = SqlDbType.Date;
+                                                            param[7].Direction = ParameterDirection.Input;
 
-                                                    param[8] = new SqlParameter("p_ismanual", "W"); // W - Manual, P - Process
-                                                    param[8].SqlDbType = SqlDbType.Char;
-                                                    param[8].Direction = ParameterDirection.Input;
+                                                            param[8] = new SqlParameter("p_ismanual", "W"); // W - Manual, P - Process
+                                                            param[8].SqlDbType = SqlDbType.Char;
+                                                            param[8].Direction = ParameterDirection.Input;
 
-                                                    DB.ExecuteProcedure("createcostqueueNotFRPT", param, Get_Trx());
+                                                            DB.ExecuteProcedure("createcostqueueNotFRPT", param, Get_Trx());
 
-                                                    // get Product Cost after Assembly
-                                                    v_productcost = MCost.GetproductCosts(
-                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
-                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
-                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
-                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
-                                                       Get_Trx(),
-                                                       Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
+                                                            // get Product Cost after Assembly
+                                                            v_productcost = MCost.GetproductCosts(
+                                                               Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Client_ID"]),
+                                                               Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["AD_Org_ID"]),
+                                                               Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]),
+                                                               Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_ID"]),
+                                                               Get_Trx(),
+                                                               Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Warehouse_ID"]));
 
 
-                                                    if (IsCostUpdation)
-                                                    {
+                                                            if (IsCostUpdation)
+                                                            {
 
-                                                        LineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT Amt FROM M_ProductionLine WHERE M_ProductionLine_ID = 
+                                                                LineAmt = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT Amt FROM M_ProductionLine WHERE M_ProductionLine_ID = 
                                                                 {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionLine_ID"])}", null, Get_Trx()));
-                                                        // Update Costing detial on Transaction
-                                                        DB.ExecuteQuery($@"UPDATE M_Transaction
+                                                                // Update Costing detial on Transaction
+                                                                DB.ExecuteQuery($@"UPDATE M_Transaction
                                                                             SET
 	                                                                            costinglevel = {GlobalVariable.TO_STRING(v_costinglevel)},
 	                                                                            m_costelement_id = {v_definedcostelement_id},
@@ -759,12 +767,12 @@ namespace VAdvantage.Process
                                                                                 Updated = {GlobalVariable.TO_DATE(DateTime.Now, false)}
                                                                             WHERE
 	                                                                            m_transaction_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"])}", null, Get_Trx());
-                                                    }
+                                                            }
 
-                                                    // Update Differnce Value on product Plan only
-                                                    // Component Cost - Finish Good Qty
-                                                    sql.Clear();
-                                                    sql.Append($@" SELECT
+                                                            // Update Differnce Value on product Plan only
+                                                            // Component Cost - Finish Good Qty
+                                                            sql.Clear();
+                                                            sql.Append($@" SELECT
                                                                     pp.m_productionplan_id,
                                                                     pp.m_production_id,
                                                                     pp.productionqty,
@@ -779,16 +787,16 @@ namespace VAdvantage.Process
                                                                 ORDER BY
                                                                     pp.line,
                                                                     pp.m_product_id");
-                                                    dsCostingMethod = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                                                    if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
-                                                    {
-                                                        for (int k = 0; k < dsCostingMethod.Tables[0].Rows.Count; k++)
-                                                        {
-                                                            if (Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[k]["vas_isreverseassembly"]).Equals("N") &&
-                                                               Util.GetValueOfDecimal(dsCostingMethod.Tables[0].Rows[k]["productionqty"]) < 0)
+                                                            dsCostingMethod = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                                                            if (dsCostingMethod != null && dsCostingMethod.Tables.Count > 0 && dsCostingMethod.Tables[0].Rows.Count > 0)
                                                             {
-                                                                sql.Clear();
-                                                                sql.Append($@" WITH production_costs AS (
+                                                                for (int k = 0; k < dsCostingMethod.Tables[0].Rows.Count; k++)
+                                                                {
+                                                                    if (Util.GetValueOfString(dsCostingMethod.Tables[0].Rows[k]["vas_isreverseassembly"]).Equals("N") &&
+                                                                       Util.GetValueOfDecimal(dsCostingMethod.Tables[0].Rows[k]["productionqty"]) < 0)
+                                                                    {
+                                                                        sql.Clear();
+                                                                        sql.Append($@" WITH production_costs AS (
                                                                     SELECT
                                                                         NVL(ABS(SUM(CASE WHEN MaterialType = 'C' AND NVL(M_Product_ID, 0) != 0 THEN MovementQty * Amt END)), 0) AS v_component_cost,
                                                                         NVL(ABS(SUM(CASE WHEN MaterialType = 'F' AND NVL(M_Product_ID, 0) != 0 THEN MovementQty * Amt END)), 0) AS v_finishgood_cost
@@ -808,643 +816,391 @@ namespace VAdvantage.Process
                                                                     production_costs
                                                                 WHERE
                                                                     m_productionplan_id = { Util.GetValueOfInt(dsCostingMethod.Tables[0].Rows[k]["m_productionplan_id"]) } ");
+                                                                    }
+                                                                }
                                                             }
+
+                                                            // update prodution header 
+                                                            //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("N"))
+                                                            //{
+                                                            //    DB.ExecuteQuery("UPDATE M_Production SET IsCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+                                                            //}
+
+                                                            //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("Y") &&
+                                                            //    !Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversedCostCalculated"]).Equals("N") &&
+                                                            //    Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversed"]).Equals("Y"))
+                                                            //{
+                                                            //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
+                                                            //}
                                                         }
+                                                        catch (Exception ex)
+                                                        {
+                                                            _log.Severe("ReCostingCalculationTransaction: Production -> " + ex.Message);
+                                                            Get_Trx().Rollback();
+                                                        }
+                                                        #endregion
                                                     }
-
-                                                    // update prodution header 
-                                                    //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("N"))
-                                                    //{
-                                                    //    DB.ExecuteQuery("UPDATE M_Production SET IsCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
-                                                    //}
-
-                                                    //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("Y") &&
-                                                    //    !Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversedCostCalculated"]).Equals("N") &&
-                                                    //    Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversed"]).Equals("Y"))
-                                                    //{
-                                                    //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
-                                                    //}
                                                 }
-                                                catch (Exception ex)
-                                                {
-                                                    _log.Severe("ReCostingCalculationTransaction: Production -> " + ex.Message);
-                                                    Get_Trx().Rollback();
-                                                }
-                                                #endregion
                                             }
+                                        }
+                                        Get_Trx().Commit();
+                                        continue;
+                                    }
+                                }
+                                catch
+                                {
+                                    Get_Trx().Rollback();
+                                }
+                                #endregion
+
+                                #region Cost Calculation For  Return to Vendor --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
+
+                                        CalculateCostForReturnToVendor(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation Against AP Credit Memo - During Return Cycle of Purchase --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInv" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y"))
+                                    {
+
+                                        CalculationCostCreditMemo(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation For shipment --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
+
+                                        CalculateCostForShipment(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation For Customer Return --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
+                                        Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                    {
+
+                                        CalculateCostForCustomerReturn(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Component Reduce for Production Execution --
+                                try
+                                {
+                                    if (count > 0)
+                                    {
+                                        if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "VAMFG_M_WrkOdrTransaction" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                        {
+
+                                            _log.Info("costng calculation start for production execution for Prod Exec ID =  " + Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                            CalculateCostForProduction(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]));
+
+                                            continue;
                                         }
                                     }
                                 }
-                                Get_Trx().Commit();
-                                continue;
-                            }
-                        }
-                        catch
-                        {
-                            Get_Trx().Rollback();
-                        }
-                        #endregion
-
-                        #region Cost Calculation For  Return to Vendor --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
-                            {
-
-                                CalculateCostForReturnToVendor(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation Against AP Credit Memo - During Return Cycle of Purchase --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInv" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y"))
-                            {
-
-                                CalculationCostCreditMemo(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation For shipment --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
-                            {
-
-                                CalculateCostForShipment(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation For Customer Return --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
-                                Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
-                            {
-
-                                CalculateCostForCustomerReturn(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Component Reduce for Production Execution --
-                        try
-                        {
-                            if (count > 0)
-                            {
-                                if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "VAMFG_M_WrkOdrTransaction" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CO" ||
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "CL"))
+                                catch (Exception exProductionExecution)
                                 {
-
-                                    _log.Info("costng calculation start for production execution for Prod Exec ID =  " + Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-                                    CalculateCostForProduction(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]));
-
-                                    continue;
+                                    _log.Info("Error Occured during Production Execution costing " + exProductionExecution.ToString());
                                 }
-                            }
-                        }
-                        catch (Exception exProductionExecution)
-                        {
-                            _log.Info("Error Occured during Production Execution costing " + exProductionExecution.ToString());
-                        }
 
 
-                        #endregion
+                                #endregion
 
-                        //Reverse Record
+                                //Reverse Record
 
-                        #region Component Reduce for Production Execution --
-                        try
-                        {
-                            if (count > 0)
-                            {
-                                if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "VAMFG_M_WrkOdrTransaction" &&
-                                    Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                #region Component Reduce for Production Execution --
+                                try
                                 {
-
-                                    CalculateCostForProduction(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]));
-
-                                    continue;
-                                }
-                            }
-                        }
-                        catch (Exception exProductionExecution)
-                        {
-                            _log.Info("Error Occured during Production Execution costing " + exProductionExecution.ToString());
-                        }
-
-
-                        #endregion
-
-                        #region Cost Calculation For Customer Return --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-
-                                CalculateCostForCustomerReturn(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation For shipment --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-
-                                CalculateCostForShipment(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation Against AP Credit Memo - During Return Cycle of Purchase - Reverse --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInvCostTrack" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y"))
-                            {
-
-                                CalculateCostCreditMemoreversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation For  Return to Vendor --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-
-                                CalculateCostForReturnToVendor(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation for Inventory Move --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Movement" &&
-                              Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-
-                                CalculateCostForMovement(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation for  Internal use inventory --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "Y")
-                            {
-
-                                CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation for Physical Inventory --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
-                              Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE" &&
-                              Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "N")
-                            {
-
-                                CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation for  PO Cycle Reverse --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInvCostTrack" &&
-                                (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                                 Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N"))
-                            {
-
-                                CalculateCostForMatchInvoiceReversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation for SO / CRMA / VRMA
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "C_Invoice" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-                                invoice = new MInvoice(GetCtx(), Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Get_Trx());
-
-                                sql.Clear();
-                                if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                {
-                                    sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
-                                                 " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                    if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                    if (count > 0)
                                     {
-                                        sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                                    }
-                                    else
-                                    {
-                                        sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                                    }
-                                    sql.Append(" ORDER BY Line");
-                                }
-                                else
-                                {
-                                    sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
-                                                 " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                    sql.Append(@" AND IsCostImmediate = 'N' ");
-                                    if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
-                                    {
-                                        sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                                    }
-                                    else
-                                    {
-                                        sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                                    }
-                                    sql.Append(" ORDER BY Line");
-                                }
-                                dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
-                                if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
-                                {
-                                    /*Costing Object*/
-                                    costingCheck = new CostingCheck(GetCtx());
-                                    costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
-                                    costingCheck.invoice = invoice;
-                                    costingCheck.isReversal = invoice.IsReversal();
-
-                                    for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
-                                    {
-                                        try
+                                        if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "VAMFG_M_WrkOdrTransaction" &&
+                                            Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
                                         {
-                                            //VIS_0045: Reset Class parameters
-                                            if (costingCheck != null)
+
+                                            CalculateCostForProduction(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]));
+
+                                            continue;
+                                        }
+                                    }
+                                }
+                                catch (Exception exProductionExecution)
+                                {
+                                    _log.Info("Error Occured during Production Execution costing " + exProductionExecution.ToString());
+                                }
+
+
+                                #endregion
+
+                                #region Cost Calculation For Customer Return --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+
+                                        CalculateCostForCustomerReturn(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation For shipment --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "Y" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+
+                                        CalculateCostForShipment(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation Against AP Credit Memo - During Return Cycle of Purchase - Reverse --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInvCostTrack" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y"))
+                                    {
+
+                                        CalculateCostCreditMemoreversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation For  Return to Vendor --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "Y" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+
+                                        CalculateCostForReturnToVendor(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for Inventory Move --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Movement" &&
+                                      Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+
+                                        CalculateCostForMovement(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for  Internal use inventory --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "Y")
+                                    {
+
+                                        CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for Physical Inventory --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Inventory" &&
+                                      Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE" &&
+                                      Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["IsInternalUse"]) == "N")
+                                    {
+
+                                        CalculateCostForInventory(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for  PO Cycle Reverse --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_MatchInvCostTrack" &&
+                                        (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                         Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N"))
+                                    {
+
+                                        CalculateCostForMatchInvoiceReversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation for SO / CRMA / VRMA
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "C_Invoice" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+                                        invoice = new MInvoice(GetCtx(), Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Get_Trx());
+
+                                        sql.Clear();
+                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                        {
+                                            sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                                                         " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                             {
-                                                costingCheck.ResetProperty();
+                                                sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
                                             }
-                                            costingCheck.AD_Org_ID = invoice.GetAD_Org_ID();
-                                            costingCheck.movementDate = invoice.GetDateAcct();
+                                            else
+                                            {
+                                                sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                                            }
+                                            sql.Append(" ORDER BY Line");
+                                        }
+                                        else
+                                        {
+                                            sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
+                                                         " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                            sql.Append(@" AND IsCostImmediate = 'N' ");
+                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            {
+                                                sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                            }
+                                            else
+                                            {
+                                                sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                                            }
+                                            sql.Append(" ORDER BY Line");
+                                        }
+                                        dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+                                        if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
+                                        {
+                                            /*Costing Object*/
+                                            costingCheck = new CostingCheck(GetCtx());
+                                            costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
+                                            costingCheck.invoice = invoice;
                                             costingCheck.isReversal = invoice.IsReversal();
 
-                                            product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
-                                            invoiceLine = new MInvoiceLine(GetCtx(), dsChildRecord.Tables[0].Rows[j], Get_Trx());
-
-                                            if (invoiceLine != null && invoiceLine.GetC_Invoice_ID() > 0 && invoiceLine.GetQtyInvoiced() == 0)
-                                                continue;
-
-                                            if (invoiceLine != null && invoiceLine.Get_ID() > 0)
+                                            for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
                                             {
-                                                ProductInvoiceLineCost = invoiceLine.GetProductLineCost(invoiceLine, true);
-                                            }
-
-                                            costingCheck.invoiceline = invoiceLine;
-                                            costingCheck.product = product;
-
-                                            if (invoiceLine.GetC_OrderLine_ID() > 0)
-                                            {
-                                                if (invoiceLine.GetC_Charge_ID() > 0)
+                                                try
                                                 {
-                                                    #region Landed Cost Allocation
-                                                    if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
+                                                    //VIS_0045: Reset Class parameters
+                                                    if (costingCheck != null)
                                                     {
-                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0, "Invoice(Vendor)",
-                                                            null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                        {
-                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                            {
-                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                            }
-                                                            _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                + invoiceLine.GetC_InvoiceLine_ID() +
-                                                               " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                        }
-                                                        else
-                                                        {
-                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                            {
-                                                                //invoiceLine.SetIsReversedCostCalculated(true);
-                                                            }
-                                                            //invoiceLine.SetIsCostCalculated(true);
-                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                            {
-                                                                invoiceLine.SetIsCostImmediate(true);
-                                                            }
-                                                            if (!invoiceLine.Save(Get_Trx()))
-                                                            {
-                                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                Get_Trx().Rollback();
-                                                            }
-                                                            else
-                                                            {
-                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                Get_Trx().Commit();
-                                                            }
-                                                        }
+                                                        costingCheck.ResetProperty();
                                                     }
-                                                    #endregion
-                                                }
-                                                else
-                                                {
-                                                    #region for Expense type product
-                                                    if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
+                                                    costingCheck.AD_Org_ID = invoice.GetAD_Org_ID();
+                                                    costingCheck.movementDate = invoice.GetDateAcct();
+                                                    costingCheck.isReversal = invoice.IsReversal();
+
+                                                    product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
+                                                    invoiceLine = new MInvoiceLine(GetCtx(), dsChildRecord.Tables[0].Rows[j], Get_Trx());
+
+                                                    if (invoiceLine != null && invoiceLine.GetC_Invoice_ID() > 0 && invoiceLine.GetQtyInvoiced() == 0)
+                                                        continue;
+
+                                                    if (invoiceLine != null && invoiceLine.Get_ID() > 0)
                                                     {
-                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
-                                                             "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(),
-                                                             costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                        {
-                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                            {
-                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                            }
-                                                            _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                + invoiceLine.GetC_InvoiceLine_ID() +
-                                                             " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                        }
-                                                        else
-                                                        {
-                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                            {
-                                                                //invoiceLine.SetIsReversedCostCalculated(true);
-                                                            }
-                                                            //invoiceLine.SetIsCostCalculated(true);
-                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                            {
-                                                                invoiceLine.SetIsCostImmediate(true);
-                                                            }
-                                                            if (!invoiceLine.Save(Get_Trx()))
-                                                            {
-                                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                Get_Trx().Rollback();
-                                                            }
-                                                            else
-                                                            {
-                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                Get_Trx().Commit();
-                                                            }
-                                                        }
+                                                        ProductInvoiceLineCost = invoiceLine.GetProductLineCost(invoiceLine, true);
                                                     }
-                                                    #endregion
 
-                                                    #region  for Item Type product
-                                                    else if (product.GetProductType() == "I" && product.GetM_Product_ID() > 0)
+                                                    costingCheck.invoiceline = invoiceLine;
+                                                    costingCheck.product = product;
+
+                                                    if (invoiceLine.GetC_OrderLine_ID() > 0)
                                                     {
-                                                        if (countColumnExist > 0)
+                                                        if (invoiceLine.GetC_Charge_ID() > 0)
                                                         {
-                                                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
-                                                        }
-
-                                                        MOrder order1 = new MOrder(GetCtx(), invoice.GetC_Order_ID(), Get_Trx());
-                                                        MOrderLine ol1 = new MOrderLine(GetCtx(), invoiceLine.GetC_OrderLine_ID(), Get_Trx());
-                                                        if (order1.GetC_Order_ID() == 0 || order1.GetC_Order_ID() != ol1.GetC_Order_ID())
-                                                        {
-                                                            order1 = new MOrder(GetCtx(), ol1.GetC_Order_ID(), Get_Trx());
-                                                        }
-
-                                                        costingCheck.order = order1;
-                                                        costingCheck.orderline = ol1;
-
-                                                        #region  Sales Order
-                                                        if (order1.IsSOTrx() && !order1.IsReturnTrx())
-                                                        {
-                                                            if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                                  "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                            #region Landed Cost Allocation
+                                                            if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
                                                             {
-                                                                if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                                {
-                                                                    conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                                }
-                                                                _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                    + invoiceLine.GetC_InvoiceLine_ID() +
-                                                               " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                            }
-                                                            else
-                                                            {
-                                                                if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                                {
-                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
-                                                                }
-                                                                if (invoiceLine.GetM_InOutLine_ID() > 0)
-                                                                {
-                                                                    DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
-                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
-                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
-                                                                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                                                    {
-                                                                        if (IsCostUpdation)
-                                                                        {
-                                                                            invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
-                                                                        }
-
-                                                                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                                   invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
-                                                                                                   Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
-                                                                        if (IsCostUpdation)
-                                                                        {
-                                                                            invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
-                                                                        }
-                                                                    }
-                                                                }
-                                                                //invoiceLine.SetIsCostCalculated(true);
-                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                                {
-                                                                    invoiceLine.SetIsCostImmediate(true);
-                                                                }
-                                                                if (!invoiceLine.Save(Get_Trx()))
-                                                                {
-                                                                    ValueNamePair pp = VLogger.RetrieveError();
-                                                                    _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                    Get_Trx().Rollback();
-                                                                }
-                                                                else
-                                                                {
-                                                                    _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                    Get_Trx().Commit();
-                                                                }
-                                                            }
-                                                        }
-                                                        #endregion
-
-                                                        #region CRMA
-                                                        else if (order1.IsSOTrx() && order1.IsReturnTrx())
-                                                        {
-                                                            if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                              "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
-                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                            {
-                                                                if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                                {
-                                                                    conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                                }
-                                                                _log.Info("Cost not Calculated for Invoice(Customer) for this Line ID = "
-                                                                    + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                            }
-                                                            else
-                                                            {
-                                                                if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                                {
-                                                                    //invoiceLine.SetIsReversedCostCalculated(true);
-                                                                }
-                                                                if (invoiceLine.GetM_InOutLine_ID() > 0)
-                                                                {
-                                                                    DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
-                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
-                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
-                                                                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                                                    {
-                                                                        if (IsCostUpdation)
-                                                                        {
-                                                                            invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
-                                                                        }
-
-                                                                        currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                                   invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
-                                                                                                   Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
-                                                                        if (IsCostUpdation)
-                                                                        {
-                                                                            invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
-                                                                        }
-                                                                    }
-                                                                }
-                                                                //invoiceLine.SetIsCostCalculated(true);
-                                                                //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                                {
-                                                                    invoiceLine.SetIsCostImmediate(true);
-                                                                }
-                                                                if (!invoiceLine.Save(Get_Trx()))
-                                                                {
-                                                                    ValueNamePair pp = VLogger.RetrieveError();
-                                                                    _log.Info("Error found for saving Invoice(Customer) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                               " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                    Get_Trx().Rollback();
-                                                                }
-                                                                else
-                                                                {
-                                                                    _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                    Get_Trx().Commit();
-                                                                }
-                                                            }
-                                                        }
-                                                        #endregion
-
-                                                        #region VRMA
-                                                        else if (!order1.IsSOTrx() && order1.IsReturnTrx())
-                                                        {
-                                                            //change 12-5-2016
-                                                            // when Ap Credit memo is alone then we will do a impact on costing.
-                                                            // this is bcz of giving discount for particular product
-                                                            // discount is given only when document type having setting as "Treat As Discount" = True
-                                                            MDocType docType = new MDocType(GetCtx(), invoice.GetC_DocTypeTarget_ID(), Get_Trx());
-                                                            if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && invoiceLine.GetC_OrderLine_ID() == 0 && invoiceLine.GetM_InOutLine_ID() == 0 && invoiceLine.GetM_Product_ID() > 0)
-                                                            {
-                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                                  "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0, "Invoice(Vendor)",
+                                                                    null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                                 {
                                                                     if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                     {
                                                                         conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
                                                                     }
                                                                     _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                        + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                        + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                       " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
                                                                 }
                                                                 else
                                                                 {
-                                                                    query.Clear();
-                                                                    query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
-                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
-                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
-                                                                    DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
-                                                                    int M_Locator_ID = 0;
-                                                                    int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
-                                                                    if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
-                                                                    {
-                                                                        M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
-                                                                        if (M_Warehouse_ID == 0)
-                                                                        {
-                                                                            M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
-                                                                        }
-                                                                    }
-
                                                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                     {
                                                                         //invoiceLine.SetIsReversedCostCalculated(true);
@@ -1465,252 +1221,325 @@ namespace VAdvantage.Process
                                                                     {
                                                                         _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                         Get_Trx().Commit();
+                                                                    }
+                                                                }
+                                                            }
+                                                            #endregion
+                                                        }
+                                                        else
+                                                        {
+                                                            #region for Expense type product
+                                                            if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
+                                                            {
+                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
+                                                                     "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_Trx(),
+                                                                     costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                {
+                                                                    if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                    {
+                                                                        conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                    }
+                                                                    _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                        + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                     " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                    {
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    }
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    {
+                                                                        invoiceLine.SetIsCostImmediate(true);
+                                                                    }
+                                                                    if (!invoiceLine.Save(Get_Trx()))
+                                                                    {
+                                                                        ValueNamePair pp = VLogger.RetrieveError();
+                                                                        _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                        Get_Trx().Rollback();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                        Get_Trx().Commit();
+                                                                    }
+                                                                }
+                                                            }
+                                                            #endregion
 
-                                                                        // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
-                                                                        currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
-                                                                                           product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
-                                                                        UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                            #region  for Item Type product
+                                                            else if (product.GetProductType() == "I" && product.GetM_Product_ID() > 0)
+                                                            {
+                                                                if (countColumnExist > 0)
+                                                                {
+                                                                    isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
+                                                                }
+
+                                                                MOrder order1 = new MOrder(GetCtx(), invoice.GetC_Order_ID(), Get_Trx());
+                                                                MOrderLine ol1 = new MOrderLine(GetCtx(), invoiceLine.GetC_OrderLine_ID(), Get_Trx());
+                                                                if (order1.GetC_Order_ID() == 0 || order1.GetC_Order_ID() != ol1.GetC_Order_ID())
+                                                                {
+                                                                    order1 = new MOrder(GetCtx(), ol1.GetC_Order_ID(), Get_Trx());
+                                                                }
+
+                                                                costingCheck.order = order1;
+                                                                costingCheck.orderline = ol1;
+
+                                                                #region  Sales Order
+                                                                if (order1.IsSOTrx() && !order1.IsReturnTrx())
+                                                                {
+                                                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                          "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
+                                                                          Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                    {
+                                                                        if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                        {
+                                                                            conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                        }
+                                                                        _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                            + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                       " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                        {
+                                                                            //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        }
+                                                                        if (invoiceLine.GetM_InOutLine_ID() > 0)
+                                                                        {
+                                                                            DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
+                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
+                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                                                            {
+                                                                                if (IsCostUpdation)
+                                                                                {
+                                                                                    invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
+                                                                                }
+
+                                                                                currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
+                                                                                                           invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
+                                                                                                           Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
+                                                                                if (IsCostUpdation)
+                                                                                {
+                                                                                    invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                        //invoiceLine.SetIsCostCalculated(true);
+                                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                        {
+                                                                            invoiceLine.SetIsCostImmediate(true);
+                                                                        }
+                                                                        if (!invoiceLine.Save(Get_Trx()))
+                                                                        {
+                                                                            ValueNamePair pp = VLogger.RetrieveError();
+                                                                            _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                            Get_Trx().Rollback();
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                            Get_Trx().Commit();
+                                                                        }
+                                                                    }
+                                                                }
+                                                                #endregion
+
+                                                                #region CRMA
+                                                                else if (order1.IsSOTrx() && order1.IsReturnTrx())
+                                                                {
+                                                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                      "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                    {
+                                                                        if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                        {
+                                                                            conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                        }
+                                                                        _log.Info("Cost not Calculated for Invoice(Customer) for this Line ID = "
+                                                                            + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                        {
+                                                                            //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        }
+                                                                        if (invoiceLine.GetM_InOutLine_ID() > 0)
+                                                                        {
+                                                                            DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
+                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
+                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                                                            {
+                                                                                if (IsCostUpdation)
+                                                                                {
+                                                                                    invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
+                                                                                }
+
+                                                                                currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
+                                                                                                           invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
+                                                                                                           Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
+                                                                                if (IsCostUpdation)
+                                                                                {
+                                                                                    invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                        //invoiceLine.SetIsCostCalculated(true);
+                                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                        {
+                                                                            invoiceLine.SetIsCostImmediate(true);
+                                                                        }
+                                                                        if (!invoiceLine.Save(Get_Trx()))
+                                                                        {
+                                                                            ValueNamePair pp = VLogger.RetrieveError();
+                                                                            _log.Info("Error found for saving Invoice(Customer) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                            Get_Trx().Rollback();
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                            Get_Trx().Commit();
+                                                                        }
+                                                                    }
+                                                                }
+                                                                #endregion
+
+                                                                #region VRMA
+                                                                else if (!order1.IsSOTrx() && order1.IsReturnTrx())
+                                                                {
+                                                                    //change 12-5-2016
+                                                                    // when Ap Credit memo is alone then we will do a impact on costing.
+                                                                    // this is bcz of giving discount for particular product
+                                                                    // discount is given only when document type having setting as "Treat As Discount" = True
+                                                                    MDocType docType = new MDocType(GetCtx(), invoice.GetC_DocTypeTarget_ID(), Get_Trx());
+                                                                    if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && invoiceLine.GetC_OrderLine_ID() == 0 && invoiceLine.GetM_InOutLine_ID() == 0 && invoiceLine.GetM_Product_ID() > 0)
+                                                                    {
+                                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                          "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
+                                                                          Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                        {
+                                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                            {
+                                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                            }
+                                                                            _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                                + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            query.Clear();
+                                                                            query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                            DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                            int M_Locator_ID = 0;
+                                                                            int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                            if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                            {
+                                                                                M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                                if (M_Warehouse_ID == 0)
+                                                                                {
+                                                                                    M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                                }
+                                                                            }
+
+                                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                            {
+                                                                                //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                            }
+                                                                            //invoiceLine.SetIsCostCalculated(true);
+                                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                            {
+                                                                                invoiceLine.SetIsCostImmediate(true);
+                                                                            }
+                                                                            if (!invoiceLine.Save(Get_Trx()))
+                                                                            {
+                                                                                ValueNamePair pp = VLogger.RetrieveError();
+                                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                                Get_Trx().Rollback();
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                                Get_Trx().Commit();
+
+                                                                                // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                                                                                currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                                                   product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
+                                                                                UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                                                Get_Trx().Commit();
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                #endregion
+                                                            }
+                                                            #endregion
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        #region for Landed Cost Allocation
+                                                        if (invoiceLine.GetC_Charge_ID() > 0)
+                                                        {
+                                                            if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
+                                                            {
+                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0,
+                                                                    "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(),
+                                                                    costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                {
+                                                                    if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                    {
+                                                                        conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                    }
+                                                                    _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                        + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                    {
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    }
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    {
+                                                                        invoiceLine.SetIsCostImmediate(true);
+                                                                    }
+                                                                    if (!invoiceLine.Save(Get_Trx()))
+                                                                    {
+                                                                        ValueNamePair pp = VLogger.RetrieveError();
+                                                                        _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                        Get_Trx().Rollback();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                         Get_Trx().Commit();
                                                                     }
                                                                 }
                                                             }
                                                         }
                                                         #endregion
-                                                    }
-                                                    #endregion
-                                                }
-                                            }
-                                            else
-                                            {
-                                                #region for Landed Cost Allocation
-                                                if (invoiceLine.GetC_Charge_ID() > 0)
-                                                {
-                                                    if (!invoice.IsSOTrx() && !invoice.IsReturnTrx())
-                                                    {
-                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), null, 0,
-                                                            "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0, Get_TrxName(),
-                                                            costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                        {
-                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                            {
-                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                            }
-                                                            _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                        }
-                                                        else
-                                                        {
-                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                            {
-                                                                //invoiceLine.SetIsReversedCostCalculated(true);
-                                                            }
-                                                            //invoiceLine.SetIsCostCalculated(true);
-                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                            {
-                                                                invoiceLine.SetIsCostImmediate(true);
-                                                            }
-                                                            if (!invoiceLine.Save(Get_Trx()))
-                                                            {
-                                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                Get_Trx().Rollback();
-                                                            }
-                                                            else
-                                                            {
-                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                Get_Trx().Commit();
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                #endregion
 
-                                                #region for Expense type product
-                                                if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
-                                                {
-                                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
-                                                        "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0,
-                                                        Get_TrxName(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                    {
-                                                        if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                        #region for Expense type product
+                                                        if (product.GetProductType() == "E" && product.GetM_Product_ID() > 0)
                                                         {
-                                                            conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                        }
-                                                        _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                            + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                    }
-                                                    else
-                                                    {
-                                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                        {
-                                                            //invoiceLine.SetIsReversedCostCalculated(true);
-                                                        }
-                                                        //invoiceLine.SetIsCostCalculated(true);
-                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                        {
-                                                            invoiceLine.SetIsCostImmediate(true);
-                                                        }
-                                                        if (!invoiceLine.Save(Get_Trx()))
-                                                        {
-                                                            ValueNamePair pp = VLogger.RetrieveError();
-                                                            _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                            Get_Trx().Rollback();
-                                                        }
-                                                        else
-                                                        {
-                                                            _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                            Get_Trx().Commit();
-                                                        }
-                                                    }
-                                                }
-                                                #endregion
-
-                                                #region  for Item Type product
-                                                else if (product.GetProductType() == "I" && product.GetM_Product_ID() > 0)
-                                                {
-                                                    if (countColumnExist > 0)
-                                                    {
-                                                        isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
-                                                    }
-
-                                                    #region Sales Order
-                                                    if (invoice.IsSOTrx() && !invoice.IsReturnTrx())
-                                                    {
-                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                              "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                        {
-                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                            {
-                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                            }
-                                                            _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
-                                                                + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                        }
-                                                        else
-                                                        {
-                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                            {
-                                                                //invoiceLine.SetIsReversedCostCalculated(true);
-                                                            }
-                                                            if (invoiceLine.GetM_InOutLine_ID() > 0)
-                                                            {
-                                                                DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
-                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
-                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
-                                                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                                                {
-                                                                    if (IsCostUpdation)
-                                                                    {
-                                                                        invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
-                                                                    }
-
-                                                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                               invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
-                                                                                               Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
-                                                                    if (IsCostUpdation)
-                                                                    {
-                                                                        invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
-                                                                    }
-                                                                }
-                                                            }
-                                                            //invoiceLine.SetIsCostCalculated(true);
-                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                            {
-                                                                invoiceLine.SetIsCostImmediate(true);
-                                                            }
-                                                            if (!invoiceLine.Save(Get_Trx()))
-                                                            {
-                                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                Get_Trx().Rollback();
-                                                            }
-                                                            else
-                                                            {
-                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                Get_Trx().Commit();
-                                                            }
-                                                        }
-                                                    }
-                                                    #endregion
-
-                                                    #region CRMA
-                                                    else if (invoice.IsSOTrx() && invoice.IsReturnTrx())
-                                                    {
-                                                        if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                          "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
-                                                          Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
-                                                        {
-                                                            if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
-                                                            {
-                                                                conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
-                                                            }
-                                                            _log.Info("Cost not Calculated for Invoice(Customer) for this Line ID = "
-                                                                + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
-                                                        }
-                                                        else
-                                                        {
-                                                            if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
-                                                            {
-                                                                //invoiceLine.SetIsReversedCostCalculated(true);
-                                                            }
-                                                            if (invoiceLine.GetM_InOutLine_ID() > 0)
-                                                            {
-                                                                DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
-                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
-                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
-                                                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                                                                {
-                                                                    if (IsCostUpdation)
-                                                                    {
-                                                                        invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
-                                                                    }
-
-                                                                    currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
-                                                                                               invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
-                                                                                               Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
-                                                                    if (IsCostUpdation)
-                                                                    {
-                                                                        invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
-                                                                    }
-                                                                }
-                                                            }
-                                                            //invoiceLine.SetIsCostCalculated(true);
-                                                            //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
-                                                            {
-                                                                invoiceLine.SetIsCostImmediate(true);
-                                                            }
-                                                            if (!invoiceLine.Save(Get_Trx()))
-                                                            {
-                                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                                _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
-                                                                           " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-                                                                Get_Trx().Rollback();
-                                                            }
-                                                            else
-                                                            {
-                                                                _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
-                                                                Get_Trx().Commit();
-                                                            }
-                                                        }
-                                                    }
-                                                    #endregion
-
-                                                    #region VRMA
-                                                    else if (!invoice.IsSOTrx() && invoice.IsReturnTrx())
-                                                    {
-                                                        // when Ap Credit memo is alone then we will do a impact on costing.
-                                                        // this is bcz of giving discount for particular product
-                                                        // discount is given only when document type having setting as "Treat As Discount" = True
-                                                        MDocType docType = new MDocType(GetCtx(), invoice.GetC_DocTypeTarget_ID(), Get_Trx());
-                                                        if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && invoiceLine.GetC_OrderLine_ID() == 0 && invoiceLine.GetM_InOutLine_ID() == 0 && invoiceLine.GetM_Product_ID() > 0)
-                                                        {
-                                                            if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
-                                                              "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
-                                                              Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                            if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, 0,
+                                                                "Invoice(Vendor)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, 0,
+                                                                Get_TrxName(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                                                             {
                                                                 if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
                                                                 {
@@ -1721,24 +1550,6 @@ namespace VAdvantage.Process
                                                             }
                                                             else
                                                             {
-                                                                query.Clear();
-                                                                query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
-                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
-                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
-                                                                DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
-                                                                int M_Locator_ID = 0;
-                                                                int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
-                                                                if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
-                                                                {
-                                                                    M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
-                                                                    if (M_Warehouse_ID == 0)
-                                                                    {
-                                                                        M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
-                                                                    }
-                                                                }
-
-
                                                                 if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                                                 {
                                                                     //invoiceLine.SetIsReversedCostCalculated(true);
@@ -1759,49 +1570,248 @@ namespace VAdvantage.Process
                                                                 {
                                                                     _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
                                                                     Get_Trx().Commit();
-
-                                                                    // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
-                                                                    currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
-                                                                                       product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
-                                                                    UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
-                                                                    Get_Trx().Commit();
                                                                 }
                                                             }
                                                         }
+                                                        #endregion
+
+                                                        #region  for Item Type product
+                                                        else if (product.GetProductType() == "I" && product.GetM_Product_ID() > 0)
+                                                        {
+                                                            if (countColumnExist > 0)
+                                                            {
+                                                                isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
+                                                            }
+
+                                                            #region Sales Order
+                                                            if (invoice.IsSOTrx() && !invoice.IsReturnTrx())
+                                                            {
+                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                      "Invoice(Customer)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                {
+                                                                    if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                    {
+                                                                        conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                    }
+                                                                    _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                        + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                    {
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    }
+                                                                    if (invoiceLine.GetM_InOutLine_ID() > 0)
+                                                                    {
+                                                                        DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
+                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
+                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                                                        {
+                                                                            if (IsCostUpdation)
+                                                                            {
+                                                                                invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
+                                                                            }
+
+                                                                            currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
+                                                                                                       invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
+                                                                                                       Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
+                                                                            if (IsCostUpdation)
+                                                                            {
+                                                                                invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    {
+                                                                        invoiceLine.SetIsCostImmediate(true);
+                                                                    }
+                                                                    if (!invoiceLine.Save(Get_Trx()))
+                                                                    {
+                                                                        ValueNamePair pp = VLogger.RetrieveError();
+                                                                        _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                        Get_Trx().Rollback();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                        Get_Trx().Commit();
+                                                                    }
+                                                                }
+                                                            }
+                                                            #endregion
+
+                                                            #region CRMA
+                                                            else if (invoice.IsSOTrx() && invoice.IsReturnTrx())
+                                                            {
+                                                                if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                  "Invoice(Customer)", null, null, null, invoiceLine, null, ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced(),
+                                                                  Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                {
+                                                                    if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                    {
+                                                                        conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                    }
+                                                                    _log.Info("Cost not Calculated for Invoice(Customer) for this Line ID = "
+                                                                        + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                    {
+                                                                        //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                    }
+                                                                    if (invoiceLine.GetM_InOutLine_ID() > 0)
+                                                                    {
+                                                                        DataSet ds = DB.ExecuteDataset(@"SELECT M_InOutLine.CurrentCostPrice, M_InOut.M_Warehouse_ID 
+                                                                                FROM M_InOutLine INNER JOIN M_InOut ON M_InOut.M_InOut_ID = M_InOutLine.M_InOut_ID
+                                                                                WHERE M_InOutLine.M_InOutLIne_ID = " + invoiceLine.GetM_InOutLine_ID(), null, Get_Trx());
+                                                                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                                                        {
+                                                                            if (IsCostUpdation)
+                                                                            {
+                                                                                invoiceLine.SetCurrentCostPrice(Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["CurrentCostPrice"]));
+                                                                            }
+
+                                                                            currentCostPrice = MCost.GetproductCostAndQtyMaterial(invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(),
+                                                                                                       invoiceLine.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(),
+                                                                                                       Util.GetValueOfInt(ds.Tables[0].Rows[0]["M_Warehouse_ID"]), false);
+                                                                            if (IsCostUpdation)
+                                                                            {
+                                                                                invoiceLine.SetPostCurrentCostPrice(currentCostPrice);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    //invoiceLine.SetIsCostCalculated(true);
+                                                                    //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                    {
+                                                                        invoiceLine.SetIsCostImmediate(true);
+                                                                    }
+                                                                    if (!invoiceLine.Save(Get_Trx()))
+                                                                    {
+                                                                        ValueNamePair pp = VLogger.RetrieveError();
+                                                                        _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                        Get_Trx().Rollback();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                        Get_Trx().Commit();
+                                                                    }
+                                                                }
+                                                            }
+                                                            #endregion
+
+                                                            #region VRMA
+                                                            else if (!invoice.IsSOTrx() && invoice.IsReturnTrx())
+                                                            {
+                                                                // when Ap Credit memo is alone then we will do a impact on costing.
+                                                                // this is bcz of giving discount for particular product
+                                                                // discount is given only when document type having setting as "Treat As Discount" = True
+                                                                MDocType docType = new MDocType(GetCtx(), invoice.GetC_DocTypeTarget_ID(), Get_Trx());
+                                                                if (docType.GetDocBaseType() == "APC" && docType.IsTreatAsDiscount() && invoiceLine.GetC_OrderLine_ID() == 0 && invoiceLine.GetM_InOutLine_ID() == 0 && invoiceLine.GetM_Product_ID() > 0)
+                                                                {
+                                                                    if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoice.GetAD_Client_ID(), invoice.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
+                                                                      "Invoice(Vendor)", null, null, null, invoiceLine, null, Decimal.Negate(ProductInvoiceLineCost), Decimal.Negate(invoiceLine.GetQtyInvoiced()),
+                                                                      Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
+                                                                    {
+                                                                        if (!conversionNotFoundInvoice1.Contains(conversionNotFoundInvoice))
+                                                                        {
+                                                                            conversionNotFoundInvoice1 += conversionNotFoundInvoice + " , ";
+                                                                        }
+                                                                        _log.Info("Cost not Calculated for Invoice(Vendor) for this Line ID = "
+                                                                            + invoiceLine.GetC_InvoiceLine_ID() + " , " + (!string.IsNullOrEmpty(costingCheck.errorMessage) ? costingCheck.errorMessage : ""));
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        query.Clear();
+                                                                        query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
+                                                                        INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
+                                                                        INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                                                                        WHERE il.C_InvoiceLine_ID =  { invoiceLine.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                        DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                                                                        int M_Locator_ID = 0;
+                                                                        int M_Warehouse_ID = invoiceLine.GetM_Warehouse_ID() > 0 ? invoiceLine.GetM_Warehouse_ID() : invoice.GetM_Warehouse_ID();
+                                                                        if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
+                                                                        {
+                                                                            M_Locator_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Locator_ID"]);
+                                                                            if (M_Warehouse_ID == 0)
+                                                                            {
+                                                                                M_Warehouse_ID = Util.GetValueOfInt(dsRefInOut.Tables[0].Rows[0]["M_Warehouse_ID"]);
+                                                                            }
+                                                                        }
+
+
+                                                                        if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                                                        {
+                                                                            //invoiceLine.SetIsReversedCostCalculated(true);
+                                                                        }
+                                                                        //invoiceLine.SetIsCostCalculated(true);
+                                                                        //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
+                                                                        {
+                                                                            invoiceLine.SetIsCostImmediate(true);
+                                                                        }
+                                                                        if (!invoiceLine.Save(Get_Trx()))
+                                                                        {
+                                                                            ValueNamePair pp = VLogger.RetrieveError();
+                                                                            _log.Info("Error found for saving Invoice(Vendor) for this Line ID = " + invoiceLine.GetC_InvoiceLine_ID() +
+                                                                                       " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
+                                                                            Get_Trx().Rollback();
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            _log.Fine("Cost Calculation updated for C_InvoiceLine = " + invoiceLine.GetC_InvoiceLine_ID());
+                                                                            Get_Trx().Commit();
+
+                                                                            // get cost from Product Cost after cost calculation, and update on Product Transaction against Invoice
+                                                                            currentCostPrice = MCost.GetproductCosts(GetAD_Client_ID(), GetAD_Org_ID(),
+                                                                                               product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), M_Warehouse_ID);
+                                                                            UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
+                                                                            Get_Trx().Commit();
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            #endregion
+                                                        }
+                                                        #endregion
                                                     }
-                                                    #endregion
                                                 }
-                                                #endregion
+                                                catch { }
                                             }
                                         }
-                                        catch { }
+                                        continue;
                                     }
                                 }
-                                continue;
+                                catch { }
+                                #endregion
+
+                                #region Cost Calculation For Material Receipt --
+                                try
+                                {
+                                    if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
+                                       Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
+                                    {
+
+                                        CalculateCostForMaterialReversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                                #endregion
+
                             }
                         }
-                        catch { }
-                        #endregion
-
-                        #region Cost Calculation For Material Receipt --
-                        try
-                        {
-                            if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_InOut" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]) == "N" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["isreturntrx"]) == "N" &&
-                               Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]) == "RE")
-                            {
-
-                                CalculateCostForMaterialReversal(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                CalculateCostForPurchaseInvoice(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-
-                                continue;
-                            }
-                        }
-                        catch { }
-                        #endregion
-
                     }
                 }
 
@@ -2004,41 +2014,6 @@ namespace VAdvantage.Process
                 return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotInserted");
             }
             return "";
-        }
-
-        /// <summary>
-        ///  Get min date for re-costing calculation
-        /// </summary>
-        /// <param name="count">Manufacturing Module is updated or not</param>
-        /// <param name="M_Product_ID">Minimum date of selected product from Transaction</param>
-        /// <returns>DateTime -- form which date cost calculation process to be started </returns>
-        public DateTime? SerachMinDate(int count, String M_Product_ID)
-        {
-            DateTime? minDate;
-            //DateTime? tempDate;
-            try
-            {
-                sql.Clear();
-                sql.Append(@"SELECT Min(MovementDate) FROM M_Transaction WHERE IsActive = 'Y' AND AD_Client_ID = " + GetCtx().GetAD_Client_ID());
-                if (!String.IsNullOrEmpty(M_Product_ID))
-                {
-                    sql.Append(@" AND M_Product_ID IN ( " + M_Product_ID + ")");
-                }
-                if (M_AttributeSetInstance_ID > 0)
-                {
-                    sql.Append(@" AND M_AttributesetInstance_ID = " + M_AttributeSetInstance_ID);
-                }
-                if (DateFrom != null)
-                {
-                    sql.Append($" AND trunc(movementdate) >= {GlobalVariable.TO_DATE(DateFrom, true)}");
-                }
-                minDate = Util.GetValueOfDateTime(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-            return minDate;
         }
 
         /// <summary>
@@ -6876,8 +6851,8 @@ namespace VAdvantage.Process
                 Util.GetValueOfString(po_WrkOdrTransaction.Get_Value("VAMFG_Description")).Contains("{->") &&
                 (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_1_ComponentIssueToWorkOrder)
                 || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_ComponentReturnFromWorkOrder) ||
-                (countGOM01 <= 0 && (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore)
-                || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory)))
+                (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore)
+                || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory))
                 || woTrxType.Equals("PM")))
             {
                 sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
@@ -6894,8 +6869,8 @@ namespace VAdvantage.Process
             }
             else if (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_1_ComponentIssueToWorkOrder)
                 || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_ComponentReturnFromWorkOrder)
-                || (countGOM01 <= 0 && (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore)
-                || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory)))
+                || (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore)
+                || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory))
                 || woTrxType.Equals("PM"))
             {
                 sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
@@ -6991,7 +6966,6 @@ namespace VAdvantage.Process
                                 Util.GetValueOfInt(po_WrkOdrTrnsctionLine.Get_Value("AD_Org_ID")), product, Util.GetValueOfInt(po_WrkOdrTrnsctionLine.Get_Value("M_AttributeSetInstance_ID")),
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory) ? currentCostPrice : 0,
-                                countGOM01 > 0 ? Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity"))) :
                                 Decimal.Negate(Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered"))), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
@@ -7061,7 +7035,6 @@ namespace VAdvantage.Process
                                 Util.GetValueOfInt(po_WrkOdrTrnsctionLine.Get_Value("AD_Org_ID")), product, Util.GetValueOfInt(po_WrkOdrTrnsctionLine.Get_Value("M_AttributeSetInstance_ID")),
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? "PE-FinishGood" : "Production Execution", null, null, null, null, po_WrkOdrTrnsctionLine,
                                 woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_3_TransferAssemblyToStore) ? currentCostPrice : 0,
-                                countGOM01 > 0 ? Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("GOM01_ActualQuantity")) :
                                 Util.GetValueOfDecimal(po_WrkOdrTrnsctionLine.Get_Value("VAMFG_QtyEntered")), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
                             {
                                 if (!conversionNotFoundProductionExecution1.Contains(conversionNotFoundProductionExecution))
