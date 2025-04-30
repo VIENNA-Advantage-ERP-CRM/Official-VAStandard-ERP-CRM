@@ -816,7 +816,7 @@
                dropdowns in Filter Accordion
             */
 
-            filterArray = [];
+            let filterArray = [];
             function readFilterData() {
                 var data = '';
                 var divId = $filterValInput.attr('value');
@@ -1006,7 +1006,7 @@
                         $filterColumnInput.val(filterSelectTableVal);
                     }
                     else {
-                        var itemValue = $filters.children('.vas-filter-item').attr('value');
+                        var itemValue = $filters.children('.vas-filter-item.active').attr('value');
                         $filterColumnInput.val(itemValue);
                     }
                     var filterCondition = filterItem.find(".vas-filter-condition.active").text().trim();
@@ -1212,18 +1212,20 @@
                to add/update filters
             */
 
+            // Event handler for adding or editing filter
             $addFilterBtn.on(VIS.Events.onTouchStartOrClick, function (event) {
                 var filterCondition = $filterOperator.val();
                 var filterColumn = $filterColumnInput.val();
                 var updatedFilterValue = $filterValue.val();
-                var selectedVal = $filterValInput.val();
+                var displayType = $filterColumnInput.attr("datatype");
 
-                var displayType = $filterColumnName.children('.vas-column-list-item.active').attr("datatype");
+                // Check if the filter value div is visible
                 if ($filterValueDiv.css('display') != 'none') {
                     if (autoComValue != null) {
                         updatedFilterValue = autoComValue;
                     }
-                    var displayType = $filterColumnName.children('.vas-column-list-item.active').attr("datatype");
+
+                    // Check if the display type is Date or DateTime
                     if (VIS.DisplayType.Date == displayType || VIS.DisplayType.DateTime == displayType) {
                         if (!isDynamic.is(':checked') && updatedFilterValue.length > 0) {
                             filterColumn += "TO_CHAR(" + filterColumn + ", 'yyyy-mm-dd')";
@@ -1235,137 +1237,88 @@
                             filterCondition = ">=";
                         }
                     }
+
+                    // Handle Yes/No condition
                     if (displayType == VIS.DisplayType.YesNo) {
-                        if ($filterValue.is(':checked')) {
-                            updatedFilterValue = "'Y'";
-                        } else {
-                            updatedFilterValue = "'N'";
-                        }
+                        updatedFilterValue = $filterValue.is(':checked') ? "'Y'" : "'N'";
                     }
+
+                    // Handle other types like String, List, Text
                     if (VIS.DisplayType.String == displayType || VIS.DisplayType.List == displayType
                         || VIS.DisplayType.Text == displayType || VIS.DisplayType.TextLong == displayType) {
                         updatedFilterValue = "'" + updatedFilterValue + "'";
                     }
                 }
+                // Handling if filter value exchange icon block is visible
                 else if ($filterValExchangeIconBlock.css('display') != 'none' && $filterValExchangeIconBlock.find('input').val() != '') {
                     updatedFilterValue = $filterValExchangeIconBlock.find('input').attr('columnid');
                 }
+                // Handling if a new column is displayed
                 else if ($filterNewColumn.css('display') != 'none') {
                     updatedFilterValue = $filterNewColumn.find('input').val();
                     displayType = 13;
                 }
+
+                // Make sure all necessary filter values are provided before adding filter
                 if (filterColumn != '' && filterCondition != '' && filterCondition != undefined && updatedFilterValue
                     && updatedFilterValue.length > 0) {
 
+                    var WhereCondition = '';
+                    // Set WHERE if it hasn't been set yet
                     if (andFlag && $selectGeneratorQuery.text().indexOf('WHERE') == -1) {
                         WhereCondition = "WHERE";
                     }
                     else {
                         WhereCondition = $filterConditionV2.val();
                     }
-                    /*if (filterCondition == 'IN') {
-                        filterColumn = "(" + $inDropdownVal + ")";
-                    }*/
+
+                    // Edit button logic
                     if ($(this).hasClass('vas-edit-btn')) {
                         $filters.empty();
 
-                        /*$filters.find('.vas-filter-price-value.active').text(updatedFilterValue);*/
+                        // Get the updated filter condition and operator
                         var updatedFilterConditionValue = $filterOperator.find('option:selected').val();
                         $filters.find('.vas-filter-price-value.active').parents('.vas-filter-item').attr("filterId", updatedFilterValue);
-                        /*$filters.find('.vas-filter-condition.active').text(updatedFilterConditionValue);*/
+
                         var andOrOperator = $filterConditionV2.find('option:selected').val();
-                        //$filters.find('.vas-filter-andor-value.active').text(andOrOperator);
-                        //$filters.find('.vas-selecttable.active').text(filterColumn);
                         var oldQuery = $filterEditDiv.text();
                         var sqlGenQuery = $selectGeneratorQuery.text();
-                        var reqFilterVal = $filterValInput.val();
-                        // Disabled the day, month, year textboxes on click of edit button
+                        
+
+                        // Disable dynamic filter inputs while editing
                         txtDay.prop("readonly", true);
                         txtMonth.prop("readonly", true);
                         txtYear.prop("readonly", true);
                         isDynamic.prop("disabled", true);
                         $filterDateList.prop("disabled", true);
 
-                        // Checked if there is a New Column or Old Column in Condition section dropdown in case of edit
-                        //if ($filterNewColumn.css('display') != 'none') {
-                        //    $filters.find('.vas-filter-price-name.active').text(updatedFilterValue);
-                        //    reqFilterVal = $filterNewColumn.find('input').val();
-                        //}
-                        //else {
-                        //    $filters.find('.vas-filter-price-name.active').text(reqFilterVal);
-                        //}
+                        // Set dynamic value if dynamic checkbox is checked
+                        var chkDynamic = isDynamic.is(':checked') ? "Y" : "N";
 
-                        // Set the chkDynamic to Y if isDynamic checkbox is checked
-                        var chkDynamic = "N";
-                        if (isDynamic.is(':checked')) {
-                            chkDynamic = "Y";
-                        }
-
-                        // Enabled the isDynamic checkbox 
+                        // Enable dynamic checkbox after edit
                         isDynamic.prop("disabled", false);
 
-                        // Extract the part(except filterColumn) from SQL query in case of Date datatype
+                        // Handle SQL query generation logic
                         var columnVersion = $filterValInput.data('input');
-
                         if ($filterNewColumn.css('display') != 'none') {
                             reqFilterVal = $filterNewColumn.find('input').val();
                             columnVersion = $filterNewColumn.find('input').data('input');
                         }
 
                         var dateType = $filterColumnInput.attr('datatype');
+                        var newQuery = generateNewQuery(dateType, filterColumn, updatedFilterValue, updatedFilterConditionValue, andOrOperator, filterArrayIndex);
 
-                        var startIndex = filterColumn.indexOf("TO_CHAR(");
+                        // Update SQL generator query
+                        sqlGenQuery = sqlGenQuery.replace(oldQuery, newQuery);
+                        $selectGeneratorQuery.text(sqlGenQuery);
 
-                        var extracted = "";
 
-                        var endIndex = "";
-
-                        if (startIndex !== -1) {
-                            endIndex = filterColumn.indexOf(")", startIndex) + 1;
-                            extracted = filterColumn.slice(startIndex, endIndex);
-                        }
-                        // console.log(extracted);
-                        var newQuery = "";
+                        // Update filterArray with new values
+                        var dataTypeReq = $filterColumnInput.attr('datatype');
+                        
+                        var reqFilterVal = $filterValInput.val();
                         var regex = /(.+)TO_CHAR/;
                         var match = filterColumn.match(regex);
-
-
-                        // Function to handle dateType 17 logic
-                        function wrapInQuotes(value, dateType) {
-                            return dateType == 17 ? "'" + value + "'" : value;
-                        }
-
-                        if (filterArrayIndex == 0 && dateType != 15 && dateType != 16) {
-                            newQuery = " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
-                        } else if (match != null && (dateType == 15 || dateType == 16)) {
-                            if (filterArrayIndex >= 1) {
-                                newQuery = andOrOperator + " " + extracted + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
-                            } else {
-                                newQuery = " " + extracted + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
-                            }
-                        } else if (match == null && (dateType == 15 || dateType == 16)) {
-                            if (filterArrayIndex < 1) {
-                                newQuery = " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
-                            }
-                        } else {
-                            newQuery = andOrOperator + " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
-                        }
-
-
-                        $(this).removeClass('vas-edit-btn');
-                        ClearText();
-                        autoComValue = null;
-                        $addFilterBtn.val(VIS.Msg.getMsg("VAS_AddFilter"));
-                        $filterSelectArrow.css('pointer-events', 'all');
-                        newQuery = newQuery.replace(/\s{2,}/g, ' ');
-                        sqlGenQuery = sqlGenQuery.replace(/\s{2,}/g, ' ');
-
-                        var editedQuery = sqlGenQuery.replace(oldQuery, newQuery);
-
-
-                        var dataTypeReq = $filterColumnInput.attr('datatype');
-                        //var filterColumnInput = $filterColumnInput.val();
-                        $selectGeneratorQuery.text(editedQuery);
                         if (filterIndex > -1 && filterArray[filterIndex] && typeof filterArray[filterIndex] === 'object') {
                             filterArray[filterIndex].filterCondition = updatedFilterConditionValue;
                             filterArray[filterIndex].columnVal = reqFilterVal;
@@ -1382,31 +1335,86 @@
                             filterArray[filterIndex].filterAndOrValue = andOrOperator;
                             filterArray[filterIndex].chkDynamic = chkDynamic;
                         }
-                        readFilterData();
 
-                    }
-                    else {
-                        //if (updatedFilterValue == '') {
-                        //    return;
-                        //}
+                        // Reset UI state after editing
+                        $(this).removeClass('vas-edit-btn');
+                        ClearText();
+                        autoComValue = null;
+                        $addFilterBtn.val(VIS.Msg.getMsg("VAS_AddFilter"));
+                        $filterSelectArrow.css('pointer-events', 'all');
 
+                        readFilterData();  // Refresh the filter data UI
+
+                    } else {
+                        // Add a new filter to the list if edit button wasn't clicked
                         $addFilterDiv.append($filters);
                         ApplyFilter(WhereCondition, updatedFilterValue, displayType);
                         addFilter(updatedFilterValue, displayType);
+
+                        // Reset filter input type and hide date div
                         $filterValue.attr('type', 'text');
                         $filterDateDiv.hide();
                     }
 
+                    // Reset filter column input after adding or editing filter
                     $filterColumnInput.val('');
                     ClearText();
-                    //$inDropdownVal = [];
-                    // $inOperatorValues.empty();
-                }
-                else {
+
+                } else {
                     $sqlResultDiv.text(VIS.Msg.getMsg("VAS_AddFilterValues"));
                     $sqlResultDiv.addClass('vas-sql-result-error');
                 }
             });
+
+            /**
+             * Function to generate new SQL query based on filter values
+             * @param {any} dateType
+             * @param {any} filterColumn
+             * @param {any} updatedFilterValue
+             * @param {any} updatedFilterConditionValue
+             * @param {any} andOrOperator
+             * @param {any} filterArrayIndex
+             */
+            function generateNewQuery(dateType, filterColumn, updatedFilterValue, updatedFilterConditionValue, andOrOperator, filterArrayIndex) {
+                // Wrap values in quotes based on dateType or other conditions
+                var startIndex = filterColumn.indexOf("TO_CHAR(");
+
+                var extracted = "";
+
+                var endIndex = "";
+
+                if (startIndex !== -1) {
+                    endIndex = filterColumn.indexOf(")", startIndex) + 1;
+                    extracted = filterColumn.slice(startIndex, endIndex);
+                }
+                var newQuery = "";
+                var regex = /(.+)TO_CHAR/;
+                var match = filterColumn.match(regex);
+
+
+                // Function to handle dateType 17 logic
+                function wrapInQuotes(value, dateType) {
+                    return dateType == 17 ? "'" + value + "'" : value;
+                }
+
+                if (filterArrayIndex == 0 && dateType != 15 && dateType != 16) {
+                    newQuery = " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
+                } else if (match != null && (dateType == 15 || dateType == 16)) {
+                    if (filterArrayIndex >= 1) {
+                        newQuery = andOrOperator + " " + extracted + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
+                    } else {
+                        newQuery = " " + extracted + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
+                    }
+                } else if (match == null && (dateType == 15 || dateType == 16)) {
+                    if (filterArrayIndex < 1) {
+                        newQuery = " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
+                    }
+                } else {
+                    newQuery = andOrOperator + " " + filterColumn + " " + updatedFilterConditionValue + " " + wrapInQuotes(updatedFilterValue, dateType);
+                }
+
+                return newQuery.replace(/\s{2,}/g, ' '); // Clean up extra spaces
+            }
 
             /*
                Function to collect joins data to display
@@ -2607,6 +2615,11 @@
                                 }
                                 pagingPlusBtnDiv.removeClass('d-none');
                                 pagingPlusBtnDiv.addClass('d-flex justify-content-between align-items-center');
+                                if (result.RecordList.length < 100 && pageNo == 1) {
+                                    pagingDiv.find("select").append($("<option>").val(pageNo).text(pageNo));
+                                    pagingDiv.find('li').last().css('pointer-events', 'none');
+                                    pagingDiv.find('li').last().find('i').addClass('VA107-disablePage');
+                                }
                             }
                             else {
                                 if (sqlFlag) {
