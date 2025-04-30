@@ -156,6 +156,8 @@ namespace VIS.Models
             query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             // query += " FETCH FIRST 100 ROWS ONLY";
 
+            VLogger.Get().Severe("Alert=" + query);
+
             if (ValidateSql(query))
             {
                 DataSet ds = new DataSet();
@@ -174,7 +176,7 @@ namespace VIS.Models
                     DataTable table = ds.Tables[0];
                     int rowCount = table.Rows.Count;
                     int colCount = table.Columns.Count;
-                    if (recordCount == 0 && pageNo == 1)
+                    if (recordCount == 0 && pageNo == 1 && rowCount > 100)
                     {
                         results.TotalRecord = rowCount;
                         rowCount = 100;
