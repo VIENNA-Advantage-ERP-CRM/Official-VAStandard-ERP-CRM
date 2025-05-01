@@ -187,8 +187,8 @@ namespace ViennaAdvantage.Process
                 if (dsSuspect != null && dsSuspect.Tables.Count > 0 && dsSuspect.Tables[0].Rows.Count > 0)
                 {
 
-                    MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA061_SuspectInterestArea"), null);
-                    PO obj = tbl.GetPO(GetCtx(), GetRecord_ID(), null);
+                    MTable tbl = new MTable(GetCtx(), MTable.Get_Table_ID("VA061_SuspectInterestArea"), Get_Trx());
+                    PO obj = tbl.GetPO(GetCtx(), GetRecord_ID(), Get_Trx());
                     obj.SetAD_Client_ID(Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["AD_Client_ID"]));
                     obj.SetAD_Org_ID(Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["AD_Org_ID"]));
                     obj.Set_Value("R_InterestArea_ID", R_InterestArea_ID);
