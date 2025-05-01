@@ -7,6 +7,8 @@ using VAdvantage.Utility;
 using VAdvantage.Logging;
 //using ViennaAdvantage.Model;
 using VAdvantage.DataBase;
+using VAdvantage.Model;
+using System.Data;
 
 /* Process: Generate Target List 
  * Writer :Arpit Singh
@@ -49,10 +51,28 @@ namespace ViennaAdvantageServer.Process
 
         protected override String DoIt()
         {
-            string sql = "Select ad_table_id from ad_table where tablename='C_Lead'";
-            int leadTable_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-            sql = "Select ad_table_id from ad_table where tablename='C_BPartner'";
-            int BPartnerTable_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+            //VAI050-optimize the code
+            string sql = @"SELECT TableName, AD_Table_ID  FROM AD_Table 
+                          WHERE TableName IN ('C_Lead', 'C_BPartner', 'VA061_Suspect')";
+
+            DataSet ds = DB.ExecuteDataset(sql);
+            int leadTable_ID = 0, BPartnerTable_ID = 0, SuspectID = 0;
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                foreach (System.Data.DataRow row in ds.Tables[0].Rows)
+                {
+                    string tableName = row["TableName"].ToString();
+                    int id = Util.GetValueOfInt(row["AD_Table_ID"]);
+
+                    if (tableName == "C_Lead")
+                        leadTable_ID = id;
+                    else if (tableName == "C_BPartner")
+                        BPartnerTable_ID = id;
+                    else if (tableName == "VA061_Suspect")
+                        SuspectID = id;
+                }
+            }
+
 
             VAdvantage.Model.X_C_TargetList TList = new VAdvantage.Model.X_C_TargetList(GetCtx(), 0, null);
 
@@ -124,9 +144,28 @@ namespace ViennaAdvantageServer.Process
                     //return Msg.GetMsg(GetCtx(), "TargetListNotCreate");
                 }
             }
+            //VAI050-Add suspect to target list
+            if (Table_id == SuspectID && Env.IsModuleInstalled("VA061_"))
+            {
+                string query = "SELECT City, C_Country_ID FROM VA061_Suspect WHERE VA061_Suspect_ID=" + GetRecord_ID();
+                DataSet dsSuspect = DB.ExecuteDataset(query);
+                if (dsSuspect != null && dsSuspect.Tables.Count > 0 && dsSuspect.Tables[0].Rows.Count > 0)
+                {
+                    TList.Set_ValueNoCheck("C_MasterTargetList_ID", Campaign_id);
+                    TList.Set_Value("VA061_Suspect_ID", Record_ID);
+                    TList.SetCity(Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["City"]));
+                    TList.SetC_Country_ID(Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["C_Country_ID"]));
+                    if (!TList.Save())
+                    {
+                        return GetRetrievedError(TList, "TargetListNotCreate");
+                    }
+                    return Msg.GetMsg(GetCtx(), "TargetListCreate");
+                }
 
 
-            return Msg.GetMsg(GetCtx(), "TargetListCreate");
+            }
+
+            return Msg.GetMsg(GetCtx(), "TargetListNotCreate");
         }
 
 
