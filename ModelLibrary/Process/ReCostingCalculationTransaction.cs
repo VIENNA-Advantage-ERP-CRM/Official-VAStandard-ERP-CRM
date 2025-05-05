@@ -13,8 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-//using System.Data.OracleClient;
-
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -29,6 +27,7 @@ namespace VAdvantage.Process
     public class ReCostingCalculationTransaction : SvrProcess
     {
         private StringBuilder sql = new StringBuilder();
+        private StringBuilder prodSql = new StringBuilder();
         private StringBuilder sqlInvoice = new StringBuilder();
         private DataSet dsInvoice = null;
         private static VLogger _log = VLogger.GetVLogger(typeof(ReCostingCalculationTransaction).FullName);
@@ -189,8 +188,6 @@ namespace VAdvantage.Process
                 // update / delete query
                 UpdateAndDeleteCostImpacts(count);
 
-                if (onlyDeleteCosting.Equals("Y"))
-                    return Msg.GetMsg(GetCtx(), "VIS_DeleteCostingImpacts");
 
                 // Insert Closing Cost 
                 if (DateFrom != null)
@@ -227,23 +224,12 @@ namespace VAdvantage.Process
                 client = MClient.Get(GetCtx(), GetCtx().GetAD_Client_ID());
                 VAS_IsInvoiceRecostonGRNDate = Util.GetValueOfBool(client.Get_Value("VAS_IsInvoiceRecostonGRNDate"));
 
-                // When From Date less than min Date record then Cost to be updated 
-                if (DateFrom != null && minDateRecord != null && DateFrom.Value.Date <= minDateRecord.Value.Date)
-                {
-                    IsCostUpdation = true;
-                }
-                else if (DateFrom == null)
-                {
-                    // When From date not selected then Cost to be updated 
-                    IsCostUpdation = true;
-                }
-
                 _log.Info("RE Cost Calculation Start for " + minDateRecord);
                 var pc = "(SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )";
                 sql.Clear();
 
                 sql.Append($@"WITH trx AS (
-                       SELECT t.AD_Client_ID, t.AD_Org_ID , t.M_Product_ID, t.M_AttributeSetInstance_ID ,t.movementdate, t.created ,t.M_Transaction_ID ,
+                       SELECT t.AD_Client_ID, t.AD_Org_ID , t.M_Product_ID, t.M_AttributeSetInstance_ID ,t.movementdate,  to_char(t.created, 'DD-MON-YY HH24:MI:SS') AS created ,t.M_Transaction_ID ,
                         t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_productionline_ID, ");
                 if (count > 0)
                 {
@@ -338,7 +324,8 @@ namespace VAdvantage.Process
                 sql.Append($@" LEFT JOIN C_Invoiceline invl ON (t.C_Invoiceline_ID = invl.C_Invoiceline_ID)
                                 LEFT JOIN C_Invoice hinvl ON (hinvl.C_Invoice_ID = invl.C_Invoice_ID)
                                 LEFT JOIN M_MatchInv mit ON (mit.C_Invoiceline_ID = t.C_Invoiceline_ID AND mit.C_Invoiceline_ID = invl.C_Invoiceline_ID)
-                                LEFT JOIN C_LandedCostAllocation LCA ON (t.C_InvoiceLine_ID = LCA.C_InvoiceLine_ID AND t.vas_islandedcost = 'Y' AND LCA.M_Product_ID = t.M_Product_ID)
+                                LEFT JOIN C_LandedCostAllocation LCA ON (t.C_InvoiceLine_ID = LCA.C_InvoiceLine_ID AND t.vas_islandedcost = 'Y'
+                                          AND LCA.M_Product_ID = t.M_Product_ID AND NVL(LCA.M_AttributeSetInstance_ID, 0) = NVL(t.M_AttributeSetInstance_ID, 0))
                                 WHERE t.IsActive = 'Y'  AND t.AD_Client_ID = {GetCtx().GetAD_Client_ID()}");
                 if (!string.IsNullOrEmpty(productCategoryID) || !string.IsNullOrEmpty(productID))
                 {
@@ -350,11 +337,11 @@ namespace VAdvantage.Process
                 }
                 if (DateFrom != null)
                 {
-                    sql.Append($@" AND t.movementdate >= { GlobalVariable.TO_DATE(DateFrom, true) })");
+                    sql.Append($@" AND t.movementdate >= { GlobalVariable.TO_DATE(DateFrom, true) }");
                 }
                 sql.Append("),");
                 sql.Append($@"MatchInv as 
-                                (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  mi.M_Product_ID, mi.M_AttributeSetInstance_ID ,i.DateAcct as movementdate, i.created  ,
+                                (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  mi.M_Product_ID, mi.M_AttributeSetInstance_ID ,i.DateAcct as movementdate,  to_char(i.created, 'DD-MON-YY HH24:MI:SS') AS created  ,
                                 0 as M_Transaction_ID,  0 as M_InOutline_ID  , 0 as M_Inventoryline_ID  , 0 as M_Movementline_ID , 0 as M_Productionline_ID, 
                                 0 as VAMFG_M_wrkodrtransaction_ID  , 0 as VAMFG_M_wrkodrtrnsctionline_ID, 
                                 0 as VAFAM_assetdisposal_ID, mi.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, mi.M_MatchInv_Id AS Record_Id,
@@ -374,7 +361,7 @@ namespace VAdvantage.Process
                 }
                 if (DateFrom != null)
                 {
-                    sql.Append($@" AND i.DateAcct >= { GlobalVariable.TO_DATE(DateFrom, true) })");
+                    sql.Append($@" AND i.DateAcct >= { GlobalVariable.TO_DATE(DateFrom, true) }");
                 }
                 if (VAS_IsInvoiceRecostonGRNDate)
                 {
@@ -382,7 +369,7 @@ namespace VAdvantage.Process
                 }
                 sql.Append("), ");
                 sql.Append($@"LandedCost as 
-                                (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  lca.M_Product_ID, lca.M_AttributeSetInstance_ID ,i.DateAcct as movementdate, i.created  ,
+                                (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  lca.M_Product_ID, lca.M_AttributeSetInstance_ID ,i.DateAcct as movementdate,  to_char(i.created, 'DD-MON-YY HH24:MI:SS') AS created  ,
                                 0 as M_Transaction_ID,  0 as M_InOutline_ID  , 0 as M_Inventoryline_ID  , 0 as M_Movementline_ID , 0 as M_productionline_ID, 
                                 0 as VAMFG_M_wrkodrtransaction_ID  , 0 as VAMFG_M_wrkodrtrnsctionline_ID, 
                                 0 as VAFAM_assetdisposal_ID, lca.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, lca.C_LANDEDCOSTALLOCATION_ID AS Record_Id,
@@ -402,7 +389,7 @@ namespace VAdvantage.Process
                 }
                 if (DateFrom != null)
                 {
-                    sql.Append($@" AND i.DateAcct >= { GlobalVariable.TO_DATE(DateFrom, true) })");
+                    sql.Append($@" AND i.DateAcct >= { GlobalVariable.TO_DATE(DateFrom, true) }");
                 }
                 if (VAS_IsInvoiceRecostonGRNDate)
                 {
@@ -421,7 +408,7 @@ namespace VAdvantage.Process
                 {
                     int pazeSize = 500;
                     int TotalPage = (totalRecord % pazeSize) == 0 ? (totalRecord / pazeSize) : ((totalRecord / pazeSize) + 1);
-                    string Query = "SELECT * FROM (" + sql.ToString() + " ORDER BY t.movementdate, t.created";
+                    string Query = "SELECT * FROM (" + sql.ToString() + " ORDER BY t.movementdate, TO_DATE(Created, 'DD-MON-YY HH24:MI:SS'), M_Transaction_ID ";
                     for (int pageNo = 1; pageNo <= TotalPage; pageNo++)
                     {
 
@@ -435,6 +422,25 @@ namespace VAdvantage.Process
                                 {
                                     continue;
                                 }
+
+                                productID = Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["M_Product_ID"]);
+
+                                // Get Min Date as Movement Date from Product Transaction
+                                minDateRecord = Util.GetValueOfDateTime(dsRecord.Tables[0].Rows[z]["movementdate"]);
+                                _log.Info($"Re-Costing Calculation with Trx Data start for Product ID : {productID} and Movement Date : {minDateRecord}");
+                                // When From Date less than min Date record then Cost to be updated 
+                                if (DateFrom != null && minDateRecord != null && DateFrom.Value.Date <= minDateRecord.Value.Date)
+                                {
+                                    IsCostUpdation = true;
+                                }
+                                else if (DateFrom == null)
+                                {
+                                    // When From date not selected then Cost to be updated 
+                                    IsCostUpdation = true;
+                                }
+
+
+
 
                                 #region Cost Calculation For Material Receipt --
                                 try
@@ -601,14 +607,18 @@ namespace VAdvantage.Process
                                                       AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
                                                       AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
-                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
-                                            {
-                                                sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                                            }
-                                            else
-                                            {
-                                                sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
-                                            }
+
+                                            prodSql.Clear();
+                                            prodSql.Append(sql);
+
+                                            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            //{
+                                            //    sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                            //}
+                                            //else
+                                            //{
+                                            sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
+                                            //}
                                             sql.Append(" ORDER BY  pp.Line,  pl.Line");
                                             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
                                             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -618,16 +628,22 @@ namespace VAdvantage.Process
                                                     #region calculate/update cost of components (Here IsSotrx means IsReversed --> on production header)
                                                     if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["issotrx"]).Equals("N") && IsCostUpdation)
                                                     {
-                                                        SqlParameter[] param = new SqlParameter[2];
-                                                        param[0] = new SqlParameter("p_record_id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
-                                                        param[0].SqlDbType = SqlDbType.Int;
-                                                        param[0].Direction = ParameterDirection.Input;
+                                                        prodSql.Append(" AND pl.Amt = 0 ");
+                                                        DataSet ds = DB.ExecuteDataset(prodSql.ToString(), null, Get_Trx());
+                                                        for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
+                                                        {
+                                                            SqlParameter[] param = new SqlParameter[2];
+                                                            param[0] = new SqlParameter("p_record_id", Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                                            param[0].SqlDbType = SqlDbType.Int;
+                                                            param[0].Direction = ParameterDirection.Input;
 
-                                                        param[1] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]));
-                                                        param[1].SqlDbType = SqlDbType.Int;
-                                                        param[1].Direction = ParameterDirection.Input;
+                                                            param[1] = new SqlParameter("p_m_product_id", Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_Product_ID"]));
+                                                            param[1].SqlDbType = SqlDbType.Int;
+                                                            param[1].Direction = ParameterDirection.Input;
 
-                                                        DB.ExecuteProcedure("updateproductionlinewithcostreversal", param, Get_Trx());
+                                                            DB.ExecuteProcedure("updateproductionlinewithcostreversal", param, Get_Trx());
+                                                            //DB.ExecuteProcedure("updateProductionLineWithCost", param, Get_Trx());
+                                                        }
                                                     }
                                                     #endregion
 
@@ -819,19 +835,6 @@ namespace VAdvantage.Process
                                                                     }
                                                                 }
                                                             }
-
-                                                            // update prodution header 
-                                                            //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("N"))
-                                                            //{
-                                                            //    DB.ExecuteQuery("UPDATE M_Production SET IsCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
-                                                            //}
-
-                                                            //if (Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsCostCalculated"]).Equals("Y") &&
-                                                            //    !Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversedCostCalculated"]).Equals("N") &&
-                                                            //    Util.GetValueOfString(dsChildRecord.Tables[0].Rows[j]["IsReversed"]).Equals("Y"))
-                                                            //{
-                                                            //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
-                                                            //}
                                                         }
                                                         catch (Exception ex)
                                                         {
@@ -1120,14 +1123,18 @@ namespace VAdvantage.Process
                                         {
                                             sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
                                                          " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            //{
+                                            //    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                            //}
+                                            //else
+                                            //{
+                                            sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                                            if (M_AttributeSetInstance_ID > 0)
                                             {
-                                                sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                                sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
                                             }
-                                            else
-                                            {
-                                                sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                                            }
+                                            //}
                                             sql.Append(" ORDER BY Line");
                                         }
                                         else
@@ -1135,14 +1142,18 @@ namespace VAdvantage.Process
                                             sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
                                                          " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                             sql.Append(@" AND IsCostImmediate = 'N' ");
-                                            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                                            //{
+                                            //    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                            //}
+                                            //else
+                                            //{
+                                            sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                                            if (M_AttributeSetInstance_ID > 0)
                                             {
-                                                sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                                                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
                                             }
-                                            else
-                                            {
-                                                sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                                            }
+                                            //}
                                             sql.Append(" ORDER BY Line");
                                         }
                                         dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -1891,7 +1902,7 @@ namespace VAdvantage.Process
                               AND iil.IsActive = 'Y'
                               AND il.iscostcalculated = 'N'
                               AND il.IsCostImmediate = 'N'
-                              AND il.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
+                              AND il.M_Product_ID IN ( " + (productID) + @" )
                            ) io ON ci.C_Invoice_ID = io.C_Invoice_ID");
             sqlInvoice.Append(@" WHERE ci.IsSOTrx = 'N' AND (ci.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true));
             // Get invoice which are linked with GRN / DO
@@ -1900,7 +1911,7 @@ namespace VAdvantage.Process
                                     INNER JOIN M_InOut io ON (iil.M_Inout_ID = io.M_Inout_ID)
                                     INNER JOIN C_InvoiceLine il ON (il.M_InoutLine_ID = iil.M_InoutLine_ID)
                                     WHERE io.M_InOut_ID = {M_InOut_ID} AND iil.IsActive = 'Y' AND il.iscostcalculated = 'N' AND il.IsCostImmediate = 'N' 
-                                    AND il.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) ) ");
+                                    AND il.M_Product_ID IN ( " + (productID) + @" ) ) ");
 
             // Treat as Discount record
             sqlInvoice.Append($@" OR 
@@ -1909,7 +1920,7 @@ namespace VAdvantage.Process
                                     INNER JOIN M_InoutLine iil ON (il.M_InoutLine_ID = iil.M_InoutLine_ID)
                                     INNER JOIN M_InOut io ON (iil.M_Inout_ID = io.M_Inout_ID)                                   
                                     WHERE io.M_InOut_ID = {M_InOut_ID} AND tad.IsActive = 'Y' AND tad.iscostcalculated = 'N' AND tad.IsCostImmediate = 'N' 
-                                    AND tad.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) ) ");
+                                    AND tad.M_Product_ID IN ( " + (productID) + @" ) ) ");
             // Treat as Discount record where on Original Invoice not linked with GRN Line
             sqlInvoice.Append($@" OR 
                                 ci.C_Invoice_ID IN (SELECT tad.C_Invoice_ID FROM C_InvoiceLine tad 
@@ -1917,7 +1928,7 @@ namespace VAdvantage.Process
                                     INNER JOIN M_InoutLine iil ON (il.M_InoutLine_ID = iil.M_InoutLine_ID)
                                     INNER JOIN M_InOut io ON (iil.M_Inout_ID = io.M_Inout_ID)                                   
                                     WHERE io.M_InOut_ID = {M_InOut_ID} AND tad.IsActive = 'Y' AND tad.iscostcalculated = 'N' AND tad.IsCostImmediate = 'N' 
-                                    AND tad.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) ) ");
+                                    AND tad.M_Product_ID IN ( " + (productID) + @" ) ) ");
             sqlInvoice.Append(@" ) AND ci.isactive = 'Y'
                               AND ((ci.docstatus IN ('CO' , 'CL') AND ci.iscostcalculated = 'N' ) OR (ci.docstatus  IN ('RE') AND ci.iscostcalculated = 'Y'
                               AND ci.ISREVERSEDCOSTCALCULATED= 'N' AND ci.description LIKE '%{->%')) 
@@ -1929,13 +1940,13 @@ namespace VAdvantage.Process
                               INNER JOIN c_invoiceline il ON (il.c_invoiceline_id = mi.c_invoiceline_id)
                               INNER JOIN C_Invoice i ON (i.c_invoice_id = il.c_invoice_id)
                               INNER JOIN M_InoutLine iol ON (iol.M_InoutLine_ID = mi.M_InoutLine_ID)
-                              WHERE i.IsSOTrx = 'N' AND mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
+                              WHERE i.IsSOTrx = 'N' AND mi.M_Product_ID IN ( " + (productID) + @" )
                               AND ( ");
             // When Match invoice cost is calculating on GRN Date
             sqlInvoice.Append($@" mi.M_InOutLine_ID IN (SELECT iil.M_InoutLine_ID FROM M_InoutLine iil INNER JOIN M_InOut io ON (iil.M_Inout_ID = io.M_Inout_ID) 
                                 WHERE io.M_InOut_ID = {M_InOut_ID} AND iil.IsActive = 'Y'  
-                                AND mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
-                                AND iil.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) ) ");
+                                AND mi.M_Product_ID IN ( " + (productID) + @" ) 
+                                AND iil.M_Product_ID IN ( " + (productID) + @" ) ) ");
             sqlInvoice.Append(@" ) AND i.isactive = 'Y' AND i.docstatus IN ('CO' , 'CL') AND mi.iscostcalculated = 'N' AND mi.iscostImmediate = 'N' ");
             sqlInvoice.Append($@"  UNION
                          SELECT DISTINCT il.ad_client_id ,il.ad_org_id ,il.isactive ,to_char(LCA.created, 'DD-MON-YY HH24:MI:SS') as created ,   i.createdby , TO_CHAR(i.updated, 'DD-MON-YY HH24:MI:SS') AS updated ,
@@ -1947,7 +1958,7 @@ namespace VAdvantage.Process
                         INNER JOIN M_InOutLine iol ON (iol.M_InOutLine_ID = LCA.M_InOutLine_ID)
                         INNER JOIN M_InOut io ON (io.M_InOut_ID = iol.M_InOut_ID)
                         WHERE io.M_InOut_ID = {M_InOut_ID} AND il.isactive = 'Y' AND 
-                        LCA.M_PRODUCT_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
+                        LCA.M_PRODUCT_ID IN ( " + (productID) + @" ) 
                         AND lca.iscostcalculated = 'N' AND I.DOCSTATUS IN ('CO' , 'CL', 'RE', 'VO') AND I.ISSOTRX = 'N' AND I.ISRETURNTRX = 'N' ");
             sqlInvoice.Append(@")t ORDER BY dateacct, to_date(created, 'DD-MON-YY HH24:MI:SS') ");
             dsInvoice = DB.ExecuteDataset(sqlInvoice.ToString(), null, Get_Trx());
@@ -2838,7 +2849,7 @@ namespace VAdvantage.Process
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 #endregion
             }
-            else if (onlyDeleteCosting.Equals("Y"))
+            else
             {
                 #region when user select "Only Delete Costing"
                 // for M_Inout / M_Inoutline
@@ -3367,7 +3378,7 @@ namespace VAdvantage.Process
             {
                 sql.Clear();
                 sql.Append($@"SELECT DISTINCT io.VAMFG_M_WrkOdrTransaction_ID FROM VAMFG_M_WrkOdrTransaction io 
-                                    INNER JOIN VAMFG_M_WrkOdrTrnsctionLine iol ON (io.M_VAMFG_M_WrkOdrTransaction_ID = iol.M_VAMFG_M_WrkOdrTransaction_ID)
+                                    INNER JOIN VAMFG_M_WrkOdrTrnsctionLine iol ON (io.VAMFG_M_WrkOdrTransaction_ID = iol.VAMFG_M_WrkOdrTransaction_ID)
                                     INNER JOIN M_Product p ON (p.M_Product_ID = iol.M_Product_ID)");
                 if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 {
@@ -3431,14 +3442,14 @@ namespace VAdvantage.Process
             {
                 sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
                              " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
-                if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
-                {
-                    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
-                }
-                else
-                {
-                    sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                }
+                //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                //{
+                //    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                //}
+                //else
+                //{
+                sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                //}
                 sql.Append(" ORDER BY Line");
             }
             else
@@ -4174,14 +4185,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostcalculated = 'N' ");
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -4394,14 +4409,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostcalculated = 'N' ");
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
 
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -4654,14 +4673,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostcalculated = 'N' ");
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -4953,14 +4976,18 @@ namespace VAdvantage.Process
             {
                 sql.Append(" AND il.iscostcalculated = 'N' AND il.IsCostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
 
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -5252,36 +5279,6 @@ namespace VAdvantage.Process
                     }
                 }
             }
-            //sql.Clear();
-            //sql.Append("SELECT COUNT(M_InOutLine_ID) FROM M_InOutLine WHERE  IsActive = 'Y' AND M_InOut_ID = " + inout.GetM_InOut_ID());
-            //if (inout.IsReversal())
-            //{
-            //    sql.Append(" AND IsReversedCostCalculated = 'N' ");
-            //}
-            //else
-            //{
-            //    sql.Append(@" AND IsCostImmediate = 'N' ");
-            //}
-            //if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) <= 0)
-            //{
-            //    if (inout.IsReversal())
-            //    {
-            //        inout.SetIsReversedCostCalculated(true);
-            //    }
-            //    inout.SetIsCostCalculated(true);
-            //    if (!inout.Save(Get_Trx()))
-            //    {
-            //        ValueNamePair pp = VLogger.RetrieveError();
-            //        _log.Info("Error found for saving M_inout for this Record ID = " + inout.GetM_InOut_ID() +
-            //                   " Error Name is " + pp.GetName() + " And Error Type is " + pp.GetType());
-
-            //    }
-            //    else
-            //    {
-            //        _log.Fine("Cost Calculation updated for m_inout = " + inout.GetM_InOut_ID());
-            //        Get_Trx().Commit();
-            //    }
-            //}
         }
 
         /// <summary>
@@ -5412,14 +5409,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostcalculated = 'N' ");
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else if (!String.IsNullOrEmpty(productID))
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else if (!String.IsNullOrEmpty(productID))
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -6157,14 +6158,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
 
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -6602,14 +6607,18 @@ namespace VAdvantage.Process
                 sql.Append(" AND il.iscostcalculated = 'N' ");
                 sql.Append(" AND il.iscostImmediate = 'N' ");
             }
-            if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+            //{
+            //    sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+            //}
+            //else
+            //{
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
             {
-                sql.Append(" AND il.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
-            else
-            {
-                sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
-            }
+            //}
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -6857,14 +6866,18 @@ namespace VAdvantage.Process
             {
                 sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
                             " AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
-                if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                //{
+                //    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                //}
+                //else
+                //{
+                sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                if (M_AttributeSetInstance_ID > 0)
                 {
-                    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                    sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
                 }
-                else
-                {
-                    sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                }
+                //}
                 sql.Append(" ORDER BY VAMFG_Line");
             }
             else if (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_1_ComponentIssueToWorkOrder)
@@ -6876,14 +6889,18 @@ namespace VAdvantage.Process
                 sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
                              " AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
                 sql.Append(@" AND iscostImmediate = 'N' ");
-                if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                //{
+                //    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                //}
+                //else
+                //{
+                sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                if (M_AttributeSetInstance_ID > 0)
                 {
-                    sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
+                    sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
                 }
-                else
-                {
-                    sql.Append(" AND M_Product_ID IN (" + productID + " )");
-                }
+                //}
                 sql.Append(" ORDER BY VAMFG_Line");
             }
             if (!String.IsNullOrEmpty(sql.ToString()))
@@ -7393,70 +7410,70 @@ namespace VAdvantage.Process
         /// <param name="list">list of class -- ReCalculateRecord </param>
         private void ReVerfyAndCalculateCost(List<ReCalculateRecord> list)
         {
-            //ReCalculateRecord objReCalculateRecord = null;
-            //int loopCount = list.Count;
-            //for (int i = 0; i < loopCount; i++)
-            //{
-            //    objReCalculateRecord = list[i];
-            //    if (objReCalculateRecord.WindowName == (int)windowName.Shipment)
-            //    {
-            //        CalculateCostForShipment(objReCalculateRecord.HeaderId);
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.ReturnVendor)
-            //    {
-            //        CalculateCostForReturnToVendor(objReCalculateRecord.HeaderId);
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.Movement)
-            //    {
-            //        CalculateCostForMovement(objReCalculateRecord.HeaderId);
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.MaterialReceipt)
-            //    {
-            //        if (objReCalculateRecord.IsReversal)
-            //        {
-            //            CalculateCostForMaterialReversal(objReCalculateRecord.HeaderId);
-            //        }
-            //        else
-            //        {
-            //            CalculateCostForMaterial(objReCalculateRecord.HeaderId);
-            //        }
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.MatchInvoice)
-            //    {
-            //        if (objReCalculateRecord.IsReversal)
-            //        {
-            //            CalculateCostForMatchInvoiceReversal(objReCalculateRecord.HeaderId);
-            //        }
-            //        else
-            //        {
-            //            CalculateCostForMatchInvoiced(objReCalculateRecord.HeaderId);
-            //        }
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.Inventory)
-            //    {
-            //        CalculateCostForInventory(objReCalculateRecord.HeaderId);
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.CustomerReturn)
-            //    {
-            //        CalculateCostForCustomerReturn(objReCalculateRecord.HeaderId);
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.CreditMemo)
-            //    {
-            //        if (objReCalculateRecord.IsReversal)
-            //        {
-            //            CalculateCostCreditMemoreversal(objReCalculateRecord.HeaderId);
-            //        }
-            //        else
-            //        {
-            //            CalculationCostCreditMemo(objReCalculateRecord.HeaderId);
-            //        }
-            //    }
-            //    else if (objReCalculateRecord.WindowName == (int)windowName.AssetDisposal)
-            //    {
-            //        po_AssetDisposal = tbl_AssetDisposal.GetPO(GetCtx(), objReCalculateRecord.HeaderId, Get_Trx());
-            //        CalculateCostForAssetDisposal(objReCalculateRecord.HeaderId, Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
-            //    }
-            //}
+            ReCalculateRecord objReCalculateRecord = null;
+            int loopCount = list.Count;
+            for (int i = 0; i < loopCount; i++)
+            {
+                objReCalculateRecord = list[i];
+                if (objReCalculateRecord.WindowName == (int)windowName.Shipment)
+                {
+                    CalculateCostForShipment(objReCalculateRecord.HeaderId);
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.ReturnVendor)
+                {
+                    CalculateCostForReturnToVendor(objReCalculateRecord.HeaderId);
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.Movement)
+                {
+                    CalculateCostForMovement(objReCalculateRecord.HeaderId);
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.MaterialReceipt)
+                {
+                    if (objReCalculateRecord.IsReversal)
+                    {
+                        CalculateCostForMaterialReversal(objReCalculateRecord.HeaderId);
+                    }
+                    else
+                    {
+                        CalculateCostForMaterial(objReCalculateRecord.HeaderId);
+                    }
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.MatchInvoice)
+                {
+                    if (objReCalculateRecord.IsReversal)
+                    {
+                        CalculateCostForMatchInvoiceReversal(objReCalculateRecord.HeaderId);
+                    }
+                    else
+                    {
+                        CalculateCostForMatchInvoiced(objReCalculateRecord.HeaderId);
+                    }
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.Inventory)
+                {
+                    CalculateCostForInventory(objReCalculateRecord.HeaderId);
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.CustomerReturn)
+                {
+                    CalculateCostForCustomerReturn(objReCalculateRecord.HeaderId);
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.CreditMemo)
+                {
+                    if (objReCalculateRecord.IsReversal)
+                    {
+                        CalculateCostCreditMemoreversal(objReCalculateRecord.HeaderId);
+                    }
+                    else
+                    {
+                        CalculationCostCreditMemo(objReCalculateRecord.HeaderId);
+                    }
+                }
+                else if (objReCalculateRecord.WindowName == (int)windowName.AssetDisposal)
+                {
+                    po_AssetDisposal = tbl_AssetDisposal.GetPO(GetCtx(), objReCalculateRecord.HeaderId, Get_Trx());
+                    CalculateCostForAssetDisposal(objReCalculateRecord.HeaderId, Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
+                }
+            }
         }
 
     }
