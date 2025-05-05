@@ -199,7 +199,11 @@ namespace ViennaAdvantage.Process
                     obj.Set_Value("EMail", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["EMail"]));
                     obj.Set_Value("City", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["City"]));
                     obj.Set_Value("C_Country_ID", Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["C_Country_ID"]));
-                    obj.Set_Value("VA061_LastEngagementDate", Util.GetValueOfDateTime(dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"]));
+                    if (dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"] != null)
+                    {
+                        obj.Set_Value("VA061_LastEngagementDate", Util.GetValueOfDateTime(dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"]));
+
+                    }
                     if (!obj.Save())
                     {
                         return GetRetrievedError(obj, "NotSubscribed");
