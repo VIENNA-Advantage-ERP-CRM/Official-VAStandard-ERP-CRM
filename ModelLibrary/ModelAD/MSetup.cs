@@ -331,7 +331,11 @@ namespace VAdvantage.Model
             password = "";
             if (isPwdEncrypted == "Y")
             {
-                password = VAdvantage.Utility.SecureEngine.Encrypt(name);
+                password = SecureEngine.Encrypt(name);
+            }
+            else if (isPwdHashed == "Y")
+            {
+                password = SecureEngine.ComputeHash(name);
             }
             else
             {
