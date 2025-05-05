@@ -192,14 +192,18 @@ namespace ViennaAdvantage.Process
                     obj.SetAD_Client_ID(Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["AD_Client_ID"]));
                     obj.SetAD_Org_ID(Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["AD_Org_ID"]));
                     obj.Set_Value("R_InterestArea_ID", R_InterestArea_ID);
-                    obj.Set_Value("Value", dsSuspect.Tables[0].Rows[0]["Value"]);
-                    obj.Set_Value("VA061_Suspect_ID", dsSuspect.Tables[0].Rows[0]["VA061_Suspect_ID"]);
-                    obj.Set_Value("Name", dsSuspect.Tables[0].Rows[0]["Name"]);
-                    obj.Set_Value("VA061_Company", dsSuspect.Tables[0].Rows[0]["VA061_Company"]);
-                    obj.Set_Value("EMail", dsSuspect.Tables[0].Rows[0]["EMail"]);
-                    obj.Set_Value("City", dsSuspect.Tables[0].Rows[0]["City"]);
-                    obj.Set_Value("C_Country_ID", dsSuspect.Tables[0].Rows[0]["C_Country_ID"]);
-                    obj.Set_Value("VA061_LastEngagementDate", dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"]);
+                    obj.Set_Value("Value", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["Value"]));
+                    obj.Set_Value("VA061_Suspect_ID", Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["VA061_Suspect_ID"]));
+                    obj.Set_Value("Name", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["Name"]));
+                    obj.Set_Value("VA061_Company", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["VA061_Company"]));
+                    obj.Set_Value("EMail", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["EMail"]));
+                    obj.Set_Value("City", Util.GetValueOfString(dsSuspect.Tables[0].Rows[0]["City"]));
+                    obj.Set_Value("C_Country_ID", Util.GetValueOfInt(dsSuspect.Tables[0].Rows[0]["C_Country_ID"]));
+                    if (dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"] != null)
+                    {
+                        obj.Set_Value("VA061_LastEngagementDate", Util.GetValueOfDateTime(dsSuspect.Tables[0].Rows[0]["VA061_LastEngagementDate"]));
+
+                    }
                     if (!obj.Save())
                     {
                         return GetRetrievedError(obj, "NotSubscribed");
