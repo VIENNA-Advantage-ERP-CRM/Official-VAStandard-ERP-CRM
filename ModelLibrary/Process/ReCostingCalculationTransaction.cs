@@ -16,6 +16,7 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
@@ -235,9 +236,17 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@"t.VAMFG_M_wrkodrtransaction_ID  , t.VAMFG_M_wrkodrtrnsctionline_ID, ");
                 }
+                else
+                {
+                    sql.Append($@" 0 AS VAMFG_M_wrkodrtransaction_ID  , 0 AS VAMFG_M_wrkodrtrnsctionline_ID, ");
+                }
                 if (countVAFAM > 0)
                 {
                     sql.Append($@" t.VAFAM_assetdisposal_ID, ");
+                }
+                else
+                {
+                    sql.Append($@" 0 AS VAFAM_assetdisposal_ID, ");
                 }
                 sql.Append($@" t.C_Invoiceline_ID, t.vas_iscreditnote, t.vas_islandedcost, t.treatasdiscount, 
                         CASE 
@@ -411,6 +420,7 @@ namespace VAdvantage.Process
                     string Query = "SELECT * FROM (" + sql.ToString() + " ORDER BY t.movementdate, TO_DATE(Created, 'DD-MON-YY HH24:MI:SS'), M_Transaction_ID ";
                     for (int pageNo = 1; pageNo <= TotalPage; pageNo++)
                     {
+                        Thread.Sleep(100);
 
                         dsRecord = DB.GetDatabase().ExecuteDatasetPaging(Query, pageNo, pazeSize, 0);
 
@@ -418,16 +428,27 @@ namespace VAdvantage.Process
                         {
                             for (int z = 0; z < dsRecord.Tables[0].Rows.Count; z++)
                             {
+                                // when From Date not selected then not to calculate cost for reversal document.
+                                // otherwise cost calculated, reason may be Original record cost is calculated before the from date Parameter.
+                                //if (DateFrom == null)
+                                //{
                                 if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["docstatus"]).Equals("RE"))
                                 {
                                     continue;
                                 }
+                                //}
 
                                 productID = Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["M_Product_ID"]);
 
                                 // Get Min Date as Movement Date from Product Transaction
                                 minDateRecord = Util.GetValueOfDateTime(dsRecord.Tables[0].Rows[z]["movementdate"]);
-                                _log.Info($"Re-Costing Calculation with Trx Data start for Product ID : {productID} and Movement Date : {minDateRecord}");
+
+                                _log.Info($@"Re-Costing Calculation with Trx Data start for 
+                                                TableName : {Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"])} 
+                                                Product ID : {productID} and 
+                                                Movement Date : {minDateRecord}");
+
+
                                 // When From Date less than min Date record then Cost to be updated 
                                 if (DateFrom != null && minDateRecord != null && DateFrom.Value.Date <= minDateRecord.Value.Date)
                                 {
@@ -438,9 +459,6 @@ namespace VAdvantage.Process
                                     // When From date not selected then Cost to be updated 
                                     IsCostUpdation = true;
                                 }
-
-
-
 
                                 #region Cost Calculation For Material Receipt --
                                 try
@@ -1121,7 +1139,7 @@ namespace VAdvantage.Process
                                         sql.Clear();
                                         if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                         {
-                                            sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                                            sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND (iscostcalculated = 'Y' OR IsCostImmediate = 'Y') AND IsReversedCostCalculated = 'N' " +
                                                          " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                             //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                             //{
@@ -3440,7 +3458,8 @@ namespace VAdvantage.Process
             sql.Clear();
             if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
             {
-                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
+                            @"IsActive = 'Y' AND (iscostcalculated = 'Y' OR IsCostImmediate = 'Y') AND IsReversedCostCalculated = 'N' " +
                              " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                 //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 //{
@@ -4970,7 +4989,7 @@ namespace VAdvantage.Process
                         WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -5402,7 +5421,7 @@ namespace VAdvantage.Process
                         WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -6150,7 +6169,7 @@ namespace VAdvantage.Process
                             WHERE il.IsActive = 'Y' AND il.M_Inventory_ID = " + inventory.GetM_Inventory_ID());
             if (inventory.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -6600,7 +6619,7 @@ namespace VAdvantage.Process
                          WHERE il.IsActive = 'Y' AND il.M_Movement_ID = " + movement.GetM_Movement_ID());
             if (movement.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -6864,7 +6883,7 @@ namespace VAdvantage.Process
                 || woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_AssemblyReturnFromInventory))
                 || woTrxType.Equals("PM")))
             {
-                sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                sql.Append("SELECT * FROM VAMFG_M_WrkOdrTrnsctionLine WHERE IsActive = 'Y' AND (iscostcalculated = 'Y' OR IsCostImmediate = 'Y') AND IsReversedCostCalculated = 'N' " +
                             " AND VAMFG_M_WrkOdrTransaction_ID = " + VAMFG_M_WrkOdrTransaction_ID);
                 //if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 //{

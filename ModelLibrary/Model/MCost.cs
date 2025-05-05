@@ -91,10 +91,10 @@ namespace VAdvantage.Model
                             AND CST.C_ACCTSCHEMA_ID = (SELECT c_acctschema1_id FROM ad_clientinfo WHERE ad_client_id = " + client_Id + " )";
                 cost = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, trxName));
             }
-            catch
+            catch(Exception ex)
             {
                 _log.Info("GetproductCosts : " + sql);
-                throw new ArgumentException("Error in getting cost from GetProductCosts");
+                throw new ArgumentException("Error in getting cost from GetProductCosts" + ex);
             }
             return cost;
         }
