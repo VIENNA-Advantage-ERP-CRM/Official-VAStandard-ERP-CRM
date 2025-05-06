@@ -4197,7 +4197,7 @@ namespace VAdvantage.Process
                         WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -4421,7 +4421,7 @@ namespace VAdvantage.Process
                         WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
@@ -4685,7 +4685,7 @@ namespace VAdvantage.Process
                         WHERE il.IsActive = 'Y' AND il.M_Inout_ID = " + inout.GetM_InOut_ID());
             if (inout.IsReversal())
             {
-                sql.Append(" AND il.iscostcalculated = 'Y' AND il.IsReversedCostCalculated = 'N' ");
+                sql.Append(" AND (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' ");
             }
             else
             {
