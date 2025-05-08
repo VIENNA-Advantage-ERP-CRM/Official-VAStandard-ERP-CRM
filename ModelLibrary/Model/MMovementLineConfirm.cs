@@ -38,9 +38,9 @@ namespace VAdvantage.Model
         /// <param name="trxName">transaction</param>
         public MMovementLineConfirm(Ctx ctx, int M_MovementLineConfirm_ID, Trx trxName)
             : base(ctx, M_MovementLineConfirm_ID, trxName)
-	    {
+        {
             if (M_MovementLineConfirm_ID == 0)
-		    {
+            {
                 //	SetM_MovementConfirm_ID (0);	Parent
                 //	SetM_MovementLine_ID (0);
                 SetConfirmedQty(Env.ZERO);
@@ -48,10 +48,10 @@ namespace VAdvantage.Model
                 SetScrappedQty(Env.ZERO);
                 SetTargetQty(Env.ZERO);
                 SetProcessed(false);
-            }	
-	    }
+            }
+        }
 
-	    /// <summary>
+        /// <summary>
         /// Load Constructor
         /// </summary>
         /// <param name="ctx">context</param>
@@ -62,16 +62,16 @@ namespace VAdvantage.Model
         {
         }
 
-	    /// <summary>
-	    /// Parent constructor
-	    /// </summary>
-	    /// <param name="parent">parent</param>
-	    public MMovementLineConfirm (MMovementConfirm parent)
+        /// <summary>
+        /// Parent constructor
+        /// </summary>
+        /// <param name="parent">parent</param>
+        public MMovementLineConfirm(MMovementConfirm parent)
             : this(parent.GetCtx(), 0, parent.Get_TrxName())
-	    {
+        {
             SetClientOrg(parent);
             SetM_MovementConfirm_ID(parent.GetM_MovementConfirm_ID());
-	    }
+        }
 
         /// <summary>
         /// Set Movement Line
@@ -116,10 +116,10 @@ namespace VAdvantage.Model
 
             //Lakhwinder
             //Apply UOM Conversion Logic
-            MProduct _Pro = new MProduct(GetCtx(),line.GetM_Product_ID(), Get_TrxName());
+            MProduct _Pro = new MProduct(GetCtx(), line.GetM_Product_ID(), Get_TrxName());
             if (GetC_UOM_ID() != _Pro.GetC_UOM_ID())
             {
-               
+
                 line.SetTargetQty(Util.GetValueOfDecimal(MUOMConversion.ConvertProductFrom(GetCtx(), line.GetM_Product_ID(), GetC_UOM_ID(), GetTargetQty())));
                 line.SetMovementQty(Util.GetValueOfDecimal(MUOMConversion.ConvertProductFrom(GetCtx(), line.GetM_Product_ID(), GetC_UOM_ID(), GetConfirmedQty())));
                 line.SetConfirmedQty(Util.GetValueOfDecimal(MUOMConversion.ConvertProductFrom(GetCtx(), line.GetM_Product_ID(), GetC_UOM_ID(), GetConfirmedQty())));
@@ -180,6 +180,28 @@ namespace VAdvantage.Model
             //difference = Decimal.Subtract(difference, GetScrappedQty());
             //SetDifferenceQty(difference);
             //
+            return true;
+        }
+        /// <summary>
+        /// VAI050-This method used to apply logic after saving the record
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <param name="success"></param>
+        /// <returns></returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+                return success;
+            if (!newRecord && Is_ValueChanged("VAS_ReceivingLocator"))
+            {
+                MMovementLine mLine = new MMovementLine(GetCtx(), GetM_MovementLine_ID(), Get_Trx());
+                mLine.SetM_LocatorTo_ID(Get_ValueAsInt("VAS_ReceivingLocator"));
+                if (!mLine.Save())
+                {
+                    return false;
+                }
+            }
+
             return true;
         }
     }

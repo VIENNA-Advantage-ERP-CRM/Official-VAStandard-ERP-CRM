@@ -137,6 +137,8 @@ namespace VAdvantage.Model
                 // setting QtyEntered in Target Qty on Confirmation Line
                 cLine.SetTargetQty(mLine.GetQtyEntered());
                 cLine.SetConfirmedQty(mLine.GetQtyEntered());
+                //VAI050-Set the receiving locator value on confirmation line
+                cLine.Set_Value("VAS_ReceivingLocator", Util.GetValueOfInt(mLine.GetM_LocatorTo_ID()));
 
                 //Lakhwinder 1Feb2021
                 //Shipment and Inventory Move Module Changes
@@ -752,7 +754,7 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             Save(Get_Trx());
-            
+
             //Adde by Arpit To complete The Inventory Move if Move Confirmation is completed ,16th Dec,2016
             MMovement Mov = new MMovement(GetCtx(), GetM_Movement_ID(), Get_Trx());
             if (move.GetDocStatus() != DOCSTATUS_Completed)
