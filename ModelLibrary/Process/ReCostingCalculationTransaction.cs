@@ -2266,7 +2266,7 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID} ) )");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID} ) )");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
@@ -2678,7 +2678,7 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE M_Product_ID IN ({ productID })");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
@@ -3017,7 +3017,7 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE AD_client_ID IN ({ GetAD_Client_ID() })");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
