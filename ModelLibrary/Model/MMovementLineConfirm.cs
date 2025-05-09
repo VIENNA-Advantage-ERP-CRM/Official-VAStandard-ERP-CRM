@@ -192,10 +192,10 @@ namespace VAdvantage.Model
         {
             if (!success)
                 return success;
-            if (!newRecord && Is_ValueChanged("VAS_ReceivingLocator"))
+            if (!newRecord && Is_ValueChanged("VAS_ReceivingLocator_ID"))
             {
                 MMovementLine mLine = new MMovementLine(GetCtx(), GetM_MovementLine_ID(), Get_Trx());
-                mLine.SetM_LocatorTo_ID(Get_ValueAsInt("VAS_ReceivingLocator"));
+                mLine.SetM_LocatorTo_ID(Get_ValueAsInt("VAS_ReceivingLocator_ID"));
                 if (!mLine.Save())
                 {
                     return false;

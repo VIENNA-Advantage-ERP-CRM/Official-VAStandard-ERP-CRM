@@ -138,7 +138,9 @@ namespace VAdvantage.Model
                 cLine.SetTargetQty(mLine.GetQtyEntered());
                 cLine.SetConfirmedQty(mLine.GetQtyEntered());
                 //VAI050-Set the receiving locator value on confirmation line
-                cLine.Set_Value("VAS_ReceivingLocator", Util.GetValueOfInt(mLine.GetM_LocatorTo_ID()));
+                cLine.Set_Value("VAS_ReceivingLocator_ID", Util.GetValueOfInt(mLine.GetM_LocatorTo_ID()));
+                cLine.Set_Value("M_AttributeSetInstance_ID", Util.GetValueOfInt(mLine.GetM_AttributeSetInstance_ID()));
+
 
                 //Lakhwinder 1Feb2021
                 //Shipment and Inventory Move Module Changes
