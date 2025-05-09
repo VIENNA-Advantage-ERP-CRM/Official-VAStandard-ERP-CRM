@@ -229,7 +229,7 @@
     min-height: 35px;
     border-radius: 2px;
     font-size: 14px;
-    border-color: rgba(var(--v-c-secondary),1);
+    /*border-color: rgba(var(--v-c-secondary),1);*/
 }
 
 .vas-add-label label, .vas-add-filter label {
@@ -375,22 +375,23 @@
     width: 100%;
 }
 
-    .vas-filters .vas-filter-item.vas-filters-row {
+    .vas-filters .vas-filter-item {
         background: rgba(var(--v-c-secondary), .3);
-        padding: 5px;
+        /*padding: 5px;*/
         border-radius: 3px;
+        margin-bottom: 10px;
     }
 
-        .vas-filters .vas-filter-item.vas-filters-row:not(:last-child) {
-            padding-bottom: 0px;
+        .vas-filters .vas-filter-item:last-child {
+            margin-bottom: 0px;
         }
 
-    .vas-filters .vas-filter-item .vas-filter-item-inner {
-        float: left;
-        width: 100%;
-        background: rgba(var(--v-c-on-primary));
-        padding: 10px 10px;
-    }
+        .vas-filters .vas-filter-item .vas-filter-item-inner {
+            float: left;
+            width: 100%;
+            background: rgba(var(--v-c-on-primary));
+            padding: 10px 10px;
+        }
 
     .vas-filters .vas-filter-item {
         background: rgba(var(--v-c-on-primary));
@@ -1816,6 +1817,10 @@ html[dir="rtl"] .vas-sql-result-msg {
     .VAS-pagingDiv li:last-child {
         min-width: 24px;
     }
+
+.vas-single-input .vas-select-col.vas-disable-filtercolumn {
+    background-color: #d3d3d342;
+}
 
 html[dir=rtl] .vas-filters-editdelete-btns {
     float: left;
@@ -7592,6 +7597,7 @@ html[dir="rtl"] .VAS-cashISOCode {
         width: 100%;
         height: 100%;
         object-fit: contain;
+        border-radius: 50%;
     }
 
 .VAS-chat-body {
