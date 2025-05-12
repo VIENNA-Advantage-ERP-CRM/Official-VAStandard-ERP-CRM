@@ -5383,6 +5383,13 @@ namespace VAdvantage.Process
             costingCheck.dsAccountingSchema = costingCheck.GetAccountingSchema(GetAD_Client_ID());
 
             landedCostAllocation = new MLandedCostAllocation(GetCtx(), C_LandedCostAllocation_ID, Get_Trx());
+
+            //VIS_0045: 12-May-2025, When Actaul item cost not calculated then not to calculated its landed cost as well
+            if (!IsActualItemCostCalculated(landedCostAllocation.GetM_InOutLine_ID()))
+            {
+                return;
+            }
+
             MInvoiceLine invoiceLine = new MInvoiceLine(GetCtx(), landedCostAllocation.GetC_InvoiceLine_ID(), Get_Trx());
             ProductInvoiceLineCost = invoiceLine.GetProductLineCost(invoiceLine, true);
             MProduct product = MProduct.Get(GetCtx(), landedCostAllocation.GetM_Product_ID());
@@ -5405,6 +5412,22 @@ namespace VAdvantage.Process
                 _log.Fine("Cost Calculation updated for m_invoiceline = " + landedCostAllocation.GetC_InvoiceLine_ID());
                 Get_Trx().Commit();
             }
+        }
+
+        /// <summary>
+        /// This function is used to check actual item cost calculated or not.
+        /// </summary>
+        /// <param name="M_InOutLine_ID">InoutLine ID</param>
+        /// <returns>True, when calculated</returns>
+        public bool IsActualItemCostCalculated(int M_InOutLine_ID)
+        {
+            int no = 1;
+            if (M_InOutLine_ID > 0)
+            {
+                no = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT Count(M_InOutLine_ID) FROM M_InOutLine 
+                 WHERE M_InOutLine_ID = {M_InOutLine_ID} AND (IsCostCalculated = 'Y' OR IsCostImmediate = 'Y')", null, Get_Trx()));
+            }
+            return no > 0;
         }
 
         /// <summary>
