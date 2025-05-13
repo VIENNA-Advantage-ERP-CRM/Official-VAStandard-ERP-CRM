@@ -38,6 +38,7 @@ namespace VAdvantage.Process
         string productID = null;
         String onlyDeleteCosting = "N";
         DateTime? DateFrom = null;
+        int M_AttributeSetInstance_ID = 0;
 
         // for load assembly
         private static Assembly asm = null;
@@ -154,6 +155,10 @@ namespace VAdvantage.Process
                 else if (name.Equals("M_Product_ID"))
                 {
                     productID = Util.GetValueOfString(para[i].GetParameter());
+                }
+                else if (name.Equals("M_AttributeSetInstance_ID"))
+                {
+                    M_AttributeSetInstance_ID = Util.GetValueOfInt(para[i].GetParameter());
                 }
                 else if (name.Equals("IsDeleteCosting"))
                 {
@@ -322,17 +327,9 @@ namespace VAdvantage.Process
                                 i.updatedby ,  mi.documentno ,  M_MatchInv_Id AS Record_Id ,  i.issotrx ,  i.isreturntrx ,  ''           AS IsInternalUse,  'M_MatchInv' AS TableName,
                                 i.docstatus,i.DateAcct AS DateAcct,  mi.iscostcalculated ,  i.isreversedcostcalculated
                          FROM M_MatchInv mi INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id INNER JOIN C_Invoice i ON i.c_invoice_id       = il.c_invoice_id
-                              WHERE  mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
+                              WHERE " + (M_AttributeSetInstance_ID > 0 ? $" mi.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                              @"mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
                               AND (mi.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true));
-                    //if (VAS_IsInvoiceRecostonGRNDate)
-                    //{
-                    //    // When Match invoice cost is calculating on GRN Date
-                    //    sql.Append(@" OR 
-                    //            mi.M_InOutLine_ID IN (SELECT iil.M_InoutLine_ID FROM M_InoutLine iil INNER JOIN M_InOut io ON (iil.M_Inout_ID = io.M_Inout_ID) 
-                    //            WHERE io.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND iil.IsActive = 'Y' AND iil.iscostcalculated = 'N' AND iil.IsCostImmediate = 'N' 
-                    //            AND mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
-                    //            AND iil.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) ) ");
-                    //}
                     sql.Append(@" ) AND i.isactive = 'Y' AND i.docstatus IN ('CO' , 'CL') AND mi.iscostcalculated = 'N' AND mi.iscostImmediate = 'N'");
                     if (VAS_IsInvoiceRecostonGRNDate)
                     {
@@ -356,7 +353,8 @@ namespace VAdvantage.Process
                               'LandedCost' as TABLENAME,  I.DOCSTATUS, DATEACCT as DATEACCT , LCA.ISCOSTCALCULATED , 'N' as ISREVERSEDCOSTCALCULATED
                         FROM C_LANDEDCOSTALLOCATION LCA INNER JOIN C_INVOICELINE IL ON IL.C_INVOICELINE_ID = LCA.C_INVOICELINE_ID
                         INNER JOIN c_invoice i ON I.C_INVOICE_ID = IL.C_INVOICE_ID
-                        WHERE i.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND il.isactive     = 'Y' AND 
+                        WHERE " + (M_AttributeSetInstance_ID > 0 ? $" LCA.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                        @"i.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND il.isactive     = 'Y' AND 
                         LCA.M_PRODUCT_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
                         AND lca.iscostcalculated = 'N' AND I.DOCSTATUS IN ('CO' , 'CL', 'RE', 'VO') AND I.ISSOTRX = 'N' AND I.ISRETURNTRX = 'N' ");
                     if (VAS_IsInvoiceRecostonGRNDate)
@@ -456,7 +454,8 @@ namespace VAdvantage.Process
                                 provisionalInvoice = new MProvisionalInvoice(GetCtx(), Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Get_Trx());
 
                                 sql.Clear();
-                                sql.Append(@"SELECT * FROM C_ProvisionalInvoiceLine WHERE IsActive = 'Y' 
+                                sql.Append(@"SELECT * FROM C_ProvisionalInvoiceLine WHERE IsActive = 'Y' " 
+                                                + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"
                                                 AND " + (provisionalInvoice.IsReversal() ? " iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' "
                                                 : " iscostcalculated = 'N' ") +
                                                 " AND C_ProvisionalInvoice_ID = " + provisionalInvoice.GetC_ProvisionalInvoice_ID());
@@ -625,8 +624,8 @@ namespace VAdvantage.Process
                                     sql.Clear();
                                     sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
                                                    INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
-                                                    WHERE pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} 
-                                                    ");
+                                                    WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                                    $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
                                     if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                     {
                                         sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -656,7 +655,8 @@ namespace VAdvantage.Process
                                                      INNER JOIN M_Locator loc ON (loc.M_Locator_id = pl.M_Locator_id)
                                                      INNER JOIN M_Warehouse wh ON (loc.M_Warehouse_id = wh.M_Warehouse_id)
                                                      INNER JOIN M_Transaction t ON (t.M_ProductionLine_ID = pl.M_ProductionLine_ID) 
-                                                WHERE p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
+                                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
+                                                      @"p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
                                                       AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
                                                       AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
@@ -892,8 +892,9 @@ namespace VAdvantage.Process
                                                         //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
                                                         //}
                                                     }
-                                                    catch
+                                                    catch(Exception ex)
                                                     {
+                                                        _log.Severe("ReCostingCalculationTransaction: Production -> " + ex.Message);
                                                         Get_Trx().Rollback();
                                                     }
                                                     #endregion
@@ -1176,8 +1177,9 @@ namespace VAdvantage.Process
                                     sql.Clear();
                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                     {
-                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
-                                                     " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                                    @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                                                    " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -1190,8 +1192,9 @@ namespace VAdvantage.Process
                                     }
                                     else
                                     {
-                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
-                                                     " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                                    @"IsActive = 'Y' AND iscostcalculated = 'N' " +
+                                                    " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                         sql.Append(@" AND IsCostImmediate = 'N' ");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
@@ -2124,6 +2127,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append(@" AND M_Product_ID IN ( " + M_Product_ID + ")");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append(@" AND M_AttributesetInstance_ID = " + M_AttributeSetInstance_ID);
+                }
                 if (DateFrom != null)
                 {
                     sql.Append($" AND trunc(movementdate) >= {GlobalVariable.TO_DATE(DateFrom, true)}");
@@ -2159,6 +2166,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND M_InOut_id IN (SELECT m.M_InOut_id FROM M_InOut m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID}");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 if (countRecord > 0)
@@ -2188,6 +2199,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND C_Invoice_ID IN (SELECT m.C_Invoice_ID FROM C_Invoice m WHERE trunc(m.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
                 {
@@ -2214,6 +2229,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND C_ProvisionalInvoice_ID IN (SELECT m.C_ProvisionalInvoice_ID FROM C_ProvisionalInvoice m WHERE trunc(m.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2244,6 +2263,10 @@ namespace VAdvantage.Process
                     sql.Append($@" AND C_InvoiceLine_ID IN (SELECT C_InvoiceLine_ID FROM C_Invoice i INNER JOIN C_InvoiceLine il ON (i.C_Invoice_ID = il.C_Invoice_ID) 
                                 WHERE TRUNC(i.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 // expected landed cost
@@ -2262,6 +2285,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Inventory_ID IN (SELECT m.M_Inventory_ID FROM M_Inventory m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2291,6 +2318,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
 
@@ -2306,6 +2337,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Movement_ID IN (SELECT m.M_Movement_ID FROM M_Movement m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2330,10 +2365,14 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID} ) )");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID} ) )");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2364,6 +2403,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 DeleteFactDetails(MMatchInv.Table_ID, MMatchInv.Table_Name);
@@ -2390,6 +2433,10 @@ namespace VAdvantage.Process
                     if (DateFrom != null)
                     {
                         sql.Append($@" AND VAMFG_M_WrkOdrTransaction_ID IN (SELECT m.VAMFG_M_WrkOdrTransaction_ID FROM VAMFG_M_WrkOdrTransaction m WHERE trunc(m.VAMFG_DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                    }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                     }
                     countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                     if (countRecord > 0)
@@ -2419,6 +2466,10 @@ namespace VAdvantage.Process
                     {
                         sql.Append($@" AND trunc(VAMFG_DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                     }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                    }
                     countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                     DeleteFactDetails(MTable.Get_Table_ID("M_VAMFG_M_WrkOdrTransaction"), "M_VAMFG_M_WrkOdrTransaction");
@@ -2433,14 +2484,19 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 // Delete Query 
                 int M_CostElement_ID = GetStandardCostElement();
-                DB.ExecuteQuery($@"delete from m_cost where m_product_id IN 
+                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
                 DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
-                                    WHERE m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
+                                    WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
+                                    @"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
                 //DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN 
                 //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 sql.Clear();
@@ -2449,6 +2505,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
 
                 // Update Current Stock which is affected after the from date on Cost Queue
@@ -2464,6 +2524,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 sql.Clear();
@@ -2473,6 +2537,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 sql.Clear();
@@ -2481,6 +2549,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 #endregion
@@ -2498,6 +2570,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_InOut_id IN (SELECT m.M_InOut_id FROM M_InOut m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
@@ -2530,6 +2606,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND C_Invoice_ID IN (SELECT m.C_Invoice_ID FROM C_Invoice m WHERE trunc(m.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2561,6 +2641,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND C_ProvisionalInvoice_ID IN (SELECT m.C_ProvisionalInvoice_ID FROM C_ProvisionalInvoice m WHERE trunc(m.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2590,6 +2674,10 @@ namespace VAdvantage.Process
                     sql.Append($@" AND C_InvoiceLine_ID IN (SELECT C_InvoiceLine_ID FROM C_Invoice i INNER JOIN C_InvoiceLine il ON (i.C_Invoice_ID = il.C_Invoice_ID) 
                                 WHERE TRUNC(i.DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
@@ -2608,6 +2696,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Inventory_ID IN (SELECT m.M_Inventory_ID FROM M_Inventory m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
@@ -2638,6 +2730,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND M_Movement_ID IN (SELECT m.M_Movement_ID FROM M_Movement m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 if (countRecord > 0)
@@ -2667,6 +2763,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
@@ -2677,10 +2777,14 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE M_Product_ID IN ({ productID })");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND M_Product_ID IN ({ productID })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
@@ -2712,6 +2816,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
@@ -2736,6 +2844,10 @@ namespace VAdvantage.Process
                     if (DateFrom != null)
                     {
                         sql.Append($@" AND VAMFG_M_WrkOdrTransaction_ID IN (SELECT m.VAMFG_M_WrkOdrTransaction_ID FROM VAMFG_M_WrkOdrTransaction m WHERE trunc(m.VAMFG_DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                    }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                     }
                     sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                     countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
@@ -2766,6 +2878,10 @@ namespace VAdvantage.Process
                     {
                         sql.Append($@" AND trunc(VAMFG_DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                     }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                    }
                     sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                     countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
@@ -2779,14 +2895,20 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 // Delete Query 
                 int M_CostElement_ID = GetStandardCostElement();
-                DB.ExecuteQuery($@"delete from m_cost where m_product_id IN  ({ productID } ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
+                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
+                    $@"m_product_id IN  ({ productID } ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
                 DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
-                                    WHERE m_product_id IN  ({ productID } )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
+                                    WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
+                                    $@"m_product_id IN  ({ productID } )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
 
                 //DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN  (" + productID + " ) ", null, Get_Trx());
                 sql.Clear();
@@ -2794,6 +2916,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
@@ -2809,6 +2935,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 sql.Clear();
@@ -2817,6 +2947,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
+                }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 sql.Clear();
@@ -2824,6 +2958,10 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                 #endregion
@@ -2978,7 +3116,7 @@ namespace VAdvantage.Process
                 sql.Clear();
                 sql.Append($@"UPDATE m_productionline SET  Amt = 0");
                 sql.Append(", IsCostImmediate = 'N'");
-                sql.Append($@" WHERE AD_client_ID IN ({ GetAD_Client_ID() })");
+                sql.Append($@" WHERE NVL(C_Charge_ID, 0) = 0 AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
@@ -3131,7 +3269,8 @@ namespace VAdvantage.Process
                             SET CurrentQty =  (
                                 SELECT ABS(SUM(cqt.MovementQty))
                                 FROM M_CostQueueTransaction cqt
-                                WHERE cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                  @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)}
@@ -3139,7 +3278,8 @@ namespace VAdvantage.Process
                             WHERE EXISTS (
                                 SELECT 1
                                 FROM M_CostQueueTransaction cqt
-                                WHERE cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                  @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)})");
@@ -3419,8 +3559,9 @@ namespace VAdvantage.Process
             sql.Clear();
             if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
             {
-                sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
-                             " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                            @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
+                            " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                 if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 {
                     sql.Append(" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -3433,8 +3574,9 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append("SELECT * FROM C_InvoiceLine WHERE IsActive = 'Y' AND iscostcalculated = 'N' " +
-                             " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
+                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                            @"IsActive = 'Y' AND iscostcalculated = 'N' " +
+                            " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                 sql.Append(@" AND IsCostimmediate = 'N' ");
                 if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                 {
@@ -4172,6 +4314,10 @@ namespace VAdvantage.Process
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+            }
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -4391,6 +4537,10 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
             sql.Append(" ORDER BY il.Line");
 
@@ -4651,6 +4801,10 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -4950,6 +5104,10 @@ namespace VAdvantage.Process
             else
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
             sql.Append(" ORDER BY il.Line");
 
@@ -5409,6 +5567,10 @@ namespace VAdvantage.Process
             else if (!String.IsNullOrEmpty(productID))
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
             }
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
@@ -6155,6 +6317,10 @@ namespace VAdvantage.Process
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+            }
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -6600,6 +6766,10 @@ namespace VAdvantage.Process
             {
                 sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
             }
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+            }
             sql.Append(" ORDER BY il.Line");
             dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
             if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
@@ -6855,6 +7025,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append(" AND M_Product_ID IN (" + productID + " )");
                 }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+                }
                 sql.Append(" ORDER BY VAMFG_Line");
             }
             else if (woTrxType.Equals(ViennaAdvantage.Model.X_VAMFG_M_WrkOdrTransaction.VAMFG_WORKORDERTXNTYPE_1_ComponentIssueToWorkOrder)
@@ -6873,6 +7047,10 @@ namespace VAdvantage.Process
                 else
                 {
                     sql.Append(" AND M_Product_ID IN (" + productID + " )");
+                }
+                if (M_AttributeSetInstance_ID > 0)
+                {
+                    sql.Append(" AND NVL(M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
                 }
                 sql.Append(" ORDER BY VAMFG_Line");
             }
@@ -7524,68 +7702,71 @@ namespace VAdvantage.Process
         /// <param name="list">list of class -- ReCalculateRecord </param>
         private void ReVerfyAndCalculateCost(List<ReCalculateRecord> list)
         {
-            ReCalculateRecord objReCalculateRecord = null;
-            int loopCount = list.Count;
-            for (int i = 0; i < loopCount; i++)
+            if (list != null)
             {
-                objReCalculateRecord = list[i];
-                if (objReCalculateRecord.WindowName == (int)windowName.Shipment)
+                ReCalculateRecord objReCalculateRecord = null;
+                int loopCount = list.Count;
+                for (int i = 0; i < loopCount; i++)
                 {
-                    CalculateCostForShipment(objReCalculateRecord.HeaderId);
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.ReturnVendor)
-                {
-                    CalculateCostForReturnToVendor(objReCalculateRecord.HeaderId);
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.Movement)
-                {
-                    CalculateCostForMovement(objReCalculateRecord.HeaderId);
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.MaterialReceipt)
-                {
-                    if (objReCalculateRecord.IsReversal)
+                    objReCalculateRecord = list[i];
+                    if (objReCalculateRecord.WindowName == (int)windowName.Shipment)
                     {
-                        CalculateCostForMaterialReversal(objReCalculateRecord.HeaderId);
+                        CalculateCostForShipment(objReCalculateRecord.HeaderId);
                     }
-                    else
+                    else if (objReCalculateRecord.WindowName == (int)windowName.ReturnVendor)
                     {
-                        CalculateCostForMaterial(objReCalculateRecord.HeaderId);
+                        CalculateCostForReturnToVendor(objReCalculateRecord.HeaderId);
                     }
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.MatchInvoice)
-                {
-                    if (objReCalculateRecord.IsReversal)
+                    else if (objReCalculateRecord.WindowName == (int)windowName.Movement)
                     {
-                        CalculateCostForMatchInvoiceReversal(objReCalculateRecord.HeaderId);
+                        CalculateCostForMovement(objReCalculateRecord.HeaderId);
                     }
-                    else
+                    else if (objReCalculateRecord.WindowName == (int)windowName.MaterialReceipt)
                     {
-                        CalculateCostForMatchInvoiced(objReCalculateRecord.HeaderId);
+                        if (objReCalculateRecord.IsReversal)
+                        {
+                            CalculateCostForMaterialReversal(objReCalculateRecord.HeaderId);
+                        }
+                        else
+                        {
+                            CalculateCostForMaterial(objReCalculateRecord.HeaderId);
+                        }
                     }
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.Inventory)
-                {
-                    CalculateCostForInventory(objReCalculateRecord.HeaderId);
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.CustomerReturn)
-                {
-                    CalculateCostForCustomerReturn(objReCalculateRecord.HeaderId);
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.CreditMemo)
-                {
-                    if (objReCalculateRecord.IsReversal)
+                    else if (objReCalculateRecord.WindowName == (int)windowName.MatchInvoice)
                     {
-                        CalculateCostCreditMemoreversal(objReCalculateRecord.HeaderId);
+                        if (objReCalculateRecord.IsReversal)
+                        {
+                            CalculateCostForMatchInvoiceReversal(objReCalculateRecord.HeaderId);
+                        }
+                        else
+                        {
+                            CalculateCostForMatchInvoiced(objReCalculateRecord.HeaderId);
+                        }
                     }
-                    else
+                    else if (objReCalculateRecord.WindowName == (int)windowName.Inventory)
                     {
-                        CalculationCostCreditMemo(objReCalculateRecord.HeaderId);
+                        CalculateCostForInventory(objReCalculateRecord.HeaderId);
                     }
-                }
-                else if (objReCalculateRecord.WindowName == (int)windowName.AssetDisposal)
-                {
-                    po_AssetDisposal = tbl_AssetDisposal.GetPO(GetCtx(), objReCalculateRecord.HeaderId, Get_Trx());
-                    CalculateCostForAssetDisposal(objReCalculateRecord.HeaderId, Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
+                    else if (objReCalculateRecord.WindowName == (int)windowName.CustomerReturn)
+                    {
+                        CalculateCostForCustomerReturn(objReCalculateRecord.HeaderId);
+                    }
+                    else if (objReCalculateRecord.WindowName == (int)windowName.CreditMemo)
+                    {
+                        if (objReCalculateRecord.IsReversal)
+                        {
+                            CalculateCostCreditMemoreversal(objReCalculateRecord.HeaderId);
+                        }
+                        else
+                        {
+                            CalculationCostCreditMemo(objReCalculateRecord.HeaderId);
+                        }
+                    }
+                    else if (objReCalculateRecord.WindowName == (int)windowName.AssetDisposal)
+                    {
+                        po_AssetDisposal = tbl_AssetDisposal.GetPO(GetCtx(), objReCalculateRecord.HeaderId, Get_Trx());
+                        CalculateCostForAssetDisposal(objReCalculateRecord.HeaderId, Util.GetValueOfInt(Util.GetValueOfInt(po_AssetDisposal.Get_Value("M_Product_ID"))));
+                    }
                 }
             }
         }
