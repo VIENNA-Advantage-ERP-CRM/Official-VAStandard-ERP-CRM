@@ -213,6 +213,8 @@ namespace VAdvantage.Acct
         public static int ACCTTYPE_WOScrapAcct = 7677;
         /** Overhead Absorption Account */
         public static int ACCTTYPE_OverhdAbsorptionAcct = 7678;  //TODO Check the account number
+        // Reversal Accounting Date			
+        private DateTime? _ReversalDateAcct = null;
 
         #endregion
 
@@ -1199,6 +1201,11 @@ namespace VAdvantage.Acct
 
             //	Period defined in GL Journal (e.g. adjustment period)
             int index = _po.Get_ColumnIndex("C_Period_ID");
+            if (IsReversalDoc())
+            {
+                //VIS_045, 11-Apr-2025,  When document is reversal, then system get period based on Reversal date rather than defined Period
+                index = -1;
+            }
             if (index != -1)
             {
                 int? ii = (int?)_po.Get_Value(index);
@@ -1209,10 +1216,11 @@ namespace VAdvantage.Acct
             }
             if (_period == null)
             {
-                _period = MPeriod.Get(GetCtx(), GetDateAcct(), GetAD_Org_ID());
+                //VIS_045, 11-Apr-2025, when reversal document then period close check with reversal date rather than acct date 
+                _period = MPeriod.Get(GetCtx(), IsReversalDoc() ? GetReversalDateAcct() : GetDateAcct(), GetAD_Org_ID());
             }
             //	Is Period Open?
-            if (_period != null && MPeriod.IsOpen(GetCtx(), GetDateAcct(), GetDocumentType(), GetAD_Org_ID()))
+            if (_period != null && MPeriod.IsOpen(GetCtx(), IsReversalDoc() ? GetReversalDateAcct() : GetDateAcct(), GetDocumentType(), GetAD_Org_ID()))
             {
                 _C_Period_ID = _period.GetC_Period_ID();
             }
@@ -1222,7 +1230,7 @@ namespace VAdvantage.Acct
             }
             //
             log.Fine(	// + AD_Client_ID + " - " 
-                GetDateAcct() + " - " + GetDocumentType() + " => " + _C_Period_ID);
+                GetReversalDateAcct() + " - " + GetDateAcct() + " - " + GetDocumentType() + " => " + _C_Period_ID);
         }
 
         /// <summary>
@@ -2393,6 +2401,73 @@ namespace VAdvantage.Acct
         protected void SetDateAcct(DateTime? da)
         {
             _DateAcct = da;
+        }
+
+        /// <summary>
+        ///  	Get Reversal Accounting Date
+        /// </summary>
+        /// <returns>Reversal Date</returns>
+        public DateTime? GetReversalDateAcct()
+        {
+            if (_ReversalDateAcct != null)
+            {
+                return _ReversalDateAcct;
+            }
+            int index = _po.Get_ColumnIndex("VAS_ReversedDate");
+            if (index != -1)
+            {
+                _ReversalDateAcct = (DateTime?)_po.Get_Value(index);
+            }
+            if (_ReversalDateAcct != null)
+            {
+                return _ReversalDateAcct;
+            }
+            else
+            {
+                _ReversalDateAcct = GetDateAcct();
+                return _ReversalDateAcct;
+            }
+
+            throw new Exception("No Reversal DateAcct");
+        }
+
+        /// <summary>
+        /// This function is used to check the document is Reversal Document or not
+        /// </summary>
+        /// <returns>true, when reversed document</returns>
+        public bool IsReversalDoc()
+        {
+            int index = _po.Get_ColumnIndex("IsReversal");
+            if (index == -1)
+            {
+                index = _po.Get_ColumnIndex("ReversalDoc_ID");
+            }
+            if (index != -1)
+            {
+                Object posted = _po.Get_Value(index);
+                if (posted is Boolean)
+                {
+                    return Util.GetValueOfBool(((Boolean)posted));
+                }
+                if (posted is String)
+                {
+                    return "Y".Equals(posted);
+                }
+                if (posted is int)
+                {
+                    int ReversalDoc_ID = (int)posted;
+                    index = _po.Get_ColumnIndex(Get_TableName() + "_ID");
+                    if (index != -1)
+                    {
+                        // When Original Record id is less than reversal doc id
+                        // this case happen when on original document, reversal doc id is updated
+                        // when reversal doc is leser than Record id, thats mean reversal record
+                        return ReversalDoc_ID < (int)_po.Get_Value(index) && ReversalDoc_ID != 0;
+                    }
+                    return ReversalDoc_ID > 0;
+                }
+            }
+            return false;
         }
 
         /// <summary>

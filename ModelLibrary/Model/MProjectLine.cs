@@ -80,6 +80,9 @@ namespace VAdvantage.Model
         /// <returns>success</returns>
         protected override bool AfterDelete(bool success)
         {
+            if (!success)
+                return success;
+
             UpdateHeader();
             return success;
         }
@@ -92,6 +95,9 @@ namespace VAdvantage.Model
         /// <returns>success</returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+                return success;
+
             UpdateHeader();
             return success;
         }

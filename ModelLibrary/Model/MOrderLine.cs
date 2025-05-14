@@ -584,7 +584,7 @@ namespace VAdvantage.Model
                     if (taxCat.GetVATAX_Preference1() == "R" || taxCat.GetVATAX_Preference2() == "R" || taxCat.GetVATAX_Preference3() == "R")
                     {
                         sql = @"SELECT tcr.C_Tax_ID FROM VATAX_TaxRegion tcr LEFT JOIN C_Tax tx ON tcr.C_Tax_ID = tx.C_Tax_ID WHERE tcr.IsDefault = 'Y' AND tcr.IsActive = 'Y' 
-                                AND tx.SOPOType IN ('B','" + (inv.IsSOTrx() ? 'S' : 'P') + "') ORDER BY tcr.Updated";
+                                AND tx.SOPOType IN ('B','" + (inv.IsSOTrx() ? 'S' : 'P') + "') AND tcr.AD_Client_ID =" + GetAD_Client_ID() + " ORDER BY tcr.Updated";
                         c_tax_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
                         if (c_tax_ID > 0)
                         {
@@ -4957,12 +4957,22 @@ namespace VAdvantage.Model
                         }
                     }
                 }
+
                 if (!(!String.IsNullOrEmpty(Ord.GetConditionalFlag()) &&
                     Ord.GetConditionalFlag().Equals(MOrder.CONDITIONALFLAG_PrepareIt)))
                 {
                     if (!UpdateHeaderTax())
                         return false;
+
+                    // VIS0060: Set maximum promise date from line to header tab.
+                    if (Is_ValueChanged("DatePromised") && GetDatePromised() != null && Ord.GetDatePromised().Value.Date < GetDatePromised().Value.Date)
+                    {
+                        string sql = "UPDATE C_Order SET DatePromised=" + GlobalVariable.TO_DATE(GetDatePromised(), true) + 
+                            " WHERE C_Order_ID=" + GetC_Order_ID();
+                        int no = DB.ExecuteQuery(sql, null, Get_TrxName());
+                    }
                 }
+
                 // Warning message needs to display in case Entered Price is less than Cost of the Product on Sales Order                
                 if (Ord.IsSOTrx() && !Ord.IsReturnTrx() && GetM_Product_ID() > 0)
                 {

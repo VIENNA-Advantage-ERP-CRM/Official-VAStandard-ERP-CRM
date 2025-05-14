@@ -116,16 +116,23 @@ namespace VAdvantage.Model
             _processMsg = ModelValidationEngine.Get().FireDocValidate(this, ModalValidatorVariables.DOCTIMING_BEFORE_PREPARE);
             if (_processMsg != null)
                 return DocActionVariables.STATUS_INVALID;
-
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), GetDocBaseType(), GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
             }
 
             // is Non Business Day?
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = VAdvantage.Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -409,15 +416,18 @@ namespace VAdvantage.Model
         public bool ReverseCorrectIt()
         {            
             _log.Info(ToString());
-
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), GetDocBaseType(), GetAD_Org_ID()))
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+                ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return false;
             }
 
             // is Non Business Day?
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return false;
@@ -446,6 +456,11 @@ namespace VAdvantage.Model
             //Set Orignal Document Reference
             reversal.SetReversalDoc_ID(GetC_ProvisionalInvoice_ID());
             reversal.AddDescription("{->" + GetDocumentNo() + ")");
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                reversal.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save())
             {
                 pp = VLogger.RetrieveError();

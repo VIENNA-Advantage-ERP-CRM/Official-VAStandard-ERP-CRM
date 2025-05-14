@@ -110,6 +110,7 @@ namespace VAdvantage.Process
                         _cbp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                         _cbp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                         _cbp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                        _cbp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
 
                     }
                     if (!_cbp.Save())
@@ -174,6 +175,7 @@ namespace VAdvantage.Process
                         bp.Set_Value("VA061_SheetName", lead.Get_Value("VA061_SheetName"));
                         bp.Set_Value("VA061_SheetID", lead.Get_Value("VA061_SheetID"));
                         bp.Set_Value("VA061_SheetPDFURL", lead.Get_Value("VA061_SheetPDFURL"));
+                        bp.Set_Value("VA061_ProcessStage", lead.Get_Value("VA061_ProcessStage"));
 
                     }
 
@@ -272,63 +274,9 @@ namespace VAdvantage.Process
                     lead.Save(Get_TrxName());
                 }
                 #endregion
-
-                #region Copy Mail
-                int tableID = PO.Get_Table_ID("C_Lead");
-                int c_bpTableID = PO.Get_Table_ID("C_BPartner");
-                if (tableID > 0)
-                {
-                    int[] RecordIDS = MMailAttachment1.GetAllIDs("MailAttachment1", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
-                    if (RecordIDS.Length > 0)
-                    {
-                        MMailAttachment1 hist = null;
-                        MMailAttachment1 Oldhist = null;
-                        for (int i = 0; i < RecordIDS.Length; i++)
-                        {
-                            Oldhist = new MMailAttachment1(GetCtx(), RecordIDS[i], Get_TrxName());
-                            hist = new MMailAttachment1(GetCtx(), 0, Get_TrxName());
-                            Oldhist.CopyTo(hist);
-                            if (bp != null)
-                                hist.SetRecord_ID(bp.GetC_BPartner_ID());
-                            if (c_bpTableID > 0)
-                                hist.SetAD_Table_ID(c_bpTableID);
-                            if (!hist.Save())
-                                log.SaveError("ERROR:", "Error in Copy Email");
-
-                        }
-
-                    }
-
-                }
-                #endregion
-
-                #region Copy History Records
-                if (tableID > 0)
-                {
-                    int[] RecordsIDS = MAppointmentsInfo.GetAllIDs("AppointmentsInfo", "AD_Table_ID=" + tableID + " AND Record_ID=" + lead.GetC_Lead_ID(), Get_TrxName());
-                    if (RecordsIDS.Length > 0)
-                    {
-                        MAppointmentsInfo hist = null;
-                        MAppointmentsInfo Oldhist = null;
-                        for (int i = 0; i < RecordsIDS.Length; i++)
-                        {
-                            Oldhist = new MAppointmentsInfo(GetCtx(), RecordsIDS[i], Get_TrxName());
-                            hist = new MAppointmentsInfo(GetCtx(), 0, Get_TrxName());
-                            Oldhist.CopyTo(hist);
-                            if (bp != null)
-                                hist.SetRecord_ID(bp.GetC_BPartner_ID());
-                            if (c_bpTableID > 0)
-                                hist.SetAD_Table_ID(c_bpTableID);
-                            if (!hist.Save())
-                                log.SaveError("ERROR:", "Error in Copy HistoryRecords");
-                        }
-
-                    }
-
-                }
-
-                #endregion
-                //
+                int FromTableID = lead.Get_Table_ID();
+                int ToTableID = bp.Get_Table_ID();
+                VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());        
             }
             #endregion
             //

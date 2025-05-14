@@ -124,6 +124,34 @@ namespace ModelLibrary.Classes
                         log.Severe("VIS_ErrorCopyChatData");
                     }
                 }
+                //copy call data
+                if (Env.IsModuleInstalled("VA048_"))
+                {
+                    string query = @"SELECT cd.VA048_CALLDETAILS_ID FROM VA048_CALLDETAILS cd
+                                     WHERE cd.VA048_TO IS NOT NULL AND cd.ISACTIVE = 'Y'
+                                     AND cd.AD_TABLE_ID = " + FromTableID + "   AND cd.RECORD_ID = " + FromRecordID;
+                    DataSet dsChat = DB.ExecuteDataset(query);
+                    if (dsChat != null && dsChat.Tables.Count > 0 && dsChat.Tables[0].Rows.Count > 0)
+                    {
+                        MTable tbl = new MTable(ctx, MTable.Get_Table_ID("VA048_CallDetails"), trx);
+
+                        for (int i = 0; i < dsChat.Tables[0].Rows.Count; i++)
+                        {
+                            PO FromRecord = tbl.GetPO(ctx, Util.GetValueOfInt(dsChat.Tables[0].Rows[i]["VA048_CallDetails_ID"]), trx);
+                            PO ToRecord = tbl.GetPO(ctx, 0, trx);
+                            FromRecord.CopyTo(ToRecord);
+                            if (ToRecordID != 0)
+                                ToRecord.Set_Value("Record_ID", ToRecordID);
+                            if (ToTableID > 0)
+                                ToRecord.Set_Value("AD_Table_ID", ToTableID);
+                            if (!ToRecord.Save())
+                            {
+                                log.Severe("VIS_ErrorCopyCallData");
+                            }
+                        }
+                    }
+                }
+
             }
         }
     }

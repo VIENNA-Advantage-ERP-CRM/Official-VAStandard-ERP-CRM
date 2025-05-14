@@ -449,7 +449,16 @@ namespace VAdvantage.Model
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
 
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            //VIS_427 if document is reversed thn the period open should be check with reverse date
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 m_processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
@@ -457,7 +466,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 m_processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -795,6 +804,11 @@ namespace VAdvantage.Model
                 description += " ** " + GetDocumentNo() + " **";
                 reverse.SetDescription(description);
             }
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                reverse.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reverse.Save())
             {
                 ValueNamePair pp = VLogger.RetrieveError();
@@ -818,6 +832,17 @@ namespace VAdvantage.Model
                 {
                     continue;
                 }
+                //set reversal date for journal on reversal of gl journal batch
+                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+                {
+                    // When Reversal date is less than Account date if journal then not to reverse the document
+                    if (journal.GetDateAcct().Value.Date > Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")))
+                    {
+                        m_processMsg = Msg.GetMsg(GetCtx(), "VIS_AcctDateGTthanReversalDate") + reverse.GetDocumentNo();
+                        return false;
+                    }
+                    journal.Set_Value("VAS_ReversedDate",(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"))));
+                }
                 if (journal.ReverseCorrectIt(reverse.GetGL_JournalBatch_ID()) == null)
                 {
                     m_processMsg = "Could not reverse " + journal;
@@ -825,8 +850,31 @@ namespace VAdvantage.Model
                 }
                 journal.Save();
             }
+
+            AddDescription("(" + reverse.GetDocumentNo() + "<-)");
+            reverse.SetDocAction(DOCACTION_None);
+            reverse.SetDocStatus(DOCSTATUS_Reversed);
+            reverse.SetProcessed(true);
+            reverse.Save(Get_TrxName());
+
+            //JID_0889: show on void full message Reversal Document created
+            m_processMsg = Msg.GetMsg(GetCtx(), "VIS_DocumentReversed") + reverse.GetDocumentNo();
+
             return true;
         }	//	reverseCorrectionIt
+
+        /// <summary>
+        /// Add to Description
+        /// </summary>
+        /// <param name="description">text</param>
+        public void AddDescription(String description)
+        {
+            String desc = GetDescription();
+            if (desc == null)
+                SetDescription(description);
+            else
+                SetDescription(desc + " | " + description);
+        }
 
         /// <summary>
         /// Reverse Accrual.	Flip Dr/Cr - Use Today's date

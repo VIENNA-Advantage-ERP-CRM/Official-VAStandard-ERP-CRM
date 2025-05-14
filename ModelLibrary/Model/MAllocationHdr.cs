@@ -605,6 +605,11 @@ namespace VAdvantage.Model
 
                         // work done to set cashline ID on payschedule tab of invoice if allocation done by cash
                         paySch.SetC_CashLine_ID(line.GetC_CashLine_ID());
+                        //VIS_427 Seet the value of gl_journalline_id
+                        if(line.GetGL_JournalLine_ID() > 0)
+                        {
+                            paySch.Set_Value("GL_JournalLine_ID", line.GetGL_JournalLine_ID());                        
+                        }
 
                         // when schedule is paid from cash journal then Payment Execution status = Received
                         // when schedule is paid from Payment then Payment Execution status = In-Progress
@@ -663,10 +668,10 @@ namespace VAdvantage.Model
                             MPaySchedule psched = null;
                             if (paySch.GetC_PaySchedule_ID() > 0)
                             {
-                              psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
+                                psched = new MPaySchedule(GetCtx(), paySch.GetC_PaySchedule_ID(), Get_Trx());
                             }
                             //get the discount percentage
-                            decimal discountPer = psched !=null ? psched.GetDiscount() : pterm.GetDiscount();
+                            decimal discountPer = psched != null ? psched.GetDiscount() : pterm.GetDiscount();
                             decimal discountPer2 = pterm.GetDiscount2();
                             //PO.CopyValues(paySch, newPaySch, paySch.GetAD_Client_ID(), paySch.GetAD_Org_ID());
 
@@ -696,6 +701,8 @@ namespace VAdvantage.Model
                             newPaySch.SetVA009_Variance(0);
                             newPaySch.SetC_Payment_ID(0);
                             newPaySch.SetC_CashLine_ID(0);
+                            //cleared value for new schedule
+                            newPaySch.Set_Value("GL_JournalLine_ID",null);
                             newPaySch.SetVA009_ExecutionStatus("A");
                             newPaySch.SetIsValid(true);
                             newPaySch.SetVA009_IsPaid(false);
@@ -984,12 +991,16 @@ namespace VAdvantage.Model
             if (!IsActive())
                 throw new Exception("Allocation already reversed (not active)");
 
+            /*VIS_045 - 15-Apr-2025,  Allocation Document reversal on Reversed Date rather than on Acct Date */
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+              ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
+
             //	Can we delete posting
-            if (!MPeriod.IsOpen(GetCtx(), GetDateTrx(), MDocBaseType.DOCBASETYPE_PAYMENTALLOCATION, GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, MDocBaseType.DOCBASETYPE_PAYMENTALLOCATION, GetAD_Org_ID()))
                 throw new Exception("@PeriodClosed@");
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateTrx(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 throw new Exception(Common.Common.NONBUSINESSDAY);
             }
@@ -998,7 +1009,7 @@ namespace VAdvantage.Model
             SetIsActive(false);
             SetDocumentNo(GetDocumentNo() + "^");
             SetApprovalAmt(Env.ZERO);
-            SetDocStatus(DOCSTATUS_Reversed);	//	for direct calls
+            SetDocStatus(DOCSTATUS_Reversed);   //	for direct calls
             if (!Save() || IsActive())
                 throw new Exception("Cannot de-activate allocation");
 
@@ -1026,10 +1037,10 @@ namespace VAdvantage.Model
                 line.SetWithholdingAmt(Env.ZERO);
                 line.SetBackupWithholdingAmount(Env.ZERO);
                 line.Save();
-                
-                
+
+
                 // Added by Amit for Payment Management 5-11-2015   
-                if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID()>0)
+                if (Env.IsModuleInstalled("VA009_") && line.GetC_InvoicePaySchedule_ID() > 0)
                 {
                     MInvoicePaySchedule paySch = new MInvoicePaySchedule(GetCtx(), line.GetC_InvoicePaySchedule_ID(), Get_Trx());
                     paySch.SetVA009_IsPaid(false);

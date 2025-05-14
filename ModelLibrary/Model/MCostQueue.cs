@@ -839,6 +839,15 @@ namespace VAdvantage.Model
                             #endregion
                         }
 
+                        // When Qty is Zero, then no need to take impact on cost
+                        if ((windowName.Equals("Material Receipt") || windowName.Equals("Customer Return") || windowName.Equals("Shipment") || windowName.Equals("Return To Vendor") ||
+                            windowName.Equals("Inventory Move")) && Qty == 0)
+                        {
+                            _log.Info($"Costing Engine: {windowName} - Quantity is zero for the record, so costing not be calculate.");
+                            conversionNotFound = "";
+                            return true;
+                        }
+
                         if (string.IsNullOrEmpty(costingCheck.materialCostingMethod) ||
                            costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Fifo) ||
                            costingCheck.materialCostingMethod.Equals(MCostElement.COSTINGMETHOD_Lifo))

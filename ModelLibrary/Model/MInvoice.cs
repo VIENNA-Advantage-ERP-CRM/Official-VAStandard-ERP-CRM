@@ -2345,9 +2345,16 @@ namespace VAdvantage.Model
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocTypeTarget_ID());
             SetIsReturnTrx(dt.IsReturnTrx());
             SetIsSOTrx(dt.IsSOTrx());
-
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
@@ -2355,7 +2362,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -3293,7 +3300,8 @@ namespace VAdvantage.Model
                                 {
                                     if (IsSOTrx())
                                     {
-                                        lineBlanket1.SetQtyInvoiced(Decimal.Subtract(lineBlanket1.GetQtyInvoiced(), line.GetQtyInvoiced()));
+                                        //VIS_045, 23-Apr-2025, need to update Qty Invoiced with Postive value on Blanket sales order screen
+                                        lineBlanket1.SetQtyInvoiced(Decimal.Add(lineBlanket1.GetQtyInvoiced(), line.GetQtyInvoiced()));
                                     }
                                     else
                                     {
@@ -7103,7 +7111,11 @@ namespace VAdvantage.Model
 
             log.Info(ToString());
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+                ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return false;
@@ -7111,7 +7123,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return false;
@@ -7191,7 +7203,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
-
+           
             // JID_0872: Remove invoice reference from Service Contract Schedule.
             if (IsSOTrx() && GetC_Contract_ID() > 0)
             {
@@ -7229,6 +7241,11 @@ namespace VAdvantage.Model
             catch (Exception) { }
             //On Reversal Marked checkbox true to identify that Invoice is generated from this form
             reversal.Set_Value("VAS_IsTEMInvoice", this.Get_Value("VAS_IsTEMInvoice"));
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                reversal.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save(Get_TrxName()))
             {
                 ValueNamePair vp = VLogger.RetrieveError();

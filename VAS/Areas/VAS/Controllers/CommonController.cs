@@ -2770,26 +2770,26 @@ namespace VIS.Controllers
                                     MatchedInv_ID = match.GetDocumentNo();
                                     success = true;
                                     // Check applied by mohit asked by ravikant to restrict the recalcualtion of costing for invoice for which the costing is already calculated.06/07/2017 PMS TaskID=4170
-                                    if (iLine.GetC_OrderLine_ID() == 0 && !iLine.IsCostCalculated())
-                                    {
-                                        if (client.IsCostImmediate())
-                                        {
-                                            MProduct product = new MProduct(ctx, match.GetM_Product_ID(), trx);
+                                    //if (iLine.GetC_OrderLine_ID() == 0 && !iLine.IsCostCalculated())
+                                    //{
+                                    //    if (client.IsCostImmediate())
+                                    //    {
+                                    //        MProduct product = new MProduct(ctx, match.GetM_Product_ID(), trx);
 
-                                            // Not returning any value as No effect
-                                            MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product,
-                                                 match.GetM_AttributeSetInstance_ID(), "Match IV", null, sLine, null, iLine, null,
-                                                 Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), match.GetQty()),
-                                                 match.GetQty(), trx, out conversionNotFoundMatch, "window");
-                                            if (!string.IsNullOrEmpty(conversionNotFoundMatch))
-                                            {
-                                                if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
-                                                {
-                                                    success = false;
-                                                }
-                                            }
-                                        }
-                                    }
+                                    //        // Not returning any value as No effect
+                                    //        MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product,
+                                    //             match.GetM_AttributeSetInstance_ID(), "Match IV", null, sLine, null, iLine, null,
+                                    //             Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), match.GetQty()),
+                                    //             match.GetQty(), trx, out conversionNotFoundMatch, "window");
+                                    //        if (!string.IsNullOrEmpty(conversionNotFoundMatch))
+                                    //        {
+                                    //            if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                    //            {
+                                    //                success = false;
+                                    //            }
+                                    //        }
+                                    //    }
+                                    //}
                                 }
                                 else
                                 {
@@ -2830,23 +2830,23 @@ namespace VIS.Controllers
                                 else
                                 {
                                     MatchedPO_ID = matchPO.GetDocumentNo();
-                                    if (client.IsCostImmediate())
-                                    {
-                                        MProduct product = new MProduct(ctx, matchPO.GetM_Product_ID(), trx);
+                                    //if (client.IsCostImmediate())
+                                    //{
+                                    //    MProduct product = new MProduct(ctx, matchPO.GetM_Product_ID(), trx);
 
-                                        // Not returning any value as No effect
-                                        MCostQueue.CreateProductCostsDetails(ctx, matchPO.GetAD_Client_ID(), matchPO.GetAD_Org_ID(), product,
-                                              matchPO.GetM_AttributeSetInstance_ID(), "Match IV", null, sLine, null, iLine, null,
-                                              Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), matchPO.GetQty()),
-                                              matchPO.GetQty(), trx, out conversionNotFoundMatch, "window");
-                                        if (!string.IsNullOrEmpty(conversionNotFoundMatch))
-                                        {
-                                            if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
-                                            {
-                                                success = false;
-                                            }
-                                        }
-                                    }
+                                    //    // Not returning any value as No effect
+                                    //    MCostQueue.CreateProductCostsDetails(ctx, matchPO.GetAD_Client_ID(), matchPO.GetAD_Org_ID(), product,
+                                    //          matchPO.GetM_AttributeSetInstance_ID(), "Match IV", null, sLine, null, iLine, null,
+                                    //          Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), matchPO.GetQty()),
+                                    //          matchPO.GetQty(), trx, out conversionNotFoundMatch, "window");
+                                    //    if (!string.IsNullOrEmpty(conversionNotFoundMatch))
+                                    //    {
+                                    //        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                    //        {
+                                    //            success = false;
+                                    //        }
+                                    //    }
+                                    //}
                                 }
                             }
                         }
@@ -2899,27 +2899,27 @@ namespace VIS.Controllers
                                     success = true;
                                     MatchedPO_ID = match.GetDocumentNo();
                                     // updated by Amit 23-12-2015
-                                    MProduct product = new MProduct(ctx, match.GetM_Product_ID(), trx);
+                                    // MProduct product = new MProduct(ctx, match.GetM_Product_ID(), trx);
 
                                     // Not returning any value as No effect
-                                    if (client.IsCostImmediate())
-                                        MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product, match.GetM_AttributeSetInstance_ID(),
-                                        "Match PO", null, sLine, null, null, null, oLine.GetC_OrderLine_ID(), match.GetQty(), trx, out conversionNotFoundMatch, "window");
-                                    if (!string.IsNullOrEmpty(conversionNotFoundMatch))
-                                    {
-                                        if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
-                                        {
-                                            success = false;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        sLine.SetIsCostCalculated(true);
-                                        if (!sLine.Save())
-                                        {
-                                            success = false;
-                                        }
-                                    }
+                                    //if (client.IsCostImmediate())
+                                    //    MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product, match.GetM_AttributeSetInstance_ID(),
+                                    //    "Match PO", null, sLine, null, null, null, oLine.GetC_OrderLine_ID(), match.GetQty(), trx, out conversionNotFoundMatch, "window");
+                                    //if (!string.IsNullOrEmpty(conversionNotFoundMatch))
+                                    //{
+                                    //    if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
+                                    //    {
+                                    //        success = false;
+                                    //    }
+                                    //}
+                                    //else
+                                    //{
+                                    //    sLine.SetIsCostCalculated(true);
+                                    //    if (!sLine.Save())
+                                    //    {
+                                    //        success = false;
+                                    //    }
+                                    //}
 
                                     //	Correct Ordered Qty for Stocked Products (see MOrder.reserveStock / MInOut.processIt)
                                     if (success && sLine.GetProduct() != null && sLine.GetProduct().IsStocked())

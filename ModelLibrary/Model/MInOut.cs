@@ -973,7 +973,7 @@ namespace VAdvantage.Model
                 line.Set_ValueNoCheck("M_InOutLine_ID", I_ZERO);	//	new
                 //	Reset
                 if (!setOrder)
-                    line.SetC_OrderLine_ID(0);                
+                    line.SetC_OrderLine_ID(0);
                 // SI_0642 : when we reverse MR or Customer Return, at that tym - on Save - system also check - qty availablity agaisnt same attribute 
                 // on storage. If we set ASI as 0, then system not find qty and not able to save record
                 if (!counter && !IsReversal())
@@ -1845,7 +1845,8 @@ namespace VAdvantage.Model
             int BaseCurrency = GetCtx().GetContextAsInt("$C_Currency_ID");
             decimal retValue;
             string sql = "SELECT ROUND(SUM(COALESCE("
-                + "CURRENCYBASEWITHCONVERSIONTYPE((ol.LineTotalAmt/ol.QtyOrdered)*il.MovementQty,o.C_Currency_ID,o.DateOrdered, o.AD_Client_ID,o.AD_Org_ID, o.C_CONVERSIONTYPE_ID), 0)), "
+                + "CURRENCYBASEWITHCONVERSIONTYPE(CASE WHEN ol.QtyOrdered != 0" +
+                " THEN (ol.LineTotalAmt/ol.QtyOrdered)*il.MovementQty ELSE 0 END,o.C_Currency_ID,o.DateOrdered, o.AD_Client_ID,o.AD_Org_ID, o.C_CONVERSIONTYPE_ID), 0)), "
                 + MCurrency.Get(GetCtx(), BaseCurrency).GetStdPrecision() + ")"
                 + " FROM M_InOutLine il INNER JOIN C_OrderLine ol ON (il.C_OrderLine_ID=ol.C_OrderLine_ID)"
                 + " INNER JOIN C_Order o ON (ol.C_Order_ID=o.C_Order_ID) "
@@ -1869,9 +1870,17 @@ namespace VAdvantage.Model
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
             SetIsReturnTrx(dt.IsReturnTrx());
             SetIsSOTrx(dt.IsSOTrx());
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+             check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
 
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return DocActionVariables.STATUS_INVALID;
@@ -1879,7 +1888,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -2378,7 +2387,7 @@ namespace VAdvantage.Model
                                         INNER JOIN M_InOut i ON (i.M_InOut_ID = retiol.M_InOut_ID)
                                         INNER JOIN C_OrderLine rmaol ON (rmaol.C_OrderLine_ID = retiol.C_OrderLine_ID)
                                         INNER JOIN M_InOutLine orgiol ON (orgiol.M_InOutLine_ID = rmaol.Orig_InOutLine_ID)
-                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null , Get_Trx());
+                                        WHERE i.M_InOut_ID = {GetM_InOut_ID()}", null, Get_Trx());
             }
 
             //	Outstanding (not processed) Incoming Confirmations ?
@@ -3013,6 +3022,19 @@ namespace VAdvantage.Model
                             else
                                 _processMsg = "Could not create Material Transaction";
                             return DocActionVariables.STATUS_INVALID;
+                        }
+                        else
+                        {
+                            //VIS_0045: Reset Class parameters
+                            if (costingCheck != null)
+                            {
+                                costingCheck.ResetProperty();
+
+                                if (costingCheck != null)
+                                {
+                                    costingCheck.M_Transaction_ID = mtrx.GetM_Transaction_ID();
+                                }
+                            }
                         }
 
                         //Update Transaction for Current Quantity
@@ -6025,8 +6047,13 @@ namespace VAdvantage.Model
             log.Info(ToString());
             string reversedDocno = null;
             string ss = ToString();
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 &&
+                Get_Value("VAS_ReversedDate") != null
+                ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
             MDocType dt = MDocType.Get(GetCtx(), GetC_DocType_ID());
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(), dt.GetDocBaseType(), GetAD_Org_ID()))
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck, dt.GetDocBaseType(), GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
                 return false;
@@ -6034,7 +6061,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return false;
@@ -6119,7 +6146,11 @@ namespace VAdvantage.Model
 
             //Set DateAccount as orignal document
             reversal.SetMovementDate(GetMovementDate());
-
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                reversal.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save(Get_TrxName()))
             {
                 pp = VLogger.RetrieveError();
@@ -6274,6 +6305,12 @@ namespace VAdvantage.Model
             {
                 // Not getting DocAction and Docstatus values during reversal in case of shipment reversal
                 Save(Get_TrxName());
+
+                //VIS_045, 16-Apr-2025, Set Reversal Date on Drop Shipment Record
+                if (Get_Value("VAS_ReversedDate") != null)
+                {
+                    DB.ExecuteQuery($@"UPDATE M_InOut SET VAS_ReversedDate = {GlobalVariable.TO_DATE(Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")), true)} WHERE M_InOut_ID = {GetRef_ShipMR_ID()} ", null, Get_Trx());
+                }
                 MInOut ino = new MInOut(GetCtx(), GetRef_ShipMR_ID(), Get_Trx());
                 ino.VoidIt();
                 ino.SetProcessed(true);

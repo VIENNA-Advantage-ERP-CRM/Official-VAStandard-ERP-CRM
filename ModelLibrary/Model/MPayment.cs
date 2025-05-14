@@ -2703,9 +2703,16 @@ namespace VAdvantage.Model
             {
                 return DocActionVariables.STATUS_INVALID;
             }
-
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+            check will be considered*/
+            DateTime? DateForPeriodCheck = GetDateAcct();
+            if (GetReversalDoc_ID() > 0 && IsReversal()
+                && Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                DateForPeriodCheck = Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate"));
+            }
             //	Std Period open?
-            if (!MPeriod.IsOpen(GetCtx(), GetDateAcct(),
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck,
                 IsReceipt() ? MDocBaseType.DOCBASETYPE_ARRECEIPT : MDocBaseType.DOCBASETYPE_APPAYMENT, GetAD_Org_ID()))
             {
                 _processMsg = "@PeriodClosed@";
@@ -2714,7 +2721,7 @@ namespace VAdvantage.Model
 
             // is Non Business Day?
             // JID_1205: At the trx, need to check any non business day in that org. if not fund then check * org.
-            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), GetDateAcct(), GetAD_Org_ID()))
+            if (MNonBusinessDay.IsNonBusinessDay(GetCtx(), DateForPeriodCheck, GetAD_Org_ID()))
             {
                 _processMsg = Common.Common.NONBUSINESSDAY;
                 return DocActionVariables.STATUS_INVALID;
@@ -5318,6 +5325,11 @@ namespace VAdvantage.Model
             log.Fine("#" + allocations.Length);
             for (int i = 0; i < allocations.Length; i++)
             {
+                // VIS_045, 15-Apr-2025, Set Reversal Date on Allocation Document for back date document reversal on Reversal Date rather than on Acct Date
+                if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+                {
+                    allocations[i].Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+                }
                 allocations[i].Set_TrxName(Get_Trx());
                 allocations[i].SetDocAction(DocActionVariables.ACTION_REVERSE_CORRECT);
                 allocations[i].ProcessIt(DocActionVariables.ACTION_REVERSE_CORRECT);
@@ -5630,10 +5642,18 @@ namespace VAdvantage.Model
             }
 
             //	Std Period open?
-            DateTime? dateAcct = GetDateAcct();
-            if (!MPeriod.IsOpen(GetCtx(), dateAcct,
+            //  DateTime? dateAcct = GetDateAcct();
+            /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
+              check will be considered*/
+            DateTime? DateForPeriodCheck= Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+                ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
+
+            if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck,
                 IsReceipt() ? MDocBaseType.DOCBASETYPE_ARRECEIPT : MDocBaseType.DOCBASETYPE_APPAYMENT, GetAD_Org_ID()))
-                dateAcct = DateTime.Now;
+            {
+                _processMsg = "@PeriodClosed@";
+                return false;
+            }
 
             //	Auto Reconcile if not on Bank Statement
             Boolean reconciled = false; //	GetC_BankStatementLine_ID() == 0;
@@ -5667,7 +5687,7 @@ namespace VAdvantage.Model
             reversal.SetC_Order_ID(0);
             reversal.SetC_Invoice_ID(0);
             reversal.Set_Value("GL_JournalLine_ID", null); //VIS_427 DevopsTaskId :2156 Set Gl JournalLine to zero on reverse
-            reversal.SetDateAcct(dateAcct);
+            reversal.SetDateAcct(GetDateAcct());
             //
             reversal.SetDocumentNo(GetDocumentNo() + REVERSE_INDICATOR);	//	indicate reversals
             reversal.SetDocStatus(DOCSTATUS_Drafted);
@@ -5761,7 +5781,11 @@ namespace VAdvantage.Model
                     reversal.UpdatePaymentStatus(Util.GetValueOfInt(Get_Value("C_ProvisionalInvoice_ID")));
                 }
             }
-
+            //VIS_427 10/04/2025 Set date with reversal date if column exist
+            if (Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null)
+            {
+                reversal.Set_Value("VAS_ReversedDate", Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")));
+            }
             if (!reversal.Save(Get_Trx()))
             {
                 ValueNamePair pp = VLogger.RetrieveError();
