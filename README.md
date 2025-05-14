@@ -27,7 +27,7 @@
   	
       Port: 22
   	
-      Password: dr^1#xZ06-
+      Password: XM#@VuNM2
 
 
 7.	Go to the path /Required Files for Partner-kit Setup/5.x and copy all DLLs from “CommonDlls” folder and paste them into the “DLL” folder within ViennaAdvantageWeb. As shown in below pic.
