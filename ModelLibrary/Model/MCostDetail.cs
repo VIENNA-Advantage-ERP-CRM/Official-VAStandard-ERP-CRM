@@ -3814,7 +3814,7 @@ namespace VAdvantage.Model
             sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
                                      AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
                          @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
-                         @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) = 0 " +
+                         @" AND ced.M_InOutLine_ID IN (  " + cd.GetM_InOutLine_ID() + @") AND NVL(ced.C_OrderLIne_ID , 0) IN ( 0 )" +
                          @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
                                         AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
             MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
@@ -3836,11 +3836,15 @@ namespace VAdvantage.Model
                 sql += @" AND ced.M_Product_ID = " + product.GetM_Product_ID() + @" 
                                      AND ced.C_AcctSchema_ID = " + mas.GetC_AcctSchema_ID() + @" AND  NVL(ced.M_AttributeSetInstance_ID , 0) IN (  " + M_ASI_ID +
                          @"," + cd.GetM_AttributeSetInstance_ID() + " )" +
-                         @" AND ced.M_InOutLine_ID =  " + cd.GetM_InOutLine_ID() + @" AND NVL(ced.C_OrderLIne_ID , 0) =  " + cd.GetC_OrderLine_ID() +
-                         @" AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
+                         @" AND ced.M_InOutLine_ID IN (  " + cd.GetM_InOutLine_ID() + @") AND NVL(ced.C_OrderLIne_ID , 0) IN (" + cd.GetC_OrderLine_ID() +
+                         @") AND NVL(ced.C_InvoiceLine_ID , 0) = 0 
                                         AND ced.AD_Client_ID = " + cd.GetAD_Client_ID();
                 MRPrice = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, Get_Trx()));
             }
+
+            // Get Consolidate MR price if have
+            MRPrice = GetConsolidateMRPrice(costingCheck, MRPrice, mas, product, M_ASI_ID, cd);
+
             MRPrice = Decimal.Round(MRPrice, mas.GetCostingPrecision(), MidpointRounding.AwayFromZero);
 
             if (ce.IsAveragePO() || ce.IsLastPOPrice() || ce.IsWeightedAveragePO())
@@ -3869,6 +3873,66 @@ namespace VAdvantage.Model
             }
             return cost.Save();
             #endregion
+        }
+
+        /// <summary>
+        /// This function is used to ge the consolidate amount of multiple GRN which are linked with single Invoice
+        /// </summary>
+        /// <param name="costingCheck">Costing Check</param>
+        /// <param name="MRPrice">GRN Price (single GRN price whose reference is linked on cost detail)</param>
+        /// <param name="mas">Object of Accounting Schema</param>
+        /// <param name="product">Object of Product</param>
+        /// <param name="M_ASI_ID">Attribute set instance id</param>
+        /// <param name="cd">object of Cost Detail</param>
+        /// <returns>Consolidate GRN price</returns>
+        /// <author>VIS_045: 15-May-2025</author>
+        public decimal GetConsolidateMRPrice(CostingCheck costingCheck, decimal MRPrice, MAcctSchema mas, MProduct product, int M_ASI_ID, MCostDetail cd)
+        {
+            string sql = "";
+            if (costingCheck?.isReversal ?? false && costingCheck.invoiceline != null)
+            {
+                // Check, is multiple GRN is linked with the Single Invoice or not
+                sql = $@"SELECT COUNT(mi.M_MatchInv_id) AS TotalCount 
+                        FROM M_MatchInv mi
+                        INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)
+                        WHERE il.C_InvoiceLine_ID={costingCheck.invoiceline.GetReversalDoc_ID()}";
+                DataSet dsValue = DB.ExecuteDataset(sql, null, null);/* Not tpo pass Trx, bcz match inv record deleted in trx*/
+                if (dsValue != null && dsValue.Tables.Count > 0 && dsValue.Tables[0].Rows.Count > 0 && Util.GetValueOfInt(dsValue.Tables[0].Rows[0]["TotalCount"]) > 1)
+                {
+                    // When Multiple GRN linked with single invoice then get sum of ( cost of individual line ) which will be divided by the Invoice Qty
+                    sql = $@"SELECT ROUND(SUM(mi.Qty * {(costingCheck.IsQunatityValidated ? "ced.Amt" : "ced.Amt / ced.Qty")}), 12) AS Amt
+                                FROM M_MatchInv mi
+                                INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)";
+                    if (costingCheck.IsQunatityValidated)
+                    {
+                        sql += @" T_Temp_CostDetail ced ON (ced.M_InOutLine_ID = mi.M_InOutLine_ID)
+                            INNER JOIN m_costqueue cq ON(cq.m_costqueue_id = ced.m_costqueue_id)";
+                    }
+                    else
+                    {
+                        sql += "INNER JOIN M_CostDetail ced ON (ced.M_InOutLine_ID = mi.M_InOutLine_ID)";
+                    }
+
+                    sql += $@" WHERE il.C_InvoiceLine_ID = {costingCheck.invoiceline.GetReversalDoc_ID()}
+                                  AND ced.IsActive = 'Y'
+                                  {(costingCheck.IsQunatityValidated ? "AND COALESCE(ced.M_CostElement_ID, 0) = 0" : "")}
+                                  AND ced.M_Product_ID = { product.GetM_Product_ID()}
+                                  AND ced.C_AcctSchema_ID = { mas.GetC_AcctSchema_ID()}
+                                  AND COALESCE(ced.M_AttributeSetInstance_ID, 0) IN(0, { M_ASI_ID})
+                                  AND COALESCE(ced.C_InvoiceLine_ID, 0) = 0
+                                  AND ced.AD_Client_ID = { cd.GetAD_Client_ID()}; ";
+                    dsValue = DB.ExecuteDataset(sql, null, null);/* Not tpo pass Trx, bcz match inv record deleted in trx*/
+                    if (dsValue != null && dsValue.Tables.Count > 0 && dsValue.Tables[0].Rows.Count > 0)
+                    {
+                        MRPrice = Util.GetValueOfDecimal(dsValue.Tables[0].Rows[0]["Amt"]) / GetQty();
+                        if (GetQty() < 0)
+                        {
+                            MRPrice = decimal.Negate(MRPrice);
+                        }
+                    }
+                }
+            }
+            return MRPrice;
         }
 
         /// <summary>
@@ -4066,22 +4130,6 @@ namespace VAdvantage.Model
 
             if (ce.IsAverageInvoice())
             {
-                if (cd.GetC_OrderLine_ID() > 0)
-                {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
-                    {
-                        cost.SetCurrentQty(0);
-                    }
-                    else
-                    {
-                        //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                        //    cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                    }
-
-                    //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                    //    cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
-                }
-
                 if (Env.Signum(cost.GetCumulatedQty()) != 0)
                 {
                     price = Decimal.Round(Decimal.Divide(cost.GetCumulatedAmt(), cost.GetCumulatedQty()), precision, MidpointRounding.AwayFromZero);
@@ -4094,61 +4142,25 @@ namespace VAdvantage.Model
             }
             else if (ce.IsLastInvoice())
             {
-                if (cd.GetC_OrderLine_ID() > 0)
-                {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
-                    {
-                        cost.SetCurrentQty(0);
-                    }
-                    else
-                    {
-                        //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                        //    cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                    }
-
-                    //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                    //    cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
-                }
                 cost.SetCurrentCostPrice(price);
             }
             else if (ce.IsWeightedAverageCost())
             {
                 // Formula : ((CurrentQty * CurrentCostPrice) + (amt * qty)) / (CurrentQty + qty)
-                if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
-                {
-                    cost.SetCurrentQty(0);
-                    cost.SetCurrentCostPrice(0);
-                }
-                else
+
+                if (cost.GetCurrentQty() != 0)
                 {
                     price = Decimal.Round(Decimal.Divide(
                                            Decimal.Add(
                                            Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amtWithSurcharge),
-                                           Decimal.Add(cost.GetCurrentQty(), qty))
+                                           cost.GetCurrentQty())
                                            , precision, MidpointRounding.AwayFromZero);
                     cost.SetCurrentCostPrice(price);
-                    //cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                 }
-                //cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
                 log.Finer("Inv - WeightedAverageCost - " + cost);
             }
             else if (ce.IsStandardCosting())
             {
-                if (cd.GetC_OrderLine_ID() > 0)
-                {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) == 0)
-                    {
-                        cost.SetCurrentQty(0);
-                    }
-                    else
-                    {
-                        //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                        //    cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                    }
-
-                    //if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                    //    cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
-                }
                 if (cost.GetCurrentCostPrice() == 0)
                 {
                     if (Env.Signum(cost.GetCumulatedQty()) != 0)
@@ -4164,20 +4176,6 @@ namespace VAdvantage.Model
             }
             else if (ce.IsLifo() || ce.IsFifo())
             {
-                if (cd.GetC_OrderLine_ID() > 0)
-                {
-                    if (Decimal.Add(cost.GetCurrentQty(), qty) <= 0)
-                    {
-                        cost.SetCurrentQty(0);
-                    }
-                    else
-                    {
-                        if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                            cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
-                    }
-                    if (costingCheck != null && costingCheck.isMatchFromForm.Equals("N"))
-                        cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
-                }
                 MCostQueue[] cQueue = MCostQueue.GetQueueForCostUpdate(product, cd.GetM_AttributeSetInstance_ID(),
                     mas, QueueOrganizationID, ce, Get_TrxName(), cd.GetM_Warehouse_ID(), costingCheck);
                 if (cQueue != null && cQueue.Length > 0)
@@ -4186,7 +4184,8 @@ namespace VAdvantage.Model
                 }
                 else if (cQueue.Length == 0)
                 {
-                    cost.SetCurrentCostPrice(0);
+                    // not to set CC as ZERO, bcz if user want to do physical inventory then user can enter stock with previous CC.
+                    //cost.SetCurrentCostPrice(0);
                 }
 
             }
