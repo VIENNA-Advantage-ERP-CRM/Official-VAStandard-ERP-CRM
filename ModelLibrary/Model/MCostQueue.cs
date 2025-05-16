@@ -1707,16 +1707,9 @@ namespace VAdvantage.Model
                                 if ((optionalstr == "window" && costingMethodMatchPO == "A") || optionalstr == "process")
                                 {
                                     query.Clear();
-                                    if (costingCheck == null || string.IsNullOrEmpty(costingCheck.materialCostingMethod))
-                                    {
-                                        query.Append(@"SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID +
-                                                     @" AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
-                                        costElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
-                                    }
-                                    else
-                                    {
-                                        costElementId = costingCheck.materialCostingElement;
-                                    }
+                                    query.Append(@"SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID +
+                                                 @" AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
+                                    costElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
 
                                     costElement = MCostElement.Get(ctx, costElementId);
 
@@ -1968,9 +1961,9 @@ namespace VAdvantage.Model
                                 {
                                     #region Av. PO
                                     query.Clear();
-                                    query.Append("SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID + " AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
+                                    query.Append("SELECT M_CostElement_ID FROM M_CostElement WHERE  AD_Client_ID=" + AD_Client_ID +
+                                        @" AND IsActive='Y' AND CostElementType='M'  AND CostingMethod = 'A'");
                                     costElementId = Util.GetValueOfInt(DB.ExecuteScalar(query.ToString(), null, trxName));
-
                                     costElement = MCostElement.Get(ctx, costElementId);
 
                                     if (cl == MProductCategory.COSTINGLEVEL_Client || cl == MProductCategory.COSTINGLEVEL_Organization) //(cl != "B")
@@ -2064,7 +2057,7 @@ namespace VAdvantage.Model
                                         cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), cd.GetQty()));
                                     }
 
-                                    cost.SetCurrentCostPrice(Decimal.Round(Decimal.Add(Price, Decimal.Divide(Decimal.Multiply(Price, costElement.GetSurchargePercentage()), 100)), 
+                                    cost.SetCurrentCostPrice(Decimal.Round(Decimal.Add(Price, Decimal.Divide(Decimal.Multiply(Price, costElement.GetSurchargePercentage()), 100)),
                                         acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero));
 
                                     if (!cost.Save())
