@@ -2284,13 +2284,76 @@
                         joinCommonColumn = result;
                         for (var i = 0; i < result.length; i++) {
                             // Append the dynamic values of Sort/Joins/Conditions and displayed on UI
-                            $sortByDropdown.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + mainTableName + "." + result[i].DBColumn + " refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + " TableName=" + mainTableName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterColumnName.append("<div class='vas-column-list-item' columnID=" + result[i].ColumnID + " TableName=" + mainTableName + "  title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + "  datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterCol2Block.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " fieldName=" + result[i].FieldName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $checkBoxes.append(" <div class='vas-column-list-item' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " fieldName=" + result[i].FieldName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " isParent=" + result[i].IsParent + " title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $sortByDropdown.append(
+                                "<div class='vas-column-list-item' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "'>" +
+                                result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $filterColumnName.append(
+                                "<div class='vas-column-list-item' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
+                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $filterCol2Block.append(
+                                "<div class='vas-column-list-item' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
+                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $checkBoxes.append(
+                                "<div class='vas-column-list-item' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" +
+                                "<input type='checkbox' class='vas-column-checkbox' data-oldIndex='" + i + "'>" +
+                                result[i].FieldName + " - " + result[i].DBColumn +
+                                "</div>"
+                            );
                         }
                     }
                     seletedCloumn = [];
