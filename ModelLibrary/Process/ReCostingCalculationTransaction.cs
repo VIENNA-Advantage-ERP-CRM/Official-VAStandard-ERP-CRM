@@ -4779,8 +4779,8 @@ namespace VAdvantage.Process
                                     }
                                 }
                                 #endregion
-
-                                if (inout.GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
+                                //VIS_045:20-May-2025, when vebdor return match with RMA using form then on Vendor Return header, system was not updating the Orig Order reference, so remove that check
+                                if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
                                 {
                                     #region Return to Vendor against without Vendor RMA
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,

@@ -2771,7 +2771,7 @@ namespace VIS.Controllers
                                     MatchedInv_ID = match.GetDocumentNo();
                                     success = true;
                                     // Check applied by mohit asked by ravikant to restrict the recalcualtion of costing for invoice for which the costing is already calculated.06/07/2017 PMS TaskID=4170
-                                    if (!iLine.IsCostImmediate())
+                                    if (!iLine.IsCostImmediate() || MatchMode == 1)
                                     {
                                         if (client.IsCostImmediate())
                                         {
@@ -2783,9 +2783,9 @@ namespace VIS.Controllers
 
                                             // Not returning any value as No effect
                                             if (!MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product,
-                                                 match.GetM_AttributeSetInstance_ID(), "Match IV", null, sLine, null, iLine, null,
-                                                 Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), match.GetQty()),
-                                                 match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
+                                                 match.GetM_AttributeSetInstance_ID(), inv.IsReturnTrx() ? "Invoice(Vendor)-Return" :  "Match IV", null, sLine, null, iLine, null,
+                                                 ((inv.IsReturnTrx() || MatchMode == 1) ? -1 : 1) * Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), match.GetQty()),
+                                                 ((inv.IsReturnTrx() || MatchMode == 1) ? -1 : 1) * match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
                                             {
                                                 if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                                 {
@@ -2848,11 +2848,20 @@ namespace VIS.Controllers
 
                                                         DB.ExecuteQuery($"Update M_Transaction SET ProductCost = " + match.GetPostCurrentCostPrice() +
                                                         $@" WHERE M_Transaction_ID IN (SELECT M_Transaction_ID FROM M_InoutLineMA 
-                                                                WHERE M_InOutLine_ID = {sLine.GetM_InOutLine_ID()})", null, trx);
+                                                                WHERE M_InOutLine_ID = {iLine.GetM_InOutLine_ID()})", null, trx);
                                                     }
                                                 }
 
-                                                iLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                if (MatchMode == 0) 
+                                                {
+                                                    /* During Matching Trx Entry will be created*/
+                                                    iLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
+                                                }
+                                                else
+                                                {
+                                                    /* During Un-Matching Trx Entry will be deleted*/
+                                                    DB.ExecuteQuery($@"DELETE FROM M_Transaction WHERE C_InvoiceLine_ID IN ( {iLine.GetC_InvoiceLine_ID()})", null, trx);
+                                                }
                                             }
                                         }
                                     }

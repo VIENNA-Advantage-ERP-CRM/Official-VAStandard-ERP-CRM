@@ -3532,7 +3532,7 @@ namespace VAdvantage.Model
                                 //VIS_045: 15-May-2025, Get the Consolidate Amount of Multiple Order which are linked with Same GRN Line
                                 if (IsReversal() && sLine.GetReversalDoc_ID() > 0)
                                 {
-                                    (decimal, decimal) POAmtandPrice = GetConsolidatedPriceofPO(productCQ, sLine.GetReversalDoc_ID());
+                                    (decimal, decimal) POAmtandPrice = GetConsolidatedPriceofPO(productCQ, sLine.GetReversalDoc_ID(), orderLine.GetParent().GetC_Currency_ID(), isUpdatePostCurrentcostPriceFromMR);
                                     if (POAmtandPrice.Item1 != 0)
                                     {
                                         amt = POAmtandPrice.Item1;
@@ -4251,14 +4251,18 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="Product">Product Object</param>
         /// <param name="M_inOutLine_ID">GRN Line id </param>
+        /// <param name="OrderCurrency">Order Currency ID</param>
+        /// <param name="IsPOCostingMethod">Is linked costing method belongs to PO Methods or not</param>
         /// <returns>(Total Cost , Per Unit Cost (based on GRN Movement Quantity)</returns>
         /// <auther>VIS_045, 14-May-2025</auther>
-        public (decimal, decimal) GetConsolidatedPriceofPO(MProduct Product, int M_inOutLine_ID)
+        public (decimal, decimal) GetConsolidatedPriceofPO(MProduct Product, int M_inOutLine_ID, int OrderCurrency, bool IsPOCostingMethod)
         {
             (decimal, decimal) POAmtandPrice = (0, 0);
-            DataSet ds = DB.ExecuteDataset($@"SELECT mpo.C_OrderLine_ID , mpo.Qty, ol.*
+
+            DataSet ds = DB.ExecuteDataset($@"SELECT mpo.C_OrderLine_ID, o.C_Currency_ID, o.C_ConversionType_ID, mpo.Qty, ol.*
                          FROM M_MatchPO mpo 
                          INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = mpo.C_OrderLine_ID)
+                         INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
                          WHERE mpo.M_InOutLine_ID = {M_inOutLine_ID}", null, null); /*Trx cant'be use, because during reversal, system delete the MatchPO record*/
 
             // this section will execute only when 1 GRN linked with many PO's
@@ -4273,6 +4277,14 @@ namespace VAdvantage.Model
                     objOrderLine = new MOrderLine(GetCtx(), ds.Tables[0].Rows[k], Get_Trx());
                     // Total Cost
                     ProductOrderLineCost = objOrderLine.GetProductLineCost(objOrderLine);
+
+                    // When Multiple match order with single GRN Line currency are different than convert it into that order currency which orderline is linked on GRN line
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_Currency_ID"]) != OrderCurrency)
+                    {
+                        ProductOrderLineCost = MConversionRate.ConvertCostingPrecision(GetCtx(), ProductOrderLineCost, Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_Currency_ID"]),
+                            OrderCurrency, GetDateAcct(), Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_ConversionType_ID"]), GetAD_Client_ID(), GetAD_Org_ID());
+                    }
+
                     // Matched Qty
                     totalQty += Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["Qty"]);
                     // Total Amount of Matched Quantity 

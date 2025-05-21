@@ -2607,7 +2607,7 @@ namespace VAdvantage.Model
                                                          0, Price, Qty, null, trxName);
                                 }
                                 cd.SetC_InvoiceLine_ID(invoiceline.GetC_InvoiceLine_ID());
-                                cd.SetC_OrderLine_ID(invoiceline.GetC_OrderLine_ID());
+                                cd.SetC_OrderLine_ID(invoiceline.GetC_OrderLine_ID() > 0 ? invoiceline.GetC_OrderLine_ID() : inoutline.GetC_OrderLine_ID());
                                 cd.SetM_InOutLine_ID(inoutline.GetM_InOutLine_ID());
                                 cd.SetM_Warehouse_ID(inoutline.GetM_Warehouse_ID()); // get warehouse reference from header
                                 cd.Set_Value("MovementDate", invoiceline.GetParent().GetDateAcct());
