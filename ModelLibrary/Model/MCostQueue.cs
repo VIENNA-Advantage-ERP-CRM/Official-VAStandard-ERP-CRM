@@ -1461,7 +1461,7 @@ namespace VAdvantage.Model
                             if (order.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                             {
                                 Price = MConversionRate.ConvertCostingPrecision(ctx, Decimal.Divide(ProductOrderLineCost,
-                                    product.IsCostAdjustmentOnLost() && inout != null ? Qty : orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
+                                    product.IsCostAdjustmentOnLost() && inout != null ? (Qty < 0 ? -1 : 1) * Qty : orderline.GetQtyOrdered()), order.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
                                     (inout != null ? inout.GetDateAcct() : order.GetDateAcct()), order.GetC_ConversionType_ID(), AD_Client_ID, AD_Org_ID2);
                                 if (Price == 0)
                                 {
@@ -1485,7 +1485,7 @@ namespace VAdvantage.Model
                             }
                             else
                             {
-                                Price = Decimal.Divide(ProductOrderLineCost, product.IsCostAdjustmentOnLost() && inout != null ? Qty : orderline.GetQtyOrdered());
+                                Price = Decimal.Divide(ProductOrderLineCost, product.IsCostAdjustmentOnLost() && inout != null ? (Qty < 0 ? -1 : 1) * Qty : orderline.GetQtyOrdered());
                             }
                             #endregion
 
@@ -1680,8 +1680,8 @@ namespace VAdvantage.Model
                                                  AND AD_Client_ID = { AD_Client_ID }
                                                  AND AD_Org_ID IN ( { AD_Org_ID }, {inoutline.GetAD_Org_ID()} ) 
                                                  AND C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID() }
-                                                 AND M_Product_ID = { product.GetM_Product_ID() } AND NVL(C_OrderLine_ID , 0) = 0  
-                                                 AND M_InOutLine_ID = { inoutline.GetM_InOutLine_ID()} ORDER BY AD_Org_ID ASC ");
+                                                 AND M_Product_ID = { product.GetM_Product_ID() } /*AND NVL(C_OrderLine_ID , 0) = 0*/  
+                                                 AND M_InOutLine_ID = { inoutline.GetM_InOutLine_ID()} ORDER BY NVL(C_OrderLine_ID , 0) ASC ");
                                 MRPriceAvPo = Util.GetValueOfDecimal(DB.ExecuteScalar(query.ToString(), null, trxName));
                                 //query.Append(@"SELECT amt FROM T_Temp_CostDetail WHERE IsActive = 'Y' AND AD_Client_ID = " + AD_Client_ID +
                                 //             " AND AD_Org_ID = " + AD_Org_ID + " AND C_AcctSchema_ID = " + acctSchema.GetC_AcctSchema_ID() +
@@ -4404,6 +4404,20 @@ namespace VAdvantage.Model
                                                     AND cd.M_InOutLine_ID = { matchInoutLine.GetM_InOutLine_ID() }
                                                     AND cd.C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID()}");
                                         DataSet ds1 = DB.ExecuteDataset(query.ToString(), null, trxName);
+                                        if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count == 0)
+                                        {
+                                            // VIS_045, 22-Mar-2025, Get detail for those record where order line reference not linked.
+                                            // When GRN created without Order, later match order using Order form then on invoice reversal system not updating cost on Cost Queue
+                                            query.Clear();
+                                            query.Append($@"SELECT cd.M_CostQueue_ID, cd.Amt, cq.ActualQty, cq.CurrentQty, cq.M_CostElement_ID, ce.CostingMethod
+                                                    FROM T_Temp_CostDetail cd 
+                                                    INNER JOIN M_COstQueue cq ON (cd.M_CostQueue_ID = cq.M_CostQueue_ID)
+                                                    INNER JOIN M_CostElement ce ON (ce.M_CostElement_ID = cq.M_CostElement_ID)
+                                                    WHERE NVL(cd.C_OrderLine_ID, 0) = { 0 }
+                                                    AND cd.M_InOutLine_ID = { matchInoutLine.GetM_InOutLine_ID() }
+                                                    AND cd.C_AcctSchema_ID = { acctSchema.GetC_AcctSchema_ID()}");
+                                            ds1 = DB.ExecuteDataset(query.ToString(), null, trxName);
+                                        }
                                         if (ds1 != null && ds1.Tables.Count > 0 && ds1.Tables[0].Rows.Count > 0)
                                         {
                                             for (int k = 0; k < ds1.Tables[0].Rows.Count; k++)
