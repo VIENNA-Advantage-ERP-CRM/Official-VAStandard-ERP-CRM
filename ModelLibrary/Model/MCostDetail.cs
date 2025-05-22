@@ -3737,14 +3737,16 @@ namespace VAdvantage.Model
                 {
                     // Calculate expected landed cost
                     Decimal cCosts = Decimal.Add(Decimal.Multiply(cost.GetCurrentCostPrice(), cost.GetCurrentQty()), amt);
-                    Decimal qty1 = Decimal.Add(cost.GetCurrentQty(), qty);
+                    //VIS_045: 21-May-2025, not to add Quantity when expected landed cost is calculatef during match form
+                    Decimal qty1 = Decimal.Add(cost.GetCurrentQty(), costingCheck.handlingWindowName.Equals("Match PO") ? 0 : qty);
                     if (qty1.CompareTo(Decimal.Zero) == 0)
                     {
                         qty1 = Decimal.One;
                     }
                     cCosts = Decimal.Round(Decimal.Divide(cCosts, qty1), precision, MidpointRounding.AwayFromZero);
                     cost.SetCurrentCostPrice(cCosts);
-                    cost.Add(amt, qty);
+                    //VIS_045: 21-May-2025, not to add Quantity when expected landed cost is calculatef during match form
+                    cost.Add(amt, costingCheck.handlingWindowName.Equals("Match PO") ? 0 : qty);
                 }
                 log.Finer("PO - " + ce + " - " + cost);
             }

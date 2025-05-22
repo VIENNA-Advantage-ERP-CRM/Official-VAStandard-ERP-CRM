@@ -742,6 +742,8 @@ namespace VAdvantage.Model
                     {
                         inout = new MInOut(ctx, inoutline.GetM_InOut_ID(), trxName);
                     }
+                    //VIS_045: 21-May-2025, Maintain cost is calcualting using match PO form or not
+                    costingCheck.handlingWindowName = handlingWindowName;
                 }
 
                 // first calculate cost for primary accounting schema then calculate for other 
@@ -2142,6 +2144,10 @@ namespace VAdvantage.Model
                                 }
                             }
 
+                            //VIS_045: 21-May-2025, Maintain Cost Detail reference so that cost combination will be calculated
+                            //during Match PO, when expected landed cost is linked on PO, system was clear th cd object, so cost combinatoin was not calculating
+                            costingCheck.costDetail = cd;
+
                             // Update Cost Queue Price
                             if (!UpdateCostQueuePrice(0, MRPriceAvPo, Qty, Price, inoutline.GetM_InOutLine_ID(), acctSchema.GetC_AcctSchema_ID(),
                                 acctSchema.GetCostingPrecision(), trxName))
@@ -3186,8 +3192,9 @@ namespace VAdvantage.Model
                         }
 
                         // calculate expected landed cost from GRN
-                        if (windowName == "Material Receipt" && orderline != null && orderline.Get_ID() > 0
-                            && order != null && order.Get_ID() > 0 && inoutline != null && inoutline.Get_ID() > 0 && !inoutline.IsCostImmediate())
+                        if ((windowName == "Material Receipt" && orderline != null && orderline.Get_ID() > 0
+                            && order != null && order.Get_ID() > 0 && inoutline != null && inoutline.Get_ID() > 0 && !inoutline.IsCostImmediate()) ||
+                            handlingWindowName.Equals("Match PO"))
                         {
                             #region calculate expected landed cost 
                             decimal expectedAmt = 0;
@@ -3221,6 +3228,17 @@ namespace VAdvantage.Model
 
                                     // movement qty
                                     expectedQty = inoutline.GetMovementQty();
+
+                                    //VIS_045: 21-May-2025,  When Match PO with GRN using form and Landed cost is defined on PO then check its matching or unmatching record
+                                    if (handlingWindowName.Equals("Match PO"))
+                                    {
+                                        // Unmatch Record
+                                        if (Qty < 0 && expectedQty > 0)
+                                        {
+                                            expectedQty = decimal.Negate(expectedQty);
+                                        }
+                                    }
+
                                     // when we reverese invoice, expected lanede cost calcualetd on invoice
                                     // then make the qty Negate
                                     //if (!IsPOCostingMethod && invoiceline.GetQtyInvoiced() < 0)
@@ -3239,7 +3257,9 @@ namespace VAdvantage.Model
                                     else if (expectedQty < 0 && expectedAmt > 0)
                                     {
                                         // In case of normal loss, when qty is less than ZERO then nagate amount 
-                                        //expectedAmt = Decimal.Negate(expectedAmt);
+                                        //VIS_045: 21-May-2025, during cost adjustment on normal loss and Match Form case 
+                                        // system was adding the cost rather than decrease the cost
+                                        expectedAmt = Decimal.Negate(expectedAmt);
                                     }
 
                                     if (OrderCurrency_ID != acctSchema.GetC_Currency_ID())
@@ -3279,7 +3299,7 @@ namespace VAdvantage.Model
                                     }
 
                                     // if cost detail not created on completion, need to create cost detail
-                                    if (cd == null || cd.GetM_CostDetail_ID() <= 0)
+                                    if (cd == null || cd.GetM_CostDetail_ID() <= 0 || handlingWindowName.Equals("Match PO"))
                                     {
                                         // get warehouse org -- freight record to be created in warehouse org
                                         if (M_Warehouse_Id > 0)
@@ -3287,7 +3307,8 @@ namespace VAdvantage.Model
                                             AD_Org_ID = MWarehouse.Get(ctx, M_Warehouse_Id).GetAD_Org_ID();
                                         }
                                         cd = MCostDetail.CreateCostDetail(acctSchema, AD_Org_ID, inoutline.GetM_Product_ID(),
-                                            inoutline.GetM_AttributeSetInstance_ID(), windowName, inventoryLine, inoutline, movementline,
+                                             inoutline.GetM_AttributeSetInstance_ID(), handlingWindowName.Equals("Match PO") ? "Material Receipt" : windowName, 
+                                             inventoryLine, inoutline, movementline,
                                              invoiceline, po, Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["M_CostElement_ID"]),
                                              Decimal.Round(expectedAmt, acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero),
                                              expectedQty, null, trxName, M_Warehouse_Id);
@@ -3300,7 +3321,7 @@ namespace VAdvantage.Model
                                         //    cd.SetCalculateExpectedLandedCostFromInvoice(true);
                                         //}
 
-                                        result = cd.UpdateProductCost(windowName, cd, acctSchema, product, inoutline.GetM_AttributeSetInstance_ID(),
+                                        result = cd.UpdateProductCost(handlingWindowName.Equals("Match PO") ? "Material Receipt" : windowName, cd, acctSchema, product, inoutline.GetM_AttributeSetInstance_ID(),
                                                                       AD_Org_ID, costingCheck, optionalStrCd: optionalstr);
                                         if (result)
                                         {
@@ -3331,6 +3352,12 @@ namespace VAdvantage.Model
 
                                         // set cost detail reference as null, so that system will calculate MR costs also
                                         cd = null;
+
+                                        //VIS_045: 21-May-2025, Set Value of Cost Detail when match PO with GRN -- So that cost combination will be calcualted
+                                        if (costingCheck.handlingWindowName.Equals("Match PO"))
+                                        {
+                                            cd = costingCheck.costDetail;
+                                        }
                                     }
                                 }
                             }
@@ -4717,8 +4744,7 @@ namespace VAdvantage.Model
                                     }
                                 }
                             }
-                            else
-                                if (cd != null && windowName != "Invoice(Customer)" && !isLandedCostAllocation)
+                            else if (cd != null && windowName != "Invoice(Customer)" && !isLandedCostAllocation)
                             {
                                 cd.CreateCostForCombination(cd, acctSchema, product, M_ASI_ID, 0, windowName, costingCheck, optionalStrcc: optionalstr);
                             }
