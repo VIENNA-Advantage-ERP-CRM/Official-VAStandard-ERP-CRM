@@ -3922,7 +3922,7 @@ namespace VAdvantage.Model
                                   AND ced.C_AcctSchema_ID = { mas.GetC_AcctSchema_ID()}
                                   AND COALESCE(ced.M_AttributeSetInstance_ID, 0) IN(0, { M_ASI_ID})
                                   AND COALESCE(ced.C_InvoiceLine_ID, 0) = 0
-                                  AND ced.AD_Client_ID = { cd.GetAD_Client_ID()}; ";
+                                  AND ced.AD_Client_ID = { cd.GetAD_Client_ID()} ";
                     dsValue = DB.ExecuteDataset(sql, null, null);/* Not tpo pass Trx, bcz match inv record deleted in trx*/
                     if (dsValue != null && dsValue.Tables.Count > 0 && dsValue.Tables[0].Rows.Count > 0)
                     {
@@ -4771,7 +4771,7 @@ namespace VAdvantage.Model
         public bool FreightDistribution(String windowName, MCostDetail cd, MAcctSchema acctSchema, int AD_Org_ID, MProduct product, int M_ASI_ID, int M_Warehouse_ID)
         {
             // is used to get current qty of defined costing method on Product category or Accounting schema
-            Decimal Qty = MCost.GetproductCostAndQtyMaterial(cd.GetAD_Client_ID(), AD_Org_ID, product.GetM_Product_ID(), M_ASI_ID, cd.Get_Trx(), M_Warehouse_ID, true);
+            Decimal Qty = MCost.GetproductCostAndQtyMaterialonAcctSchema(cd.GetAD_Client_ID(), AD_Org_ID, acctSchema.GetC_AcctSchema_ID(), product.GetM_Product_ID(), M_ASI_ID, cd.Get_Trx(), M_Warehouse_ID, true);
             if (Qty == 0 && cd.GetM_CostElement_ID() > 0)
             {
                 // check, is this kind of Custome or Freight (bypass)

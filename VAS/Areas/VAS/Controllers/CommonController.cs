@@ -2925,6 +2925,12 @@ namespace VIS.Controllers
                                     //}
                                 }
                             }
+                            if (MatchMode == 1)
+                            {
+                                // Unmatching case (delete inoutline line refernce from c_invoiceline)
+                                DB.ExecuteQuery($@"UPDATE C_InvoiceLine SET M_InOutLine_ID = NULL WHERE C_InvoiceLine_ID = {iLine.GetC_InvoiceLine_ID()}", null, trx);
+                            }
+
                         }
                     }
                     else    //	Shipment - Order

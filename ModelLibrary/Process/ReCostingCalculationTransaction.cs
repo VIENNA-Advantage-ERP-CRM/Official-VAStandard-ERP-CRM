@@ -4740,6 +4740,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -5044,6 +5045,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), inout.GetAD_Client_ID(), product.GetM_Product_ID(), Get_Trx());
 
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
@@ -5499,6 +5501,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -5944,7 +5947,13 @@ namespace VAdvantage.Process
                     //invoiceLine.SetIsCostCalculated(true);
                     //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
-                        invoiceLine.SetIsCostImmediate(true);
+                        query.Clear();
+                        query.Append($@"SELECT CASE WHEN SUM(mi.Qty) = il.QtyInvoiced THEN 'Y' ELSE 'N' END AS IsCstImmediate 
+                                                FROM M_MatchInv mi
+                                                INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)
+                                                WHERE il.C_InvoiceLine_ID={invoiceLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");
+                        bool isCostImmediate = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, Get_Trx())).Equals("Y");
+                        invoiceLine.SetIsCostImmediate(isCostImmediate);
                     }
                     if (!invoiceLine.Save(Get_Trx()))
                     {
