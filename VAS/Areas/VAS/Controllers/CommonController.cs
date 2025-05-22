@@ -2783,9 +2783,10 @@ namespace VIS.Controllers
 
                                             // Not returning any value as No effect
                                             if (!MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product,
-                                                 match.GetM_AttributeSetInstance_ID(), inv.IsReturnTrx() ? "Invoice(Vendor)-Return" :  "Match IV", null, sLine, null, iLine, null,
-                                                 ((inv.IsReturnTrx() || MatchMode == 1) ? -1 : 1) * Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()), match.GetQty()),
-                                                 ((inv.IsReturnTrx() || MatchMode == 1) ? -1 : 1) * match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
+                                                 match.GetM_AttributeSetInstance_ID(), inv.IsReturnTrx() ? "Invoice(Vendor)-Return" : "Match IV", null, sLine, null, iLine, null,
+                                                 ((inv.IsReturnTrx()) ? -1 : 1) * Decimal.Multiply(Decimal.Divide(iLine.GetProductLineCost(iLine), iLine.GetQtyInvoiced()),
+                                                 (product.IsCostAdjustmentOnLost() && !inv.IsReturnTrx() ? (match.GetQty() < 0 ? -1 : 1) * iLine.GetQtyInvoiced() : match.GetQty())),
+                                                 (inv.IsReturnTrx() ? -1 : 1) * match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
                                             {
                                                 if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                                 {
@@ -2852,7 +2853,7 @@ namespace VIS.Controllers
                                                     }
                                                 }
 
-                                                if (MatchMode == 0) 
+                                                if (MatchMode == 0)
                                                 {
                                                     /* During Matching Trx Entry will be created*/
                                                     iLine.CreateTransactionEntry(currentCostPrice, sLine, 0, costingCheck.definedCostingElement, costingCheck.costinglevel, costingCheck, out int M_Trx_ID);
@@ -2971,6 +2972,11 @@ namespace VIS.Controllers
                                 }
                                 else
                                 {
+                                    if (MatchMode == 1)
+                                    {
+                                        // Unmatching case (delete order line refernce from InoutLine)
+                                        DB.ExecuteQuery($@"UPDATE M_InOutLine SET C_OrderLine_ID = NULL WHERE M_InOutLine_ID = {sLine.GetM_InOutLine_ID()}", null, trx);
+                                    }
                                     success = true;
                                     MatchedPO_ID = match.GetDocumentNo();
                                     // updated by Amit 23-12-2015
@@ -2981,7 +2987,7 @@ namespace VIS.Controllers
                                     {
                                         CostingCheck costingCheck = new CostingCheck(ctx);
                                         if (!MCostQueue.CreateProductCostsDetails(ctx, match.GetAD_Client_ID(), match.GetAD_Org_ID(), product, match.GetM_AttributeSetInstance_ID(),
-                                        "Match PO", null, sLine, null, null, null, oLine.GetC_OrderLine_ID(), match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
+                                        "Match PO", null, sLine, null, null, null, oLine.GetC_OrderLine_ID(), (ship.IsReturnTrx() ? -1 : 1) * match.GetQty(), trx, costingCheck, out conversionNotFoundMatch, "window"))
                                         {
                                             if (client.Get_ColumnIndex("IsCostMandatory") > 0 && client.IsCostMandatory())
                                             {
@@ -3004,6 +3010,15 @@ namespace VIS.Controllers
                                                       PostCurrentCostPrice = CASE WHEN 1 = " + (isUpdatePostCurrentcostPriceFromMR ? 1 : 0) +
                                                               @" THEN " + currentCostPrice + @" ELSE PostCurrentCostPrice END 
                                                     WHERE M_InoutLine_ID = " + sLine.GetM_InOutLine_ID(), null, trx);
+
+                                            //VIS_045: 21-May-2025, Update landed Cost on Product Transaction tab
+                                            if (costingCheck.ExpectedLandedCost != 0)
+                                            {
+                                                DB.ExecuteQuery($"Update M_Transaction SET VAS_LandedCost = " + costingCheck.ExpectedLandedCost +
+                                                            $@" WHERE M_Transaction_ID IN (SELECT M_Transaction_ID FROM M_InoutLineMA 
+                                                                WHERE M_InOutLine_ID = {sLine.GetM_InOutLine_ID()})", null, trx);
+                                            }
+
                                         }
                                     }
 
