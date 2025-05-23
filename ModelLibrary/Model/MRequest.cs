@@ -1125,11 +1125,16 @@ namespace VAdvantage.Model
             }
 
             //	Current Info
-            MRequestUpdate update = new MRequestUpdate(this);
-            if (update.IsNewInfo())
-                update.Save();
-            else
-                update = null;
+            //VAI050-if status changed than no need to create a new entry in the R_RequestUpdate table
+            MRequestUpdate update = null;
+            if (!Is_ValueChanged("R_Status_ID"))
+            {
+                update = new MRequestUpdate(this);
+                if (update.IsNewInfo())
+                    update.Save();
+            }
+
+
             //
             // check mail templates from request or request type.
             if (GetR_MailText_ID() > 0)
