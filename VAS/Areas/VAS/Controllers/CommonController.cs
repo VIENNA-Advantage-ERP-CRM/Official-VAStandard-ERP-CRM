@@ -2810,6 +2810,12 @@ namespace VIS.Controllers
                                                 WHERE il.C_InvoiceLine_ID={iLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");
                                                 string isCostImmediate = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, trx));
 
+                                                // VIS_045: 23-May-2025, During matching, cost adjustment on loss is true then mark iscostimmedaite as true
+                                                if (MatchMode == 0 && product.IsCostAdjustmentOnLost())
+                                                {
+                                                    isCostImmediate = "Y";
+                                                }
+
                                                 query.Clear();
                                                 query.Append($@"UPDATE C_InvoiceLine SET IsCostImmediate= {GlobalVariable.TO_STRING(isCostImmediate)} ");
                                                 // get cost from Product Cost after cost calculation
