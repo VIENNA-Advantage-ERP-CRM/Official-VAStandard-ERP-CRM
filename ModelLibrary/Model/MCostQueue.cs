@@ -2703,19 +2703,20 @@ namespace VAdvantage.Model
                                     {
                                         #region Calculate amount of matched Invoice
                                         query.Clear();
-                                        query.Append(@"SELECT il.c_invoiceline_id , il.c_invoice_id , ROUND(il.linenetamt/il.qtyinvoiced , 4) AS priceactual , 
+                                        query.Append($@"SELECT il.c_invoiceline_id , il.c_invoice_id , 
+                                            ROUND(il.linenetamt/{(product.IsCostAdjustmentOnLost() ? " CASE WHEN il.qtyinvoiced > 0 THEN ABS(mi.qty) ELSE mi.qty END " : "il.qtyinvoiced")}  , 4) AS priceactual, 
                                              CASE WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
-                                                THEN ROUND((il.taxbaseamt + il.taxamt + il.surchargeamt) / il.qtyinvoiced , 4)
+                                                THEN ROUND((il.taxbaseamt + il.taxamt + il.surchargeamt) / {(product.IsCostAdjustmentOnLost() ? " CASE WHEN il.qtyinvoiced > 0 THEN ABS(mi.qty) ELSE mi.qty END " : "il.qtyinvoiced")} , 4)
                                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'N'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
-                                                THEN ROUND((il.taxbaseamt + il.taxamt) / il.qtyinvoiced , 4)
+                                                THEN ROUND((il.taxbaseamt + il.taxamt) / {(product.IsCostAdjustmentOnLost() ? " CASE WHEN il.qtyinvoiced > 0 THEN ABS(mi.qty) ELSE mi.qty END " : "il.qtyinvoiced")} , 4)
                                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
-                                                THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
-                                                ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
+                                                THEN ROUND((il.taxbaseamt + il.surchargeamt) / {(product.IsCostAdjustmentOnLost() ? " CASE WHEN il.qtyinvoiced > 0 THEN ABS(mi.qty) ELSE mi.qty END " : "il.qtyinvoiced")}, 4)
+                                                ELSE ROUND(il.taxbaseamt  / {(product.IsCostAdjustmentOnLost() ? " CASE WHEN il.qtyinvoiced > 0 THEN ABS(mi.qty) ELSE mi.qty END " : "il.qtyinvoiced")}, 4)
                                               END AS PriceActualIncludedTax,    
-                                            mi.qty ,  (mi.qty) AS matchedqty 
+                                            mi.qty ,  (mi.qty) AS matchedqty
                                           FROM m_inout io INNER JOIN m_inoutline iol ON io.m_inout_id = iol.m_inout_id
                                           INNER JOIN m_matchInv mi ON iol.m_inoutline_id = mi.m_inoutline_id
                                           INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id
@@ -6540,7 +6541,7 @@ namespace VAdvantage.Model
                 }
 
 
-                sql = @"SELECT ROUND( il.linenetamt/il.qtyinvoiced , 4) as priceactual,
+                sql = $@"SELECT ROUND( il.linenetamt/il.qtyinvoiced , 4) as priceactual,
                             CASE
                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
@@ -6553,14 +6554,16 @@ namespace VAdvantage.Model
                                 THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
                                 ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
                               END AS PriceActualIncludedTax,
-                                                   il.qtyinvoiced as qtyentered,  i.c_currency_id ,  i.c_conversiontype_id ,
-                                                   il.c_invoiceline_id ,  iol.m_inout_id , il.m_inoutline_id  , i.dateacct , iol.movementqty AS mrqty
-                                              FROM m_inoutline iol INNER JOIN c_invoiceline il ON il.m_inoutline_id = iol.m_inoutline_id
-                                                   INNER JOIN c_tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID
-                                                   LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID
-                                                   INNER JOIN c_invoice i ON i.c_invoice_id = il.c_invoice_id
-                                              WHERE il.IsActive = 'Y' AND i.DocStatus IN ('CO' , 'CL') AND i.issotrx = 'N' and i.isreturntrx = 'N'
-                                                    AND iol.M_Inoutline_ID = " + matchInoutLine.GetM_InOutLine_ID();
+                              il.qtyinvoiced as qtyentered,  i.c_currency_id ,  i.c_conversiontype_id ,
+                              il.c_invoiceline_id ,  iol.m_inout_id , il.m_inoutline_id  , i.dateacct , iol.movementqty AS mrqty
+                         FROM m_inoutline iol 
+                         INNER JOIN c_invoiceline il ON (il.m_inoutline_id = iol.m_inoutline_id)
+                         INNER JOIN c_tax C_Tax ON (C_Tax.C_Tax_ID = il.C_Tax_ID)
+                         LEFT JOIN C_Tax C_SurChargeTax ON (C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID)
+                         INNER JOIN c_invoice i ON (i.c_invoice_id = il.c_invoice_id)
+                         WHERE il.IsActive = 'Y' AND i.DocStatus IN ('CO' , 'CL') AND i.issotrx = 'N' and i.isreturntrx = 'N'
+                               AND iol.M_Inoutline_ID = " + matchInoutLine.GetM_InOutLine_ID();
+                sql += " ORDER BY il.C_InvoiceLine_ID ASC ";
                 DataSet dsInvoiceRecord = new DataSet();
                 dsInvoiceRecord = DB.ExecuteDataset(sql, null, trxName);
                 if (dsInvoiceRecord != null && dsInvoiceRecord.Tables.Count > 0 && dsInvoiceRecord.Tables[0].Rows.Count > 0)
@@ -6598,12 +6601,18 @@ namespace VAdvantage.Model
                         }
                         if (Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]) != acctSchema.GetC_Currency_ID())
                         {
+                            //surchargeAmount = MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(),
+                            //    isCostAdjustmentOnLost == "Y" && MRQtyConsumed < Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"])
+                            //    ? decimal.Multiply(PriceActual, MRQtyConsumed)
+                            //    : decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"])),
+                            //      Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]), acctSchema.GetC_Currency_ID(),
+                            //      Util.GetValueOfDateTime(dsInvoiceRecord.Tables[0].Rows[i]["dateacct"]),
+                            //      Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_conversiontype_id"]), AD_Client_ID, invoiceLine.GetAD_Org_ID());
                             surchargeAmount = MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(),
-                                isCostAdjustmentOnLost == "Y" && MRQtyConsumed < Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]) ? decimal.Multiply(PriceActual, MRQtyConsumed)
-                                : decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"])),
-                                                  Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]), acctSchema.GetC_Currency_ID(),
-                                                  Util.GetValueOfDateTime(dsInvoiceRecord.Tables[0].Rows[i]["dateacct"]),
-                                                  Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_conversiontype_id"]), AD_Client_ID, invoiceLine.GetAD_Org_ID());
+                                 decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"])),
+                                 Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_currency_id"]), acctSchema.GetC_Currency_ID(),
+                                 Util.GetValueOfDateTime(dsInvoiceRecord.Tables[0].Rows[i]["dateacct"]),
+                                 Util.GetValueOfInt(dsInvoiceRecord.Tables[0].Rows[i]["c_conversiontype_id"]), AD_Client_ID, invoiceLine.GetAD_Org_ID());
                             if (PriceActual > 0 && surchargeAmount == 0)
                             {
                                 costingCheck.errorMessage += "Conversion not available";
@@ -6615,8 +6624,11 @@ namespace VAdvantage.Model
                         }
                         else
                         {
-                            surchargeAmount = isCostAdjustmentOnLost == "Y" && MRQtyConsumed < Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]) ? decimal.Multiply(Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["priceactual"]), MRQtyConsumed)
-                                : decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]));
+                            //surchargeAmount = isCostAdjustmentOnLost == "Y" && MRQtyConsumed < Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]) 
+                            //    ? decimal.Multiply(Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["priceactual"]), MRQtyConsumed)
+                            //    : decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]));
+
+                            surchargeAmount = decimal.Multiply(PriceActual, Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["qtyentered"]));
 
                             // Add Invoice Qty * price into GRN Price
                             PriceLifoOrFifo += Decimal.Round(Decimal.Add(surchargeAmount, Decimal.Divide(Decimal.Multiply(surchargeAmount, ce.GetSurchargePercentage()), 100)), acctSchema.GetCostingPrecision(), MidpointRounding.AwayFromZero);
@@ -6629,6 +6641,8 @@ namespace VAdvantage.Model
                         // This section will impact the price for the invoice which is completing, not completed yet
                         if (i == dsInvoiceRecord.Tables[0].Rows.Count - 1)
                         {
+                            MRQtyConsumed -= invoiceLine.GetQtyInvoiced();
+
                             // when we are calculating cost on completion / Optional Str = "window
                             if (iscostImmdiate && optionalStr == "window")
                             {
@@ -6637,7 +6651,7 @@ namespace VAdvantage.Model
                                 if (!dsInvoiceRecord.Tables[0].AsEnumerable()
                                  .Any(row => Util.GetValueOfInt(row.Field<object>("c_invoiceline_id")) == invoiceLine.GetC_InvoiceLine_ID()))
                                 {
-                                    if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
+                                    if (invoice.GetReversalDoc_ID() > 0)
                                     {
                                         // when we revrse the transaction, remove invoice amount and add mr amount
                                         if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
@@ -6649,13 +6663,25 @@ namespace VAdvantage.Model
                                         {
                                             PriceLifoOrFifo += (ProductInvoicePriceActual * invoiceLine.GetQtyEntered());
                                         }
+
                                         //VIS_45: 29-Mar-2024, price is base UOM, so we need to consider with qty invoiced rather than qty entered
-                                        PriceLifoOrFifo -= price * invoiceLine.GetQtyInvoiced();
+                                        if (dsInvoiceRecord.Tables[0].Rows.Count == 1 && isCostAdjustmentOnLost.Equals("Y") &&
+                                            Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["mrqty"]) < Math.Abs(invoiceLine.GetQtyInvoiced()))
+                                        {
+                                            PriceLifoOrFifo -= price * Util.GetValueOfDecimal(dsInvoiceRecord.Tables[0].Rows[i]["mrqty"]) * Math.Sign(invoiceLine.GetQtyInvoiced());
+                                        }
+                                        else
+                                        {
+                                            PriceLifoOrFifo -= price * (isCostAdjustmentOnLost.Equals("Y") && MRQtyConsumed < 0 ?
+                                            decimal.Subtract(invoiceLine.GetQtyInvoiced(), MRQtyConsumed) : invoiceLine.GetQtyInvoiced());
+                                        }
+
                                     }
                                     else
                                     {
                                         //VIS_45: 29-Mar-2024, price is base UOM, so we need to consider with qty invoiced rather than qty entered
-                                        PriceLifoOrFifo -= price * invoiceLine.GetQtyInvoiced();
+                                        PriceLifoOrFifo -= price * (isCostAdjustmentOnLost.Equals("Y") && MRQtyConsumed < 0 ?
+                                             decimal.Add(invoiceLine.GetQtyInvoiced(), MRQtyConsumed) : invoiceLine.GetQtyInvoiced());
                                         if (invoice.GetC_Currency_ID() != acctSchema.GetC_Currency_ID())
                                         {
                                             PriceLifoOrFifo += MConversionRate.ConvertCostingPrecision(invoiceLine.GetCtx(), (ProductInvoicePriceActual * invoiceLine.GetQtyEntered()), invoice.GetC_Currency_ID(), acctSchema.GetC_Currency_ID(),
