@@ -3206,6 +3206,7 @@ namespace VAdvantage.Model
                             #region calculate expected landed cost 
                             decimal expectedAmt = 0;
                             decimal expectedQty = 0;
+                            bool isLandedCostReversed = false;
                             query.Clear();
                             //VIS_045: 20/Dec/2023, Task ID - 3605, Get Currency of Landed cost Allocation
                             query.Append(@"SELECT C_ExpectedCost.M_CostElement_ID , C_Expectedcostdistribution.Amt , C_Expectedcostdistribution.Qty,
@@ -3219,6 +3220,7 @@ namespace VAdvantage.Model
                             if (dsExpectedLandedCostAllocation != null && dsExpectedLandedCostAllocation.Tables.Count > 0 && dsExpectedLandedCostAllocation.Tables[0].Rows.Count > 0)
                             {
                                 int OrderCurrency_ID;
+                                decimal expectedAmtinOrderCurrency = 0;
                                 for (int lca = 0; lca < dsExpectedLandedCostAllocation.Tables[0].Rows.Count; lca++)
                                 {
                                     //VIS_045: 20/Dec/2023, Task ID - 3605, Get Currency of Landed cost Allocation
@@ -3268,6 +3270,31 @@ namespace VAdvantage.Model
                                         // system was adding the cost rather than decrease the cost
                                         expectedAmt = Decimal.Negate(expectedAmt);
                                     }
+
+                                    expectedAmtinOrderCurrency = expectedAmt;
+                                    if (handlingWindowName.Equals("Match PO"))
+                                    {
+                                        if (Qty < 0)
+                                        {
+                                            if (acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
+                                            {
+                                                //VIS_045: 26-May-2025, update the Difference amount on Actual Landed cost Allocation Line when expected landed cost is calculated before Actual
+                                                UpdateLandedCostDifferenceAmt(ctx, handlingWindowName, costingCheck, inoutline, inout,
+                                                Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["M_CostElement_ID"]), expectedAmtinOrderCurrency,
+                                                OrderCurrency_ID, Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) != 0 ?
+                                                                 Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) :
+                                                                 order.GetC_ConversionType_ID(), trxName, false);
+                                                isLandedCostReversed = true;
+                                            }
+                                        }
+
+                                        //VIS_045: 26-May-2025, when Matching PO with GRN and Actula landed Cost already calculated then no need to calculated Expected Landed Cost
+                                        if (CheckIsActualLandedCostCalculated(inoutline, Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["M_CostElement_ID"]), trxName))
+                                        {
+                                            continue;
+                                        }
+                                    }
+
 
                                     if (OrderCurrency_ID != acctSchema.GetC_Currency_ID())
                                     {
@@ -3336,6 +3363,16 @@ namespace VAdvantage.Model
                                             if (acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
                                             {
                                                 costingCheck.ExpectedLandedCost += Decimal.Round(Decimal.Divide(expectedAmt, expectedQty), acctSchema.GetCostingPrecision());
+
+                                                if ((handlingWindowName.Equals("Match PO") && !isLandedCostReversed) || !handlingWindowName.Equals("Match PO"))
+                                                {
+                                                    //VIS_045: 26-May-2025, update the Difference amount on Actual Landed cost Allocation Line when expected landed cost is calculated before Actual
+                                                    UpdateLandedCostDifferenceAmt(ctx, windowName, costingCheck, inoutline, inout,
+                                                        Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["M_CostElement_ID"]), expectedAmtinOrderCurrency,
+                                                        OrderCurrency_ID, Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) != 0 ?
+                                                                         Util.GetValueOfInt(dsExpectedLandedCostAllocation.Tables[0].Rows[lca]["C_ConversionType_ID"]) :
+                                                                         order.GetC_ConversionType_ID(), trxName, true);
+                                                }
                                             }
                                             // will mark IsCostCalculated as TRUE during last accounting schema cycle
                                             //if (i == ds.Tables[0].Rows.Count - 1)
@@ -4790,6 +4827,106 @@ namespace VAdvantage.Model
                 return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// This function is used to update the Difference amount on Actual Landed cost Allocation Line when expected landed cost is calculated before Actual
+        /// </summary>
+        /// <param name="ctx">Contexr</param>
+        /// <param name="costingCheck">Costing Check</param>
+        /// <param name="inoutLine">GRN Line Object</param>
+        /// <param name="inout">GRN Object</param>
+        /// <param name="M_CostElement_ID">Cost Element ID</param>
+        /// <param name="expectedAmt">Expected Landed Cost</param>
+        /// <param name="OrderCurrency_ID">Expected Landed cost, Order Currency</param>
+        /// <param name="OrderConversionType_ID">Conversion Type</param>
+        /// <param name="trx">TrxName</param>
+        /// <returns>True when Difference amount updated on Actual Landed Cost</returns>
+        public static bool UpdateLandedCostDifferenceAmt(Ctx ctx, string windowName, CostingCheck costingCheck, MInOutLine inoutLine, MInOut inout, int M_CostElement_ID,
+            decimal expectedAmt, int OrderCurrency_ID, int OrderConversionType_ID, Trx trx, bool IsMatch)
+        {
+            string IsExpectedCostCalculated = "Y";
+            string sql = $@"SELECT lca.IsExpectedCostCalculated, lca.DifferenceAmt, lca.C_LandedCostAllocation_ID, lc.M_CostElement_ID, i.C_Currency_ID, lca.Amt 
+                            FROM C_LandedCost lc 
+                            INNER JOIN C_LandedCostAllocation lca ON (lc.C_LandedCost_ID = lca.C_LandedCost_ID)
+                            INNER JOIN C_InvoiceLine il ON (il.C_InvoiceLine_ID = lc.C_InvoiceLine_ID)
+                            INNER JOIN C_Invoice i ON (i.C_Invoice_ID = il.C_Invoice_ID)
+                            WHERE i.DocStatus IN ('CO', 'CL') AND lc.M_CostElement_ID = { M_CostElement_ID }
+                            AND lc.M_InOut_ID = { inoutLine.GetM_InOut_ID() } AND lca.M_InOutLine_ID = { inoutLine.GetM_InOutLine_ID()}";
+            if (!windowName.Equals("Match PO"))
+            {
+                sql += " AND lca.IsExpectedCostCalculated = 'N'";
+            }
+            DataSet dsActulaLandedCost = DB.ExecuteDataset(sql, null, trx);
+            if (dsActulaLandedCost != null && dsActulaLandedCost.Tables.Count > 0 && dsActulaLandedCost.Tables[0].Rows.Count > 0)
+            {
+                if (OrderCurrency_ID != Util.GetValueOfInt(dsActulaLandedCost.Tables[0].Rows[0]["C_Currency_ID"]))
+                {
+                    expectedAmt = MConversionRate.ConvertCostingPrecision(ctx, expectedAmt, OrderCurrency_ID, Util.GetValueOfInt(dsActulaLandedCost.Tables[0].Rows[0]["C_Currency_ID"]),
+                                  inout.GetDateAcct(), OrderConversionType_ID, inout.GetAD_Client_ID(), inout.GetAD_Org_ID());
+                }
+
+                // When matching PO with GRN, and Actual LC is defined then get diffreence value as Amount - expected landed cost
+                if (IsMatch)
+                {
+                    expectedAmt = Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["Amt"]) - expectedAmt;
+                }
+
+                // when Unmatching, then expected landed cost value is added into Difference Value  so that when actual landed cost calculated then that value will be added
+                if (!IsMatch)
+                {
+                    expectedAmt = decimal.Negate(expectedAmt);
+                    if (Util.GetValueOfString(dsActulaLandedCost.Tables[0].Rows[0]["IsExpectedCostCalculated"]).Equals("N") &&
+                        Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["DifferenceAmt"]) == 0)
+                    {
+                        // when expetected landed cost is false on Actual landed cost record then no need to take impact on Actula landed cost
+                        expectedAmt = 0;
+                        IsExpectedCostCalculated = "N";
+                    }
+                    else if (Util.GetValueOfString(dsActulaLandedCost.Tables[0].Rows[0]["IsExpectedCostCalculated"]).Equals("Y") &&
+                       Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["DifferenceAmt"]) == 0)
+                    {
+                        // when expetected landed cost is true on Actual landed cost record and difference amount is ZERO then only mark 
+                        // the expected landed cost as false only
+                        expectedAmt = 0;
+                        IsExpectedCostCalculated = "N";
+                    }
+                    else if (Util.GetValueOfString(dsActulaLandedCost.Tables[0].Rows[0]["IsExpectedCostCalculated"]).Equals("Y") &&
+                       decimal.Add( Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["DifferenceAmt"]), expectedAmt) ==
+                       Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["Amt"]))
+                    {
+                        // when expected landed cost is true on Actual landed cost record and sum of difference Amt and expected amount is equal to Total amount
+                        // then mark expected landed cost as false and difference amount as ZERO
+                        expectedAmt = decimal.Negate(Util.GetValueOfDecimal(dsActulaLandedCost.Tables[0].Rows[0]["DifferenceAmt"]));
+                        IsExpectedCostCalculated = "N";
+                    }
+                }
+
+                int no = DB.ExecuteQuery($@"UPDATE C_LandedCostAllocation SET IsExpectedCostCalculated = {GlobalVariable.TO_STRING(IsExpectedCostCalculated)}, 
+                         DifferenceAmt = DifferenceAmt + {expectedAmt}
+                         WHERE C_LandedCostAllocation_ID = {Util.GetValueOfInt(dsActulaLandedCost.Tables[0].Rows[0]["C_LandedCostAllocation_ID"])}", null, trx);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// This function is used to check actual landed cost is already calculated for the selected GRN line or not
+        /// </summary>
+        /// <param name="inoutLine">GRN Line Object</param>
+        /// <param name="M_CostElement_ID">Cost Element ID</param>
+        /// <param name="trx">TrxName</param>
+        /// <returns>True, when Actual alnedd cost is already calculated</returns>
+        public static bool CheckIsActualLandedCostCalculated(MInOutLine inoutLine, int M_CostElement_ID, Trx trx)
+        {
+            string sql = $@"SELECT lca.IsCostCalculated
+                            FROM C_LandedCost lc 
+                            INNER JOIN C_LandedCostAllocation lca ON (lc.C_LandedCost_ID = lca.C_LandedCost_ID)
+                            INNER JOIN C_InvoiceLine il ON (il.C_InvoiceLine_ID = lc.C_InvoiceLine_ID)
+                            INNER JOIN C_Invoice i ON (i.C_Invoice_ID = il.C_Invoice_ID)
+                            WHERE i.DocStatus IN ('CO', 'CL') AND lc.M_CostElement_ID = { M_CostElement_ID }
+                            AND lc.M_InOut_ID = { inoutLine.GetM_InOut_ID() } AND lca.M_InOutLine_ID = { inoutLine.GetM_InOutLine_ID()}";
+            string value = Util.GetValueOfString(DB.ExecuteScalar(sql, null, trx));
+            return value.Equals("Y");
         }
 
         /// <summary>
