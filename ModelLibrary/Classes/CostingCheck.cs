@@ -75,6 +75,10 @@ namespace ModelLibrary.Classes
 
         public bool isInvoiceLinkedwithGRN = false;
 
+        /* required during Match PO -Receipt-invoice Form*/
+        public string handlingWindowName = "";
+        public MCostDetail costDetail = null;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -227,6 +231,9 @@ namespace ModelLibrary.Classes
             VAS_IsDOCost = false;
 
             isInvoiceLinkedwithGRN = false;
+
+            handlingWindowName = "";
+            costDetail = null;
 
         }
 

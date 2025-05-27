@@ -343,19 +343,24 @@ namespace VAdvantage.Model
 
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+                return success;
+
             if (IsCostCalculated() || IsCostImmediate())
             {
                 X_M_MatchInvCostTrack costTrack = null;
                 DataSet M_MatchInvCostTrack_ID = DB.ExecuteDataset("SELECT * FROM M_MatchInvCostTrack WHERE M_MatchInv_ID = " + GetM_MatchInv_ID());
                 if (M_MatchInvCostTrack_ID != null && M_MatchInvCostTrack_ID.Tables[0].Rows.Count > 0)
                 {
-                    costTrack = new X_M_MatchInvCostTrack(GetCtx(), M_MatchInvCostTrack_ID.Tables[0].Rows[0], null);
+                    costTrack = new X_M_MatchInvCostTrack(GetCtx(), M_MatchInvCostTrack_ID.Tables[0].Rows[0], Get_Trx());
                     costTrack.SetIsCostCalculated(IsCostCalculated());
                     costTrack.SetIsCostImmediate(IsCostImmediate());
                 }
                 else
                 {
-                    costTrack = new X_M_MatchInvCostTrack(GetCtx(), 0, null);
+                    /*VIS_045: 16-May-2025, trx passed, using match Inv form, when independent GRN linked with invoice (which is already linked with Orderline)
+                     then system giving exception and rollback the all impacts, except MatchInvCostTrack not rollback due to oject was not using trx */
+                    costTrack = new X_M_MatchInvCostTrack(GetCtx(), 0, Get_Trx());
                     costTrack.SetM_MatchInv_ID(GetM_MatchInv_ID());
                     costTrack.SetM_InOutLine_ID(GetM_InOutLine_ID());
                     costTrack.SetC_InvoiceLine_ID(GetC_InvoiceLine_ID());
