@@ -461,6 +461,7 @@ namespace VIS.Controllers
 
     public class CommonModel
     {
+        string msg = "";
         #region VAttributeGrid
 
         public string GetGridElement(Ctx ctx, int xM_Attribute_ID, int xM_AttributeValue_ID, int yM_Attribute_ID, int yM_AttributeValue_ID, int M_PriceList_Version_ID, int M_Warehouse_ID, string windowNo)
@@ -1747,7 +1748,7 @@ namespace VIS.Controllers
                 {
                     /*VIS_427 Here restricted user to not add refrence of shipment when qtyinvoiced is greater or equal to 
                     movement quantity against particular orderline*/
-                    String WhereClause= $@" NOT EXISTS(SELECT 1 FROM C_InvoiceLine C_InvoiceLine INNER JOIN 
+                    String WhereClause = $@" NOT EXISTS(SELECT 1 FROM C_InvoiceLine C_InvoiceLine INNER JOIN 
                                             C_Invoice C_Invoice ON (C_Invoice.C_Invoice_ID = C_InvoiceLine.C_Invoice_ID
                                             AND C_Invoice.Docstatus NOT IN ('RE','VO'))  WHERE C_InvoiceLine.C_Orderline_ID = {C_OrderLine_ID} 
                                             GROUP by C_InvoiceLine.C_Orderline_ID 
@@ -2663,6 +2664,140 @@ namespace VIS.Controllers
         #endregion
 
         #region Match PO
+        /// <summary>
+        /// This function is used to split the shipment line
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="ship">MInout object</param>
+        /// <param name="fromLine">Old shipment line</param>
+        /// <param name="toLine">New shipment line</param>
+        /// <param name="trx">Trx</param>
+        /// <param name="qty">Quantity which is to be matched</param>
+        /// <param name="OrdOrInvQty">Order or invoic quantity</param>
+        /// <returns>New  Shipment Line Object</returns>
+        /// <author>VIS_427</author>
+        public MInOutLine CreateNewShipLine(Ctx ctx, MInOut ship, MInOutLine fromLine, MInOutLine toLine, Trx trx, decimal qty, decimal OrdOrInvQty)
+        {
+            toLine = new MInOutLine(ship);
+            PO.CopyValues(fromLine, toLine);
+            toLine.SetQtyEntered(fromLine.GetQtyEntered() - OrdOrInvQty);
+            toLine.SetMovementQty(fromLine.GetMovementQty() - qty);
+            return toLine;
+        }
+
+        /// <summary>
+        /// This function is used to update or create transcation
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="mtrx">object of MTransaction</param>
+        /// <param name="sLine">Object of shipmentline</param>
+        /// <param name="IsToCreateNew">Check for whether to create new object or update existing one</param>
+        /// <param name="qty">Quantity to be matched</param>
+        /// <param name="C_InvoiceLine_ID">C_InvoiceLine_ID</param>
+        /// <param name="trx">Transaction</param>
+        /// <returns>Object of Transaction</returns>
+        /// <author>VIS_427</author>
+        public MTransaction CreateOrUpdateProductTransaction(Ctx ctx, MTransaction mtrx, MInOutLine sLine, bool IsToCreateNew, decimal qty, int C_InvoiceLine_ID,
+            Trx trx)
+        {
+            if (!IsToCreateNew)
+            {
+                mtrx = new MTransaction(ctx, Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_Transaction_ID FROM M_Transaction WHERE" +
+                             " M_InoutLine_ID =" + sLine.GetM_InOutLine_ID())), trx);
+                //set the current quantity after subtracting it from quantity which is to matched
+                mtrx.SetCurrentQty(mtrx.GetCurrentQty() - qty);
+                mtrx.SetMovementQty(sLine.GetMovementQty());
+                //if matching is with invoice then set the invoiceline id
+                if (C_InvoiceLine_ID != 0)
+                {
+                    mtrx.Set_Value("C_InvoiceLine_ID", C_InvoiceLine_ID);
+                }
+            }
+            else
+            {
+                mtrx = new MTransaction(ctx, mtrx.GetAD_Org_ID(), mtrx.GetMovementType()
+                                        , mtrx.GetM_Locator_ID(), mtrx.GetM_Product_ID(), mtrx.GetM_AttributeSetInstance_ID(),
+                                         sLine.GetMovementQty(), mtrx.GetMovementDate(), trx);
+                //set the current quantity after adding it from quantity which is to matched
+                mtrx.SetCurrentQty(sLine.GetMovementQty() + qty);
+                mtrx.SetM_InOutLine_ID(sLine.GetM_InOutLine_ID());
+            }
+            return mtrx;
+        }
+        /// <summary>
+        /// This Function is used to create or update policy tab
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="sLine">Shipment Line Object</param>
+        /// <param name="PolicyDate">PolicyDate</param>
+        /// <param name="toInOutLineMA">Policy Object</param>
+        /// <param name="mtrx">Transaction Object</param>
+        /// <param name="isToCreateNew"></param>
+        /// <param name="trx">Trx</param>
+        /// <returns>Object Of MInoutLineMa</returns>
+        /// <author>VIS_427</author>
+        public MInOutLineMA CreateOrUpdatePolicy(Ctx ctx, MInOutLine sLine, DateTime? PolicyDate, MInOutLineMA toInOutLineMA, MTransaction mtrx, bool isToCreateNew, Trx trx)
+        {
+            if (!isToCreateNew)
+            {
+                int count = DB.ExecuteQuery("UPDATE M_InOutLineMA SET MovementQty=" + sLine.GetMovementQty()
+                    + " WHERE M_InoutLine_ID=" + sLine.GetM_InOutLine_ID(), null, trx);
+                if (count < 0)
+                {
+
+                }
+            }
+            else
+            {
+                toInOutLineMA = new MInOutLineMA(sLine, sLine.GetM_AttributeSetInstance_ID(), sLine.GetMovementQty(), PolicyDate);
+                //set the reference of transaction id when new shipment policy is created
+                toInOutLineMA.Set_Value("M_Transaction_ID", mtrx.GetM_Transaction_ID());
+            }
+            return toInOutLineMA;
+        }
+
+        /// <summary>
+        /// This function is used to save thee classes and returns the boolean value
+        /// </summary>
+        /// <param name="mtrx">Object Of Transaction</param>
+        /// <param name="mInOutLine">Object Of ShipmentLine</param>
+        /// <param name="mInOutLineMA">Object Of Policy tab</param>
+        /// <returns>Boolean value</returns>
+        /// <author>VIS_427</author>
+        public bool SaveClasses(MTransaction mtrx, MInOutLine mInOutLine, MInOutLineMA mInOutLineMA)
+        {
+            PO saveObj = null;
+
+            if (mtrx != null)
+            {
+                saveObj = (PO)mtrx;
+            }
+            else if (mInOutLine != null)
+            {
+                saveObj = (PO)mInOutLine;
+            }
+            else if (mInOutLine != null)
+            {
+                saveObj = (PO)mInOutLineMA;
+            }
+
+            if (saveObj !=null && !saveObj.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                string val = "";
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                msg += "Error: " + val;
+                return false;
+            }
+            return true;
+        }
 
         /// <summary>
         /// save/create Matched Purchase Order or Matched Invoice records by Matching PO - Invoices form
@@ -2677,11 +2812,10 @@ namespace VIS.Controllers
         public dynamic CreateMatchRecord(Ctx ctx, bool invoice, int MatchMode, int MatchFrom, int LineMatched, decimal ToMatchQty, List<GetTableLoadVmatch> data)
         {
             Trx trx = null;     // Trx.GetTrx("MatchPO");
-            string msg = "";
             string conversionNotFoundMatch = "";
             MClient client = null;
             decimal qty = 0;
-            bool success = false;
+            bool success = true;
             int M_InOutLine_ID = 0;
             int Line_ID = 0;
             string MatchedPO_ID = "";
@@ -2741,6 +2875,9 @@ namespace VIS.Controllers
 
                     MInOutLine sLine = new MInOutLine(ctx, M_InOutLine_ID, trx);
                     MInOut ship = new MInOut(ctx, sLine.GetM_InOut_ID(), trx);
+                    MInOutLine newInOutLine = null;
+                    MTransaction oldMtrx = null;
+                    MInOutLineMA mInOutLineMA = null;
                     if (invoice)    //	Shipment - Invoice
                     {
                         //	Update Invoice Line
@@ -2749,6 +2886,44 @@ namespace VIS.Controllers
                         iLine.SetM_InOutLine_ID(M_InOutLine_ID);
                         if (sLine.GetC_OrderLine_ID() != 0)
                             iLine.SetC_OrderLine_ID(sLine.GetC_OrderLine_ID());
+                        /* If the quantity to be processed (qty) is less than the movement quantity 
+                           (sLine.GetMovementQty()), then we proceed to split the shipment line,
+                           transaction, and policy accordingly. */
+                        if (qty < sLine.GetMovementQty())
+                        {
+                            // Variable to store the quantity entered after conversion if the UOM differs
+                            decimal QtyEntered = 0;
+
+                            /* Check if the current unit of measurement (UOM) of the shipment line differs 
+                             from the UOM of the product (retrieved from the database).*/
+                            if (sLine.GetC_UOM_ID() != Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID="
+                                    + sLine.GetM_Product_ID(), null, null)))
+                            {
+                                //If UOMs are different, convert the quantity to the correct UOM using the conversion utility
+                                QtyEntered = (Decimal)MUOMConversion.ConvertProductTo(ctx, sLine.GetM_Product_ID(), sLine.GetC_UOM_ID(), qty);
+                            }
+                            else
+                            {
+                                // If UOMs are the same, use the quantity as entered
+                                QtyEntered = qty;
+                            }
+
+                            // Create a new shipment line with the correct quantities and other required information
+                            newInOutLine = CreateNewShipLine(ctx, ship, sLine, newInOutLine, trx, qty, QtyEntered);
+
+                            // Calculate the remaining quantity after splitting (the original movement quantity minus the processed quantity)
+                            decimal quatinty = sLine.GetMovementQty() - qty;
+
+                            // Update the shipment line's quantities
+                            sLine.SetQtyEntered(QtyEntered);  // Set the entered quantity
+                            sLine.SetMovementQty(qty);       // Set the movement quantity to the processed amount
+
+                            // Update or create a policy record for this shipment line
+                            mInOutLineMA = CreateOrUpdatePolicy(ctx, sLine, null, mInOutLineMA, oldMtrx, false, trx);
+
+                            // Update the product transaction record (dealing with the remaining quantity after the split)
+                            oldMtrx = CreateOrUpdateProductTransaction(ctx, oldMtrx, sLine, false, quatinty, iLine.GetC_InvoiceLine_ID(), trx);
+                        }
                         if (!iLine.Save())
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
@@ -2757,6 +2932,56 @@ namespace VIS.Controllers
                         }
                         else
                         {
+                            if (!sLine.Save())
+                            {
+                                ValueNamePair vp = VLogger.RetrieveError();
+                                string val = "";
+                                if (vp != null)
+                                {
+                                    val = vp.GetName();
+                                    if (String.IsNullOrEmpty(val))
+                                    {
+                                        val = vp.GetValue();
+                                    }
+                                }
+                                msg += "Error: " + val;
+                                success = false;
+                            }
+                            if (success && !SaveClasses(oldMtrx, null, null))
+                            {
+                                success = false;
+                            }
+                            if (success && !SaveClasses(null, newInOutLine, null))
+                            {
+                                success = false;
+                            }
+                            /*If newInOutLine is not null (meaning a new shipment line was successfully created or updated), 
+                            we proceed with creating or updating product transactions and policies for the new shipment line.*/
+                            else if (newInOutLine != null)
+                            {
+                                /*Create  the product transaction for the new shipment line.*/
+                                MTransaction newMtrx = CreateOrUpdateProductTransaction(ctx, oldMtrx, newInOutLine, true, oldMtrx.GetCurrentQty(), 0, trx);
+                                if (success && !SaveClasses(newMtrx, null, null))
+                                {
+                                    success = false; // Mark as unsuccessful if SaveClasses fails
+                                }
+
+                                // Initialize the object for the shipment line policy (MInOutLineMA) for the new shipment line.
+                                MInOutLineMA newmInOutLineMA = null;
+
+                                /* 
+                                   SQL query to fetch the policy date (MMPolicyDate) from the M_InOutLineMA table based on the current 
+                                   shipment line ID (sLine.GetM_InOutLine_ID()).
+                                */
+                                string sql = @"SELECT MMPolicyDate FROM M_InOutLineMA WHERE M_InOutLine_ID=" + sLine.GetM_InOutLine_ID();
+                                /*Create or update the policy associated with the new shipment line using the policy date fetched 
+                                   from the database. The 'true' flag indicates that the policy update is valid.*/
+                                newmInOutLineMA = CreateOrUpdatePolicy(ctx, newInOutLine, Util.GetValueOfDateTime(DB.ExecuteScalar(sql, null, trx)), newmInOutLineMA, newMtrx, true, trx);
+                                if (success && !SaveClasses(null, null, newmInOutLineMA))
+                                {
+                                    success = false;
+                                }
+                            }
                             client = MClient.Get(ctx, Util.GetValueOfInt(inv.GetAD_Client_ID()));
 
                             //	Create Shipment - Invoice Link
@@ -2855,6 +3080,61 @@ namespace VIS.Controllers
                     {
                         //	Update Shipment Line
                         sLine.SetC_OrderLine_ID(Line_ID);
+                        MOrderLine oLine = new MOrderLine(ctx, Line_ID, trx);
+                        /* 
+                        If the quantity to be processed (qty) is less than the movement quantity 
+                        (sLine.GetMovementQty()), we proceed to split the shipment line, 
+                        update the transaction, and adjust the policy.
+                        */
+                        if (qty < sLine.GetMovementQty())
+                        {
+                            // Initialize a variable to store the entered quantity after possible UOM conversion
+                            decimal QtyEntered = 0;
+
+                            /* 
+                               Check if the UOM (Unit of Measure) for the shipment line is different from 
+                               the UOM for the product. If they are different, 
+                               we need to convert the quantity according to  UOM.
+                            */
+                            if (sLine.GetC_UOM_ID() != Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_UOM_ID FROM M_Product WHERE M_Product_ID="
+                                    + sLine.GetM_Product_ID(), null, null)))
+                            {
+                                /* 
+                                   Perform the UOM conversion and store the converted quantity in QtyEntered. 
+                                   The conversion is based on the product's UOM and the UOM of the shipment line.
+                                */
+                                QtyEntered = (Decimal)MUOMConversion.ConvertProductTo(ctx, sLine.GetM_Product_ID(), sLine.GetC_UOM_ID(), qty);
+                            }
+                            else
+                            {
+                                // If UOMs are the same, use the original entered quantity as is
+                                QtyEntered = qty;
+                            }
+
+                            /* 
+                               Create a new shipment line (newInOutLine) with the processed quantities.
+                            */
+                            newInOutLine = CreateNewShipLine(ctx, ship, sLine, newInOutLine, trx, qty, QtyEntered);
+                            decimal quatinty = sLine.GetMovementQty() - qty;
+
+                            // Update the shipment line with the new entered quantity and movement quantity
+                            sLine.SetQtyEntered(QtyEntered);
+                            sLine.SetMovementQty(qty);      
+
+                            /* 
+                               Create or update the policy for the current shipment line.
+                               The 'false' flag indicates that this is an intermediate operation, not a final one.
+                               The policy is associated with the movement of the goods.
+                            */
+                            mInOutLineMA = CreateOrUpdatePolicy(ctx, sLine, null, mInOutLineMA, oldMtrx, false, trx);
+
+                            /* 
+                               Update the product transaction for the remaining quantity (quatinty) to reflect the inventory change.
+                               The transaction is updated for the remaining quantity, and the corresponding inventory and movement records are adjusted.
+                            */
+                            oldMtrx = CreateOrUpdateProductTransaction(ctx, oldMtrx, sLine, false, quatinty, 0, trx);
+                        }
+
                         if (!sLine.Save())
                         {
                             ValueNamePair pp = VLogger.RetrieveError();
@@ -2863,8 +3143,33 @@ namespace VIS.Controllers
                         }
                         else
                         {
+                            if (success && !SaveClasses(oldMtrx, null, null))
+                            {
+                                success = false;
+                            }
+                            if (success && !SaveClasses(null, newInOutLine, null))
+                            {
+                                success = false;
+                            }
+                            else if (newInOutLine != null)
+                            {
+                                //created new product transaction after save of new shipment line
+                                MTransaction newMtrx = CreateOrUpdateProductTransaction(ctx, oldMtrx, newInOutLine, true, oldMtrx.GetCurrentQty(), 0, trx);
+                                if (!SaveClasses(newMtrx, null, null))
+                                {
+                                    success = false;
+                                }
+                                //created new shipment policy after save of new shipment line
+                                MInOutLineMA newmInOutLineMA = null;
+                                string sql = @"SELECT MMPolicyDate FROM M_InOutLineMA WHERE M_InOutLine_ID=" + sLine.GetM_InOutLine_ID();
+                                newmInOutLineMA = CreateOrUpdatePolicy(ctx, newInOutLine, Util.GetValueOfDateTime(DB.ExecuteScalar(sql, null, trx)), newmInOutLineMA, newMtrx, true, trx); ;
+                                if (success && !SaveClasses(null, null, newmInOutLineMA))
+                                {
+                                    success = false;
+                                }
+                            }
                             //	Update Order Line
-                            MOrderLine oLine = new MOrderLine(ctx, Line_ID, trx);
+                            //MOrderLine oLine = new MOrderLine(ctx, Line_ID, trx);
                             if (oLine.Get_ID() != 0)    //	other in MInOut.completeIt
                             {
                                 //oLine.SetQtyReserved(oLine.GetQtyReserved().subtract(qty));
