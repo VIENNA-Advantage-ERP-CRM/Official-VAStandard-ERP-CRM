@@ -4740,6 +4740,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -4779,8 +4780,8 @@ namespace VAdvantage.Process
                                     }
                                 }
                                 #endregion
-
-                                if (inout.GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
+                                //VIS_045:20-May-2025, when vebdor return match with RMA using form then on Vendor Return header, system was not updating the Orig Order reference, so remove that check
+                                if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
                                 {
                                     #region Return to Vendor against without Vendor RMA
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
@@ -5044,6 +5045,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), inout.GetAD_Client_ID(), product.GetM_Product_ID(), Get_Trx());
 
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
@@ -5499,6 +5501,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -5905,7 +5908,7 @@ namespace VAdvantage.Process
                 // when isCostAdjustableOnLost = true on product and movement qty on MR is less than invoice qty then consider MR qty else invoice qty
                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                       "Invoice(Vendor)", null, inoutLine, null, invoiceLine, null,
-                    isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? ProductInvoiceLineCost
+                    isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? (matchInvoice.GetQty() < 0 ? -1 : 1) * ProductInvoiceLineCost
                     : Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvoice.GetQty()),
                       matchInvoice.GetQty(), Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                 {
@@ -5944,7 +5947,13 @@ namespace VAdvantage.Process
                     //invoiceLine.SetIsCostCalculated(true);
                     //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
-                        invoiceLine.SetIsCostImmediate(true);
+                        query.Clear();
+                        query.Append($@"SELECT CASE WHEN SUM(mi.Qty) = il.QtyInvoiced THEN 'Y' ELSE 'N' END AS IsCstImmediate 
+                                                FROM M_MatchInv mi
+                                                INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)
+                                                WHERE il.C_InvoiceLine_ID={invoiceLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");
+                        bool isCostImmediate = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, Get_Trx())).Equals("Y");
+                        invoiceLine.SetIsCostImmediate(isCostImmediate);
                     }
                     if (!invoiceLine.Save(Get_Trx()))
                     {
