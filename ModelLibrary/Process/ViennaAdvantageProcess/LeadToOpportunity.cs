@@ -95,6 +95,7 @@ namespace ViennaAdvantage.Process
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     // VIS0060: Set Lead status to Converted.
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
+                    lead.SetProcessed(true);
                     lead.Save();
 
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
@@ -171,6 +172,7 @@ namespace ViennaAdvantage.Process
                     lead.SetC_Project_ID(opp.GetC_Project_ID());
                     // VIS0060: Set Lead status to Converted.
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
+                    lead.SetProcessed(true);
                     lead.Save();
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
