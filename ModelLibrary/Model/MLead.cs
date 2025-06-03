@@ -745,12 +745,6 @@ namespace VAdvantage.Model
                     SetProcessed(_Status.IsClosed());
             }
 
-            // Set Lead to Processed if Status is Converted or Lost
-            if (Is_ValueChanged("Status") && (base.GetStatus().Equals("20") || base.GetStatus().Equals("23")))
-            {
-                SetProcessed(true);
-            }
-
             // Added work from SOTC module.
             if (Env.IsModuleInstalled("VA047_"))
             {
