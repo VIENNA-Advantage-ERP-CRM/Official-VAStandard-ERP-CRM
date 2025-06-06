@@ -624,7 +624,7 @@ namespace VAdvantage.Process
                     userOrBp = Msg.GetMsg(GetCtx(), "Lead");
                 }
                 existRec = GetAttachedRecord(_tableID, recordID, mail.MessageID, folderName);
-                
+
                 if (existRec > 0)// Is mail already attached
                 {
                     retVal.Append("MailAlreadyAttachedWithParticularRecord");
@@ -1047,51 +1047,53 @@ namespace VAdvantage.Process
         private void SendMailOrNotification(DataSet dsUser, Ctx ctx, string message, int tableID, int recordID, string searchKey)
         {
             StringBuilder str = new StringBuilder();
-            bool isEmail = false;
-            bool isNotice = false;
-            if (dsUser != null && dsUser.Tables.Count > 0 && dsUser.Tables[0].Rows.Count > 0)
-            {
-                if (Convert.ToString(dsUser.Tables[0].Rows[0]["ISEMAIL"]) == "Y")
-                {
-                    isEmail = true;
+            SendEmailOrNotification(ctx, AD_User_ID, false, true, false, tableID, str, message, recordID, searchKey);
 
-                    if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "E")
-                    {
-                        isEmail = true;
-                    }
-                    else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "N")
-                    {
-                        isNotice = true;
-                    }
-                    else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "B")
-                    {
-                        isNotice = true;
-                    }
-                    if (isEmail && isNotice)
-                    {
-                        SendEmailOrNotification(ctx, AD_User_ID, false, false, true, tableID, str, message, recordID, searchKey);
-                    }
-                    else if (isEmail)
-                    {
-                        SendEmailOrNotification(ctx, AD_User_ID, true, false, false, tableID, str, message, recordID, searchKey);
-                    }
-                }
-                else
-                {
-                    if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "E")
-                    {
-                        SendEmailOrNotification(ctx, AD_User_ID, true, false, false, tableID, str, message, recordID, searchKey);
-                    }
-                    else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "N")
-                    {
-                        SendEmailOrNotification(ctx, AD_User_ID, false, true, false, tableID, str, message, recordID, searchKey);
-                    }
-                    else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "B")
-                    {
-                        SendEmailOrNotification(ctx, AD_User_ID, false, false, true, tableID, str, message, recordID, searchKey);
-                    }
-                }
-            }
+            //bool isEmail = false;
+            //bool isNotice = false;
+            //if (dsUser != null && dsUser.Tables.Count > 0 && dsUser.Tables[0].Rows.Count > 0)
+            //{
+            //    if (Convert.ToString(dsUser.Tables[0].Rows[0]["ISEMAIL"]) == "Y")
+            //    {
+            //        isEmail = true;
+
+            //        if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "E")
+            //        {
+            //            isEmail = true;
+            //        }
+            //        else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "N")
+            //        {
+            //            isNotice = true;
+            //        }
+            //        else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "B")
+            //        {
+            //            isNotice = true;
+            //        }
+            //        if (isEmail && isNotice)
+            //        {
+            //            SendEmailOrNotification(ctx, AD_User_ID, false, false, true, tableID, str, message, recordID, searchKey);
+            //        }
+            //        else if (isEmail)
+            //        {
+            //            SendEmailOrNotification(ctx, AD_User_ID, true, false, false, tableID, str, message, recordID, searchKey);
+            //        }
+            //    }
+            //    else
+            //    {
+            //        if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "E")
+            //        {
+            //            SendEmailOrNotification(ctx, AD_User_ID, true, false, false, tableID, str, message, recordID, searchKey);
+            //        }
+            //        else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "N")
+            //        {
+            //            SendEmailOrNotification(ctx, AD_User_ID, false, true, false, tableID, str, message, recordID, searchKey);
+            //        }
+            //        else if (Convert.ToString(dsUser.Tables[0].Rows[0]["NOTIFICATIONTYPE"]) == "B")
+            //        {
+            //            SendEmailOrNotification(ctx, AD_User_ID, false, false, true, tableID, str, message, recordID, searchKey);
+            //        }
+            //    }
+            //}
         }
 
         public void SendEmailOrNotification(Ctx ctx, int userID, bool isEmail, bool isNotification, bool isBoth, int tableid, StringBuilder strBuilder, string message, int recordID, string searchKey)
