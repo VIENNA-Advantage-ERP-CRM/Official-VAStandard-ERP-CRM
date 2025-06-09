@@ -73,9 +73,9 @@ namespace VAdvantage.Process
                                   umail.DateLastRun, umail.AD_UserMailConfigration_ID, umail.VA101_Protocol, umail.VAS_ExcludedEmailList,
                                   ap.VA101_Provider, ac.VA101_APIAuthCredential_ID, ac.VA101_AccessToken, ac.VA101_Email
                                 FROM ad_usermailconfigration umail LEFT JOIN VA101_APIAuthCredential ac
-                                ON (umail.VA101_APIAuthCredential_ID=ac.VA101_APIAuthCredential_ID)
+                                ON (umail.VA101_APIAuthCredential_ID=ac.VA101_APIAuthCredential_ID AND ac.VA101_IsAuthorized='Y')
                                 LEFT JOIN VA101_AuthProvider ap ON (umail.VA101_AuthProvider_ID=ap.VA101_AuthProvider_ID)
-                                WHERE umail.IsActive ='Y' AND umail.VA101_Protocol='OA'";
+                                WHERE umail.IsActive ='Y' AND ac.IsActive ='Y' AND umail.VA101_IsAllowAccessEmail='Y'";
             }
             else
             {

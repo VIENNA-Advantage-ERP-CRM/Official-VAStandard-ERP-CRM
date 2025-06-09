@@ -23,6 +23,7 @@
         var sqlGenerateFlag = false;
         var sqlFlag = true;
         var filterIndex = null;
+        var sortedIndex = null;
         var WhereCondition;
         var joinsArray, $filterCurrentDate, $filterDateList, isDynamic, txtYear, txtMonth, txtDay;
         var joinTable;
@@ -1722,54 +1723,66 @@
 
             /*   Click event on Add Sort Button
                to add sorts like ASC, DESC etc*/
-            var sortValuesArray = [];
+            let sortValuesArray = [];
 
             $addSortBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var sortQuery = "";
                 var sortColumn = $sortColumnInput.val();
                 var sql = $selectGeneratorQuery.text();
+                var direction = $sortElements.val();
 
                 // Append subquery in sorting in Add Sort section
                 var datatype = $sortColumnInput.attr('datatype');
-                if (VIS.DisplayType.IsLookup(datatype)) {
-                    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
-                        $sortColumnInput.attr('DBColumnName'),
-                        $sortColumnInput.attr('refValId'),
-                        $sortColumnInput.attr('isParent'),
-                        $sortColumnInput.attr('TableName'));
-                    if (subQuery.indexOf(') as') > 0) {
-                        sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
+
+                if (!$(this).hasClass('vas-edit-sort')) {
+                    //if (VIS.DisplayType.IsLookup(datatype)) {
+                    //    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
+                    //        $sortColumnInput.attr('DBColumnName'),
+                    //        $sortColumnInput.attr('refValId'),
+                    //        $sortColumnInput.attr('isParent'),
+                    //        $sortColumnInput.attr('TableName'));
+                    //    if (subQuery.indexOf(') as') > 0) {
+                    //        sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
+                    //    }
+                    //}
+
+                    // Check if both sql and sortColumn are not empty
+                    if (sql !== '' && sortColumn !== '') {
+                        // Create sort string based on current sortValuesArray
+                        if (sortValuesArray.length === 0) {
+                            sortQuery = " ORDER BY LOWER(TRIM(" + sortColumn + ")) " + $sortElements.val();
+                        } else {
+                            sortQuery = ", LOWER(TRIM(" + sortColumn + ")) " + $sortElements.val();
+                        }
+
+                        var sortObject = {
+                            column: sortColumn,
+                            direction: direction
+                        };
+
+                        // Push the current sort element value to the array
+                        sortValuesArray.push(sortObject);
+
+                        $sortColumnInput.val('');
+
+                        // Display the sort values on the UI
+                        displaySortValues();
                     }
+
+                    // Update the SQL query
+                    sql += sortQuery;
+                    $selectGeneratorQuery.text(''); // Clear the previous text
+                    $selectGeneratorQuery.text(sql); // Set the new SQL query
                 }
-
-                // Check if both sql and sortColumn are not empty
-                if (sql !== '' && sortColumn !== '') {
-                    // Create sort string based on current sortValuesArray
-                    if (sortValuesArray.length === 0) {
-                        sortQuery = " ORDER BY LOWER(" + sortColumn + ") " + $sortElements.val();
-                    } else {
-                        sortQuery = ", LOWER(" + sortColumn + ") " + $sortElements.val();
-                    }
-
-                    var sortObject = {
-                        column: sortColumn,
-                        direction: $sortElements.val()
-                    };
-
-                    // Push the current sort element value to the array
-                    sortValuesArray.push(sortObject);
-
+                else {
+                    $(this).removeClass('vas-edit-sort');
+                    $addSortBtn.val(VIS.Msg.getMsg("VAS_AddSort"));
                     $sortColumnInput.val('');
-
-                    // Display the sort values on the UI
+                    sortValuesArray[sortedIndex].column = sortColumn;
+                    sortValuesArray[sortedIndex].direction = direction;
                     displaySortValues();
+                    rebuildSQLQuery();
                 }
-
-                // Update the SQL query
-                sql += sortQuery;
-                $selectGeneratorQuery.text(''); // Clear the previous text
-                $selectGeneratorQuery.text(sql); // Set the new SQL query
-
             });
 
             // Function to display the sort values on the UI
@@ -1778,11 +1791,21 @@
 
                 // Create a list to display the sort values
                 sortValuesArray.forEach(function (sortObject, index) {
-                    $sortCollection.append('<div class="VAS-sortedItem d-flex justify-content-between" style="background-color:' + randomColor() + '">' + sortObject.column + ' ' + sortObject.direction + ' <div class="vas-sortBtns"><i class="vis vis-delete" data-index="' + index + '"></i></div></div>');
+                    $sortCollection.append(`
+                      <div class="VAS-sortedItem d-flex justify-content-between" data-index=${index} style="background-color: ${randomColor()}">
+                        <div>${sortObject.column} ${sortObject.direction}</div>
+                        <div class='vas-sortColumnName d-none'>${sortObject.column}</div>
+                        <div class='vas-sortDirection d-none'>${sortObject.direction}</div>
+                        <div class="vas-sortBtns">
+                          <i class="vis vis-edit" data-index="${index}"></i>
+                          <i class="vis vis-delete" data-index="${index}"></i>
+                        </div>
+                      </div>
+                    `);
                 });
 
-                // Attach click event to delete buttons
-                $sortCollection.find('.vas-sortBtns i').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
+                // Attach click event to delete button
+                $sortCollection.find('.vas-sortBtns i.vis-delete').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
                     var indexToRemove = $(this).data('index');
                     sortValuesArray.splice(indexToRemove, 1); // Remove the selected sort object from the array
 
@@ -1790,23 +1813,45 @@
                     rebuildSQLQuery();
                     displaySortValues(); // Update the displayed sort values
                 });
+
+                // Attach click event to edit button
+                $sortCollection.find('.vas-sortBtns i.vis-edit').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
+                    var sortedItem = $(event.target).parents('.VAS-sortedItem');
+                    sortedItem.addClass('active');
+                    sortedItem.siblings().removeClass('active');
+                    var sortColumnVal = sortedItem.find('.vas-sortColumnName').text();
+                    $sortColumnInput.val(sortColumnVal);
+                    var sortDirectionVal = sortedItem.find('.vas-sortDirection').text();
+                    $sortElements.val(sortDirectionVal);
+                    $addSortBtn.val(VIS.Msg.getMsg("VAS_UpdateSort"));
+                    $addSortBtn.addClass('vas-edit-sort');
+                    sortedIndex = sortedItem.data('index');
+                });
             }
 
             // Function to rebuild the SQL query based on the current sortValuesArray
             function rebuildSQLQuery() {
-                var sql = $selectGeneratorQuery.text().split(" ORDER BY ")[0]; // Get the base SQL
+                var sql = $selectGeneratorQuery.text().replace(/ORDER BY[\s\S]*$/i, '').trim();// Get the base SQL
                 if (sortValuesArray.length > 0) {
                     var orderByClauses = sortValuesArray.map(function (sortObject) {
-                        return sortObject.column + " " + sortObject.direction;
+                        return "LOWER(TRIM(" + sortObject.column + ")) " + " " + sortObject.direction;
                     }).join(", ");
                     sql += " ORDER BY " + orderByClauses; // Re-add the ORDER BY clause
                 }
                 $selectGeneratorQuery.text(sql); // Update the SQL query
             }
 
+            // Reset the Sorting array & query
+            function resetSorting() {
+                sortValuesArray = [];
+                displaySortValues();
+                rebuildSQLQuery();
+            }
+
             // Clear/refresh sql query
             $sqlGenDeleteIcon.on(VIS.Events.onTouchStartOrClick, function () {
                 clear();
+                resetSorting();
             });
 
             //show query 
@@ -1874,8 +1919,8 @@
         }
 
         function pageCtrls() {
-            pagingDiv.find("select").empty();
             if (totalPages > 0) {
+                pagingDiv.find("select").empty();
                 for (var i = 0; i < totalPages; i++) {
                     pagingDiv.find("select").append($("<option>").val(i + 1).text(i + 1));
                 }
@@ -2663,7 +2708,6 @@
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result != null && result != []) {
-
                             if (result.RecordList.length > 0) {
                                 recordCount = result.TotalRecord;
                                 totalPages = Math.ceil(recordCount / pageSize)
@@ -2678,11 +2722,6 @@
                                 }
                                 pagingPlusBtnDiv.removeClass('d-none');
                                 pagingPlusBtnDiv.addClass('d-flex justify-content-between align-items-center');
-                                if (result.RecordList.length < 100 && pageNo == 1) {
-                                    pagingDiv.find("select").append($("<option>").val(pageNo).text(pageNo));
-                                    pagingDiv.find('li').last().css('pointer-events', 'none');
-                                    pagingDiv.find('li').last().find('i').addClass('VA107-disablePage');
-                                }
                             }
                             else {
                                 if (sqlFlag) {
@@ -3132,6 +3171,7 @@
             whereJoinClause = '';
             pagingPlusBtnDiv.addClass('d-none');
             pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
+            sortValuesArray = [];
         }
 
         this.getRoot = function () {
@@ -3198,6 +3238,7 @@
             pageNo = 1;
             recordCount = 0;
             filterIndex = null;
+            sortedIndex = null;
             this.getRoot = null;
             this.dGrid = null;
             this.disposeComponent = null;

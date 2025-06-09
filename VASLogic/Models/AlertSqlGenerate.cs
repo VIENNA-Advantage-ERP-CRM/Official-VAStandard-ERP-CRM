@@ -162,29 +162,46 @@ namespace VIS.Models
             {
                 DataSet ds = new DataSet();
 
-                if (pageNo == 1)
+                //if (pageNo == 1)
+                //{
+                //    ds = DB.ExecuteDataset(query);
+                //}
+                //else
+                //{
+                //    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
+                //}
+
+                string sql = "SELECT COUNT(*) FROM ( " + query + " )";
+
+                if (VAdvantage.DataBase.DatabaseType.IsPostgre)
+
                 {
-                    ds = DB.ExecuteDataset(query);
+                    sql += " as SQLQuery ";
+
                 }
-                else
-                {
-                    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
-                }
+
+
+                int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+
+                ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
 
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
                     DataTable table = ds.Tables[0];
                     int rowCount = table.Rows.Count;
                     int colCount = table.Columns.Count;
-                    if (recordCount == 0 && pageNo == 1 && rowCount > 100)
-                    {
-                        results.TotalRecord = rowCount;
-                        rowCount = 100;
-                    }
-                    else
-                    {
-                        results.TotalRecord = recordCount;
-                    }
+                    
+                    //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
+                    //{
+                    //    results.TotalRecord = rowCount;
+                    //    rowCount = 100;
+                    //}
+                    //else
+                    //{
+                    //    results.TotalRecord = recordCount;
+                    //}
+
+                    results.TotalRecord = totalRec;
 
                     for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
                     {
