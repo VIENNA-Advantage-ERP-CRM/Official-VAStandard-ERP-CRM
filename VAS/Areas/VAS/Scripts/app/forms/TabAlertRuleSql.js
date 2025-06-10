@@ -1791,17 +1791,18 @@
 
                 // Create a list to display the sort values
                 sortValuesArray.forEach(function (sortObject, index) {
-                    $sortCollection.append(`
-                      <div class="VAS-sortedItem d-flex justify-content-between" data-index=${index} style="background-color: ${randomColor()}">
-                        <div>${sortObject.column} ${sortObject.direction}</div>
-                        <div class='vas-sortColumnName d-none'>${sortObject.column}</div>
-                        <div class='vas-sortDirection d-none'>${sortObject.direction}</div>
-                        <div class="vas-sortBtns">
-                          <i class="vis vis-edit" data-index="${index}"></i>
-                          <i class="vis vis-delete" data-index="${index}"></i>
-                        </div>
-                      </div>
-                    `);
+                    $sortCollection.append(
+                        '<div class="VAS-sortedItem d-flex justify-content-between" data-index=' + index +
+                        ' style="background-color: ' + randomColor() + '">' +
+                        '<div>' + sortObject.column + ' ' + sortObject.direction + '</div>' +
+                        '<div class="vas-sortColumnName d-none">' + sortObject.column + '</div>' +
+                        '<div class="vas-sortDirection d-none">' + sortObject.direction + '</div>' +
+                        '<div class="vas-sortBtns">' +
+                        '<i class="vis vis-edit" data-index="' + index + '"></i>' +
+                        '<i class="vis vis-delete" data-index="' + index + '"></i>' +
+                        '</div>' +
+                        '</div>'
+                    );
                 });
 
                 // Attach click event to delete button
