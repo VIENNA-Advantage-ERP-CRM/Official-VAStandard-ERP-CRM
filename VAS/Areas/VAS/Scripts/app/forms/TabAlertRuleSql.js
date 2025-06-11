@@ -1730,21 +1730,24 @@
                 var sortColumn = $sortColumnInput.val();
                 var sql = $selectGeneratorQuery.text();
                 var direction = $sortElements.val();
+                var sortColValue = $sortColumnInput.val();
+                
 
                 // Append subquery in sorting in Add Sort section
                 var datatype = $sortColumnInput.attr('datatype');
 
+                if (VIS.DisplayType.IsLookup(datatype)) {
+                    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
+                        $sortColumnInput.attr('DBColumnName'),
+                        $sortColumnInput.attr('refValId'),
+                        $sortColumnInput.attr('isParent'),
+                        $sortColumnInput.attr('TableName'));
+                    if (subQuery.indexOf(') as') > 0) {
+                        sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
+                    }
+                }
+
                 if (!$(this).hasClass('vas-edit-sort')) {
-                    //if (VIS.DisplayType.IsLookup(datatype)) {
-                    //    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
-                    //        $sortColumnInput.attr('DBColumnName'),
-                    //        $sortColumnInput.attr('refValId'),
-                    //        $sortColumnInput.attr('isParent'),
-                    //        $sortColumnInput.attr('TableName'));
-                    //    if (subQuery.indexOf(') as') > 0) {
-                    //        sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
-                    //    }
-                    //}
 
                     // Check if both sql and sortColumn are not empty
                     if (sql !== '' && sortColumn !== '') {
@@ -1757,6 +1760,7 @@
 
                         var sortObject = {
                             column: sortColumn,
+                            reqSortVal: sortColValue,
                             direction: direction
                         };
 
@@ -1780,10 +1784,14 @@
                     $sortColumnInput.val('');
                     sortValuesArray[sortedIndex].column = sortColumn;
                     sortValuesArray[sortedIndex].direction = direction;
+                    sortValuesArray[sortedIndex].reqSortVal = sortColValue;
                     displaySortValues();
                     rebuildSQLQuery();
                 }
             });
+
+
+            
 
             // Function to display the sort values on the UI
             function displaySortValues() {
@@ -1795,6 +1803,7 @@
                         '<div class="VAS-sortedItem d-flex justify-content-between" data-index=' + index +
                         ' style="background-color: ' + randomColor() + '">' +
                         '<div>' + sortObject.column + ' ' + sortObject.direction + '</div>' +
+                        '<div class="vas-sortcolval d-none">' + sortObject.reqSortVal + '</div>' +
                         '<div class="vas-sortColumnName d-none">' + sortObject.column + '</div>' +
                         '<div class="vas-sortDirection d-none">' + sortObject.direction + '</div>' +
                         '<div class="vas-sortBtns">' +
@@ -1820,7 +1829,7 @@
                     var sortedItem = $(event.target).parents('.VAS-sortedItem');
                     sortedItem.addClass('active');
                     sortedItem.siblings().removeClass('active');
-                    var sortColumnVal = sortedItem.find('.vas-sortColumnName').text();
+                    var sortColumnVal = sortedItem.find('.vas-sortcolval').text();
                     $sortColumnInput.val(sortColumnVal);
                     var sortDirectionVal = sortedItem.find('.vas-sortDirection').text();
                     $sortElements.val(sortDirectionVal);
