@@ -258,23 +258,14 @@ namespace VAdvantage.Model
             AD_User_Name = name;
             name = DataBase.DB.TO_STRING(name);
 
-            // VIS0060: Changes done to create Hash value of password if IsHashed is true.
-            string isPwdEncrypted = "", isPwdHashed = "";
-            DataSet ds = DB.ExecuteDataset("SELECT IsEncrypted, IsHashed FROM AD_COLUMN WHERE AD_Column_ID=" + 417);
-            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-            {
-                isPwdEncrypted = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsEncrypted"]);
-                isPwdHashed = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsHashed"]);
-            }
 
-            string password;
+            ///Change by Sukhwinder on 28-Oct-2016 for password encryption when tenant creation.
+
+            var isPwdEncrypted = Util.GetValueOfString(DB.ExecuteScalar("SELECT ISENCRYPTED FROM AD_COLUMN WHERE  AD_TABLE_ID=" + MTable.Get_Table_ID("AD_User") + " AND ColumnName = 'Password' AND EXPORT_ID = 'VIS_417'"));
+            string password = "";
             if (isPwdEncrypted == "Y")
             {
-                password = SecureEngine.Encrypt(name);
-            }
-            else if (isPwdHashed == "Y")
-            {
-                password = SecureEngine.ComputeHash(name);
+                password = VAdvantage.Utility.SecureEngine.Encrypt(name);
             }
             else
             {
@@ -331,11 +322,7 @@ namespace VAdvantage.Model
             password = "";
             if (isPwdEncrypted == "Y")
             {
-                password = SecureEngine.Encrypt(name);
-            }
-            else if (isPwdHashed == "Y")
-            {
-                password = SecureEngine.ComputeHash(name);
+                password = VAdvantage.Utility.SecureEngine.Encrypt(name);
             }
             else
             {
@@ -3181,30 +3168,30 @@ namespace VAdvantage.Model
 
                 #region Lakhwinder 29Jan2020
                 //Adding new DocBaseType
-                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null,m_trx));
+                int docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='MMC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
                 {
-                   
+
                     DB.ExecuteQuery(@"INSERT INTO C_DocBaseType (AD_Client_ID,AD_Org_ID,C_DocBaseType_ID,Created,CreatedBy,Description,DocBaseType,EntityType,IsActive,Name,Updated,UpdatedBy) VALUES (
                                             0,
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
-                                           "+ GlobalVariable.TO_DATE(DateTime.Now, false) + @",
+                                           " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                              " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
-                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation+ @"',
+                                            '" + MDocBaseType.DOCBASETYPE_MoveConfirmation + @"',
                                             'D',
                                             'Y',
                                             'Move Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             " + m_ctx.GetAD_User_ID() + @",
-                                        ) ", null,m_trx);
-                    
-                
+                                        ) ", null, m_trx);
+
+
                 }
                 CreateDocType("Move Confirmation", "Move Confirmation",
                     MDocBaseType.DOCBASETYPE_MoveConfirmation, null, 0, 0,
-                    0, GL_MM,String.Empty);
+                    0, GL_MM, String.Empty);
 
                 docBasetypeID = Util.GetValueOfInt(DB.ExecuteScalar("Select C_DocBaseType_ID from C_DocBaseType WHERE docbasetype='SRC'", null, m_trx));
                 if (docBasetypeID < 1)//INSERT DocBaseType
@@ -3215,7 +3202,7 @@ namespace VAdvantage.Model
                                             0,
                                             (SELECT MAX(C_DOCBASETYPE_ID) + 1 FROM C_DocBaseType),
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
-                                            "+m_ctx.GetAD_User_ID()+@",
+                                            " + m_ctx.GetAD_User_ID() + @",
                                             '*** System Maintained ***',
                                             '" + MDocBaseType.DOCBASETYPE_ShipReceiptConfirmation + @"',
                                             'D',
@@ -3223,7 +3210,7 @@ namespace VAdvantage.Model
                                             'Ship/Receipt Confirmation',
                                              " + GlobalVariable.TO_DATE(DateTime.Now, false) + @",
                                             100
-                                        ) ", null, m_trx);                 
+                                        ) ", null, m_trx);
 
                 }
                 CreateDocType("Ship/Receipt Confirmation", "Ship/Receipt Confirmation",
@@ -3374,7 +3361,7 @@ namespace VAdvantage.Model
             if (DocSubTypeSO != null)
                 dt.SetDocSubTypeSO(DocSubTypeSO);
 
-            
+
             // For Blanket Order Set Document Type of Release
             if (C_DocTypeShipment_ID != 0)
             {
