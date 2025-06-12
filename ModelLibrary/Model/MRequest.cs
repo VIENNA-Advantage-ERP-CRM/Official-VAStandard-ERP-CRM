@@ -1127,7 +1127,7 @@ namespace VAdvantage.Model
             //	Current Info
             //VAI050-if status changed than no need to create a new entry in the R_RequestUpdate table
             MRequestUpdate update = null;
-            if (!Is_ValueChanged("R_Status_ID"))
+            if (!Is_ValueChanged("R_Status_ID") || sendInfo.Count > 1 || Is_ValueChanged("Result"))
             {
                 update = new MRequestUpdate(this);
                 if (update.IsNewInfo())
