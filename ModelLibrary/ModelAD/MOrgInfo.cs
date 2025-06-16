@@ -28,6 +28,9 @@ namespace VAdvantage.Model
         //New Record
         private bool _createNew = false;
 
+        // STateCode with Business Partner Location
+        private static CCache<int, string> s_cache_Org_Statecode = new CCache<int, string>("VA106_Org_StateCode", 30);
+
         /// <summary>
         /// Standard Constructor
         /// </summary>
@@ -158,7 +161,35 @@ namespace VAdvantage.Model
             if (_createNew)
                 return base.Save();
             return SaveUpdate();
-        }	//	save
+        }   //	save
+
+        /// <summary>
+        /// This function is used to get the Statecode of selected region on Location field
+        /// </summary>
+        /// <param name="AD_Org_ID">Organization ID</param>
+        /// <returns>State Code</returns>
+        /// <author>VIS_045, 12-June-2025</author>
+        public static string GetStateCode(int AD_Org_ID)
+        {
+            string stateCode = string.Empty;
+            if (s_cache_Org_Statecode.Count == 0 || (string.IsNullOrEmpty(s_cache_Org_Statecode[AD_Org_ID])))
+            {
+                string sql = $@"SELECT cr.VA106_StateCode FROM AD_OrgInfo cbl 
+                                INNER JOIN C_Location cl ON (cl.C_Location_ID = cbl.C_Location_ID) 
+                                INNER JOIN C_Region cr ON (cr.C_Region_ID = cl.C_Region_ID) 
+                                WHERE cbl.AD_Org_ID = {AD_Org_ID}";
+                stateCode = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+                if (!string.IsNullOrEmpty(stateCode))
+                {
+                    s_cache_Org_Statecode.Add(AD_Org_ID, stateCode);
+                }
+            }
+            else
+            {
+                stateCode = s_cache_Org_Statecode[AD_Org_ID];
+            }
+            return stateCode;
+        }
 
     }
 }
