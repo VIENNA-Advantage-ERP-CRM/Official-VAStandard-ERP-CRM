@@ -142,15 +142,40 @@ namespace VIS.Models
         /// <param name="Tax_ID">Tax</param>
         /// <writer>1052</writer>
         /// <returns>TaxExempt details</returns>
-        public Dictionary<String, Object> GetTaxExempt(int Tax_ID)
+        public Dictionary<String, Object> GetTaxExempt(Ctx ctx,string fields)
         {
+            /*Definition of Parameters-
+             paramValue[0] - C_Tax_ID
+            paramValue[1]-AD_Org_ID
+            paramValue[2] - C_Invoice_ID
+            paramValue[3] - C_BPartner_Location_ID
+            paramValue[4]- IsSoTrx*/
             Dictionary<String, Object> retval = new Dictionary<String, Object>();
-            string sql = "SELECT IsTaxExempt, C_TaxExemptReason_ID FROM C_Tax WHERE IsActive='Y' AND C_Tax_ID= "+Tax_ID;
+            //split the value into array
+            string[] paramValue = fields.Split(',');
+            string sql = "SELECT IsTaxExempt, C_TaxExemptReason_ID FROM C_Tax WHERE IsActive='Y' AND C_Tax_ID= "+Util.GetValueOfInt(paramValue[0]);
+
             DataSet ds = DB.ExecuteDataset(sql);
-            if (ds != null && ds.Tables[0].Rows.Count>0)
+            if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 retval["IsTaxExempt"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsTaxExempt"]);
-                retval["C_TaxExemptReason_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_TaxExemptReason_ID"]); 
+                retval["C_TaxExemptReason_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_TaxExemptReason_ID"]);
+            }
+            /*if length of param is greater then 1 then check for GSTType vvalidation and if their
+            is any message then show the error in UI*/
+            if (paramValue.Length > 1 && Util.GetValueOfBool(paramValue[4]))           
+            {
+                int BPLoc_ID = Util.GetValueOfInt(paramValue[3]);
+                if( BPLoc_ID == 0)
+                {
+                     BPLoc_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_BPartner_Location_ID FROM C_Invoice WHERE C_Invoice_ID=" + Util.GetValueOfInt(paramValue[2]), null, null));
+                }
+                //Called function to check gst type validation
+                retval["errorMsg"] = MInvoiceLine.CheckGSTTaxType(ctx, BPLoc_ID, Util.GetValueOfInt(paramValue[1]), Util.GetValueOfInt(paramValue[0]));
+            }
+            else
+            {
+                retval["errorMsg"] = "";
             }
             return retval;
         }
