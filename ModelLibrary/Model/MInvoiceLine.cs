@@ -4004,12 +4004,13 @@ namespace VAdvantage.Model
                 }
 
                 //VIS_045, 12-June-2025, When VA106 module installed then check correct tax is selected or not
-                if (newRecord || Is_ValueChanged("C_Tax_ID"))
+                if ((newRecord || Is_ValueChanged("C_Tax_ID")) && inv.IsSOTrx())
                 {
-                    string message = CheckGSTTaxType(inv.GetC_BPartner_Location_ID(), GetAD_Org_ID());
+                    string message = CheckGSTTaxType(GetCtx(),inv.GetC_BPartner_Location_ID(), GetAD_Org_ID(),GetC_Tax_ID());
                     if (!string.IsNullOrEmpty(message))
                     {
                         log.SaveError("", message);
+                        log.Info("State Code / GST Tax Type Mismatched - " + message);
                         return false;
                     }
                 }
@@ -4505,9 +4506,11 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="C_BPartner_Location_ID">Business Partner Location ID</param>
         /// <param name="AD_Org_ID">Organization ID</param>
+        /// <param name="C_Tax_ID">C_Tax_ID</param>
+        /// <param name="ctx">Context</param>
         /// <returns>Message, when incorrect tax is selected</returns>
         /// <author>VIS_045, 12-June-2025</author>
-        public string CheckGSTTaxType(int C_BPartner_Location_ID, int AD_Org_ID)
+        public static string CheckGSTTaxType(Ctx ctx,int C_BPartner_Location_ID, int AD_Org_ID,int C_Tax_ID)
         {
             string message = string.Empty;
             if (Env.IsModuleInstalled("VA106_") && C_BPartner_Location_ID != 0 && AD_Org_ID != 0)
@@ -4521,37 +4524,32 @@ namespace VAdvantage.Model
                 // When Proper Region not selected on location or State Code not found
                 if (string.IsNullOrEmpty(BPStateCode) && string.IsNullOrEmpty(OrgStateCode))
                 {
-                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundOrgAndBP");
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrgAndBP");
                 }
                 else if (string.IsNullOrEmpty(BPStateCode))
                 {
-                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundBP");
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundBP");
                 }
                 else if (string.IsNullOrEmpty(OrgStateCode))
                 {
-                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundOrg");
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrg");
                 }
 
                 // Get Tax Detail
-                MTax tax = MTax.Get(GetCtx(), GetC_Tax_ID());
+                MTax tax = MTax.Get(ctx, C_Tax_ID);
 
                 // When Bp and Org State are same, but Incorrect GST Type selected
                 if (BPStateCode.Equals(OrgStateCode) && !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
                 {
-                    message = Msg.GetMsg(GetCtx(), "VAS_IncorrectGSTTypeForIntra");
+                    message = Msg.GetMsg(ctx, "VAS_IncorrectGSTTypeForIntra");
                 }
 
                 // When Bp and Org State are not same, but Incorrect GST Type selected
                 else if (!BPStateCode.Equals(OrgStateCode) &&
                     (string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))) ||
-                    !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))).Equals("03")))
+                    !Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType")).Equals("03")))
                 {
-                    message = Msg.GetMsg(GetCtx(), "VAS_IncorrectGSTTypeForInter");
-                }
-
-                if (!string.IsNullOrEmpty(message))
-                {
-                    log.Info("State Code / GST Tax Type Mismatched - " + message);
+                    message = Msg.GetMsg(ctx, "VAS_IncorrectGSTTypeForInter");
                 }
             }
             return message;
