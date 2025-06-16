@@ -3160,7 +3160,7 @@ namespace VAdvantage.Model
                 objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
                 objTransaction.SetMovementQty(costingCheck.Qty);
             }
-            
+
             // Is Invoice belong to treat as discount or not
             if (Util.GetValueOfBool(this._parent.Get_Value("TreatAsDiscount")))
             {
@@ -4003,6 +4003,17 @@ namespace VAdvantage.Model
                     SetC_Tax_ID(GetCtx().GetContextAsInt("C_Tax_ID"));
                 }
 
+                //VIS_045, 12-June-2025, When VA106 module installed then check correct tax is selected or not
+                if (newRecord || Is_ValueChanged("C_Tax_ID"))
+                {
+                    string message = CheckGSTTaxType(inv.GetC_BPartner_Location_ID(), GetAD_Org_ID());
+                    if (!string.IsNullOrEmpty(message))
+                    {
+                        log.SaveError("", message);
+                        return false;
+                    }
+                }
+
                 //1052-Set IsTaxExempt and TaxExemptReason
                 if (newRecord && !IsCopy && !IsTaxExempt() && GetReversalDoc_ID() == 0 && Get_ColumnIndex("IsTaxExempt") > -1 && Get_ColumnIndex("C_TaxExemptReason_ID") > -1)
                 {
@@ -4487,6 +4498,63 @@ namespace VAdvantage.Model
             }
 
             return UpdateHeaderTax(inv);
+        }
+
+        /// <summary>
+        /// This function is used to check the selected tax is correct based on organization location and Customer Location
+        /// </summary>
+        /// <param name="C_BPartner_Location_ID">Business Partner Location ID</param>
+        /// <param name="AD_Org_ID">Organization ID</param>
+        /// <returns>Message, when incorrect tax is selected</returns>
+        /// <author>VIS_045, 12-June-2025</author>
+        public string CheckGSTTaxType(int C_BPartner_Location_ID, int AD_Org_ID)
+        {
+            string message = string.Empty;
+            if (Env.IsModuleInstalled("VA106_") && C_BPartner_Location_ID != 0 && AD_Org_ID != 0)
+            {
+                // get BP state Code
+                string BPStateCode = MBPartnerLocation.GetStateCode(C_BPartner_Location_ID);
+
+                // Get Org State code
+                string OrgStateCode = MOrgInfo.GetStateCode(AD_Org_ID);
+
+                // When Proper Region not selected on location or State Code not found
+                if (string.IsNullOrEmpty(BPStateCode) && string.IsNullOrEmpty(OrgStateCode))
+                {
+                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundOrgAndBP");
+                }
+                else if (string.IsNullOrEmpty(BPStateCode))
+                {
+                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundBP");
+                }
+                else if (string.IsNullOrEmpty(OrgStateCode))
+                {
+                    message = Msg.GetMsg(GetCtx(), "VAS_RegionCodenotFoundOrg");
+                }
+
+                // Get Tax Detail
+                MTax tax = MTax.Get(GetCtx(), GetC_Tax_ID());
+
+                // When Bp and Org State are same, but Incorrect GST Type selected
+                if (BPStateCode.Equals(OrgStateCode) && !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
+                {
+                    message = Msg.GetMsg(GetCtx(), "VAS_IncorrectGSTTypeForIntra");
+                }
+
+                // When Bp and Org State are not same, but Incorrect GST Type selected
+                else if (!BPStateCode.Equals(OrgStateCode) &&
+                    (string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))) ||
+                    !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))).Equals("03")))
+                {
+                    message = Msg.GetMsg(GetCtx(), "VAS_IncorrectGSTTypeForInter");
+                }
+
+                if (!string.IsNullOrEmpty(message))
+                {
+                    log.Info("State Code / GST Tax Type Mismatched - " + message);
+                }
+            }
+            return message;
         }
 
         /// <summary>
