@@ -381,6 +381,10 @@
                     else {
                         mTab.setValue("IsDiscountPrinted", "N");
                     }
+                    //if dr has supply type property then set its value
+                    if (dr.hasOwnProperty("VA106_SupplyType")) {
+                        mTab.setValue("VA106_SupplyType", dr["VA106_SupplyType"]);
+                    }
                     // set withholding tax defined on vendor/customer
                     //mTab.setValue("C_Withholding_ID", Util.getValueOfInt(dr.get("C_Withholding_ID")));
                 }
