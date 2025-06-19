@@ -163,9 +163,15 @@
             //    + " LEFT OUTER JOIN AD_User c ON (p.C_BPartner_ID=c.C_BPartner_ID) "
             //    + "WHERE p.C_BPartner_ID=" + C_BPartner_ID + " AND p.IsActive='Y'";		//	#1
             var _CountVA009 = false;
+            //VIS_427 defined variable to check whether VA106 module is installed or not
+            var _countVA106 = false;
             var module = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "VA009_");
             if (module != null) {
                 _CountVA009 = module["VA009_"];
+            }
+            module = VIS.dataContext.getJSONRecord("ModulePrefix/GetModulePrefix", "VA106_");
+            if (module != null) {
+                _countVA106 = module["VA106_"];
             }
 
             var paramString = _CountVA009.toString() + "," + C_BPartner_ID.toString();
@@ -380,6 +386,10 @@
                     }
                     else {
                         mTab.setValue("IsDiscountPrinted", "N");
+                    }
+                    //if VA106 module then set value of supply type
+                    if (_countVA106) {
+                        mTab.setValue("VA106_SupplyType", dr["VA106_SupplyType"]);
                     }
                     // set withholding tax defined on vendor/customer
                     //mTab.setValue("C_Withholding_ID", Util.getValueOfInt(dr.get("C_Withholding_ID")));
