@@ -2895,7 +2895,7 @@
             $filterDateDiv.hide();
             $filterValDropdown.empty();
             var displayType = self.attr("datatype");
-            var columnName = self.attr("DBColumnName").toUpper();
+            var columnName = self.attr("DBColumnName");
             var tableName = self.attr("TableName");
             var refrenceValue = self.attr('refvalid');
             if (!VIS.DisplayType.IsLookup(displayType)) {
