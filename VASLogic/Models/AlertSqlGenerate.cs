@@ -454,7 +454,7 @@ namespace VIS.Models
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, getTable, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            sql += " FETCH FIRST 100 ROWS ONLY";
+          //  sql += " FETCH FIRST 100 ROWS ONLY";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
