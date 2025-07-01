@@ -392,6 +392,9 @@ html[dir="rtl"] .vas-expay-leftar {
 html[dir="rtl"] .vas-exinvd-invoice-lbl {
    text-align:left;
 }
+html[dir="rtl"] .vas-exinvd-right-ovrflow {
+    text-align: left !important;
+}
 html[dir="rtl"] .vas-expay-rtlHU{
     text-align:center;
 }
@@ -404,7 +407,14 @@ html[dir="rtl"] .vas-expay-symbol {
     margin-left: 0.3em;
 }
 html[dir="rtl"] .vas-arwidg-rtl-amt{
-    flex-direction:row-reverse;
+    /*flex-direction:row-reverse;*/
+}
+html[dir="rtl"] .vas-psdwidg-salesYear {
+    color: #083959;
+    font-size: 1em;
+    font-family: Verdana;
+    max-width: 120px;
+    text-align: center !important;
 }
 
 .VAS-payment-details ul li.active {
@@ -677,6 +687,10 @@ span.vas-arwidg-cur-symbol {
     margin-left: 5px;
 }
 
+html[dir="rtl"] span.vas-arwidg-cur-symbol {
+    margin-right: 5px;
+
+}
 :root {
     --width-100: calc(1920px/9);
     --width-70: calc(1366px*0.7/9);
@@ -1605,9 +1619,11 @@ span.vas-arwidg-cur-symbol {
         margin-right: 20px;
         outline: none;
     }
-
+html[dir="rtl"] .vas-piechartexpense-container select {
+    margin-left: 20px;
+    margin-right: 0px;
+}
 /**Expense Revenue Profit Widget CSS*/
-
 .vas-barline-ExRePr-container {
     padding: 0.5em;
     width: 100%;

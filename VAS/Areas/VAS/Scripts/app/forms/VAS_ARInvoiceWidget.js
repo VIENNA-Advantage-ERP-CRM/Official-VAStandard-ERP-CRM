@@ -15,7 +15,7 @@
         var $self = this;
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = $('<div class="vas-arwidg-receivable-container">');
-        var ctx = this.ctx;
+        var ctx = VIS.Env.getCtx();
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
         var msgArray = null;
@@ -137,7 +137,7 @@
                 "VAS_Billion"
             ];
 
-            VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
+            VAS.translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true);
             msgArray = [VAS.translatedTexts.VAS_30, VAS.translatedTexts.VAS_30to60, VAS.translatedTexts.VAS_60to90, VAS.translatedTexts.VAS_90to120, VAS.translatedTexts.VAS_Older];
 
         }
