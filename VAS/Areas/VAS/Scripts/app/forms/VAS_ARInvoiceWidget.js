@@ -15,7 +15,7 @@
         var $self = this;
         var $root = $('<div class="h-100 w-100">');
         var $maindiv = $('<div class="vas-arwidg-receivable-container">');
-        var ctx = VIS.Env.getCtx();
+        var ctx = this.ctx;
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
         var msgArray = null;
