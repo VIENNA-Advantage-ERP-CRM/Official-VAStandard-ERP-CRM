@@ -421,12 +421,12 @@ namespace VAdvantage.Process
                             sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
                                 c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
                                 FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
-                                WHERE (LOWER(c.Email) LIKE " + "'%" + from + "%'");
+                                WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + from + "%'");
                             if (!emailDomains.Contains(mailDomain))
                             {
                                 sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
                             }
-                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID);
+                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID + " ORDER BY c.IsArchive ASC, c.Updated DESC");
                         }
                         else
                         {
@@ -455,7 +455,7 @@ namespace VAdvantage.Process
                                     sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
                                         c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
                                         FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
-                                        WHERE (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
+                                        WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
                                     if (!emailDomains.Contains(mailDomain))
                                     {
                                         sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
@@ -468,6 +468,13 @@ namespace VAdvantage.Process
                                     idr.Close();
                                     if (dt.Rows.Count <= 0)
                                     {
+                                        existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+
+                                        if (existRec > 0)// Is mail already attached
+                                        {
+                                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                            return;
+                                        }
                                         AttachMail(mail, 0, 0, attachType, "", "", "");
                                     }
                                     else
@@ -483,6 +490,13 @@ namespace VAdvantage.Process
                         {
                             if (sender == "C_Lead")
                             {
+                                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+
+                                if (existRec > 0)// Is mail already attached
+                                {
+                                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                    return;
+                                }
                                 AttachMail(mail, 0, 0, attachType, "", "", "");
                             }
                             else
@@ -635,6 +649,13 @@ namespace VAdvantage.Process
             }
             else
             {
+                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+
+                if (existRec > 0)// Is mail already attached
+                {
+                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                    return;
+                }
                 AttachMail(mail, 0, 0, attachType, "", "", "");
             }
         }
@@ -1024,9 +1045,8 @@ namespace VAdvantage.Process
 
         private int GetAttachedRecord(int tableID, int RecordID, string MailUID, string folderName)//, string MailUserFrom)
         {
-            String sql = "SELECT MAILATTACHMENT1_ID FROM MAILATTACHMENT1 where AD_TABLE_ID=" + tableID
-                        + " AND RECORD_ID=" + RecordID
-                        + " AND MAILUID='" + MailUID
+            String sql = "SELECT MAILATTACHMENT1_ID FROM MAILATTACHMENT1 WHERE" + (tableID > 0 ? " AD_TABLE_ID=" + tableID + " AND"
+                        : "") + (RecordID > 0 ? " RECORD_ID=" + RecordID + " AND" :"") + " MAILUID='" + MailUID
                         + "' AND FolderName='" + folderName + "'";
 
             System.Data.DataSet ds = DB.ExecuteDataset(sql);
