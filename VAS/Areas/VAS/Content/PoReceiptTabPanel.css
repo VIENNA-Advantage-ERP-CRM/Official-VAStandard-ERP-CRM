@@ -407,7 +407,7 @@ html[dir="rtl"] .vas-expay-symbol {
     margin-left: 0.3em;
 }
 html[dir="rtl"] .vas-arwidg-rtl-amt{
-    /*flex-direction:row-reverse;*/
+    flex-direction:row-reverse;
 }
 html[dir="rtl"] .vas-psdwidg-salesYear {
     color: #083959;
@@ -687,10 +687,10 @@ span.vas-arwidg-cur-symbol {
     margin-left: 5px;
 }
 
-html[dir="rtl"] span.vas-arwidg-cur-symbol {
+/*html[dir="rtl"] span.vas-arwidg-cur-symbol {
     margin-right: 5px;
 
-}
+}*/
 :root {
     --width-100: calc(1920px/9);
     --width-70: calc(1366px*0.7/9);
