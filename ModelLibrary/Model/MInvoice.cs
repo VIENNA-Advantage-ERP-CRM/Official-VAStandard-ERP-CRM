@@ -134,6 +134,12 @@ namespace VAdvantage.Model
                 to.SetBackupWithholdingAmount(Decimal.Negate(from.GetBackupWithholdingAmount()));
                 to.SetGrandTotalAfterWithholding(Decimal.Negate(from.GetGrandTotalAfterWithholding()));
                 to.Set_Value("C_ProvisionalInvoice_ID", from.Get_ValueAsInt("C_ProvisionalInvoice_ID"));
+
+                //VIS_045, 01-July-2025, set amount on Reversal
+                if (Env.IsModuleInstalled("VA106_") && to.Get_ColumnIndex("VA106_TCSTotalAmount") >= 0)
+                {
+                    to.Set_Value("VA106_TCSTotalAmount", decimal.Negate(Util.GetValueOfDecimal(from.Get_Value("VA106_TCSTotalAmount"))));
+                }
             }
             else
             {
@@ -1047,6 +1053,13 @@ namespace VAdvantage.Model
                     //
                     line.Set_Value("C_ProvisionalInvoiceLine_ID", fromLine.Get_ValueAsInt("C_ProvisionalInvoiceLine_ID"));
 
+                    // when "Indian Taxation module" is installed then copy value
+                    if (Env.IsModuleInstalled("VA106_") && line.Get_ColumnIndex("VA106_TaxCollectedAtSource_ID") >= 0)
+                    {
+                        line.Set_Value("VA106_TaxCollectedAtSource_ID", fromLine.Get_ValueAsInt("VA106_TaxCollectedAtSource_ID"));
+                        line.Set_Value("VA106_TCSAmount", decimal.Negate(Util.GetValueOfDecimal(fromLine.Get_Value("VA106_TCSAmount"))));
+                    }
+
                     // VIS0060: Set Asset Values on Reversal Line in case of Sale of Asset.
                     if (otherInvoice.IsSOTrx() && fromLine.GetA_Asset_ID() > 0 && Env.IsModuleInstalled("VAFAM_") && fromLine.Get_ColumnIndex("VAFAM_Quantity") >= 0)
                     {
@@ -1183,6 +1196,8 @@ namespace VAdvantage.Model
                    + ", AmtDimSubTotal = null "
                    + ", AmtDimGrandTotal = null "
                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
+                    + (Env.IsModuleInstalled("VA106_") && Get_ColumnIndex("VA106_TCSTotalAmount") > 0 ?
+                    ", VA106_TCSTotalAmount = (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)" : "")
                    + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
@@ -1192,14 +1207,19 @@ namespace VAdvantage.Model
 
             if (IsTaxIncluded())
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines "
-                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
+                    + $"SET GrandTotal = COALESCE((TotalLines " +
+                     $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)" 
+                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? $" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSAmount, 0) " : "")} ),0) " : "")
                     + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines+"
+                    + "SET GrandTotal = COALESCE((TotalLines+"
                         + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
-                        + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ")  FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
+                        + $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                        + (Get_ColumnIndex("WithholdingAmt") > 0 ?
+                        " , GrandTotalAfterWithholding = COALESCE((TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + $@")  
+                                FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) 
+                                {(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")}), 0)" : "")
                         + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
@@ -2751,6 +2771,7 @@ namespace VAdvantage.Model
                 //	Lines
                 Decimal totalLines = Env.ZERO;
                 Decimal totalWithholdingAmt = Env.ZERO;
+                decimal totalTCSAmt = 0;
                 List<int> taxList = new List<int>();
                 MInvoiceLine[] lines = GetLines(false);
                 for (int i = 0; i < lines.Length; i++)
@@ -2794,6 +2815,11 @@ namespace VAdvantage.Model
                     if (Get_ColumnIndex("WithholdingAmt") > 0)
                     {
                         totalWithholdingAmt = Decimal.Add(totalWithholdingAmt, line.GetWithholdingAmt());
+                    }
+                    //VIS_045: 01-July-2025, Sum of VA106_TCSAmount
+                    if (Env.IsModuleInstalled("VA106_") && IsSOTrx())
+                    {
+                        totalTCSAmt = Decimal.Add(totalTCSAmt, Util.GetValueOfDecimal(line.Get_Value("VA106_TCSAmount")));
                     }
                 }
 
@@ -2881,12 +2907,23 @@ namespace VAdvantage.Model
                 }
                 //
                 SetTotalLines(totalLines);
+                if (Env.IsModuleInstalled("VA106_") && IsSOTrx())
+                {
+                    // Sum up Grand Total with TCS Amount
+                    grandTotal = decimal.Add(grandTotal, totalTCSAmt);
+
+                    if (Get_ColumnIndex("VA106_TCSTotalAmount") >= 0)
+                    {
+                        Set_Value("VA106_TCSTotalAmount", totalTCSAmt);
+                    }
+                }
                 SetGrandTotal(Decimal.Round(grandTotal, GetPrecision()));
-                if (Get_ColumnIndex("WithholdingAmt") > 0)
+                if (Get_ColumnIndex("WithholdingAmt") >= 0)
                 {
                     base.SetWithholdingAmt(totalWithholdingAmt);
                     SetGrandTotalAfterWithholding(Decimal.Round((grandTotal - totalWithholdingAmt), GetPrecision()));
                 }
+
             }
             catch (Exception)
             {
@@ -7203,7 +7240,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
-           
+
             // JID_0872: Remove invoice reference from Service Contract Schedule.
             if (IsSOTrx() && GetC_Contract_ID() > 0)
             {

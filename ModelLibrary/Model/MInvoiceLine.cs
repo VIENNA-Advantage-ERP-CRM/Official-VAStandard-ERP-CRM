@@ -3160,7 +3160,7 @@ namespace VAdvantage.Model
                 objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
                 objTransaction.SetMovementQty(costingCheck.Qty);
             }
-            
+
             // Is Invoice belong to treat as discount or not
             if (Util.GetValueOfBool(this._parent.Get_Value("TreatAsDiscount")))
             {
@@ -4003,6 +4003,18 @@ namespace VAdvantage.Model
                     SetC_Tax_ID(GetCtx().GetContextAsInt("C_Tax_ID"));
                 }
 
+                //VIS_045, 12-June-2025, When VA106 module installed then check correct tax is selected or not
+                if ((newRecord || Is_ValueChanged("C_Tax_ID")) && inv.IsSOTrx())
+                {
+                    string message = CheckGSTTaxType(GetCtx(), inv.GetC_BPartner_Location_ID(), GetAD_Org_ID(), GetC_Tax_ID());
+                    if (!string.IsNullOrEmpty(message))
+                    {
+                        log.SaveError("", message);
+                        log.Info("State Code / GST Tax Type Mismatched - " + message);
+                        return false;
+                    }
+                }
+
                 //1052-Set IsTaxExempt and TaxExemptReason
                 if (newRecord && !IsCopy && !IsTaxExempt() && GetReversalDoc_ID() == 0 && Get_ColumnIndex("IsTaxExempt") > -1 && Get_ColumnIndex("C_TaxExemptReason_ID") > -1)
                 {
@@ -4081,6 +4093,19 @@ namespace VAdvantage.Model
                     else
                     {
                         SetTaxBaseAmt(Decimal.Subtract(GetLineTotalAmt(), GetTaxAmt()));
+                    }
+                }
+
+                // Calculate TCS Tax when "Indian Taxation module" is installed, (not to calculate on reversal)
+                if (Env.IsModuleInstalled("VA106_") &&
+                    !((!String.IsNullOrEmpty(inv.GetConditionalFlag()) && inv.GetConditionalFlag().Equals(MInvoice.CONDITIONALFLAG_Reversal)) || IsReversal()))
+                {
+                    if (inv.IsSOTrx() && (newRecord ||
+                        Is_ValueChanged("VA106_TaxCollectedAtSource_ID") ||
+                        Is_ValueChanged("C_Tax_ID") || Is_ValueChanged("TaxBaseAmt") || Is_ValueChanged("TaxAmt") || Is_ValueChanged("SurchargeAmt")))
+                    {
+                        decimal VA106_TCSAmount = CalculateTCSTax(GetPrecision());
+                        Set_Value("VA106_TCSAmount", VA106_TCSAmount);
                     }
                 }
 
@@ -4490,6 +4515,60 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// This function is used to check the selected tax is correct based on organization location and Customer Location
+        /// </summary>
+        /// <param name="C_BPartner_Location_ID">Business Partner Location ID</param>
+        /// <param name="AD_Org_ID">Organization ID</param>
+        /// <param name="C_Tax_ID">C_Tax_ID</param>
+        /// <param name="ctx">Context</param>
+        /// <returns>Message, when incorrect tax is selected</returns>
+        /// <author>VIS_045, 12-June-2025</author>
+        public static string CheckGSTTaxType(Ctx ctx, int C_BPartner_Location_ID, int AD_Org_ID, int C_Tax_ID)
+        {
+            string message = string.Empty;
+            if (Env.IsModuleInstalled("VA106_") && C_BPartner_Location_ID != 0 && AD_Org_ID != 0)
+            {
+                // get BP state Code
+                string BPStateCode = MBPartnerLocation.GetStateCode(C_BPartner_Location_ID);
+
+                // Get Org State code
+                string OrgStateCode = MOrgInfo.GetStateCode(AD_Org_ID);
+
+                // When Proper Region not selected on location or State Code not found
+                if (string.IsNullOrEmpty(BPStateCode) && string.IsNullOrEmpty(OrgStateCode))
+                {
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrgAndBP");
+                }
+                else if (string.IsNullOrEmpty(BPStateCode))
+                {
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundBP");
+                }
+                else if (string.IsNullOrEmpty(OrgStateCode))
+                {
+                    message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrg");
+                }
+
+                // Get Tax Detail
+                MTax tax = MTax.Get(ctx, C_Tax_ID);
+
+                // When Bp and Org State are same, but Incorrect GST Type selected
+                if (BPStateCode.Equals(OrgStateCode) && !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
+                {
+                    message = Msg.GetMsg(ctx, "VAS_IncorrectGSTTypeForIntra");
+                }
+
+                // When Bp and Org State are not same, but Incorrect GST Type selected
+                else if (!BPStateCode.Equals(OrgStateCode) &&
+                    (string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))) ||
+                    !Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType")).Equals("03")))
+                {
+                    message = Msg.GetMsg(ctx, "VAS_IncorrectGSTTypeForInter");
+                }
+            }
+            return message;
+        }
+
+        /// <summary>
         /// Set TaxExempt and TaxExemptReason
         /// </summary>
         /// <writer>1052</writer>
@@ -4747,6 +4826,8 @@ namespace VAdvantage.Model
                 + (resetAmtDim ? ", AmtDimSubTotal = null " : "")       // reset Amount Dimension if Sub Total Amount is different
                 + (resetTotalAmtDim ? ", AmtDimGrandTotal = null " : "")     // reset Amount Dimension if Grand Total Amount is different
                 + (Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
+                + (Env.IsModuleInstalled("VA106_") && Get_ColumnIndex("VA106_TCSAmount") > 0 ?
+                    ", VA106_TCSTotalAmount = (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)" : "")
             + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             int no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
@@ -4756,14 +4837,22 @@ namespace VAdvantage.Model
 
             if (IsTaxIncluded())
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines "
-                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
+                    + $"SET GrandTotal=COALESCE((TotalLines " +
+                    //$"{(Env.IsModuleInstalled("VA106_") ? " + (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)  " : "")} )"
+                    $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                    + (Get_ColumnIndex("WithholdingAmt") > 0 ?
+                    $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSAmount, 0) " : "")} ), 0) " : "")
                     + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines+"
-                        + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
-                        + (Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
+                    + "SET GrandTotal= COALESCE((TotalLines+"
+                        + @"(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + GetPrecision() + $") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) " +
+                        //$"{(Env.IsModuleInstalled("VA106_") ? " + (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID) " : "")} )"
+                        $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                        + (Get_ColumnIndex("WithholdingAmt") > 0 ?
+                        $@" , GrandTotalAfterWithholding = COALESCE((TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0)),{ GetPrecision() } 
+                        ) FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) 
+                        {(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ),0)" : "")
                         + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             no = DataBase.DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
@@ -4794,6 +4883,31 @@ namespace VAdvantage.Model
             _parent = null;
 
             return no == 1;
+        }
+
+        /// <summary>
+        /// This function is used to calculate the "Tax Collected at Source" 
+        /// TCS calculated at Sales Side
+        /// </summary>
+        /// <param name="RoundOff">Rounding off value</param>
+        /// <returns>TCS Amount</returns>
+        public decimal CalculateTCSTax(int RoundOff = 2)
+        {
+            decimal tcsValue = 0;
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                int VA106_TaxCollectedAtSource_ID = Get_ValueAsInt("VA106_TaxCollectedAtSource_ID");
+                if (VA106_TaxCollectedAtSource_ID > 0)
+                {
+                    decimal rate = MProduct.GetTCSTaxRate(VA106_TaxCollectedAtSource_ID);
+                    if (rate != 0)
+                    {
+                        decimal ttlAmount = GetTaxBaseAmt() + GetTaxAmt() + GetSurchargeAmt();
+                        tcsValue = decimal.Round(decimal.Divide(decimal.Multiply(rate, ttlAmount), 100), RoundOff, MidpointRounding.AwayFromZero);
+                    }
+                }
+            }
+            return tcsValue;
         }
 
         /// <summary>

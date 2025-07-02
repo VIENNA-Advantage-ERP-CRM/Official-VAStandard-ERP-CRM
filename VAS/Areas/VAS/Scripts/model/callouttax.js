@@ -77,10 +77,21 @@
         }
         try {
             this.setCalloutActive(true);
-            var data = VIS.dataContext.getJSONRecord("MTax/GetTaxExempt", Util.getValueOfString(mTab.getValue("C_Tax_ID")));
+            //check whether window is of sales type
+            var isSOTrx = ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y";
+            //Added parameter in order to handle the connditions
+            var paramString = Util.getValueOfString(mTab.getValue("C_Tax_ID")) + "," + Util.getValueOfString(mTab.getValue("AD_Org_ID")) + ","
+                + Util.getValueOfString(mTab.getValue("C_Invoice_ID")) + "," + Util.getValueOfString(ctx.getWindowContext(windowNo, "C_BPartner_Location_ID"))
+                + "," + Util.getValueOfString(isSOTrx);
+            var data = VIS.dataContext.getJSONRecord("MTax/GetTaxExempt", paramString);
+
             if (data != null) {
                 mTab.setValue("IsTaxExempt", Util.getValueOfString(data["IsTaxExempt"]).equals("Y") ? true : false);
                 mTab.setValue("C_TaxExemptReason_ID", Util.getValueOfInt(data["C_TaxExemptReason_ID"]));
+            }
+            //if their is any message on change of tax then displayed in ui for sale type windows
+            if (data["errorMsg"] != "" && isSOTrx) {
+                VIS.ADialog.info("", "", data["errorMsg"]);
             }
         }
         catch (err) {
@@ -102,7 +113,7 @@
      * @param {any} value
      * @param {any} oldValue
      */
-    
+
     CalloutTax.prototype.SetTaxRate = function (ctx, windowNo, mTab, mField, value, oldValue) {
 
         if (value == null || value == 0 || value.toString() == "" || this.isCalloutActive()) {
@@ -285,7 +296,7 @@
     CalloutTaxAmount.prototype.CashLineTaxAmount = function (ctx, windowNo, mTab, mField, value, oldValue) {
         if (this.isCalloutActive() || value == null || value.toString() == "") {
             return "";
-        }        
+        }
         this.setCalloutActive(true);
         try {
             var StdPrecision = 2;

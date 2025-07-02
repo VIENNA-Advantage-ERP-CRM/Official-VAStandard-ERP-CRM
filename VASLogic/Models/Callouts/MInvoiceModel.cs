@@ -86,7 +86,9 @@ namespace VIS.Models
                 // Get Product Detail
                 sql.Clear();
                 //VAI050-Get Purchase and Sales UOM from product
-                sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote, C_RevenueRecognition_ID,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE
+                sql.Append($@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote, C_RevenueRecognition_ID,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID
+                    {(Env.IsModuleInstalled("VA106_") ? " , VA106_TaxCollectedAtSource_ID " : " ")}
+                    FROM M_Product WHERE
                     IsActive = 'Y' AND M_Product_ID = " + _m_Product_Id);
                 dsProductInfo = DB.ExecuteDataset(sql.ToString());
                 if (dsProductInfo != null && dsProductInfo.Tables[0].Rows.Count > 0)
@@ -98,6 +100,10 @@ namespace VIS.Models
                     result["C_RevenueRecognition_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["C_RevenueRecognition_ID"]);
                     result["VAS_PurchaseUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_PurchaseUOM_ID"]);
                     result["VAS_SalesUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
+                    if (Env.IsModuleInstalled("VA106_"))
+                    {
+                        result["VA106_TaxCollectedAtSource_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VA106_TaxCollectedAtSource_ID"]);
+                    }
                 }
 
                 // Get Purchasing or Base UOM
@@ -1695,6 +1701,29 @@ namespace VIS.Models
                 retValue["C_UOM_ID"] = Util.GetValueOfInt(_ds.Tables[0].Rows[0]["C_UOM_ID"]);
                 retValue["QtyEntered"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["QtyEntered"]);
                 retValue["QtyInvoiced"] = Util.GetValueOfDecimal(_ds.Tables[0].Rows[0]["QtyInvoiced"]);
+            }
+            return retValue;
+        }
+
+        /// <summary>
+        /// This function is used to calculate the TCS tax 
+        /// </summary>
+        /// <param name="fields">VA106_TaxCollectedAtSource_ID, Amount</param>
+        /// <returns></returns>
+        public Dictionary<string, object> VA106_CalculateTCSTax(string fields)
+        {
+            string[] paramValue = fields.Split(',');
+            int VA106_TaxCollectedAtSource_ID = Util.GetValueOfInt(paramValue[0]);
+
+            Dictionary<string, object> retValue = new Dictionary<string, object>();
+            decimal rate = MProduct.GetTCSTaxRate(VA106_TaxCollectedAtSource_ID);
+            if (rate != 0)
+            {
+                retValue["VA106_TCSTaxValue"] = decimal.Round(decimal.Divide(decimal.Multiply(rate, Util.GetValueOfDecimal(paramValue[1])), 100), 2, MidpointRounding.AwayFromZero);
+            }
+            else
+            {
+                retValue["VA106_TCSTaxValue"] = 0;
             }
             return retValue;
         }

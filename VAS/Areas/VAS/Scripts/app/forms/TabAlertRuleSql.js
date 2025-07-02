@@ -23,11 +23,11 @@
         var sqlGenerateFlag = false;
         var sqlFlag = true;
         var filterIndex = null;
-        var sortedIndex = null;
         var WhereCondition;
         var joinsArray, $filterCurrentDate, $filterDateList, isDynamic, txtYear, txtMonth, txtDay;
         var joinTable;
         var seletedJoinCloumn = [];
+        var sortValuesArray = [];
         var whereJoinClause = '';
         var $query = $("<div>");
         var gridDiv = $("<div class='vas-grid-div1'>");
@@ -45,6 +45,7 @@
         var sqlGridCols = [];
         var sqlGeneratorGridCols = [];
         var filterArray;
+        var sortedIndex = -1;
         var pagePrev, pageNext = null;
         var totalPages = 1;
         var recordCount = 0;
@@ -1723,7 +1724,8 @@
 
             /*   Click event on Add Sort Button
                to add sorts like ASC, DESC etc*/
-            let sortValuesArray = [];
+            sortValuesArray = [];
+            sortedIndex = -1;
 
             $addSortBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var sortQuery = "";
@@ -1731,73 +1733,60 @@
                 var sql = $selectGeneratorQuery.text();
                 var direction = $sortElements.val();
                 var sortColValue = $sortColumnInput.val();
-                
 
                 // Append subquery in sorting in Add Sort section
-                var datatype = $sortColumnInput.attr('datatype');
+                var sortdatatype = $sortColumnInput.attr('sortdatatype');
+                var sortcolumnID = $sortColumnInput.attr('sortcolumnID');
+                var sortDBColumnName = $sortColumnInput.attr('sortDBColumnName');
+                var sortrefValId = $sortColumnInput.attr('sortrefValId');
+                var sortisParent = $sortColumnInput.attr('sortisParent');
+                var sortTableName = $sortColumnInput.attr('sortTableName');
 
-                if (VIS.DisplayType.IsLookup(datatype)) {
-                    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
-                        $sortColumnInput.attr('DBColumnName'),
-                        $sortColumnInput.attr('refValId'),
-                        $sortColumnInput.attr('isParent'),
-                        $sortColumnInput.attr('TableName'));
+                if (VIS.DisplayType.IsLookup(sortdatatype)) {
+                    var subQuery = GetLookup(sortdatatype, sortcolumnID, sortDBColumnName, sortrefValId, sortisParent, sortTableName);
                     if (subQuery.indexOf(') as') > 0) {
                         sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
                     }
                 }
 
+                var sortObject = {
+                    column: sortColumn,
+                    reqSortVal: sortColValue,
+                    direction: direction,
+                    sortdatatype: sortdatatype,
+                    sortcolumnID: sortcolumnID,
+                    sortDBColumnName: sortDBColumnName,
+                    sortrefValId: sortrefValId,
+                    sortisParent: sortisParent,
+                    sortTableName: sortTableName
+                };
+
                 if (!$(this).hasClass('vas-edit-sort')) {
-
-                    // Check if both sql and sortColumn are not empty
                     if (sql !== '' && sortColumn !== '') {
-                        // Create sort string based on current sortValuesArray
-                        if (sortValuesArray.length === 0) {
-                            sortQuery = " ORDER BY LOWER(TRIM(" + sortColumn + ")) " + $sortElements.val();
-                        } else {
-                            sortQuery = ", LOWER(TRIM(" + sortColumn + ")) " + $sortElements.val();
-                        }
-
-                        var sortObject = {
-                            column: sortColumn,
-                            reqSortVal: sortColValue,
-                            direction: direction
-                        };
-
-                        // Push the current sort element value to the array
+                        // Push the current sort object to the array
                         sortValuesArray.push(sortObject);
-
                         $sortColumnInput.val('');
-
-                        // Display the sort values on the UI
                         displaySortValues();
+                        rebuildSQLQuery();
                     }
-
-                    // Update the SQL query
-                    sql += sortQuery;
-                    $selectGeneratorQuery.text(''); // Clear the previous text
-                    $selectGeneratorQuery.text(sql); // Set the new SQL query
-                }
-                else {
+                } else {
                     $(this).removeClass('vas-edit-sort');
                     $addSortBtn.val(VIS.Msg.getMsg("VAS_AddSort"));
                     $sortColumnInput.val('');
-                    sortValuesArray[sortedIndex].column = sortColumn;
-                    sortValuesArray[sortedIndex].direction = direction;
-                    sortValuesArray[sortedIndex].reqSortVal = sortColValue;
+
+                    if (sortedIndex >= 0 && sortedIndex < sortValuesArray.length) {
+                        sortValuesArray[sortedIndex] = sortObject;
+                    }
+
                     displaySortValues();
                     rebuildSQLQuery();
                 }
             });
 
-
-            
-
             // Function to display the sort values on the UI
             function displaySortValues() {
-                $sortCollection.empty(); // Clear the existing values
+                $sortCollection.empty();
 
-                // Create a list to display the sort values
                 sortValuesArray.forEach(function (sortObject, index) {
                     $sortCollection.append(
                         '<div class="VAS-sortedItem d-flex justify-content-between" data-index=' + index +
@@ -1806,6 +1795,12 @@
                         '<div class="vas-sortcolval d-none">' + sortObject.reqSortVal + '</div>' +
                         '<div class="vas-sortColumnName d-none">' + sortObject.column + '</div>' +
                         '<div class="vas-sortDirection d-none">' + sortObject.direction + '</div>' +
+                        '<div class="vas-sort-datatype d-none">' + sortObject.sortdatatype + '</div>' +
+                        '<div class="vas-sort-columnID d-none">' + sortObject.sortcolumnID + '</div>' +
+                        '<div class="vas-sort-DBColumName d-none">' + sortObject.sortDBColumnName + '</div>' +
+                        '<div class="vas-sort-refValId d-none">' + sortObject.sortrefValId + '</div>' +
+                        '<div class="vas-sort-isParent d-none">' + sortObject.sortisParent + '</div>' +
+                        '<div class="vas-sort-TableName d-none">' + sortObject.sortTableName + '</div>' +
                         '<div class="vas-sortBtns">' +
                         '<i class="vis vis-edit" data-index="' + index + '"></i>' +
                         '<i class="vis vis-delete" data-index="' + index + '"></i>' +
@@ -1814,54 +1809,51 @@
                     );
                 });
 
-                // Attach click event to delete button
+                // Delete handler
                 $sortCollection.find('.vas-sortBtns i.vis-delete').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
-                    var indexToRemove = $(this).data('index');
-                    sortValuesArray.splice(indexToRemove, 1); // Remove the selected sort object from the array
-
-                    // Rebuild the SQL query after deletion
+                    var indexToRemove = parseInt($(this).data('index'));
+                    sortValuesArray.splice(indexToRemove, 1);
+                    displaySortValues();
                     rebuildSQLQuery();
-                    displaySortValues(); // Update the displayed sort values
                 });
 
-                // Attach click event to edit button
+                // Edit handler
                 $sortCollection.find('.vas-sortBtns i.vis-edit').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
-                    var sortedItem = $(event.target).parents('.VAS-sortedItem');
-                    sortedItem.addClass('active');
-                    sortedItem.siblings().removeClass('active');
-                    var sortColumnVal = sortedItem.find('.vas-sortcolval').text();
-                    $sortColumnInput.val(sortColumnVal);
-                    var sortDirectionVal = sortedItem.find('.vas-sortDirection').text();
-                    $sortElements.val(sortDirectionVal);
-                    $addSortBtn.val(VIS.Msg.getMsg("VAS_UpdateSort"));
-                    $addSortBtn.addClass('vas-edit-sort');
-                    sortedIndex = sortedItem.data('index');
+                    var sortedItem = $(this).closest('.VAS-sortedItem');
+                    sortedIndex = parseInt(sortedItem.data('index'));
+
+                    sortedItem.addClass('active').siblings().removeClass('active');
+
+                    $sortColumnInput.val(sortedItem.find('.vas-sortcolval').text());
+                    $sortElements.val(sortedItem.find('.vas-sortDirection').text());
+                    $sortColumnInput.attr('sortdatatype', sortedItem.find('.vas-sort-datatype').text());
+                    $sortColumnInput.attr('sortcolumnID', sortedItem.find('.vas-sort-columnID').text());
+                    $sortColumnInput.attr('sortDBColumnName', sortedItem.find('.vas-sort-DBColumName').text());
+                    $sortColumnInput.attr('sortrefValId', sortedItem.find('.vas-sort-refValId').text());
+                    $sortColumnInput.attr('sortisParent', sortedItem.find('.vas-sort-isParent').text());
+                    $sortColumnInput.attr('sortTableName', sortedItem.find('.vas-sort-TableName').text());
+
+                    $addSortBtn.val(VIS.Msg.getMsg("VAS_UpdateSort")).addClass('vas-edit-sort');
                 });
             }
 
-            // Function to rebuild the SQL query based on the current sortValuesArray
+            // Rebuilds the SQL query
             function rebuildSQLQuery() {
-                var sql = $selectGeneratorQuery.text().replace(/ORDER BY[\s\S]*$/i, '').trim();// Get the base SQL
+                var sql = $selectGeneratorQuery.text().replace(/ORDER BY[\s\S]*$/i, '').trim();
                 if (sortValuesArray.length > 0) {
                     var orderByClauses = sortValuesArray.map(function (sortObject) {
-                        return "LOWER(TRIM(" + sortObject.column + ")) " + " " + sortObject.direction;
+                        return "LOWER(TRIM(" + sortObject.column + ")) " + sortObject.direction;
                     }).join(", ");
-                    sql += " ORDER BY " + orderByClauses; // Re-add the ORDER BY clause
+                    sql += " ORDER BY " + orderByClauses;
                 }
-                $selectGeneratorQuery.text(sql); // Update the SQL query
+                $selectGeneratorQuery.text(sql);
             }
 
-            // Reset the Sorting array & query
-            function resetSorting() {
-                sortValuesArray = [];
-                displaySortValues();
-                rebuildSQLQuery();
-            }
 
             // Clear/refresh sql query
             $sqlGenDeleteIcon.on(VIS.Events.onTouchStartOrClick, function () {
                 clear();
-                resetSorting();
+                //resetSorting();
             });
 
             //show query 
@@ -2895,7 +2887,7 @@
             $filterDateDiv.hide();
             $filterValDropdown.empty();
             var displayType = self.attr("datatype");
-            var columnName = self.attr("DBColumnName").toUpper();
+            var columnName = self.attr("DBColumnName");
             var tableName = self.attr("TableName");
             var refrenceValue = self.attr('refvalid');
             if (!VIS.DisplayType.IsLookup(displayType)) {
@@ -3072,17 +3064,17 @@
             $sortSelectedItem.removeClass('active');
             self.addClass('active');
             var activeItemDataType = $sortByDropdown.children('.vas-column-list-item.active').attr('datatype');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('datatype', activeItemDataType);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortdatatype', activeItemDataType);
             var activeItemColId = $sortByDropdown.children('.vas-column-list-item.active').attr('columnID');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('columnID', activeItemColId);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortcolumnID', activeItemColId);
             var activeItemColDB = $sortByDropdown.children('.vas-column-list-item.active').attr('DBColumnName');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('DBColumnName', activeItemColDB);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortDBColumnName', activeItemColDB);
             var activeItemrefID = $sortByDropdown.children('.vas-column-list-item.active').attr('refValId');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('refValId', activeItemrefID);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortrefValId', activeItemrefID);
             var activeItemChkParent = $sortByDropdown.children('.vas-column-list-item.active').attr('isParent');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('isParent', activeItemChkParent);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortisParent', activeItemChkParent);
             var activeItemtable = $sortByDropdown.children('.vas-column-list-item.active').attr('TableName');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('TableName', activeItemtable);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortTableName', activeItemtable);
         }
 
         function getIdsName(columnName, tableName, displayType, whereClause, isNameExist, columnID, refrenceValueID) {
@@ -3128,6 +3120,7 @@
             filterArray = [];
             Joinrecord = [];
             record = [];
+            $sortCollection.empty();
             $filters.empty();
             $filterCol2Block.empty();
             $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
@@ -3182,6 +3175,7 @@
             pagingPlusBtnDiv.addClass('d-none');
             pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
             sortValuesArray = [];
+            sortedIndex = -1;
         }
 
         this.getRoot = function () {
@@ -3248,7 +3242,7 @@
             pageNo = 1;
             recordCount = 0;
             filterIndex = null;
-            sortedIndex = null;
+            sortedIndex = -1;
             this.getRoot = null;
             this.dGrid = null;
             this.disposeComponent = null;
