@@ -35,6 +35,7 @@ namespace VAdvantage.Model
         private MProductDownload[] _downloads = null;
         //	Cache						
         private static CCache<int, MProduct> s_cache = new CCache<int, MProduct>("M_Product", 40, 5);	//	5 minutes
+        private static CCache<int, decimal> s_cache_tcs = new CCache<int, decimal>("TCS", 40);
         //	Static Logger	*
         private static VLogger _log = VLogger.GetVLogger(typeof(MProduct).FullName);
 
@@ -1079,5 +1080,27 @@ namespace VAdvantage.Model
             }
         }
 
+        /// <summary>
+        /// This function is used to get the selected TCS rate
+        /// </summary>
+        /// <param name="VA106_TaxCollectedAtSource_ID">Record ID</param>
+        /// <returns>TCS Rate</returns>
+        /// <author>VIS_045: 01-July-2025</author>
+        public static decimal GetTCSTaxRate(int VA106_TaxCollectedAtSource_ID)
+        {
+            decimal rate = 0;
+            if (s_cache_tcs.Count == 0 || s_cache_tcs[VA106_TaxCollectedAtSource_ID] >= 0)
+            {
+                string sql = $@"SELECT tcs.Percentage FROM VA106_TaxCollectedAtSource tcs
+                                WHERE tcs.VA106_TaxCollectedAtSource_ID = {VA106_TaxCollectedAtSource_ID}";
+                rate = Util.GetValueOfDecimal(DB.ExecuteScalar(sql, null, null));
+                s_cache_tcs.Add(VA106_TaxCollectedAtSource_ID, rate);
+            }
+            else
+            {
+                rate = s_cache_tcs[VA106_TaxCollectedAtSource_ID];
+            }
+            return rate;
+        }
     }
 }

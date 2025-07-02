@@ -170,5 +170,22 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// This function is used to calculate TCS Tax Amount
+        /// </summary>
+        /// <param name="fields">VA106_TaxCollectedAtSource_ID, Amount</param>
+        /// <returns>TCS Tax Amount</returns>
+        public JsonResult VA106_CalculateTCSTax(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MInvoiceModel objInvoice = new MInvoiceModel();
+                retJSON = JsonConvert.SerializeObject(objInvoice.VA106_CalculateTCSTax(fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
