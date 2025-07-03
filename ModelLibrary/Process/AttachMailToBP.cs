@@ -276,6 +276,346 @@ namespace VAdvantage.Process
             List<object> result = enumerable.Cast<object>().ToList();
             if (result != null && result.Count > 0)
             {
+                int _tableID = -1;
+                int existRec = -1;
+                StringBuilder attachmentID = new StringBuilder();
+                string userOrBp = string.Empty, value = string.Empty, name = string.Empty;
+                int record_ID = 0;
+                var emailDomains = new List<string>
+                {
+                    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com", "ymail.com", "rocketmail.com",
+                    "icloud.com", "me.com", "mac.com", "protonmail.com", "pm.me", "zoho.com", "aol.com", "gmx.com", "gmx.net", "mail.com", "yandex.com",
+                    "yandex.ru", "tutanota.com", "tutanota.de", "comcast.net", "verizon.net", "cox.net", "sbcglobal.net", "bellsouth.net", "btinternet.com",
+                    "orange.fr", "mailinator.com", "10minutemail.com", "guerrillamail.com", "tempmail.net", "trashmail.com"
+                };
+                foreach (dynamic mail in result)
+                {
+                    try
+                    {
+                        string tableName = "AD_User";
+                        string from = Util.GetValueOfString(mail.From).ToLower();
+                        string subJect = mail.Subject;
+                        string to = mail.To;
+                        string mailDomain = from.Contains("@") ? from.Split('@').Last().Trim().ToLower() : string.Empty;
+                        string attachType = "I";
+                        if (!String.IsNullOrEmpty(subJect) && subJect.IndexOf("(●") > -1)
+                        {
+                            string documentNO = subJect.Substring(subJect.IndexOf(":") + 1, subJect.IndexOf("(●") - (subJect.IndexOf(":") + 1));
+
+                            subJect = subJect.Substring(subJect.IndexOf("(●") + 2);
+                            subJect = subJect.Substring(0, subJect.LastIndexOf("●)"));
+                            string TableID = subJect.Split('-')[0];// subJect.Substring(subJect.IndexOf("(") + 1, subJect.LastIndexOf("_") - subJect.IndexOf("(") - 1);
+                            string recordID = subJect.Split('-')[1];// subJect.Substring(subJect.IndexOf("_") + 1, subJect.LastIndexOf(")") - subJect.IndexOf("_") - 1);
+
+
+                            existRec = GetAttachedRecord(Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), mail.MessageID, folderName);
+
+                            if (existRec > 0)// Is mail already attached
+                            {
+                                retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                continue;
+                            }
+
+                            MMailAttachment1 mAttachment = new MMailAttachment1(GetCtx(), 0, null);
+
+                            string textmsg = mail.Body;
+                            bool isAttachment = false;
+
+                            for (int i = 0; i < mail.Attachments.Count; i++)
+                            {
+                                isAttachment = true;
+                                mAttachment.AddEntry(mail.Attachments[i].FileName, mail.Attachments[i].AttachData);
+                            }
+
+                            string mailAddress = "";
+                            for (int i = 0; i < mail.To.Count; i++)
+                            {
+                                mailAddress += mail.To[i].Address + ";";
+                            }
+                            string mailFrom = mail.From;
+
+                            mAttachment.SetAD_Client_ID(GetCtx().GetAD_Client_ID());
+                            mAttachment.SetAD_Org_ID(GetCtx().GetAD_Org_ID());
+                            mAttachment.SetAD_Table_ID(Util.GetValueOfInt(TableID));
+                            mAttachment.SetAttachmentType("I");
+                            mAttachment.SetDateMailReceived(mail.EmailDate);
+                            mAttachment.SetFolderName(folderName);
+                            mAttachment.SetIsActive(true);
+                            mAttachment.SetIsAttachment(isAttachment);
+                            mAttachment.SetMailAddress(mailAddress);
+                            mAttachment.SetMailAddressBcc(mail.Bcc);
+                            mAttachment.SetMailAddressCc(mail.Cc);
+                            mAttachment.SetMailAddressFrom(mailFrom);
+                            mAttachment.SetRecord_ID(Util.GetValueOfInt(recordID));
+
+                            mAttachment.SetMailUID(mail.MessageID);
+                            mAttachment.SetMailUserName(mailAddress);
+                            mAttachment.SetTextMsg(textmsg);
+                            mAttachment.SetTitle(mail.Subject);
+                            if (!mAttachment.Save())//save into database
+                            {
+                                retVal.Append("SaveError");
+                            }
+                            else
+                            {
+                                SendMailOrNotification(dsUser, GetCtx(), Msg.GetMsg(GetCtx(), "Emailrecievedwithsubject") + " = " + mail.Subject + " " + Msg.GetMsg(GetCtx(), "ANDAttachto") + " " + Msg.GetMsg(GetCtx(), "RequestID") + " = " + recordID, Util.GetValueOfInt(TableID), Util.GetValueOfInt(recordID), Convert.ToString(documentNO));
+                            }
+                        }
+
+                        string pattern = @"\{AttachTo:\s*(?<email>[^}]+)\}";
+                        Match match = Regex.Match(subJect, pattern, RegexOptions.IgnoreCase);
+                        if (match.Success)
+                        {
+                            from = match.Groups["email"].Value.Trim().ToLower();
+                            pattern = @"(?i)\{AttachTo:\s*[^}]+\}";
+                            subJect = Regex.Replace(subJect, pattern, "").Trim();
+                        }
+                        //if (!String.IsNullOrEmpty(subJect) && subJect.ToLower().IndexOf("{attachto") > -1 && subJect.IndexOf("}") > -1)
+                        //{
+                        //    from = subJect.Substring(subJect.ToLower().IndexOf("{attachto:") + 1, subJect.IndexOf("}") - (subJect.ToLower().IndexOf("{attachto:") + 1)).ToLower();                           
+                        //}
+                        else if (Util.GetValueOfString(mail.Cc).ToLower().Contains(userEmail))
+                        {
+                            bool internalmail = true;
+                            string[] tomails = to.Split(';').ToArray();
+                            if (userDomain.Equals(mailDomain))
+                            {
+                                foreach (var tomail in tomails)
+                                {
+                                    if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
+                                    {
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        from = tomail;
+                                        attachType = "M";
+                                        internalmail = false;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                internalmail = false;
+                            }
+
+                            if (internalmail)
+                            {
+                                continue;
+                            }
+                        }
+                        else if (userDomain.Equals(mailDomain))
+                        {
+                            continue;
+                        }
+
+                        if (excludedEmails.ToLower().Contains(from))
+                        {
+                            continue;
+                        }
+
+                        StringBuilder sql = new StringBuilder();
+                        sql.Append("SELECT " + tableName + "_ID, C_BPartner_ID, Name, Value FROM " + tableName +
+                            " WHERE LOWER(Email) LIKE " + "'%" + from + "%' AND AD_Client_ID=" + AD_Client_ID);
+
+                        IDataReader idr = DB.ExecuteReader(sql.ToString());
+                        DataTable dt = new DataTable();
+                        dt.Load(idr);
+                        idr.Close();
+                        if (dt.Rows.Count <= 0)
+                        {
+                            tableName = "C_BPartner";
+                            sql.Clear();
+                            sql.Append("SELECT " + tableName + "_ID, C_BPartner_ID, Name, Value FROM " + tableName +
+                            " WHERE LOWER(Email) LIKE " + "'%" + from + "%' AND AD_Client_ID=" + AD_Client_ID);
+
+                            idr = DB.ExecuteReader(sql.ToString());
+                            dt = new DataTable();
+                            dt.Load(idr);
+                            idr.Close();
+                        }
+
+                        if (dt.Rows.Count <= 0)
+                        {
+                            tableName = "C_Lead";
+                            sql.Clear();
+                            sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
+                                c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
+                                FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
+                                WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + from + "%'");
+                            if (!emailDomains.Contains(mailDomain))
+                            {
+                                sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
+                            }
+                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID + " ORDER BY c.IsArchive ASC, c.Updated DESC");
+
+                            idr = DB.ExecuteReader(sql.ToString());
+                            dt = new DataTable();
+                            dt.Load(idr);
+                            idr.Close();
+                        }
+
+                        if (dt.Rows.Count <= 0 && tableName == "C_Lead")
+                        {
+                            string[] tomails = to.ToLower().Split(';').ToArray();
+                            foreach (var tomail in tomails)
+                            {
+                                if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    mailDomain = tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty;
+                                    sql.Clear();
+                                    sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
+                                        c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
+                                        FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
+                                        WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
+                                    if (!emailDomains.Contains(mailDomain))
+                                    {
+                                        sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
+                                    }
+                                    sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID);
+
+                                    idr = DB.ExecuteReader(sql.ToString());
+                                    dt = new DataTable();
+                                    dt.Load(idr);
+                                    idr.Close();
+                                    if (dt.Rows.Count <= 0)
+                                    {
+                                        existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+
+                                        if (existRec > 0)// Is mail already attached
+                                        {
+                                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                            return;
+                                        }
+                                        AttachMail(mail, 0, 0, attachType, "", "", "");
+                                    }
+                                    else
+                                    {
+                                        AttachToLead(mail, dt, attachType, tomail.Trim());
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
+                        else if (dt.Rows.Count <= 0)
+                        {
+                            existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                            if (existRec > 0)// Is mail already attached
+                            {
+                                retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                return;
+                            }
+                            AttachMail(mail, 0, 0, attachType, "", "", "");
+                            continue;
+                        }
+                        else
+                        {
+                            if (tableName == "C_Lead")
+                            {
+                                AttachToLead(mail, dt, attachType, from);
+                                continue;
+                            }
+                            if (dt.Rows.Count > 1)
+                            {
+                                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                                if (existRec > 0)// Is mail already attached
+                                {
+                                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                    return;
+                                }
+                                AttachMail(mail, 0, 0, attachType, "", "", "");
+                                continue;
+                            }
+                            else
+                            {
+                                string sqlQuery = "SELECT IsEmployee FROM C_BPartner WHERE C_BPartner_ID=" + Util.GetValueOfInt(dt.Rows[0]["C_BPartner_ID"]);
+                                DataSet ds = DB.ExecuteDataset(sqlQuery);
+
+                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                {
+                                    if (isExcludeEmployee == "Y" && Convert.ToString(ds.Tables[0].Rows[0]["IsEmployee"]).Trim() == "Y")
+                                    {
+                                        continue;
+                                    }
+                                }
+                                if (tableName == "AD_User")
+                                {
+                                    _tableID = PO.Get_Table_ID("AD_User");
+                                    existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                                    userOrBp = Msg.GetMsg(GetCtx(), "User");
+                                }
+                                if (tableName == "C_BPartner")
+                                {
+                                    _tableID = PO.Get_Table_ID("C_BPartner");
+                                    existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                                    userOrBp = Msg.GetMsg(GetCtx(), "BusinessPartner");
+                                }
+                                if (existRec > 0)// Is mail already attached
+                                {
+                                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                                    continue;
+                                }
+
+                                if (tableName == "AD_User")
+                                {
+                                    record_ID = Util.GetValueOfInt(dt.Rows[0][0]);
+                                }
+                                if (tableName == "C_BPartner")
+                                {
+                                    record_ID = Util.GetValueOfInt(dt.Rows[0][1]);
+                                }
+                                name = Util.GetValueOfString(dt.Rows[0]["Name"]);
+                                value = Util.GetValueOfString(dt.Rows[0]["Value"]);
+                                AttachMail(mail, _tableID, record_ID, attachType, userOrBp, name, value);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                    }
+                }
+            }
+        }
+
+        private void GetEmailsOld(int AD_User_ID, int AD_Client_ID, int AD_Org_ID)
+        {
+            dsUser = DB.ExecuteDataset("SELECT IsEmail, NotificationType FROM AD_User WHERE AD_User_ID=" + AD_User_ID);
+
+            // Create an instance of EmailServices
+            object emailServiceInstance = Activator.CreateInstance(emailServiceType);
+
+            // Get the method with matching parameter types
+            MethodInfo getEmailMethod = emailServiceType.GetMethod("GetEmails", new Type[] {
+                                typeof(Ctx), typeof(int), typeof(DateTime?)});
+
+            if (getEmailMethod == null)
+            {
+                log.Severe("GetEmails method not found.");
+            }
+
+            // Prepare arguments
+            object[] parameters = new object[]
+            {
+                 GetCtx(),
+                 apiAuthCred_ID,
+                 lastRun
+            };
+
+            var rawResult = getEmailMethod.Invoke(emailServiceInstance, parameters);
+
+            // Safely cast to IEnumerable to iterate
+            IEnumerable enumerable = rawResult as IEnumerable;
+            if (enumerable == null)
+                throw new InvalidCastException("Returned result is not an IEnumerable.");
+
+            List<object> result = enumerable.Cast<object>().ToList();
+            if (result != null && result.Count > 0)
+            {
                 string tableName = "AD_User";
                 int _tableID = -1;
                 int existRec = -1;
@@ -1046,7 +1386,7 @@ namespace VAdvantage.Process
         private int GetAttachedRecord(int tableID, int RecordID, string MailUID, string folderName)//, string MailUserFrom)
         {
             String sql = "SELECT MAILATTACHMENT1_ID FROM MAILATTACHMENT1 WHERE" + (tableID > 0 ? " AD_TABLE_ID=" + tableID + " AND"
-                        : "") + (RecordID > 0 ? " RECORD_ID=" + RecordID + " AND" :"") + " MAILUID='" + MailUID
+                        : "") + (RecordID > 0 ? " RECORD_ID=" + RecordID + " AND" : "") + " MAILUID='" + MailUID
                         + "' AND FolderName='" + folderName + "'";
 
             System.Data.DataSet ds = DB.ExecuteDataset(sql);
