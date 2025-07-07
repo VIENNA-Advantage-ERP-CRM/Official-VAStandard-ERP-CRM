@@ -49,9 +49,7 @@ namespace ViennaAdvantageServer.Process
             //VAI050-to create entry on AI Assistant window
             if (Env.IsModuleInstalled("VAI01_"))
             {
-                string query = "SELECT AD_Table_ID FROM AD_Table WHERE Name='Business Partner'";
-                int toTableID = Util.GetValueOfInt(DB.ExecuteScalar(query));
-                VAS_CommonMethod.CreateAITabPanel(toTableID, C_Bpartner_ID, C_Bpartner_ID, "VAS_CustomerMaster", Get_TrxName(), GetCtx());
+                VAS_CommonMethod.CreateAITabPanel(291, 291, C_Bpartner_ID, C_Bpartner_ID, "VAS_CustomerMaster", Get_TrxName(), GetCtx());
             }
             //bp.SetIsCustomer(true);
             //bp.SetIsProspect(false);

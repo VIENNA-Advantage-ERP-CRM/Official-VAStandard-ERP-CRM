@@ -322,7 +322,7 @@ namespace ViennaAdvantageServer.Process
                 //VAI050-to create entry on AI Assistant window
                 if (Env.IsModuleInstalled("VAI01_"))
                 {
-                    VAS_CommonMethod.CreateAITabPanel(order.Get_Table_ID(), order.GetC_Order_ID(), GetRecord_ID(), "VAS_SalesOrder", Get_TrxName(), GetCtx());
+                    VAS_CommonMethod.CreateAITabPanel(fromProject.Get_Table_ID(), order.Get_Table_ID(), order.GetC_Order_ID(), GetRecord_ID(), "VAS_SalesOrder", Get_TrxName(), GetCtx());
                 }
                 return Msg.GetMsg(GetCtx(), "OrderGenerationDone") + order.GetDocumentNo();
             }

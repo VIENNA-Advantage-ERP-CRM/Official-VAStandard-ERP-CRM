@@ -36,14 +36,12 @@ namespace ModelLibrary.Classes
         {
             if (Env.IsModuleInstalled("VAI01_"))
             {
-                string query = "SELECT Name From AD_Table WHERE AD_Table_ID=" + ToTableID;
-                string tableName = Util.GetValueOfString(DB.ExecuteScalar(query));
                 string windowName = "VAS_Opportunity";
-                if (tableName == "Business Partner")
+                if (ToTableID == 291)
                 {
                     windowName = "VAS_Prospects";
                 }
-                CreateAITabPanel(ToTableID, ToRecordID, FromRecordID, windowName, trx, ctx);
+                CreateAITabPanel(FromTableID, ToTableID, ToRecordID, FromRecordID, windowName, trx, ctx);
             }
             // Copy Mail Attachments
             if (FromTableID > 0)
@@ -184,12 +182,12 @@ namespace ModelLibrary.Classes
         /// <param name="WindowName"></param>
         /// <param name="trx"></param>
         /// <param name="ctx"></param>
-        public static void CreateAITabPanel(int ToTableID, int ToRecordID, int FromRecordID, string WindowName, Trx trx, Ctx ctx)
+        public static void CreateAITabPanel(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, string WindowName, Trx trx, Ctx ctx)
         {
             string query = @"SELECT a.AD_Client_ID, a.AD_Org_ID, a.VAI01_AIAssistant_ID, b.VAI01_ThreadID 
                              FROM VAI01_AssistantScreen a
                              INNER JOIN VAI01_AssistantThread b ON a.VAI01_AssistantScreen_ID = b.VAI01_AssistantScreen_ID
-                            WHERE b.VAI01_RecordID = '" + FromRecordID + "'";
+                            WHERE a.AD_Table_ID=" + FromTableID + " AND b.VAI01_RecordID = '" + FromRecordID + "'";
 
             DataSet ds = DB.ExecuteDataset(query, null, trx);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -224,6 +222,7 @@ namespace ModelLibrary.Classes
                     screen.Set_ValueNoCheck("VAI01_AIAssistant_ID", aiAssistantId);
                     screen.Set_Value("AD_Window_ID", windowId);
                     screen.Set_Value("AD_Tab_ID", tabId);
+                    screen.Set_Value("AD_Table_ID", ToTableID);
                     if (!screen.Save())
                     {
                         return;
