@@ -13,7 +13,7 @@ using VAdvantage.Utility;
 using System.Data;
 using VAdvantage.Logging;
 using VAdvantage.ProcessEngine;
-
+using ModelLibrary.Classes;
 
 namespace ViennaAdvantageServer.Process
 {
@@ -39,12 +39,17 @@ namespace ViennaAdvantageServer.Process
 
             string sqlbp = "UPDATE C_BPartner SET VAS_IsConverted='Y', IsCustomer='Y', IsProspect='N'" +
                     // VIS0060: Changes done to set BPartner Agent on Customer in Case Partner Management module is installed.
-                    (Env.IsModuleInstalled("VA114_") && bpAgent_ID > 0 ? ", VA114_BPAgent_ID = " + bpAgent_ID : "") + 
+                    (Env.IsModuleInstalled("VA114_") && bpAgent_ID > 0 ? ", VA114_BPAgent_ID = " + bpAgent_ID : "") +
                     " WHERE C_BPartner_ID=" + C_Bpartner_ID;
             value = DB.ExecuteQuery(sqlbp, null, Get_TrxName());
             if (value == -1)
             {
-
+                return Msg.GetMsg(GetCtx(), "AccountNotGenerated");
+            }
+            //VAI050-to create entry on AI Assistant window
+            if (Env.IsModuleInstalled("VAI01_"))
+            {
+                VAS_CommonMethod.CreateAITabPanel(291, 291, C_Bpartner_ID, C_Bpartner_ID, "VAS_CustomerMaster", Get_TrxName(), GetCtx());
             }
             //bp.SetIsCustomer(true);
             //bp.SetIsProspect(false);
