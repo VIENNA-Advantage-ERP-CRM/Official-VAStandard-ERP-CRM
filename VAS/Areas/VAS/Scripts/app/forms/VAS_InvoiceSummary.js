@@ -48,6 +48,12 @@
                                 + (data[i].TaxAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: data[0].stdPrecision, maximumFractionDigits: data[0].stdPrecision }) + '</span>');
                         }
 
+                        if (data[0].TCSAmount != 0) {
+                            wrapperDiv.find(".VAS-summary-header").append('<span class="">' + VIS.Msg.getMsg("VAS_TCSTotal") + ":" + '</span>');
+                            wrapperDiv.find(".VAS-summary-info").append('<span class="VAS-summary-amount">' + data[0].CurSymbol + " "
+                                + (data[0].TCSAmount).toLocaleString(window.navigator.language, { minimumFractionDigits: data[0].stdPrecision, maximumFractionDigits: data[0].stdPrecision }) + '</span>');
+                        }
+
                         wrapperDiv.find(".VAS-summary-header").append('<span class="">' + VIS.Msg.getMsg("GrandTotal") + ":" + '</span>');
                         wrapperDiv.find(".VAS-summary-info").append('<span class="VAS-summary-amount" style="font-weight: 600;font-size: 1rem;border-top: 1px solid rgba(var(--v-c-on-secondary), 1);">' + data[0].CurSymbol + " "
                             + (data[0].GrandTotal).toLocaleString(window.navigator.language, { minimumFractionDigits: data[0].stdPrecision, maximumFractionDigits: data[0].stdPrecision }) + '</span>');

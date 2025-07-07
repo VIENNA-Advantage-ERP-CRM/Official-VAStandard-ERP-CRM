@@ -86,12 +86,16 @@ namespace VASLogic.Models
         {
             //Fixed query to get data for subtotal and grandtotal
             List<TaxTabPanel> InvocieTaxTabPanel = new List<TaxTabPanel>();
-            String sql = @"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,SUM(cl.TaxBaseAmt) AS SumAmt, cy.CurSymbol,cy.StdPrecision FROM C_InvoiceTax ct 
+            String sql = $@"SELECT t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,SUM(cl.TaxBaseAmt) AS SumAmt, cy.CurSymbol,cy.StdPrecision
+                          {(Env.IsModuleInstalled("VA106_") ? " , ci.VA106_TCSTotalAmount " : "")}
+                          FROM C_InvoiceTax ct 
                           INNER JOIN C_Invoice ci ON (ci.C_Invoice_ID = ct.C_Invoice_ID) 
                           INNER JOIN C_InvoiceLine cl ON (cl.C_Invoice_ID=ci.C_Invoice_ID)
                           INNER JOIN C_Tax t ON (t.C_Tax_ID = ct.C_Tax_ID) 
-                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Invoice_ID = " + InvoiceId + " " +
-                          " GROUP BY t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,cy.CurSymbol,cy.StdPrecision Order By t.Name";
+                          INNER JOIN C_Currency cy ON (cy.C_Currency_ID = ci.C_Currency_ID) WHERE ct.C_Invoice_ID = { InvoiceId }
+                          GROUP BY t.Name,ct.TaxAmt,ct.TaxBaseAmt,ct.IsTaxIncluded, ci.TotalLines, ci.GrandTotal,cy.CurSymbol,cy.StdPrecision
+                           {(Env.IsModuleInstalled("VA106_") ? " , ci.VA106_TCSTotalAmount " : "")}
+                          Order By t.Name";
 
             DataSet ds = DB.ExecuteDataset(sql, null, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
@@ -107,6 +111,7 @@ namespace VASLogic.Models
                     obj.CurSymbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
                     obj.TotalLines = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmt"]); ;
                     obj.GrandTotal = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["GrandTotal"]);
+                    obj.TCSAmount = (Env.IsModuleInstalled("VA106_") ? Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["VA106_TCSTotalAmount"]) : 0);
                     InvocieTaxTabPanel.Add(obj);
                 }
             }
@@ -416,7 +421,7 @@ namespace VASLogic.Models
             List<ARInvWidgData> ARInvWidgData = new List<ARInvWidgData>();
             string docBaseTypeARI_APT = ISOtrx ? "'ARI'" : "'API'";
             string docBaseTypeARC_APC = ISOtrx ? "'ARC'" : "'APC'";
-            string docBaseTypeAR_AP= ISOtrx ? "('ARI','ARC')" : "('API','APC')";
+            string docBaseTypeAR_AP = ISOtrx ? "('ARI','ARC')" : "('API','APC')";
 
             sql.Append($@"WITH InvoiceData AS (
                          {MRole.GetDefault(ctx).AddAccessSQL($@"SELECT ci.AD_Client_ID,
@@ -634,7 +639,7 @@ namespace VASLogic.Models
                              INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=ci.C_BPartner_ID)
                              INNER JOIN C_DocType cd ON (cd.C_DocType_ID=ci.C_DocTypeTarget_ID)
                              LEFT OUTER JOIN AD_Image custimg ON (custimg.AD_Image_ID = CAST(cb.Pic AS INT))
-                             WHERE cd.DocBaseType IN "+ docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
+                             WHERE cd.DocBaseType IN " + docBaseTypeAR_AP + @" AND ci.DocStatus IN ('CO','CL') AND " + BPCheck, "ci", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW
                      )})");
             sql.Append(@",PeriodDetail AS (SELECT c_period.AD_Client_ID,Min(c_period.StartDate) AS StartDate,Max(c_period.EndDate) AS EndDate  FROM C_Year INNER JOIN C_Period on (C_Year.C_Year_ID=c_period.C_Year_ID) WHERE ");
             //Getting data according to Current month
@@ -977,7 +982,7 @@ namespace VASLogic.Models
                     obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["SumAmount"]);
                     obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
                     obj.stdPrecision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
-                    obj.Type= Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
+                    obj.Type = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
                     invData.Add(obj);
                 }
             }
@@ -1008,7 +1013,7 @@ namespace VASLogic.Models
             string DeliveryCheck = (ISOtrx == true ? "min.IsSOTrx='Y'" : "min.IsSOTrx='N'");
             var C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             string BPCheck = (ISOtrx == true ? " AND cb.IsCustomer='Y'" : " AND cb.IsVendor='Y'");
-            string DocBaseTypeCheck = (ISOtrx == true ? " AND dt.DocBaseType IN ('SOO')" :" AND dt.DocBaseType IN ('POO')");
+            string DocBaseTypeCheck = (ISOtrx == true ? " AND dt.DocBaseType IN ('SOO')" : " AND dt.DocBaseType IN ('POO')");
             sql.Append($@"SELECT * FROM  (");
             //AL=ALL ,PO=Purchase Order,SO=Sales Order
 
@@ -1193,8 +1198,8 @@ namespace VASLogic.Models
                 if (ISOtrx)
                 {
                     //first parameter is new screen and second parameter is old screen
-                    GRNId=GetWindowId("VAS_DeliveryOrder", "Shipment (Customer)");
-                    OrderWinId= GetWindowId("VAS_SalesOrder", "Sales Order");
+                    GRNId = GetWindowId("VAS_DeliveryOrder", "Shipment (Customer)");
+                    OrderWinId = GetWindowId("VAS_SalesOrder", "Sales Order");
                     InvWindowId = GetWindowId("VAS_ARInvoice", "Invoice (Customer)");
                 }
                 else
@@ -1205,49 +1210,49 @@ namespace VASLogic.Models
                 }
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
-                        obj = new ExpectedInvoice();
-                        obj.recordCount = RecordCount;
-                        obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
-                        //If currency symbol not found the pick base currency symbol and precision
-                        if (!String.IsNullOrEmpty(Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"])))
-                        {
-                            obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
-                        }
-                        else
-                        {
-                            obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
-                        }
-                        obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
-                        obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
-                        obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
-                        obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
-
-                        obj.stdPrecision = (Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]) != 0 ? Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"])
-                            : Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]));
-                        obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
-                        obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
-                        obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
-                        obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
-
-                        if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
-                        {
-                            obj.Window_ID = OrderWinId;
-                            obj.Primary_ID = "C_Order_ID";
-                        }
-                        else
-                        {
-                            obj.Window_ID = GRNId;
-                            obj.Primary_ID = "M_InOut_ID";
-                            obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
-                        }
-                        obj.InvWinID = InvWindowId;
-                        //if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
-                        //{
-                        //    obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
-
-                        //}
-                        invGrandTotalData.Add(obj);
+                    obj = new ExpectedInvoice();
+                    obj.recordCount = RecordCount;
+                    obj.TotalAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["TotalValue"]);
+                    //If currency symbol not found the pick base currency symbol and precision
+                    if (!String.IsNullOrEmpty(Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"])))
+                    {
+                        obj.Symbol = Util.GetValueOfString(ds.Tables[0].Rows[i]["CurSymbol"]);
                     }
+                    else
+                    {
+                        obj.Symbol = Util.GetValueOfString(dsCurrency.Tables[0].Rows[0]["Symbol"]);
+                    }
+                    obj.DocumentNo = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocumentNo"]);
+                    obj.Record_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["Record_ID"]);
+                    obj.RecordType = Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]);
+                    obj.IsFullyDelivered = Util.GetValueOfString(ds.Tables[0].Rows[i]["IsNotFullyDelivered"]);
+
+                    obj.stdPrecision = (Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]) != 0 ? Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"])
+                        : Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]));
+                    obj.OrderdDate = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["DateOrdered"]).Value;
+                    obj.DatePromised = Util.GetValueOfDateTime(ds.Tables[0].Rows[i]["PromisedDate"]).Value;
+                    obj.Name = Util.GetValueOfString(ds.Tables[0].Rows[i]["Name"]);
+                    obj.InvoiceRule = Util.GetValueOfString(ds.Tables[0].Rows[i]["InvoiceRule"]);
+
+                    if (Util.GetValueOfString(ds.Tables[0].Rows[i]["Type"]) == "Order")
+                    {
+                        obj.Window_ID = OrderWinId;
+                        obj.Primary_ID = "C_Order_ID";
+                    }
+                    else
+                    {
+                        obj.Window_ID = GRNId;
+                        obj.Primary_ID = "M_InOut_ID";
+                        obj.AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                    }
+                    obj.InvWinID = InvWindowId;
+                    //if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) != 0)
+                    //{
+                    //    obj.ImageUrl = "Images/Thumb46x46/" + Util.GetValueOfInt(ds.Tables[0].Rows[i]["Pic"]) + Util.GetValueOfString(ds.Tables[0].Rows[i]["ImageExtension"]);
+
+                    //}
+                    invGrandTotalData.Add(obj);
+                }
             }
             return invGrandTotalData;
         }
@@ -1300,13 +1305,13 @@ namespace VASLogic.Models
         /// <param name="OldScreen">Old Screen</param>
         /// <returns>Returns AD_Window_ID</returns>
         /// <author>VIS_427</author>
-        public int GetWindowId(string NewScreen,string OldScreen)
+        public int GetWindowId(string NewScreen, string OldScreen)
         {
             int AD_Window_ID = 0;
-            AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(NewScreen)}", null, null));
+            AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(NewScreen)}", null, null));
             if (AD_Window_ID == 0)
             {
-                AD_Window_ID= Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(OldScreen)}", null, null));
+                AD_Window_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Window_ID FROM AD_Window WHERE Name={ GlobalVariable.TO_STRING(OldScreen)}", null, null));
             }
             return AD_Window_ID;
         }
@@ -2482,7 +2487,7 @@ namespace VASLogic.Models
                     obj.OrderPrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["OrderPrice"]);
                     obj.InvoicePrice = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["InvoicePrice"]);
                     obj.UOMPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["UOMPrecision"]);
-                    obj.InvoicePriceListPrecision= Util.GetValueOfInt(ds.Tables[0].Rows[i]["InvoicePriceListPrecision"]);
+                    obj.InvoicePriceListPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["InvoicePriceListPrecision"]);
                     obj.CurrencyPrecision = Util.GetValueOfInt(ds.Tables[0].Rows[i]["CurrencyPrecision"]);
                     obj.DocStatus = Util.GetValueOfString(ds.Tables[0].Rows[i]["DocStatus"]);
                     obj.AdvanceAmt = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["NotPaidAdvanceOrder"]);
@@ -2929,7 +2934,7 @@ namespace VASLogic.Models
             try
             {
                 // Set parameters
-                obj.SetParameter(invRef, docId, IsGenCheck, grnid,ctx);
+                obj.SetParameter(invRef, docId, IsGenCheck, grnid, ctx);
 
                 // Call the Generate method, which might throw an exception
                 obj.Generate();
@@ -2959,7 +2964,7 @@ namespace VASLogic.Models
         /// <param name="C_BankAccount_ID">C_BankAccount_ID</param>
         /// <returns>Monthly average balance data</returns>
         /// <author>VIS_427</author>
-        public MonthlyAvBankBal GetMonthlyAvBankBalData(Ctx ctx,int C_BankAccount_ID)
+        public MonthlyAvBankBal GetMonthlyAvBankBalData(Ctx ctx, int C_BankAccount_ID)
         {
             string[] labels = null;
             decimal[] lstAPPayAmt = null;
@@ -2971,7 +2976,7 @@ namespace VASLogic.Models
             int C_Currency_ID = ctx.GetContextAsInt("$C_Currency_ID");
             //fetched Default conversion type from context
             int C_ConversionType_ID = ctx.GetContextAsInt("C_ConversionType_ID");
-            int precision = 2;string ISO_Code = "";
+            int precision = 2; string ISO_Code = "";
             List<MonthlyAvBankBal> payMonthlyAvBankBal = new List<MonthlyAvBankBal>();
             string CurrentYear = "";
             int calendar_ID = 0;
@@ -2991,13 +2996,13 @@ namespace VASLogic.Models
                 currQuarter = Util.GetValueOfInt(dsFinancialYear.Tables[0].Rows[0]["CurQuarter"]);
             }
             //if bank Account id is not zero then fetched its cuurrency
-            if(C_BankAccount_ID != 0)
+            if (C_BankAccount_ID != 0)
             {
-               C_Currency_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID=" + C_BankAccount_ID,null,null));
+                C_Currency_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT C_Currency_ID FROM C_BankAccount WHERE C_BankAccount_ID=" + C_BankAccount_ID, null, null));
             }
             //Fetched the currency details 
             sql.Append(@"SELECT StdPrecision,ISO_Code FROM C_Currency WHERE C_Currency_ID=" + C_Currency_ID);
-             DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
+            DataSet dsCurrency = DB.ExecuteDataset(sql.ToString(), null, null);
             if (dsCurrency != null && dsCurrency.Tables[0].Rows.Count > 0)
             {
                 precision = Util.GetValueOfInt(dsCurrency.Tables[0].Rows[0]["StdPrecision"]);
@@ -3037,11 +3042,11 @@ namespace VASLogic.Models
                          FROM C_Payment", "C_Payment", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RW));
             sqlmain.Append(@" AND C_Payment.IsActive = 'Y'
                             and C_Payment.DocStatus IN ('CO','CL')");
-            if(C_BankAccount_ID != 0)
+            if (C_BankAccount_ID != 0)
             {
                 sqlmain.Append(" AND C_Payment.C_BankAccount_ID=" + C_BankAccount_ID);
             }
-            sql.Append(sqlmain +")");
+            sql.Append(sqlmain + ")");
             sql.Append(@",latest_bank_data AS (");
             sqlmain.Clear();
             sqlmain.Append(MRole.GetDefault(ctx).AddAccessSQL(@"SELECT C_BankAccount.AD_Client_ID,
@@ -3052,7 +3057,7 @@ namespace VASLogic.Models
                                  TO_CHAR(C_BankAccountline.StatementDate, 'YYYY-MM'), C_BankAccount.C_BankAccount_ID) THEN 'EndingBalance' 
                                  ELSE NULL END AS isendingbalance,
                                  C_BankAccountline.StatementDate,
-                                 CASE WHEN C_BankAccount.C_Currency_ID !=" +C_Currency_ID+ @" THEN 
+                                 CASE WHEN C_BankAccount.C_Currency_ID !=" + C_Currency_ID + @" THEN 
                                  ROUND(COALESCE(currencyconvert(
                                  C_BankAccountline.EndingBalance,
 	                             C_BankAccount.C_Currency_ID,
@@ -3178,6 +3183,7 @@ namespace VASLogic.Models
         public string CurSymbol { get; set; }
         public decimal TotalLines { get; set; }
         public decimal GrandTotal { get; set; }
+        public decimal TCSAmount { get; set; }
 
     }
     public class PurchaseOrderTabPanel
