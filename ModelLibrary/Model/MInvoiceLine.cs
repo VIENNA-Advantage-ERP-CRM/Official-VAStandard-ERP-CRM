@@ -4538,14 +4538,17 @@ namespace VAdvantage.Model
                 if (string.IsNullOrEmpty(BPStateCode) && string.IsNullOrEmpty(OrgStateCode))
                 {
                     message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrgAndBP");
+                    return message;
                 }
                 else if (string.IsNullOrEmpty(BPStateCode))
                 {
                     message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundBP");
+                    return message;
                 }
                 else if (string.IsNullOrEmpty(OrgStateCode))
                 {
                     message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrg");
+                    return message;
                 }
 
                 // Get Tax Detail
