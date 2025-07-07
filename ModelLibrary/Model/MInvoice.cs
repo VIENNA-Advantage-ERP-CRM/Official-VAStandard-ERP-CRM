@@ -653,6 +653,13 @@ namespace VAdvantage.Model
             SetC_Activity_ID(order.GetC_Activity_ID());
             SetUser1_ID(order.GetUser1_ID());
             SetUser2_ID(order.GetUser2_ID());
+
+            // VIS_045: 04-July-2025, set Supply type from Order to Invoice when defined
+            if (Env.IsModuleInstalled("VA106_") && order.Get_ColumnIndex("VA106_SupplyType") >= 0 && Get_ColumnIndex("VA106_SupplyType") >= 0 &&
+                !string.IsNullOrEmpty(Util.GetValueOfString(order.Get_Value("VA106_SupplyType"))))
+            {
+                Set_Value("VA106_SupplyType", order.Get_Value("VA106_SupplyType"));
+            }
         }
 
         /// <summary>
@@ -737,6 +744,13 @@ namespace VAdvantage.Model
                     SetC_DocTypeTarget_ID(dt.GetC_DocTypeInvoice_ID(), true);
                 //	Overwrite Invoice Address
                 SetC_BPartner_Location_ID(order.GetBill_Location_ID());
+
+                // VIS_045: 04-July-2025, set Supply type from Order to Invoice when defined
+                if (Env.IsModuleInstalled("VA106_") && order.Get_ColumnIndex("VA106_SupplyType") >= 0 && Get_ColumnIndex("VA106_SupplyType") >= 0 &&
+                    !string.IsNullOrEmpty(Util.GetValueOfString(order.Get_Value("VA106_SupplyType"))))
+                {
+                    Set_Value("VA106_SupplyType", order.Get_Value("VA106_SupplyType"));
+                }
             }
         }
 
@@ -1208,8 +1222,10 @@ namespace VAdvantage.Model
             if (IsTaxIncluded())
                 sql = "UPDATE C_Invoice i "
                     + $"SET GrandTotal = COALESCE((TotalLines " +
-                     $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)" 
-                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? $" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSAmount, 0) " : "")} ),0) " : "")
+                     $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? 
+                        $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) 
+                            {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSTotalAmount, 0) " : "")} ),0) " : "")
                     + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "

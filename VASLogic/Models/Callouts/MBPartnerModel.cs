@@ -256,6 +256,10 @@ namespace VIS.Models
                 //VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
                 sql += " p.VA009_PaymentMethod_ID, p.VA009_PO_PaymentMethod_ID,";
             }
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                sql += " p.VA106_SupplyType, ";
+            }
             sql += "p.IsDiscountPrinted, p.InvoiceRule,p.DeliveryRule,p.FreightCostRule,DeliveryViaRule,"
                 + " p.CreditStatusSettingOn,p.SO_CreditLimit, NVL(p.SO_CreditLimit,0)-NVL(p.SO_CreditUsed,0) AS CreditAvailable,"
                 + " lship.C_BPartner_Location_ID,c.AD_User_ID,"
@@ -285,6 +289,10 @@ namespace VIS.Models
                         + Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PaymentMethod_ID"]), null, null));
                     //VA009_PO_PaymentMethod_ID added new column for enhancement.. Google Sheet ID-- SI_0036
                     retDic["VA009_PO_PaymentMethod_ID"] = Util.GetValueOfInt(ds.Tables[0].Rows[0]["VA009_PO_PaymentMethod_ID"]);
+                }
+                if (Env.IsModuleInstalled("VA106_"))
+                {
+                    retDic["VA106_SupplyType"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["VA106_SupplyType"]);
                 }
                 retDic["InvoiceRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["InvoiceRule"]);
                 retDic["DeliveryRule"] = Util.GetValueOfString(ds.Tables[0].Rows[0]["DeliveryRule"]);

@@ -4841,7 +4841,7 @@ namespace VAdvantage.Model
                     //$"{(Env.IsModuleInstalled("VA106_") ? " + (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)  " : "")} )"
                     $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
                     + (Get_ColumnIndex("WithholdingAmt") > 0 ?
-                    $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSAmount, 0) " : "")} ), 0) " : "")
+                    $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSTotalAmount, 0) " : "")} ), 0) " : "")
                     + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
