@@ -13,6 +13,7 @@ using VAdvantage.Utility;
 using System.Security.Policy;
 using VAdvantage.ProcessEngine;
 using VAdvantage.Model;
+using ModelLibrary.Classes;
 //using ViennaAdvantage.Model;
 
 namespace ViennaAdvantageServer.Process
@@ -304,7 +305,11 @@ namespace ViennaAdvantageServer.Process
 
                     DB.ExecuteQuery("UPDATE C_Order SET ConditionalFlag = null WHERE C_Order_ID = " + order.GetC_Order_ID(), null, Get_TrxName());
                 }
-
+                //VAI050-to create entry on AI Assistant window
+                if (Env.IsModuleInstalled("VAI01_"))
+                {
+                    VAS_CommonMethod.CreateAITabPanel(order.Get_Table_ID(), order.GetC_Order_ID(), GetRecord_ID(), "VAS_SalesQuotation", Get_TrxName(), GetCtx());
+                }
                 msg = Msg.GetMsg(GetCtx(), "QuotationGenerated") + order.GetDocumentNo();
             }
             else
