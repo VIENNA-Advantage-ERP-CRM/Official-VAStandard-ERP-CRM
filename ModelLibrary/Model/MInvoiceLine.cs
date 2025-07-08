@@ -4529,18 +4529,24 @@ namespace VAdvantage.Model
             if (Env.IsModuleInstalled("VA106_") && C_BPartner_Location_ID != 0 && AD_Org_ID != 0)
             {
                 // get BP state Code
-                string BPStateCode = MBPartnerLocation.GetStateCode(C_BPartner_Location_ID);
+                (string , int) BPStateCode = MBPartnerLocation.GetStateCode(ctx, C_BPartner_Location_ID);
+
+                // When the Business Partner Location is not of India, then not to check GST Tax Type
+                if (BPStateCode.Item2 != 208)
+                {
+                    return "";
+                }
 
                 // Get Org State code
                 string OrgStateCode = MOrgInfo.GetStateCode(AD_Org_ID);
 
                 // When Proper Region not selected on location or State Code not found
-                if (string.IsNullOrEmpty(BPStateCode) && string.IsNullOrEmpty(OrgStateCode))
+                if (string.IsNullOrEmpty(BPStateCode.Item1) && string.IsNullOrEmpty(OrgStateCode))
                 {
                     message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundOrgAndBP");
                     return message;
                 }
-                else if (string.IsNullOrEmpty(BPStateCode))
+                else if (string.IsNullOrEmpty(BPStateCode.Item1))
                 {
                     message = Msg.GetMsg(ctx, "VAS_RegionCodenotFoundBP");
                     return message;
@@ -4553,15 +4559,26 @@ namespace VAdvantage.Model
 
                 // Get Tax Detail
                 MTax tax = MTax.Get(ctx, C_Tax_ID);
+                // When Tax Exempt then not to check the Inter / Intra state setting
+                if(tax.IsTaxExempt())
+                {
+                    return "";
+                }
+
+                // When tax rate is Zero, then not to check the Inter / Intra state setting
+                if (tax.GetRate()== 0)
+                {
+                    return "";
+                }
 
                 // When Bp and Org State are same, but Incorrect GST Type selected
-                if (BPStateCode.Equals(OrgStateCode) && !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
+                if (BPStateCode.Item1.Equals(OrgStateCode) && !string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))))
                 {
                     message = Msg.GetMsg(ctx, "VAS_IncorrectGSTTypeForIntra");
                 }
 
                 // When Bp and Org State are not same, but Incorrect GST Type selected
-                else if (!BPStateCode.Equals(OrgStateCode) &&
+                else if (!BPStateCode.Item1.Equals(OrgStateCode) &&
                     (string.IsNullOrEmpty(Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType"))) ||
                     !Util.GetValueOfString(tax.Get_Value("VA106_GSTTaxType")).Equals("03")))
                 {

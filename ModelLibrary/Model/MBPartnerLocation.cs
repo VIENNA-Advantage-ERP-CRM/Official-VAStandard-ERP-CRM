@@ -35,7 +35,7 @@ namespace VAdvantage.Model
         private static VLogger _log = VLogger.GetVLogger(typeof(MBPartnerLocation).FullName);
 
         // STateCode with Business Partner Location
-        private static CCache<int, string> s_cache_BPLoc_Statecode = new CCache<int, string>("VA106_BP_StateCode", 30);
+        private static CCache<int, MRegion> s_cache_BPLoc_Statecode = new CCache<int, MRegion>("VA106_BP_StateCode", 30);
 
         /* 	Get Locations for BPartner
         *	@param ctx context
@@ -138,28 +138,41 @@ namespace VAdvantage.Model
         /// This function is used to get the Statecode of selected region on Location field
         /// </summary>
         /// <param name="C_BPartner_Location_ID">Business Partner Location ID</param>
-        /// <returns>State Code</returns>
+        /// <returns>State Code, Country ID</returns>
         /// <author>VIS_045, 12-June-2025</author>
-        public static string GetStateCode(int C_BPartner_Location_ID)
+        public static (string, int) GetStateCode(Ctx ctx, int C_BPartner_Location_ID)
         {
             string stateCode = string.Empty;
-            if (s_cache_BPLoc_Statecode.Count == 0 || (string.IsNullOrEmpty(s_cache_BPLoc_Statecode[C_BPartner_Location_ID])))
+            int C_Coutry_ID = 0;
+            MRegion reg = null;
+            if (!s_cache_BPLoc_Statecode.TryGetValue(C_BPartner_Location_ID, out reg) || reg == null)
             {
-                string sql = $@"SELECT cr.VA106_StateCode FROM C_BPartner_Location cbl 
+                string sql = $@"SELECT cr.* , cc.C_Country_ID AS LocCountry_ID FROM C_BPartner_Location cbl 
                                 INNER JOIN C_Location cl ON (cl.C_Location_ID = cbl.C_Location_ID) 
-                                INNER JOIN C_Region cr ON (cr.C_Region_ID = cl.C_Region_ID) 
+                                INNER JOIN C_Country cc ON (cc.C_Country_ID = cl.C_Country_ID)
+                                LEFT JOIN C_Region cr ON (cr.C_Region_ID = cl.C_Region_ID) 
                                 WHERE cbl.C_BPartner_Location_ID = {C_BPartner_Location_ID}";
-                stateCode = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
-                if (!string.IsNullOrEmpty(stateCode))
+                DataSet dsRegion = DB.ExecuteDataset(sql, null, null);
+                if (dsRegion != null && dsRegion.Tables.Count > 0 && dsRegion.Tables[0].Rows.Count > 0)
                 {
-                    s_cache_BPLoc_Statecode.Add(C_BPartner_Location_ID, stateCode);
+                    if (Util.GetValueOfInt(dsRegion.Tables[0].Rows[0]["C_Region_ID"]) > 0)
+                    {
+                        reg = new MRegion(ctx, dsRegion.Tables[0].Rows[0], null);
+                        s_cache_BPLoc_Statecode.Add(C_BPartner_Location_ID, reg);
+                    }
+                    else
+                    {
+                        C_Coutry_ID = Util.GetValueOfInt(dsRegion.Tables[0].Rows[0]["LocCountry_ID"]);
+                    }
                 }
             }
-            else
+
+            if (reg != null)
             {
-                stateCode = s_cache_BPLoc_Statecode[C_BPartner_Location_ID];
+                stateCode = Util.GetValueOfString(reg.Get_Value("VA106_StateCode"));
+                C_Coutry_ID = reg.GetC_Country_ID();
             }
-            return stateCode;
+            return (stateCode, C_Coutry_ID);
         }
 
         /**
