@@ -79,10 +79,18 @@
             this.setCalloutActive(true);
             //check whether window is of sales type
             var isSOTrx = ctx.getWindowContext(windowNo, "IsSOTrx", true) == "Y";
+            var paramString = Util.getValueOfString(mTab.getValue("C_Tax_ID"));
             //Added parameter in order to handle the connditions
-            var paramString = Util.getValueOfString(mTab.getValue("C_Tax_ID")) + "," + Util.getValueOfString(mTab.getValue("AD_Org_ID")) + ","
-                + Util.getValueOfString(mTab.getValue("C_Invoice_ID")) + "," + Util.getValueOfString(ctx.getWindowContext(windowNo, "C_BPartner_Location_ID"))
-                + "," + Util.getValueOfString(isSOTrx);
+            if (mTab.getKeyColumnName() == "C_InvoiceLine_ID") {
+                paramString = Util.getValueOfString(mTab.getValue("C_Tax_ID")) + "," + Util.getValueOfString(mTab.getValue("AD_Org_ID")) + ","
+                    + Util.getValueOfString(mTab.getValue("C_Invoice_ID")) + "," + Util.getValueOfString(ctx.getWindowContext(windowNo, "C_BPartner_Location_ID"))
+                    + "," + Util.getValueOfString(isSOTrx) + ", " + mTab.getKeyColumnName().toString();
+            }
+            else if (mTab.getKeyColumnName() == "C_OrderLine_ID") {
+                paramString = Util.getValueOfString(mTab.getValue("C_Tax_ID")) + "," + Util.getValueOfString(mTab.getValue("AD_Org_ID")) + ","
+                    + Util.getValueOfString(mTab.getValue("C_Order_ID")) + "," + Util.getValueOfString(ctx.getWindowContext(windowNo, "C_BPartner_Location_ID"))
+                    + "," + Util.getValueOfString(isSOTrx) + ", " + mTab.getKeyColumnName().toString();
+            }
             var data = VIS.dataContext.getJSONRecord("MTax/GetTaxExempt", paramString);
 
             if (data != null) {

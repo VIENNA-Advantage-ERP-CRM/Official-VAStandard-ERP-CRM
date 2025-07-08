@@ -4405,6 +4405,18 @@ namespace VAdvantage.Model
             if (GetC_Tax_ID() == 0)
                 SetTax();
 
+            //VIS_045, 08-July-2025, When VA106 module installed then check correct tax is selected or not
+            if ((newRecord || Is_ValueChanged("C_Tax_ID")) && Ord.IsSOTrx())
+            {
+                string message = MInvoiceLine.CheckGSTTaxType(GetCtx(), Ord.GetC_BPartner_Location_ID(), GetAD_Org_ID(), GetC_Tax_ID());
+                if (!string.IsNullOrEmpty(message))
+                {
+                    log.SaveError("", message);
+                    log.Info("State Code / GST Tax Type Mismatched - " + message);
+                    return false;
+                }
+            }
+
             //	Get Line No
             if (GetLine() == 0)
             {
