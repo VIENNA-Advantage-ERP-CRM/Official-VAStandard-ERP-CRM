@@ -1313,6 +1313,12 @@ namespace VAdvantage.Model
                 }
             }
 
+            //VIS_045: 09-July-2025, Set Standard Costing method on save, for posting
+            if (GetM_Product_ID() > 0 && _Product != null && (newRecord || Is_ValueChanged("M_Product_ID")))
+            {
+                SetIsStandardCosting(_Product.GetM_Product_Category_ID());
+            }
+
             //Mandatory
             if (Env.IsModuleInstalled("DTD001_"))
             {
@@ -1386,6 +1392,46 @@ namespace VAdvantage.Model
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// This function is used to identify the which costing method is linked with Product
+        /// When Costing Method is not define on Product Category then system will check on Primary Accounting Schema
+        /// </summary>
+        /// <param name="M_Product_Category_ID">Product Category ID</param>
+        public void SetIsStandardCosting(int M_Product_Category_ID)
+        {
+            if (M_Product_Category_ID > 0)
+            {
+                string sql = $@"WITH StandardCostingElement AS 
+                                (SELECT cel.M_Ref_CostElement, refEle.costingmethod, ce.M_CostElement_ID AS CostCom_ID 
+                                  FROM M_CostElement ce 
+                                  INNER JOIN m_costelementline cel ON (ce.M_CostElement_ID = cel.M_CostElement_ID) 
+                                  INNER JOIN M_CostElement refEle ON (CAST(cel.M_Ref_CostElement AS INTEGER) = refEle.M_CostElement_ID AND refEle.costingmethod IS NOT NULL) 
+                                  WHERE ce.AD_Client_ID = {GetCtx().GetAD_Client_ID()}
+                                  AND ce.IsActive = 'Y' AND ce.CostElementType = 'C'
+                                  AND cel.IsActive = 'Y' AND  refEle.costingmethod = 'S')
+                        SELECT CASE WHEN pc.costingmethod = 'S' THEN 'Y'
+                                    WHEN pc.costingmethod = 'C' AND sce.costingmethod = 'S' THEN 'Y'
+                                    WHEN pc.costingmethod IS NULL AND asch.costingmethod = 'S' THEN 'Y'
+                                    ELSE 'N' END AS isstdCostingMethod 
+                        FROM M_Product p
+                        INNER JOIN M_Product_category pc ON (p.m_product_category_id = pc.m_product_category_id)
+                        INNER JOIN AD_ClientInfo c ON (c.ad_client_id = {GetCtx().GetAD_Client_ID()})
+                        INNER JOIN C_AcctSchema asch ON (asch.c_acctschema_id = c.c_acctschema1_id)
+                        LEFT JOIN StandardCostingElement sce ON (sce.CostCom_ID = pc.m_costelement_id)
+                        WHERE (pc.costingmethod = 'S' OR sce.costingmethod = 'S' OR (pc.costingmethod IS NULL AND asch.costingmethod = 'S'))
+                              AND pc.M_Product_Category_ID={M_Product_Category_ID}";
+                string isStandardCosting = Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()));
+                if (!string.IsNullOrEmpty(isStandardCosting) && isStandardCosting.Equals("Y"))
+                {
+                    Set_Value("VAS_IsStandardCosting", true);
+                }
+                else
+                {
+                    Set_Value("VAS_IsStandardCosting", false);
+                }
+            }
         }
 
         private static int CountAttributes(string Attributes)
