@@ -3543,7 +3543,7 @@ namespace VAdvantage.Process
             query.Append($@"DELETE FROM Fact_Acct ");
             query.Append($@" WHERE AD_Table_ID = {AD_Table_ID} ");
             query.Append($@" AND Record_ID IN ({sql.ToString()})");
-            int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+            int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
             return (no > 0);
 
         }
@@ -6175,7 +6175,7 @@ namespace VAdvantage.Process
                     {
                         sql += ", TreatAsDiscount = 'Y' ";
                     }
-                    if (Util.GetValueOfBool(costingCheck.invoice.Get_Value("VAS_IsLandedCost")))
+                    if (costingCheck.invoiceline != null && costingCheck.invoiceline.Get_ID() > 0 && Util.GetValueOfBool(costingCheck.invoiceline.Get_Value("VAS_IsLandedCost")))
                     {
                         sql += ", VAS_IsLandedCost = 'Y' ";
                     }
