@@ -1045,7 +1045,9 @@ namespace VAdvantage.Model
                     log.SaveError("Error", GetProcessMsg());
                     return false;
                 }
-                if (Is_ValueChanged("BackupWithholdingAmount") || Is_ValueChanged("WithholdingAmt"))
+                /* VIS_045: 14-July-2025, When we change account date etc, then system was reseting the "PayAmt" with "Payment Amount" value 
+                 * so we need to recalculate the PayAmt with the impacts of Withholding Amount */
+                if (Is_ValueChanged("DateAcct") || Is_ValueChanged("PayAmt") || Is_ValueChanged("BackupWithholdingAmount") || Is_ValueChanged("WithholdingAmt"))
                 {
                     SetPayAmt(Decimal.Subtract(GetPaymentAmount(), Decimal.Add(GetBackupWithholdingAmount(), GetWithholdingAmt())));
                 }
@@ -5645,7 +5647,7 @@ namespace VAdvantage.Model
             //  DateTime? dateAcct = GetDateAcct();
             /*VIS_427 13/04/2025 Get the value of date for which the period and non business day
               check will be considered*/
-            DateTime? DateForPeriodCheck= Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
+            DateTime? DateForPeriodCheck = Get_ColumnIndex("VAS_ReversedDate") >= 0 && Get_Value("VAS_ReversedDate") != null
                 ? Util.GetValueOfDateTime(Get_Value("VAS_ReversedDate")) : GetDateAcct();
 
             if (!MPeriod.IsOpen(GetCtx(), DateForPeriodCheck,
