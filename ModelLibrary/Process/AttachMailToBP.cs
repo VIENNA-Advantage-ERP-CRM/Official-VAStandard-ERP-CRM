@@ -489,7 +489,7 @@ namespace VAdvantage.Process
                                         if (existRec > 0)// Is mail already attached
                                         {
                                             retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                            return;
+                                            continue;
                                         }
                                         AttachMail(mail, 0, 0, attachType, "", "", "");
                                     }
@@ -508,7 +508,7 @@ namespace VAdvantage.Process
                             if (existRec > 0)// Is mail already attached
                             {
                                 retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                return;
+                                continue;
                             }
                             AttachMail(mail, 0, 0, attachType, "", "", "");
                             continue;
@@ -526,7 +526,7 @@ namespace VAdvantage.Process
                                 if (existRec > 0)// Is mail already attached
                                 {
                                     retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                    return;
+                                    continue;
                                 }
                                 AttachMail(mail, 0, 0, attachType, "", "", "");
                                 continue;
