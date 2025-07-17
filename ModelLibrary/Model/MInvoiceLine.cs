@@ -4104,6 +4104,14 @@ namespace VAdvantage.Model
                         Is_ValueChanged("VA106_TaxCollectedAtSource_ID") ||
                         Is_ValueChanged("C_Tax_ID") || Is_ValueChanged("TaxBaseAmt") || Is_ValueChanged("TaxAmt") || Is_ValueChanged("SurchargeAmt")))
                     {
+                        if (Get_ValueAsInt("VA106_TaxCollectedAtSource_ID") <= 0 && GetM_Product_ID() > 0)
+                        {
+                            int VA106_TaxCollectedAtSource_ID = MProduct.Get(GetCtx(), GetM_Product_ID()).Get_ValueAsInt("VA106_TaxCollectedAtSource_ID");
+                            if (VA106_TaxCollectedAtSource_ID > 0)
+                            {
+                                Set_Value("VA106_TaxCollectedAtSource_ID", VA106_TaxCollectedAtSource_ID);
+                            }
+                        }
                         decimal VA106_TCSAmount = CalculateTCSTax(GetPrecision());
                         Set_Value("VA106_TCSAmount", VA106_TCSAmount);
                     }
@@ -4529,7 +4537,7 @@ namespace VAdvantage.Model
             if (Env.IsModuleInstalled("VA106_") && C_BPartner_Location_ID != 0 && AD_Org_ID != 0)
             {
                 // get BP state Code
-                (string , int) BPStateCode = MBPartnerLocation.GetStateCode(ctx, C_BPartner_Location_ID);
+                (string, int) BPStateCode = MBPartnerLocation.GetStateCode(ctx, C_BPartner_Location_ID);
 
                 // When the Business Partner Location is not of India, then not to check GST Tax Type
                 if (BPStateCode.Item2 != 208)
@@ -4560,13 +4568,13 @@ namespace VAdvantage.Model
                 // Get Tax Detail
                 MTax tax = MTax.Get(ctx, C_Tax_ID);
                 // When Tax Exempt then not to check the Inter / Intra state setting
-                if(tax.IsTaxExempt())
+                if (tax.IsTaxExempt())
                 {
                     return "";
                 }
 
                 // When tax rate is Zero, then not to check the Inter / Intra state setting
-                if (tax.GetRate()== 0)
+                if (tax.GetRate() == 0)
                 {
                     return "";
                 }

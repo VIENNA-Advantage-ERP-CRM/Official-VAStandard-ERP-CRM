@@ -1740,6 +1740,13 @@ namespace VIS.Controllers
                 invoiceLine.SetM_Product_ID(M_Product_ID, C_UOM_ID);	//	Line UOM
                 invoiceLine.SetQty(QtyEntered);                         //	Invoiced/Entered
 
+                /*VIS_045: 16-July-2025, if TCS define on product then set reference on Invoice Line*/
+                if (Env.IsModuleInstalled("VA106_") && _invoice.IsSOTrx() && invoiceLine.Get_ValueAsInt("VA106_TaxCollectedAtSource_ID") <= 0
+                    && M_Product_ID > 0 && product.Get_ValueAsInt("VA106_TaxCollectedAtSource_ID") > 0)
+                {
+                    invoiceLine.Set_Value("VA106_TaxCollectedAtSource_ID", product.Get_ValueAsInt("VA106_TaxCollectedAtSource_ID"));
+                }
+
 
                 //  Info
                 MOrderLine orderLine = null;
