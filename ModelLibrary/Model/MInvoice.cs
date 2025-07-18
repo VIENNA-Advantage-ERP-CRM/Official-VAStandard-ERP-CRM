@@ -1223,8 +1223,8 @@ namespace VAdvantage.Model
             String sql = "UPDATE C_Invoice i"
                    + " SET TotalLines="
                    + "(SELECT COALESCE(SUM(LineNetAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID) "
-                   + ", AmtDimSubTotal = null "
-                   + ", AmtDimGrandTotal = null "
+                   + (IsReversal() ? "" : ", AmtDimSubTotal = null ")
+                   + (IsReversal() ? "" : ", AmtDimGrandTotal = null ")
                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
                     + (Env.IsModuleInstalled("VA106_") && Get_ColumnIndex("VA106_TCSTotalAmount") > 0 ?
                     ", VA106_TCSTotalAmount = (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)" : "")
