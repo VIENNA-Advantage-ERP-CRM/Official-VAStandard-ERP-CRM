@@ -25,7 +25,7 @@ using System.IO;
 //using System.IO;
 using VAdvantage.Logging;
 using VAdvantage.Print;
-
+using ModelLibrary.Classes;
 
 namespace VAdvantage.Model
 {
@@ -139,6 +139,13 @@ namespace VAdvantage.Model
                 if (Env.IsModuleInstalled("VA106_") && to.Get_ColumnIndex("VA106_TCSTotalAmount") >= 0)
                 {
                     to.Set_Value("VA106_TCSTotalAmount", decimal.Negate(Util.GetValueOfDecimal(from.Get_Value("VA106_TCSTotalAmount"))));
+                }
+
+                // VIS_045: 18-July-2025, Set Amount Dimension Control Refernces Values
+                string amtDimErrMessage = VAS_CommonMethod.SetAmountDimControlValue(from, to, X_C_Invoice.Table_ID);
+                if (!string.IsNullOrEmpty(amtDimErrMessage))
+                {
+                    _log.Log(Level.SEVERE, "Amount Dimesnion Control value not saved on Invoice for Invoice ID " + to.GetC_Invoice_ID());
                 }
             }
             else
@@ -1002,6 +1009,8 @@ namespace VAdvantage.Model
             }
             MInvoiceLine[] fromLines = otherInvoice.GetLines(false);
             int count = 0;
+            string amtDimErrMessage = string.Empty;
+
             for (int i = 0; i < fromLines.Length; i++)
             {
                 log.Log(Level.INFO, i.ToString());
@@ -1072,6 +1081,13 @@ namespace VAdvantage.Model
                     {
                         line.Set_Value("VA106_TaxCollectedAtSource_ID", fromLine.Get_ValueAsInt("VA106_TaxCollectedAtSource_ID"));
                         line.Set_Value("VA106_TCSAmount", decimal.Negate(Util.GetValueOfDecimal(fromLine.Get_Value("VA106_TCSAmount"))));
+                    }
+
+                    // VIS_045: 18-July-2025, Set Amount Dimension Control Refernces Values
+                    amtDimErrMessage = VAS_CommonMethod.SetAmountDimControlValue(fromLine, line, X_C_InvoiceLine.Table_ID);
+                    if (!string.IsNullOrEmpty(amtDimErrMessage))
+                    {
+                        log.Log(Level.SEVERE, "Amount Dimesnion Control value not saved on Invoice Line for Invoice ID " + line.GetC_Invoice_ID());
                     }
 
                     // VIS0060: Set Asset Values on Reversal Line in case of Sale of Asset.
@@ -1223,7 +1239,7 @@ namespace VAdvantage.Model
                 sql = "UPDATE C_Invoice i "
                     + $"SET GrandTotal = COALESCE((TotalLines " +
                      $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
-                    + (Get_ColumnIndex("WithholdingAmt") > 0 ? 
+                    + (Get_ColumnIndex("WithholdingAmt") > 0 ?
                         $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) 
                             {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSTotalAmount, 0) " : "")} ),0) " : "")
                     + " WHERE C_Invoice_ID=" + GetC_Invoice_ID();

@@ -5,6 +5,7 @@
  * Chronological Development
  * VAI050    24-03-2025
  ******************************************************/
+using CoreLibrary.Classes;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -22,6 +23,7 @@ namespace ModelLibrary.Classes
     public class VAS_CommonMethod
     {
         private static VLogger log = VLogger.GetVLogger("VAS_CommonMethod");
+        private static CCache<int, List<string>> s_cache_AmtDim = new CCache<int, List<string>>("AmtDim", 40);
 
         /// <summary>
         /// VAI050-This method used to copy history record data
@@ -154,5 +156,352 @@ namespace ModelLibrary.Classes
 
             }
         }
+
+        #region Reversal Document creation for Amount Dimension Control
+
+        /// <summary>
+        /// This function is used to get the Amount Dimension columns from the specified tables
+        /// </summary>
+        /// <param name="AD_Table_ID">table ID</param>
+        /// <returns>List of Column Names</returns>
+        /// <author>VIS_045, 17-July-2025</author>
+        public static List<string> GetAmountDimensionColumns(int AD_Table_ID)
+        {
+            List<string> lstAmtDimCols = new List<string>();
+            if (!s_cache_AmtDim.TryGetValue(AD_Table_ID, out lstAmtDimCols) || lstAmtDimCols.Count == 0)
+            {
+                if (lstAmtDimCols == null)
+                {
+                    lstAmtDimCols = new List<string>();
+                }
+                string sql = $@"SELECT ColumnName, AD_Column_ID FROM AD_Column WHERE AD_Table_ID = {AD_Table_ID} AND IsActive = 'Y' AND AD_Reference_ID = 47 ";
+                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        lstAmtDimCols.Add(Util.GetValueOfString(ds.Tables[0].Rows[i]["ColumnName"]));
+                    }
+                    s_cache_AmtDim.Add(AD_Table_ID, lstAmtDimCols);
+                }
+            }
+            return lstAmtDimCols;
+        }
+
+        /// <summary>
+        /// This function is used to create Amount Dimension Copy record during Reversal
+        /// </summary>
+        /// <param name="from">From Object</param>
+        /// <param name="To">To Object</param>
+        /// <param name="AD_Table_ID">Table ID</param>
+        /// <returns>Amount Dimesnion ID (when created Successfully)</returns>
+        /// <author>VIS_045, 18-July-2025</author>
+        public static string SetAmountDimControlValue(PO from, PO To, int AD_Table_ID)
+        {
+            string errormessage = string.Empty;
+            try
+            {
+                // Get Column Name of Amount Dimension reference 
+                List<string> lstAmtDimCol = VAS_CommonMethod.GetAmountDimensionColumns(AD_Table_ID);
+                if (lstAmtDimCol != null && lstAmtDimCol.Count > 0)
+                {
+                    int C_DimAmt_ID = 0;
+                    foreach (string columnName in lstAmtDimCol)
+                    {
+                        // Check Amount Dimension reference is linked or not
+                        C_DimAmt_ID = from.Get_ValueAsInt(columnName);
+                        if (C_DimAmt_ID > 0)
+                        {
+                            // Create reversal document of Amount Dimension Control Reference
+                            C_DimAmt_ID = VAS_CommonMethod.CreateAmountDimensionEntry(from.GetCtx(), C_DimAmt_ID, To.Get_Trx(), out errormessage);
+                            if (!string.IsNullOrEmpty(errormessage))
+                            {
+                                return errormessage;
+                            }
+
+                            // Set Value on reversal/copied document
+                            To.Set_Value(columnName, C_DimAmt_ID);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Log(Level.SEVERE, "Amount Dimesnion Control value not saved - " + ex.Message.ToString());
+            }
+            return errormessage;
+        }
+
+        /// <summary>
+        /// This function is used to create counter entry for Reversal / Copieed Document of Amount Dimesnion Control
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="C_DimAmt_ID">Original Amount Dimension Control Reference ID</param>
+        /// <param name="trxName">TrxName</param>
+        /// <param name="errorMessage"> OUT Error Message</param>
+        /// <returns>Reversal / Copied Amount Dimension Control Reference ID</returns>
+        /// <author>VIS_045, 18-July-2025</author>
+        public static int CreateAmountDimensionEntry(Ctx ctx, int C_DimAmt_ID, Trx trxName, out string errorMessage)
+        {
+            int reversalDimAmt_ID = 0;
+            errorMessage = string.Empty;
+
+            // Get Detail of Original Amount Dimension Control reference for copying
+            DataSet dsData = GetDimAmtRecord(C_DimAmt_ID);
+
+            if (dsData != null && dsData.Tables.Count == 3)
+            {
+                // CReate object of Amt Dimension Header
+                PO _amtDim = MTable.GetPO(ctx, "C_DimAmt", 0, trxName);
+
+                // Get All Columns
+                MColumn[] DimAmtCols = MTable.Get(ctx, "C_DimAmt").GetColumns(false);
+
+                foreach (DataColumn colName in dsData.Tables[0].Columns)
+                {
+                    // Get Column
+                    MColumn columnName = DimAmtCols.FirstOrDefault(col => col.GetColumnName().Equals(colName.ColumnName, StringComparison.OrdinalIgnoreCase));
+
+                    // Set Values
+                    if (columnName.GetColumnName().ToLower().Equals("amount"))
+                    {
+                        _amtDim.Set_ValueNoCheck(columnName.GetColumnName(), decimal.Negate(Util.GetValueOfDecimal(dsData.Tables[0].Rows[0][colName.ColumnName])));
+                    }
+                    else
+                    {
+                        _amtDim.Set_ValueNoCheck(columnName.GetColumnName(), dsData.Tables[0].Rows[0][colName.ColumnName]);
+                    }
+                }
+                _amtDim.Set_ValueNoCheck("C_DimAmt_ID", 0);
+                if (!_amtDim.Save())
+                {
+                    ValueNamePair vp = VLogger.RetrieveError();
+                    if (vp != null)
+                    {
+                        string val = vp.GetName();
+                        if (String.IsNullOrEmpty(val))
+                        {
+                            val = vp.GetValue();
+                        }
+                        errorMessage = val;
+                    }
+                    if (string.IsNullOrEmpty(errorMessage))
+                    {
+                        errorMessage = Msg.GetMsg(ctx, "VAS_AmtDimNotCreated");
+                    }
+                    return 0;
+                }
+                else
+                {
+                    // copied Header Amount Dimension ID
+                    reversalDimAmt_ID = _amtDim.Get_ValueAsInt("C_DimAmt_ID");
+
+                    int reversalDimTypeID = 0;
+                    int reversalDimLineID = 0;
+
+                    // Iteration on Amount DImension Type Records
+                    for (int dimType = 0; dimType < dsData.Tables[1].Rows.Count; dimType++)
+                    {
+                        // Create Amount Dimession type
+                        reversalDimTypeID = CreateAmtDimtypeRecord(ctx, reversalDimAmt_ID, dsData.Tables[1].Columns, dsData.Tables[1].Rows[dimType], trxName, out errorMessage);
+                        if (reversalDimTypeID > 0)
+                        {
+                            // Get Amount Dimension Lines against Amount Dimension type
+                            DataRow[] drAmtDimLine = dsData.Tables[2].Select("C_DimAmt_ID =" + Util.GetValueOfInt(dsData.Tables[0].Rows[0]["C_DimAmt_ID"]) +
+                                " AND C_DimAmtAcctType_ID = " + Util.GetValueOfInt(dsData.Tables[1].Rows[dimType]["C_DimAmtAcctType_ID"]));
+                            if (drAmtDimLine != null)
+                            {
+                                for (int line = 0; line < drAmtDimLine.Length; line++)
+                                {
+                                    // Create Amount Dimession type
+                                    reversalDimLineID = CreateAmtDimLineRecord(ctx, reversalDimAmt_ID, reversalDimTypeID, dsData.Tables[2].Columns, drAmtDimLine[line], trxName, out errorMessage);
+                                    if (reversalDimLineID < 0)
+                                    {
+                                        return 0;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            return 0;
+                        }
+                    }
+                }
+            }
+            return reversalDimAmt_ID;
+        }
+
+        /// <summary>
+        /// This function is used to create counter entry for Reversal / Copieed Document of Amount Dimesnion type
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="DimAmt_ID">Header Amt Dimension ID against whcih Type to be created</param>
+        /// <param name="Columns">Data Columns</param>
+        /// <param name="dr">DataRow</param>
+        /// <param name="trxName">TrxName</param>
+        /// <param name="errorMessage">OUT Error Message</param>
+        /// <returns>Reversal / Copied Amount Dimension Type Reference ID</returns>
+        /// <author>VIS_045, 18-July-2025</author>
+        public static int CreateAmtDimtypeRecord(Ctx ctx, int DimAmt_ID, DataColumnCollection Columns, DataRow dr, Trx trxName, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            // Create Object
+            PO _amtDimType = MTable.GetPO(ctx, "C_DimAmtAcctType", 0, trxName);
+
+            // Get All Columns
+            MColumn[] DimAmtCols = MTable.Get(ctx, "C_DimAmtAcctType").GetColumns(false);
+
+            foreach (DataColumn colName in Columns)
+            {
+                // Get Column
+                MColumn columnName = DimAmtCols.FirstOrDefault(col => col.GetColumnName().Equals(colName.ColumnName, StringComparison.OrdinalIgnoreCase));
+
+                // Set Values
+                if (columnName.GetColumnName().ToLower().Equals("totaldimlineamout"))
+                {
+                    _amtDimType.Set_ValueNoCheck(columnName.GetColumnName(), decimal.Negate(Util.GetValueOfDecimal(dr[colName.ColumnName])));
+                }
+                else
+                {
+                    _amtDimType.Set_ValueNoCheck(columnName.GetColumnName(), dr[colName.ColumnName]);
+                }
+            }
+
+            // Set header ID
+            _amtDimType.Set_ValueNoCheck("C_DimAmt_ID", DimAmt_ID);
+
+            // Clear own ID
+            _amtDimType.Set_ValueNoCheck("C_DimAmtAcctType_ID", 0);
+            if (!_amtDimType.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                if (vp != null)
+                {
+                    string val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                    errorMessage = val;
+                }
+                if (string.IsNullOrEmpty(errorMessage))
+                {
+                    errorMessage = Msg.GetMsg(ctx, "VAS_AmtDimTypeNotCreated");
+                }
+                return 0;
+            }
+            return _amtDimType.Get_ValueAsInt("C_DimAmtAcctType_ID");
+        }
+
+        /// <summary>
+        /// This function is used to create counter entry for Reversal / Copieed Document of Amount Dimesnion Lines
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="DimAmt_ID">Header Amt Dimension ID against whcih Type to be created</param>
+        /// <param name="C_DimAmtAcctType_ID">Amt Dimension Type ID against whcih Line to be created</param>
+        /// <param name="Columns">Data Columns</param>
+        /// <param name="dr">DataRow</param>
+        /// <param name="trxName">TrxName</param>
+        /// <param name="errorMessage">OUT Error Message</param>
+        /// <returns>Reversal / Copied Amount Dimension Line Reference ID</returns>
+        /// <author>VIS_045, 18-July-2025</author>
+        public static int CreateAmtDimLineRecord(Ctx ctx, int DimAmt_ID, int C_DimAmtAcctType_ID, DataColumnCollection Columns, DataRow dr, Trx trxName, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            // Create Object
+            PO _amtDimLine = MTable.GetPO(ctx, "C_DimAmtLine", 0, trxName);
+
+            // Get All Columns
+            MColumn[] DimAmtCols = MTable.Get(ctx, "C_DimAmtLine").GetColumns(false);
+
+            foreach (DataColumn colName in Columns)
+            {
+                // Get Column
+                MColumn columnName = DimAmtCols.FirstOrDefault(col => col.GetColumnName().Equals(colName.ColumnName, StringComparison.OrdinalIgnoreCase));
+
+                // Set Values
+                if (columnName.GetColumnName().ToLower().Equals("amount"))
+                {
+                    _amtDimLine.Set_ValueNoCheck(columnName.GetColumnName(), decimal.Negate(Util.GetValueOfDecimal(dr[colName.ColumnName])));
+                }
+                else
+                {
+                    _amtDimLine.Set_ValueNoCheck(columnName.GetColumnName(), dr[colName.ColumnName]);
+                }
+            }
+
+            // Set Parent ID's
+            _amtDimLine.Set_ValueNoCheck("C_DimAmt_ID", DimAmt_ID);
+            _amtDimLine.Set_ValueNoCheck("C_DimAmtAcctType_ID", C_DimAmtAcctType_ID);
+
+            // Clear own reference 
+            _amtDimLine.Set_ValueNoCheck("C_DimAmtLine_ID", 0);
+            if (!_amtDimLine.Save())
+            {
+                ValueNamePair vp = VLogger.RetrieveError();
+                if (vp != null)
+                {
+                    string val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                    errorMessage = val;
+                }
+                if (string.IsNullOrEmpty(errorMessage))
+                {
+                    errorMessage = Msg.GetMsg(ctx, "VAS_AmtDimTypeNotCreated");
+                }
+                return 0;
+            }
+            return _amtDimLine.Get_ValueAsInt("C_DimAmtLine_ID");
+        }
+
+        /// <summary>
+        /// This function is used to get the Amount Dimesnion Control Record Details
+        /// </summary>
+        /// <param name="C_DimAmt_ID">Amount Dimension Control ID</param>
+        /// <returns>Dataset</returns>
+        /// <author>VIS_045, 18-July-2025</author>
+        public static DataSet GetDimAmtRecord(int C_DimAmt_ID)
+        {
+            string sql = string.Empty;
+            DataSet ds = new DataSet();
+
+            // 1️ Load C_DimAmt table
+            sql = $@"SELECT * FROM C_DimAmt WHERE C_DimAmt_ID = {C_DimAmt_ID}";
+            DataTable dtDimAmt = DB.ExecuteDataset(sql).Tables[0].Copy(); ;
+            if (dtDimAmt.Rows.Count > 0)
+            {
+                dtDimAmt.TableName = "C_DimAmt";
+                ds.Tables.Add(dtDimAmt);
+            }
+
+            // 2️ Load C_DimAmtAcctType table
+            sql = $@"SELECT * FROM C_DimAmtAcctType WHERE C_DimAmt_ID = {C_DimAmt_ID}";
+            DataTable dtAcctType = DB.ExecuteDataset(sql).Tables[0].Copy(); ;
+            if (dtAcctType.Rows.Count > 0)
+            {
+                dtAcctType.TableName = "C_DimAmtAcctType";
+                ds.Tables.Add(dtAcctType);
+            }
+
+            // 3️ Load C_DimAmtLine table
+            sql = $@"SELECT * FROM C_DimAmtLine WHERE C_DimAmt_ID = {C_DimAmt_ID}";
+            DataTable dtAmtLine = DB.ExecuteDataset(sql).Tables[0].Copy(); ;
+            if (dtAmtLine.Rows.Count > 0)
+            {
+                dtAmtLine.TableName = "C_DimAmtLine";
+                ds.Tables.Add(dtAmtLine);
+            }
+
+            return ds;
+        }
+
+        #endregion
+
     }
 }
