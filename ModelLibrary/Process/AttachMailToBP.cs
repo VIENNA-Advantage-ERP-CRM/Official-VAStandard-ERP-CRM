@@ -369,11 +369,7 @@ namespace VAdvantage.Process
                             from = match.Groups["email"].Value.Trim().ToLower();
                             pattern = @"(?i)\{AttachTo:\s*[^}]+\}";
                             subJect = Regex.Replace(subJect, pattern, "").Trim();
-                        }
-                        //if (!String.IsNullOrEmpty(subJect) && subJect.ToLower().IndexOf("{attachto") > -1 && subJect.IndexOf("}") > -1)
-                        //{
-                        //    from = subJect.Substring(subJect.ToLower().IndexOf("{attachto:") + 1, subJect.IndexOf("}") - (subJect.ToLower().IndexOf("{attachto:") + 1)).ToLower();                           
-                        //}
+                        }                       
                         else if (Util.GetValueOfString(mail.Cc).ToLower().Contains(userEmail))
                         {
                             bool internalmail = true;
@@ -439,15 +435,14 @@ namespace VAdvantage.Process
                         {
                             tableName = "C_Lead";
                             sql.Clear();
-                            sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
-                                c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
-                                FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
-                                WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + from + "%'");
+                            sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
+                                c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N'
+                                AND (LOWER(c.Email) LIKE " + "'%" + from + "%'");
                             if (!emailDomains.Contains(mailDomain))
                             {
                                 sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
                             }
-                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID + " ORDER BY c.IsArchive ASC, c.Updated DESC");
+                            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID + " ORDER BY c.Updated DESC");
 
                             idr = DB.ExecuteReader(sql.ToString());
                             dt = new DataTable();
@@ -468,10 +463,9 @@ namespace VAdvantage.Process
                                 {
                                     mailDomain = tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty;
                                     sql.Clear();
-                                    sql.Append(@"SELECT c.C_Lead_ID, o.C_Bpartner_ID, c.Name, c.DocumentNo AS Value, 
-                                        c.Email, c.C_Project_ID, o.Ref_Order_ID, o.C_Order_ID
-                                        FROM C_Lead c LEFT JOIN C_Project o ON (c.C_Project_ID=o.C_Project_ID)
-                                        WHERE c.IsActive='Y' AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
+                                    sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
+                                        c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N' 
+                                        AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
                                     if (!emailDomains.Contains(mailDomain))
                                     {
                                         sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
@@ -941,44 +935,15 @@ namespace VAdvantage.Process
 
         private void AttachToLead(dynamic mail, DataTable dt, string attachType, string from)
         {
-            int _tableID = 0, recordID = 0, existRec;
-            string userOrBp = "";
+            int _tableID, recordID, existRec;
+            string userOrBp;
             DataRow[] dr = dt.Select($"Email = '{from.Replace("'", "''")}'");
             if (dr.Length == 1)
             {
-                if (Util.GetValueOfInt(dr[0]["C_Order_ID"]) > 0 || Util.GetValueOfInt(dr[0]["Ref_Order_ID"]) > 0)
-                {
-                    _tableID = PO.Get_Table_ID("C_Order");
-                    recordID = Util.GetValueOfInt(dr[0]["C_Order_ID"]) > 0 ? Util.GetValueOfInt(dr[0]["C_Order_ID"]) : Util.GetValueOfInt(dr[0]["Ref_Order_ID"]);
-                    if (Util.GetValueOfInt(dr[0]["C_Order_ID"]) > 0)
-                    {
-                        userOrBp = Msg.GetMsg(GetCtx(), "SalesOrder");
-                    }
-                    else
-                    {
-                        userOrBp = Msg.GetMsg(GetCtx(), "SalesQuotation");
-                    }
-                }
-                else if (Util.GetValueOfInt(dr[0]["C_Project_ID"]) > 0)
-                {
-                    _tableID = PO.Get_Table_ID("C_Project");
-                    recordID = Util.GetValueOfInt(dr[0]["C_Project_ID"]);
-                    userOrBp = Msg.GetMsg(GetCtx(), "Opportunity");
-                }
-                else if (Util.GetValueOfInt(dr[0]["C_BPartner_ID"]) > 0)
-                {
-                    _tableID = PO.Get_Table_ID("C_BPartner");
-                    recordID = Util.GetValueOfInt(dr[0]["C_BPartner_ID"]);
-                    userOrBp = Msg.GetMsg(GetCtx(), "Prospect");
-                }
-                else
-                {
-                    _tableID = PO.Get_Table_ID("C_Lead");
-                    recordID = Util.GetValueOfInt(dr[0]["C_Lead_ID"]);
-                    userOrBp = Msg.GetMsg(GetCtx(), "Lead");
-                }
+                _tableID = PO.Get_Table_ID("C_Lead");
+                recordID = Util.GetValueOfInt(dr[0]["C_Lead_ID"]);
+                userOrBp = Msg.GetMsg(GetCtx(), "Lead");
                 existRec = GetAttachedRecord(_tableID, recordID, mail.MessageID, folderName);
-
                 if (existRec > 0)// Is mail already attached
                 {
                     retVal.Append("MailAlreadyAttachedWithParticularRecord");
@@ -990,7 +955,6 @@ namespace VAdvantage.Process
             else
             {
                 existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-
                 if (existRec > 0)// Is mail already attached
                 {
                     retVal.Append("MailAlreadyAttachedWithParticularRecord");
