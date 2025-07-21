@@ -3557,11 +3557,19 @@ namespace VAdvantage.Model
                                                 }
                                             }
 
+                                            // Cost Combination calculated, so that combination affects goes to Trx detail of Landed Cost
+                                            if (cd != null)
+                                            {
+                                                cd.CreateCostForCombination(cd, acctSchema, productLca, M_ASI_ID, 0, "LandedCostAllocation", costingCheck, optionalStrcc: optionalstr);
+                                            }
+
                                             //22-Jan-2025, Create Entry or Update Landed cost (Difference value between Actual and Expected landed Cost) on Product Transaction Tab,
                                             if (costingCheck.UnAllocatedLandedCost == 0 && acctSchema.GetC_Currency_ID() == ctx.GetContextAsInt("$C_Currency_ID"))
                                             {
                                                 costingCheck.Qty = qntity;
                                                 costingCheck.ExpectedLandedCost = decimal.Round(decimal.Divide(amt, qntity), acctSchema.GetCostingPrecision());
+                                                costingCheck.PostCurrentCostPrice = MCost.GetproductCostBasedonAcctSchema(AD_Client_ID, AD_Org_ID, acctSchema.GetC_AcctSchema_ID(),
+                                                                   productLca.GetM_Product_ID(), M_ASI_ID, trxName, M_Warehouse_Id);
                                                 CreateOrUpdateLandedCostTransaction(costingCheck, invoiceline, dsLandedCostAllocation.Tables[0].Rows[lca], trxName);
                                             }
                                         }
@@ -3576,10 +3584,6 @@ namespace VAdvantage.Model
                                             return false;
                                         }
                                         //}
-                                        if (cd != null)
-                                        {
-                                            cd.CreateCostForCombination(cd, acctSchema, productLca, M_ASI_ID, 0, "LandedCostAllocation", costingCheck, optionalStrcc: optionalstr);
-                                        }
                                     }
                                 }
                             }
@@ -4955,7 +4959,8 @@ namespace VAdvantage.Model
                 int no = DB.ExecuteQuery($@"Update M_Transaction SET VAS_LandedCost = {costingCheck.ExpectedLandedCost},
                                     M_CostElement_ID = {Util.GetValueOfInt(drLandedCost["M_CostElement_ID"])}, 
                                     CostingLevel = {GlobalVariable.TO_STRING(costingCheck.costinglevel)},
-                                    VAS_IsLandedCost = 'Y', MovementQty = {costingCheck.Qty}
+                                    VAS_IsLandedCost = 'Y', MovementQty = {costingCheck.Qty},
+                                    ProductCost = {costingCheck.PostCurrentCostPrice}
                                 WHERE M_Transaction_ID = {M_Transaction_ID}", null, trxName);
                 if (no <= 0)
                 {
