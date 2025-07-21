@@ -6061,7 +6061,7 @@ namespace VAdvantage.Process
                         query.Append($@"SELECT CASE WHEN SUM(mi.Qty) = il.QtyInvoiced THEN 'Y' ELSE 'N' END AS IsCstImmediate 
                                                 FROM M_MatchInv mi
                                                 INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)
-                                                WHERE il.C_InvoiceLine_ID={invoiceLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");                       
+                                                WHERE il.C_InvoiceLine_ID={invoiceLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");
                         bool isCostImmediate = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, Get_Trx())).Equals("Y");
                         invoiceLine.SetIsCostImmediate(isCostImmediate);
                     }
@@ -6178,6 +6178,7 @@ namespace VAdvantage.Process
                     if (costingCheck.invoiceline != null && costingCheck.invoiceline.Get_ID() > 0 && Util.GetValueOfBool(costingCheck.invoiceline.Get_Value("VAS_IsLandedCost")))
                     {
                         sql += ", VAS_IsLandedCost = 'Y' ";
+                        sql += $", ProductCost = {costingCheck.PostCurrentCostPrice} ";
                     }
                 }
                 sql += $@" WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}";
