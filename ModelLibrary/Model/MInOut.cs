@@ -3529,6 +3529,20 @@ namespace VAdvantage.Model
                                     amt = Decimal.Multiply(ProductOrderPriceActual, sLine.GetQtyEntered());
                                 }
 
+                                //VIS_045: 15-May-2025, Get the Consolidate Amount of Multiple Order which are linked with Same GRN Line
+                                if (IsReversal() && sLine.GetReversalDoc_ID() > 0)
+                                {
+                                    (decimal, decimal) POAmtandPrice = GetConsolidatedPriceofPO(productCQ, sLine.GetReversalDoc_ID(), orderLine.GetParent().GetC_Currency_ID(), isUpdatePostCurrentcostPriceFromMR);
+                                    if (POAmtandPrice.Item1 != 0)
+                                    {
+                                        amt = POAmtandPrice.Item1;
+                                        if (amt > 0 && sLine.GetMovementQty() < 0)
+                                        {
+                                            amt = decimal.Negate(amt);
+                                        }
+                                    }
+                                }
+
                                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), GetAD_Client_ID(), GetAD_Org_ID(), productCQ,
                                     sLine.GetM_AttributeSetInstance_ID(), "Material Receipt", null, sLine, null, null, null, amt,
                                    sLine.GetMovementQty(), Get_Trx(), costingCheck, out conversionNotFoundInOut, optionalstr: "window"))
@@ -4229,6 +4243,63 @@ namespace VAdvantage.Model
             SetProcessed(true);
             SetDocAction(DOCACTION_Close);
             return DocActionVariables.STATUS_COMPLETED;
+        }
+
+        /// <summary>
+        /// This function is used to get the Consolidate Amount of Multiple Order which are linked with Same GRN Line
+        /// Generally this happen user user match mutiple PO with same GRN line using Match PO_Receipt-Invoice Form
+        /// </summary>
+        /// <param name="Product">Product Object</param>
+        /// <param name="M_inOutLine_ID">GRN Line id </param>
+        /// <param name="OrderCurrency">Order Currency ID</param>
+        /// <param name="IsPOCostingMethod">Is linked costing method belongs to PO Methods or not</param>
+        /// <returns>(Total Cost , Per Unit Cost (based on GRN Movement Quantity)</returns>
+        /// <auther>VIS_045, 14-May-2025</auther>
+        public (decimal, decimal) GetConsolidatedPriceofPO(MProduct Product, int M_inOutLine_ID, int OrderCurrency, bool IsPOCostingMethod)
+        {
+            (decimal, decimal) POAmtandPrice = (0, 0);
+
+            DataSet ds = DB.ExecuteDataset($@"SELECT mpo.C_OrderLine_ID, o.C_Currency_ID, o.C_ConversionType_ID, mpo.Qty, ol.*
+                         FROM M_MatchPO mpo 
+                         INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = mpo.C_OrderLine_ID)
+                         INNER JOIN C_Order o ON (ol.C_Order_ID = o.C_Order_ID)
+                         WHERE mpo.M_InOutLine_ID = {M_inOutLine_ID}", null, null); /*Trx cant'be use, because during reversal, system delete the MatchPO record*/
+
+            // this section will execute only when 1 GRN linked with many PO's
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 1)
+            {
+                MOrderLine objOrderLine = null;
+                Decimal ProductOrderLineCost = 0;
+                decimal totalProductOrderLineCost = 0;
+                decimal totalQty = 0;
+                for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
+                {
+                    objOrderLine = new MOrderLine(GetCtx(), ds.Tables[0].Rows[k], Get_Trx());
+                    // Total Cost
+                    ProductOrderLineCost = objOrderLine.GetProductLineCost(objOrderLine);
+
+                    // When Multiple match order with single GRN Line currency are different than convert it into that order currency which orderline is linked on GRN line
+                    if (Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_Currency_ID"]) != OrderCurrency)
+                    {
+                        ProductOrderLineCost = MConversionRate.ConvertCostingPrecision(GetCtx(), ProductOrderLineCost, Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_Currency_ID"]),
+                            OrderCurrency, GetDateAcct(), Util.GetValueOfInt(ds.Tables[0].Rows[k]["C_ConversionType_ID"]), GetAD_Client_ID(), GetAD_Org_ID());
+                    }
+
+                    // Matched Qty
+                    totalQty += Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["Qty"]);
+                    // Total Amount of Matched Quantity 
+                    if (Product.IsCostAdjustmentOnLost())
+                    {
+                        totalProductOrderLineCost += ProductOrderLineCost;
+                    }
+                    else
+                    {
+                        totalProductOrderLineCost += Decimal.Multiply(Decimal.Divide(ProductOrderLineCost, objOrderLine.GetQtyOrdered()), Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["Qty"]));
+                    }
+                }
+                POAmtandPrice = (totalProductOrderLineCost, decimal.Divide(totalProductOrderLineCost, totalQty));
+            }
+            return POAmtandPrice;
         }
 
         private bool CalculateCosting(MClient client, MInOutLine sLine, CostingCheck costingCheck, Decimal Qty)

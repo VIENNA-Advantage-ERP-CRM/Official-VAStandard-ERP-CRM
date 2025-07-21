@@ -381,6 +381,10 @@
                     else {
                         mTab.setValue("IsDiscountPrinted", "N");
                     }
+                    //if dr has supply type property then set its value
+                    if (dr.hasOwnProperty("VA106_SupplyType")) {
+                        mTab.setValue("VA106_SupplyType", dr["VA106_SupplyType"]);
+                    }
                     // set withholding tax defined on vendor/customer
                     //mTab.setValue("C_Withholding_ID", Util.getValueOfInt(dr.get("C_Withholding_ID")));
                 }
@@ -498,8 +502,8 @@
 
             var purchasingUom = 0;
             if (countEd011 > 0) {
-                 //VAI050- If isSoTrx false than Set Purchasing UOM from Product if Purchasing UOM found on Purchasing tab
-                    //If Purchasing UOM not found than give priority to PU unit of Product else set Base UOM of Product
+                //VAI050- If isSoTrx false than Set Purchasing UOM from Product if Purchasing UOM found on Purchasing tab
+                //If Purchasing UOM not found than give priority to PU unit of Product else set Base UOM of Product
                 if (Util.getValueOfInt(invoiceRecord["purchasingUom"]) > 0 && !isSOTrx)
                     purchasingUom = Util.getValueOfInt(invoiceRecord["purchasingUom"]);
                 else
@@ -507,7 +511,7 @@
                 if (purchasingUom > 0 && isSOTrx == false) {
                     mTab.setValue("C_UOM_ID", purchasingUom);
                 }
-                 //VAI050- If isSoTrx true than Set Sales UOM from Product if found else set Base UOM
+                //VAI050- If isSoTrx true than Set Sales UOM from Product if found else set Base UOM
                 else if (Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]) > 0 && isSOTrx) {
                     mTab.setValue("C_UOM_ID", Util.getValueOfInt(invoiceRecord["VAS_SalesUOM_ID"]));
                 }
@@ -519,6 +523,11 @@
             // set C_RevenueRecognition_ID if InvoiceLine Tab Contains C_RevenueRecognition_ID field
             if (mTab.findColumn("C_RevenueRecognition_ID") > -1) {
                 mTab.setValue("C_RevenueRecognition_ID", Util.getValueOfInt(invoiceRecord["C_RevenueRecognition_ID"]));
+            }
+
+            // VIS_045: 01-July-2025, Check Tax Collected at Source is defined on Product Master, if defined then check it is sales trx, if yes then set value on InvoiceLine
+            if (isSOTrx && mTab.findColumn("VA106_TaxCollectedAtSource_ID") > -1 && invoiceRecord.hasOwnProperty("VA106_TaxCollectedAtSource_ID")) {
+                mTab.setValue("VA106_TaxCollectedAtSource_ID", Util.getValueOfInt(invoiceRecord["VA106_TaxCollectedAtSource_ID"]));
             }
 
             //		
@@ -1195,10 +1204,73 @@
             else {
                 mTab.setValue("LineTotalAmt", Util.getValueOfDecimal((lineNetAmt + taxAmt).toFixed(StdPrecision)));
             }
+
+            /*VIS_045: 01-July-2025, Calculate TCS tax Amount */
+            if (isSOTrx && mTab.findColumn("VA106_TaxCollectedAtSource_ID") > -1 && Util.getValueOfInt(mTab.getValue("VA106_TaxCollectedAtSource_ID")) > 0) {
+                if (Util.getValueOfDecimal(mTab.getValue("LineTotalAmt")) != 0) {
+                    paramStr = Util.getValueOfInt(mTab.getValue("VA106_TaxCollectedAtSource_ID")).toString() + "," +
+                        Util.getValueOfDecimal(mTab.getValue("LineTotalAmt")).toString();
+
+                    var tcsTaxDetails = VIS.dataContext.getJSONRecord("MInvoice/VA106_CalculateTCSTax", paramStr);
+
+                    if (tcsTaxDetails != null) {
+                        mTab.setValue("VA106_TCSAmount", Util.getValueOfDecimal(tcsTaxDetails["VA106_TCSTaxValue"]));
+                    }
+                }
+                else {
+                    mTab.setValue("VA106_TCSAmount", 0);
+                }
+            }
+
+
         }
         catch (err) {
             this.setCalloutActive(false);
             this.log.severe(err.toString());
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
+    /**
+     * This function is used to calculate the TCS tax 
+     * Calculate on Value -- Taxable amt + Tax Amt + Surcharge Amt = Line Total Amt
+     * Rate will be picked from Tax Collected at source screen
+     * @param {any} ctx
+     * @param {any} windowNo
+     * @param {any} mTab
+     * @param {any} mField
+     * @param {any} value
+     * @param {any} oldValue
+     */
+    CalloutInvoice.prototype.VA106_CalculateTCSTax = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (this.isCalloutActive()) {
+            return "";
+        }
+        if (value == null || value.toString() == "") {
+            mTab.setValue("VA106_TCSAmount", 0);
+        }
+        try {
+            this.setCalloutActive(true);
+
+            if (Util.getValueOfDecimal(mTab.getValue("LineTotalAmt")) != 0) {
+                var paramStr = Util.getValueOfInt(mTab.getValue("VA106_TaxCollectedAtSource_ID")).toString() + "," +
+                    Util.getValueOfDecimal(mTab.getValue("LineTotalAmt")).toString();
+
+                var tcsTaxDetails = VIS.dataContext.getJSONRecord("MInvoice/VA106_CalculateTCSTax", paramStr);
+
+                if (tcsTaxDetails != null) {
+                    mTab.setValue("VA106_TCSAmount", Util.getValueOfDecimal(tcsTaxDetails["VA106_TCSTaxValue"]));
+                }
+            }
+            else {
+                mTab.setValue("VA106_TCSAmount", 0);
+            }
+        }
+        catch (err) {
+            this.setCalloutActive(false);
+            return err;
         }
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;

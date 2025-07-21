@@ -281,7 +281,7 @@ namespace ViennaAdvantage.Process
                         || _invoice.GetC_PaymentTerm_ID() != order.GetC_PaymentTerm_ID()
                         || _invoice.GetM_PriceList_ID() != order.GetM_PriceList_ID()
                         || _invoice.GetAD_Org_ID() != order.GetAD_Org_ID()
-                        || _invoice.Get_ValueAsInt("VAS_ContractMaster_ID") != order.Get_ValueAsInt("VAS_ContractMaster_ID")                        
+                        || _invoice.Get_ValueAsInt("VAS_ContractMaster_ID") != order.Get_ValueAsInt("VAS_ContractMaster_ID")
                         || ((_invoice.GetC_ConversionType_ID() != 0 ? _invoice.GetC_ConversionType_ID() : defaultConversionType)
                              != (order.GetC_ConversionType_ID() != 0 ? order.GetC_ConversionType_ID() : defaultConversionType))
                        )))
@@ -885,6 +885,14 @@ namespace ViennaAdvantage.Process
                 if (!_invoice.ProcessIt(_docAction))
                 {
                     log.Warning("completeInvoice - failed: " + _invoice);
+                    if (_msg == null || string.IsNullOrEmpty(_msg.ToString()))
+                    {
+                        _msg.Append(_invoice.GetProcessMsg() + " - ");
+                    }
+                    else
+                    {
+                        _msg.Append(", " + _invoice.GetProcessMsg() + " - ");
+                    }
                 }
                 _invoice.SetConditionalFlag(null);
                 _invoice.Save();
@@ -916,6 +924,8 @@ namespace ViennaAdvantage.Process
                 + ", AmtDimSubTotal = null "      // reset Amount Dimension if Sub Total Amount is different
                 + ", AmtDimGrandTotal = null "     // reset Amount Dimension if Grand Total Amount is different
                 + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? ", WithholdingAmt = ((SELECT COALESCE(SUM(WithholdingAmt),0) FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID))" : "")
+                + (Env.IsModuleInstalled("VA106_") && invoice.Get_ColumnIndex("VA106_TCSTotalAmount") > 0 ?
+                  ", VA106_TCSTotalAmount = (SELECT ROUND(SUM(COALESCE(VA106_TCSAmount,0))," + invoice.GetPrecision() + $") FROM C_InvoiceLine il WHERE i.C_Invoice_ID=il.C_Invoice_ID)" : "")
             + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             int no = DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)
@@ -925,14 +935,21 @@ namespace ViennaAdvantage.Process
 
             if (invoice.IsTaxIncluded())
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines "
-                    + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)) " : "")
+                    + "SET GrandTotal= COALESCE((TotalLines "
+                     + $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                    + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ?
+                    $@" , GrandTotalAfterWithholding = COALESCE((TotalLines - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0)
+                           {(Env.IsModuleInstalled("VA106_") ? " + NVL(VA106_TCSTotalAmount, 0) " : "")} ),0) " : "")
                     + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             else
                 sql = "UPDATE C_Invoice i "
-                    + "SET GrandTotal=TotalLines+"
-                        + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0)),"+invoice.GetPrecision()+") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
-                        + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ? " , GrandTotalAfterWithholding = (TotalLines + (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + invoice.GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0))" : "")
+                    + "SET GrandTotal= COALESCE((TotalLines + "
+                        + "(SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + invoice.GetPrecision() + ") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) "
+                        + $"{(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")} ), 0)"
+                        + (invoice.Get_ColumnIndex("WithholdingAmt") > 0 ?
+                            $@" , GrandTotalAfterWithholding = COALESCE((TotalLines + 
+                                 (SELECT ROUND((COALESCE(SUM(TaxAmt),0))," + invoice.GetPrecision() + $@") FROM C_InvoiceTax it WHERE i.C_Invoice_ID=it.C_Invoice_ID) 
+                                - NVL(WithholdingAmt, 0) - NVL(BackupWithholdingAmount, 0) {(Env.IsModuleInstalled("VA106_") ? " + VA106_TCSTotalAmount " : "")}), 0)" : "")
                         + " WHERE C_Invoice_ID=" + invoice.GetC_Invoice_ID();
             no = DB.ExecuteQuery(sql, null, Get_TrxName());
             if (no != 1)

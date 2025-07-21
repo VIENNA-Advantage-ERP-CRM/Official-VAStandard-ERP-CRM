@@ -30,9 +30,12 @@ namespace ViennaAdvantageServer.Process
         private int _m_Product_ID = 0;
         private int _ad_Org_ID = 0;
         private int _m_Attributesetinstance_ID = 0;
+        private int _m_Warehouse_ID = 0;
         private int _c_AcctSchema_ID = 0;
         List<int> costElement = new List<int>();
         MCostElement ce = null;
+        string MaterialCostingMethod = "";
+        int MaterialCostingElement_ID = 0;
 
         protected override void Prepare()
         {
@@ -44,25 +47,52 @@ namespace ViennaAdvantageServer.Process
             try
             {
                 // Get Combination Record
-                sql = @"SELECT ce.M_CostElement_ID ,  ce.Name ,  cel.lineno ,  cel.m_ref_costelement
-                            FROM M_CostElement ce INNER JOIN m_costelementline cel ON ce.M_CostElement_ID = cel.M_CostElement_ID "
-                              + " WHERE ce.AD_Client_ID=" + GetAD_Client_ID() + " AND ce.M_CostElement_ID = " + costElement_ID
-                              + " AND ce.IsActive='Y'  AND cel.IsActive='Y'";
+                sql = $@"SELECT ce.M_CostElement_ID ,  ce.Name ,  cel.lineno ,  cel.m_ref_costelement, refEle.costingmethod 
+                            FROM M_CostElement ce 
+                            INNER JOIN m_costelementline cel ON (ce.M_CostElement_ID = cel.M_CostElement_ID)
+                            INNER JOIN M_CostElement refEle ON (CAST(cel.M_Ref_CostElement AS INTEGER) = refEle.M_CostElement_ID) 
+                               WHERE ce.AD_Client_ID = { GetAD_Client_ID() } AND ce.M_CostElement_ID = { costElement_ID }
+                               AND ce.IsActive='Y'  AND cel.IsActive='Y'";
                 dsCostCombination = DB.ExecuteDataset(sql, null, null);
                 if (dsCostCombination != null && dsCostCombination.Tables.Count > 0 && dsCostCombination.Tables[0].Rows.Count > 0)
                 {
                     for (int i = 0; i < dsCostCombination.Tables[0].Rows.Count; i++)
                     {
+                        if (!string.IsNullOrEmpty(Util.GetValueOfString(dsCostCombination.Tables[0].Rows[i]["costingmethod"])))
+                        {
+                            MaterialCostingElement_ID = Util.GetValueOfInt(dsCostCombination.Tables[0].Rows[i]["m_ref_costelement"]);
+                            MaterialCostingMethod = Util.GetValueOfString(dsCostCombination.Tables[0].Rows[i]["costingmethod"]);
+                        }
+
                         costElement.Add(Util.GetValueOfInt(dsCostCombination.Tables[0].Rows[i]["m_ref_costelement"]));
                     }
                 }
-                //var costElementRecord = dsCostCombination.Tables[0].AsEnumerable().Select(r => r.Field<int>("m_ref_costelement")).ToList();
+
+                string costElements = string.Join(",", costElement);
 
                 // Get All Product
-                sql = @"SELECT ad_client_id ,  ad_org_id ,  m_product_id ,  m_attributesetinstance_id ,  c_acctschema_id ,
-                           m_costtype_id ,   m_costelement_id ,  cumulatedamt ,  cumulatedqty ,  currentcostprice ,  currentqty
-                      FROM m_cost WHERE ad_client_id = " + GetAD_Client_ID() +
-                          " ORDER BY m_product_id ,   ad_org_id ,  m_attributesetinstance_id ,  c_acctschema_id";
+                sql = $@"SELECT c.ad_client_id ,  c.ad_org_id ,  c.m_product_id ,  c.m_attributesetinstance_id ,  c.c_acctschema_id , c.m_warehouse_id,
+                           c.m_costtype_id ,   c.m_costelement_id ,  c.cumulatedamt ,  c.cumulatedqty ,  c.currentcostprice ,  c.currentqty
+                      FROM m_cost c 
+                      INNER JOIN C_AcctSchema acct ON (c.C_AcctSchema_ID = acct.C_AcctSchema_ID AND c.m_costtype_id = acct.m_costtype_id)";
+                sql += $@" WHERE c.ad_client_id = { GetAD_Client_ID() } ";
+
+                /* Filter those record from product those elements is belongs to selected Cost Combination record*/
+                if (!string.IsNullOrEmpty(costElements))
+                {
+                    sql += $" AND c.m_costelement_id IN ({costElements})";
+                }
+
+                /* Consider those product on which that Cost Element is linked which is linked on the selected Cost Combination Record */
+                sql += $@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product mp 
+                        INNER JOIN M_Product_Category mpc ON (mp.M_Product_Category_ID = mpc.M_Product_Category_ID)
+                        WHERE mpc.CostingMethod = {GlobalVariable.TO_STRING(MaterialCostingMethod)} OR mpc.M_CostElement_ID IN (
+                        SELECT ce.M_CostElement_ID FROM M_CostElement ce
+                        INNER JOIN M_CostElementLine cel ON (ce.M_CostElement_ID = cel.M_CostElement_ID)
+                        INNER JOIN M_CostElement refEle ON (CAST(cel.M_Ref_CostElement AS INTEGER) = refEle.M_CostElement_ID AND refEle.costingmethod IS NOT NULL)
+                        WHERE CAST(cel.M_Ref_CostElement AS INTEGER)= {MaterialCostingElement_ID}) )";
+
+                sql += @" ORDER BY c.m_product_id ,   c.ad_org_id ,  c.m_attributesetinstance_id ,  c.c_acctschema_id, c.m_warehouse_id ";
                 dsProductCost = DB.ExecuteDataset(sql, null, null);
 
                 if (dsProductCost != null && dsProductCost.Tables.Count > 0 && dsProductCost.Tables[0].Rows.Count > 0)
@@ -75,19 +105,27 @@ namespace ViennaAdvantageServer.Process
                     for (int i = 0; i < dsProductCost.Tables[0].Rows.Count; i++)
                     {
                         if (!costElement.Contains(Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["m_costelement_id"])))
+                        {
                             continue;
+                        }
+
                         if (_m_Product_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["m_product_id"]) ||
                              _ad_Org_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["ad_org_id"]) ||
                              _m_Attributesetinstance_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["m_attributesetinstance_id"]) ||
-                            _c_AcctSchema_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["c_acctschema_id"]))
+                            _c_AcctSchema_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["c_acctschema_id"]) ||
+                            _m_Warehouse_ID != Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["M_Warehouse_ID"]))
                         {
                             _m_Product_ID = Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["m_product_id"]);
                             _ad_Org_ID = Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["ad_org_id"]);
                             _m_Attributesetinstance_ID = Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["m_attributesetinstance_id"]);
                             _c_AcctSchema_ID = Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["c_acctschema_id"]);
+                            _m_Warehouse_ID = Util.GetValueOfInt(dsProductCost.Tables[0].Rows[i]["M_Warehouse_ID"]);
+
                             MProduct product = new MProduct(GetCtx(), _m_Product_ID, Get_TrxName());
                             MAcctSchema acctSchema = new MAcctSchema(GetCtx(), _c_AcctSchema_ID, Get_TrxName());
-                            costcombination = MCost.Get(product, _m_Attributesetinstance_ID, acctSchema, _ad_Org_ID, Util.GetValueOfInt(dsCostCombination.Tables[0].Rows[0]["M_CostElement_ID"]));
+
+                            costcombination = MCost.Get(product, _m_Attributesetinstance_ID, acctSchema, _ad_Org_ID,
+                                Util.GetValueOfInt(dsCostCombination.Tables[0].Rows[0]["M_CostElement_ID"]), _m_Warehouse_ID);
                         }
 
                         // created object of Cost elemnt for checking iscalculated = true/ false
@@ -95,7 +133,7 @@ namespace ViennaAdvantageServer.Process
 
                         costcombination.SetCurrentCostPrice(Decimal.Add(costcombination.GetCurrentCostPrice(), Util.GetValueOfDecimal(dsProductCost.Tables[0].Rows[i]["currentcostprice"])));
                         costcombination.SetCumulatedAmt(Decimal.Add(costcombination.GetCumulatedAmt(), Util.GetValueOfDecimal(dsProductCost.Tables[0].Rows[i]["cumulatedamt"])));
-                        
+
                         // if calculated = true then we added qty else not and costing method is Standard Costing
                         if (ce.IsCalculated() || ce.GetCostingMethod() == MCostElement.COSTINGMETHOD_StandardCosting)
                         {
@@ -125,7 +163,7 @@ namespace ViennaAdvantageServer.Process
                     dsCostCombination.Dispose();
                 }
             }
-            return Msg.GetMsg(GetCtx(), "SucessfullyUpdated");
+            return Msg.GetMsg(GetCtx(), "VAS_CostCombSucessfullyUpdated");
         }
     }
 }

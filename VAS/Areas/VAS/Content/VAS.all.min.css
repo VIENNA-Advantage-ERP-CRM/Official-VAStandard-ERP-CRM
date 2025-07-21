@@ -1,11 +1,9 @@
 ﻿/*version 1.6.4.0*/
-
 .vis-payment-table {
     width: 100%;
     margin-bottom: 0px;
     /*margin-top:2px;*/
 }
-
 
 .vis-payment-td1 {
     /*width: 40%;*/
@@ -37,7 +35,6 @@
 .vis-payment-span {
     /*margin: 5px 0px 5px 1%;*/
 }
-
 
 .vis-payment-inputs {
     /*margin: 10px 1% 5px 2%;
@@ -399,7 +396,7 @@
         width: 100%;
     }
 
-.vas-filters-editdelete-btns .vis-edit {
+.vas-filters-editdelete-btns .vis-edit, .vas-sortBtns .vis-edit {
     margin-right: 5px;
 }
 
@@ -792,9 +789,7 @@
         display: block;
     }
 
-    .vas-comparision-opeartor option:nth-child(1), .vas-comparision-opeartor option:nth-child(2),
-    .vas-comparision-opeartor option:nth-child(3), .vas-comparision-opeartor option:nth-child(4),
-    .vas-comparision-opeartor option:nth-child(5), .vas-comparision-opeartor option:nth-child(6) {
+    .vas-comparision-opeartor option:nth-child(1), .vas-comparision-opeartor option:nth-child(2), .vas-comparision-opeartor option:nth-child(3), .vas-comparision-opeartor option:nth-child(4), .vas-comparision-opeartor option:nth-child(5), .vas-comparision-opeartor option:nth-child(6) {
         display: block;
     }
 
@@ -1172,7 +1167,6 @@ html[dir="rtl"] .vas-sql-result-msg {
     background-color: rgba(var(--v-c-secondary),1);
 }
 
-
 .pipeline {
     display: flex;
     align-items: center;
@@ -1184,13 +1178,16 @@ html[dir="rtl"] .vas-sql-result-msg {
     position: relative;
     flex: 1;
     text-align: center;
-    z-index: 1; /* Ensure stages are above connectors */
+    z-index: 1;
+    /* Ensure stages are above connectors */
 }
 
 .connector {
     flex: 1;
-    height: 15px; /* Thickness of the line */
-    background-color: #ccc; /* Color of the line */
+    height: 15px;
+    /* Thickness of the line */
+    background-color: #ccc;
+    /* Color of the line */
 }
 
 .vas-tis-top-fields {
@@ -1480,7 +1477,6 @@ html[dir="rtl"] .vas-sql-result-msg {
         color: #b2b2b2;
     }
 
-
 .vas-tis-steps-col::before {
     content: " ";
     position: absolute;
@@ -1623,13 +1619,16 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-step-completed .vas-tis-step-content span {
     color: #9FC150;
 }
+
 /* Styles for drafted steps */
 .vas-tis-step-drafted .vas-tis-step-circle {
-    border-color: #d9a117a6; /* Yellow color */
+    border-color: #d9a117a6;
+    /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-start span {
-    color: #d9a117a6; /* Yellow color */
+    color: #d9a117a6;
+    /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-start .vis {
@@ -1637,11 +1636,13 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-step-drafted.vas-tis-steps-col::before {
-    background-color: #d9a117a6; /* Yellow color */
+    background-color: #d9a117a6;
+    /* Yellow color */
 }
 
 .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle {
-    border-color: #d9a117a6; /* Yellow color */
+    border-color: #d9a117a6;
+    /* Yellow color */
 }
 
     .vas-tis-step-drafted .vas-tis-step-content .vas-tis-step-circle .vis {
@@ -1650,15 +1651,19 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-step-drafted .vas-tis-step-content span {
     /* Add specific styling for span elements here */
-    color: #d9a117a6; /* Yellow color */
+    color: #d9a117a6;
+    /* Yellow color */
 }
+
 /* Styles for null status steps */
 .vas-tis-step-null .vas-tis-step-circle {
-    border-color: #b2b2b2; /* Grey color */
+    border-color: #b2b2b2;
+    /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-start span {
-    color: #b2b2b2; /* Grey color */
+    color: #b2b2b2;
+    /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-start .vis {
@@ -1666,11 +1671,13 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-step-null.vas-tis-steps-col::before {
-    background-color: #b2b2b2; /* Grey color */
+    background-color: #b2b2b2;
+    /* Grey color */
 }
 
 .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle {
-    border-color: #b2b2b2; /* Grey color */
+    border-color: #b2b2b2;
+    /* Grey color */
 }
 
     .vas-tis-step-null .vas-tis-step-content .vas-tis-step-circle .vis {
@@ -1679,7 +1686,8 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-step-null .vas-tis-step-content span {
     /* Add specific styling for span elements here */
-    color: #b2b2b2; /* Grey color */
+    color: #b2b2b2;
+    /* Grey color */
 }
 
 .vas-tis-steps-col.vas-tis-step-drafted:nth-child(3)::after {
@@ -1875,13 +1883,11 @@ html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] +
 2. Ignore the vis-fonts.css file its already in framework
 3. Ignore framework.css
 */
-
 /*
 
 Only index.html and style.css is for your use There is no need to copy any other file
 
 */
-
 .vas-apInvPoWrapper {
     display: flex;
     flex-direction: column;
@@ -1929,7 +1935,6 @@ Only index.html and style.css is for your use There is no need to copy any other
     font-size: 14px;
     display: block;
 }
-
 
 .vas-apTaxWrapper {
     display: flex;
@@ -2277,6 +2282,10 @@ html[dir="rtl"] .vas-exinvd-invoice-lbl {
     text-align: left;
 }
 
+html[dir="rtl"] .vas-exinvd-right-ovrflow {
+    text-align: left !important;
+}
+
 html[dir="rtl"] .vas-expay-rtlHU {
     text-align: center;
 }
@@ -2293,6 +2302,14 @@ html[dir="rtl"] .vas-expay-symbol {
 
 html[dir="rtl"] .vas-arwidg-rtl-amt {
     flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .vas-psdwidg-salesYear {
+    color: #083959;
+    font-size: 1em;
+    font-family: Verdana;
+    max-width: 120px;
+    text-align: center !important;
 }
 
 .VAS-payment-details ul li.active {
@@ -2462,7 +2479,7 @@ html[dir="rtl"] .vas-arwidg-rtl-amt {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-arwidg-totalRec-amount {
         font-size: 9px;
     }
@@ -2565,6 +2582,10 @@ span.vas-arwidg-cur-symbol {
     margin-left: 5px;
 }
 
+/*html[dir="rtl"] span.vas-arwidg-cur-symbol {
+    margin-right: 5px;
+
+}*/
 :root {
     --width-100: calc(1920px/9);
     --width-70: calc(1366px*0.7/9);
@@ -2650,7 +2671,6 @@ span.vas-arwidg-cur-symbol {
         /*font-weight: 600;*/
     }
 
-
 .vas-igtwidg-invoiceTotalAmt {
     display: flex;
     align-items: center;
@@ -2663,7 +2683,6 @@ span.vas-arwidg-cur-symbol {
     color: #093756;
     font-family: 'Verdana';
 }
-
 
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .vas-igtwidg-top-vendors-col {
@@ -2742,12 +2761,13 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-invoiceTotalAmt {
         font-size: 7px;
     }
+
     /* .vas-vaswidg-Symbol {
         font-size: 7px;
     }*/
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-igtwidg-top-vendors-col {
         font-size: 14px;
     }
@@ -2755,6 +2775,7 @@ span.vas-arwidg-cur-symbol {
     .vis-editModeWidget .vas-vaswidg-Symbol {
         font-size: 7px;
     }
+
     /*.vas-vaswidg-Symbol {
         font-size: 7px;
     }*/
@@ -2772,6 +2793,7 @@ span.vas-arwidg-cur-symbol {
     .vas-igtwidg-cur-symbol {
         font-size: 1.1em;
     }
+
     /* .vas-vaswidg-Symbol {
         font-size: 7px;
     }*/
@@ -2901,6 +2923,7 @@ span.vas-arwidg-cur-symbol {
     .vas-psdwidg-tile-heading, .vas-psdwidg-purchase-state-col {
         font-size: 10px;
     }
+
     /* .vas-psdwidg-sales-comparison-col {
         font-size: 10px;
     }*/
@@ -2916,7 +2939,7 @@ span.vas-arwidg-cur-symbol {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-psdwidg-sales-comparison-col {
         font-size: 12px;
     }
@@ -3087,6 +3110,7 @@ span.vas-arwidg-cur-symbol {
     background-color: rgba(var(--v-c-common), 1);
     padding: 0.2em;
 }
+
     /*    .vas-exinvd-invoices-box.vas-exinvd-emptydiv {
         display: none;
     }*/
@@ -3169,8 +3193,6 @@ span.vas-arwidg-cur-symbol {
 /* .vas-exinvd-slider-arrows span {
         font-size: 1.1em;
     }*/
-
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .vas-exinvd-expected-invoice {
         font-size: 12px;
@@ -3197,7 +3219,6 @@ span.vas-arwidg-cur-symbol {
     /*   .vas-exinvd-invoicesListing {
         height: calc(100% - 6em);
     }*/
-
     .vas-exinvd-invoices-box {
         font-size: 10px;
     }
@@ -3233,7 +3254,7 @@ span.vas-arwidg-cur-symbol {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-exinvd-expected-invoice {
         font-size: 8px;
     }
@@ -3328,7 +3349,6 @@ span.vas-arwidg-cur-symbol {
 /*.vas-exinvd-expected-invoice .vas-exinvd-expected-heading {
     margin: 0 20px 10px 0;
 }*/
-
 .vas-exinvd-expected-invoice .vas-exinvd-expected-heading .vas-exinvd-filterby-col {
     flex-basis: 35%;
     justify-content: flex-end;
@@ -3426,11 +3446,11 @@ span.vas-arwidg-cur-symbol {
     min-width: 22px;
 }
 
-
 @media (max-width: 1300px) {
     .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
         font-size: 8px;
     }
+
     /*  .vas-vaswidg-Symbol {
         font-size: 10px;
     }*/
@@ -3451,7 +3471,6 @@ span.vas-arwidg-cur-symbol {
         overflow-y: auto;
     }
 }*/
-
 .vas-idtwidg-emptydiv {
     background-color: unset;
     user-select: none;
@@ -3461,6 +3480,7 @@ span.vas-arwidg-cur-symbol {
 .vas-igtwidg-thumb-w-txt img.vas-igtwidg-emptyimg {
     width: 0px;
 }
+
 /*.vas-piechartexpense-container {
     padding: 0.5em;
 }*/
@@ -3494,8 +3514,12 @@ span.vas-arwidg-cur-symbol {
         outline: none;
     }
 
-/**Expense Revenue Profit Widget CSS*/
+html[dir="rtl"] .vas-piechartexpense-container select {
+    margin-left: 20px;
+    margin-right: 0px;
+}
 
+/**Expense Revenue Profit Widget CSS*/
 .vas-barline-ExRePr-container {
     padding: 0.5em;
     width: 100%;
@@ -3610,7 +3634,6 @@ span.vas-arwidg-cur-symbol {
 /*.vas-fdi-reqGen-Txt span {
         //display: block;
     }*/
-
 .vas-fdi-spaceBetween {
     width: 100%;
     display: flex;
@@ -3711,7 +3734,7 @@ span.vas-arwidg-cur-symbol {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-fdi-feed-container {
         font-size: 13px;
     }
@@ -3817,6 +3840,7 @@ canvas.vas-t10exp-canvas {
 .vas-exinvd-emptydiv {
     background-color: rgba(var(--v-c-primary), 0);
 }
+
 /*Schedule Data CSS*/
 .vas-scheduleDataWrapper {
     display: flex;
@@ -4025,7 +4049,6 @@ hr.vas-paymentData-underline {
 /*max-height: calc(100vh - 320px);*/
 /*overflow-y: auto;*/
 /*}*/
-
 .vas-scheduleData-root {
     height: 100%
 }
@@ -4047,8 +4070,8 @@ hr.vas-paymentData-underline {
 .vas-scheduledatalist {
     margin-top: 1px;
 }
-/*Schedule Data CSS End*/
 
+/*Schedule Data CSS End*/
 /*Expected Payments css start*/
 .vas-expay-expected-payment {
     /* background-color: rgba(var(--v-c-primary), .1);*/
@@ -4154,7 +4177,6 @@ hr.vas-paymentData-underline {
 /*.vas-expay-payment-w-amount {
     text-align: right;
 }*/
-
 .vas-expay-payment-lbl {
     font-size: 0.985em;
     /*font-weight: 600;*/
@@ -4194,8 +4216,6 @@ hr.vas-paymentData-underline {
 /* .vas-expay-slider-arrows span {
         font-size: 1.1em;
     }*/
-
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .vas-expay-expected-payment {
         font-size: 12px;
@@ -4226,7 +4246,6 @@ hr.vas-paymentData-underline {
     /*   .vas-expay-paymentsListing {
         height: calc(100% - 6em);
     }*/
-
     .vas-expay-payments-box {
         font-size: 10px;
     }
@@ -4262,7 +4281,7 @@ hr.vas-paymentData-underline {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .vas-expay-expected-payment {
         font-size: 7px;
     }
@@ -4357,7 +4376,6 @@ hr.vas-paymentData-underline {
 /*.vas-expay-expected-payment .vas-expay-expected-heading {
     margin: 0 20px 10px 0;
 }*/
-
 .vas-expay-expected-payment .vas-expay-expected-heading .vas-expay-filterby-col {
     flex-basis: 35%;
     justify-content: flex-end;
@@ -4528,9 +4546,8 @@ hr.vas-paymentData-underline {
 .vas-expay-head-font {
     font-weight: 600;
 }
+
 /*Expected Payments css End*/
-
-
 /** Invoice Match Detail Tab Panel CSS Start*/
 .vas-invmatch-DataItem {
     background-color: #EDF5FA;
@@ -4704,7 +4721,6 @@ hr.vas-paymentData-underline {
 }
 
 /** Invoice Match Detail CSS End*/
-
 /**Cash Flow Widget CSS*/
 .vas-barline-cashFlow-container {
     padding: 0.5em;
@@ -4744,10 +4760,10 @@ hr.vas-paymentData-underline {
     background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
     position: relative;
 }
+
 /*.vas-barline-cashFlow-container{
     height:100%;
 }*/
-
 .vas-expay-filter-flyout .vis-input-wrap select[data-hasBtn] {
     background-image: linear-gradient(45deg, transparent 50%, #000 50%), linear-gradient(135deg, #000 50%, transparent 50%);
 }
@@ -4924,10 +4940,10 @@ hr.vas-paymentData-underline {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
 /*.vas-expay-filter-flyout .vis-input-wrap input:focus + label.vas-exinvd-bpLabel {
     background-color: rgb(235,235,235);
 }*/
-
 .vas-expay-filter-flyout .vis-input-wrap input:focus ~ label.vas-exinvd-bpLabel {
     background: rgb(235,235,235);
 }
@@ -4959,6 +4975,7 @@ hr.vas-paymentData-underline {
         padding: 5px 6px;
     }
 }
+
 /*Monthly Average Balance css*/
 .vas-barline-monAvBbal-container {
     padding: 0.5em;
@@ -4993,8 +5010,8 @@ hr.vas-paymentData-underline {
     margin-top: -14px;
     margin-bottom: -8px;
 }
-/*Monthly Average Balance css ends here*/
 
+/*Monthly Average Balance css ends here*/
 .vis-pSelectInfo {
     width: 320px;
     float: left;
@@ -5072,10 +5089,7 @@ hr.vas-paymentData-underline {
     cursor: not-allowed;
 }
 
-.vis-paymentselect-field select,
-.vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]),
-.vis-paymentPrint-field select,
-.vis-paymentPrint-field input:not([type="submit"]) {
+.vis-paymentselect-field select, .vis-paymentselect-field input:not([type="submit"]):not([type="checkbox"]), .vis-paymentPrint-field select, .vis-paymentPrint-field input:not([type="submit"]) {
     /*width: 100%;
     float: left;*/
     /* color: rgba(var(--v-c-on-secondary), 1); */
@@ -5180,7 +5194,6 @@ hr.vas-paymentData-underline {
     margin-top: 6px;
 }
 
-
 @media (max-width: 1024px) {
     .vis-paymentPrint-field {
         /*width:48.5%;*/
@@ -5196,7 +5209,7 @@ hr.vas-paymentData-underline {
     }
 }
 
-@media (max-width:999px) {
+@media (max-width: 999px) {
     .vis-pSelectInfo {
         width: 35%;
     }
@@ -5212,8 +5225,7 @@ hr.vas-paymentData-underline {
     }
 }
 
-.vas-parent,
-html[dir="rtl"].vas-parent {
+.vas-parent, html[dir="rtl"].vas-parent {
     display: flex;
     align-items: center;
     padding: 0.5rem;
@@ -5230,45 +5242,38 @@ html[dir="rtl"].vas-parent {
     margin: -11px -12px 10px -12px;
 }
 
-.vas-root,
-html[dir="rtl"].vas-root {
+.vas-root, html[dir="rtl"].vas-root {
     width: 100%;
     height: 100%;
     background-color: #FFF;
 }
 
-.vas-lowerDiv,
-html[dir="rtl"].vas-lowerDiv {
+.vas-lowerDiv, html[dir="rtl"].vas-lowerDiv {
     height: calc(100% - 102px);
     overflow: auto;
 }
 
-    .vas-lowerDiv .w2ui-grid-body,
-    html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
+    .vas-lowerDiv .w2ui-grid-body, html[dir="rtl"].vas-lowerDiv .w2ui-grid-body {
         background-color: transparent;
         height: 100% !important;
     }
 
-    .vas-lowerDiv.w2ui-reset.w2ui-grid > div,
-    html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
+    .vas-lowerDiv.w2ui-reset.w2ui-grid > div, html[dir="rtl"].vas-lowerDiv.w2ui-reset.w2ui-grid > div {
         height: 100% !important;
     }
 
-    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records,
-    html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
+    .vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records, html[dir="rtl"].vas-lowerDiv .w2ui-grid .w2ui-grid-body .w2ui-grid-records {
         overflow-x: hidden !important;
     }
 
-.vas-bottom,
-html[dir="rtl"].vas-bottom {
+.vas-bottom, html[dir="rtl"].vas-bottom {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 10px
 }
 
-.vas-actionbtn,
-html[dir="rtl"].vas-actionbtn {
+.vas-actionbtn, html[dir="rtl"].vas-actionbtn {
     background: rgba(var(--v-c-primary), 1);
     border: none;
     color: rgba(var(--v-c-on-primary), 1);
@@ -5278,16 +5283,14 @@ html[dir="rtl"].vas-actionbtn {
     margin-left: 10px;
 }
 
-.vas-businessPartnerImg,
-html[dir="rtl"].vas-businessPartnerImg {
+.vas-businessPartnerImg, html[dir="rtl"].vas-businessPartnerImg {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.vas-businessPartnerInput,
-html[dir="rtl"].vas-businessPartnerInput {
+.vas-businessPartnerInput, html[dir="rtl"].vas-businessPartnerInput {
     display: flex;
     align-items: center;
     flex: 1;
@@ -5296,8 +5299,7 @@ html[dir="rtl"].vas-businessPartnerInput {
     margin-right: 4px;
 }
 
-.input-group-text.vas-businessPartnerSearch,
-html[dir="rtl"].vas-businessPartnerSearch {
+.input-group-text.vas-businessPartnerSearch, html[dir="rtl"].vas-businessPartnerSearch {
     background: rgba(var(--v-c-primary), 1);
     font-size: 18px !important;
     color: #fff;
@@ -5308,30 +5310,25 @@ html[dir="rtl"].vas-businessPartnerSearch {
         color: inherit;
     }
 
-.vas-noimageicon,
-html[dir="rtl"].vas-noimageicon {
+.vas-noimageicon, html[dir="rtl"].vas-noimageicon {
     font-size: 26px;
 }
 
-.vas-gridImageicon,
-html[dir="rtl"].vas-gridImageicon {
+.vas-gridImageicon, html[dir="rtl"].vas-gridImageicon {
     font-size: 1.2rem;
 }
 
-.vas-disableBtn,
-html[dir="rtl"].vas-disableBtn {
+.vas-disableBtn, html[dir="rtl"].vas-disableBtn {
     pointer-events: none;
     opacity: 0.6;
 }
 
-.vas-errorGridBody,
-html[dir="rtl"].vas-errorGridBody {
+.vas-errorGridBody, html[dir="rtl"].vas-errorGridBody {
     height: calc(100% - 35px);
     overflow: auto;
 }
 
-.vas-disablePage,
-html[dir="rtl"].vas-disablePage {
+.vas-disablePage, html[dir="rtl"].vas-disablePage {
     pointer-events: none;
     opacity: 0.6;
 }
@@ -5340,7 +5337,6 @@ html[dir="rtl"].vas-disablePage {
     background-color: #f0f0f0;
     font-weight: bold;
 }
-
 
 .vas-inputboxPadding input[type="text"] {
     padding-left: 10px !important;
@@ -5353,7 +5349,6 @@ html[dir="rtl"] .vas-inputboxPadding input[type="text"] {
 .vas-inputboxPaddingRight {
     padding-right: 10px !important;
 }
-
 
 .VAS-PO-summary {
     padding: 0.625rem;
@@ -5558,7 +5553,6 @@ span.vis.vis-info.vas-openItem {
     text-align: right;
 }
 
-
 .firstRow {
     padding: 15px;
 }
@@ -5593,7 +5587,6 @@ span.vis.vis-info.vas-openItem {
 .vas-txtbox {
     text-align: right;
 }
-
 
 .VAS-selling-container {
     width: 100%;
@@ -5769,7 +5762,7 @@ span.vis.vis-info.vas-openItem {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .VAS-selling-container {
         font-size: 11px;
     }
@@ -5941,7 +5934,6 @@ span.vis.vis-info.vas-openItem {
 }
 
 /* all claims css */
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .VAS-bankbalance-container {
         font-size: 10px;
@@ -6154,7 +6146,6 @@ html[dir="rtl"] .VAS-bankbalISOCode {
 }
 
 /* all claims css */
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .VAS-cashbalance-container {
         font-size: 10px;
@@ -6308,6 +6299,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     height: 100%;
     grid-template-columns: 30% 70%;
 }
+
 /*
     /////////////////////////////////////////////*/
 .VAS_resourceInput {
@@ -6361,6 +6353,7 @@ html[dir="rtl"] .VAS-cashISOCode {
         font-size: 0.65rem;
         cursor: pointer;
     }
+
 /*
     /////////////////////////////////////////////*/
 .VAS-Datefileter {
@@ -6428,7 +6421,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     font-size: 0.875rem;
     font-weight: 500;
 }
-
 
 .VAS-avail-cart-col {
     width: 100%;
@@ -6569,7 +6561,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     /* .VAS-filter-list-table-col tr th .form-check {
         padding-left: 0;
     }*/
-
     .VAS-filter-list-table-col tr th .form-check .form-check-input {
         margin-left: 0;
     }
@@ -6579,13 +6570,13 @@ html[dir="rtl"] .VAS-cashISOCode {
     flex-direction: column;
     justify-content: space-between;
 }
+
 /*.vas-FromdateDiv {
  
     display: flex;
     gap: 5px;
 
 }*/
-
 .VAS-footerBtn-w-opt {
     padding: 0.75rem;
     display: flex;
@@ -6617,7 +6608,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     height: calc(100% - 63px);
 }
 
-
 .VAS-lbl-chip {
     background-color: rgba(var(--v-c-on-secondary), 0.4);
     padding: 0.1rem 0.3rem;
@@ -6647,7 +6637,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     margin-right: 5px;
 }
 
-
 .VAS-org-unitsales-col {
     position: relative;
     width: 100%;
@@ -6672,7 +6661,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     margin-bottom: 0.5em;
     padding-bottom: 5px;
 }
-
 
 .VAS-sales-dropdown {
     width: 100%;
@@ -6726,7 +6714,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     background-color: #EEB645;
 }
 
-
 .VAS-org-unitsales-col .VAS-startSale-box {
     background-color: #797F1E;
 }
@@ -6734,7 +6721,6 @@ html[dir="rtl"] .VAS-cashISOCode {
 .VAS-org-lowest-unitsales-col .VAS-endSale-box {
     background-color: #F83D3D;
 }
-
 
 .VAS-org-unitsales-col .VAS-endSale-box {
     background-color: #156195;
@@ -6792,7 +6778,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     height: calc(100% - 5.25em);
 }
 
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .VAS-org-unitsales-col {
         font-size: 13px;
@@ -6819,7 +6804,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .VAS-org-unitsales-col {
         font-size: 13px;
     }
@@ -6886,8 +6871,6 @@ html[dir="rtl"] .VAS-cashISOCode {
 .VAS-organization-block .VAS-pagination-col {
     float: right;
 }
-
-
 
 .VAS-deliveries-container {
     background: rgb(177,167,198);
@@ -6957,7 +6940,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     height: 100%;
     font-family: Verdana;
 }
-
 
 .VAS-deliveries-heading {
     display: flex;
@@ -7042,7 +7024,8 @@ html[dir="rtl"] .VAS-cashISOCode {
 
 .VAS-delivery-box {
     background-color: rgba(var(--v-c-common), 1);
-    padding: 0.5em 0.75em 0.5em 0.75em; /* top right bottom left */
+    padding: 0.5em 0.75em 0.5em 0.75em;
+    /* top right bottom left */
     width: 100%;
     /* font-family: verdana;*/
 }
@@ -7094,19 +7077,24 @@ html[dir="rtl"] .VAS-cashISOCode {
     justify-content: space-between;
 }
 
-
 .VAS-lbl-text {
     font-size: 0.875em;
     color: rgba(var(--v-c-on-common), 0.6);
 }
 
 .VAS-spaceBetween-col .VAS-lbl-text {
-    flex: 1; /* Makes each div take equal space */
-    width: 50%; /* Ensures each div takes up 50% width */
-    overflow: hidden; /* Hides overflow content */
-    white-space: nowrap; /* Prevents content from wrapping to the next line */
-    text-overflow: ellipsis; /* Adds the ellipsis (...) */
-    box-sizing: border-box; /* Includes padding and border in the width */
+    flex: 1;
+    /* Makes each div take equal space */
+    width: 50%;
+    /* Ensures each div takes up 50% width */
+    overflow: hidden;
+    /* Hides overflow content */
+    white-space: nowrap;
+    /* Prevents content from wrapping to the next line */
+    text-overflow: ellipsis;
+    /* Adds the ellipsis (...) */
+    box-sizing: border-box;
+    /* Includes padding and border in the width */
 }
 
 .VAS-lbl-text span {
@@ -7136,7 +7124,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     -webkit-line-clamp: 1;
     overflow: hidden;
 }
-
 
 .VAS-arrow-col {
     width: 100%;
@@ -7209,7 +7196,7 @@ html[dir="rtl"] .VAS-cashISOCode {
 @media screen and (max-width: 1024px) {
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
 }
 
 @media screen and (max-width: 768px) {
@@ -7245,29 +7232,28 @@ html[dir="rtl"] .VAS-cashISOCode {
     z-index: 2;
 }
 
-
-
 .VAS-pointer-cursor {
     cursor: pointer;
 }
 
 .VAS-delivery-box.no-stock {
-    background-color: #f8d7da; /* Light red background for no stock */
-    border: 1px solid #f5c6cb; /* Light red border */
+    background-color: #f8d7da;
+    /* Light red background for no stock */
+    border: 1px solid #f5c6cb;
+    /* Light red border */
 }
 
 .VAS-selection-checkbox:disabled {
     cursor: not-allowed;
-    opacity: 0.6; /* Make disabled checkboxes appear grayed out */
+    opacity: 0.6;
+    /* Make disabled checkboxes appear grayed out */
 }
-
 
 /*.VAS-deliveries-heading {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }*/
-
 .VAS-generate-delivery-btn {
     padding-right: 20px;
     padding-top: 10px;
@@ -7280,7 +7266,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     position: absolute;
 }
 
-
 .VAS-data-message {
     position: absolute;
     top: 50%;
@@ -7291,11 +7276,11 @@ html[dir="rtl"] .VAS-cashISOCode {
     text-align: center;
     padding: 20px;
     margin: 0;
-    background-color: rgba(255, 255, 255, 0.8); /* Optional: background color with transparency */
-    border-radius: 5px; /* Optional: rounded corners */
+    background-color: rgba(255, 255, 255, 0.8);
+    /* Optional: background color with transparency */
+    border-radius: 5px;
+    /* Optional: rounded corners */
 }
-
-
 
 .badge-green {
     background-color: green;
@@ -7316,7 +7301,6 @@ html[dir="rtl"] .VAS-cashISOCode {
 }
 
 /*-------------------------------------------- Credit Utilization Widget CSS ------------------------------------------------------*/
-
 .VAS-creditLimit-container {
     background: linear-gradient(145deg, rgba(237,245,250,1) 0%, rgba(240,240,240,1) 100%);
     padding: 0.75em;
@@ -7481,7 +7465,6 @@ html[dir="rtl"] .VAS-cashISOCode {
     justify-content: center;
 }
 
-
 @media screen and (max-width: 1920px) {
     .vis-editModeWidget .VAS-creditLimit-container {
         font-size: 12px;
@@ -7509,7 +7492,7 @@ html[dir="rtl"] .VAS-cashISOCode {
     }
 }
 
-@media screen and (max-width:900px) {
+@media screen and (max-width: 900px) {
     .VAS-creditLimit-container {
         font-size: 12px;
     }
@@ -7726,4 +7709,3 @@ html[dir="rtl"] .VAS-cashISOCode {
         height: 45px;
         resize: none;
     }
-

@@ -745,15 +745,16 @@ namespace VAdvantage.Model
                     SetProcessed(_Status.IsClosed());
             }
 
-            // Set Lead to Processed if Status is Converted or Lost
-            if (Is_ValueChanged("Status") && (base.GetStatus().Equals("20") || base.GetStatus().Equals("23")))
-            {
-                SetProcessed(true);
-            }
-
             // Added work from SOTC module.
             if (Env.IsModuleInstalled("VA047_"))
             {
+                // VIS0060: When Leads submited from partner portal, Set Lead source as Partner and Lead Name as company name.
+                if (newRecord && Util.GetValueOfInt(Get_Value("VA047_Partner_Sales_Rep")) > 0)
+                {
+                    SetName(GetBPName());
+                    SetR_Source_ID(Util.GetValueOfInt(DB.ExecuteScalar("SELECT R_Source_ID FROM R_Source WHERE Export_ID='VIS_1000008'")));                    
+                }
+
                 int count = 0;
                 StringBuilder sql = new StringBuilder();
                 bool email = false;

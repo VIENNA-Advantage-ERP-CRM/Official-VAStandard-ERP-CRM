@@ -991,6 +991,11 @@
                     if (s != null && s.length != 0)
                         mTab.setValue("DeliveryViaRule", s);
                 }
+
+                //if dr has supply type property then set its value
+                if (dr.hasOwnProperty("VA106_SupplyType")) {
+                    mTab.setValue("VA106_SupplyType", dr["VA106_SupplyType"]);
+                }
             }
 
             //sql = "SELECT p.AD_Language,p.C_PaymentTerm_ID, "

@@ -137,7 +137,7 @@
                 "VAS_Billion"
             ];
 
-            VAS.translatedTexts = VIS.Msg.translate(ctx, elements, true);
+            VAS.translatedTexts = VIS.Msg.translate(VIS.Env.getCtx(), elements, true);
             msgArray = [VAS.translatedTexts.VAS_30, VAS.translatedTexts.VAS_30to60, VAS.translatedTexts.VAS_60to90, VAS.translatedTexts.VAS_90to120, VAS.translatedTexts.VAS_Older];
 
         }

@@ -327,7 +327,7 @@ namespace VAdvantage.Process
                                 i.updatedby ,  mi.documentno ,  M_MatchInv_Id AS Record_Id ,  i.issotrx ,  i.isreturntrx ,  ''           AS IsInternalUse,  'M_MatchInv' AS TableName,
                                 i.docstatus,i.DateAcct AS DateAcct,  mi.iscostcalculated ,  i.isreversedcostcalculated
                          FROM M_MatchInv mi INNER JOIN c_invoiceline il ON il.c_invoiceline_id = mi.c_invoiceline_id INNER JOIN C_Invoice i ON i.c_invoice_id       = il.c_invoice_id
-                              WHERE " + (M_AttributeSetInstance_ID > 0 ? $" mi.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                              WHERE " + (M_AttributeSetInstance_ID > 0 ? $" mi.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                               @"mi.M_Product_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" )
                               AND (mi.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true));
                     sql.Append(@" ) AND i.isactive = 'Y' AND i.docstatus IN ('CO' , 'CL') AND mi.iscostcalculated = 'N' AND mi.iscostImmediate = 'N'");
@@ -353,7 +353,7 @@ namespace VAdvantage.Process
                               'LandedCost' as TABLENAME,  I.DOCSTATUS, DATEACCT as DATEACCT , LCA.ISCOSTCALCULATED , 'N' as ISREVERSEDCOSTCALCULATED
                         FROM C_LANDEDCOSTALLOCATION LCA INNER JOIN C_INVOICELINE IL ON IL.C_INVOICELINE_ID = LCA.C_INVOICELINE_ID
                         INNER JOIN c_invoice i ON I.C_INVOICE_ID = IL.C_INVOICE_ID
-                        WHERE " + (M_AttributeSetInstance_ID > 0 ? $" LCA.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                        WHERE " + (M_AttributeSetInstance_ID > 0 ? $" LCA.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                         @"i.dateacct = " + GlobalVariable.TO_DATE(minDateRecord, true) + @" AND il.isactive     = 'Y' AND 
                         LCA.M_PRODUCT_ID IN ( " + ((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID) + @" ) 
                         AND lca.iscostcalculated = 'N' AND I.DOCSTATUS IN ('CO' , 'CL', 'RE', 'VO') AND I.ISSOTRX = 'N' AND I.ISRETURNTRX = 'N' ");
@@ -454,7 +454,7 @@ namespace VAdvantage.Process
                                 provisionalInvoice = new MProvisionalInvoice(GetCtx(), Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), Get_Trx());
 
                                 sql.Clear();
-                                sql.Append(@"SELECT * FROM C_ProvisionalInvoiceLine WHERE IsActive = 'Y' " 
+                                sql.Append(@"SELECT * FROM C_ProvisionalInvoiceLine WHERE IsActive = 'Y' "
                                                 + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"
                                                 AND " + (provisionalInvoice.IsReversal() ? " iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' "
                                                 : " iscostcalculated = 'N' ") +
@@ -624,7 +624,7 @@ namespace VAdvantage.Process
                                     sql.Clear();
                                     sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
                                                    INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
-                                                    WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                                    WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                                     $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
                                     if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                     {
@@ -892,7 +892,7 @@ namespace VAdvantage.Process
                                                         //    DB.ExecuteQuery("UPDATE M_Production SET IsReversedCostCalculated='Y' WHERE M_Production_ID= " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx());
                                                         //}
                                                     }
-                                                    catch(Exception ex)
+                                                    catch (Exception ex)
                                                     {
                                                         _log.Severe("ReCostingCalculationTransaction: Production -> " + ex.Message);
                                                         Get_Trx().Rollback();
@@ -1177,7 +1177,7 @@ namespace VAdvantage.Process
                                     sql.Clear();
                                     if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
                                     {
-                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                                     @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
                                                     " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
@@ -1192,7 +1192,7 @@ namespace VAdvantage.Process
                                     }
                                     else
                                     {
-                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                        sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                                     @"IsActive = 'Y' AND iscostcalculated = 'N' " +
                                                     " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                                         sql.Append(@" AND IsCostImmediate = 'N' ");
@@ -3269,7 +3269,7 @@ namespace VAdvantage.Process
                             SET CurrentQty =  (
                                 SELECT ABS(SUM(cqt.MovementQty))
                                 FROM M_CostQueueTransaction cqt
-                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                   @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
@@ -3278,7 +3278,7 @@ namespace VAdvantage.Process
                             WHERE EXISTS (
                                 SELECT 1
                                 FROM M_CostQueueTransaction cqt
-                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                   @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
@@ -3543,7 +3543,7 @@ namespace VAdvantage.Process
             query.Append($@"DELETE FROM Fact_Acct ");
             query.Append($@" WHERE AD_Table_ID = {AD_Table_ID} ");
             query.Append($@" AND Record_ID IN ({sql.ToString()})");
-            int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+            int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
             return (no > 0);
 
         }
@@ -3559,7 +3559,7 @@ namespace VAdvantage.Process
             sql.Clear();
             if (invoice.GetDescription() != null && invoice.GetDescription().Contains("{->"))
             {
-                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                             @"IsActive = 'Y' AND iscostcalculated = 'Y' AND IsReversedCostCalculated = 'N' " +
                             " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                 if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
@@ -3574,7 +3574,7 @@ namespace VAdvantage.Process
             }
             else
             {
-                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + 
+                sql.Append("SELECT * FROM C_InvoiceLine WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                             @"IsActive = 'Y' AND iscostcalculated = 'N' " +
                             " AND C_Invoice_ID = " + invoice.GetC_Invoice_ID());
                 sql.Append(@" AND IsCostimmediate = 'N' ");
@@ -4842,6 +4842,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -4882,7 +4883,8 @@ namespace VAdvantage.Process
                                 }
                                 #endregion
 
-                                if (inout.GetOrig_Order_ID() == 0 || orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
+                                //VIS_045:20-May-2025, when vebdor return match with RMA using form then on Vendor Return header, system was not updating the Orig Order reference, so remove that check
+                                if (orderLine == null || orderLine.GetC_OrderLine_ID() == 0)
                                 {
                                     #region Return to Vendor against without Vendor RMA
                                     if (!MCostQueue.CreateProductCostsDetails(GetCtx(), inout.GetAD_Client_ID(), inout.GetAD_Org_ID(), product, costingCheck.M_ASI_ID,
@@ -5146,6 +5148,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             bool isUpdatePostCurrentcostPriceFromMR = MCostElement.IsPOCostingmethod(GetCtx(), inout.GetAD_Client_ID(), product.GetM_Product_ID(), Get_Trx());
 
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
@@ -5608,6 +5611,7 @@ namespace VAdvantage.Process
                         product = new MProduct(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Product_ID"]), Get_Trx());
                         if (product.GetProductType() == "I") // for Item Type product
                         {
+                            isCostAdjustableOnLost = product.IsCostAdjustmentOnLost();
                             costingCheck.AD_Org_ID = inoutLine.GetAD_Org_ID();
                             costingCheck.M_ASI_ID = Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]);
                             costingCheck.M_Warehouse_ID = inout.GetM_Warehouse_ID();
@@ -6014,7 +6018,7 @@ namespace VAdvantage.Process
                 // when isCostAdjustableOnLost = true on product and movement qty on MR is less than invoice qty then consider MR qty else invoice qty
                 if (!MCostQueue.CreateProductCostsDetails(GetCtx(), invoiceLine.GetAD_Client_ID(), invoiceLine.GetAD_Org_ID(), product, invoiceLine.GetM_AttributeSetInstance_ID(),
                       "Invoice(Vendor)", null, inoutLine, null, invoiceLine, null,
-                    isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? ProductInvoiceLineCost
+                    isCostAdjustableOnLost && matchInvoice.GetQty() < invoiceLine.GetQtyInvoiced() ? (matchInvoice.GetQty() < 0 ? -1 : 1) * ProductInvoiceLineCost
                     : Decimal.Multiply(Decimal.Divide(ProductInvoiceLineCost, invoiceLine.GetQtyInvoiced()), matchInvoice.GetQty()),
                       matchInvoice.GetQty(), Get_Trx(), costingCheck, out conversionNotFoundInvoice, optionalstr: "window"))
                 {
@@ -6053,7 +6057,13 @@ namespace VAdvantage.Process
                     //invoiceLine.SetIsCostCalculated(true);
                     //if (client.IsCostImmediate() && !invoiceLine.IsCostImmediate())
                     {
-                        invoiceLine.SetIsCostImmediate(true);
+                        query.Clear();
+                        query.Append($@"SELECT CASE WHEN SUM(mi.Qty) = il.QtyInvoiced THEN 'Y' ELSE 'N' END AS IsCstImmediate 
+                                                FROM M_MatchInv mi
+                                                INNER JOIN C_InvoiceLine il ON (mi.C_InvoiceLine_id = il.C_InvoiceLine_id)
+                                                WHERE il.C_InvoiceLine_ID={invoiceLine.GetC_InvoiceLine_ID()} GROUP BY il.QtyInvoiced ");                       
+                        bool isCostImmediate = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, Get_Trx())).Equals("Y");
+                        invoiceLine.SetIsCostImmediate(isCostImmediate);
                     }
                     if (!invoiceLine.Save(Get_Trx()))
                     {
@@ -6165,7 +6175,7 @@ namespace VAdvantage.Process
                     {
                         sql += ", TreatAsDiscount = 'Y' ";
                     }
-                    if (Util.GetValueOfBool(costingCheck.invoice.Get_Value("VAS_IsLandedCost")))
+                    if (costingCheck.invoiceline != null && costingCheck.invoiceline.Get_ID() > 0 && Util.GetValueOfBool(costingCheck.invoiceline.Get_Value("VAS_IsLandedCost")))
                     {
                         sql += ", VAS_IsLandedCost = 'Y' ";
                     }

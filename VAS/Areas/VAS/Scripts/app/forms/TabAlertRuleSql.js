@@ -27,6 +27,7 @@
         var joinsArray, $filterCurrentDate, $filterDateList, isDynamic, txtYear, txtMonth, txtDay;
         var joinTable;
         var seletedJoinCloumn = [];
+        var sortValuesArray = [];
         var whereJoinClause = '';
         var $query = $("<div>");
         var gridDiv = $("<div class='vas-grid-div1'>");
@@ -44,6 +45,7 @@
         var sqlGridCols = [];
         var sqlGeneratorGridCols = [];
         var filterArray;
+        var sortedIndex = -1;
         var pagePrev, pageNext = null;
         var totalPages = 1;
         var recordCount = 0;
@@ -1722,91 +1724,136 @@
 
             /*   Click event on Add Sort Button
                to add sorts like ASC, DESC etc*/
-            var sortValuesArray = [];
+            sortValuesArray = [];
+            sortedIndex = -1;
 
             $addSortBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var sortQuery = "";
                 var sortColumn = $sortColumnInput.val();
                 var sql = $selectGeneratorQuery.text();
+                var direction = $sortElements.val();
+                var sortColValue = $sortColumnInput.val();
 
                 // Append subquery in sorting in Add Sort section
-                var datatype = $sortColumnInput.attr('datatype');
-                if (VIS.DisplayType.IsLookup(datatype)) {
-                    var subQuery = GetLookup(datatype, $sortColumnInput.attr('columnID'),
-                        $sortColumnInput.attr('DBColumnName'),
-                        $sortColumnInput.attr('refValId'),
-                        $sortColumnInput.attr('isParent'),
-                        $sortColumnInput.attr('TableName'));
+                var sortdatatype = $sortColumnInput.attr('sortdatatype');
+                var sortcolumnID = $sortColumnInput.attr('sortcolumnID');
+                var sortDBColumnName = $sortColumnInput.attr('sortDBColumnName');
+                var sortrefValId = $sortColumnInput.attr('sortrefValId');
+                var sortisParent = $sortColumnInput.attr('sortisParent');
+                var sortTableName = $sortColumnInput.attr('sortTableName');
+
+                if (VIS.DisplayType.IsLookup(sortdatatype)) {
+                    var subQuery = GetLookup(sortdatatype, sortcolumnID, sortDBColumnName, sortrefValId, sortisParent, sortTableName);
                     if (subQuery.indexOf(') as') > 0) {
                         sortColumn = subQuery.substring(0, subQuery.indexOf(') as') + 1).trim();
                     }
                 }
 
-                // Check if both sql and sortColumn are not empty
-                if (sql !== '' && sortColumn !== '') {
-                    // Create sort string based on current sortValuesArray
-                    if (sortValuesArray.length === 0) {
-                        sortQuery = " ORDER BY LOWER(" + sortColumn + ") " + $sortElements.val();
-                    } else {
-                        sortQuery = ", LOWER(" + sortColumn + ") " + $sortElements.val();
+                var sortObject = {
+                    column: sortColumn,
+                    reqSortVal: sortColValue,
+                    direction: direction,
+                    sortdatatype: sortdatatype,
+                    sortcolumnID: sortcolumnID,
+                    sortDBColumnName: sortDBColumnName,
+                    sortrefValId: sortrefValId,
+                    sortisParent: sortisParent,
+                    sortTableName: sortTableName
+                };
+
+                if (!$(this).hasClass('vas-edit-sort')) {
+                    if (sql !== '' && sortColumn !== '') {
+                        // Push the current sort object to the array
+                        sortValuesArray.push(sortObject);
+                        $sortColumnInput.val('');
+                        displaySortValues();
+                        rebuildSQLQuery();
                     }
-
-                    var sortObject = {
-                        column: sortColumn,
-                        direction: $sortElements.val()
-                    };
-
-                    // Push the current sort element value to the array
-                    sortValuesArray.push(sortObject);
-
+                } else {
+                    $(this).removeClass('vas-edit-sort');
+                    $addSortBtn.val(VIS.Msg.getMsg("VAS_AddSort"));
                     $sortColumnInput.val('');
 
-                    // Display the sort values on the UI
+                    if (sortedIndex >= 0 && sortedIndex < sortValuesArray.length) {
+                        sortValuesArray[sortedIndex] = sortObject;
+                    }
+
                     displaySortValues();
+                    rebuildSQLQuery();
                 }
-
-                // Update the SQL query
-                sql += sortQuery;
-                $selectGeneratorQuery.text(''); // Clear the previous text
-                $selectGeneratorQuery.text(sql); // Set the new SQL query
-
             });
 
             // Function to display the sort values on the UI
             function displaySortValues() {
-                $sortCollection.empty(); // Clear the existing values
+                $sortCollection.empty();
 
-                // Create a list to display the sort values
                 sortValuesArray.forEach(function (sortObject, index) {
-                    $sortCollection.append('<div class="VAS-sortedItem d-flex justify-content-between" style="background-color:' + randomColor() + '">' + sortObject.column + ' ' + sortObject.direction + ' <div class="vas-sortBtns"><i class="vis vis-delete" data-index="' + index + '"></i></div></div>');
+                    $sortCollection.append(
+                        '<div class="VAS-sortedItem d-flex justify-content-between" data-index=' + index +
+                        ' style="background-color: ' + randomColor() + '">' +
+                        '<div>' + sortObject.column + ' ' + sortObject.direction + '</div>' +
+                        '<div class="vas-sortcolval d-none">' + sortObject.reqSortVal + '</div>' +
+                        '<div class="vas-sortColumnName d-none">' + sortObject.column + '</div>' +
+                        '<div class="vas-sortDirection d-none">' + sortObject.direction + '</div>' +
+                        '<div class="vas-sort-datatype d-none">' + sortObject.sortdatatype + '</div>' +
+                        '<div class="vas-sort-columnID d-none">' + sortObject.sortcolumnID + '</div>' +
+                        '<div class="vas-sort-DBColumName d-none">' + sortObject.sortDBColumnName + '</div>' +
+                        '<div class="vas-sort-refValId d-none">' + sortObject.sortrefValId + '</div>' +
+                        '<div class="vas-sort-isParent d-none">' + sortObject.sortisParent + '</div>' +
+                        '<div class="vas-sort-TableName d-none">' + sortObject.sortTableName + '</div>' +
+                        '<div class="vas-sortBtns">' +
+                        '<i class="vis vis-edit" data-index="' + index + '"></i>' +
+                        '<i class="vis vis-delete" data-index="' + index + '"></i>' +
+                        '</div>' +
+                        '</div>'
+                    );
                 });
 
-                // Attach click event to delete buttons
-                $sortCollection.find('.vas-sortBtns i').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
-                    var indexToRemove = $(this).data('index');
-                    sortValuesArray.splice(indexToRemove, 1); // Remove the selected sort object from the array
-
-                    // Rebuild the SQL query after deletion
+                // Delete handler
+                $sortCollection.find('.vas-sortBtns i.vis-delete').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
+                    var indexToRemove = parseInt($(this).data('index'));
+                    sortValuesArray.splice(indexToRemove, 1);
+                    displaySortValues();
                     rebuildSQLQuery();
-                    displaySortValues(); // Update the displayed sort values
+                });
+
+                // Edit handler
+                $sortCollection.find('.vas-sortBtns i.vis-edit').off(VIS.Events.onTouchStartOrClick).on(VIS.Events.onTouchStartOrClick, function () {
+                    var sortedItem = $(this).closest('.VAS-sortedItem');
+                    sortedIndex = parseInt(sortedItem.data('index'));
+
+                    sortedItem.addClass('active').siblings().removeClass('active');
+
+                    $sortColumnInput.val(sortedItem.find('.vas-sortcolval').text());
+                    $sortElements.val(sortedItem.find('.vas-sortDirection').text());
+                    $sortColumnInput.attr('sortdatatype', sortedItem.find('.vas-sort-datatype').text());
+                    $sortColumnInput.attr('sortcolumnID', sortedItem.find('.vas-sort-columnID').text());
+                    $sortColumnInput.attr('sortDBColumnName', sortedItem.find('.vas-sort-DBColumName').text());
+                    $sortColumnInput.attr('sortrefValId', sortedItem.find('.vas-sort-refValId').text());
+                    $sortColumnInput.attr('sortisParent', sortedItem.find('.vas-sort-isParent').text());
+                    $sortColumnInput.attr('sortTableName', sortedItem.find('.vas-sort-TableName').text());
+
+                    $addSortBtn.val(VIS.Msg.getMsg("VAS_UpdateSort")).addClass('vas-edit-sort');
                 });
             }
 
-            // Function to rebuild the SQL query based on the current sortValuesArray
+            // Rebuilds the SQL query
             function rebuildSQLQuery() {
-                var sql = $selectGeneratorQuery.text().split(" ORDER BY ")[0]; // Get the base SQL
+                var sql = $selectGeneratorQuery.text().replace(/ORDER BY[\s\S]*$/i, '').trim();
                 if (sortValuesArray.length > 0) {
                     var orderByClauses = sortValuesArray.map(function (sortObject) {
-                        return sortObject.column + " " + sortObject.direction;
+                        return "LOWER(TRIM(" + sortObject.column + ")) " + sortObject.direction;
                     }).join(", ");
-                    sql += " ORDER BY " + orderByClauses; // Re-add the ORDER BY clause
+                    sql += " ORDER BY " + orderByClauses;
                 }
-                $selectGeneratorQuery.text(sql); // Update the SQL query
+                $selectGeneratorQuery.text(sql);
             }
+
 
             // Clear/refresh sql query
             $sqlGenDeleteIcon.on(VIS.Events.onTouchStartOrClick, function () {
                 clear();
+                //resetSorting();
             });
 
             //show query 
@@ -1874,8 +1921,8 @@
         }
 
         function pageCtrls() {
-            pagingDiv.find("select").empty();
             if (totalPages > 0) {
+                pagingDiv.find("select").empty();
                 for (var i = 0; i < totalPages; i++) {
                     pagingDiv.find("select").append($("<option>").val(i + 1).text(i + 1));
                 }
@@ -2284,13 +2331,76 @@
                         joinCommonColumn = result;
                         for (var i = 0; i < result.length; i++) {
                             // Append the dynamic values of Sort/Joins/Conditions and displayed on UI
-                            $sortByDropdown.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' value=" + mainTableName + "." + result[i].DBColumn + " refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + " TableName=" + mainTableName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterColumnName.append("<div class='vas-column-list-item' columnID=" + result[i].ColumnID + " TableName=" + mainTableName + "  title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " isParent=" + result[i].IsParent + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " fieldName=" + result[i].FieldName + "  datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $filterCol2Block.append("<div class='vas-column-list-item' title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " fieldName=" + result[i].FieldName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " value=" + mainTableName + "." + result[i].DBColumn + ">" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" + "</div>");
-                            $checkBoxes.append(" <div class='vas-column-list-item' refValId=" + result[i].ReferenceValueID + " fieldID=" + result[i].FieldID + " WindowID=" + result[i].WindowID + " tabID=" + tabID + " DBColumnName=" + result[i].DBColumn + " TableName=" + mainTableName + " fieldName=" + result[i].FieldName + " columnID="
-                                + result[i].ColumnID + " datatype=" + result[i].DataType + " isParent=" + result[i].IsParent + " title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" + "<input type='checkbox' class='vas-column-checkbox' data-oldIndex = " + i + ">" + result[i].FieldName + " - " + result[i].DBColumn + "</div>");
+                            $sortByDropdown.append(
+                                "<div class='vas-column-list-item' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "'>" +
+                                result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $filterColumnName.append(
+                                "<div class='vas-column-list-item' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
+                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $filterCol2Block.append(
+                                "<div class='vas-column-list-item' " +
+                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
+                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                "</div>"
+                            );
+
+                            $checkBoxes.append(
+                                "<div class='vas-column-list-item' " +
+                                "refValId='" + result[i].ReferenceValueID + "' " +
+                                "fieldID='" + result[i].FieldID + "' " +
+                                "WindowID='" + result[i].WindowID + "' " +
+                                "tabID='" + tabID + "' " +
+                                "DBColumnName='" + result[i].DBColumn + "' " +
+                                "TableName='" + mainTableName + "' " +
+                                "fieldName='" + result[i].FieldName + "' " +
+                                "columnID='" + result[i].ColumnID + "' " +
+                                "datatype='" + result[i].DataType + "' " +
+                                "isParent='" + result[i].IsParent + "' " +
+                                "title='" + result[i].FieldName + " - " + result[i].DBColumn + "'>" +
+                                "<input type='checkbox' class='vas-column-checkbox' data-oldIndex='" + i + "'>" +
+                                result[i].FieldName + " - " + result[i].DBColumn +
+                                "</div>"
+                            );
                         }
                     }
                     seletedCloumn = [];
@@ -2600,7 +2710,6 @@
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result != null && result != []) {
-
                             if (result.RecordList.length > 0) {
                                 recordCount = result.TotalRecord;
                                 totalPages = Math.ceil(recordCount / pageSize)
@@ -2615,11 +2724,6 @@
                                 }
                                 pagingPlusBtnDiv.removeClass('d-none');
                                 pagingPlusBtnDiv.addClass('d-flex justify-content-between align-items-center');
-                                if (result.RecordList.length < 100 && pageNo == 1) {
-                                    pagingDiv.find("select").append($("<option>").val(pageNo).text(pageNo));
-                                    pagingDiv.find('li').last().css('pointer-events', 'none');
-                                    pagingDiv.find('li').last().find('i').addClass('VA107-disablePage');
-                                }
                             }
                             else {
                                 if (sqlFlag) {
@@ -2783,7 +2887,7 @@
             $filterDateDiv.hide();
             $filterValDropdown.empty();
             var displayType = self.attr("datatype");
-            var columnName = self.attr("DBColumnName").toUpper();
+            var columnName = self.attr("DBColumnName");
             var tableName = self.attr("TableName");
             var refrenceValue = self.attr('refvalid');
             if (!VIS.DisplayType.IsLookup(displayType)) {
@@ -2960,17 +3064,17 @@
             $sortSelectedItem.removeClass('active');
             self.addClass('active');
             var activeItemDataType = $sortByDropdown.children('.vas-column-list-item.active').attr('datatype');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('datatype', activeItemDataType);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortdatatype', activeItemDataType);
             var activeItemColId = $sortByDropdown.children('.vas-column-list-item.active').attr('columnID');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('columnID', activeItemColId);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortcolumnID', activeItemColId);
             var activeItemColDB = $sortByDropdown.children('.vas-column-list-item.active').attr('DBColumnName');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('DBColumnName', activeItemColDB);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortDBColumnName', activeItemColDB);
             var activeItemrefID = $sortByDropdown.children('.vas-column-list-item.active').attr('refValId');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('refValId', activeItemrefID);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortrefValId', activeItemrefID);
             var activeItemChkParent = $sortByDropdown.children('.vas-column-list-item.active').attr('isParent');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('isParent', activeItemChkParent);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortisParent', activeItemChkParent);
             var activeItemtable = $sortByDropdown.children('.vas-column-list-item.active').attr('TableName');
-            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('TableName', activeItemtable);
+            self.parent($sortByDropdown).prev($sortInputBlock).find($sortColumnInput).attr('sortTableName', activeItemtable);
         }
 
         function getIdsName(columnName, tableName, displayType, whereClause, isNameExist, columnID, refrenceValueID) {
@@ -3016,6 +3120,7 @@
             filterArray = [];
             Joinrecord = [];
             record = [];
+            $sortCollection.empty();
             $filters.empty();
             $filterCol2Block.empty();
             $windowFieldColumnSelect.addClass("vis-ev-col-mandatory");
@@ -3069,6 +3174,8 @@
             whereJoinClause = '';
             pagingPlusBtnDiv.addClass('d-none');
             pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
+            sortValuesArray = [];
+            sortedIndex = -1;
         }
 
         this.getRoot = function () {
@@ -3135,6 +3242,7 @@
             pageNo = 1;
             recordCount = 0;
             filterIndex = null;
+            sortedIndex = -1;
             this.getRoot = null;
             this.dGrid = null;
             this.disposeComponent = null;
