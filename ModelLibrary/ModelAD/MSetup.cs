@@ -258,14 +258,23 @@ namespace VAdvantage.Model
             AD_User_Name = name;
             name = DataBase.DB.TO_STRING(name);
 
+            // VIS0060: Changes done to create Hash value of password if IsHashed is true.
+            string isPwdEncrypted = "", isPwdHashed = "";
+            DataSet ds = DB.ExecuteDataset("SELECT IsEncrypted, IsHashed FROM AD_COLUMN WHERE AD_Column_ID=" + 417);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                isPwdEncrypted = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsEncrypted"]);
+                isPwdHashed = Util.GetValueOfString(ds.Tables[0].Rows[0]["IsHashed"]);
+            }
 
-            ///Change by Sukhwinder on 28-Oct-2016 for password encryption when tenant creation.
-
-            var isPwdEncrypted = Util.GetValueOfString(DB.ExecuteScalar("SELECT ISENCRYPTED FROM AD_COLUMN WHERE  AD_TABLE_ID=" + MTable.Get_Table_ID("AD_User") + " AND ColumnName = 'Password' AND EXPORT_ID = 'VIS_417'"));
-            string password = "";
+            string password;
             if (isPwdEncrypted == "Y")
             {
-                password = VAdvantage.Utility.SecureEngine.Encrypt(name);
+                password = SecureEngine.Encrypt(name);
+            }
+            else if (isPwdHashed == "Y")
+            {
+                password = SecureEngine.ComputeHash(name);
             }
             else
             {
@@ -322,7 +331,11 @@ namespace VAdvantage.Model
             password = "";
             if (isPwdEncrypted == "Y")
             {
-                password = VAdvantage.Utility.SecureEngine.Encrypt(name);
+                password = SecureEngine.Encrypt(name);
+            }
+            else if (isPwdHashed == "Y")
+            {
+                password = SecureEngine.ComputeHash(name);
             }
             else
             {
