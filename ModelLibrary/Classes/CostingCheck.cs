@@ -79,6 +79,9 @@ namespace ModelLibrary.Classes
         public string handlingWindowName = "";
         public MCostDetail costDetail = null;
 
+        /* Cost after landed Cost / Trx Calculation */
+        public decimal PostCurrentCostPrice = 0;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -234,6 +237,8 @@ namespace ModelLibrary.Classes
 
             handlingWindowName = "";
             costDetail = null;
+
+            PostCurrentCostPrice = 0;
 
         }
 
