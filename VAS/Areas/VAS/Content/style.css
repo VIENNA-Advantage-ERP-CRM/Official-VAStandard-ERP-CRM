@@ -500,7 +500,7 @@
 }
 
     .vas-query-input.vas-sql-query-input {
-        height: calc(100% - 30px);
+        height: calc(100% - 72px);
     }
 
 .vas-sql-result-msg {
@@ -513,6 +513,10 @@
     .vas-sql-result-msg.vas-sql-result-error {
         color: #ff0000;
     }
+
+.vas-alert-emailmsg {
+    margin-top:15px;
+}
 
 .vas-grid-div1 {
     width: 100%;
