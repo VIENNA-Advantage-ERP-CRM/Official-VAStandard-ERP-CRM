@@ -222,7 +222,7 @@ namespace VAdvantage.Model
         /// <param name="Payment_Id">payment id</param>
         /// <author> DevopsId 4680 VIS_427</author>
         /// <returns>Allocated amount</returns>
-        public Decimal AllocatedAmt(int AllocationLine_ID,int Payment_Id)
+        public Decimal AllocatedAmt(int AllocationLine_ID, int Payment_Id)
         {
             /*On reverse of Allocation header the document changes to inactive, So 
              in order to get correct Allocated  amount Removed IsActive check */
@@ -252,10 +252,10 @@ namespace VAdvantage.Model
             MInvoice invoice = GetInvoice();
             //handled if IsInterBusinessPartner is checked then not to set Business partner id
             if (invoice != null
-                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID() && 
+                && GetC_BPartner_ID() != invoice.GetC_BPartner_ID() &&
                 ((Get_ColumnIndex("IsInterBusinessPartner") >= 0 && !Util.GetValueOfBool(Get_Value("IsInterBusinessPartner"))) || Get_ColumnIndex("IsInterBusinessPartner") < 0))
             {
-                    SetC_BPartner_ID(invoice.GetC_BPartner_ID());
+                SetC_BPartner_ID(invoice.GetC_BPartner_ID());
             }
             //
             int C_Payment_ID = GetC_Payment_ID();
@@ -289,7 +289,7 @@ namespace VAdvantage.Model
                         }
                         if (Util.GetValueOfDecimal(payment.Get_Value("VAS_UnAllocatedAmount")) == 0)
                         {
-                            addAllocatedtoUnallocated = Math.Abs(payment.GetPayAmt()) - Math.Abs(AllocatedAmt(GetC_AllocationLine_ID(),payment.GetC_Payment_ID()));
+                            addAllocatedtoUnallocated = Math.Abs(payment.GetPayAmt()) - Math.Abs(AllocatedAmt(GetC_AllocationLine_ID(), payment.GetC_Payment_ID()));
                         }
                         /*VIS_427 30/01/2024 DevopsId 4680 Handled on reversal of document if PayAmt greater than zero
                          then set Unallocated amount as positive*/
@@ -300,7 +300,7 @@ namespace VAdvantage.Model
                         else if (payment.GetPayAmt() < 0)
                         {
                             payment.Set_Value("VAS_UnAllocatedAmount", Decimal.Negate(addAllocatedtoUnallocated));
-                        }                       
+                        }
                         payment.Save();
                     }
                 }
@@ -338,7 +338,7 @@ namespace VAdvantage.Model
                     }
                 }
             }
-   
+
             //	Payment - Invoice
             if (C_Payment_ID != 0 && invoice != null)
             {
@@ -518,7 +518,9 @@ namespace VAdvantage.Model
                                 // convert (payment amount / Amount from View Allocation) to invoice currency amount then subtract Paid invoice amount to calculated amount
                                 if (doctype.GetDocBaseType() == "ARC" || doctype.GetDocBaseType() == "APC")
                                 {
-                                    if (payment.GetC_Invoice_ID() != 0)
+                                    // VIS_045: 22-July-2025, when Allocation Line and Payment Invoice Reference are same then only execute below condition 
+                                    // Otherwise if the amount is partially allocated then system takes wrong impacts
+                                    if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
                                     {
                                         // when payment created with invoice refernce direct
                                         // convert payment amount in invoice amt with payment date and payment conversion type
@@ -543,7 +545,11 @@ namespace VAdvantage.Model
                                 }
                                 else
                                 {
-                                    if (payment.GetC_Invoice_ID() != 0)
+                                    // VIS_045: 22-July-2025, when Allocation Line and Payment Invoice Reference are same then only execute below condition 
+                                    // Otherwise if the amount is partially allocated then system takes wrong impacts
+                                    // Case: Payment created with Invoice reference, after that reverse the Allocation, after that payment is allocated with another invoice with partial amount of invoice 
+                                    // after that again when user reverse the allocation system take wrong impacts on Invoice Schedule
+                                    if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
                                     {
                                         // when we create payment with invoice reference direct
                                         // convert payment amount in invoice amt with payment date and payment conversion type
