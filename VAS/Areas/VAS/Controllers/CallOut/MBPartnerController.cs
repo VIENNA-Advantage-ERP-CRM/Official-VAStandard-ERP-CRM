@@ -135,5 +135,22 @@ namespace VIS.Controllers
             retJSON = JsonConvert.SerializeObject(objBPModel.LoadBPartnerOrderData(ctx, fields));
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+
+        /// <summary>
+        /// VAI050-get group id
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns></returns>
+        public JsonResult GetPartnerCategory(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MBPartnerModel objBPModel = new MBPartnerModel();
+                retJSON = JsonConvert.SerializeObject(objBPModel.GetPartnerCategory(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
     }
 }
