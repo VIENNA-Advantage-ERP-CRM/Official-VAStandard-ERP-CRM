@@ -400,9 +400,10 @@ namespace VIS.Models
                 }
             }
             MAlert alert = new MAlert(ctx, AD_Alert_ID, null);
-            if (Util.GetValueOfBool(alert.Get_Value("IsSchedule")))
+            string basedOn = Util.GetValueOfString(alert.Get_Value("BasedOn"));
+            if (!string.IsNullOrEmpty(basedOn))
             {
-                details.IsSchedule = Util.GetValueOfBool(alert.Get_Value("IsSchedule"));
+                details.BasedOn = basedOn;
                 details.IsEmail = Util.GetValueOfBool(obj.Get_Value("IsEmail"));
                 details.EmailColumnName = Util.GetValueOfString(obj.Get_Value("EMail"));
             }
@@ -576,7 +577,7 @@ namespace VIS.Models
     public class AlertRuleDetail
     {
         public string EmailColumnName { get; set; }
-        public bool IsSchedule { get; set; }
+        public string BasedOn { get; set; }
         public bool IsEmail { get; set; }
         public string query { get; set; }
     }

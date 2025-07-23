@@ -51,7 +51,7 @@
         var recordCount = 0;
         this.dGrid = null;
         this.dGridGen = null;
-        this.isSchedule = false;
+        this.BasedOn = "";
         var $windowTabDiv = $("<div class='vas-windowtab'><label>" + VIS.Msg.getMsg("VAS_WindowTab") + "</label>");
         var $joinSearch = $("<div class='vas-windowtab vas-searchinput-block'><label>" + VIS.Msg.getMsg("VAS_WindowTabAddition") + "</label>");
         var $multiSelectArrow = $('<span class="vis vis-arrow-down vas-arrow-down"></span>');
@@ -272,6 +272,7 @@
             var emailColCtrlWrap = $('<div class="vis-control-wrap">');
 
             $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText.append($sqlGenDeleteIcon)).append($selectGeneratorQuery).append(gridDiv2);
+
 
             txtIsEmail = new VIS.Controls.VCheckBox("IsEmail", false, false, true, VIS.Msg.getMsg("VAS_SendMail"), null, false);
             isEmailCtrl.append(isEmailCtrlWrap);
@@ -1918,8 +1919,8 @@
                         result = JSON.parse(result);
                         if (result) {
                             $selectQuery.text(result.query);
-                            $self.isSchedule = result.IsSchedule;
-                            if (result.IsSchedule) {
+                            $self.BasedOn = result.BasedOn;
+                            if (result.BasedOn && result.BasedOn=='S') {
                                 emailContentDiv.show();
                                 txtEmailColName.setValue(result.EmailColumnName);
                                 txtIsEmail.setValue(result.IsEmail);
@@ -3151,7 +3152,7 @@
            Clears the values of controls used
         */
         function clear() {
-            $self.isSchedule = false;
+            $self.BasedOn = "";
             tableID = 0;
             mainTableName = "";
             tabID = 0;
