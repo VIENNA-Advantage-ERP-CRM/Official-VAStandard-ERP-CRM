@@ -331,6 +331,29 @@
         return "";
     };
 
+    /**
+   * VAI050-To set the partner category according to BP
+   * @param {any} ctx
+   * @param {any} windowNo
+   * @param {any} mTab
+   * @param {any} mField
+   * @param {any} value
+   * @param {any} oldValue
+   */
+        
+    CalloutLead.prototype.setPartnerCategory = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if ((this.isCalloutActive() || value == null || value.toString() == "")) {
+            mTab.setValue("C_BP_Group_ID", null);
+            return "";
+        }
+        this.setCalloutActive(true);
+        var ds = VIS.dataContext.getJSONRecord("MPriceList/GetPartnerCategory", Util.getValueOfInt(value));
+        mTab.setValue("C_BP_Group_ID", Util.getValueOfInt(ds));
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    };
+
 
 
 
