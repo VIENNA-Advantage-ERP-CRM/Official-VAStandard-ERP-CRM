@@ -347,7 +347,7 @@
             return "";
         }
         this.setCalloutActive(true);
-        var ds = VIS.dataContext.getJSONRecord("MPriceList/GetPartnerCategory", Util.getValueOfInt(value));
+        var ds = VIS.dataContext.getJSONRecord("MBPartner/GetPartnerCategory", Util.getValueOfInt(value));
         mTab.setValue("C_BP_Group_ID", Util.getValueOfInt(ds));
         this.setCalloutActive(false);
         ctx = windowNo = mTab = mField = value = oldValue = null;

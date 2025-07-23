@@ -143,17 +143,7 @@ namespace VIS.Models
             return obj;
         }
 
-        /// <summary>
-        /// VAI050-get group id
-        /// </summary>
-        /// <param name="ctx"></param>
-        /// <param name="fields"></param>
-        /// <returns></returns>
-        public int GetPartnerCategory(Ctx ctx, string fields)
-        {
-            string sql = @"SELECT C_BP_Group_ID FROM C_BPartner WHERE  C_BPartner_ID= " + Util.GetValueOfInt(fields);
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql,null,null));
-        }
+      
 
     }
 }

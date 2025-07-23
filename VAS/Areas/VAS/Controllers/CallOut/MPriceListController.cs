@@ -102,22 +102,7 @@ namespace VIS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// VAI050-get group id
-        /// </summary>
-        /// <param name="fields"></param>
-        /// <returns></returns>
-        public JsonResult GetPartnerCategory(string fields)
-        {
-            string retJSON = "";
-            if (Session["ctx"] != null)
-            {
-                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
-                MPriceListModel objPriceList = new MPriceListModel();
-                retJSON = JsonConvert.SerializeObject(objPriceList.GetPartnerCategory(ctx, fields));
-            }
-            return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }
+     
 
     }
 }
