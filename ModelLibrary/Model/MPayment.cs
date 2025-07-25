@@ -2746,6 +2746,13 @@ namespace VAdvantage.Model
                 return DocActionVariables.STATUS_INVALID;
             }
 
+            /* VIS_045: 25-July-2025 - Check Amount Can't be negative*/
+            if (!IsReversal() && !IsReceipt() && GetTenderType().Equals(X_C_Payment.TENDERTYPE_Check) && GetPayAmt() < 0)
+            {
+                _processMsg = Msg.GetMsg(GetCtx(), "VAS_CheckCantNegativeAmt");
+                return DocActionVariables.STATUS_INVALID;
+            }
+
             //	Waiting Payment - Need to create Invoice & Shipment
             if (GetC_Order_ID() != 0 && GetC_Invoice_ID() == 0)
             {	//	see WebOrder.process

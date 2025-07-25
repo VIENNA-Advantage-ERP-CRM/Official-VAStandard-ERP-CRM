@@ -129,6 +129,7 @@ namespace VAdvantage.Process
                     _user.SetMobile(lead.GetMobile());
                     _user.SetEMail(lead.GetEMail());
                     _user.SetDescription(lead.GetDescription());
+                    _user.Set_Value("VA047_LinkedIn ",lead.Get_Value("VA047_LinkedIn"));
                     if (!_user.Save())
                         log.SaveError("ERROR:", "Error in Saving User");
                 }

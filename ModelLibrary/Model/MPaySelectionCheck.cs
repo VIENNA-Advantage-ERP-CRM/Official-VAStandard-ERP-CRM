@@ -583,6 +583,11 @@ namespace VAdvantage.Model
                         payment.SetDateTrx(check.GetParent().GetPayDate());
                         payment.SetDateAcct(check.GetParent().GetPayDate());
                         payment.SetC_BPartner_ID(check.GetC_BPartner_ID());
+                        /*VIS_045, 25-July-2025 - Set Business Partner location on Payment, otherwise syatem was not reversing the document*/
+                        if (check.Get_ColumnIndex("C_BPartner_Location_ID") >= 0)
+                        {
+                            payment.SetC_BPartner_Location_ID(check.Get_ValueAsInt("C_BPartner_Location_ID"));
+                        }
 
                         //to set VA009_PaymentMethod_ID on payment from Print Export Form
                         VA009_PaymentMethod_ID = Util.GetValueOfInt(check.Get_Value("VA009_PaymentMethod_ID"));
@@ -613,7 +618,7 @@ namespace VAdvantage.Model
                             _log.Fine("Map to Invoice " + psl);
                             //
                             payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
-                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") > 0)
+                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") >= 0)
                             {
                                 payment.SetC_InvoicePaySchedule_ID(psl.GetC_InvoicePaySchedule_ID());
                             }
@@ -632,11 +637,11 @@ namespace VAdvantage.Model
                         if (psls.Length == 1)
                         {
                             MPaySelectionLine psl = psls[0];
-                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") > 0)
+                            payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
+                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") >= 0)
                             {
                                 payment.SetC_InvoicePaySchedule_ID(psl.GetC_InvoicePaySchedule_ID());
                             }
-                            payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
                             payment.SetDiscountAmt(psl.GetDiscountAmt());
                             if (psl.GetDifferenceAmt() > 0)
                                 payment.SetWriteOffAmt(psl.GetDifferenceAmt());
