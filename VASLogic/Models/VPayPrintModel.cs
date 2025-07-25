@@ -397,10 +397,16 @@ namespace VIS.Models
             VAdvantage.ProcessEngine.ProcessCtl pctrl = null;
             try
             {
-                sql = "select ad_table_id from ad_table where tablename = 'C_Payment'";
-                paymentTable_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+                /*VIS_045: 24-July-2025, Commented code - not using*/
+                //sql = "select ad_table_id from ad_table where tablename = 'C_Payment'";
+                //paymentTable_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
 
-                sql = "select ad_process_id from ad_process where value = 'PaymentPrintFormat'";
+                /*Change print Format to Crystal report, so this is commented*/
+                //sql = "select ad_process_id from ad_process where value = 'PaymentPrintFormat'";
+                //paymentAD_Process_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+
+                /*Crystal Report*/
+                sql = "select ad_process_id from ad_process where value = 'VARPT_PaymentVoucher'";
                 paymentAD_Process_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
 
             }
@@ -418,7 +424,7 @@ namespace VIS.Models
             //    pctrl = new VAdvantage.ProcessEngine.ProcessCtl(ctx,null, pin, null);
             //    pctrl.Process(pin, ctx,out reportData, out result);              
             //}
-            return "";
+            return paymentAD_Process_ID.ToString();
         }
 
 
