@@ -399,7 +399,7 @@ namespace VAdvantage.Model
                 _bp.SetMobile(GetMobile());
                 _bp.Set_Value("R_Source_ID", GetR_Source_ID());
                 _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
-                _bp.Set_Value ("LeadRating",GetLeadRating());
+                _bp.Set_Value("LeadRating", GetLeadRating());
 
 
                 // VIS0060: Set Next Step, Next Step By and Follow update
@@ -643,18 +643,59 @@ namespace VAdvantage.Model
             _project.SetDescription(GetDescription());
             _project.SetNote(GetHelp());
             //
-            _project.SetC_BPartner_ID(GetC_BPartner_ID());
+            //VIS0336:chnages done for lead window
+
+            if (Env.IsModuleInstalled("VA047_"))
+            {
+
+                if ((GetC_BPartner_ID() == 0 && GetRef_BPartner_ID() != 0) || (GetC_BPartner_ID() == 0 && GetRef_BPartner_ID() != 0 && GetC_Project_ID() != 0))
+                {
+                    _project.SetC_BPartner_ID(GetC_BPartner_ID());
+                    _project.SetC_BPartnerSR_ID(GetC_BPartnerSR_ID());
+                    _project.SetRef_BPartner_ID(GetRef_BPartner_ID());
+
+                }
+
+                else if (GetC_BPartner_ID() > 0 && GetRef_BPartner_ID() == 0 && GetC_Project_ID() == 0)
+                {
+                    _project.SetC_BPartner_ID(GetC_BPartner_ID());
+                    _project.SetC_BPartnerSR_ID(GetC_BPartner_ID());
+                    _project.SetRef_BPartner_ID(GetC_BPartner_ID());
+
+                }
+
+                else if (GetC_BPartner_ID() > 0 && GetRef_BPartner_ID() > 0)
+                {
+                    _project.SetC_BPartner_ID(GetC_BPartner_ID());
+                    _project.SetC_BPartnerSR_ID(GetRef_BPartner_ID());
+                    _project.SetRef_BPartner_ID(GetRef_BPartner_ID());
+
+                }
+                else if (GetC_BPartner_ID() == 0 && GetRef_BPartner_ID() == 0 && GetC_Project_ID() == 0)
+                {
+                    _project.SetC_BPartner_ID(GetC_BPartner_ID());
+                    _project.SetC_BPartnerSR_ID(GetRef_BPartner_ID());
+                    _project.SetRef_BPartner_ID(GetRef_BPartner_ID());
+
+                }
+
+            }
+            else
+            {
+                _project.SetC_BPartner_ID(GetC_BPartner_ID());
+
+            }
+
             _project.SetC_BPartner_Location_ID(GetC_BPartner_Location_ID());
             _project.SetAD_User_ID(GetAD_User_ID());
-            _project.SetC_BPartnerSR_ID(GetC_BPartnerSR_ID());
             _project.SetC_Campaign_ID(GetC_Campaign_ID());
-
             _project.SetC_ProjectType_ID(C_ProjectType_ID);
             _project.SetSalesRep_ID(GetSalesRep_ID());
             _project.SetC_SalesRegion_ID(GetC_SalesRegion_ID());
             _project.SetC_EnquiryRdate(GetC_EnquiryRdate());
             _project.Set_Value("Status", Get_Value("Status"));
             _project.Set_Value("LeadRating", Get_Value("LeadRating"));
+
             if (!_project.Save())
                 return "@SaveError@";
             //
@@ -665,6 +706,10 @@ namespace VAdvantage.Model
             }
             //
             SetC_Project_ID(_project.GetC_Project_ID());
+            if (Env.IsModuleInstalled("VA047_"))
+            {
+                Set_Value("IsArchive", true);
+            }
             return null;
         }
 
@@ -757,7 +802,7 @@ namespace VAdvantage.Model
                 if (newRecord && Util.GetValueOfInt(Get_Value("VA047_Partner_Sales_Rep")) > 0)
                 {
                     SetName(GetBPName());
-                    SetR_Source_ID(Util.GetValueOfInt(DB.ExecuteScalar("SELECT R_Source_ID FROM R_Source WHERE Export_ID='VIS_1000008'")));                    
+                    SetR_Source_ID(Util.GetValueOfInt(DB.ExecuteScalar("SELECT R_Source_ID FROM R_Source WHERE Export_ID='VIS_1000008'")));
                 }
 
                 int count = 0;
