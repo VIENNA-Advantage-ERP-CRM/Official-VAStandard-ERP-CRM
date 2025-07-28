@@ -5215,7 +5215,8 @@ namespace VAdvantage.Model
                 + " psl.PayAmt, psl.DiscountAmt, psl.DifferenceAmt, psl.OpenAmt ";
             if (Env.IsModuleInstalled("VA009_"))
             {
-                sql += " , psl.C_InvoicePaySchedule_ID ";
+                /*VIS_045: 28-July-2025, Get OverUnder and Write-off amount from Payment Selection Line itself */
+                sql += " , psl.C_InvoicePaySchedule_ID, WriteOffAmt, OverUnderAmt ";
             }
             sql += " FROM C_PaySelectionLine psl"
               + " INNER JOIN C_PaySelectionCheck psc ON (psl.C_PaySelectionCheck_ID=psc.C_PaySelectionCheck_ID) "
@@ -5233,22 +5234,32 @@ namespace VAdvantage.Model
                     Boolean isSOTrx = "Y".Equals(idr[2].ToString());
                     Decimal payAmt = Utility.Util.GetValueOfDecimal(idr[3]);
                     Decimal discountAmt = Utility.Util.GetValueOfDecimal(idr[4]);
-                    Decimal writeOffAmt = Utility.Util.GetValueOfDecimal(idr[5]);
+                    Decimal writeOffAmt = 0;
+                    if (Util.GetValueOfDecimal(idr[8]) == 0 && Util.GetValueOfDecimal(idr[9]) == 0 && Util.GetValueOfDecimal(idr[5]) != 0)
+                    {
+                        writeOffAmt = Utility.Util.GetValueOfDecimal(idr[5]);
+                    }
+                    else
+                    {
+                        writeOffAmt = Utility.Util.GetValueOfDecimal(idr[8]);
+                    }
                     Decimal openAmt = Utility.Util.GetValueOfDecimal(idr[6]);
-                    Decimal overUnderAmt = 0;
+                    Decimal overUnderAmt = Utility.Util.GetValueOfDecimal(idr[9]);
                     if (Env.IsModuleInstalled("VA009_"))
                     {
-                        if (Utility.Util.GetValueOfDecimal(idr[5]) < 0)
+                        if (Util.GetValueOfDecimal(idr[8]) == 0 && Util.GetValueOfDecimal(idr[9]) == 0 && Util.GetValueOfDecimal(idr[5]) != 0)
                         {
-                            overUnderAmt = Utility.Util.GetValueOfDecimal(idr[5]);
-                            writeOffAmt = decimal.Zero;
+                            if (Utility.Util.GetValueOfDecimal(idr[5]) < 0)
+                            {
+                                overUnderAmt = Utility.Util.GetValueOfDecimal(idr[5]);
+                                writeOffAmt = decimal.Zero;
+                            }
+                            else
+                            {
+                                writeOffAmt = Utility.Util.GetValueOfDecimal(idr[5]);
+                                overUnderAmt = decimal.Zero;
+                            }
                         }
-                        else
-                        {
-                            writeOffAmt = Utility.Util.GetValueOfDecimal(idr[5]);
-                            overUnderAmt = decimal.Zero;
-                        }
-
                     }
                     else
                     {
