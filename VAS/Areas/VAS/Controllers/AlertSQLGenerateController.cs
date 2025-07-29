@@ -32,18 +32,18 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tabID">AD_Tab_ID</param>
         /// <param name="windowNo">Window number</param>
         /// <returns>TableName/AD_Table_ID</returns>
-        public JsonResult GetTable(int tabID,int windowNo)
+        public JsonResult GetTable(int tabID, int windowNo)
         {
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AlertSqlGenerate obj = new AlertSqlGenerate();
-                List<Tabs> result= obj.GetTable(ctx, tabID, windowNo);
+                List<Tabs> result = obj.GetTable(ctx, tabID, windowNo);
                 var jsonResult = Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }
-            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);          
+            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="pageSize">page Size</param>
         /// <param name="tableName">Table Name</param>
         /// <returns>ListofRecords</returns>
-        public JsonResult GetResult(string query, int pageNo,int pageSize,string tableName, int recordCount)
+        public JsonResult GetResult(string query, int pageNo, int pageSize, string tableName, int recordCount)
         {
             if (Session["Ctx"] != null)
             {
@@ -66,7 +66,7 @@ namespace VAS.Areas.VAS.Controllers
                 jsonResult.MaxJsonLength = int.MaxValue;
                 return jsonResult;
             }
-            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);          
+            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
@@ -74,7 +74,7 @@ namespace VAS.Areas.VAS.Controllers
         /// </summary>
         /// <param name="tableID">AD_Table_ID</param>
         /// <returns>ColumnInfornationList</returns>
-        public JsonResult GetColumns(int tableID,int tabID)
+        public JsonResult GetColumns(int tableID, int tabID)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -84,7 +84,7 @@ namespace VAS.Areas.VAS.Controllers
                 retJSON = JsonConvert.SerializeObject(obj.GetColumns(ctx, tableID, tabID));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
-        }   
+        }
 
         /// <summary>
         /// Update record of AlertRule by TabSqlGenerator 
@@ -93,8 +93,10 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tableID">AD_Table_ID</param>
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
+        /// <param name="isEmail">isEmail</param>
+        /// <param name="emailColumn">emailColumn</param>
         /// <returns>Updated/NotUpdated</returns>
-        public JsonResult UpdateQuery(string query,int tableID, int alertID,int alertRuleID)
+        public JsonResult UpdateQuery(string query, int tableID, int alertID, int alertRuleID, bool isEmail, string emailColumn)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -107,7 +109,7 @@ namespace VAS.Areas.VAS.Controllers
                 {
                     return Json(null);
                 }
-                retJSON = JsonConvert.SerializeObject(obj.UpdateQuery(ctx, query, tableID, alertID, alertRuleID));
+                retJSON = JsonConvert.SerializeObject(obj.UpdateQuery(ctx, query, tableID, alertID, alertRuleID, isEmail, emailColumn));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
@@ -136,7 +138,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="tableName">Table Name</param>
         /// <param name="displayType"> Dispaly type</param>
         /// <returns>Names</returns>
-        public JsonResult GetIdsName(string columnName,string tableName, int displayType,string whereClause,bool isNameExist,int columnID, int refrenceValueID,int windowNo)
+        public JsonResult GetIdsName(string columnName, string tableName, int displayType, string whereClause, bool isNameExist, int columnID, int refrenceValueID, int windowNo)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -147,7 +149,7 @@ namespace VAS.Areas.VAS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
-        
+
         /// <summary>
         /// Getting subquery from loopup  to show names instead of Ids
         /// </summary>
@@ -159,7 +161,7 @@ namespace VAS.Areas.VAS.Controllers
         /// <param name="isParent">Is parent link column</param>
         /// <param name="tableName">Table Name</param>
         /// <returns>subquery</returns>
-        public JsonResult GetLookup(int windowNo, int columnDatatype, int columnID, string columnName, int refrenceID,bool isParent,string tableName)
+        public JsonResult GetLookup(int windowNo, int columnDatatype, int columnID, string columnName, int refrenceID, bool isParent, string tableName)
         {
             string retJSON = "";
             if (Session["ctx"] != null)

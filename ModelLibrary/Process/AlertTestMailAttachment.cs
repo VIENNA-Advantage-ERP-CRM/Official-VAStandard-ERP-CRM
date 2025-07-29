@@ -27,6 +27,8 @@ namespace ViennaAdvantage.Process
 { 
     public class AlertTestMailAttachment : SvrProcess
     {
+        List<string> emailAddresses = new List<string>();
+        List<DataRow> emailRows = new List<DataRow>();
         string userName =null;
         string userEmail = null;   
         int AD_User_ID = 0;  
@@ -110,6 +112,42 @@ namespace ViennaAdvantage.Process
         }
 
         /// <summary>
+        /// Create excel file for single row
+        /// </summary>
+        /// <param name="row">Datarow</param>
+        /// <returns>file</returns>
+        private FileInfo CreateSingleRowExcel(DataRow row)
+        {
+            Random rndm = new Random();
+            string path = "Alert_" + DateTime.Now.Ticks + "_" + rndm.Next(0, 9999);
+            string filePath = GlobalVariable.PhysicalPath + "TempDownload\\";
+            if (!Directory.Exists(filePath))
+                Directory.CreateDirectory(filePath);
+            log.Log(Level.INFO, "TestAlert=> Create Directory in CreateExcelFile");
+            string fileName = filePath + path + ".xlsx";
+            var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Data");
+
+            // Add headers
+            for (int i = 0; i < row.Table.Columns.Count; i++)
+            {
+                worksheet.Cell(1, i + 1).Value = row.Table.Columns[i].ColumnName;
+            }
+
+            // Add row data
+            for (int i = 0; i < row.Table.Columns.Count; i++)
+            {
+                worksheet.Cell(2, i + 1).Value = row[i];
+            }
+
+            workbook.SaveAs(fileName);
+            log.Log(Level.INFO, "TestAlert=> Create Exporter.export in CreateExcelFile");
+            FileInfo fInfo = new FileInfo(fileName);
+            log.Log(Level.INFO, "TestAlert=> Create new File Info in CreateExcelFile");
+            return fInfo;
+        }
+
+        /// <summary>
         /// Create excel file
         /// </summary>
         /// <param name="data">sql Result</param>
@@ -160,11 +198,13 @@ namespace ViennaAdvantage.Process
         /// <param name="sql">Sql Query</param>
         /// <param name="trxName">Transaction Name</param>
         /// <returns>Query data</returns>
-        private DataTable GetData(String sql, Trx trxName)
+        private DataTable GetData(String sql, Trx trxName,string emailColumnName)
         {
             DataTable data = new DataTable();
+            emailRows = new List<DataRow>();
             IDataReader rs = null;
             Exception error = null;
+            emailAddresses = new List<string>();
             try
             {
                 if (!ValidateSql(sql))
@@ -191,6 +231,12 @@ namespace ViennaAdvantage.Process
                         row[col] = rs[col];
                     }
                     data.Rows.Add(row);
+                    if (!string.IsNullOrEmpty(emailColumnName) && data.Columns.Contains(emailColumnName) && row[emailColumnName] != DBNull.Value)
+                    {
+                        string email = row[emailColumnName].ToString();
+                        emailAddresses.Add(email);
+                        emailRows.Add(row);
+                    }
                 }
             }
             catch (Exception e)
@@ -276,7 +322,24 @@ namespace ViennaAdvantage.Process
             }
             if (SendInfo(AD_User_ID, alert.GetAlertSubject(), finalMsg.ToString(), attachments))
             {
-               return true;
+                if (emailAddresses.Count > 0)
+                {
+
+                    for (int i = 0; i < emailAddresses.Count; i++)
+                    {
+                        string email = emailAddresses[i];
+                        DataRow row = emailRows[i];
+
+                        FileInfo file = CreateSingleRowExcel(row);
+                        EMail emailObj = m_client.CreateEMail(email, "", alert.GetAlertSubject(), finalMsg.ToString(), false);
+                        if (emailObj != null)
+                        {
+                            emailObj.AddAttachment(file);
+                            emailObj.Send();
+                        }
+                    }
+                }
+                return true;
             }
             return false;
         }
@@ -323,7 +386,12 @@ namespace ViennaAdvantage.Process
         /// <returns></returns>
         private String GetExcelReport(MAlertRule rule, String sql, Trx trxName, List<FileInfo> attachments)
         {
-            DataTable data = GetData(sql, trxName);
+            string emailColumnName = "";
+            bool isEmail = Util.GetValueOfBool(rule.Get_Value("IsEmail"));
+            if (isEmail) {
+                emailColumnName = Util.GetValueOfString(rule.Get_Value("EMail"));
+            }
+            DataTable data = GetData(sql, trxName, emailColumnName);
             if (data == null)
             {
                 log.Log(Level.SEVERE, "TestAlert=>Error executing sql on GetExcelReport");
