@@ -44,13 +44,14 @@
         var $addSortBtn = null;
         var sqlGridCols = [];
         var sqlGeneratorGridCols = [];
-        var filterArray;
+        var filterArray, isEmailCtrl, emailColNameCtrl, txtIsEmail, txtEmailColName, emailContentDiv;
         var sortedIndex = -1;
         var pagePrev, pageNext = null;
         var totalPages = 1;
         var recordCount = 0;
         this.dGrid = null;
         this.dGridGen = null;
+        this.BasedOn = "";
         var $windowTabDiv = $("<div class='vas-windowtab'><label>" + VIS.Msg.getMsg("VAS_WindowTab") + "</label>");
         var $joinSearch = $("<div class='vas-windowtab vas-searchinput-block'><label>" + VIS.Msg.getMsg("VAS_WindowTabAddition") + "</label>");
         var $multiSelectArrow = $('<span class="vis vis-arrow-down vas-arrow-down"></span>');
@@ -260,7 +261,26 @@
             $joiningTableInputBlock.append($joiningTableInput).append($joiningTableSelectArrow);
             $addSortBySelectWithButton.append($sortElements).append($addSortBtn);
             $sqlContent.append($selectQuery).append($queryResultGrid);
+            $sqlContent.append('<div id="emailContent_' + $self.windowNo + '" class="vas-alert-emailmsg VIS_Pref_show vis-formouterwrpdiv">'
+                + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap" id="Is_Email_' + $self.windowNo + '"></div></div>'
+                + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap" id="EmailColName_' + $self.windowNo + '"></div></div>'
+                + '</div>');
+            isEmailCtrl = $sqlContent.find("#Is_Email_" + $self.windowNo);
+            emailColNameCtrl = $sqlContent.find("#EmailColName_" + $self.windowNo);
+            emailContentDiv = $sqlContent.find("#emailContent_" + $self.windowNo);
+            var isEmailCtrlWrap = $('<div class="vis-control-wrap">');
+            var emailColCtrlWrap = $('<div class="vis-control-wrap">');
+
             $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText.append($sqlGenDeleteIcon)).append($selectGeneratorQuery).append(gridDiv2);
+
+
+            txtIsEmail = new VIS.Controls.VCheckBox("IsEmail", false, false, true, VIS.Msg.getMsg("VAS_SendMail"), null, false);
+            isEmailCtrl.append(isEmailCtrlWrap);
+            isEmailCtrlWrap.append(txtIsEmail.getControl().addClass("vis-ec-col-lblchkbox"));
+
+            txtEmailColName = new VIS.Controls.VTextBox("EMail", true, false, true);
+            emailColNameCtrl.append(emailColCtrlWrap);
+            emailColCtrlWrap.append(txtEmailColName.getControl().attr('title', VIS.Msg.getMsg("VAS_TypeEmailColumn")).attr('placeholder', ' ').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_EmailColumn")+'</label>');
 
             // Empty the Condition's Operator value
             $filterOperator.val('');
@@ -517,6 +537,7 @@
                             $queryResultGrid.hide();
                             $query.show();
                             $selectQuery.show();
+                            emailContentDiv.show();
                             $sqlContent.find($saveBtn).hide();
                             $sqlResultDiv.hide();
                             $sqlContent.removeClass('vas-grid-height');
@@ -1285,7 +1306,7 @@
                         var andOrOperator = $filterConditionV2.find('option:selected').val();
                         var oldQuery = $filterEditDiv.text();
                         var sqlGenQuery = $selectGeneratorQuery.text();
-                        
+
 
                         // Disable dynamic filter inputs while editing
                         txtDay.prop("readonly", true);
@@ -1317,7 +1338,7 @@
 
                         // Update filterArray with new values
                         var dataTypeReq = $filterColumnInput.attr('datatype');
-                        
+
                         var reqFilterVal = $filterValInput.val();
                         var regex = /(.+)TO_CHAR/;
                         var match = filterColumn.match(regex);
@@ -1500,7 +1521,7 @@
                     $filterColumnName.hide();
                 }
                 if (!target.is($baseTableSelectArrow) && !target.is($baseTableJoinInput) && !target.is($joinOnFieldColumnMainTable)) {
-                   // $joinOnFieldColumnMainTable.hide();
+                    // $joinOnFieldColumnMainTable.hide();
                     if ($joinOnFieldColumnMainTable == null) {
                         return;
                     }
@@ -1602,7 +1623,7 @@
                             joinCommonColumn = joinCommonColumn.concat(joinData);
                             for (var i = 0; i < joinData.length; i++) {
                                 var optionValue = joinTableName + "." + joinData[i].DBColumn;
-                                var optionText = joinTableName + " > " + joinData[i].ColumnName + " (" + joinData[i].DBColumn + ")";
+                                var optionText = joinTableName + " - " + joinData[i].ColumnName + " (" + joinData[i].DBColumn + ")";
                                 if (!addedOptions.includes(optionValue)) {
                                     $sortByDropdown.append(" <div class='vas-column-list-item' title='" + optionText + "' value=" + optionValue + ">" + optionText + "</div>");
                                     $filterColumnName.append(" <div class='vas-column-list-item' title='" + optionText + "' refValId=" + joinData[i].ReferenceValueID + " fieldID=" + joinData[i].FieldID + " WindowID=" + joinData[i].WindowID + " tabID=" + tabID + " DBColumnName=" + joinData[i].DBColumn + " TableName=" + joinTableName + " columnID=" + joinData[i].ColumnID +
@@ -1884,6 +1905,7 @@
             AJAX Call to get Alert Data
         */
         this.SqlQuery = function (ParentId) {
+            emailContentDiv.hide();
             alertRuleID = ParentId;
             if (alertRuleID > 0) {
                 $sqlGeneratorBtn.attr('disabled', true);
@@ -1895,8 +1917,14 @@
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
-                        if (result && result.length > 0) {
-                            $selectQuery.text(result);
+                        if (result) {
+                            $selectQuery.text(result.query);
+                            $self.BasedOn = result.BasedOn;
+                            if (result.BasedOn && result.BasedOn=='S') {
+                                emailContentDiv.show();
+                                txtEmailColName.setValue(result.EmailColumnName);
+                                txtIsEmail.setValue(result.IsEmail);
+                            }
                         }
                     },
                     error: function (error) {
@@ -1916,6 +1944,7 @@
                 $queryResultGrid.hide();
                 $query.show();
                 $selectQuery.show();
+                emailContentDiv.show();
                 $saveBtn.hide();
             }
         }
@@ -2333,7 +2362,7 @@
                             // Append the dynamic values of Sort/Joins/Conditions and displayed on UI
                             $sortByDropdown.append(
                                 "<div class='vas-column-list-item' " +
-                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "title='" + mainTableName + " - " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
                                 "value='" + mainTableName + "." + result[i].DBColumn + "' " +
                                 "refValId='" + result[i].ReferenceValueID + "' " +
                                 "fieldID='" + result[i].FieldID + "' " +
@@ -2353,7 +2382,7 @@
                                 "<div class='vas-column-list-item' " +
                                 "columnID='" + result[i].ColumnID + "' " +
                                 "TableName='" + mainTableName + "' " +
-                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "title='" + mainTableName + " - " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
                                 "refValId='" + result[i].ReferenceValueID + "' " +
                                 "fieldID='" + result[i].FieldID + "' " +
                                 "WindowID='" + result[i].WindowID + "' " +
@@ -2363,13 +2392,13 @@
                                 "fieldName='" + result[i].FieldName + "' " +
                                 "datatype='" + result[i].DataType + "' " +
                                 "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
-                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                mainTableName + " - " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
                                 "</div>"
                             );
 
                             $filterCol2Block.append(
                                 "<div class='vas-column-list-item' " +
-                                "title='" + mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
+                                "title='" + mainTableName + " - " + result[i].ColumnName + " (" + result[i].DBColumn + ")' " +
                                 "refValId='" + result[i].ReferenceValueID + "' " +
                                 "fieldID='" + result[i].FieldID + "' " +
                                 "WindowID='" + result[i].WindowID + "' " +
@@ -2380,7 +2409,7 @@
                                 "columnID='" + result[i].ColumnID + "' " +
                                 "datatype='" + result[i].DataType + "' " +
                                 "value='" + mainTableName + "." + result[i].DBColumn + "'>" +
-                                mainTableName + " > " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
+                                mainTableName + " - " + result[i].ColumnName + " (" + result[i].DBColumn + ")" +
                                 "</div>"
                             );
 
@@ -2641,11 +2670,20 @@
         */
         function UpdateAlertRule(query) {
             if (query != null) {
+
+                var obj = {
+                    query: VIS.secureEngine.encrypt(query),
+                    alertRuleID: alertRuleID,
+                    alertID: alertID,
+                    tableID: tableID,
+                    isEmail: txtIsEmail.getValue(),
+                    emailColumn: txtEmailColName.getValue()
+                }
                 alertRuleID = $self.ParentId;
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/UpdateQuery",
                     type: "POST",
-                    data: { query: VIS.secureEngine.encrypt(query), alertRuleID: alertRuleID, alertID: alertID, tableID: tableID },
+                    data: obj,
                     async: false,
                     success: function (result) {
                         result = JSON.parse(result);
@@ -2731,6 +2769,7 @@
                                     $queryResultGrid.hide();
                                     $query.show();
                                     $selectQuery.show();
+                                    emailContentDiv.show();
                                     $saveBtn.hide();
                                 }
                                 if (sqlGenerateFlag) {
@@ -2755,6 +2794,7 @@
                                 $queryResultGrid.hide();
                                 $query.show();
                                 $selectQuery.show();
+                                emailContentDiv.show();
                                 $saveBtn.hide();
                             }
                             if (sqlGenerateFlag) {
@@ -2824,6 +2864,7 @@
                 records: w2utils.encodeTags(result)
             });
             $selectQuery.hide();
+            emailContentDiv.hide();
             $query.hide();
             $queryResultGrid.show();
         }
@@ -3111,6 +3152,7 @@
            Clears the values of controls used
         */
         function clear() {
+            $self.BasedOn = "";
             tableID = 0;
             mainTableName = "";
             tabID = 0;

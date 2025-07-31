@@ -190,7 +190,7 @@ namespace VIS.Models
                     DataTable table = ds.Tables[0];
                     int rowCount = table.Rows.Count;
                     int colCount = table.Columns.Count;
-                    
+
                     //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
                     //{
                     //    results.TotalRecord = rowCount;
@@ -216,7 +216,7 @@ namespace VIS.Models
                         results.RecordList.Add(rowResult); // Add rowResult to the list
                     }
 
-                   // results.TotalRecord = totatRecCount; // Set Totalrecord
+                    // results.TotalRecord = totatRecCount; // Set Totalrecord
                     return results;
                 }
                 else
@@ -235,8 +235,10 @@ namespace VIS.Models
         /// <param name="tableID">AD_Table_ID</param>
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
+        /// <param name="isEmail">isEmail</param>
+        /// <param name="emailColumn">emailColumn</param>
         /// <returns>saved/notsaved</returns>
-        public string SaveQuery(Ctx ctx, string query, int tableID, int alertID, int alertRuleID)
+        public string SaveQuery(Ctx ctx, string query, int tableID, int alertID, int alertRuleID, bool isEmail, string emailColumn)
         {
             if (query != null && query.Length > 0)
             {
@@ -279,6 +281,8 @@ namespace VIS.Models
                     obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
                     obj.SetIsActive(true);
                     obj.SetIsValid(true);
+                    obj.Set_Value("IsEmail", Util.GetValueOfBool(isEmail));
+                    obj.Set_Value("EMail", Util.GetValueOfString(emailColumn));
                     if (obj.Save())
                     {
                         return Msg.GetMsg(ctx, "SavedSuccessfully");
@@ -303,14 +307,16 @@ namespace VIS.Models
         /// <param name="tableID">AD_Table_ID</param>
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
+        /// <param name="isEmail">isEmail</param>
+        /// <param name="emailColumn">emailColumn</param>
         /// <returns>Updated/NotUpdated</returns>
-        public string UpdateQuery(Ctx ctx, string query, int tableID, int alertID, int alertRuleID)
+        public string UpdateQuery(Ctx ctx, string query, int tableID, int alertID, int alertRuleID, bool isEmail, string emailColumn)
         {
             if (query != null && query.Length > 0 && alertID > 0)
             {
                 if (alertRuleID <= 0)
                 {
-                    string msg = SaveQuery(ctx, query, tableID, alertID, 0);
+                    string msg = SaveQuery(ctx, query, tableID, alertID, 0, isEmail, emailColumn);
                     return msg;
                 }
                 int indexOfFrom = query.IndexOf("FROM");
@@ -345,6 +351,8 @@ namespace VIS.Models
                     obj.SetWhereClause(Util.GetValueOfString(whereClause + " "));
                     obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
                     obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
+                    obj.Set_Value("IsEmail", Util.GetValueOfBool(isEmail));
+                    obj.Set_Value("EMail", Util.GetValueOfString(emailColumn));
                     obj.SetIsActive(true);
                     if (obj.Save())
                     {
@@ -369,10 +377,12 @@ namespace VIS.Models
         /// <param name="alertID">AD_Alert_ID</param>
         /// <param name="alertRuleID">AD_AlertRule_ID</param>
         /// <returns>RecordInfo</returns>
-        public string GetAlertData(Ctx ctx, int alertRuleID)
+        public AlertRuleDetail GetAlertData(Ctx ctx, int alertRuleID)
         {
+            AlertRuleDetail details = new AlertRuleDetail();
             string sql = "";
             MAlertRule obj = new MAlertRule(ctx, alertRuleID, null);
+            int AD_Alert_ID = obj.GetAD_Alert_ID();
             string selectClause = obj.GetSelectClause();
             string fromClause = obj.GetFromClause();
             string whereClause = obj.GetWhereClause();
@@ -389,7 +399,25 @@ namespace VIS.Models
                     sql += " " + otherClause;
                 }
             }
-            return sql;
+            MAlert alert = new MAlert(ctx, AD_Alert_ID, null);
+            string basedOn = Util.GetValueOfString(alert.Get_Value("BasedOn"));
+            if (!string.IsNullOrEmpty(basedOn))
+            {
+                details.BasedOn = basedOn;
+                details.IsEmail = Util.GetValueOfBool(obj.Get_Value("IsEmail"));
+                details.EmailColumnName = Util.GetValueOfString(obj.Get_Value("EMail"));
+            }
+            details.query = sql;
+            try
+            {
+                string decrypted = SecureEngine.Decrypt("ke9LjRIaP4Vsb9y66n1o18pQZUftEs692vGMirrMoME=:YN7RSxHiX54FDF7ucFYtFg==");
+                Console.WriteLine("Decrypted: " + decrypted);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error while decrypting: " + ex.Message);
+            }
+            return details;
         }
         /// <summary>
         /// Getting idetifier value 
@@ -404,7 +432,7 @@ namespace VIS.Models
         /// <param name="refrenceValueID">AD_RefrenceValue_ID</param>
         /// <param name="windowNo">windowNo</param>
         /// <returns>idetifier and ID</returns>
-        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType, string whereClause,bool isNameExist,
+        public List<IDDetails> GetIdsName(Ctx ctx, string columnName, string tableName, int displayType, string whereClause, bool isNameExist,
             int columnID, int refrenceValueID, int windowNo)
         {
             List<IDDetails> data = new List<IDDetails>();
@@ -424,15 +452,18 @@ namespace VIS.Models
             }
             string displayCol = lInfo.displayColSubQ;
             string newTable = lInfo.tableName;
-           
+
 
             if (tableName.ToUpper() != newTable.ToUpper() && newTable != "")
             {
                 sql = "SELECT ";
-                if (!string.IsNullOrEmpty(displayCol)) {
-                    sql += displayCol+", "+keyCol;
+                if (!string.IsNullOrEmpty(displayCol))
+                {
+                    sql += displayCol + ", " + keyCol;
                     isDisplayed = true;
-                } else {
+                }
+                else
+                {
                     sql += "*";
                 }
                 sql += @" FROM " + newTable + " WHERE " + newTable + "." + pColumnName + " IS NOT NULL ";
@@ -440,7 +471,7 @@ namespace VIS.Models
             }
             else
             {
-                sql = @"SELECT "+columnName +" FROM " + tableName+" WHERE " + tableName + "." + columnName+" IS NOT NULL ";
+                sql = @"SELECT " + columnName + " FROM " + tableName + " WHERE " + tableName + "." + columnName + " IS NOT NULL ";
                 getTable = tableName;
                 isDisplayed = false;
             }
@@ -454,20 +485,21 @@ namespace VIS.Models
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, getTable, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-          //  sql += " FETCH FIRST 100 ROWS ONLY";
+            //  sql += " FETCH FIRST 100 ROWS ONLY";
             DataSet ds = DB.ExecuteDataset(sql);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
-                DataTable table = ds.Tables[0];               
+                DataTable table = ds.Tables[0];
                 for (int i = 0; i < table.Rows.Count; i++)
                 {
                     IDDetails obj = new IDDetails();
-                    if (isDisplayed) {
+                    if (isDisplayed)
+                    {
                         obj.Name = Util.GetValueOfString(table.Rows[i][0]);
                         obj.Value = Util.GetValueOfString(table.Rows[i][1]);
                         obj.tableName = getTable;
                         obj.isNameExist = true;
-                    }                 
+                    }
                     else
                     {
                         obj.Name = Util.GetValueOfString(table.Rows[i][columnName]);
@@ -517,7 +549,7 @@ namespace VIS.Models
             else if (displayCol.IndexOf("nothing.png") > -1)
             {
                 displayCol = displayCol.Replace(displayCol.Substring(displayCol.IndexOf("NVL((SELECT NVL(ImageURL,'')"), displayCol.IndexOf("thing.png^^') ||' '||") + 21), "");
-            }         
+            }
             if (lookup.queryDirect.Length > 0 && !string.IsNullOrEmpty(displayCol))
             {
                 if (lookup.tableName.Equals("AD_Ref_List"))
@@ -540,6 +572,14 @@ namespace VIS.Models
         public string WindowName { get; set; }
         public int TableID { get; set; }
         public int WindowID { get; set; }
+    }
+
+    public class AlertRuleDetail
+    {
+        public string EmailColumnName { get; set; }
+        public string BasedOn { get; set; }
+        public bool IsEmail { get; set; }
+        public string query { get; set; }
     }
 
     public class Tabs
