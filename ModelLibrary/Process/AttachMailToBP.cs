@@ -450,53 +450,54 @@ namespace VAdvantage.Process
                             idr.Close();
                         }
 
-                        if (dt.Rows.Count <= 0 && tableName == "C_Lead")
-                        {
-                            string[] tomails = to.ToLower().Split(';').ToArray();
-                            foreach (var tomail in tomails)
-                            {
-                                if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
-                                {
-                                    continue;
-                                }
-                                else
-                                {
-                                    mailDomain = tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty;
-                                    sql.Clear();
-                                    sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
-                                        c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N' 
-                                        AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
-                                    if (!emailDomains.Contains(mailDomain))
-                                    {
-                                        sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
-                                    }
-                                    sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID);
+                        //if (dt.Rows.Count <= 0 && tableName == "C_Lead")
+                        //{
+                        //    string[] tomails = to.ToLower().Split(';').ToArray();
+                        //    foreach (var tomail in tomails)
+                        //    {
+                        //        if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
+                        //        {
+                        //            continue;
+                        //        }
+                        //        else
+                        //        {
+                        //            mailDomain = tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty;
+                        //            sql.Clear();
+                        //            sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
+                        //                c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N' 
+                        //                AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
+                        //            if (!emailDomains.Contains(mailDomain))
+                        //            {
+                        //                sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
+                        //            }
+                        //            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID);
 
-                                    idr = DB.ExecuteReader(sql.ToString());
-                                    dt = new DataTable();
-                                    dt.Load(idr);
-                                    idr.Close();
-                                    if (dt.Rows.Count <= 0)
-                                    {
-                                        existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                        //            idr = DB.ExecuteReader(sql.ToString());
+                        //            dt = new DataTable();
+                        //            dt.Load(idr);
+                        //            idr.Close();
+                        //            if (dt.Rows.Count <= 0)
+                        //            {
+                        //                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
 
-                                        if (existRec > 0)// Is mail already attached
-                                        {
-                                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                                            continue;
-                                        }
-                                        AttachMail(mail, 0, 0, attachType, "", "", "");
-                                    }
-                                    else
-                                    {
-                                        AttachToLead(mail, dt, attachType, tomail.Trim());
-                                    }
-                                    continue;
-                                }
-                            }
-                        }
-
-                        else if (dt.Rows.Count <= 0)
+                        //                if (existRec > 0)// Is mail already attached
+                        //                {
+                        //                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                        //                    continue;
+                        //                }
+                        //                AttachMail(mail, 0, 0, attachType, "", "", "");
+                        //            }
+                        //            else
+                        //            {
+                        //                AttachToLead(mail, dt, attachType, tomail.Trim());
+                        //            }
+                        //            continue;
+                        //        }
+                        //    }
+                        //}
+                        //else
+                                                
+                        if (dt.Rows.Count <= 0)
                         {
                             existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
                             if (existRec > 0)// Is mail already attached
