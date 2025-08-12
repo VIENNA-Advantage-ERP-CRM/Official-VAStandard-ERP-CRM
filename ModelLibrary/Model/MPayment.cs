@@ -754,6 +754,10 @@ namespace VAdvantage.Model
                     {
                         SetTenderType("A");
                     }
+                    else if (tenderType.Equals(X_C_Payment.TENDERTYPE_LetterOfCredit))
+                    {
+                        SetTenderType(X_C_Payment.TENDERTYPE_LetterOfCredit);
+                    }
                     else
                     {
                         SetTenderType("A");/*Direct Deposit*/
