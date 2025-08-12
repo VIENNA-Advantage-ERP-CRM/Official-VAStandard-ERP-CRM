@@ -618,7 +618,7 @@ namespace VAdvantage.Model
                 SetAD_Org_ID(0);
 
             //	Region Check
-            if (GetC_Region_ID() == 0 && !string.IsNullOrEmpty(GetRegionName()))
+            if ((GetC_Region_ID() == 0 || Is_ValueChanged("RegionName")) && !string.IsNullOrEmpty(GetRegionName()))
             {
                 SetRegionID(GetCtx(), GetRegionName());
             }
