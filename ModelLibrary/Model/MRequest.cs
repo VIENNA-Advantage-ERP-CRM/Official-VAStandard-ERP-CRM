@@ -1091,7 +1091,7 @@ namespace VAdvantage.Model
             CheckChange(ra, "C_BPartner_ID");
             CheckChange(ra, "AD_User_ID");
             CheckChange(ra, "C_Project_ID");
-            CheckChange(ra, "A_AsSet_ID");
+            CheckChange(ra, "A_Asset_ID");
             CheckChange(ra, "C_Order_ID");
             CheckChange(ra, "C_Invoice_ID");
             CheckChange(ra, "M_Product_ID");
@@ -1435,7 +1435,7 @@ namespace VAdvantage.Model
                 CheckChange(ra, "C_BPartner_ID");
                 CheckChange(ra, "AD_User_ID");
                 CheckChange(ra, "C_Project_ID");
-                CheckChange(ra, "A_AsSet_ID");
+                CheckChange(ra, "A_Asset_ID");
                 CheckChange(ra, "C_Order_ID");
                 CheckChange(ra, "C_Invoice_ID");
                 CheckChange(ra, "M_Product_ID");
