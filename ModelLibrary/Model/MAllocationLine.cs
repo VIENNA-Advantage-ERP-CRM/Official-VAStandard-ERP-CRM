@@ -520,28 +520,30 @@ namespace VAdvantage.Model
                                 {
                                     // VIS_045: 22-July-2025, when Allocation Line and Payment Invoice Reference are same then only execute below condition 
                                     // Otherwise if the amount is partially allocated then system takes wrong impacts
-                                    if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
+
+                                    //VIS_045: 14-Aug-2025, Commented code
+                                    //if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
+                                    //{
+                                    //    // when payment created with invoice refernce direct
+                                    //    // convert payment amount in invoice amt with payment date and payment conversion type
+                                    //    payAmt = MConversionRate.Convert(GetCtx(), Decimal.Negate(Decimal.Add(Decimal.Add((payment.GetPayAmt() +
+                                    //        (payment.Get_ColumnIndex("BackupWithholdingAmount") >= 0 ? (payment.GetWithholdingAmt() + payment.GetBackupWithholdingAmount()) : 0)), payment.GetDiscountAmt()),
+                                    //        payment.GetWriteOffAmt())), payment.GetC_Currency_ID(), invoice.GetC_Currency_ID(), payment.GetDateAcct(),
+                                    //        payment.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                                    //}
+                                    //else
+                                    //{
+                                    // when payment created with Payment Allocate entry OR
+                                    // when we match payment with invoice through Payment Allocation form
+                                    // convert payment amount in invoice amt with view allocation date 
+                                    payAmt = MConversionRate.Convert(GetCtx(), Decimal.Negate(Decimal.Add(Decimal.Add(GetAmount(), GetDiscountAmt()),
+                                        GetWriteOffAmt())), allocHdr.GetC_Currency_ID(), invoice.GetC_Currency_ID(), allocHdr.GetDateAcct(),
+                                        invoice.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                                    if (doctype.GetDocBaseType() == "APC")
                                     {
-                                        // when payment created with invoice refernce direct
-                                        // convert payment amount in invoice amt with payment date and payment conversion type
-                                        payAmt = MConversionRate.Convert(GetCtx(), Decimal.Negate(Decimal.Add(Decimal.Add((payment.GetPayAmt() +
-                                            (payment.Get_ColumnIndex("BackupWithholdingAmount") >= 0 ? (payment.GetWithholdingAmt() + payment.GetBackupWithholdingAmount()) : 0)), payment.GetDiscountAmt()),
-                                            payment.GetWriteOffAmt())), payment.GetC_Currency_ID(), invoice.GetC_Currency_ID(), payment.GetDateAcct(),
-                                            payment.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                                        payAmt = Decimal.Negate(payAmt);
                                     }
-                                    else
-                                    {
-                                        // when payment created with Payment Allocate entry OR
-                                        // when we match payment with invoice through Payment Allocation form
-                                        // convert payment amount in invoice amt with view allocation date 
-                                        payAmt = MConversionRate.Convert(GetCtx(), Decimal.Negate(Decimal.Add(Decimal.Add(GetAmount(), GetDiscountAmt()),
-                                            GetWriteOffAmt())), allocHdr.GetC_Currency_ID(), invoice.GetC_Currency_ID(), allocHdr.GetDateAcct(),
-                                            invoice.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
-                                        if (doctype.GetDocBaseType() == "APC")
-                                        {
-                                            payAmt = Decimal.Negate(payAmt);
-                                        }
-                                    }
+                                    //}
                                 }
                                 else
                                 {
@@ -549,28 +551,30 @@ namespace VAdvantage.Model
                                     // Otherwise if the amount is partially allocated then system takes wrong impacts
                                     // Case: Payment created with Invoice reference, after that reverse the Allocation, after that payment is allocated with another invoice with partial amount of invoice 
                                     // after that again when user reverse the allocation system take wrong impacts on Invoice Schedule
-                                    if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
-                                    {
-                                        // when we create payment with invoice reference direct
-                                        // convert payment amount in invoice amt with payment date and payment conversion type
-                                        payAmt = MConversionRate.Convert(GetCtx(), Decimal.Add(Decimal.Add((payment.GetPayAmt() +
-                                            (payment.Get_ColumnIndex("BackupWithholdingAmount") >= 0 ? (payment.GetWithholdingAmt() + payment.GetBackupWithholdingAmount()) : 0)), payment.GetDiscountAmt()),
-                                            payment.GetWriteOffAmt()), payment.GetC_Currency_ID(), invoice.GetC_Currency_ID(), payment.GetDateAcct(),
-                                            payment.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
-                                    }
-                                    else
-                                    {
-                                        // when payment created with Payment Allocate entry Or
-                                        // when we match payment with invoice through Payment Allocation form
-                                        // convert payment amount in invoice amt with view allocation date 
-                                        payAmt = MConversionRate.Convert(GetCtx(), Decimal.Add(Decimal.Add(GetAmount(), GetDiscountAmt()), GetWriteOffAmt()),
+
+                                    //VIS_045: 14-Aug-2025, Commented code
+                                    //if (payment.GetC_Invoice_ID() != 0 && payment.GetC_Invoice_ID() == GetC_Invoice_ID() && GetC_InvoicePaySchedule_ID() == payment.GetC_InvoicePaySchedule_ID())
+                                    //{
+                                    //    // when we create payment with invoice reference direct
+                                    //    // convert payment amount in invoice amt with payment date and payment conversion type
+                                    //    payAmt = MConversionRate.Convert(GetCtx(), Decimal.Add(Decimal.Add((payment.GetPayAmt() +
+                                    //        (payment.Get_ColumnIndex("BackupWithholdingAmount") >= 0 ? (payment.GetWithholdingAmt() + payment.GetBackupWithholdingAmount()) : 0)), payment.GetDiscountAmt()),
+                                    //        payment.GetWriteOffAmt()), payment.GetC_Currency_ID(), invoice.GetC_Currency_ID(), payment.GetDateAcct(),
+                                    //        payment.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
+                                    //}
+                                    //else
+                                    //{
+                                    // when payment created with Payment Allocate entry Or
+                                    // when we match payment with invoice through Payment Allocation form
+                                    // convert payment amount in invoice amt with view allocation date 
+                                    payAmt = MConversionRate.Convert(GetCtx(), Decimal.Add(Decimal.Add(GetAmount(), GetDiscountAmt()), GetWriteOffAmt()),
                                         allocHdr.GetC_Currency_ID(), invoice.GetC_Currency_ID(), allocHdr.GetDateAcct(), invoice.GetC_ConversionType_ID(),
                                         GetAD_Client_ID(), GetAD_Org_ID());
                                         if (doctype.GetDocBaseType() == "API")
                                         {
                                             payAmt = Decimal.Negate(payAmt);
                                         }
-                                    }
+                                    //}
                                 }
                                 invoiceSchedule.SetVA009_PaidAmntInvce(Decimal.Round(Decimal.Subtract(invoiceSchedule.GetVA009_PaidAmntInvce(), payAmt),
                                     currency.GetStdPrecision()));
