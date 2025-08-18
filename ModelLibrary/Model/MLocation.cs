@@ -23,6 +23,7 @@ using System.Data;
 using VAdvantage.Logging;
 using System.Xml;
 using System.Web;
+using System.Text.RegularExpressions;
 
 namespace VAdvantage.Model
 {
@@ -546,8 +547,8 @@ namespace VAdvantage.Model
                     retStr.Append(GetAddress4()).Append(", ");
                 //	City, Region, Postal
                 if (ParseCRP(GetCountry()).Trim() != ",")
-                {                    
-                        retStr.Append(ParseCRP(GetCountry()));
+                {
+                    retStr.Append(ParseCRP(GetCountry()));
                 }
                 //	Add Country would come here
             }
@@ -615,7 +616,12 @@ namespace VAdvantage.Model
         {
             if (GetAD_Org_ID() != 0)
                 SetAD_Org_ID(0);
+
             //	Region Check
+            if ((GetC_Region_ID() == 0 || Is_ValueChanged("RegionName")) && !string.IsNullOrEmpty(GetRegionName()))
+            {
+                SetRegionID(GetCtx(), GetRegionName());
+            }
             if (GetC_Region_ID() != 0)
             {
                 if (_country == null || _country.GetC_Country_ID() != GetC_Country_ID())
@@ -629,6 +635,24 @@ namespace VAdvantage.Model
             SetLatitude(LngLat[0]);
 
             return true;
+        }
+
+        /// <summary>
+        /// Thid function is used to set the Accurate Region Name and ID on location when user type region value manually
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="RegionName">User Input Region</param>
+        /// <author>VIS_045: 12-Aug-2025</author>
+        public void SetRegionID(Ctx ctx, string RegionName)
+        {
+            /* multiple spaces between words → single space*/
+            string Normalize(string text) => Regex.Replace(text.Trim().ToLower(), @"\s+", " ");
+            MRegion matchRegion = MRegion.GetRegions(ctx).FirstOrDefault(r => Normalize(r.GetName()) == Normalize(RegionName));
+            if (matchRegion != null && matchRegion.Get_ID() != 0)
+            {
+                SetC_Region_ID(matchRegion.Get_ID());
+                SetRegionName(matchRegion.GetName());
+            }
         }
 
         public string[] GetLongitudeAndLatitude(string address, string sensor)

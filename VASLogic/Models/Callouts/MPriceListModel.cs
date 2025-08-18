@@ -29,7 +29,7 @@ namespace VIS.Models
                 M_PriceList_ID = Util.GetValueOfInt(paramValue[0].ToString());
                 //End Assign parameter value
 
-                MPriceList prcLst =  MPriceList.Get(ctx, M_PriceList_ID, null);
+                MPriceList prcLst = MPriceList.Get(ctx, M_PriceList_ID, null);
                 Dictionary<String, String> retDic = new Dictionary<string, string>();
                 // Reset Orig Shipment
                 MCurrency crncy = MCurrency.Get(ctx, prcLst.GetC_Currency_ID());
@@ -142,6 +142,8 @@ namespace VIS.Models
             }
             return obj;
         }
-       
+
+      
+
     }
 }

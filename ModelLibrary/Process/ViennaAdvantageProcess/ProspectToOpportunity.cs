@@ -66,6 +66,14 @@ namespace ViennaAdvantage.Process
                         opp.SetIsOpportunity(true);
                         // VIA051: changes done to set the value of Ref_BPartner_ID for loading data into Uer/Contact and Location .
                         opp.SetRef_BPartner_ID(lead.GetRef_BPartner_ID());
+                        opp.Set_Value("Status", lead.Get_Value("Status"));
+                        opp.Set_Value("LeadRating", lead.GetLeadRating());
+                        if (Env.IsModuleInstalled("VA047_"))
+                        {
+                            opp.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
+                            opp.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
+                            opp.SetC_EnquiryRdate(lead.GetCreated());
+                        }
                         //VAI050-Set below coulum if VA061 module install
                         if (Env.IsModuleInstalled("VA061_"))
                         {
@@ -118,6 +126,7 @@ namespace ViennaAdvantage.Process
                 opp.SetAD_User_ID(user.GetAD_User_ID());
                 opp.SetC_BPartner_Location_ID(user.GetC_BPartner_Location_ID());
                 opp.SetC_Campaign_ID(partner.GetC_Campaign_ID());
+                opp.Set_Value("LeadRating", partner.Get_Value("LeadRating"));
                 opp.SetIsOpportunity(true);
 
                 if (opp.Save())

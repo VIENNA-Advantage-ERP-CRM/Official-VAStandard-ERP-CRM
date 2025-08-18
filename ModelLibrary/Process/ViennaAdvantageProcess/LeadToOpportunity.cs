@@ -62,6 +62,16 @@ namespace ViennaAdvantage.Process
                 opp.SetIsOpportunity(true);
                 /*Vivek*/
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
+                opp.Set_Value("Status", lead.GetStatus());
+                opp.Set_Value("LeadRating", lead.GetLeadRating());
+                opp.SetC_BPartnerSR_ID(lead.GetC_BPartner_ID());
+                if (Env.IsModuleInstalled("VA047_"))
+                {
+                    opp.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
+                    opp.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
+                    opp.SetC_EnquiryRdate(lead.GetCreated());
+                }
+             
                 //VAI050-Set below coulum if VA061 module install
                 if (Env.IsModuleInstalled("VA061_"))
                 {
@@ -146,6 +156,14 @@ namespace ViennaAdvantage.Process
                 }
                 /*Vivek*/
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
+                opp.Set_Value("Status", lead.GetStatus());
+                opp.Set_Value("LeadRating", lead.GetLeadRating());
+                if (Env.IsModuleInstalled("VA047_"))
+                {
+                    opp.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
+                    opp.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
+                    opp.SetC_EnquiryRdate(lead.GetCreated());
+                }
                 if (lead.GetC_ProposalDdate() != null)
                 {
                     /** Fix for Proposal Due Date issue ** Dt: 05/12/2021 ** Modified By: Kumar **/

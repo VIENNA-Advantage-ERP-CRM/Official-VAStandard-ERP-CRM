@@ -6068,6 +6068,7 @@ namespace VAdvantage.Process
                     if (costingCheck.invoiceline != null && costingCheck.invoiceline.Get_ID() > 0 && Util.GetValueOfBool(costingCheck.invoiceline.Get_Value("VAS_IsLandedCost")))
                     {
                         sql += ", VAS_IsLandedCost = 'Y' ";
+                        sql += $", ProductCost = {costingCheck.PostCurrentCostPrice} ";
                     }
                 }
                 sql += $@" WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}";

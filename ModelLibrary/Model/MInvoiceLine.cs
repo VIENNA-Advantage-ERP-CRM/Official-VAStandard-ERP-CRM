@@ -3225,7 +3225,7 @@ namespace VAdvantage.Model
             objTransaction.Set_Value("C_InvoiceLine_ID", GetC_InvoiceLine_ID());
             objTransaction.Set_Value("CostingLevel", CostingLevel);
             objTransaction.Set_Value("M_CostElement_ID", Util.GetValueOfInt(drLandedCost["M_CostElement_ID"]));
-            objTransaction.Set_Value("ProductCost", 0);
+            objTransaction.Set_Value("ProductCost", costingCheck.PostCurrentCostPrice);
             objTransaction.Set_Value("VAS_LandedCost", costingCheck.ExpectedLandedCost);
             if (GetReversalDoc_ID() > 0)
             {

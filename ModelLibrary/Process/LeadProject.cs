@@ -129,6 +129,7 @@ namespace VAdvantage.Process
                     _user.SetMobile(lead.GetMobile());
                     _user.SetEMail(lead.GetEMail());
                     _user.SetDescription(lead.GetDescription());
+                    _user.Set_Value("VA047_LinkedIn ",lead.Get_Value("VA047_LinkedIn"));
                     if (!_user.Save())
                         log.SaveError("ERROR:", "Error in Saving User");
                 }
@@ -294,9 +295,17 @@ namespace VAdvantage.Process
                 project.SetC_Lead_ID(lead.GetC_Lead_ID());
 
                 if (lead.GetC_BPartner_ID() > 0)
+                {
                     project.SetC_BPartner_ID(lead.GetC_BPartner_ID());
+                    project.SetC_BPartnerSR_ID(lead.GetC_BPartner_ID());
+
+
+                }
                 else
+                {
                     project.SetC_BPartnerSR_ID(lead.GetRef_BPartner_ID());
+
+                }
 
                 project.SetIsOpportunity(true);
                 project.Set_Value("Created", lead.GetCreated());
@@ -311,6 +320,10 @@ namespace VAdvantage.Process
 
                 }
 
+                project.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
+                project.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
+                project.SetC_EnquiryRdate(lead.GetCreated());
+                
                 if (project.Save())
                 {
                     //VAI050-Save History from lead window to opportunity window

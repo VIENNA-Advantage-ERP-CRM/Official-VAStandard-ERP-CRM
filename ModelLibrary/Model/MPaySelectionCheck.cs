@@ -314,7 +314,7 @@ namespace VAdvantage.Model
                         .Append(x).Append(bpba[BA_Name]).Append(x).Append(",")          // Bank Name
                         .Append(x).Append(bpba[BA_RoutingNo]).Append(x).Append(",")     // Bank RoutingNo
                         .Append(x).Append(bpba[BA_SwitftCode]).Append(x).Append(",")    // SwiftCode
-                        //  Payment Info
+                                                                                        //  Payment Info
                         .Append(x).Append(mpp.GetDocumentNo()).Append(x).Append(",")    // DocumentNo
                         .Append(mpp.GetParent().GetPayDate()).Append(",")               // PayDate
                         .Append(x).Append(MCurrency.GetISO_Code(Env.GetContext(), mpp.GetParent().GetC_Currency_ID())).Append(x).Append(",")    // Currency
@@ -583,6 +583,11 @@ namespace VAdvantage.Model
                         payment.SetDateTrx(check.GetParent().GetPayDate());
                         payment.SetDateAcct(check.GetParent().GetPayDate());
                         payment.SetC_BPartner_ID(check.GetC_BPartner_ID());
+                        /*VIS_045, 25-July-2025 - Set Business Partner location on Payment, otherwise syatem was not reversing the document*/
+                        if (check.Get_ColumnIndex("C_BPartner_Location_ID") >= 0)
+                        {
+                            payment.SetC_BPartner_Location_ID(check.Get_ValueAsInt("C_BPartner_Location_ID"));
+                        }
 
                         //to set VA009_PaymentMethod_ID on payment from Print Export Form
                         VA009_PaymentMethod_ID = Util.GetValueOfInt(check.Get_Value("VA009_PaymentMethod_ID"));
@@ -613,15 +618,26 @@ namespace VAdvantage.Model
                             _log.Fine("Map to Invoice " + psl);
                             //
                             payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
-                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") > 0)
+                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") >= 0)
                             {
                                 payment.SetC_InvoicePaySchedule_ID(psl.GetC_InvoicePaySchedule_ID());
                             }
                             payment.SetDiscountAmt(psl.GetDiscountAmt());
-                            if (psl.GetDifferenceAmt() > 0)
-                                payment.SetWriteOffAmt(psl.GetDifferenceAmt());
+
+                            /*VIS_045: 28-July-2025, Set Value from Payment selection Line*/
+                            if (psl.Get_ColumnIndex("OverUnderAmt") >= 0 && psl.Get_ColumnIndex("WriteOffAmt") >= 0 &&
+                                (Util.GetValueOfDecimal(psl.Get_Value("WriteOffAmt")) != 0 || Util.GetValueOfDecimal(psl.Get_Value("OverUnderAmt")) != 0))
+                            {
+                                payment.SetWriteOffAmt(Util.GetValueOfDecimal(psl.Get_Value("WriteOffAmt")));
+                                payment.SetOverUnderAmt(Util.GetValueOfDecimal(psl.Get_Value("OverUnderAmt")));
+                            }
                             else
-                                payment.SetOverUnderAmt(psl.GetDifferenceAmt());
+                            {
+                                if (psl.GetDifferenceAmt() > 0)
+                                    payment.SetWriteOffAmt(psl.GetDifferenceAmt());
+                                else
+                                    payment.SetOverUnderAmt(psl.GetDifferenceAmt());
+                            }
                         }
                         else
                         {
@@ -632,16 +648,27 @@ namespace VAdvantage.Model
                         if (psls.Length == 1)
                         {
                             MPaySelectionLine psl = psls[0];
-                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") > 0)
+                            payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
+                            if (psl.Get_ColumnIndex("C_InvoicePaySchedule_ID") >= 0)
                             {
                                 payment.SetC_InvoicePaySchedule_ID(psl.GetC_InvoicePaySchedule_ID());
                             }
-                            payment.SetC_Invoice_ID(psl.GetC_Invoice_ID());
                             payment.SetDiscountAmt(psl.GetDiscountAmt());
-                            if (psl.GetDifferenceAmt() > 0)
-                                payment.SetWriteOffAmt(psl.GetDifferenceAmt());
+
+                            /*VIS_045: 28-July-2025, Set Value from Payment selection Line*/
+                            if (psl.Get_ColumnIndex("OverUnderAmt") >= 0 && psl.Get_ColumnIndex("WriteOffAmt") >= 0 &&
+                                (Util.GetValueOfDecimal(psl.Get_Value("WriteOffAmt")) != 0 || Util.GetValueOfDecimal(psl.Get_Value("OverUnderAmt")) != 0))
+                            {
+                                payment.SetWriteOffAmt(Util.GetValueOfDecimal(psl.Get_Value("WriteOffAmt")));
+                                payment.SetOverUnderAmt(Util.GetValueOfDecimal(psl.Get_Value("OverUnderAmt")));
+                            }
                             else
-                                payment.SetOverUnderAmt(psl.GetDifferenceAmt());
+                            {
+                                if (psl.GetDifferenceAmt() > 0)
+                                    payment.SetWriteOffAmt(psl.GetDifferenceAmt());
+                                else
+                                    payment.SetOverUnderAmt(psl.GetDifferenceAmt());
+                            }
                         }
 
                         if (!payment.Save())
@@ -672,8 +699,17 @@ namespace VAdvantage.Model
                                     PayAlocate.SetInvoiceAmt(psls[j].GetOpenAmt());
                                     PayAlocate.SetAD_Client_ID(psls[j].GetAD_Client_ID());
                                     PayAlocate.SetAD_Org_ID(psls[j].GetAD_Org_ID());
-                                    PayAlocate.SetWriteOffAmt(0);
-                                    PayAlocate.SetOverUnderAmt(0);
+                                    /*VIS_045: 28-July-2025, Set Value from Payment selection Line*/
+                                    if (psls[j].Get_ColumnIndex("OverUnderAmt") >= 0 && psls[j].Get_ColumnIndex("WriteOffAmt") >= 0)
+                                    {
+                                        PayAlocate.SetWriteOffAmt(Util.GetValueOfDecimal(psls[j].Get_Value("WriteOffAmt")));
+                                        PayAlocate.SetOverUnderAmt(Util.GetValueOfDecimal(psls[j].Get_Value("OverUnderAmt")));
+                                    }
+                                    else
+                                    {
+                                        PayAlocate.SetWriteOffAmt(0);
+                                        PayAlocate.SetOverUnderAmt(0);
+                                    }
                                     if (!PayAlocate.Save())
                                     {
                                         //_log.Log(Level.SEVERE, Msg.GetMsg(check.GetCtx(), "VA009_PymentAllocateNotSaved") + payment);
@@ -699,8 +735,8 @@ namespace VAdvantage.Model
                         else
                         {
                             check.SetC_Payment_ID(C_Payment_ID);
-                            check.Save();	//	Payment process needs it
-                            //	Should start WF
+                            check.Save();   //	Payment process needs it
+                                            //	Should start WF
                             payment.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                             if (!payment.Save())
                             {
@@ -746,7 +782,7 @@ namespace VAdvantage.Model
                         if (batch != null)
                         {
                             if (batch.GetC_PaymentBatch_ID() == 0)
-                                batch.Save();	//	new
+                                batch.Save();   //	new
                             payment.SetC_PaymentBatch_ID(batch.GetC_PaymentBatch_ID());
                         }
                         //	Link to Invoice
@@ -822,8 +858,8 @@ namespace VAdvantage.Model
                         else
                         {
                             check.SetC_Payment_ID(C_Payment_ID);
-                            check.Save();	//	Payment process needs it
-                            //	Should start WF
+                            check.Save();   //	Payment process needs it
+                                            //	Should start WF
                             payment.ProcessIt(DocActionVariables.ACTION_COMPLETE);
                             if (!payment.Save())
                             {
@@ -856,7 +892,7 @@ namespace VAdvantage.Model
                 {
                     _log.Log(Level.SEVERE, "Check not saved: " + check);
                 }
-            }	//	all checks
+            }   //	all checks
 
             _log.Fine("Last Document No = " + lastDocumentNo);
             return lastDocumentNo;
