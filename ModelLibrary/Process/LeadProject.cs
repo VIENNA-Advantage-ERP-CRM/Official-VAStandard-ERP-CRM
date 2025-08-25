@@ -93,12 +93,15 @@ namespace VAdvantage.Process
                 throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);
             }
             //VAI050-Set Bp name and group iD
-            if (Env.IsModuleInstalled("VA061_"))
+            if (!string.IsNullOrEmpty(_companyName))
             {
                 lead.SetBPName(_companyName);
+
+            }
+            if (_bpGroupID > 0)
+            {
                 lead.SetC_BP_Group_ID(_bpGroupID);
             }
-
             #region Create Prospects Before Opportunity
             if (Env.IsModuleInstalled("VA047_") && lead.GetRef_BPartner_ID() == 0 && lead.GetC_BPartner_ID() == 0)
             {
