@@ -86,8 +86,14 @@ namespace ViennaAdvantage.Process
             //VAI050-Set Bp name and group iD
             if (Env.IsModuleInstalled("VA061_"))
             {
-                lead.SetBPName(_companyName);
-                lead.SetC_BP_Group_ID(_bpGroupID);
+                if (!string.IsNullOrEmpty(_companyName))
+                {
+                    lead.SetBPName(_companyName);
+                }
+                if (_bpGroupID > 0)
+                {
+                    lead.SetC_BP_Group_ID(_bpGroupID);
+                }
             }
             // Check IsArchive and Lead Qualification and IsQualified 
             if (Env.IsModuleInstalled("VA047_"))
