@@ -21,9 +21,31 @@ namespace ViennaAdvantage.Process
     {
         int _C_Lead_ID;
         bool IsProspectCreated = false;
+        private string _companyName = "";
+        private int _bpGroupID = 0;
         protected override void Prepare()
         {
             _C_Lead_ID = GetRecord_ID();
+            ProcessInfoParameter[] para = GetParameter();
+            if (para.Length > 0)
+            {
+                foreach (ProcessInfoParameter element in para)
+                {
+                    String name = element.GetParameterName();
+                    if (name.Equals("_C_Lead_ID"))
+                    {
+                        _C_Lead_ID = element.GetParameterAsInt();
+                    }
+                    else if (name.Equals("VA061_CompanyName"))
+                    {
+                        _companyName = Util.GetValueOfString(element.GetParameter());
+                    }
+                    else if (name.Equals("C_BP_Group_ID"))
+                    {
+                        _bpGroupID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                }
+            }
 
         }
 
@@ -31,6 +53,12 @@ namespace ViennaAdvantage.Process
         protected override String DoIt()
         {
             VAdvantage.Model.X_C_Lead lead = new VAdvantage.Model.X_C_Lead(GetCtx(), _C_Lead_ID, Get_TrxName());
+            //VAI050-Set Bp name and group iD
+            if (Env.IsModuleInstalled("VA061_"))
+            {
+                lead.SetBPName(_companyName);
+                lead.SetC_BP_Group_ID(_bpGroupID);
+            }
             //  lead.GetRef_BPartner_ID()))
             int ExCustomer = lead.GetC_BPartner_ID();
             int Pospect = lead.GetRef_BPartner_ID();
@@ -203,7 +231,7 @@ namespace ViennaAdvantage.Process
             }
             if (ExCustomer == 0 && Pospect == 0)
             {
-
+               
                 //CallProcess(_C_Lead_ID);
                 if (lead.GetBPName() == null)
                 {
