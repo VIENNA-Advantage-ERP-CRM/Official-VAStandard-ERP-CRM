@@ -446,7 +446,7 @@ namespace VAdvantage.Model
                 if (minGuaranteeDate != null)
                 {
                     sql += " AND (asi.GuaranteeDate IS NULL OR asi.GuaranteeDate>'" + String.Format("{0:dd-MMM-yy}", minGuaranteeDate) + "') "
-                        // + " GROUP BY asi.GuaranteeDate, l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
+                            // + " GROUP BY asi.GuaranteeDate, l.PriorityNo, s.M_Product_ID, s.M_Locator_ID, s.M_AttributeSetInstance_ID "
                             + " ORDER BY asi.GuaranteeDate, l.PriorityNo DESC, M_AttributeSetInstance_ID";
                 }
                 else
@@ -605,7 +605,7 @@ namespace VAdvantage.Model
                 return false;
             }
             MStorage storageASI = null;
-            if (M_AttributeSetInstance_ID != reservationAttributeSetInstance_ID && reservationAttributeSetInstance_ID !=0)
+            if (M_AttributeSetInstance_ID != reservationAttributeSetInstance_ID && reservationAttributeSetInstance_ID != 0)
             {
                 int reservationM_Locator_ID = M_Locator_ID;
                 //if (reservationAttributeSetInstance_ID == 0)
@@ -1392,7 +1392,7 @@ namespace VAdvantage.Model
                         break;
                     }
                     if (firstM_Locator_ID == 0)
-                        firstM_Locator_ID = Convert.ToInt32(dr[0]); 
+                        firstM_Locator_ID = Convert.ToInt32(dr[0]);
                 }
             }
             catch (Exception ex)
@@ -1908,6 +1908,39 @@ namespace VAdvantage.Model
             }
 
             return base.BeforeSave(newRecord);
+        }
+
+        /// <summary>
+        /// VAI050-To update the on hand qty on FSR and WO window 
+        /// </summary>
+        /// <param name="newRecord"></param>
+        /// <param name="success"></param>
+        /// <returns></returns>
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+
+            if (Env.IsModuleInstalled("VA075_") && Is_ValueChanged("QtyOnHand"))
+            {
+                string query = @"UPDATE VA075_WorkOrderComponent wc SET wc.QtyOnHand =" + GetQtyOnHand() + @"
+                                 WHERE wc.VA075_WorkOrderComponent_ID IN(
+                                 SELECT wc.VA075_WorkOrderComponent_ID
+                                 FROM VA075_WorkOrderComponent wc
+                                 INNER JOIN VA075_WorkOrderOperation wo
+                                 ON wc.VA075_WorkOrderOperation_ID = wo.VA075_WorkOrderOperation_ID
+                                 LEFT JOIN VA075_WorkOrder w
+                                 ON w.VA075_WorkOrder_ID = wo.VA075_WorkOrder_ID
+                                 LEFT JOIN VA075_FieldServiceReq fsr
+                                 ON fsr.VA075_FieldServiceReq_ID = wo.VA075_FieldServiceReq_ID
+                                 WHERE ((w.DocStatus IS NOT NULL AND w.DocStatus NOT IN ('CO'))
+                                 OR(fsr.DocStatus IS NOT NULL AND fsr.DocStatus NOT IN('CO')) )
+                                 AND wc.M_Warehouse_ID = " + GetM_Warehouse_ID() + @"
+                                 AND wc.M_Locator_ID = " + GetM_Locator_ID() + @"
+                                 AND wc.M_Product_ID = " + GetM_Product_ID() + @"
+                                 AND NVL(wc.M_AttributeSetInstance_ID, 0) = " + GetM_AttributeSetInstance_ID() + ")";
+                DB.ExecuteQuery(query);
+            }
+
+            return true;
         }
 
 
