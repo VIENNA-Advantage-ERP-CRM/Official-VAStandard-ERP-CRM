@@ -23,6 +23,7 @@ namespace ViennaAdvantage.Process
         bool IsProspectCreated = false;
         private string _companyName = "";
         private int _bpGroupID = 0;
+        VAdvantage.Model.MLead lead = null;
         protected override void Prepare()
         {
             _C_Lead_ID = GetRecord_ID();
@@ -52,7 +53,7 @@ namespace ViennaAdvantage.Process
 
         protected override String DoIt()
         {
-            VAdvantage.Model.X_C_Lead lead = new VAdvantage.Model.X_C_Lead(GetCtx(), _C_Lead_ID, Get_TrxName());
+            lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
             //VAI050-Set Bp name and group iD
             if (Env.IsModuleInstalled("VA061_"))
             {
@@ -99,7 +100,7 @@ namespace ViennaAdvantage.Process
                     opp.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
                     opp.SetC_EnquiryRdate(lead.GetCreated());
                 }
-             
+
                 //VAI050-Set below coulum if VA061 module install
                 if (Env.IsModuleInstalled("VA061_"))
                 {
@@ -231,11 +232,15 @@ namespace ViennaAdvantage.Process
             }
             if (ExCustomer == 0 && Pospect == 0)
             {
-               
+
                 //CallProcess(_C_Lead_ID);
                 if (lead.GetBPName() == null)
                 {
                     return Msg.GetMsg(GetCtx(), "Company Name, Prospect or Bpartner is Mandatory to fill");
+                }
+                if (lead.GetC_BP_Group_ID() == 0)
+                {
+                    throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
                 }
                 callprospect();
                 //VAI050-This flag used to check the status of prospect
@@ -289,11 +294,12 @@ namespace ViennaAdvantage.Process
             {
                 throw new Exception("@C_Lead_ID@ ID=0");
             }
-            VAdvantage.Model.MLead lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
-            if (lead.GetC_BP_Group_ID() == 0)
-            {
-                throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
-            }
+            //VAdvantage.Model.MLead lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
+
+            //if (lead.GetC_BP_Group_ID() == 0)
+            //{
+            //    throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
+            //}
             if (lead.Get_ID() != _C_Lead_ID)
             {
                 throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);
