@@ -84,3 +84,5 @@
 
 
  For more deatil how to start with Vienna Advantage, please refer development document. https://viennaadvantage.atlassian.net/wiki/spaces/VA/pages/9207809/Development+Guide
+
+ Additionally how to install modules form Vienna Market refer to this link. https://viennaadvantage.atlassian.net/wiki/spaces/VA/pages/3670266/About+VIENNA+Advantage+Market
