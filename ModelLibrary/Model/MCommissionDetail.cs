@@ -32,10 +32,12 @@ namespace VAdvantage.Model
         /// <param name="ignored">ignored</param>
         /// <param name="trxName">transaction</param>
         public MCommissionDetail(Ctx ctx, int ignored, Trx trxName)
-            : base(ctx, 0, trxName)
+            : base(ctx, ignored, trxName)
         {
             if (ignored != 0)
-                throw new ArgumentException("Multi-Key");
+            {
+                //throw new ArgumentException("Multi-Key");
+            }
         }
 
         /// <summary>
@@ -58,14 +60,14 @@ namespace VAdvantage.Model
         /// <param name="qty">quantity</param>
         public MCommissionDetail(MCommissionAmt camt, int C_Currency_ID, Decimal amt, Decimal qty)
             : this(camt.GetCtx(), 0, camt.Get_TrxName())
-	    {
+        {
             SetClientOrg(camt);
             SetC_CommissionAmt_ID(camt.GetC_CommissionAmt_ID());
             SetC_Currency_ID(C_Currency_ID);
             SetActualAmt(amt);
             SetActualQty(qty);
             SetConvertedAmt(Env.ZERO);
-	    }
+        }
 
         /// <summary>
         /// Set Line IDs
@@ -91,7 +93,7 @@ namespace VAdvantage.Model
                 GetActualAmt(), GetC_Currency_ID(), date, 0, 	//	type
                 GetAD_Client_ID(), GetAD_Org_ID());
             //if (amt != null)
-                SetConvertedAmt(amt);
+            SetConvertedAmt(amt);
         }
 
         /// <summary>
@@ -102,6 +104,11 @@ namespace VAdvantage.Model
         /// <returns>success</returns>
         protected override Boolean AfterSave(Boolean newRecord, Boolean success)
         {
+            if (!success)
+            {
+                return success;
+            }
+           
             if (!newRecord)
                 UpdateAmtHeader();
             return success;
@@ -115,7 +122,20 @@ namespace VAdvantage.Model
         protected override Boolean AfterDelete(Boolean success)
         {
             if (success)
+            {
+                /* VIS_045: 09-Sep-2025, Update CommissionCalculated value as false */
+                if (GetC_OrderLine_ID() > 0)
+                {
+                    DB.ExecuteQuery($@"UPDATE C_OrderLine SET IsCommissionCalculated = 'N' WHERE C_OrderLine_ID = {GetC_OrderLine_ID()}", null, Get_Trx());
+                }
+
+                if (GetC_InvoiceLine_ID() > 0)
+                {
+                    DB.ExecuteQuery($@"UPDATE C_InvoiceLine SET IsCommissionCalculated = 'N' WHERE C_InvoiceLine_ID = {GetC_InvoiceLine_ID()}", null, Get_Trx());
+                }
+
                 UpdateAmtHeader();
+            }
             return success;
         }
 
