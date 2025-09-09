@@ -88,7 +88,7 @@ namespace VAdvantage.Process
             //should not generate commission if there is no active commission lines
             if (lines.Length <= 0)
             {
-                msg= Msg.GetMsg(GetCtx(), "NoActiveRecordsFound");
+                msg = Msg.GetMsg(GetCtx(), "NoActiveRecordsFound");
                 return msg;
             }
             for (int i = 0; i < lines.Length; i++)
@@ -265,8 +265,11 @@ namespace VAdvantage.Process
                 {
                     sql.Append(" GROUP BY h.C_Currency_ID,l.C_OrderLine_ID");
                 }
-                else
+                else if (!m_com.IsListDetails())
+                {
+                    /* VIS_045: 09-Sep-2025, When List Detail is false then Group by appended in query */
                     sql.Append(" GROUP BY h.C_Currency_ID,l.C_InvoiceLine_ID");
+                }
 
                 //
                 log.Fine("Line=" + lines[i].GetLine() + " - " + sql);
