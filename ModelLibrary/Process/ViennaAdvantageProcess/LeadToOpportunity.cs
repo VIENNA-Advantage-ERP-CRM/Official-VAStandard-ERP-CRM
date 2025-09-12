@@ -125,6 +125,7 @@ namespace ViennaAdvantage.Process
                 {
                     opp.SetC_ProposalDdate(lead.GetC_ProposalDdate());
                 }
+                opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
                     //VAI050-To Save history data on opportunity window
@@ -136,6 +137,10 @@ namespace ViennaAdvantage.Process
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.SetProcessed(true);
                     lead.Save();
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
 
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
 
@@ -205,6 +210,7 @@ namespace ViennaAdvantage.Process
                 {
                     opp.SetC_ProposalDdate(lead.GetC_ProposalDdate());
                 }
+                opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
                     //VAI050-Save history chat data form lead window to opportunity window
@@ -221,6 +227,10 @@ namespace ViennaAdvantage.Process
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.SetProcessed(true);
                     lead.Save();
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(),Get_Trx(),GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
                 else
