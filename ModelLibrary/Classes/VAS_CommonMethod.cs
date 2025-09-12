@@ -11,11 +11,16 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using VAdvantage.Common;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.ProcessEngine;
 using VAdvantage.Utility;
+using ViennaAdvantage.Model;
+using ViennaAdvantageWeb.Areas.VIS.Models;
 
 namespace ModelLibrary.Classes
 {
@@ -45,9 +50,22 @@ namespace ModelLibrary.Classes
                 }
                 CreateAITabPanel(FromTableID, ToTableID, ToRecordID, FromRecordID, windowName, trx, ctx);
             }
-            // Copy Mail Attachments
             if (FromTableID > 0)
             {
+                Thread thread = new Thread(new ThreadStart(() =>
+                {
+                    // copy attachment data 
+                    CopyAttachments(FromRecordID, FromTableID, ToRecordID, ToTableID, ctx, trx);
+                    // copy dms document
+                    CopyDmsDocument(FromTableID, ToTableID, ToRecordID, FromRecordID, ctx, trx);
+                }));
+
+                thread.IsBackground = true;
+                thread.Start();
+
+
+
+                // Copy Mail Attachments
                 int[] mailAttachmentIDs = MMailAttachment1.GetAllIDs("MailAttachment1",
                     "AD_Table_ID=" + FromTableID + " AND Record_ID=" + FromRecordID, trx);
                 if (mailAttachmentIDs.Length > 0)
@@ -94,10 +112,30 @@ namespace ModelLibrary.Classes
 
                         if (!newAppointment.Save())
                             log.SaveError("ERROR:", "Error in Copying History Records");
+
+                        //To copy Appointment transcript
+                        int[] AppointmentTranscriptIDs = MAppointmentsInfo.GetAllIDs("AppointmentTranscript", "AppointmentsInfo_ID = " + historyRecordIDs[i], trx);
+                        if (AppointmentTranscriptIDs.Length > 0)
+                        {
+
+                            MTable tbl = new MTable(ctx, MTable.Get_Table_ID("AppointmentTranscript"), trx);
+                            for (int j = 0; j < AppointmentTranscriptIDs.Length; j++)
+                            {
+                                PO fromTranscript = tbl.GetPO(ctx, AppointmentTranscriptIDs[j], trx);
+                                PO toTranscript = tbl.GetPO(ctx, 0, trx);
+                                fromTranscript.CopyTo(toTranscript);
+                                toTranscript.Set_ValueNoCheck("Created", fromTranscript.GetCreated());
+                                toTranscript.Set_ValueNoCheck("AppointmentsInfo_ID", newAppointment.GetRecord_ID());
+                                if (!toTranscript.Save())
+                                {
+                                    log.SaveError("ERROR:", "Error in Copying appointmenttranscript Records");
+                                }
+                            }
+                        }
                     }
+
                 }
                 // Copy Chat Data
-
                 int[] chatIDs = MChat.GetAllIDs("CM_Chat",
                     "AD_Table_ID=" + FromTableID + " AND Record_ID=" + FromRecordID, trx);
                 if (chatIDs.Length > 0)
@@ -592,5 +630,360 @@ namespace ModelLibrary.Classes
                 }
             }
         }
+
+
+        /// <summary>
+        /// VAI050-This method used to copy attachment data
+        /// </summary>
+        /// <param name="FromRecordID"></param>
+        /// <param name="FromTableID"></param>
+        /// <param name="ToRecordID"></param>
+        /// <param name="ToTableID"></param>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+
+        public static void CopyAttachments(int FromRecordID, int FromTableID, int ToRecordID, int ToTableID, Ctx ctx, Trx trx)
+        {
+            try
+            {
+                string query = @"SELECT a.AD_Attachment_ID  FROM AD_Attachment a
+                                  WHERE a.Record_ID = " + FromRecordID +
+                                     " AND a.AD_Table_ID= " + FromTableID;
+
+                DataSet ds = DB.ExecuteDataset(query, null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    int attachmentID = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Attachment_ID"]);
+                    List<FileAttachmentInfo> files = GetFileBytes(attachmentID, ctx);
+                    SaveAttachment(files, ToRecordID, ToTableID, ctx);
+                }
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().Severe("CopyAttachmentsInThread error: " + ex.Message);
+            }
+        }
+        /// <summary>
+        /// VAI050-Get file bytes
+        /// </summary>
+        /// <param name="recID"></param>
+        /// <param name="ctx"></param>
+        /// <returns></returns>
+        public static List<FileAttachmentInfo> GetFileBytes(int attachmentID, Ctx ctx)
+        {
+            List<FileAttachmentInfo> filesList = new List<FileAttachmentInfo>();
+
+            try
+            {
+                string tempFolderPath = System.IO.Path.Combine(System.Web.Hosting.HostingEnvironment.ApplicationPhysicalPath, "TempDownload");
+                MAttachment attachment = null;
+                // Get all attachment lines
+                string sql = "SELECT AD_AttachmentLine_ID, FileName FROM AD_AttachmentLine WHERE AD_Attachment_ID=" + attachmentID;
+                DataSet ds = DB.ExecuteDataset(sql);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    attachment = new MAttachment(ctx, attachmentID, null);
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        string subFolder = attachment.GetFile(Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_AttachmentLine_ID"])); // returns folder
+                        string folderPath = System.IO.Path.Combine(tempFolderPath, subFolder);
+
+                        if (!System.IO.Directory.Exists(folderPath))
+                        {
+                            log.SaveError("Error: Folder does not exist - ", folderPath);
+                            continue;
+                        }
+
+                        string[] files = System.IO.Directory.GetFiles(folderPath);
+                        if (files.Length == 0)
+                        {
+                            log.SaveError("Error: No files found in folder - ", folderPath);
+                            continue;
+                        }
+
+                        string fullFilePath = files[0];
+                        byte[] fileBytes = System.IO.File.ReadAllBytes(fullFilePath);
+
+                        filesList.Add(new FileAttachmentInfo
+                        {
+                            FileName = Util.GetValueOfString(ds.Tables[0].Rows[i]["FileName"]),
+                            FileBytes = fileBytes
+                        });
+
+                        // cleanup
+                        try
+                        {
+                            System.IO.File.Delete(fullFilePath);
+                            System.IO.Directory.Delete(folderPath);
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            log.SaveError("FileNotDeleted", cleanupEx.Message);
+                        }
+                    }
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+                log.SaveError("FileNotDownload", ex.Message);
+            }
+
+            return filesList;
+        }
+
+
+        /// <summary>
+        /// VAI050-to save attachment  
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="file"></param>
+        /// <param name="record_ID"></param>
+        /// <param name="tableID"></param>
+        /// <param name="ctx"></param>
+
+        public static void SaveAttachment(List<FileAttachmentInfo> files, int record_ID, int tableID, Ctx ctx)
+        {
+            if (files == null || files.Count == 0)
+                return;
+
+            string folderPath = System.IO.Path.Combine(System.Web.Hosting.HostingEnvironment.ApplicationPhysicalPath, "TempDownload");
+            System.IO.Directory.CreateDirectory(folderPath);
+
+            List<AttFileInfo> ticketDocuments = new List<AttFileInfo>();
+
+            foreach (var file in files)
+            {
+                if (string.IsNullOrWhiteSpace(file.FileName) || file.FileBytes == null)
+                    continue;
+
+                // Save to local temp
+                string fullFilePath = System.IO.Path.Combine(folderPath, file.FileName);
+                System.IO.File.WriteAllBytes(fullFilePath, file.FileBytes);
+
+                // prepare metadata
+                ticketDocuments.Add(new AttFileInfo
+                {
+                    Name = file.FileName,
+                    Size = file.FileSize
+                });
+            }
+
+            if (ticketDocuments.Count > 0)
+            {
+                var att = new AttachmentModel();
+                att.CreateAttachmentEntries(ticketDocuments, 0, "", ctx, tableID, record_ID, "", 0, false);
+            }
+        }
+
+
+        /// <summary>
+        /// Send data to AI Knowledge base
+        /// </summary>
+        /// <param name="AD_Table_ID">Table ID</param>
+        /// <param name="Record_ID">Record ID</param>
+        /// <returns></returns>
+        public static string SendInfoToAI(int AD_Table_ID, int Record_ID, Trx trx, Ctx ctx)
+        {
+
+            //, int AD_Window_ID, int AD_Tab_ID, Trx RecTrx, bool UpdateThread
+            string threadID = Common.GetThreadID(AD_Table_ID, Record_ID);
+            if (threadID != "")
+            {
+                if (trx != null)
+                    trx.Commit();
+
+                string windowName = "VAS_Opportunity";
+                if (AD_Table_ID == 291)
+                {
+                    windowName = "VAS_Prospects";
+                }
+                else if (AD_Table_ID == 923)
+                {
+                    windowName = "VAS_Lead";
+                }
+
+                int AD_Tab_ID = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT t.AD_Tab_ID 
+                    FROM AD_Window w
+                    INNER JOIN AD_Tab t ON w.AD_Window_ID = t.AD_Window_ID
+                    WHERE w.Name = '" + windowName + "' AND t.AD_Column_ID IS NULL AND t.AD_Table_ID=" + AD_Table_ID));
+
+                if (AD_Tab_ID > 0)
+                {
+                    // Process fixed for thread data update in case AI Chat Bot module is there
+                    int Process_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Process_ID FROM AD_Process WHERE ISActive='Y' AND Value='VAI01_CreateUpdateRecordThread'"));
+                    MPInstance pin = new MPInstance(ctx, Process_ID, 0); // create object of MPInstance
+                    if (!pin.Save())
+                    {
+                        ValueNamePair vnp = VLogger.RetrieveError();
+                        string errorMsg = "";
+                        if (vnp != null)
+                        {
+                            errorMsg = vnp.GetName();
+                            if (errorMsg == "")
+                                errorMsg = vnp.GetValue();
+                        }
+                        if (errorMsg == "")
+                            errorMsg = Msg.GetMsg(ctx, "NoInstance");
+                        if (log != null)
+                            log.Log(Level.SEVERE, errorMsg);
+                        return "";
+                    }
+                    VAdvantage.ProcessEngine.ProcessInfo pi = new VAdvantage.ProcessEngine.ProcessInfo("WF", Process_ID);
+                    pi.SetAD_User_ID(ctx.GetAD_User_ID());
+                    pi.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                    pi.SetAD_PInstance_ID(pin.GetAD_PInstance_ID());
+                    pi.SetRecord_ID(Record_ID);
+                    pi.SetTable_ID(AD_Table_ID);
+                    MPInstancePara para = new MPInstancePara(pin, 10);
+                    para.setParameter("AD_Table_ID", AD_Table_ID);
+                    if (!para.Save())
+                    {
+                        String msg = "No AD_Table_ID Parameter added";  //  not translated
+                        if (log != null)
+                            log.Log(Level.SEVERE, msg);
+                        return "";
+                    }
+                    para = new MPInstancePara(pin, 20);
+                    para.setParameter("AD_Tab_ID", AD_Tab_ID);
+                    if (!para.Save())
+                    {
+                        String msg = "No AD_Tab_ID Parameter added";  //  not translated
+                        if (log != null)
+                            log.Log(Level.SEVERE, msg);
+                        return "";
+                    }
+                    para = new MPInstancePara(pin, 30);
+                    para.setParameter("record_ID", Record_ID);
+                    if (!para.Save())
+                    {
+                        String msg = "No record_ID Parameter added";  //  not translated
+                        if (log != null)
+                            log.Log(Level.SEVERE, msg);
+                        return "";
+                    }
+                    para = new MPInstancePara(pin, 40);
+                    para.setParameter("IsUpdate", "true");
+                    if (!para.Save())
+                    {
+                        String msg = "No IsUpdate Parameter added";  //  not translated
+                        if (log != null)
+                            log.Log(Level.SEVERE, msg);
+                        return "";
+                    }
+                    para = new MPInstancePara(pin, 50);
+                    para.setParameter("HasRecordTrx", "false");
+                    if (!para.Save())
+                    {
+                        String msg = "No HasRecordTrx Parameter added";  //  not translated
+                        if (log != null)
+                            log.Log(Level.SEVERE, msg);
+                        return "";
+                    }
+                    ProcessCtl worker = new ProcessCtl(ctx, null, pi, null);
+                    worker.Run();
+                    if (pi.IsError())
+                    {
+                        ValueNamePair vnp = VLogger.RetrieveError();
+                        string errorMsg = "";
+                        if (vnp != null)
+                        {
+                            errorMsg = vnp.GetName();
+                            if (errorMsg == "")
+                                errorMsg = vnp.GetValue();
+                        }
+                        if (errorMsg == "")
+                            errorMsg = pi.GetSummary();
+                        if (errorMsg == "")
+                            errorMsg = Msg.GetMsg(ctx, "DocNotCompleted");
+                        if (log != null)
+                            log.SaveError("", errorMsg);
+                        return "";
+                    }
+                    else
+                    {
+                        threadID = Common.GetThreadID(AD_Table_ID, Record_ID);
+                    }
+                }
+                else
+                {
+                    log.Log(Level.INFO, "Tab not found for screen : " + windowName);
+                }
+            }
+            return threadID;
+        }
+
+        /// <summary>
+        /// VAI050-To copy dms documents
+        /// </summary>
+        /// <param name="FromTableID"></param>
+        /// <param name="ToTableID"></param>
+        /// <param name="ToRecordID"></param>
+        /// <param name="FromRecordID"></param>
+        /// <param name="ctx"></param>
+        /// <param name="trx"></param>
+        public static void CopyDmsDocument(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, Ctx ctx, Trx trx)
+        {
+            string query = @"SELECT dlink.VADMS_Document_ID, meta.VADMS_MetaData_ID 
+                              FROM VADMS_WindowDocLink dlink
+                              INNER JOIN VADMS_MetaData meta ON(meta.VADMS_Document_ID = dlink.VADMS_Document_ID)
+                               WHERE dlink.AD_Table_ID =" + FromTableID + " AND dlink.record_ID =" + FromRecordID;
+            DataSet ds = DB.ExecuteDataset(query);
+            if (ds == null && ds.Tables.Count == 0 && ds.Tables[0].Rows.Count == 0)
+            {
+                return;
+            }
+            string windowName = "VAS_Opportunity";
+            if (ToTableID == 291)
+            {
+                windowName = "VAS_Prospects";
+            }
+            query = @"SELECT w.AD_Window_ID
+                          FROM AD_Window w
+                          INNER JOIN AD_Tab t ON w.AD_Window_ID = t.AD_Window_ID
+                          WHERE w.Name = '" + windowName + "' AND t.AD_Column_ID IS NULL AND t.AD_Table_ID=" + ToTableID;
+            int windowID = Util.GetValueOfInt(DB.ExecuteScalar(query));
+            VAdvantage.Model.X_VADMS_WindowDocLink wlink = null;
+            for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+            {
+                wlink = new VAdvantage.Model.X_VADMS_WindowDocLink(ctx, 0, null);
+                wlink.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                wlink.SetAD_Org_ID(ctx.GetAD_Org_ID());
+                wlink.SetAD_Table_ID(ToTableID);
+                wlink.SetAD_Window_ID(windowID);
+                wlink.SetRecord_ID(ToRecordID);
+                wlink.SetVADMS_Document_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["VADMS_Document_ID"]));
+                if (wlink.Save())
+                {
+
+                    X_VADMS_AttachMetaData objAttachMetaData = new X_VADMS_AttachMetaData(ctx, 0, null);
+                    objAttachMetaData.SetVADMS_WindowDocLink_ID(wlink.Get_ID());
+                    objAttachMetaData.SetVADMS_Document_ID(wlink.GetVADMS_Document_ID());
+                    objAttachMetaData.SetVADMS_MetaData_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["VADMS_MetaData_ID"]));
+                    //objAttachMetaData.SetRecord_ID(wlink.GetRecord_ID());
+                    if (!objAttachMetaData.Save())
+                    {
+                        log.SaveError("Document Not Saved", "Meta data");
+                    }
+
+                }
+                else
+                {
+                    log.SaveError("Document Not Saved", "Wlink data");
+                }
+            }
+
+
+        }
+
+
+        public class FileAttachmentInfo
+        {
+            public string FileName { get; set; }
+            public byte[] FileBytes { get; set; }
+            public int FileSize => FileBytes?.Length ?? 0;
+        }
+
     }
 }
