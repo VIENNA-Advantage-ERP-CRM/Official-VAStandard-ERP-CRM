@@ -334,6 +334,7 @@ namespace ViennaAdvantage.Process
                                 if (!cspr.Save())
                                     log.SaveError("ERROR:", "Error in Saving PartnererScreening");
                                 bp.Set_Value("C_Lead_Target", "PS");
+                                bp.SkipAIAssistantThreadUpdate = true;
                                 bp.Save();
                             }
                         }
@@ -354,6 +355,12 @@ namespace ViennaAdvantage.Process
             int c_bpTableID = PO.Get_Table_ID("C_BPartner");
 
             VAS_CommonMethod.CopyHistorRecordData(tableID, c_bpTableID, C_BpID, lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+
+            // Send Opportunity Data to Knowledge Base
+            VAS_CommonMethod.SendInfoToAI(tableID, lead.Get_ID(), Get_Trx(), GetCtx());
+
+            // Send Lead Data to Knowledge Base
+            VAS_CommonMethod.SendInfoToAI(c_bpTableID, C_BpID, Get_Trx(), GetCtx());
 
 
             if (lead.GetRef_BPartner_ID() != 0)

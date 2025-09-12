@@ -200,6 +200,7 @@ namespace VAdvantage.Process
                     }
 
                     //C_Location_ID
+                    bp.SkipAIAssistantThreadUpdate = true;
 
                     bp.Save();
 
@@ -297,6 +298,10 @@ namespace VAdvantage.Process
                 int FromTableID = lead.Get_Table_ID();
                 int ToTableID = bp.Get_Table_ID();
                 VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                // Send prospect Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(ToTableID, bp.Get_ID(), Get_Trx(), GetCtx());
+                // Send Lead Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
             }
             #endregion
             //
@@ -342,14 +347,17 @@ namespace VAdvantage.Process
                 project.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
                 project.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
                 project.SetC_EnquiryRdate(lead.GetCreated());
-
+                project.SkipAIAssistantThreadUpdate = true;
                 if (project.Save())
                 {
                     //VAI050-Save History from lead window to opportunity window
                     int FromTableID = PO.Get_Table_ID("C_Lead");
                     int ToTableID = PO.Get_Table_ID("C_Project");
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, project.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
-
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, project.Get_ID(), Get_Trx(), GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
                 };
             }
             //
