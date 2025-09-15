@@ -126,7 +126,7 @@ namespace ModelLibrary.Classes
                                 PO toTranscript = tbl.GetPO(ctx, 0, trx);
                                 fromTranscript.CopyTo(toTranscript);
                                 toTranscript.Set_ValueNoCheck("Created", fromTranscript.GetCreated());
-                                toTranscript.Set_ValueNoCheck("AppointmentsInfo_ID", newAppointment.GetRecord_ID());
+                                toTranscript.Set_ValueNoCheck("AppointmentsInfo_ID", newAppointment.GetAppointmentsInfo_ID());
                                 if (!toTranscript.Save())
                                 {
                                     log.SaveError("ERROR:", "Error in Copying appointmenttranscript Records");
