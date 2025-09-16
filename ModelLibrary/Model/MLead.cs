@@ -400,6 +400,11 @@ namespace VAdvantage.Model
                 _bp.Set_Value("R_Source_ID", GetR_Source_ID());
                 _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
                 _bp.Set_Value("LeadRating", GetLeadRating());
+                //VAI050-Set VA047_LinkedIn on prospect
+                if (Env.IsModuleInstalled("VA047_"))
+                {
+                    _bp.Set_Value("VA047_LinkedIn", Get_Value("VA047_LinkedIn"));
+                }
 
 
                 // VIS0060: Set Next Step, Next Step By and Follow update
@@ -565,6 +570,8 @@ namespace VAdvantage.Model
                 _user.SetFax(GetFax());
             if (GetTitle() != null)
                 _user.SetTitle(GetTitle());
+            if (GetMobile() != null)
+                _user.SetMobile(GetMobile());
             //
             if (!_user.Save())
             {
