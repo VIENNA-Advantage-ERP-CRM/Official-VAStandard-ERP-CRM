@@ -400,11 +400,7 @@ namespace VAdvantage.Model
                 _bp.Set_Value("R_Source_ID", GetR_Source_ID());
                 _bp.Set_Value("C_BPartnerSR_ID", GetC_BPartnerSR_ID());
                 _bp.Set_Value("LeadRating", GetLeadRating());
-                //VAI050-Set VA047_LinkedIn on prospect
-                if (Env.IsModuleInstalled("VA047_"))
-                {
-                    _bp.Set_Value("VA047_LinkedIn", Get_Value("VA047_LinkedIn"));
-                }
+               
 
 
                 // VIS0060: Set Next Step, Next Step By and Follow update
@@ -572,7 +568,13 @@ namespace VAdvantage.Model
                 _user.SetTitle(GetTitle());
             if (GetMobile() != null)
                 _user.SetMobile(GetMobile());
-            //
+            //VAI050-Set VA047_LinkedIn on prospect
+            if (Env.IsModuleInstalled("VA047_"))
+            {
+                _user.Set_Value("VA047_LinkedIn", Get_Value("VA047_LinkedIn"));
+                _user.Set_Value("LinkedInProfile", Get_Value("VA047_LinkedIn"));
+            }
+            
             if (!_user.Save())
             {
                 log.Warning("Contact not saved");
