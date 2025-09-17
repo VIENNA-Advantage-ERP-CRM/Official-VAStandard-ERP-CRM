@@ -6,6 +6,7 @@ using System.Data;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Utility;
+using CoreLibrary.Classes;
 
 namespace VAdvantage.Model
 {
@@ -29,8 +30,9 @@ namespace VAdvantage.Model
         public MAlert(Ctx ctx, DataRow rs, Trx trx)
             : base(ctx, rs, trx)
         {
-        }	//	MAlert
+        }//	MAlert
 
+        private static CCache<string, MAlert[]> _cacheDocValue = new CCache<string, MAlert[]>("AD_Alert", 5);
         /**	The Rules						*/
         private MAlertRule[] m_rules = null;
         /**	The Recipients					*/
@@ -52,6 +54,33 @@ namespace VAdvantage.Model
                 {
                     MAlertRule mAlertRule = new MAlertRule(GetCtx(), dr, null);
                     ValidateAlertRuleCondition(mAlertRule);
+                    list.Add(mAlertRule);
+                }
+            }
+            catch (Exception e)
+            {
+                log.Log(Level.SEVERE, sql, e);
+            }
+            //
+            m_rules = new MAlertRule[list.Count()];
+            m_rules = list.ToArray();
+            return m_rules;
+        } 
+        
+        public MAlertRule[] GetRule(bool reload)
+        {
+            if (m_rules != null && !reload)
+                return m_rules;
+            String sql = "SELECT * FROM AD_AlertRule "
+                + "WHERE isactive='Y' AND AD_Alert_ID=" + GetAD_Alert_ID();
+            List<MAlertRule> list = new List<MAlertRule>();
+
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(sql);
+                foreach (DataRow dr in ds.Tables[0].Rows)
+                {
+                    MAlertRule mAlertRule = new MAlertRule(GetCtx(), dr, null);
                     list.Add(mAlertRule);
                 }
             }
@@ -274,7 +303,7 @@ namespace VAdvantage.Model
                 }
             }
             else
-            {
+            {              
                 returnConditionValue = true;
             }
             if (AlertRule.GetErrorMsg() == null || AlertRule.GetErrorMsg() == string.Empty)
@@ -421,37 +450,119 @@ namespace VAdvantage.Model
         /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            int scheduleId = Util.GetValueOfInt(Get_Value("AD_Schedule_ID"));
-            if (scheduleId > 0)
+            int scheduleId = 0;
+            string BasedOn = Util.GetValueOfString(Get_Value("BasedOn"));
+            if (BasedOn == "S")
             {
-                string sql = @"SELECT AD_AlertProcessor_ID FROM AD_AlertProcessor WHERE IsActive='Y' AND AD_Schedule_ID = " + scheduleId;
-                int AD_AlertProcessor_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-                if (AD_AlertProcessor_ID == 0)
+                scheduleId = Util.GetValueOfInt(Get_Value("AD_Schedule_ID"));
+                if (scheduleId == 0)
                 {
-                    MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
-                    obj.SetAD_Schedule_ID(scheduleId);
-                    obj.SetAD_Client_ID(GetAD_Client_ID());
-                    obj.SetAD_Org_ID(GetAD_Org_ID());
-                    obj.SetName(GetName());
-                    obj.SetKeepLogDays(7);
-                    obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
-                    if (obj.Save())
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SheduleRequired"));
+                    return false;
+                }
+            }
+            int AD_AlertProcessor_ID = Util.GetValueOfInt(GetAD_AlertProcessor_ID());
+            if (newRecord)
+                AD_AlertProcessor_ID = 0;
+            if (AD_AlertProcessor_ID == 0)
+            {
+                MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
+                obj.SetAD_Schedule_ID(scheduleId);
+                obj.SetAD_Client_ID(GetAD_Client_ID());
+                obj.SetAD_Org_ID(GetAD_Org_ID());
+                obj.SetName(GetName());
+                obj.SetKeepLogDays(7);
+                obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
+                if (obj.Save())
+                {
+                    AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
+                }
+                else
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
+                    return false;
+                }
+            }
+            SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
+            return true;
+        }
+
+
+        /// <summary>
+        /// Get Doc Value Workflow
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="AD_Client_ID">client</param>
+        /// <param name="AD_Table_ID">table</param>
+        /// <returns>document value workflow array or null</returns>
+        public static MAlert[] GetAlertValue(Ctx ctx, int AD_Client_ID, int AD_Table_ID)
+        {
+            String key = "C" + AD_Client_ID + "T" + AD_Table_ID;
+            List<MAlert> list = new List<MAlert>();
+            String oldKey = "";
+            String newKey = null;
+            DataSet ds = null;
+            try
+            {
+                string sql = "SELECT COUNT(*) FROM AD_AlertRule WHERE AD_Table_ID = " + AD_Table_ID;
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_AlertRule", true, true);
+                int count = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                if (count == 0)
+                {
+                    return null;
+                }
+                sql = "SELECT * FROM AD_Alert "
+               + "WHERE BasedOn='E' AND IsActive='Y' AND IsValid='Y' "
+               + "ORDER BY AD_Client_ID";
+                ds = DataBase.DB.ExecuteDataset(sql, null, null);
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
-                        AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
-                    }
-                    else
-                    {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
-                        return false;
+                        DataRow rs = ds.Tables[0].Rows[i];
+                        MAlert alert = new MAlert(ctx, rs, null);
+                        //newKey = "C" + alert.GetAD_Client_ID() + "T" + AD_Table_ID;
+                        newKey = "C" + AD_Client_ID + "T" + AD_Table_ID;
+                        if (!newKey.Equals(oldKey) && list.Count > 0)
+                        {
+                            MAlert[] alerts = new MAlert[list.Count];
+                            alerts = list.ToArray();
+                            _cacheDocValue.Add(oldKey, alerts);
+                            list = new List<MAlert>();
+                        }
+                        oldKey = newKey;
+                        list.Add(alert);
                     }
                 }
-                SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
-                return true;
+
             }
-            else {
-                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SheduleRequired"));
-                return false;
-            } 
-        }       
+            catch (Exception e)
+            {
+                //log.SaveError("", Msg.GetMsg(GetCtx(), "");
+            }
+            // 	Last one
+            if (list.Count > 0)
+            {
+                MAlert[] alerts = new MAlert[list.Count];
+                alerts = list.ToArray();
+                _cacheDocValue.Add(oldKey, alerts);
+            }
+            //_log.Config("#" + _cacheDocValue.Count);
+            //	Look for Entry
+            MAlert[] retValue = (MAlert[])_cacheDocValue[key];
+            //return Clone object having new context 
+            if (retValue != null && retValue.Length > 0)
+            {
+                List<MAlert> alertList = new List<MAlert>(retValue.Length);
+                foreach (MAlert nalert in retValue)
+                {
+                    alertList.Add((MAlert)PO.Copy(ctx, nalert, nalert.Get_Trx()));
+                }
+
+                retValue = alertList.ToArray();
+            }
+
+            return retValue;
+        }
     }
 }

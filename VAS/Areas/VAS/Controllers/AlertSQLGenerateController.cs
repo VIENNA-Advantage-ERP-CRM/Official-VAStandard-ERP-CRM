@@ -131,6 +131,24 @@ namespace VAS.Areas.VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+
+        /// <summary>
+        /// Get AlertRule RecordInfo for TabSqlGenerator
+        /// </summary>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
+        /// <returns>RecordInfo</returns>
+        public JsonResult SaveAlertRule(int alertRuleID, int alertID, int tableID, int TabID, string ColumnID, bool IsInsert, bool IsUpdate, bool IsDelete)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                retJSON = JsonConvert.SerializeObject(obj.SaveAlertRule(ctx, alertRuleID, alertID, tableID, TabID, ColumnID, IsInsert, IsUpdate, IsDelete));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>
         /// Getting names from table if name column exists 
         /// </summary>
