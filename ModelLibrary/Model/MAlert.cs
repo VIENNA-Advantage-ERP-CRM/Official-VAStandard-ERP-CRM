@@ -498,56 +498,56 @@ namespace VAdvantage.Model
         public static MAlert[] GetAlertValue(Ctx ctx, int AD_Client_ID, int AD_Table_ID)
         {
             String key = "C" + AD_Client_ID + "T" + AD_Table_ID;
-            List<MAlert> list = new List<MAlert>();
-            String oldKey = "";
-            String newKey = null;
-            DataSet ds = null;
-            try
+            //Reload
+            if (_cacheDocValue.IsReset())
             {
-                string sql = "SELECT COUNT(*) FROM AD_AlertRule WHERE AD_Table_ID = " + AD_Table_ID;
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_AlertRule", true, true);
-                int count = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-                if (count == 0)
+                List<MAlert> list = new List<MAlert>();
+                String oldKey = "";
+                String newKey = null;
+                DataSet ds = null;
+                try
                 {
-                    return null;
-                }
-                sql = "SELECT * FROM AD_Alert "
-               + "WHERE BasedOn='E' AND IsActive='Y' AND IsValid='Y' "
-               + "ORDER BY AD_Client_ID";
-                ds = DataBase.DB.ExecuteDataset(sql, null, null);
-                if (ds != null && ds.Tables[0].Rows.Count > 0)
-                {
-                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                    {
-                        DataRow rs = ds.Tables[0].Rows[i];
-                        MAlert alert = new MAlert(ctx, rs, null);
-                        //newKey = "C" + alert.GetAD_Client_ID() + "T" + AD_Table_ID;
-                        newKey = "C" + AD_Client_ID + "T" + AD_Table_ID;
-                        if (!newKey.Equals(oldKey) && list.Count > 0)
-                        {
-                            MAlert[] alerts = new MAlert[list.Count];
-                            alerts = list.ToArray();
-                            _cacheDocValue.Add(oldKey, alerts);
-                            list = new List<MAlert>();
-                        }
-                        oldKey = newKey;
-                        list.Add(alert);
-                    }
-                }
+                    string sql = @"SELECT a.*, r.AD_Table_ID FROM AD_Alert a
+                       INNER JOIN AD_AlertRule r ON (a.AD_Alert_ID = r.AD_Alert_ID)
+                       WHERE a.BasedOn='E' AND a.IsActive='Y' AND a.IsValid='Y' AND r.AD_Table_ID = " + AD_Table_ID + @"
+                       ORDER BY a.AD_Client_ID";
 
+                    sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Alert", true, true);
+                    ds = DataBase.DB.ExecuteDataset(sql, null, null);
+                    if (ds != null && ds.Tables[0].Rows.Count > 0)
+                    {
+                        for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                        {
+                            DataRow rs = ds.Tables[0].Rows[i];
+                            MAlert alert = new MAlert(ctx, rs, null);
+                            int tableId = Util.GetValueOfInt(rs["AD_Table_ID"]); // from AlertRule
+    newKey = "C" + alert.GetAD_Client_ID() + "T" + tableId;
+                            if (!newKey.Equals(oldKey) && list.Count > 0)
+                            {
+                                MAlert[] alerts = new MAlert[list.Count];
+                                alerts = list.ToArray();
+                                _cacheDocValue.Add(oldKey, alerts);
+                                list = new List<MAlert>();
+                            }
+                            oldKey = newKey;
+                            list.Add(alert);
+                        }
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    //log.SaveError("", Msg.GetMsg(GetCtx(), "");
+                }
+                // 	Last one
+                if (list.Count > 0)
+                {
+                    MAlert[] alerts = new MAlert[list.Count];
+                    alerts = list.ToArray();
+                    _cacheDocValue.Add(oldKey, alerts);
+                }
+                //_log.Config("#" + _cacheDocValue.Count);
             }
-            catch (Exception e)
-            {
-                //log.SaveError("", Msg.GetMsg(GetCtx(), "");
-            }
-            // 	Last one
-            if (list.Count > 0)
-            {
-                MAlert[] alerts = new MAlert[list.Count];
-                alerts = list.ToArray();
-                _cacheDocValue.Add(oldKey, alerts);
-            }
-            //_log.Config("#" + _cacheDocValue.Count);
             //	Look for Entry
             MAlert[] retValue = (MAlert[])_cacheDocValue[key];
             //return Clone object having new context 

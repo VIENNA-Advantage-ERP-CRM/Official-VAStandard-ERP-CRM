@@ -22,8 +22,7 @@ namespace VAdvantage.Alert
         #region Private variable
         //	Document Workflow Manager		
         private static AlertEventManager _mgr = null;
-        private int _noCalled = 0;
-        private int _noStarted = 0;
+        private int tableID = 0;
         //	Logger			
         private static VLogger log = VLogger.GetVLogger(typeof(AlertEventManager).FullName);
         #endregion
@@ -62,56 +61,38 @@ namespace VAdvantage.Alert
         /// <summary>
         /// Alert Event Process 
         /// </summary>
-        /// <param name="newRecord">Is new record</param>
         /// <param name="document">document</param>
-        /// <param name="AD_Table_ID">AD_Table_ID</param>
-        /// <param name="columnIds">columnIds</param>
-        /// <param name="IsDeleted">IsDeleted</param>
+        /// <param name="POInfo">POInfo</param>
+        /// <param name="eventType">eventType</param>
         /// <returns></returns>
-        public bool Process(bool newRecord, PO document, int AD_Table_ID, List<(int ColumnId, string ColumnName)> columnIds, bool IsDeleted)
+        public bool Process(PO document, POInfo pinfo, string eventType)
         {
-            _noCalled++;
-            MAlert[] alerts = MAlert.GetAlertValue(document.GetCtx(), document.GetAD_Client_ID(), AD_Table_ID);
+            bool started = false;
+            tableID = pinfo.getAD_Table_ID();
+            if (tableID == 0) {
+                return false;
+            }
+            Ctx ctx = document.GetCtx();
+            MAlert[] alerts = MAlert.GetAlertValue(ctx, document.GetAD_Client_ID(), tableID);
             if (alerts == null || alerts.Length == 0)
                 return false;
-            Ctx ctx = document.GetCtx();
-            bool started = false;
             for (int i = 0; i < alerts.Length; i++)
             {
                 MAlert alert = alerts[i];
-                if (!alert.IsValid())
-                {
-                    log.Info("Invalid: " + alert);
-                    continue;
-                }
-
-                string alertType = Util.GetValueOfString(alert.Get_Value("BasedOn"));
-                if (alertType != "E")
-                {
-                    log.Severe(alert.GetName() + " not have Event");
-                    continue;
-                }
-
-                if (AD_Table_ID > 0)
-                {
-                    started = AlertRuleActivity(ctx, alert, AD_Table_ID, newRecord, columnIds, IsDeleted, document);
-                }
+                started = AlertRuleActivity(alert,document, pinfo,  eventType);
             }
             return started;
         }
         /// <summary>
         /// Getting alert rule
         /// </summary>
-        /// <param name="ctx">context</param>
         /// <param name="alert">alert</param>
-        /// <param name="AD_Table_ID">AD_Table_ID</param>
-        /// <param name="isNew">isNew</param>
-        /// <param name="columnIds">columnIds</param>
-        /// <param name="isDelete">isDelete</param>
         /// <param name="document">PO</param>
+        /// <param name="POInfo">PO Info</param>
+        /// <param name="eventtype">eventtype</param>
         /// <returns></returns>
 
-        public bool AlertRuleActivity(Ctx ctx, MAlert alert, int AD_Table_ID, bool isNew, List<(int ColumnId, string ColumnName)> columnIds, bool isDelete, PO document)
+        public bool AlertRuleActivity(MAlert alert,PO document, POInfo pinfo, string eventType)
         {
             try
             {
@@ -123,8 +104,8 @@ namespace VAdvantage.Alert
                     if (!rule.IsValid())
                         continue;
 
-                    int tableID = Util.GetValueOfInt(rule.GetAD_Table_ID());
-                    if (AD_Table_ID != tableID)
+                    int ruleTableID = Util.GetValueOfInt(rule.GetAD_Table_ID());
+                    if (tableID != ruleTableID)
                         continue;
 
                     string ruleColumnIDs = Util.GetValueOfString(rule.Get_Value("AD_Column_ID"));
@@ -138,7 +119,7 @@ namespace VAdvantage.Alert
                     }
 
                     RuleDetail detail = new RuleDetail();
-                    detail.TableId = tableID;
+                    detail.TableId = ruleTableID;
                     detail.ColumnIds = colIdList;
                     detail.IsInsert = Util.GetValueOfBool(rule.Get_Value("IsInsert"));
                     detail.IsUpdate = Util.GetValueOfBool(rule.Get_Value("IsUpdate"));
@@ -157,7 +138,7 @@ namespace VAdvantage.Alert
                 {
                     for (int j = 0; j < ruleDetails.Count; j++)
                     {
-                        EventAlertProcessing(ctx, recipients[i], ruleDetails[j], isNew, columnIds, AD_Table_ID, isDelete, document);
+                        EventAlertProcessing(recipients[i], ruleDetails[j], document,pinfo,  eventType);
                     }
                 }
             }
@@ -175,13 +156,9 @@ namespace VAdvantage.Alert
         /// <param name="ctx">context</param>
         /// <param name="recipient">recipient</param>
         /// <param name="rule">rule</param>
-        /// <param name="isNew">isNew</param>
-        /// <param name="columnIds">columnIds</param>
-        /// <param name="AD_Table_ID">AD_Table_ID</param>
-        /// <param name="isDelete">isDelete</param>
         /// <param name="document">PO</param>
         /// <returns></returns>
-        public bool EventAlertProcessing(Ctx ctx, MAlertRecipient recipient, RuleDetail rule, bool isNew, List<(int ColumnId, string ColumnName)> columnIds, int AD_Table_ID, bool isDelete, PO document)
+        public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)
         {
             string windowName = "";
             string tabName = "";
@@ -190,19 +167,19 @@ namespace VAdvantage.Alert
             List<List<object>> data = new List<List<object>>();
             List<object> header = new List<object>();
             FileInfo attachment = null;
-
-            if (isDelete)
+            eventType = eventType.ToUpper();
+            if (eventType.Equals("DELETE"))
             {
                 string query = @"SELECT AD_Tab.Name AS TabName, AD_Window.Name AS WindowName FROM AD_Tab INNER JOIN AD_Window ON AD_Window.AD_WINDOW_ID = AD_Tab.AD_Window_ID  ";
                 if (document.GetTableName().Equals("GL_Journal"))
                 {
                     query += " WHERE AD_Window.Name = " +
                         "CASE WHEN(SELECT NVL(GL_JournalBatch_ID, 0) FROM GL_Journal WHERE GL_Journal_ID = " + document.Get_ID() + ") = 0 " +
-                        "THEN 'GL Journal Line' ELSE 'GL Journal' END AND AD_Tab.AD_Table_ID = " + AD_Table_ID;
+                        "THEN 'GL Journal Line' ELSE 'GL Journal' END AND AD_Tab.AD_Table_ID = " + tableID;
                 }
                 else
                 {
-                    query += " WHERE AD_Tab.AD_Table_ID = " + AD_Table_ID;
+                    query += " WHERE AD_Tab.AD_Table_ID = " + tableID;
                 }
                 DataSet ds = DB.ExecuteDataset(query);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -219,7 +196,7 @@ namespace VAdvantage.Alert
                     "SELECT Name FROM AD_Tab WHERE AD_Tab_ID=" + document.GetWindowTabID()));
             }
 
-            if (isNew && rule.IsInsert)
+            if (eventType.Equals("INSERT") && rule.IsInsert)
             {
                 subject = "New Record Created Notification - " + windowName;
                 msg = "Hello Team,\n\nA new record has been created\n\n"
@@ -240,23 +217,28 @@ namespace VAdvantage.Alert
 
                 attachment = CreateCSVFile(data);
             }
-            else if (!isNew && rule.IsUpdate)
+            else if (eventType.Equals("UPDATE") && rule.IsUpdate)
             {
-                List<string> commonColumnList = new List<string>();
-                if (columnIds != null)
+                List<string> updatedColumn = new List<string>();
+                for (int i = 0; i < pinfo.GetColumnCount(); i++)
                 {
-                    for (int i = 0; i < columnIds.Count; i++)
+                    bool ischanges = document.Is_ValueChanged(i);
+                    if (ischanges && !pinfo.IsVirtualColumn(i))
                     {
-                        if (rule.ColumnIds.Contains(columnIds[i].ColumnId))
-                            commonColumnList.Add(columnIds[i].ColumnName);
+                        int ColumnId = pinfo.GetColumn(i).AD_Column_ID;
+                        if (rule.ColumnIds.Contains(ColumnId))
+                        {
+                            updatedColumn.Add(pinfo.GetColumnName(i));
+                        }
                     }
+
                 }
 
-                if (commonColumnList.Count > 0)
+                if (updatedColumn.Count > 0)
                 {
-                    string columnName = string.Join(", ", commonColumnList);
+                    string columnName = string.Join(", ", updatedColumn);
                     subject = "Record Update Notification - " + windowName;
-                    msg = "Hello Team,\n\nA record has been updated: "+ columnName + "\n\n"
+                    msg = "Hello Team,\n\nA record has been updated: " + columnName + "\n\n"
                         + "Window: " + windowName + "\nTab: " + tabName
                         + "\nRecord ID: " + document.Get_ID();
 
@@ -268,7 +250,7 @@ namespace VAdvantage.Alert
                     for (int i = 0; i < document.Get_ColumnCount(); i++)
                     {
                         string colName = document.Get_ColumnName(i);
-                        if (commonColumnList.Contains(colName))
+                        if (updatedColumn.Contains(colName))
                         {
                             List<object> row = new List<object>();
                             row.Add(colName);
@@ -281,8 +263,8 @@ namespace VAdvantage.Alert
                     attachment = CreateCSVFile(data);
                 }
             }
-            else if (isDelete && rule.IsDeleted)
-            {               
+            else if (eventType.Equals("DELETE") && rule.IsDeleted)
+            {
                 subject = "Record Deleted Notification - " + windowName;
                 msg = "Hello Team,\n\nA record has been deleted\n\n"
                     + "Window: " + windowName + "\nTab: " + tabName
@@ -328,12 +310,13 @@ namespace VAdvantage.Alert
             if (attachment != null)
                 files.Add(attachment);
 
-           int count= SendInfo(ctx, users, subject, msg, files);
+            int count = SendInfo(document.GetCtx(), users, subject, msg, files);
             if (count > 0)
             {
                 log.Info("Mail Sucessfully send to " + count + " user");
             }
-            else {
+            else
+            {
                 log.Info("Mail not send ");
             }
             return true;
@@ -348,10 +331,10 @@ namespace VAdvantage.Alert
         {
             Random rndm = new Random();
             string path = "Alert_" + DateTime.Now.Ticks + "_" + rndm.Next(0, 9999);
-            string filePath = GlobalVariable.PhysicalPath + "TempDownload"; 
-            if (!Directory.Exists(filePath)) 
+            string filePath = GlobalVariable.PhysicalPath + "TempDownload";
+            if (!Directory.Exists(filePath))
                 Directory.CreateDirectory(filePath);
-            string fileName = filePath + "\\" + path+".csv";
+            string fileName = filePath + "\\" + path + ".csv";
             using (StreamWriter writer = new StreamWriter(fileName))
             {
                 for (int i = 0; i < data.Count; i++)
@@ -408,7 +391,8 @@ namespace VAdvantage.Alert
         public int SendInfo(Ctx ctx, List<int> recipientUsers, string subject, string message, List<FileInfo> attachments)
         {
             int countMail = 0;
-            if (recipientUsers.Count == 0) {
+            if (recipientUsers.Count == 0)
+            {
                 log.Info("No Recipient Found");
                 return 0;
             }
@@ -424,7 +408,7 @@ namespace VAdvantage.Alert
                         {
                             email.SetCtx(ctx);
 
-                             log.Info(email.ToString());
+                            log.Info(email.ToString());
                             foreach (FileInfo f in attachments)
                             {
                                 email.AddAttachment(f);
