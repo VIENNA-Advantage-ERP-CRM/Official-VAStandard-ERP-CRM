@@ -402,6 +402,7 @@ namespace VAdvantage.Model
                 _bp.Set_Value("LeadRating", GetLeadRating());
 
 
+
                 // VIS0060: Set Next Step, Next Step By and Follow update
                 if (Env.IsModuleInstalled("VA061_"))
                 {
@@ -565,7 +566,13 @@ namespace VAdvantage.Model
                 _user.SetFax(GetFax());
             if (GetTitle() != null)
                 _user.SetTitle(GetTitle());
-            //
+            //VAI050-Set LinkedInProfile and mobile on prospect     
+            if (GetMobile() != null)
+                _user.SetMobile(GetMobile());
+
+            _user.Set_Value("LinkedInProfile", Get_Value("LinkedInProfile"));
+
+
             if (!_user.Save())
             {
                 log.Warning("Contact not saved");
