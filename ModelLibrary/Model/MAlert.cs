@@ -32,7 +32,7 @@ namespace VAdvantage.Model
         {
         }//	MAlert
 
-        private static CCache<string, MAlert[]> _cacheDocValue = new CCache<string, MAlert[]>("AD_Alert", 5);
+        private static CCache<string, MAlert[]> _cacheAlertValue = new CCache<string, MAlert[]>("AD_Alert", 5);
         /**	The Rules						*/
         private MAlertRule[] m_rules = null;
         /**	The Recipients					*/
@@ -489,80 +489,71 @@ namespace VAdvantage.Model
 
 
         /// <summary>
-        /// Get Doc Value Workflow
+        /// Get alert Value
         /// </summary>
         /// <param name="ctx">context</param>
         /// <param name="AD_Client_ID">client</param>
         /// <param name="AD_Table_ID">table</param>
-        /// <returns>document value workflow array or null</returns>
+        /// <returns>alert array or null</returns>
         public static MAlert[] GetAlertValue(Ctx ctx, int AD_Client_ID, int AD_Table_ID)
         {
-            String key = "C" + AD_Client_ID + "T" + AD_Table_ID;
-            //Reload
-            if (_cacheDocValue.IsReset())
+            string key = "C" + AD_Client_ID + "T" + AD_Table_ID;
+            if (_cacheAlertValue.ContainsKey(key))
             {
-                List<MAlert> list = new List<MAlert>();
-                String oldKey = "";
-                String newKey = null;
-                DataSet ds = null;
-                try
+                MAlert[] cachedAlerts = (MAlert[])_cacheAlertValue[key];
+                if (cachedAlerts != null && cachedAlerts.Length > 0)
                 {
-                    string sql = @"SELECT a.*, r.AD_Table_ID FROM AD_Alert a
+                    List<MAlert> alertList = new List<MAlert>(cachedAlerts.Length);
+                    foreach (MAlert nalert in cachedAlerts)
+                    {
+                        alertList.Add((MAlert)PO.Copy(ctx, nalert, nalert.Get_Trx()));
+                    }
+                    return alertList.ToArray();
+                }
+                return cachedAlerts;
+            }
+
+            List<MAlert> list = new List<MAlert>();
+            try
+            {
+                string sql = @"SELECT a.*, r.AD_Table_ID 
+                       FROM AD_Alert a
                        INNER JOIN AD_AlertRule r ON (a.AD_Alert_ID = r.AD_Alert_ID)
-                       WHERE a.BasedOn='E' AND a.IsActive='Y' AND a.IsValid='Y' AND r.AD_Table_ID = " + AD_Table_ID + @"
+                       WHERE a.BasedOn='E' AND a.IsActive='Y' AND a.IsValid='Y' 
+                         AND r.AD_Table_ID = " + AD_Table_ID + @"
                        ORDER BY a.AD_Client_ID";
 
-                    sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Alert", true, true);
-                    ds = DataBase.DB.ExecuteDataset(sql, null, null);
-                    if (ds != null && ds.Tables[0].Rows.Count > 0)
-                    {
-                        for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
-                        {
-                            DataRow rs = ds.Tables[0].Rows[i];
-                            MAlert alert = new MAlert(ctx, rs, null);
-                            int tableId = Util.GetValueOfInt(rs["AD_Table_ID"]); // from AlertRule
-    newKey = "C" + alert.GetAD_Client_ID() + "T" + tableId;
-                            if (!newKey.Equals(oldKey) && list.Count > 0)
-                            {
-                                MAlert[] alerts = new MAlert[list.Count];
-                                alerts = list.ToArray();
-                                _cacheDocValue.Add(oldKey, alerts);
-                                list = new List<MAlert>();
-                            }
-                            oldKey = newKey;
-                            list.Add(alert);
-                        }
-                    }
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Alert", true, true);
 
-                }
-                catch (Exception e)
+                DataSet ds = DataBase.DB.ExecuteDataset(sql, null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
-                    //log.SaveError("", Msg.GetMsg(GetCtx(), "");
+                    foreach (DataRow rs in ds.Tables[0].Rows)
+                    {
+                        MAlert alert = new MAlert(ctx, rs, null);
+                        list.Add(alert);
+                    }
                 }
-                // 	Last one
-                if (list.Count > 0)
-                {
-                    MAlert[] alerts = new MAlert[list.Count];
-                    alerts = list.ToArray();
-                    _cacheDocValue.Add(oldKey, alerts);
-                }
-                //_log.Config("#" + _cacheDocValue.Count);
             }
-            //	Look for Entry
-            MAlert[] retValue = (MAlert[])_cacheDocValue[key];
-            //return Clone object having new context 
-            if (retValue != null && retValue.Length > 0)
+            catch (Exception e)
             {
-                List<MAlert> alertList = new List<MAlert>(retValue.Length);
-                foreach (MAlert nalert in retValue)
+                // log error if needed
+                //_log.Log(Level.SEVERE, "GetAlertValue error", e);
+            }
+
+            MAlert[] alertsArr = list.ToArray();
+            _cacheAlertValue.Add(key, alertsArr);
+
+            if (alertsArr.Length > 0)
+            {
+                List<MAlert> alertList = new List<MAlert>(alertsArr.Length);
+                foreach (MAlert nalert in alertsArr)
                 {
                     alertList.Add((MAlert)PO.Copy(ctx, nalert, nalert.Get_Trx()));
                 }
-
-                retValue = alertList.ToArray();
+                return alertList.ToArray();
             }
-
-            return retValue;
+            return alertsArr;
         }
     }
 }
