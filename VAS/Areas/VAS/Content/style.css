@@ -1187,6 +1187,9 @@ html[dir="rtl"] .vas-sql-result-msg {
     margin-left: 10px;
 }
 
+.vas-root-eventmain {
+    padding: 20px;
+}
 .vas-tis-gridimg {
     display: flex;
     /* justify-content: center; */
