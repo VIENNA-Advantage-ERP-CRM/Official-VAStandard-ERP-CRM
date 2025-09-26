@@ -6,6 +6,7 @@ using System.Data;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Utility;
+using CoreLibrary.Classes;
 
 namespace VAdvantage.Model
 {
@@ -29,8 +30,9 @@ namespace VAdvantage.Model
         public MAlert(Ctx ctx, DataRow rs, Trx trx)
             : base(ctx, rs, trx)
         {
-        }	//	MAlert
+        }//	MAlert
 
+        private static CCache<string, MAlert[]> _cacheAlertValue = new CCache<string, MAlert[]>("AD_Alert", 5);
         /**	The Rules						*/
         private MAlertRule[] m_rules = null;
         /**	The Recipients					*/
@@ -52,6 +54,33 @@ namespace VAdvantage.Model
                 {
                     MAlertRule mAlertRule = new MAlertRule(GetCtx(), dr, null);
                     ValidateAlertRuleCondition(mAlertRule);
+                    list.Add(mAlertRule);
+                }
+            }
+            catch (Exception e)
+            {
+                log.Log(Level.SEVERE, sql, e);
+            }
+            //
+            m_rules = new MAlertRule[list.Count()];
+            m_rules = list.ToArray();
+            return m_rules;
+        } 
+        
+        public MAlertRule[] GetRule(bool reload)
+        {
+            if (m_rules != null && !reload)
+                return m_rules;
+            String sql = "SELECT * FROM AD_AlertRule "
+                + "WHERE isactive='Y' AND AD_Alert_ID=" + GetAD_Alert_ID();
+            List<MAlertRule> list = new List<MAlertRule>();
+
+            try
+            {
+                DataSet ds = DB.ExecuteDataset(sql);
+                foreach (DataRow dr in ds.Tables[0].Rows)
+                {
+                    MAlertRule mAlertRule = new MAlertRule(GetCtx(), dr, null);
                     list.Add(mAlertRule);
                 }
             }
@@ -274,7 +303,7 @@ namespace VAdvantage.Model
                 }
             }
             else
-            {
+            {              
                 returnConditionValue = true;
             }
             if (AlertRule.GetErrorMsg() == null || AlertRule.GetErrorMsg() == string.Empty)
@@ -421,37 +450,110 @@ namespace VAdvantage.Model
         /// <returns>true</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            int scheduleId = Util.GetValueOfInt(Get_Value("AD_Schedule_ID"));
-            if (scheduleId > 0)
+            int scheduleId = 0;
+            string BasedOn = Util.GetValueOfString(Get_Value("BasedOn"));
+            if (BasedOn == "S")
             {
-                string sql = @"SELECT AD_AlertProcessor_ID FROM AD_AlertProcessor WHERE IsActive='Y' AND AD_Schedule_ID = " + scheduleId;
-                int AD_AlertProcessor_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql));
-                if (AD_AlertProcessor_ID == 0)
+                scheduleId = Util.GetValueOfInt(Get_Value("AD_Schedule_ID"));
+                if (scheduleId == 0)
                 {
-                    MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
-                    obj.SetAD_Schedule_ID(scheduleId);
-                    obj.SetAD_Client_ID(GetAD_Client_ID());
-                    obj.SetAD_Org_ID(GetAD_Org_ID());
-                    obj.SetName(GetName());
-                    obj.SetKeepLogDays(7);
-                    obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
-                    if (obj.Save())
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SheduleRequired"));
+                    return false;
+                }
+            }
+            int AD_AlertProcessor_ID = Util.GetValueOfInt(GetAD_AlertProcessor_ID());
+            if (newRecord)
+                AD_AlertProcessor_ID = 0;
+            if (AD_AlertProcessor_ID == 0)
+            {
+                MAlertProcessor obj = new MAlertProcessor(GetCtx(), AD_AlertProcessor_ID, null);
+                obj.SetAD_Schedule_ID(scheduleId);
+                obj.SetAD_Client_ID(GetAD_Client_ID());
+                obj.SetAD_Org_ID(GetAD_Org_ID());
+                obj.SetName(GetName());
+                obj.SetKeepLogDays(7);
+                obj.SetSupervisor_ID(GetCtx().GetAD_User_ID());
+                if (obj.Save())
+                {
+                    AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
+                }
+                else
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
+                    return false;
+                }
+            }
+            SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
+            return true;
+        }
+
+
+        /// <summary>
+        /// Get alert Value
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="AD_Client_ID">client</param>
+        /// <param name="AD_Table_ID">table</param>
+        /// <returns>alert array or null</returns>
+        public static MAlert[] GetAlertValue(Ctx ctx, int AD_Client_ID, int AD_Table_ID)
+        {
+            string key = "C" + AD_Client_ID + "T" + AD_Table_ID;
+            if (_cacheAlertValue.ContainsKey(key))
+            {
+                MAlert[] cachedAlerts = (MAlert[])_cacheAlertValue[key];
+                if (cachedAlerts != null && cachedAlerts.Length > 0)
+                {
+                    List<MAlert> alertList = new List<MAlert>(cachedAlerts.Length);
+                    foreach (MAlert nalert in cachedAlerts)
                     {
-                        AD_AlertProcessor_ID = obj.GetAD_AlertProcessor_ID();
+                        alertList.Add((MAlert)PO.Copy(ctx, nalert, nalert.Get_Trx()));
                     }
-                    else
+                    return alertList.ToArray();
+                }
+                return cachedAlerts;
+            }
+
+            List<MAlert> list = new List<MAlert>();
+            try
+            {
+                string sql = @"SELECT a.*, r.AD_Table_ID 
+                       FROM AD_Alert a
+                       INNER JOIN AD_AlertRule r ON (a.AD_Alert_ID = r.AD_Alert_ID)
+                       WHERE a.BasedOn='E' AND a.IsActive='Y' AND a.IsValid='Y' 
+                         AND r.AD_Table_ID = " + AD_Table_ID + @"
+                       ORDER BY a.AD_Client_ID";
+
+                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "AD_Alert", true, true);
+
+                DataSet ds = DataBase.DB.ExecuteDataset(sql, null, null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    foreach (DataRow rs in ds.Tables[0].Rows)
                     {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_HandlerNotSave"));
-                        return false;
+                        MAlert alert = new MAlert(ctx, rs, null);
+                        list.Add(alert);
                     }
                 }
-                SetAD_AlertProcessor_ID(AD_AlertProcessor_ID);
-                return true;
             }
-            else {
-                log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_SheduleRequired"));
-                return false;
-            } 
-        }       
+            catch (Exception e)
+            {
+                // log error if needed
+                //_log.Log(Level.SEVERE, "GetAlertValue error", e);
+            }
+
+            MAlert[] alertsArr = list.ToArray();
+            _cacheAlertValue.Add(key, alertsArr);
+
+            if (alertsArr.Length > 0)
+            {
+                List<MAlert> alertList = new List<MAlert>(alertsArr.Length);
+                foreach (MAlert nalert in alertsArr)
+                {
+                    alertList.Add((MAlert)PO.Copy(ctx, nalert, nalert.Get_Trx()));
+                }
+                return alertList.ToArray();
+            }
+            return alertsArr;
+        }
     }
 }

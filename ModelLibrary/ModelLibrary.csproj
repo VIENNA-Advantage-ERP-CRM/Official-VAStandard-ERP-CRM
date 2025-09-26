@@ -230,6 +230,7 @@
     <Compile Include="Interface\ReplenishInterface.cs" />
     <Compile Include="Interface\UserPricingInterface.cs" />
     <Compile Include="Interface\AccountingInterface.cs" />
+    <Compile Include="Model\AlertEventManager.cs" />
     <Compile Include="Model\ListBoxVO.cs" />
     <Compile Include="Model\CTreeNode.cs" />
     <Compile Include="Model\MAccount.cs" />
