@@ -374,17 +374,17 @@ namespace VAdvantage.Report
 		String ct = GetColumnType();
 		if (ct.Equals(COLUMNTYPE_RelativePeriod))
 		{
-			SetElementType(null);
-			SetCalculationType(null);
+			//SetElementType(null);
+			//SetCalculationType(null);
 		}
 		else if (ct.Equals(COLUMNTYPE_Calculation))
 		{
-			SetElementType(null);
-			SetRelativePeriod(null);
+			//SetElementType(null);
+			//SetRelativePeriod(null);
 		}
 		else if (ct.Equals(COLUMNTYPE_SegmentValue))
 		{
-			SetCalculationType(null);
+			//SetCalculationType(null);
 		}
 		return true;
 	}	//	beforeSave
