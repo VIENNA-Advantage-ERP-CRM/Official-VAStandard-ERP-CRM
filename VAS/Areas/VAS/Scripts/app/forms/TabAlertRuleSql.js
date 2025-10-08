@@ -288,7 +288,7 @@
             $sqlContent.append($selectQuery).append($queryResultGrid);
             $sqlContent.append('<div id="emailContent_' + $self.windowNo + '" class="vas-alert-emailmsg VIS_Pref_show vis-formouterwrpdiv">'
                 + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap" id="Is_Email_' + $self.windowNo + '"></div></div>'
-                + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap" id="EmailColName_' + $self.windowNo + '"></div></div>'
+                + '<div class= "VIS_Pref_dd"><div style="display:none;" class="input-group vis-input-wrap" id="EmailColName_' + $self.windowNo + '"></div></div>'
                 + '</div>');
 
 
@@ -1309,7 +1309,7 @@
             $saveBtn.on(VIS.Events.onTouchStartOrClick, function () {
                 var query = $selectQuery.text().trim();
                 alertID = VIS.context.getContext($self.windowNo, 'AD_Alert_ID');
-                if (alertID > 0) {
+                if (alertID > 0) {                    
                     UpdateAlertRule(query);
                 }
             });
@@ -2003,7 +2003,8 @@
         */
         this.SqlQuery = function (ParentId) {
             var event = VIS.context.getContext(windowNo, 'BasedOn');
-            UpdateColumnCtrl.hide();
+            UpdateColumnCtrl.hide()
+            $sqlResultDiv.text("");
             $SQLMainDiv.show();
             $EventMainDiv.hide();
             if (event == 'E') {
@@ -2028,9 +2029,14 @@
                                 emailContentDiv.show();
                                 txtEmailColName.setValue(result.EmailColumnName);
                                 txtIsEmail.setValue(result.IsEmail);
+                                if (result.IsEmail) {
+                                    emailColNameCtrl.show();
+                                } else {
+                                    emailColNameCtrl.hide();
+                                }
                             }
-                            $selectQuery.text(result.query);
-                            if (!result.query) {
+                            $selectQuery.text(result.Query);
+                            if (!result.Query) {
                                 $windowTabSelect.setValue(null);
                                 $selectQuery.text('');
                                 $sqlGeneratorBtn.attr('disabled', false);
@@ -2317,6 +2323,14 @@
                 isProcessing = true; 
                 saveAlertRule();
             });
+
+            txtIsEmail.fireValueChanged = function (e) {
+                if (e.newValue) {
+                    emailColNameCtrl.show();
+                } else {
+                    emailColNameCtrl.hide();
+                }
+            };
         }
 
 
@@ -2951,17 +2965,14 @@
             Functionality to Update the Query in SQL Generator Tab
         */
         function UpdateAlertRule(query) {
-            if (query != null) {
-
+            if (query != null) {             
                 var obj = {
                     query: VIS.secureEngine.encrypt(query),
-                    alertRuleID: alertRuleID,
+                    tableID: tableID || 0,
                     alertID: alertID,
-                    tableID: tableID,
+                    alertRuleID: alertRuleID,
                     isEmail: txtIsEmail.getValue(),
-                    emailColumn: txtEmailColName.getValue(),
-                    BasedOn: $self.BasedOn
-
+                    emailColumn: txtEmailColName.getValue()
                 }
                 alertRuleID = $self.ParentId;
                 $.ajax({

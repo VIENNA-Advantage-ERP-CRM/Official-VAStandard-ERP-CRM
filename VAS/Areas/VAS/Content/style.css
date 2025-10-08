@@ -541,6 +541,10 @@
     color: rgba(var(--v-c-secondary),1);
 }
 
+.vas-root-main {
+    height:100%;
+}
+
 .vas-control-wrap {
     width: calc(100% - 70px);
 }
