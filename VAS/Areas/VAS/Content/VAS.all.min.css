@@ -1,4 +1,4 @@
-﻿/*version 1.6.4.0*/
+﻿/*version 1.6.9.0*/
 
 .vis-payment-table {
     width: 100%;
@@ -608,6 +608,10 @@
 .vas-first-delete-icon .vas-filters-editdelete-btns .glyphicon-trash {
     pointer-events: none;
     color: rgba(var(--v-c-secondary),1);
+}
+
+.vas-root-main {
+    height: 100%;
 }
 
 .vas-control-wrap {
@@ -1254,6 +1258,10 @@ html[dir="rtl"] .vas-sql-result-msg {
 
 .vas-tis-paddingspn {
     margin-left: 10px;
+}
+
+.vas-root-eventmain {
+    padding: 20px;
 }
 
 .vas-tis-gridimg {
