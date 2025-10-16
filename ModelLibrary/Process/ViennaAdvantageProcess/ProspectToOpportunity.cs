@@ -86,6 +86,7 @@ namespace ViennaAdvantage.Process
 
 
                         }
+                        opp.SkipAIAssistantThreadUpdate = true;
 
                         if (opp.Save())
                         {
@@ -99,6 +100,10 @@ namespace ViennaAdvantage.Process
                             lead.Save();
 
                             bp.SetCreateProject("Y");
+                            // Send Lead Data to Knowledge Base
+                            VAS_CommonMethod.SendInfoToAI(lead.Get_Table_ID(), lead.Get_ID(), Get_Trx(), GetCtx());
+                            // Send opp Data to Knowledge Base
+                            VAS_CommonMethod.SendInfoToAI(opp.Get_Table_ID(), opp.Get_ID(), Get_Trx(), GetCtx());
                             if (bp.Save())
                             {
                             }
@@ -128,7 +133,7 @@ namespace ViennaAdvantage.Process
                 opp.SetC_Campaign_ID(partner.GetC_Campaign_ID());
                 opp.Set_Value("LeadRating", partner.Get_Value("LeadRating"));
                 opp.SetIsOpportunity(true);
-
+                opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
                     //VAI050-Set below coulum if VA061 module install
@@ -148,6 +153,8 @@ namespace ViennaAdvantage.Process
                     int ToTableID = opp.Get_Table_ID();
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, opp.GetC_Project_ID(), GetRecord_ID(), Get_TrxName(), GetCtx());
                     partner.SetCreateProject("Y");
+                    // Send opp Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(opp.Get_Table_ID(), opp.Get_ID(), Get_Trx(), GetCtx());
                     if (partner.Save())
                     {
                     }

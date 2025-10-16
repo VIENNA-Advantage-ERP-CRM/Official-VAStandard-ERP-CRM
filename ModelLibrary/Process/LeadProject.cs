@@ -34,6 +34,8 @@ namespace VAdvantage.Process
         private int _C_ProjectType_ID = 0;
         /** Lead				*/
         private int _C_Lead_ID = 0;
+        private string _companyName = "";
+        private int _bpGroupID = 0;
 
         /// <summary>
         /// Prepare
@@ -51,6 +53,14 @@ namespace VAdvantage.Process
                 else if (name.Equals("C_ProjectType_ID"))
                 {
                     _C_ProjectType_ID = para[i].GetParameterAsInt();
+                }
+                else if (name.Equals("VA061_CompanyName"))
+                {
+                    _companyName = Util.GetValueOfString(para[i].GetParameter());
+                }
+                else if (name.Equals("C_BP_Group_ID"))
+                {
+                    _bpGroupID = Util.GetValueOfInt(para[i].GetParameter());
                 }
                 else
                 {
@@ -82,7 +92,16 @@ namespace VAdvantage.Process
             {
                 throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);
             }
+            //VAI050-Set Bp name and group iD
+            if (!string.IsNullOrEmpty(_companyName))
+            {
+                lead.SetBPName(_companyName);
 
+            }
+            if (_bpGroupID > 0)
+            {
+                lead.SetC_BP_Group_ID(_bpGroupID);
+            }
             #region Create Prospects Before Opportunity
             if (Env.IsModuleInstalled("VA047_") && lead.GetRef_BPartner_ID() == 0 && lead.GetC_BPartner_ID() == 0)
             {
@@ -129,7 +148,7 @@ namespace VAdvantage.Process
                     _user.SetMobile(lead.GetMobile());
                     _user.SetEMail(lead.GetEMail());
                     _user.SetDescription(lead.GetDescription());
-                    _user.Set_Value("VA047_LinkedIn ",lead.Get_Value("VA047_LinkedIn"));
+                    _user.Set_Value("VA047_LinkedIn ", lead.Get_Value("VA047_LinkedIn"));
                     if (!_user.Save())
                         log.SaveError("ERROR:", "Error in Saving User");
                 }
@@ -181,6 +200,7 @@ namespace VAdvantage.Process
                     }
 
                     //C_Location_ID
+                    bp.SkipAIAssistantThreadUpdate = true;
 
                     bp.Save();
 
@@ -277,7 +297,11 @@ namespace VAdvantage.Process
                 #endregion
                 int FromTableID = lead.Get_Table_ID();
                 int ToTableID = bp.Get_Table_ID();
-                VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());        
+                VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, bp.GetC_BPartner_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+                // Send prospect Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(ToTableID, bp.Get_ID(), Get_Trx(), GetCtx());
+                // Send Lead Data to Knowledge Base
+                VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
             }
             #endregion
             //
@@ -323,14 +347,17 @@ namespace VAdvantage.Process
                 project.Set_Value("VA047_Assignto_Bp", lead.Get_ValueAsInt("VA047_Assignto_Bp"));
                 project.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
                 project.SetC_EnquiryRdate(lead.GetCreated());
-                
+                project.SkipAIAssistantThreadUpdate = true;
                 if (project.Save())
                 {
                     //VAI050-Save History from lead window to opportunity window
                     int FromTableID = PO.Get_Table_ID("C_Lead");
                     int ToTableID = PO.Get_Table_ID("C_Project");
                     VAS_CommonMethod.CopyHistorRecordData(FromTableID, ToTableID, project.GetC_Project_ID(), lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
-
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, project.Get_ID(), Get_Trx(), GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
                 };
             }
             //

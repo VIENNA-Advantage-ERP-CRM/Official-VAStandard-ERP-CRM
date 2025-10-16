@@ -21,16 +21,45 @@ namespace ViennaAdvantage.Process
     {
         int _C_Lead_ID;
         bool IsProspectCreated = false;
+        private string _companyName = "";
+        private int _bpGroupID = 0;
+        VAdvantage.Model.MLead lead = null;
         protected override void Prepare()
         {
             _C_Lead_ID = GetRecord_ID();
+            ProcessInfoParameter[] para = GetParameter();
+            if (para.Length > 0)
+            {
+                foreach (ProcessInfoParameter element in para)
+                {
+                    String name = element.GetParameterName();
+                    if (name.Equals("_C_Lead_ID"))
+                    {
+                        _C_Lead_ID = element.GetParameterAsInt();
+                    }
+                    else if (name.Equals("VA061_CompanyName"))
+                    {
+                        _companyName = Util.GetValueOfString(element.GetParameter());
+                    }
+                    else if (name.Equals("C_BP_Group_ID"))
+                    {
+                        _bpGroupID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                }
+            }
 
         }
 
 
         protected override String DoIt()
         {
-            VAdvantage.Model.X_C_Lead lead = new VAdvantage.Model.X_C_Lead(GetCtx(), _C_Lead_ID, Get_TrxName());
+            lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
+            //VAI050-Set Bp name and group iD
+            if (Env.IsModuleInstalled("VA061_"))
+            {
+                lead.SetBPName(_companyName);
+                lead.SetC_BP_Group_ID(_bpGroupID);
+            }
             //  lead.GetRef_BPartner_ID()))
             int ExCustomer = lead.GetC_BPartner_ID();
             int Pospect = lead.GetRef_BPartner_ID();
@@ -71,7 +100,7 @@ namespace ViennaAdvantage.Process
                     opp.Set_Value("VA047_Partner_Sales_Rep", lead.Get_ValueAsInt("VA047_Partner_Sales_Rep"));
                     opp.SetC_EnquiryRdate(lead.GetCreated());
                 }
-             
+
                 //VAI050-Set below coulum if VA061 module install
                 if (Env.IsModuleInstalled("VA061_"))
                 {
@@ -96,6 +125,7 @@ namespace ViennaAdvantage.Process
                 {
                     opp.SetC_ProposalDdate(lead.GetC_ProposalDdate());
                 }
+                opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
                     //VAI050-To Save history data on opportunity window
@@ -107,6 +137,10 @@ namespace ViennaAdvantage.Process
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.SetProcessed(true);
                     lead.Save();
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
 
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
 
@@ -176,6 +210,7 @@ namespace ViennaAdvantage.Process
                 {
                     opp.SetC_ProposalDdate(lead.GetC_ProposalDdate());
                 }
+                opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
                     //VAI050-Save history chat data form lead window to opportunity window
@@ -192,6 +227,10 @@ namespace ViennaAdvantage.Process
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.SetProcessed(true);
                     lead.Save();
+                    // Send Opportunity Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(),Get_Trx(),GetCtx());
+                    // Send Lead Data to Knowledge Base
+                    VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");
                 }
                 else
@@ -208,6 +247,10 @@ namespace ViennaAdvantage.Process
                 if (lead.GetBPName() == null)
                 {
                     return Msg.GetMsg(GetCtx(), "Company Name, Prospect or Bpartner is Mandatory to fill");
+                }
+                if (lead.GetC_BP_Group_ID() == 0)
+                {
+                    throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
                 }
                 callprospect();
                 //VAI050-This flag used to check the status of prospect
@@ -261,11 +304,12 @@ namespace ViennaAdvantage.Process
             {
                 throw new Exception("@C_Lead_ID@ ID=0");
             }
-            VAdvantage.Model.MLead lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
-            if (lead.GetC_BP_Group_ID() == 0)
-            {
-                throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
-            }
+            //VAdvantage.Model.MLead lead = new VAdvantage.Model.MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
+
+            //if (lead.GetC_BP_Group_ID() == 0)
+            //{
+            //    throw new Exception(Msg.GetMsg(GetCtx(), "SelectBPGroup"));
+            //}
             if (lead.Get_ID() != _C_Lead_ID)
             {
                 throw new Exception("@NotFound@: @C_Lead_ID@ ID=" + _C_Lead_ID);

@@ -3908,6 +3908,40 @@ namespace VAdvantage.Model
                         }
                     }
 
+                    /* VIS_045: 17-Sep-2025, Check Ordered Qty is not to be greater than Invoiced Qty */
+                    if (!inv.IsReversal())
+                    {
+                        if (GetC_OrderLine_ID() > 0 && (newRecord || Is_ValueChanged("IsActive") || Is_ValueChanged("QtyInvoiced")))
+                        {
+                            /* Get Qty fom Order whose invoiced not created / completed */
+                            Decimal _openOrderQty = Util.GetValueOfDecimal(DB.ExecuteScalar(
+                                $@"SELECT  NVL(QtyOrdered, 0) - NVL(QtyInvoiced, 0) FROM C_OrderLine WHERE C_OrderLine_ID = { GetC_OrderLine_ID() }", null, Get_Trx()));
+
+                            decimal QtyNotInvoiced = 0; /* Contain Qty against order whose invoice is created but not completed */
+                            if (newRecord)
+                            {
+                                QtyNotInvoiced = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT SUM(QtyInvoiced) 
+                            FROM C_Invoice i INNER JOIN C_InvoiceLine il ON (i.C_Invoice_ID = il.C_Invoice_ID)
+                            WHERE il.C_OrderLine_ID = { GetC_OrderLine_ID() } AND il.Isactive = 'Y' 
+                            AND i.docstatus NOT IN ('RE' , 'VO' , 'CL' , 'CO')", null, Get_Trx()));
+                            }
+                            else
+                            {
+                                QtyNotInvoiced = Util.GetValueOfDecimal(DB.ExecuteScalar($@"SELECT SUM(QtyInvoiced) 
+                            FROM C_Invoice i INNER JOIN C_InvoiceLine il ON (i.C_Invoice_ID = il.C_Invoice_ID)
+                            WHERE il.C_OrderLine_ID = { GetC_OrderLine_ID() } AND il.Isactive = 'Y' 
+                            AND i.docstatus NOT IN ('RE' , 'VO' , 'CL' , 'CO') AND il.C_InvoiceLine_ID <> { GetC_InvoiceLine_ID()} ", null, Get_Trx()));
+                            }
+
+                            /* Check Current Record Qty Invoiced is greater than (Open Order Qty - Already invoiced qty (not completed) ) */
+                            if (GetQtyInvoiced() > (_openOrderQty - QtyNotInvoiced))
+                            {
+                                log.SaveError("QtyCanNotbeGreater", "");
+                                return false;
+                            }
+                        }
+                    }
+
                     //Added by Bharat to set Discrepancy Amount
                     MDocType doc = MDocType.Get(GetCtx(), inv.GetC_DocTypeTarget_ID());
                     if (!doc.IsReturnTrx())

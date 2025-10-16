@@ -31,6 +31,8 @@ namespace ViennaAdvantage.Process
         /** Lead				*/
         private int _C_Lead_ID = 0;
         int C_BpID = 0;
+        private string _companyName = "";
+        private int _bpGroupID = 0;
 
         /// <summary>
         /// Prepare
@@ -47,6 +49,18 @@ namespace ViennaAdvantage.Process
                     {
                         _C_Lead_ID = element.GetParameterAsInt();
                     }
+                    else if (name.Equals("VA061_CompanyName"))
+                    {
+                        _companyName = Util.GetValueOfString(element.GetParameter());
+                    }
+                    else if (name.Equals("C_BP_Group_ID"))
+                    {
+                        _bpGroupID = Util.GetValueOfInt(element.GetParameter());
+                    }
+                }
+                if (_C_Lead_ID == 0 && para.Length > 1)
+                {
+                    _C_Lead_ID = GetRecord_ID();
                 }
             }
             else
@@ -69,7 +83,18 @@ namespace ViennaAdvantage.Process
             }
 
             MLead lead = new MLead(GetCtx(), _C_Lead_ID, Get_TrxName());
-
+            //VAI050-Set Bp name and group iD
+            if (Env.IsModuleInstalled("VA061_"))
+            {
+                if (!string.IsNullOrEmpty(_companyName))
+                {
+                    lead.SetBPName(_companyName);
+                }
+                if (_bpGroupID > 0)
+                {
+                    lead.SetC_BP_Group_ID(_bpGroupID);
+                }
+            }
             // Check IsArchive and Lead Qualification and IsQualified 
             if (Env.IsModuleInstalled("VA047_"))
             {
@@ -126,6 +151,7 @@ namespace ViennaAdvantage.Process
                 {
                     lead.SetR_Status_ID(statusId);
                 }
+
             }
 
             // VIS0060: Set Lead status to Converted.
@@ -156,7 +182,7 @@ namespace ViennaAdvantage.Process
 
                     }
 
-                        if (!_cbp.Save())
+                    if (!_cbp.Save())
                         log.SaveError("ERROR:", "Error in Saving Bpartner");
                 }
                 if (lead.GetAD_User_ID() > 0)
@@ -308,6 +334,7 @@ namespace ViennaAdvantage.Process
                                 if (!cspr.Save())
                                     log.SaveError("ERROR:", "Error in Saving PartnererScreening");
                                 bp.Set_Value("C_Lead_Target", "PS");
+                                bp.SkipAIAssistantThreadUpdate = true;
                                 bp.Save();
                             }
                         }
@@ -327,7 +354,13 @@ namespace ViennaAdvantage.Process
             int tableID = PO.Get_Table_ID("C_Lead");
             int c_bpTableID = PO.Get_Table_ID("C_BPartner");
 
-            VAS_CommonMethod.CopyHistorRecordData(tableID, c_bpTableID, C_BpID,lead.GetC_Lead_ID(),Get_TrxName(),GetCtx());
+            VAS_CommonMethod.CopyHistorRecordData(tableID, c_bpTableID, C_BpID, lead.GetC_Lead_ID(), Get_TrxName(), GetCtx());
+
+            // Send Opportunity Data to Knowledge Base
+            VAS_CommonMethod.SendInfoToAI(tableID, lead.Get_ID(), Get_Trx(), GetCtx());
+
+            // Send Lead Data to Knowledge Base
+            VAS_CommonMethod.SendInfoToAI(c_bpTableID, C_BpID, Get_Trx(), GetCtx());
 
 
             if (lead.GetRef_BPartner_ID() != 0)
@@ -337,7 +370,7 @@ namespace ViennaAdvantage.Process
             else
                 return Msg.GetMsg(GetCtx(), "ProspectNotGenerated");
 
-        }   
+        }
 
 
     }
