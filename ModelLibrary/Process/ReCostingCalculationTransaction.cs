@@ -2015,6 +2015,7 @@ namespace VAdvantage.Process
 
         public string InsertClosingCostonCost()
         {
+            int M_CostElement_ID = GetStandardCostElement();
             sql.Clear();
             sql.Append($@"INSERT INTO M_COST(
                 M_Cost_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, CREATED, CREATEDBY, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY,
@@ -2037,13 +2038,107 @@ namespace VAdvantage.Process
             {
                 sql.Append($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
             }
+            if (DateFrom != null && M_CostElement_ID > 0)
+            {
+                sql.Append($@" AND M_CostElement_ID NOT IN ({M_CostElement_ID})");
+            }
             int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
             if (no <= 0)
             {
+                _log.Info("VAS_CostClosingNotInserted from M_CostClosing to M_Cost");
                 return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotInserted");
             }
+
+            // For Standard Costing and Date From is not null 
+            if (DateFrom != null)
+            {
+                sql.Clear();
+                sql.Append(GetCostUpdateSQL(M_CostElement_ID, DateFrom.Value));
+                if (sql.Length > 0)
+                {
+                    no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                    if (no <= 0)
+                    {
+                        _log.Info("VAS_CostClosingNotInserted for Standard Costing from M_CostClosing to M_Cost");
+                        return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotInserted");
+                    }
+                }
+            }
+
             return "";
         }
+
+        /// <summary>
+        /// This function is used to create update Query for updation of "Standard Costing" record from M_CostClosing to M_cost
+        /// </summary>
+        /// <param name="M_CostElement_ID">Standard Costing Element</param>
+        /// <param name="dateFrom">Date From</param>
+        /// <returns>Query</returns>
+        private string GetCostUpdateSQL(int M_CostElement_ID, DateTime dateFrom)
+        {
+            string sql = string.Empty;
+
+            if (M_CostElement_ID > 0)
+            {
+                // Common date expression for both databases
+                string dateCondition = GlobalVariable.TO_DATE(dateFrom.AddDays(-1), true);
+
+                int userId = GetCtx().GetAD_User_ID();
+
+                if (DB.IsOracle())
+                {
+                    sql = $@"
+                MERGE INTO M_Cost c
+                USING (
+                    SELECT *
+                    FROM M_CostClosing
+                    WHERE TRUNC(Created) = {dateCondition} AND M_CostElement_ID = {M_CostElement_ID}";
+                    if (!string.IsNullOrEmpty(productID))
+                    {
+                        sql += ($@" AND M_Product_ID IN ({productID})");
+                    }
+                    else if (!string.IsNullOrEmpty(productCategoryID))
+                    {
+                        sql += ($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
+                    }
+
+                    sql += $@") cc ON (c.M_Cost_ID = cc.M_CostClosing_ID)
+                            WHEN MATCHED THEN
+                                UPDATE SET
+                                    c.CUMULATEDAMT = cc.CUMULATEDAMT,
+                                    c.CUMULATEDQTY = cc.CUMULATEDQTY,
+                                    c.CURRENTCOSTPRICE = cc.CURRENTCOSTPRICE,
+                                    c.CURRENTQTY = cc.CURRENTQTY,
+                                    c.UPDATED = sys_extract_utc(systimestamp),
+                                    c.UPDATEDBY = { userId} ";
+                }
+                else if (DB.IsPostgreSQL())
+                {
+                    sql = $@"
+                UPDATE M_Cost c
+                SET 
+                    CUMULATEDAMT = cc.CUMULATEDAMT,
+                    CUMULATEDQTY = cc.CUMULATEDQTY,
+                    CURRENTCOSTPRICE = cc.CURRENTCOSTPRICE,
+                    CURRENTQTY = cc.CURRENTQTY,
+                    UPDATED = NOW() at TIME zone 'UTC',
+                    UPDATEDBY = {userId}
+                FROM M_CostClosing cc
+                WHERE c.M_Cost_ID = cc.M_CostClosing_ID AND cc.M_CostElement_ID = {M_CostElement_ID}
+                  AND DATE_TRUNC('day', cc.Created) = {dateCondition}";
+                    if (!string.IsNullOrEmpty(productID))
+                    {
+                        sql += ($@" AND cc.M_Product_ID IN ({productID})");
+                    }
+                    else if (!string.IsNullOrEmpty(productCategoryID))
+                    {
+                        sql += ($@" AND cc.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
+                    }
+                }
+            }
+            return sql;
+        }
+
 
         /// <summary>
         /// we will update IsCostCalculation / IsReversedCostCalculation / IsCostImmediate on the Tansaction
@@ -3191,7 +3286,7 @@ namespace VAdvantage.Process
         {
             int M_CostElement_ID = 0;
             // get Costing element id where Costing Method is Standard Costing
-            if (DateFrom == null)
+            //if (DateFrom == null)
             {
                 sql.Clear();
                 sql.Append(@"SELECT M_CostElement_ID FROM M_CostElement ce ");
