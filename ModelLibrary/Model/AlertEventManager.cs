@@ -305,6 +305,26 @@ namespace VAdvantage.Alert
                     }
                 }
             }
+            int AD_User_ID_Rec = recipient.GetAD_User_ID();
+            if (AD_User_ID_Rec >= 0)		//	System == 0
+            {
+                users.Add(AD_User_ID_Rec);
+            }
+            int AD_Role_ID_Rec = recipient.GetAD_Role_ID();
+            if (AD_Role_ID_Rec >= 0)		//	SystemAdministrator == 0
+            {
+                MUserRoles[] urs = MUserRoles.GetOfRole(document.GetCtx(), AD_Role_ID_Rec);
+                for (int j = 0; j < urs.Length; j++)
+                {
+                    MUserRoles ur = urs[j];
+                    if (!ur.IsActive())
+                        continue;
+                    if (!users.Contains(ur.GetAD_User_ID()))
+                    {
+                        users.Add(ur.GetAD_User_ID());
+                    }
+                }
+            }
 
             List<FileInfo> files = new List<FileInfo>();
             if (attachment != null)
@@ -318,7 +338,7 @@ namespace VAdvantage.Alert
             else
             {
                 log.Info("Mail not send ");
-            }
+            }        
             return true;
         }
 
@@ -438,7 +458,7 @@ namespace VAdvantage.Alert
                                     log.Log(Level.SEVERE, "Failed to delete file: " + ex.Message);
                                 }
                             }
-                        }
+                        }                       
                     }
                 }
             }
