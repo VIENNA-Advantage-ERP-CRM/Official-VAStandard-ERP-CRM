@@ -645,7 +645,13 @@
                             $sqlContent.find($saveBtn).show();
                             $sqlContent.addClass('vas-grid-height');
                             var query = $selectQuery.text();
-                            getResult(query);
+                            var match = query.match(/\bFROM\b\s+([a-zA-Z0-9_."]+)/);
+                            if (match && match[1]) {
+                                mainTableName = match[1].replace(/"/g, ''); // remove quotes if any
+                                getResult(query);
+                            } else {
+                                VIS.ADialog.error("", "", VIS.Msg.getMsg("No table found"));
+                            }
                         }
                     }
                 }
@@ -2278,6 +2284,9 @@
                 UpdateColumnCtrl.hide();
                 txtFiledColumn.setValue(null);
                 getEventColumn(e.newValue);
+                txtIsUpdate.setReadOnly(false);
+                txtIsInsert.setReadOnly(false);
+                txtIsDelete.setReadOnly(false);
                 lblBottomMsg.text("");
             };
 
@@ -2287,6 +2296,11 @@
                 if (e.newValue) {
                     txtIsDelete.setValue(false);
                     txtIsUpdate.setValue(false);
+                    txtIsDelete.setReadOnly(true);
+                    txtIsUpdate.setReadOnly(true);
+                } else {
+                    txtIsDelete.setReadOnly(false);
+                    txtIsUpdate.setReadOnly(false);
                 }
                 lblBottomMsg.text("");
             };
@@ -2299,11 +2313,16 @@
                     if (tabID == 0) {
                         VIS.ADialog.error("", "", VIS.Msg.getMsg("VAS_EnterWindowTab"));
                     }
-                    getEventColumn(tabID);
+                    UpdateColumnCtrl.show();
                     txtIsInsert.setValue(false);
                     txtIsDelete.setValue(false);
-                    lblBottomMsg.text("");
+                    txtIsDelete.setReadOnly(true);
+                    txtIsInsert.setReadOnly(true);
+                } else {
+                    txtIsDelete.setReadOnly(false);
+                    txtIsInsert.setReadOnly(false);
                 }
+                lblBottomMsg.text("");
             };
 
             txtIsDelete.fireValueChanged = function (e) {
@@ -2313,6 +2332,11 @@
                 if (e.newValue) {
                     txtIsInsert.setValue(false);
                     txtIsUpdate.setValue(false);
+                    txtIsUpdate.setReadOnly(true);
+                    txtIsInsert.setReadOnly(true);
+                } else {
+                    txtIsUpdate.setReadOnly(false);
+                    txtIsInsert.setReadOnly(false);
                 }
             };
 
@@ -2336,7 +2360,8 @@
 
         function getEventColumn(tabID) {
             FiledColumnCtrl.empty();
-            var fieldlookup = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.MultiKey, "AD_Column_ID", 0, false, " AD_Column.IsActive='Y' AND AD_Column.AD_Column_ID IN (SELECT AD_Column_ID FROM AD_Field WHERE IsActive='Y' AND AD_Tab_ID= " + tabID + ")");
+            //txtFiledColumn.setValue(null);
+            var fieldlookup = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.MultiKey, "AD_Column_ID", 0, false, " AD_Column.IsActive='Y' AND FD.AD_Tab_ID= " + tabID);
             txtFiledColumn = new VIS.Controls.VTextBoxButton("AD_Column_ID", true, false, true, VIS.DisplayType.MultiKey, fieldlookup);
             var locDep = txtFiledColumn.getControl().attr('placeholder', ' Search here').attr("id", "AD_Column_ID").css("width", "100%").css("height", "100%");
             var DivSearchCtrlWrap = $('<div class="vas-control-wrap">');
@@ -2348,7 +2373,7 @@
             DivSearchBtnWrap.append(txtFiledColumn.getBtn(1));
             txtFiledColumn.setCustomInfo('VAS_AlertFieldColumn');
             txtFiledColumn.getControl().addClass("vis-ev-col-mandatory");
-            UpdateColumnCtrl.show();
+           // UpdateColumnCtrl.show();
         }
 
         function saveAlertRule() {
