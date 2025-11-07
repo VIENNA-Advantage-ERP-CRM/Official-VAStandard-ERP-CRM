@@ -153,76 +153,84 @@ namespace VIS.Models
             {
                 RecordList = new List<Dictionary<string, string>>() // Initialize the list
             };
-            query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            // query += " FETCH FIRST 100 ROWS ONLY";
-
-            VLogger.Get().Severe("Alert=" + query);
-
-            if (ValidateSql(query))
+            try
             {
-                DataSet ds = new DataSet();
+                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // query += " FETCH FIRST 100 ROWS ONLY";
 
-                //if (pageNo == 1)
-                //{
-                //    ds = DB.ExecuteDataset(query);
-                //}
-                //else
-                //{
-                //    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
-                //}
+                VLogger.Get().Severe("Alert=" + query);
 
-                string sql = "SELECT COUNT(*) FROM ( " + query + " )";
-
-                if (VAdvantage.DataBase.DatabaseType.IsPostgre)
-
+                if (ValidateSql(query))
                 {
-                    sql += " as SQLQuery ";
+                    DataSet ds = new DataSet();
 
-                }
-
-
-                int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
-
-                ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
-
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    DataTable table = ds.Tables[0];
-                    int rowCount = table.Rows.Count;
-                    int colCount = table.Columns.Count;
-
-                    //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
+                    //if (pageNo == 1)
                     //{
-                    //    results.TotalRecord = rowCount;
-                    //    rowCount = 100;
+                    //    ds = DB.ExecuteDataset(query);
                     //}
                     //else
                     //{
-                    //    results.TotalRecord = recordCount;
+                    //    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
                     //}
 
-                    results.TotalRecord = totalRec;
+                    string sql = "SELECT COUNT(*) FROM ( " + query + " )";
 
-                    for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
+                    if (VAdvantage.DataBase.DatabaseType.IsPostgre)
+
                     {
-                        Dictionary<string, string> rowResult = new Dictionary<string, string>();
-                        for (int colIndex = 0; colIndex < colCount; colIndex++)
-                        {
-                            rowResult["recid"] = Util.GetValueOfString(colIndex + 1);
-                            string columnName = table.Columns[colIndex].ColumnName;
-                            string columnValue = Util.GetValueOfString(table.Rows[rowIndex][columnName]);
-                            rowResult[columnName] = columnValue;
-                        }
-                        results.RecordList.Add(rowResult); // Add rowResult to the list
+                        sql += " as SQLQuery ";
+
                     }
 
-                    // results.TotalRecord = totatRecCount; // Set Totalrecord
-                    return results;
+
+                    int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+
+                    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
+
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataTable table = ds.Tables[0];
+                        int rowCount = table.Rows.Count;
+                        int colCount = table.Columns.Count;
+
+                        //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
+                        //{
+                        //    results.TotalRecord = rowCount;
+                        //    rowCount = 100;
+                        //}
+                        //else
+                        //{
+                        //    results.TotalRecord = recordCount;
+                        //}
+
+                        results.TotalRecord = totalRec;
+
+                        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
+                        {
+                            Dictionary<string, string> rowResult = new Dictionary<string, string>();
+                            for (int colIndex = 0; colIndex < colCount; colIndex++)
+                            {
+                                rowResult["recid"] = Util.GetValueOfString(colIndex + 1);
+                                string columnName = table.Columns[colIndex].ColumnName;
+                                string columnValue = Util.GetValueOfString(table.Rows[rowIndex][columnName]);
+                                rowResult[columnName] = columnValue;
+                            }
+                            results.RecordList.Add(rowResult); // Add rowResult to the list
+                        }
+
+                        // results.TotalRecord = totatRecCount; // Set Totalrecord
+                        return results;
+                    }
+                    else
+                    {
+                        return results;
+                    }
                 }
-                else
-                {
-                    return results;
-                }
+            }
+            catch (Exception e)
+            {
+                VAdvantage.Logging.VLogger.Get().Severe(e.Message);
+                return null;
             }
             return null;
         }
