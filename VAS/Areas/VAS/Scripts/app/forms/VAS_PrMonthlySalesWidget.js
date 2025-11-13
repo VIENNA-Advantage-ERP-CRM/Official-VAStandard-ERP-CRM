@@ -26,6 +26,7 @@
         var $vOrg;
 
         function createStructure(widgetID) {
+            var currentYear = new Date().getFullYear();
             var $contentContainer = $('<div class="VAS-org-unitsales-col VAS-content-container vis-formouterwrpdiv">' +
                 '<div class="VAS-sales-heading">' + VIS.Msg.getMsg("VAS_HighestSellingProduct") + '</div>' +
                 '<div class="VAS-organization-block">' +
@@ -36,12 +37,12 @@
                 '<div class="VAS-salesGraph-heading"><span id="VAS_ProductRank_' + widgetID + '">#1</span>&nbsp<span id="VAS_ProductName_' + widgetID + '"> Product Name</span></div>' +
                 '<div class="VAS-totalSales-col">' +
                 '<div class="VAS-startSale-box">' +
-                '<div class="VAS-yearTxt"><span>2023<span></div>' +
+                '<div class="VAS-yearTxt"><span>' + currentYear - 1 + '<span></div>' +
                 '<div class="VAS-totalSale"><span id="VAS_LastYearSales_' + widgetID + '">520 €</span></div>' +
                 '</div>' +
                 '<div class="VAS-endSale-box">' +
                 '<div class="VAS-yearSale-col">' +
-                '<div class="VAS-yearTxt"><span>2024<span></div>' +
+                '<div class="VAS-yearTxt"><span>' + currentYear + '<span></div>' +
                 '<div class="VAS-totalSale"><span id="VAS_CurrentSales_' + widgetID + '">520 €</span></div>' +
                 '</div>' +
                 '<div class="VAS-graph-result">' +
@@ -66,18 +67,18 @@
             $lookupOrg = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.Search, "AD_Org_ID", 0, false, sqlWHERE);
             $vOrg = new VIS.Controls.VTextBoxButton("AD_Org_ID", false, false, true, VIS.DisplayType.Search, $lookupOrg);
 
-        /*    $orgButtonWrap = $('<div class="input-group-append">');*/
+            /*    $orgButtonWrap = $('<div class="input-group-append">');*/
             $orgControlWrap = $('<div class="vis-control-wrap">');
             orgDivInputWrap.append($orgControlWrap);
             $orgControlWrap.append($vOrg.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_OrgUnit") + '</label><span class= "vis-ev-ctrlinfowrap"</span>');
 
             /*    $orgButtonWrap.append($vOrg.getBtn(0));*/
-           /* orgDivInputWrap.append($orgButtonWrap);*/
+            /* orgDivInputWrap.append($orgButtonWrap);*/
             orgControlDiv.append(orgDivInputWrap);
 
             $vOrg.fireValueChanged = function () {
                 OrganizationUnit = $vOrg.getValue() == null ? 0 : $vOrg.getValue();
-               
+
                 $self.intialLoad();
             }
         }
