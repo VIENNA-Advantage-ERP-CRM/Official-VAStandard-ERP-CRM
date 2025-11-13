@@ -27,6 +27,7 @@
 
         function createStructure(widgetID) {
             var currentYear = new Date().getFullYear();
+            var lastYear = currentYear - 1;
             var $contentContainer = $('<div class="VAS-org-lowest-unitsales-col VAS-content-container vis-formouterwrpdiv">' +
                 '<div class="VAS-sales-heading">' + VIS.Msg.getMsg("VAS_LowestSellingProduct") + '</div>' +
                 '<div class="VAS-organization-block">' +
@@ -37,7 +38,7 @@
                 '<div class="VAS-salesGraph-heading"><span id="VAS_ProductRank_' + widgetID + '">#1</span>&nbsp<span id="VAS_ProductName_' + widgetID + '"> Product Name</span></div>' +
                 '<div class="VAS-totalSales-col">' +
                 '<div class="VAS-startSale-box">' +
-                '<div class="VAS-yearTxt"><span>' + currentYear - 1 + '<span></div>' +
+                '<div class="VAS-yearTxt"><span>' + lastYear + '<span></div>' +
                 '<div class="VAS-totalSale"><span id="VAS_LastYearSales_' + widgetID + '">520 €</span></div>' +
                 '</div>' +
                 '<div class="VAS-endSale-box">' +
