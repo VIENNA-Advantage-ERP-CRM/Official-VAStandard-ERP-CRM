@@ -243,6 +243,7 @@
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
+    <Content Include="Areas\VAS\Content\src\VAScss.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
@@ -345,10 +346,14 @@
     <Content Include="Areas\VAS\Scripts\model\calloutTerm.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
+    <Content Include="Areas\VAS\Scripts\src\reactjs.js" />
+    <Content Include="Areas\VAS\Scripts\src\VASjs.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
     <Content Include="Areas\VAS\Views\web.config" />
     <Content Include="Areas\VAS\Views\PaymentAllocation\Index.cshtml" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpRevProfitWidget.js" />
+    <Content Include="babel.config.json" />
+    <Content Include="package.json" />
     <None Include="packages.config" />
     <Content Include="Areas\VAS\Scripts\app\forms\acctviewer.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\acctviewermenu.js" />
@@ -371,6 +376,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\vpayselect.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vtrxmaterial.js" />
     <Content Include="Areas\VAS\Scripts\model\callouts.js" />
+    <Content Include="webpack.config.js" />
     <Content Include="web.config" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
@@ -381,6 +387,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Areas\VAS\Data\" />
+    <Folder Include="Areas\VAS\Scripts\dist\" />
     <Folder Include="Areas\VAS\Views\AlertRuleSQLGenerate\" />
     <Folder Include="Areas\VAS\Views\OrderLineTabPanel\" />
     <Folder Include="Areas\VAS\Views\Shared\" />
@@ -414,7 +421,11 @@
     </VisualStudio>
   </ProjectExtensions>
   <PropertyGroup>
-    <PostBuildEvent>xcopy /E /Y /I  "$(ProjectDir)Areas\*" "$(ProjectDir)..\ViennaAdvantageWeb\Areas"</PostBuildEvent>
+    <PostBuildEvent>rmdir /s /q "$(SolutionDir)\ViennaAdvantageWeb\Areas\$(TargetName)"
+xcopy /E /Y /I  "$(ProjectDir)Areas\*" "$(ProjectDir)..\ViennaAdvantageWeb\Areas"</PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>npm run build</PreBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
        Other similar extension points exist, see Microsoft.Common.targets.
