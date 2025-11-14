@@ -1,0 +1,14 @@
+﻿@import "../PaymentRule.css";
+@import "../style.css";
+@import "../PoReceiptTabPanel.css";
+@import "../VPaySelect.css";
+@import "../vasattachuser.css";
+@import "../VAS_PurchaseOrderTabPanel.css";
+@import "../VAS_ProductUomSetup.css";
+@import "../VAS_ProductWidgets.css";
+@import "../VAS_BankBalance.css";
+@import "../VAS_CashBalance.css";
+@import "../VAS_InventoryLines.css";
+@import "../VAS_HighestSellingWidget.css";
+@import "../VAS_ExpectedDeliveryWidget.css";
+@import "../VAS_LeadConversation.css";
