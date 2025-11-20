@@ -629,7 +629,7 @@ namespace VAdvantage.Alert
 
         <tr>
           <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px; text-align: center;'>
-            <p style='font-size: 12px; color: #64748b; margin: 0; line-height: 1.5;'>{Msg.Translate(document.GetCtx(), "VAS_AutomatedNotification")}<br>{Msg.Translate(document.GetCtx(), "VAS_NotReply")}</p>
+            <p style='font-size: 12px; color: #64748b; margin: 0; line-height: 1.5;'>{Msg.Translate(document.GetCtx(), "VAS_AutomatedNotification")}<br>{Msg.Translate(document.GetCtx(), "VAS_NotReply")}<br>{Msg.Translate(document.GetCtx(), "VAS_NullFieldNotDisplay")}</p>
           </td>
         </tr>
       </table>
