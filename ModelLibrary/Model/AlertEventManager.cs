@@ -14,6 +14,8 @@ using VAdvantage.Logging;
 using System.IO;
 using System.Linq;
 using VAdvantage.Utility;
+using System.Text;
+using VAdvantage.Classes;
 
 namespace VAdvantage.Alert
 {
@@ -73,13 +75,20 @@ namespace VAdvantage.Alert
                 return false;
             }
             Ctx ctx = document.GetCtx();
-            MAlert[] alerts = MAlert.GetAlertValue(ctx, document.GetAD_Client_ID(), tableID);
-            if (alerts == null || alerts.Length == 0)
-                return false;
-            for (int i = 0; i < alerts.Length; i++)
+            if (ctx != null)
             {
-                MAlert alert = alerts[i];
-                started = AlertRuleActivity(alert,document, pinfo,  eventType);
+                MAlert[] alerts = MAlert.GetAlertValue(ctx, document.GetAD_Client_ID(), tableID);
+                if (alerts == null || alerts.Length == 0)
+                    return false;
+                for (int i = 0; i < alerts.Length; i++)
+                {
+                    MAlert alert = alerts[i];
+                    started = AlertRuleActivity(alert, document, pinfo, eventType);
+                }
+            }
+            else
+            {
+                log.Info("context is null");
             }
             return started;
         }
@@ -134,12 +143,18 @@ namespace VAdvantage.Alert
                 }
 
                 MAlertRecipient[] recipients = alert.GetRecipients(false);
-                for (int i = 0; i < recipients.Length; i++)
+                if (recipients.Length > 0)
                 {
-                    for (int j = 0; j < ruleDetails.Count; j++)
+                    for (int i = 0; i < recipients.Length; i++)
                     {
-                        EventAlertProcessing(recipients[i], ruleDetails[j], document,pinfo,  eventType);
+                        for (int j = 0; j < ruleDetails.Count; j++)
+                        {
+                            EventAlertProcessing(recipients[i], ruleDetails[j], document, pinfo, eventType);
+                        }
                     }
+                }
+                else {
+                    log.Severe("Recipient Not Found");
                 }
             }
             catch (Exception e)
@@ -151,143 +166,166 @@ namespace VAdvantage.Alert
         }
 
         /// <summary>
-        /// Getting data
+        /// Getting FieldNames By ColumnName
         /// </summary>
-        /// <param name="ctx">context</param>
-        /// <param name="recipient">recipient</param>
-        /// <param name="rule">rule</param>
-        /// <param name="document">PO</param>
+        /// <param name="tabID">tabID</param>
         /// <returns></returns>
+        /// <summary>
+        /// Returns a mapping of ColumnName → FieldName for the given AD_Tab_ID
+        /// </summary>
+        public Dictionary<string, string> GetFieldNamesByColumnName(int tabID)
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+
+            string sql = @"
+        SELECT c.ColumnName, f.Name AS FieldName
+        FROM AD_Field f
+        INNER JOIN AD_Column c ON c.AD_Column_ID = f.AD_Column_ID
+        WHERE f.AD_Tab_ID = " + tabID + @" 
+          AND f.IsActive = 'Y'";
+
+            DataSet ds = DB.ExecuteDataset(sql);
+
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow row in ds.Tables[0].Rows)
+                {
+                    string colName = Util.GetValueOfString(row["ColumnName"]);
+                    string fieldName = Util.GetValueOfString(row["FieldName"]);
+
+                    if (!map.ContainsKey(colName))
+                        map.Add(colName, fieldName);
+                }
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// Email Alert Process
+        /// </summary>
+        /// <param name="recipient">Alert Recipient</param>
+        /// <param name="rule">Alert Rule</param>
+        /// <param name="document">document</param>
+        /// <param name="pinfo">PO info</param>
+        /// <param name="eventType">Event type</param>
+        /// <returns>true/false</returns>
         public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)
         {
             string windowName = "";
             string tabName = "";
             string subject = "";
-            string msg = "";
             List<List<object>> data = new List<List<object>>();
-            List<object> header = new List<object>();
             FileInfo attachment = null;
+
             eventType = eventType.ToUpper();
-            if (eventType.Equals("DELETE"))
-            {
-                string query = @"SELECT AD_Tab.Name AS TabName, AD_Window.Name AS WindowName FROM AD_Tab INNER JOIN AD_Window ON AD_Window.AD_WINDOW_ID = AD_Tab.AD_Window_ID  ";
-                if (document.GetTableName().Equals("GL_Journal"))
-                {
-                    query += " WHERE AD_Window.Name = " +
-                        "CASE WHEN(SELECT NVL(GL_JournalBatch_ID, 0) FROM GL_Journal WHERE GL_Journal_ID = " + document.Get_ID() + ") = 0 " +
-                        "THEN 'GL Journal Line' ELSE 'GL Journal' END AND AD_Tab.AD_Table_ID = " + tableID;
-                }
-                else
-                {
-                    query += " WHERE AD_Tab.AD_Table_ID = " + tableID;
-                }
-                DataSet ds = DB.ExecuteDataset(query);
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    windowName = Util.GetValueOfString(ds.Tables[0].Rows[0]["WindowName"]);
-                    tabName = Util.GetValueOfString(ds.Tables[0].Rows[0]["TabName"]);
-                }
-            }
-            else
+            int tableID = pinfo.GetAD_Table_ID();
+
+            // -----------------------------------------
+            // 1. WINDOW & TAB NAME FETCH
+            // -----------------------------------------
+            if (document.GetAD_Window_ID() > 0 && document.GetWindowTabID() > 0)
             {
                 windowName = Util.GetValueOfString(DB.ExecuteScalar(
-                    "SELECT Name FROM AD_Window WHERE AD_Window_ID=" + document.GetAD_Window_ID()));
+                    "SELECT DisplayName FROM AD_Window WHERE AD_Window_ID=" + document.GetAD_Window_ID()));
                 tabName = Util.GetValueOfString(DB.ExecuteScalar(
                     "SELECT Name FROM AD_Tab WHERE AD_Tab_ID=" + document.GetWindowTabID()));
             }
+            else {
+                log.Severe("Window and tab ID not found");
+                return false;
+            }
+            
+            // -----------------------------------------------------
+            // 2. FETCH FIELDNAME MAP (ColumnName → FieldName)
+            // -----------------------------------------------------
+            Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
 
+            // -----------------------------------------------------
+            // 3. INSERT CASE
+            // -----------------------------------------------------
             if (eventType.Equals("INSERT") && rule.IsInsert)
             {
-                subject = "New Record Created Notification - " + windowName;
-                msg = "Hello Team,\n\nA new record has been created\n\n"
-                    + "Window: " + windowName + "\nTab: " + tabName
-                    + "\nRecord ID: " + document.Get_ID();
-
-                header.Add("Field Name");
-                header.Add("Value");
-                data.Add(header);
-
+                subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowName;
                 for (int i = 0; i < document.Get_ColumnCount(); i++)
                 {
+                    string col = document.Get_ColumnName(i);
+                    string fieldName = fieldMap.ContainsKey(col) ? fieldMap[col] : col;
                     List<object> row = new List<object>();
-                    row.Add(document.Get_ColumnName(i));
+                    row.Add(fieldName);
                     row.Add(document.Get_ValueOld(i));
                     data.Add(row);
                 }
-
-                attachment = CreateCSVFile(data);
             }
+
+            // -----------------------------------------------------
+            // 4. UPDATE CASE
+            // -----------------------------------------------------
             else if (eventType.Equals("UPDATE") && rule.IsUpdate)
             {
                 List<string> updatedColumn = new List<string>();
+
                 for (int i = 0; i < pinfo.GetColumnCount(); i++)
                 {
-                    bool ischanges = document.Is_ValueChanged(i);
-                    if (ischanges && !pinfo.IsVirtualColumn(i))
+                    bool isChanged = document.Is_ValueChanged(i);
+
+                    if (isChanged && !pinfo.IsVirtualColumn(i))
                     {
-                        int ColumnId = pinfo.GetColumn(i).AD_Column_ID;
-                        if (rule.ColumnIds.Contains(ColumnId))
+                        int colID = pinfo.GetColumn(i).AD_Column_ID;
+                        if (rule.ColumnIds.Contains(colID))
                         {
                             updatedColumn.Add(pinfo.GetColumnName(i));
                         }
                     }
-
                 }
 
                 if (updatedColumn.Count > 0)
                 {
-                    string columnName = string.Join(", ", updatedColumn);
-                    subject = "Record Update Notification - " + windowName;
-                    msg = "Hello Team,\n\nA record has been updated: " + columnName + "\n\n"
-                        + "Window: " + windowName + "\nTab: " + tabName
-                        + "\nRecord ID: " + document.Get_ID();
-
-                    header.Add("Field Name");
-                    header.Add("Old Value");
-                    header.Add("New Value");
-                    data.Add(header);
-
+                    subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowName;
                     for (int i = 0; i < document.Get_ColumnCount(); i++)
                     {
                         string colName = document.Get_ColumnName(i);
+
                         if (updatedColumn.Contains(colName))
                         {
+                            string fieldName = fieldMap.ContainsKey(colName) ? fieldMap[colName] : colName;
+
                             List<object> row = new List<object>();
-                            row.Add(colName);
+                            row.Add(fieldName);
                             row.Add(document.Get_ValueOld(i));
                             row.Add(document.Get_Value(i));
                             data.Add(row);
                         }
                     }
-
-                    attachment = CreateCSVFile(data);
                 }
             }
+
+            // -----------------------------------------------------
+            // 5. DELETE CASE
+            // -----------------------------------------------------
             else if (eventType.Equals("DELETE") && rule.IsDeleted)
             {
-                subject = "Record Deleted Notification - " + windowName;
-                msg = "Hello Team,\n\nA record has been deleted\n\n"
-                    + "Window: " + windowName + "\nTab: " + tabName
-                    + "\nRecord ID: " + document.Get_IDOld();
-
-                header.Add("Field Name");
-                header.Add("Value");
-                data.Add(header);
-
+                subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowName;
                 for (int i = 0; i < document.Get_ColumnCount(); i++)
                 {
+                    string col = document.Get_ColumnName(i);
+                    string fieldName = fieldMap.ContainsKey(col) ? fieldMap[col] : col;
                     List<object> row = new List<object>();
-                    row.Add(document.Get_ColumnName(i));
+                    row.Add(fieldName);
                     row.Add(document.Get_ValueOld(i));
                     data.Add(row);
                 }
-
-                attachment = CreateCSVFile(data);
             }
 
+            // -----------------------------------------------------
+            // 6. IF NO SUBJECT → NO PROCESS
+            // -----------------------------------------------------
             if (string.IsNullOrEmpty(subject))
                 return false;
 
+            // -----------------------------------------------------
+            // 7. COLLECT USERS (same as your code)
+            // -----------------------------------------------------
             List<int> users = new List<int>();
             int notificationTo = Util.GetValueOfInt(recipient.Get_Value("AD_Column_ID"));
             if (notificationTo > 0)
@@ -305,75 +343,341 @@ namespace VAdvantage.Alert
                     }
                 }
             }
+
             int AD_User_ID_Rec = recipient.GetAD_User_ID();
-            if (AD_User_ID_Rec >= 0)		//	System == 0
-            {
+            if (AD_User_ID_Rec >= 0)
                 users.Add(AD_User_ID_Rec);
-            }
+
             int AD_Role_ID_Rec = recipient.GetAD_Role_ID();
-            if (AD_Role_ID_Rec >= 0)		//	SystemAdministrator == 0
+            if (AD_Role_ID_Rec >= 0)
             {
                 MUserRoles[] urs = MUserRoles.GetOfRole(document.GetCtx(), AD_Role_ID_Rec);
                 for (int j = 0; j < urs.Length; j++)
                 {
                     MUserRoles ur = urs[j];
-                    if (!ur.IsActive())
-                        continue;
-                    if (!users.Contains(ur.GetAD_User_ID()))
-                    {
+                    if (ur.IsActive() && !users.Contains(ur.GetAD_User_ID()))
                         users.Add(ur.GetAD_User_ID());
-                    }
                 }
             }
 
+            // -----------------------------------------------------
+            // 8. SEND EMAIL
+            // -----------------------------------------------------
             List<FileInfo> files = new List<FileInfo>();
             if (attachment != null)
                 files.Add(attachment);
 
-            int count = SendInfo(document.GetCtx(), users, subject, msg, files);
+            string htmlBody = GenerateHtmlEmail(windowName, tabName, document, eventType, data);
+
+            int count = SendInfoHTML(document.GetCtx(), users, subject, htmlBody);
+
             if (count > 0)
-            {
-                log.Info("Mail Sucessfully send to " + count + " user");
-            }
+                log.Info("Mail Successfully sent to " + count + " user");
             else
-            {
-                log.Info("Mail not send ");
-            }        
+                log.Info("Mail not sent");
+
             return true;
         }
 
         /// <summary>
-        /// Create CSV File
+        /// Send Mail
         /// </summary>
-        /// <param name="data">data</param>
-        /// <returns></returns>
-        public FileInfo CreateCSVFile(List<List<object>> data)
+        /// <param name="ctx">context</param>
+        /// <param name="recipientUsers">recipientUsers</param>
+        /// <param name="subject">subject</param>
+        /// <param name="htmlBody">htmlBody</param>
+        /// <returns>count</returns>
+        public int SendInfoHTML(Ctx ctx, List<int> recipientUsers, string subject, string htmlBody)
         {
-            Random rndm = new Random();
-            string path = "Alert_" + DateTime.Now.Ticks + "_" + rndm.Next(0, 9999);
-            string filePath = GlobalVariable.PhysicalPath + "TempDownload";
-            if (!Directory.Exists(filePath))
-                Directory.CreateDirectory(filePath);
-            string fileName = filePath + "\\" + path + ".csv";
-            using (StreamWriter writer = new StreamWriter(fileName))
+            int countMail = 0;
+
+            // Step 1: Build a map of unique emails → user_id
+            Dictionary<string, int> uniqueEmailUsers = new Dictionary<string, int>();
+
+            foreach (int user_id in recipientUsers)
             {
-                for (int i = 0; i < data.Count; i++)
+                MUser user = MUser.Get(ctx, user_id);
+
+                string emailAddr = user.GetEMail();
+
+                // Ignore blank or null email
+                if (string.IsNullOrEmpty(emailAddr))
+                    continue;
+
+                // Add only if email not already present
+                if (!uniqueEmailUsers.ContainsKey(emailAddr))
                 {
-                    List<object> row = data[i];
-                    List<string> fields = new List<string>();
-                    for (int j = 0; j < row.Count; j++)
-                    {
-                        string field = row[j] != null ? row[j].ToString() : "";
-                        if (field.Contains(",") || field.Contains("\"") || field.Contains("\n"))
-                        {
-                            field = "\"" + field.Replace("\"", "\"\"") + "\"";
-                        }
-                        fields.Add(field);
-                    }
-                    writer.WriteLine(string.Join(",", fields));
+                    uniqueEmailUsers[emailAddr] = user_id;
                 }
             }
-            return new FileInfo(fileName);
+
+            if (uniqueEmailUsers.Count == 0)
+            {
+                log.Info("No valid email recipients found");
+                return 0;
+            }
+
+            // Step 2: Send only once per unique email address
+            foreach (var item in uniqueEmailUsers)
+            {
+                int user_id = item.Value;
+                MUser user = MUser.Get(ctx, user_id);
+                MClient m_client = MClient.Get(ctx, ctx.GetAD_Client_ID());
+
+                if (user.IsNotificationEMail() ||
+                    user.GetNotificationType() == X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice)
+                {
+                    EMail email = m_client.CreateEMail(null, user, subject, htmlBody, true);
+                    if (email != null)
+                    {
+                        email.SetCtx(ctx);
+                        string msg = email.Send();
+                        log.Info("Email Message => " + msg);
+
+                        if (msg == EMail.SENT_OK)
+                            countMail++;
+                    }
+                }
+            }
+            return countMail;
+        }
+
+        /// <summary>
+        /// Generate HTML Email text
+        /// </summary>
+        /// <param name="windowName">Window Name</param>
+        /// <param name="tabName">Tab Name</param>
+        /// <param name="document">document</param>
+        /// <param name="eventType">Event Type</param>
+        /// <param name="data">Data</param>
+        /// <returns>Email HTML body</returns>
+        public string GenerateHtmlEmail(string windowName, string tabName, PO document, string eventType, List<List<object>> data)
+        {
+            string recordType = eventType.Equals("INSERT") ? Msg.Translate(document.GetCtx(), "Added") :
+                                eventType.Equals("UPDATE") ? Msg.Translate(document.GetCtx(), "Updated") : Msg.Translate(document.GetCtx(), "Deleted");
+
+            string recordAction = eventType.Equals("INSERT") ? Msg.Translate(document.GetCtx(), "VAS_NewRecordAdded") :
+                                  eventType.Equals("UPDATE") ? Msg.Translate(document.GetCtx(), "VAS_RecordUpdated") : Msg.Translate(document.GetCtx(), "RecordDeleted");
+
+            string performerName = document.GetCtx().GetAD_User_Name();
+
+            SimpleDateFormat df = DisplayType.GetDateFormat(DisplayType.DateTime);
+            string recordTime = Msg.Translate(document.GetCtx(), "Date") + (" : ") + (df.Format(DateTime.Now));
+
+            StringBuilder detailRows = new StringBuilder();
+
+            // Build table rows dynamically
+            if (data != null && data.Count > 1)
+            {
+                for (int i = 1; i < data.Count; i++)
+                {
+                    var row = data[i];
+                    string field = row.Count > 0 ? Util.GetValueOfString(row[0]) : "";
+
+                    if (eventType.Equals("UPDATE") && row.Count > 2)
+                    {
+                        string oldVal = Util.GetValueOfString(row[1]);
+                        string newVal = Util.GetValueOfString(row[2]);
+                        detailRows.Append($@"
+                <tr>
+                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>
+                    <td style='font-size: 14px; color: #b91c1c; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{oldVal}</td>
+                    <td style='font-size: 14px; color: #16a34a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{newVal}</td>
+                </tr>");
+                    }
+                    else
+                    {
+                        string value = row.Count > 1 ? Util.GetValueOfString(row[1]) : "";
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            detailRows.Append($@"
+                <tr>
+                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>
+                    <td style='font-size: 14px; color: #0f172a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{value}</td>
+                </tr>");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                detailRows.Append("<tr><td colspan='3' style='text-align:center; padding:8px; color:#94a3b8;'>No details available</td></tr>");
+            }
+
+            // Header columns
+            string headerColumns = eventType.Equals("UPDATE")
+                ? "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "OldValue") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "NewValue") + "</th>"
+                : "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "VAS_Value") + "</th>";
+
+            // Record Window Details section (common)
+            string recordDetailsSection = $@"
+    <div style='background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;'>
+        <div style='background-color: #f1f5f9; padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #0f172a;'>{Msg.Translate(document.GetCtx(), "VAS_RecordDetails")}</div>
+        <div style='padding: 16px; font-size: 14px; color: #334155;'>
+            <p style='margin: 4px 0;'><strong>Window Name:</strong> {windowName}</p>
+            <p style='margin: 4px 0;'><strong>Tab Name:</strong> {tabName}</p>
+            <p style='margin: 4px 0;'><strong>Record ID:</strong> {document.Get_ID()}</p>
+        </div>
+    </div>";
+
+            // Changes or Record section
+            string recordOrChangeSection = eventType.Equals("UPDATE")
+                ? $@"
+    <div style='background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 24px;'>
+        <div style='background-color: #dcfce7; padding: 12px; border-bottom: 1px solid #bbf7d0; font-weight: bold; color: #166534;'>{Msg.Translate(document.GetCtx(), "VAS_ChangesMade")}</div>
+        <div style='padding: 16px;'>
+            <table cellpadding='8' cellspacing='0' border='0' style='width: 100%; background-color: #fff; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: collapse;'>
+                <thead style='background-color: #f8fafc;'>{headerColumns}</thead>
+                <tbody>{detailRows}</tbody>
+            </table>
+        </div>
+    </div>"
+                : $@"
+    <div style='margin-bottom: 24px;'>
+        <h3 style='color: #0f172a; font-size: 16px; font-weight: bold; margin: 0 0 12px;'>{(eventType.Equals("INSERT") ? Msg.Translate(document.GetCtx(), "VAS_AddedFieldValues") : Msg.Translate(document.GetCtx(), "VAS_DeletedFieldValues"))}</h3>
+        <table cellpadding='8' cellspacing='0' border='0' style='width: 100%; background-color: #fff; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: collapse;'>
+            <thead style='background-color: #f8fafc;'>{headerColumns}</thead>
+            <tbody>{detailRows}</tbody>
+        </table>
+    </div>";
+
+            // ✅ Dynamic header icon and color setup
+            string iconSymbol, iconBgColor, iconColor,borderColor;
+            if (eventType.Equals("INSERT"))
+            {
+                iconSymbol = "✓";
+                iconBgColor = "rgb(220, 252, 231)";
+                iconColor = "rgb(22, 163, 74)";
+                borderColor = "rgb(187, 247, 208)";
+            }
+            else if (eventType.Equals("UPDATE"))
+            {
+                iconSymbol = "✎";
+                iconBgColor = "rgb(219, 234, 254)";
+                iconColor = "rgb(37, 99, 235)";
+                borderColor = "rgb(191, 219, 254)";
+            }
+            else
+            {
+                iconSymbol = "✕";
+                iconBgColor = "rgb(254, 226, 226)";
+                iconColor = "rgb(220, 38, 38)";
+                borderColor = "rgb(254, 202, 202)";
+            }
+            string performerImageUrl = GetUserImageUrl(document.GetCtx(), document.GetCtx().GetAD_User_ID());
+
+            // Full HTML email
+            string html = $@"
+    <div style='font-family: Arial, sans-serif; line-height: 1.5; border: none;'>
+      <table cellpadding='0' cellspacing='0' border='0' style='width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff;'>
+        <tr>
+          <td style='background-color: #1e293b; padding: 24px;'>
+            <table cellpadding='0' cellspacing='0' border='0' style='width: 100%;'>
+              <tr>
+                <td style='width: 40px; vertical-align: top;'>
+                  <div style='width: 40px; height: 40px; background-color: {iconBgColor}; border-radius: 8px; text-align: center; line-height: 40px; font-size: 20px; color: {iconColor};'>{iconSymbol}</div>
+                </td>
+                <td style='padding-left: 12px; vertical-align: middle;'>
+                  <h1 style='margin: 0; color: #fff; font-size: 20px; font-weight: bold;'>{recordAction}</h1>
+                  <p style='margin: 0; color: #cbd5e1; font-size: 14px;'>{Msg.Translate(document.GetCtx(), "VAS_SystemNotification")}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style='padding: 24px;'>
+            <table cellpadding='0' cellspacing='0' border='0' style='margin-bottom: 16px;'>
+              <tr>
+                <td>
+                  <span style='display: inline-block; background-color: {(eventType.Equals("INSERT") ? "rgb(34,197,94)" : eventType.Equals("UPDATE") ? "rgb(59,130,246)" : "rgb(239,68,68)")}; color: #fff; font-size: 11px; font-weight: bold; text-transform: uppercase; padding: 4px 12px; border-radius: 4px;'>{recordType}</span>
+                  <span style='color: #64748b; font-size: 14px; margin-left: 8px;'>{tabName} {Msg.Translate(document.GetCtx(), "Record")}</span>
+                </td>
+              </tr>
+            </table>
+
+            <h2 style='color: #0f172a; font-size: 18px; font-weight: bold; margin: 0 0 16px;'>{Msg.Translate(document.GetCtx(), "Window")}: {windowName}</h2>
+
+            <table cellpadding='0' cellspacing='0' border='0' style='width: 100%; background-color: {iconBgColor}; border: 1px solid {borderColor}; border-radius: 8px; margin-bottom: 24px;'>
+              <tr>
+                <td style='padding: 16px;'>
+                  <table cellpadding='0' cellspacing='0' border='0' style='width: 100%;'>
+                    <tr>
+                      <td style='width: 32px; vertical-align: top;'>
+                        <img src='{performerImageUrl}' 
+     alt='User' style='width: 32px; height: 32px; border-radius: 50%; display: block;'>
+                      </td>
+                      <td style='padding-left: 12px; vertical-align: middle;'>
+                        <div style='font-size: 14px; color: #475569;'>{Msg.Translate(document.GetCtx(), "VAS_Performeby")}</div>
+                        <div style='font-size: 14px; color: #0f172a; font-weight: bold; margin: 2px 0;'>{performerName}</div>
+                      </td>
+                    </tr>
+                  </table>
+                  <div style='height: 1px; background-color: #e2e8f0; margin: 12px 0;'></div>
+                  <div style='font-size: 14px;'>
+                    <span style='color: #0f172a;'>{recordTime}</span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            {recordDetailsSection}
+            {recordOrChangeSection}
+          </td>
+        </tr>
+
+        <tr>
+          <td style='background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px; text-align: center;'>
+            <p style='font-size: 12px; color: #64748b; margin: 0; line-height: 1.5;'>{Msg.Translate(document.GetCtx(), "VAS_AutomatedNotification")}<br>{Msg.Translate(document.GetCtx(), "VAS_NotReply")}</p>
+          </td>
+        </tr>
+      </table>
+    </div>";
+
+            return html;
+        }
+
+        /// <summary>
+        /// Get User Image URL
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="userId">AD_User_ID</param>
+        /// <returns>URL</returns>
+        private string GetUserImageUrl(Ctx ctx, int userId)
+        {
+            MUser user = MUser.Get(ctx, userId);
+
+            // If user has image
+            if (user != null && user.GetAD_Image_ID() > 0)
+            {
+                MImage img = MImage.Get(ctx, user.GetAD_Image_ID());
+                if (img != null && !string.IsNullOrEmpty(img.GetImageURL()))
+                {
+                    return ctx.GetApplicationUrl() + img.GetImageURL();
+                }
+                else if (img.GetBinaryData() != null)
+                {
+                    return "data:image/*;base64, " + Convert.ToBase64String((byte[])img.GetBinaryData());
+                }
+            }
+
+            // Fallback SVG if no image URL found
+            string firstLetter = user != null
+                ? user.GetName().Substring(0, 1).ToUpper()
+                : "U";
+
+            string svg = $@"
+<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'>
+    <circle cx='32' cy='32' r='32' fill='#6366f1'/>
+    <text x='50%' y='50%' font-size='28' fill='white' dy='.3em'
+          text-anchor='middle' font-family='Arial'>
+        {firstLetter}
+    </text>
+</svg>";
+
+            string base64Svg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svg));
+            return $"data:image/svg+xml;base64,{base64Svg}";
         }
 
         /// <summary>
@@ -397,72 +701,6 @@ namespace VAdvantage.Alert
                 }
             }
             return true;
-        }
-
-        /// <summary>
-        /// Send Mail
-        /// </summary>
-        /// <param name="ctx">context</param>
-        /// <param name="recipientUsers">recipientUsers</param>
-        /// <param name="subject">subject</param>
-        /// <param name="message">message</param>
-        /// <param name="attachments">attachments</param>
-        /// <returns></returns>
-        public int SendInfo(Ctx ctx, List<int> recipientUsers, string subject, string message, List<FileInfo> attachments)
-        {
-            int countMail = 0;
-            if (recipientUsers.Count == 0)
-            {
-                log.Info("No Recipient Found");
-                return 0;
-            }
-            foreach (int user_id in recipientUsers)
-            {
-                MClient m_client = MClient.Get(ctx, ctx.GetAD_Client_ID());
-                MUser user = MUser.Get(ctx, user_id);
-                if (user.IsNotificationEMail() || user.GetNotificationType() == X_AD_User.NOTIFICATIONTYPE_EMailPlusNotice)
-                {
-                    {
-                        EMail email = m_client.CreateEMail(null, user, subject, message, false);
-                        if (email != null)
-                        {
-                            email.SetCtx(ctx);
-
-                            log.Info(email.ToString());
-                            foreach (FileInfo f in attachments)
-                            {
-                                email.AddAttachment(f);
-                            }
-                            string msg = email.Send();
-                            log.Info("EMail Msg =>" + msg);
-                            if (msg == EMail.SENT_OK)
-                            {
-                                try
-                                {
-                                    if (attachments != null && attachments.Count > 0)
-                                    {
-                                        foreach (FileInfo file in attachments)
-                                        {
-                                            if (file.Exists)
-                                            {
-                                                file.Delete();
-                                                log.Info("Deleted file: " + file.FullName);
-                                            }
-                                        }
-                                    }
-
-                                    countMail++;
-                                }
-                                catch (Exception ex)
-                                {
-                                    log.Log(Level.SEVERE, "Failed to delete file: " + ex.Message);
-                                }
-                            }
-                        }                       
-                    }
-                }
-            }
-            return countMail;
         }
 
     }
