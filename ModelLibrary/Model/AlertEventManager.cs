@@ -29,35 +29,17 @@ namespace VAdvantage.Alert
         private static VLogger log = VLogger.GetVLogger(typeof(AlertEventManager).FullName);
         #endregion
 
-        /// <summary>
-        ///Get Document Workflow Manager
-        /// </summary>
-        /// <returns>mgr</returns>
+        private static readonly Lazy<AlertEventManager> _lazy =
+        new Lazy<AlertEventManager>();
+
         public static AlertEventManager Get()
         {
-            if (_mgr == null)
-                _mgr = new AlertEventManager();
-            return _mgr;
+            return _lazy.Value;
         }
 
-        //	Set PO Workflow Manager
-        //static 
-        //{
-        //    PO.SetDocWorkflowMgr(Get());
-        //}
         static AlertEventManager()
         {
             PO.SetAlertEventMgr(Get());
-        }
-
-
-        /// <summary>
-        /// Doc Workflow Manager
-        /// </summary>
-        private AlertEventManager() : base()
-        {
-            if (_mgr == null)
-                _mgr = this;
         }
 
         /// <summary>
@@ -467,9 +449,9 @@ namespace VAdvantage.Alert
             StringBuilder detailRows = new StringBuilder();
 
             // Build table rows dynamically
-            if (data != null && data.Count > 1)
+            if (data != null && data.Count > 0)
             {
-                for (int i = 1; i < data.Count; i++)
+                for (int i = 0; i < data.Count; i++)
                 {
                     var row = data[i];
                     string field = row.Count > 0 ? Util.GetValueOfString(row[0]) : "";
@@ -681,10 +663,10 @@ namespace VAdvantage.Alert
         }
 
         /// <summary>
-        /// Verify Sql, if Contains DROP ,Truncate in sql 
+        /// Check DROP Keyword,Truncate, Update And Delete
         /// </summary>
-        /// <param name="sql">sql query</param>
-        /// <returns>true if verified</returns>
+        /// <param name="sql">SQL Query</param>
+        /// <returns>true/false</returns>
         private bool ValidateSql(string sql)
         {
             if (string.IsNullOrEmpty(sql))
@@ -692,13 +674,11 @@ namespace VAdvantage.Alert
                 return false;
             }
             sql = sql.ToUpper();
-            List<string> arr = sql.Split(' ').ToList();
-            foreach (var str in arr)
+
+            if (sql.IndexOf("UPDATE") > -1 || sql.IndexOf("DELETE") > -1 || sql.IndexOf("DROP") > -1
+                || sql.IndexOf("TRUNCATE") > -1)
             {
-                if (System.Text.RegularExpressions.Regex.IsMatch(str, @"\b(UPDATE|DELETE|DROP|TRUNCATE)\b"))
-                {
-                    return false;
-                }
+                return false;
             }
             return true;
         }
