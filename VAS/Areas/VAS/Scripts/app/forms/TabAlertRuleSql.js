@@ -2008,6 +2008,7 @@
             AJAX Call to get Alert Data
         */
         this.SqlQuery = function (ParentId) {
+            setBusy(true);
             var event = VIS.context.getContext(windowNo, 'BasedOn');
             UpdateColumnCtrl.hide()
             $sqlResultDiv.text("");
@@ -2058,7 +2059,8 @@
                                 txtIsInsert.setValue(result.IsInsert);
                                 txtIsUpdate.setValue(result.IsUpdate);
                                 txtIsDelete.setValue(result.IsDelete);
-                                if (result.IsUpdate) {
+                                if (result.IsUpdate && result.TabID>0) {
+                                    getEventColumn(result.TabID);
                                     txtFiledColumn.setValue(result.ColumnID);
                                     UpdateColumnCtrl.show();
                                 } else {
@@ -2069,9 +2071,11 @@
                                 $EventMainDiv.show();
                             }
                         }
+                        setBusy(false);
                     },
                     error: function (error) {
                         console.log(error);
+                        setBusy(false);
                     }
                 });
                 $sqlBtn.trigger('click');
@@ -2086,6 +2090,7 @@
                 txtIsDelete.setValue(false);
                 txtFiledColumn.setValue(null);
                 EventTable = 0;
+                setBusy(false);
             }
             else {
                 $windowTabSelect.setValue(null);
@@ -2099,6 +2104,7 @@
                 $selectQuery.show();
                 emailContentDiv.show();
                 $saveBtn.hide();
+                setBusy(false);
             }
         }
 
@@ -2287,6 +2293,9 @@
                 txtIsUpdate.setReadOnly(false);
                 txtIsInsert.setReadOnly(false);
                 txtIsDelete.setReadOnly(false);
+                txtIsUpdate.setValue(false);
+                txtIsInsert.setValue(false);
+                txtIsDelete.setValue(false);
                 lblBottomMsg.text("");
             };
 
@@ -2360,7 +2369,7 @@
 
         function getEventColumn(tabID) {
             FiledColumnCtrl.empty();
-            //txtFiledColumn.setValue(null);
+            txtFiledColumn.setValue(null);
             var fieldlookup = new VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.MultiKey, "AD_Column_ID", 0, false, " AD_Column.IsActive='Y' AND FD.AD_Tab_ID= " + tabID);
             txtFiledColumn = new VIS.Controls.VTextBoxButton("AD_Column_ID", true, false, true, VIS.DisplayType.MultiKey, fieldlookup);
             var locDep = txtFiledColumn.getControl().attr('placeholder', ' Search here').attr("id", "AD_Column_ID").css("width", "100%").css("height", "100%");
