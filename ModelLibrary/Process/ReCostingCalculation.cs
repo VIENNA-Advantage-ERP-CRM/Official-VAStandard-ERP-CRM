@@ -646,8 +646,8 @@ namespace VAdvantage.Process
                                         // get record from production line based on production id
                                         sql.Clear();
                                         sql.Append(@"SELECT pl.M_ProductionLine_ID, pl.AD_Client_ID, pl.AD_Org_ID, p.MovementDate,  pl.M_Product_ID, 
-                                                        t.M_AttributeSetInstance_ID, t.MovementQty, pl.M_Locator_ID, wh.IsDisallowNegativeInv,  pl.M_Warehouse_ID ,
-                                                        p.IsCostCalculated, p.IsReversedCostCalculated,  p.IsReversed, t.M_Transaction_ID, p.M_Production_ID, pl.Amt 
+                                                    t.M_AttributeSetInstance_ID, t.MovementQty, pl.M_Locator_ID, wh.IsDisallowNegativeInv,  pl.M_Warehouse_ID ,
+                                                    p.IsCostCalculated, p.IsReversedCostCalculated,  p.IsReversed, t.M_Transaction_ID, p.M_Production_ID, pl.Amt, pl.M_ProductionPlan_id  
                                                 FROM M_Production p 
                                                      INNER JOIN M_ProductionPlan pp ON (pp.M_Production_id = pp.M_Production_id)
                                                      INNER JOIN M_ProductionLine pl ON (pl.M_ProductionPlan_id = pp.M_ProductionPlan_id)
@@ -702,7 +702,8 @@ namespace VAdvantage.Process
                                                         INNER JOIN M_Product        pr ON ( pr.M_Product_ID = pl.M_Product_ID )
                                                     WHERE nvl(pl.Amt, 0) = 0
                                                         AND pl.IsActive = 'Y' AND pp.IsActive = 'Y' AND pl.MovementQty < 0 AND pr.IsFocItem = 'N'
-                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
+                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) +
+                                                        " AND pl.M_ProductionPlan_ID = " + Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_ProductionPlan_id"]), null, Get_Trx()));
 
                                                 if ((CountCostNotAvialable == 0 && Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) > 0) ||
                                                     Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) < 0)

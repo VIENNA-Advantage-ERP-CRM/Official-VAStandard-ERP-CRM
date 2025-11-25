@@ -231,7 +231,7 @@ namespace VAdvantage.Process
 
                 sql.Append($@"WITH trx AS (
                        SELECT t.AD_Client_ID, t.AD_Org_ID , t.M_Product_ID, t.M_AttributeSetInstance_ID ,t.movementdate,  to_char(t.created, 'DD-MON-YY HH24:MI:SS') AS created ,t.M_Transaction_ID ,
-                        t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_productionline_ID, ");
+                        t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_ProductionLine_ID, ");
                 if (count > 0)
                 {
                     sql.Append($@"t.VAMFG_M_wrkodrtransaction_ID  , t.VAMFG_M_wrkodrtrnsctionline_ID, ");
@@ -587,10 +587,11 @@ namespace VAdvantage.Process
                                     if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Production")
                                     {
                                         sql.Clear();
-                                        sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
+                                        sql.Append($@"SELECT NVL(pl.M_ProductionPlan_ID, 0) FROM M_ProductionLine pl 
                                                    INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
                                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                                            $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
+                                                            $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} 
+                                                            AND pl.M_ProductionLine_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["M_ProductionLine_ID"])}");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -599,7 +600,8 @@ namespace VAdvantage.Process
                                         {
                                             sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
                                         }
-                                        if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) > 0)
+                                        int M_ProductionPlan_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                                        if (M_ProductionPlan_ID > 0)
                                         {
                                             DataSet dsCostingMethod = null;
                                             int v_definedcostelement_id = 0;
@@ -622,9 +624,10 @@ namespace VAdvantage.Process
                                                      INNER JOIN M_Transaction t ON (t.M_ProductionLine_ID = pl.M_ProductionLine_ID) 
                                                 WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                                              @"p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
-                                                      AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
+                                                      AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + $@"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
-                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
+                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID 
+                                                      AND pl.M_ProductionPlan_ID = {M_ProductionPlan_ID}");
 
                                             prodSql.Clear();
                                             prodSql.Append(sql);
@@ -677,7 +680,8 @@ namespace VAdvantage.Process
                                                         INNER JOIN M_Product        pr ON ( pr.M_Product_ID = pl.M_Product_ID )
                                                     WHERE nvl(pl.Amt, 0) = 0
                                                         AND pl.IsActive = 'Y' AND pp.IsActive = 'Y' AND pl.MovementQty < 0 AND pr.IsFocItem = 'N'
-                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
+                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) +
+                                                        " AND pl.M_ProductionPlan_ID = " + M_ProductionPlan_ID, null, Get_Trx()));
 
                                                     if ((CountCostNotAvialable == 0 && Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) > 0) ||
                                                         Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) < 0)
@@ -816,6 +820,7 @@ namespace VAdvantage.Process
                                                                     INNER JOIN m_product prod ON (prod.m_product_id = pp.m_product_id)
                                                                 WHERE
                                                                     pp.m_production_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Production_ID"])}
+                                                                    AND pp.M_ProductionPlan_ID = { M_ProductionPlan_ID }
                                                                     AND prod.isbom = 'Y'
                                                                     AND prod.isverified = 'Y' 
                                                                 ORDER BY
@@ -860,6 +865,13 @@ namespace VAdvantage.Process
                                                             Get_Trx().Rollback();
                                                         }
                                                         #endregion
+                                                    }
+                                                    else
+                                                    {
+                                                        _log.Info($@"Costing not calculated for Assembly Document - 
+                                                                        Production Plan ID = {M_ProductionPlan_ID}, 
+                                                                        M_ProductionLine_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["M_ProductionLine_ID"])},
+                                                                        component cost not found");
                                                     }
                                                 }
                                             }
