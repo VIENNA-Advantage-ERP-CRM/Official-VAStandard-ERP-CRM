@@ -3271,7 +3271,7 @@ namespace VAdvantage.Process
                                 SELECT ABS(SUM(cqt.MovementQty))
                                 FROM M_CostQueueTransaction cqt
                                 WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                  @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                  $@"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)}
@@ -3280,7 +3280,7 @@ namespace VAdvantage.Process
                                 SELECT 1
                                 FROM M_CostQueueTransaction cqt
                                 WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                  @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                  $@"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)})");
