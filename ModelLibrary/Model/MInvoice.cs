@@ -6218,8 +6218,18 @@ namespace VAdvantage.Model
                     AllHdr = new MAllocationHdr(GetCtx(), 0, Get_TrxName());
                     AllHdr.SetAD_Client_ID(GetAD_Client_ID());
                     AllHdr.SetAD_Org_ID(Convert.ToInt32(dsPayment.Tables[0].Rows[i]["AD_Org_ID"]));
-                    AllHdr.SetDateTrx(Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateTrx"]));
-                    AllHdr.SetDateAcct(Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateAcct"]));
+                    //VIS_045: 05/Dec/2025, When Date Invoiced is greater than Payment Account Date
+                    // then on Allocation Document, Invoice date will be updated 
+                    if (invoice.GetDateInvoiced().Value.Date >= Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateAcct"]).Value.Date)
+                    {
+                        AllHdr.SetDateTrx(invoice.GetDateInvoiced());
+                        AllHdr.SetDateAcct(invoice.GetDateInvoiced());
+                    }
+                    else
+                    {
+                        AllHdr.SetDateTrx(Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateTrx"]));
+                        AllHdr.SetDateAcct(Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateAcct"]));
+                    }
                     AllHdr.SetC_Currency_ID(Convert.ToInt32(dsPayment.Tables[0].Rows[i]["C_Currency_ID"]));
                     // Update conversion type from payment to view allocation (required for posting)
                     if (AllHdr.Get_ColumnIndex("C_ConversionType_ID") > 0)
