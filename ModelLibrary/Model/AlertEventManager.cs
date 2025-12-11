@@ -164,7 +164,7 @@ namespace VAdvantage.Alert
         FROM AD_Field f
         INNER JOIN AD_Column c ON c.AD_Column_ID = f.AD_Column_ID
         WHERE f.AD_Tab_ID = " + tabID + @" 
-          AND f.IsActive = 'Y'";
+          AND f.IsActive = 'Y' ORDER BY f.Name";
 
             DataSet ds = DB.ExecuteDataset(sql);
 
@@ -223,22 +223,33 @@ namespace VAdvantage.Alert
             // -----------------------------------------------------
             Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
 
+            // Create a sorted map: FieldName → ColumnName
+            SortedList<string, string> sortedByFieldName = new SortedList<string, string>();
+            foreach (KeyValuePair<string, string> kv in fieldMap)
+            {
+                sortedByFieldName[kv.Value] = kv.Key;
+            }
+
+
             // -----------------------------------------------------
             // 3. INSERT CASE
             // -----------------------------------------------------
+
             if (eventType.Equals("INSERT") && rule.IsInsert)
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowName;
-                for (int i = 0; i < document.Get_ColumnCount(); i++)
+                foreach (KeyValuePair<string, string> kv in sortedByFieldName)
                 {
-                    string col = document.Get_ColumnName(i);
-                    string fieldName = fieldMap.ContainsKey(col) ? fieldMap[col] : col;
+                    string fieldName = kv.Key;
+                    string colName = kv.Value;
+
                     List<object> row = new List<object>();
                     row.Add(fieldName);
-                    row.Add(document.Get_ValueOld(i));
+                    row.Add(document.Get_ValueOld(colName));
                     data.Add(row);
                 }
             }
+
 
             // -----------------------------------------------------
             // 4. UPDATE CASE
@@ -264,18 +275,20 @@ namespace VAdvantage.Alert
                 if (updatedColumn.Count > 0)
                 {
                     subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowName;
-                    for (int i = 0; i < document.Get_ColumnCount(); i++)
+                    foreach (KeyValuePair<string, string> kv in sortedByFieldName)
                     {
-                        string colName = document.Get_ColumnName(i);
+                        string fieldName = kv.Key;
+                        string colName = kv.Value;
 
                         if (updatedColumn.Contains(colName))
                         {
-                            string fieldName = fieldMap.ContainsKey(colName) ? fieldMap[colName] : colName;
-
                             List<object> row = new List<object>();
+                            int index = document.Get_ColumnIndex(colName);
+
                             row.Add(fieldName);
-                            row.Add(document.Get_ValueOld(i));
-                            row.Add(document.Get_Value(i));
+                            row.Add(document.Get_ValueOld(index));
+                            row.Add(document.Get_Value(index));
+
                             data.Add(row);
                         }
                     }
@@ -288,13 +301,16 @@ namespace VAdvantage.Alert
             else if (eventType.Equals("DELETE") && rule.IsDeleted)
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowName;
-                for (int i = 0; i < document.Get_ColumnCount(); i++)
+                foreach (KeyValuePair<string, string> kv in sortedByFieldName)
                 {
-                    string col = document.Get_ColumnName(i);
-                    string fieldName = fieldMap.ContainsKey(col) ? fieldMap[col] : col;
+                    string fieldName = kv.Key;
+                    string colName = kv.Value;
                     List<object> row = new List<object>();
+                    int index = document.Get_ColumnIndex(colName);
+
                     row.Add(fieldName);
-                    row.Add(document.Get_ValueOld(i));
+                    row.Add(document.Get_ValueOld(index));
+
                     data.Add(row);
                 }
             }
@@ -444,7 +460,8 @@ namespace VAdvantage.Alert
             string performerName = document.GetCtx().GetAD_User_Name();
 
             SimpleDateFormat df = DisplayType.GetDateFormat(DisplayType.DateTime);
-            string recordTime = Msg.Translate(document.GetCtx(), "Date") + (" : ") + (df.Format(DateTime.Now));
+            string recordTime = Msg.Translate(document.GetCtx(), "Date") + " : " + DateTime.Now.ToString("yyyy-MM-dd hh:mm tt");
+
 
             StringBuilder detailRows = new StringBuilder();
 
@@ -570,14 +587,6 @@ namespace VAdvantage.Alert
 
         <tr>
           <td style='padding: 24px;'>
-            <table cellpadding='0' cellspacing='0' border='0' style='margin-bottom: 16px;'>
-              <tr>
-                <td>
-                  <span style='display: inline-block; background-color: {(eventType.Equals("INSERT") ? "rgb(34,197,94)" : eventType.Equals("UPDATE") ? "rgb(59,130,246)" : "rgb(239,68,68)")}; color: #fff; font-size: 11px; font-weight: bold; text-transform: uppercase; padding: 4px 12px; border-radius: 4px;'>{recordType}</span>
-                  <span style='color: #64748b; font-size: 14px; margin-left: 8px;'>{tabName} {Msg.Translate(document.GetCtx(), "Record")}</span>
-                </td>
-              </tr>
-            </table>
 
             <h2 style='color: #0f172a; font-size: 18px; font-weight: bold; margin: 0 0 16px;'>{Msg.Translate(document.GetCtx(), "Window")}: {windowName}</h2>
 
