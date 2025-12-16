@@ -24,8 +24,8 @@ const versions = {
 };
 
 module.exports = {
-    mode: 'development', // for debuggin
-    //mode: 'production',
+    //mode: 'development', // for debuggin
+    mode: 'production',
     entry: {
         'VAS.all': './Areas/VAS/Scripts/src/VASjs.js',        
         'VAS': './Areas/VAS/Content/src/VAScss.css'
