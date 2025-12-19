@@ -6222,7 +6222,7 @@ namespace VAdvantage.Model
                     // then on Allocation Document, Invoice date will be updated 
                     if (invoice.GetDateInvoiced().Value.Date >= Util.GetValueOfDateTime(dsPayment.Tables[0].Rows[i]["DateAcct"]).Value.Date)
                     {
-                        AllHdr.SetDateTrx(invoice.GetDateInvoiced());
+                        AllHdr.SetDateTrx(DateTime.Now);
                         AllHdr.SetDateAcct(invoice.GetDateInvoiced());
                     }
                     else
@@ -6271,7 +6271,7 @@ namespace VAdvantage.Model
                         else if (Util.GetValueOfInt(dsPayment.Tables[0].Rows[i]["C_CashLine_ID"]) > 0)
                             Allline.SetC_CashLine_ID(Util.GetValueOfInt(dsPayment.Tables[0].Rows[i]["C_CashLine_ID"]));
 
-                        Allline.SetDateTrx(DateTime.Now);
+                        Allline.SetDateTrx(AllHdr.GetDateAcct());
 
                         MDocType doctype = MDocType.Get(GetCtx(), GetC_DocTypeTarget_ID());
                         // for reverse record
