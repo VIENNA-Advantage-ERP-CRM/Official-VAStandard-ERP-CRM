@@ -5231,27 +5231,50 @@ namespace VAdvantage.Model
                             List<DataRow> dr = new List<DataRow>();
 
                             // now in landed cost distribution, consider "tax amt" and "surcharge amt" based on setting applicable on tax rate
-                            qry.Append(@"SELECT il.M_Product_ID, il.M_AttributeSetInstance_ID, sum(mi.Qty) as Qty, ");
-                            //SUM(mi.Qty * il.PriceActual) AS LineNetAmt , 
-                            qry.Append(@" SUM(mi.Qty *
-                                                CASE
+                            //qry.Append(@"SELECT il.M_Product_ID, il.M_AttributeSetInstance_ID, sum(mi.Qty) as Qty, ");
+                            //qry.Append(@" SUM(mi.Qty *
+                            //                    CASE
+                            //                    WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
+                            //                    AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
+                            //                    THEN ROUND((il.taxbaseamt + il.taxamt + il.surchargeamt) / il.qtyinvoiced , 4)
+                            //                    WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'N'
+                            //                    AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
+                            //                    THEN ROUND((il.taxbaseamt + il.taxamt) / il.qtyinvoiced , 4)
+                            //                    WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
+                            //                    AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
+                            //                    THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
+                            //                    ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
+                            //                  END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
+                            //FROM C_InvoiceLine il 
+                            //INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
+                            //INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
+                            //INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
+                            //INNER JOIN c_tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID 
+                            //LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
+                            //WHERE il.C_Invoice_ID = " + lc.GetRef_Invoice_ID());
+
+                            /*Changed query to calculate landed cost for drafted documents also as earlier their was join
+                             with match invoice which is created after completions */
+                            qry.Append(@"SELECT il.M_Product_ID, il.M_AttributeSetInstance_ID, SUM(il.qtyinvoiced) as Qty, ");
+                            qry.Append(@" SUM(CASE
                                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
-                                                THEN ROUND((il.taxbaseamt + il.taxamt + il.surchargeamt) / il.qtyinvoiced , 4)
+                                                THEN ROUND((il.taxbaseamt + il.taxamt + il.surchargeamt), 4)
                                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'N'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'Y'
-                                                THEN ROUND((il.taxbaseamt + il.taxamt) / il.qtyinvoiced , 4)
+                                                THEN ROUND((il.taxbaseamt + il.taxamt), 4)
                                                 WHEN NVL(C_SurChargeTax.IsIncludeInCost , 'N') = 'Y'
                                                 AND NVL(C_Tax.IsIncludeInCost , 'N')           = 'N'
-                                                THEN ROUND((il.taxbaseamt + il.surchargeamt) / il.qtyinvoiced, 4)
-                                                ELSE ROUND(il.taxbaseamt  / il.qtyinvoiced, 4)
+                                                THEN ROUND((il.taxbaseamt + il.surchargeamt), 4)
+                                                ELSE ROUND(il.taxbaseamt, 4)
                                               END) AS LineNetAmt , io.M_Warehouse_ID, iol.M_Locator_ID 
                             FROM C_InvoiceLine il 
-                            INNER JOIN M_Matchinv mi ON Mi.C_Invoiceline_ID = Il.C_Invoiceline_ID 
-                            INNER JOIN M_InoutLine iol ON iol.M_InoutLine_ID = mi.M_InoutLine_ID
-                            INNER JOIN M_InOut io ON io.M_InOut_ID = iol.M_InOut_ID INNER JOIN M_Warehouse wh ON wh.M_Warehouse_ID = io.M_Warehouse_ID 
-                            INNER JOIN c_tax C_Tax ON C_Tax.C_Tax_ID = il.C_Tax_ID 
-                            LEFT JOIN C_Tax C_SurChargeTax ON C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID 
+                            INNER JOIN c_tax C_Tax ON (C_Tax.C_Tax_ID = il.C_Tax_ID)
+                            INNER JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
+                            INNER JOIN M_InoutLine iol ON (iol.M_InoutLine_ID = il.M_InoutLine_ID)
+                            INNER JOIN M_InOut io ON (io.M_InOut_ID = iol.M_InOut_ID)
+                            INNER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID = io.M_Warehouse_ID)                             
+                            LEFT JOIN C_Tax C_SurChargeTax ON (C_Tax.Surcharge_Tax_ID = C_SurChargeTax.C_Tax_ID)
                             WHERE il.C_Invoice_ID = " + lc.GetRef_Invoice_ID());
 
                             //	Single Invoice Line
@@ -5269,7 +5292,7 @@ namespace VAdvantage.Model
                             {
                                 qry.Append(" AND il.M_AttributeSetInstance_ID = " + lc.GetM_AttributeSetInstance_ID());
                             }
-
+                            qry.Append(" AND il.M_Product_ID > 0 ");
                             qry.Append(@" GROUP BY il.M_Product_ID, il.M_AttributeSetInstance_ID, io.M_Warehouse_ID 
                                         ,  il.taxbaseamt , il.taxamt , il.surchargeamt , C_SurChargeTax.IsIncludeInCost , C_Tax.IsIncludeInCost, il.qtyinvoiced, iol.M_Locator_ID");
 
