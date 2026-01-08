@@ -236,6 +236,12 @@ namespace VAdvantage.Model
             if (newRecord || Is_ValueChanged("QtyEntered"))
                 SetMovementQty(GetMovementQty());
 
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (GetM_Product_ID() > 0 && product != null && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                MOrderLine.SetProductHSNCode(this, product);
+            }
+
             //VAI050-To Validate Requestion Quantity with Cart Quantity
             //Quantity can not be greater than Requisition Quantity
             if (GetM_RequisitionLine_ID() > 0)

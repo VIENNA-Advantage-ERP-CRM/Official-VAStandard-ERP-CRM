@@ -3973,6 +3973,11 @@ namespace VAdvantage.Model
                 SetC_TaxExemptReason_ID(0);
             }
 
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (GetM_Product_ID() > 0 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                SetProductHSNCode(this, GetProduct());
+            }
 
             MOrder Ord = GetParent();
             MDocType docType = MDocType.Get(GetCtx(), Ord.GetC_DocTypeTarget_ID());
@@ -4820,6 +4825,24 @@ namespace VAdvantage.Model
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// This function is used to set the Product HSN Value
+        /// </summary>
+        /// <param name="line">line object</param>
+        /// <param name="product">Product object</param>
+        /// <author>VIS_045: 08-Jan-2026</author>
+        public static void SetProductHSNCode(PO line, MProduct product)
+        {
+            if (product != null && product.Get_ID() > 0 && line != null)
+            {
+                string hsnCode = Util.GetValueOfString(product.Get_Value("VAS_HSN_SACCode"));
+                if (!string.IsNullOrEmpty(hsnCode))
+                {
+                    line.Set_Value("VAS_HSN_SACCode", hsnCode);
+                }
+            }
         }
 
         /// <summary>
