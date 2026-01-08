@@ -257,8 +257,15 @@ namespace VAdvantage.Model
                 else
                 {
                     base.SetM_Locator_ID(0);
-                }
+                } 
             }
+
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode"))))
+            {
+                Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
+            }
+
             SetC_Charge_ID(oLine.GetC_Charge_ID());
             SetDescription(oLine.GetDescription());
             SetIsDescription(oLine.IsDescription());
@@ -338,6 +345,13 @@ namespace VAdvantage.Model
                 else
                     SetM_Locator_ID(M_Locator_ID);
             }
+
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(iLine.Get_Value("VAS_HSN_SACCode"))))
+            {
+                Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(iLine.Get_Value("VAS_HSN_SACCode")));
+            }
+
             SetC_Charge_ID(iLine.GetC_Charge_ID());
             SetDescription(iLine.GetDescription());
             SetIsDescription(iLine.IsDescription());
@@ -1096,6 +1110,12 @@ namespace VAdvantage.Model
             if (GetM_Product_ID() > 0)
             {
                 _Product = new MProduct(GetCtx(), GetM_Product_ID(), Get_TrxName());
+            }
+
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (GetM_Product_ID() > 0 && _Product != null && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                MOrderLine.SetProductHSNCode(this, _Product);
             }
 
             if (_Product != null && GetC_UOM_ID() != _Product.GetC_UOM_ID())

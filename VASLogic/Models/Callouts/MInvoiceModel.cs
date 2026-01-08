@@ -87,7 +87,7 @@ namespace VIS.Models
                 sql.Clear();
                 //VAI050-Get Purchase and Sales UOM from product
                 sql.Append($@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote, C_RevenueRecognition_ID,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID
-                    {(Env.IsModuleInstalled("VA106_") ? " , VA106_TaxCollectedAtSource_ID " : " ")}
+                    {(Env.IsModuleInstalled("VA106_") ? " , VA106_TaxCollectedAtSource_ID " : " ")}, VAS_HSN_SACCode 
                     FROM M_Product WHERE
                     IsActive = 'Y' AND M_Product_ID = " + _m_Product_Id);
                 dsProductInfo = DB.ExecuteDataset(sql.ToString());
@@ -104,6 +104,7 @@ namespace VIS.Models
                     {
                         result["VA106_TaxCollectedAtSource_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VA106_TaxCollectedAtSource_ID"]);
                     }
+                    result["VAS_HSN_SACCode"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["VAS_HSN_SACCode"]);
                 }
 
                 // Get Purchasing or Base UOM

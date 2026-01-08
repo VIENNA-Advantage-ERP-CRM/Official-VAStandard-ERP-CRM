@@ -1738,6 +1738,11 @@
                     //190 - Set Product description
                     mTab.setValue("PrintDescription", productInfo.DocumentNote);
 
+                    // VIS_045: 07-Jan-2026, Set HSN Code From Product
+                    if (mTab.findColumn("VAS_HSN_SACCode") > -1 && productInfo.hasOwnProperty("VAS_HSN_SACCode")) {
+                        mTab.setValue("VAS_HSN_SACCode", productInfo.VAS_HSN_SACCode);
+                    }
+
                     var productType = productInfo["productType"].toString();
                     ctx.setContext(windowNo, "ProductType", productType);
                     mTab.setValue("ProductType", productType);
@@ -1946,7 +1951,7 @@
                 mTab.setValue("PriceList", Util.getValueOfDecimal(dr["ChargeAmt"]).toFixed(stdPrecision));
             }
 
-            mTab.setValue("PriceLimit", VIS.Env.ZERO);            
+            mTab.setValue("PriceLimit", VIS.Env.ZERO);
             mTab.setValue("Discount", VIS.Env.ZERO);
         }
         catch (err) {

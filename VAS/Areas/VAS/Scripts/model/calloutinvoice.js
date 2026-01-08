@@ -530,6 +530,11 @@
                 mTab.setValue("VA106_TaxCollectedAtSource_ID", Util.getValueOfInt(invoiceRecord["VA106_TaxCollectedAtSource_ID"]));
             }
 
+            // VIS_045: 07-Jan-2026, Set HSN Code From Product
+            if (mTab.findColumn("VAS_HSN_SACCode") > -1 && invoiceRecord.hasOwnProperty("VAS_HSN_SACCode")) {
+                mTab.setValue("VAS_HSN_SACCode", Util.getValueOfString(invoiceRecord["VAS_HSN_SACCode"]));
+            }
+
             //		
             mTab.setValue("PriceList", Util.getValueOfDecimal(invoiceRecord["PriceList"]));
             mTab.setValue("PriceLimit", Util.getValueOfDecimal(invoiceRecord["PriceLimit"]));
