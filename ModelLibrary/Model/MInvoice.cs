@@ -2692,11 +2692,15 @@ namespace VAdvantage.Model
                 for (int i = 0; i < lines.Length; i++)
                 {
                     MInvoiceLine line = lines[i];
-                    String error = line.AllocateLandedCosts();
-                    if (error != null && error.Length > 0)
+                    //If charge id is greater than zero then only execute this functions
+                    if (line.GetC_Charge_ID() > 0)
                     {
-                        _processMsg = error;
-                        return DocActionVariables.STATUS_INVALID;
+                        String error = line.AllocateLandedCosts();
+                        if (error != null && error.Length > 0)
+                        {
+                            _processMsg = error;
+                            return DocActionVariables.STATUS_INVALID;
+                        }
                     }
                 }
             }
