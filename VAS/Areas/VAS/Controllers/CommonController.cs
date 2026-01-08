@@ -1310,10 +1310,16 @@ namespace VIS.Controllers
                     string Description = ol.GetDescription();
                     if (Description != null && Description.Length > 255)
                     {
-
                         Description = Description.Substring(0, 255);
                     }
                     po.Set_Value("Description", Description);
+
+                    // VIS_045: 08-Jan-2026, Set Product HSN Code
+                    if (string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode"))))
+                    {
+                        po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")));
+                    }
+
                     if (ol.GetC_Project_ID() <= 0)
                     {
                         po.Set_Value("C_Project_ID", null);
@@ -1410,10 +1416,16 @@ namespace VIS.Controllers
                     string Description = il.GetDescription();
                     if (Description != null && Description.Length > 255)
                     {
-
                         Description = Description.Substring(0, 255);
                     }
                     po.Set_Value("Description", Description);
+
+                    // VIS_045: 08-Jan-2026, Set Product HSN Code
+                    if (string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode"))))
+                    {
+                        po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")));
+                    }
+
                     if (il.GetC_Project_ID() <= 0)
                     {
                         po.Set_Value("C_Project_ID", null);

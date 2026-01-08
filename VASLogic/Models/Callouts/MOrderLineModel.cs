@@ -1873,7 +1873,7 @@ namespace VIS.Models
             retDic["purchasingUom"] = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             //VAI050-Get Purchase and Sales UOM from Product
             sql.Clear();
-            sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE
+            sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID, VAS_HSN_SACCode FROM M_Product WHERE
                     IsActive = 'Y' AND M_Product_ID = " + _m_Product_Id);
 
             dsProductInfo = DB.ExecuteDataset(sql.ToString());
@@ -1885,6 +1885,7 @@ namespace VIS.Models
                 retDic["VAS_SalesUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
                 retDic["IsDropShip"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["IsDropShip"]);
                 retDic["DocumentNote"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["DocumentNote"]);
+                retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["VAS_HSN_SACCode"]);
             }
 
             if (Util.GetValueOfInt(retDic["purchasingUom"]) > 0 && !isSOTrx)

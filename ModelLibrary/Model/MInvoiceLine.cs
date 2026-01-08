@@ -258,6 +258,13 @@ namespace VAdvantage.Model
                     SetS_ResourceAssignment_ID(oLine.GetS_ResourceAssignment_ID());
                 }
                 SetC_UOM_ID(oLine.GetC_UOM_ID());
+
+                // VIS_045: 08-Jan-2026, Set Product HSN Code
+                if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode"))))
+                {
+                    Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
+                }
+
                 //
                 SetPriceEntered(oLine.GetPriceEntered());
                 SetPriceActual(oLine.GetPriceActual());
@@ -312,6 +319,13 @@ namespace VAdvantage.Model
                 SetM_AttributeSetInstance_ID(sLine.GetM_AttributeSetInstance_ID());
                 //	SetS_ResourceAssignment_ID(sLine.GetS_ResourceAssignment_ID());
                 SetC_Charge_ID(sLine.GetC_Charge_ID());
+
+                // VIS_045: 08-Jan-2026, Set Product HSN Code
+                if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode"))))
+                {
+                    Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")));
+                }
+
                 int C_OrderLine_ID = sLine.GetC_OrderLine_ID();
                 if (C_OrderLine_ID != 0)
                 {
@@ -4061,6 +4075,11 @@ namespace VAdvantage.Model
                     SetC_TaxExemptReason_ID(0);
                 }
 
+                // VIS_045: 08-Jan-2026, Set Product HSN Code
+                if (GetM_Product_ID() > 0 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+                {
+                    MOrderLine.SetProductHSNCode(this, GetProduct());
+                }
 
                 //	Get Line No
                 if (GetLine() == 0)
