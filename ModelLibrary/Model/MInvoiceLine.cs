@@ -260,9 +260,10 @@ namespace VAdvantage.Model
                 SetC_UOM_ID(oLine.GetC_UOM_ID());
 
                 // VIS_045: 08-Jan-2026, Set Product HSN Code
-                if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode"))))
+                if (oLine.GetM_Product_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
                 {
-                    Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
+                    //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
+                    MOrderLine.SetProductHSNCode(this, GetProduct(), Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")), true);
                 }
 
                 //
@@ -321,9 +322,10 @@ namespace VAdvantage.Model
                 SetC_Charge_ID(sLine.GetC_Charge_ID());
 
                 // VIS_045: 08-Jan-2026, Set Product HSN Code
-                if (string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode"))))
+                if (sLine.GetM_Product_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
                 {
-                    Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")));
+                    //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")));
+                    MOrderLine.SetProductHSNCode(this, GetProduct(), Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")), true);
                 }
 
                 int C_OrderLine_ID = sLine.GetC_OrderLine_ID();
@@ -4076,9 +4078,9 @@ namespace VAdvantage.Model
                 }
 
                 // VIS_045: 08-Jan-2026, Set Product HSN Code
-                if (GetM_Product_ID() > 0 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+                if (GetM_Product_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
                 {
-                    MOrderLine.SetProductHSNCode(this, GetProduct());
+                    MOrderLine.SetProductHSNCode(this, GetProduct(), "", true);
                 }
 
                 //	Get Line No

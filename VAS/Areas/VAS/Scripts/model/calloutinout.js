@@ -429,6 +429,12 @@
                     qtyEntered = ((qtyEntered * (Util.getValueOfDecimal(dr["QtyEntered"]))) / (Util.getValueOfDecimal(dr["QtyOrdered"]).toFixed(12)));//, MidpointRounding.AwayFromZero));
                 }
                 mTab.setValue("QtyEntered", qtyEntered);
+
+                // VIS_045: 09-Jan-2026, Set HSN Code From Product
+                if (mTab.findColumn("VAS_HSN_SACCode") > -1 && dr.hasOwnProperty("VAS_HSN_SACCode")) {
+                    mTab.setValue("VAS_HSN_SACCode", dr.VAS_HSN_SACCode);
+                }
+
                 //
                 mTab.setValue("C_Activity_ID", Util.getValueOfInt(dr["C_Activity_ID"]));
                 mTab.setValue("C_Campaign_ID", Util.getValueOfInt(dr["C_Campaign_ID"]));

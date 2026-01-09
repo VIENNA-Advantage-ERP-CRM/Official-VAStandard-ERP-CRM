@@ -22,7 +22,7 @@ namespace VIS.Models
         /// <returns></returns>
         public Dictionary<String, String> GetOrderLine(Ctx ctx, string param)
         {
-
+            MProduct prod = null;
             string[] paramValue = param.Split(',');
 
             Dictionary<String, String> retDic = new Dictionary<string, string>();
@@ -33,7 +33,10 @@ namespace VIS.Models
             //End Assign parameter value
 
             MOrderLine orderline = new MOrderLine(ctx, id, null);
-
+            if (orderline.GetM_Product_ID() > 0)
+            {
+                prod = orderline.GetProduct();
+            }
             retDic["C_Tax_ID"] = Util.GetValueOfString(orderline.GetC_Tax_ID());
             retDic["PriceList"] = Util.GetValueOfString(orderline.GetPriceList());
             retDic["PriceLimit"] = Util.GetValueOfString(orderline.GetPriceLimit());
@@ -72,6 +75,12 @@ namespace VIS.Models
             retDic["PrintDescription"] = Util.GetValueOfString(orderline.Get_Value("PrintDescription"));
             retDic["VAS_ContractLine_ID"] = Util.GetValueOfString(orderline.Get_Value("VAS_ContractLine_ID")); //VAI050-Get Contract Line Id
 
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (orderline.Get_ColumnIndex("VAS_HSN_SACCode") > -1)
+            {
+                retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(prod.Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+            }
+
             if (Env.IsModuleInstalled("VA077_"))
             {
                 retDic["VA077_CNAutodesk"] = Util.GetValueOfString(orderline.Get_Value("VA077_CNAutodesk"));
@@ -90,7 +99,6 @@ namespace VIS.Models
                 retDic["VA077_EndDate"] = Util.GetValueOfString(orderline.Get_Value("VA077_EndDate"));
 
                 //Get Product information
-                MProduct prod = new MProduct(ctx, orderline.GetM_Product_ID(), null);
                 retDic["VA077_LicenceTracked"] = Util.GetValueOfString(prod.Get_Value("VA077_LicenceTracked"));
 
             }
@@ -915,7 +923,7 @@ namespace VIS.Models
                                 }
                             }
                         }
-                    }                    
+                    }
                 }
             }
             return C_Tax_ID;
