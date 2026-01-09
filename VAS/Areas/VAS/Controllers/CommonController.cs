@@ -1315,9 +1315,10 @@ namespace VIS.Controllers
                     po.Set_Value("Description", Description);
 
                     // VIS_045: 08-Jan-2026, Set Product HSN Code
-                    if (string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode"))))
+                    if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && M_Product_ID > 0)
                     {
-                        po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")));
+                        //po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")));
+                        MOrderLine.SetProductHSNCode(po, MProduct.Get(ctx, M_Product_ID), Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")), true);
                     }
 
                     if (ol.GetC_Project_ID() <= 0)
@@ -1421,9 +1422,10 @@ namespace VIS.Controllers
                     po.Set_Value("Description", Description);
 
                     // VIS_045: 08-Jan-2026, Set Product HSN Code
-                    if (string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && !string.IsNullOrEmpty(Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode"))))
+                    if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && M_Product_ID > 0)
                     {
-                        po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")));
+                        //po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")));
+                        MOrderLine.SetProductHSNCode(po, MProduct.Get(ctx, M_Product_ID), Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")), true);
                     }
 
                     if (il.GetC_Project_ID() <= 0)

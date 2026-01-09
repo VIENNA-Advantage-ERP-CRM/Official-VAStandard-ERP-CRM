@@ -1101,6 +1101,9 @@ namespace VAdvantage.Model
                         line.Set_Value("VAFAM_ProfitLoss", decimal.Negate(Util.GetValueOfDecimal(fromLine.Get_Value("VAFAM_ProfitLoss"))));
                         line.Set_Value("VAFAM_AssetDisposal_ID", fromLine.Get_Value("VAFAM_AssetDisposal_ID"));
                     }
+
+                    // VIS_045: 09-Jan-2026, Set Product HSN Code of Original document on reversed document
+                    line.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(fromLine.Get_Value("VAS_HSN_SACCode")));
                 }
 
                 // enhanced by Amit 4-1-2016

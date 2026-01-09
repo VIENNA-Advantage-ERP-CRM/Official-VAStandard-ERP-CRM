@@ -1917,7 +1917,7 @@ namespace VIS.Models
                             AND il.IsActive = 'Y' AND i.DocStatus NOT IN ('RE', 'VO', 'CL', 'CO'))) AS QtyRemianing,u.StdPrecision,
                             ol.IsDropShip, ol.Description, ol.C_Project_ID, ol.C_ProjectPhase_ID, ol.C_ProjectTask_ID,
                             ol.C_Activity_ID, ol.C_Campaign_ID, ol.AD_OrgTrx_ID, ol.User1_ID, ol.User2_ID, ol.PrintDescription" +
-                            (Env.IsModuleInstalled("VA010_") ? ", prd.VA010_QualityPlan_ID" : "") + @"
+                            (Env.IsModuleInstalled("VA010_") ? ", prd.VA010_QualityPlan_ID" : "") + @" , ol.VAS_HSN_SACCode 
                             FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
                             LEFT JOIN M_Product prd ON (ol.M_Product_ID = prd.M_Product_ID)
                             LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)  
@@ -1975,7 +1975,7 @@ namespace VIS.Models
 
                     for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                     {
-                        QtyEnetered =Math.Round( Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["ConversionRate"]), Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]));
+                        QtyEnetered = Math.Round(Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["QtyRemianing"]) / Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["ConversionRate"]), Util.GetValueOfInt(ds.Tables[0].Rows[i]["StdPrecision"]));
                         objLine = new MInOutLine(ctx, 0, trx);
                         objLine.SetAD_Client_ID(ctx.GetAD_Client_ID());
                         objLine.SetAD_Org_ID(Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]));
@@ -2002,6 +2002,15 @@ namespace VIS.Models
                             Description = Description.Substring(0, 255);
                         }
                         objLine.SetDescription(Description);
+
+                        // VIS_045: 08-Jan-2026, Set Product HSN Code
+                        if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]) > 0)
+                        {
+                            //objLine.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ds.Tables[0].Rows[i]["VAS_HSN_SACCode"]));
+                            MOrderLine.SetProductHSNCode(objLine, MProduct.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"])), 
+                                Util.GetValueOfString(ds.Tables[0].Rows[i]["VAS_HSN_SACCode"]), true);
+                        }
+
                         if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Project_ID"]) > 0)
                         {
                             objLine.SetC_Project_ID(Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Project_ID"]));
