@@ -265,6 +265,10 @@ namespace VAdvantage.Model
                     //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
                     MOrderLine.SetProductHSNCode(this, GetProduct(), Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")), true);
                 }
+                else if (oLine.GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+                {
+                    MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")), true);
+                }
 
                 //
                 SetPriceEntered(oLine.GetPriceEntered());
@@ -326,6 +330,10 @@ namespace VAdvantage.Model
                 {
                     //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")));
                     MOrderLine.SetProductHSNCode(this, GetProduct(), Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")), true);
+                }
+                else if (sLine.GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+                {
+                    MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), Util.GetValueOfString(sLine.Get_Value("VAS_HSN_SACCode")), true);
                 }
 
                 int C_OrderLine_ID = sLine.GetC_OrderLine_ID();
@@ -4081,6 +4089,11 @@ namespace VAdvantage.Model
                 if (GetM_Product_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
                 {
                     MOrderLine.SetProductHSNCode(this, GetProduct(), "", true);
+                }
+                else if (GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+                    (Is_ValueChanged("C_Charge_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
+                {
+                    MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), "", true);
                 }
 
                 //	Get Line No
