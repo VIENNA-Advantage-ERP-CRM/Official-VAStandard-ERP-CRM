@@ -237,7 +237,8 @@ namespace VAdvantage.Model
                 SetMovementQty(GetMovementQty());
 
             // VIS_045: 08-Jan-2026, Set Product HSN Code
-            if (GetM_Product_ID() > 0 && product != null && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            if (GetM_Product_ID() > 0 && product != null && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+                (Is_ValueChanged("M_Product_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
             {
                 MOrderLine.SetProductHSNCode(this, product, "", true);
             }

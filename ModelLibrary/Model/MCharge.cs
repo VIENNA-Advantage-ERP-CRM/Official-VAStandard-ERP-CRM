@@ -209,7 +209,7 @@ namespace VAdvantage.Model
                                 string _relatedTo = ds.Tables[0].Rows[i]["Frpt_Relatedto"].ToString();
                                 if (_relatedTo != "")
                                 {
-                                   
+
                                     if (_relatedTo == relatedtoChrge)
                                     {
                                         _sql.Clear();
@@ -223,7 +223,7 @@ namespace VAdvantage.Model
                                         //        int value = Util.GetValueOfInt(ds2.Tables[0].Rows[j]["Frpt_Acctdefault_Id"]);
                                         //        if (value == 0)
                                         //        {
-                                                    //chrgact = new X_FRPT_Charge_Acct(GetCtx(), 0, null);
+                                        //chrgact = new X_FRPT_Charge_Acct(GetCtx(), 0, null);
                                         if (recordFound == 0)
                                         {
                                             //VIS383-DevOps BugID:6004 12/07/2024:-Increase sequence no with 10 for new line
@@ -279,6 +279,33 @@ namespace VAdvantage.Model
         {
             return Delete_Accounting("C_Charge_Acct");
         }	//	beforeDelete
+
+        /// <summary>
+        /// This function is used to set the SAC Code on Trx Line
+        /// </summary>
+        /// <param name="line">Line Object</param>
+        /// <param name="charge">Charge Object</param>
+        /// <param name="charge_id">Charge ID</param>
+        /// <param name="oldHSNcode">Old SAC code</param>
+        /// <param name="isNewPriority">is updated SAC code to be updated</param>
+        /// <author>VIS045: 12-Jan-2026</author>
+        public static void SetChargeHSNCode(PO line, MCharge charge, int charge_id, string oldHSNcode, bool isNewPriority)
+        {
+            if (Env.IsModuleInstalled("VA106_"))
+            {
+                if (charge == null && charge_id > 0)
+                {
+                    charge = MCharge.Get(line.GetCtx(), charge_id);
+                }
+                if (charge != null && charge.Get_ID() > 0 && line != null)
+                {
+                    string newHSNcode = Util.GetValueOfString(charge.Get_Value("VA106_SACCode"));
+                    /* Given priority to new HSN Code*/
+                    newHSNcode = isNewPriority ? newHSNcode : (!string.IsNullOrEmpty(oldHSNcode) ? oldHSNcode : newHSNcode);
+                    line.Set_Value("VAS_HSN_SACCode", newHSNcode);
+                }
+            }
+        }
 
     }
 }
