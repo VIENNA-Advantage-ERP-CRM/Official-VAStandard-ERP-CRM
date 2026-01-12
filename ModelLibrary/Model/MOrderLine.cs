@@ -3978,6 +3978,11 @@ namespace VAdvantage.Model
             {
                 SetProductHSNCode(this, GetProduct(), "", true);
             }
+            else if (GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+                (Is_ValueChanged("C_Charge_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
+            {
+                MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), "", true);
+            }
 
             MOrder Ord = GetParent();
             MDocType docType = MDocType.Get(GetCtx(), Ord.GetC_DocTypeTarget_ID());
@@ -4839,11 +4844,8 @@ namespace VAdvantage.Model
             {
                 string newHSNcode = Util.GetValueOfString(product.Get_Value("VAS_HSN_SACCode"));
                 /* Given priority to new HSN Code*/
-                newHSNcode = !string.IsNullOrEmpty(newHSNcode) && isNewPriority ? newHSNcode : oldHSNcode;
-                if (!string.IsNullOrEmpty(newHSNcode))
-                {
-                    line.Set_Value("VAS_HSN_SACCode", newHSNcode);
-                }
+                newHSNcode = isNewPriority ? newHSNcode : (!string.IsNullOrEmpty(oldHSNcode) ? oldHSNcode : newHSNcode);
+                line.Set_Value("VAS_HSN_SACCode", newHSNcode);
             }
         }
 

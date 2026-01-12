@@ -266,6 +266,10 @@ namespace VAdvantage.Model
                 //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")));
                 MOrderLine.SetProductHSNCode(this, product, Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")), true);
             }
+            else if (oLine.GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), Util.GetValueOfString(oLine.Get_Value("VAS_HSN_SACCode")), true);
+            }
 
             SetC_Charge_ID(oLine.GetC_Charge_ID());
             SetDescription(oLine.GetDescription());
@@ -352,6 +356,10 @@ namespace VAdvantage.Model
             {
                 //Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(iLine.Get_Value("VAS_HSN_SACCode")));
                 MOrderLine.SetProductHSNCode(this, GetProduct(), Util.GetValueOfString(iLine.Get_Value("VAS_HSN_SACCode")), true);
+            }
+            else if (iLine.GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), Util.GetValueOfString(iLine.Get_Value("VAS_HSN_SACCode")), true);
             }
 
             SetC_Charge_ID(iLine.GetC_Charge_ID());
@@ -1115,9 +1123,15 @@ namespace VAdvantage.Model
             }
 
             // VIS_045: 08-Jan-2026, Set Product HSN Code
-            if (GetM_Product_ID() > 0 && _Product != null && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            if (GetM_Product_ID() > 0 && _Product != null && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+               (Is_ValueChanged("M_Product_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
             {
                 MOrderLine.SetProductHSNCode(this, _Product, "", true);
+            }
+            else if (GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+                (Is_ValueChanged("C_Charge_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
+            {
+                MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), "", true);
             }
 
             if (_Product != null && GetC_UOM_ID() != _Product.GetC_UOM_ID())
