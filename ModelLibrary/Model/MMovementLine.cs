@@ -407,7 +407,7 @@ namespace VAdvantage.Model
                 return false;
             }
 
-            if (Env.IsModuleInstalled("DTD001_"))
+            if (Env.IsModuleInstalled("DTD001_") && GetM_RequisitionLine_ID() > 0)
             {
                 if (!newRecord && Util.GetValueOfInt(Get_ValueOld("M_Product_ID")) != GetM_Product_ID())
                 {
