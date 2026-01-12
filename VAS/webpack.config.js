@@ -19,7 +19,7 @@ deleteFilesByPattern(path.resolve(__dirname, 'Areas/VAS/Content'), /^VAS\.all\.m
 
 
 const versions = {
-    'VAS.all': '1.6.9.0',    
+    'VAS.all': '1.6.10.0',    
     'VAS': '1.6.9.0' // CSS Version
 };
 
