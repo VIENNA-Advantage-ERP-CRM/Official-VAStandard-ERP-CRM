@@ -78,7 +78,14 @@ namespace VIS.Models
             // VIS_045: 08-Jan-2026, Set Product HSN Code
             if (orderline.Get_ColumnIndex("VAS_HSN_SACCode") > -1)
             {
-                retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(prod.Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+                if (orderline.GetM_Product_ID() > 0 && prod != null)
+                {
+                    retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(prod.Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+                }
+                else if (orderline.GetC_Charge_ID() > 0)
+                {
+                    retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(MCharge.Get(ctx, orderline.GetC_Charge_ID()).Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+                }
             }
 
             if (Env.IsModuleInstalled("VA077_"))
@@ -99,7 +106,10 @@ namespace VIS.Models
                 retDic["VA077_EndDate"] = Util.GetValueOfString(orderline.Get_Value("VA077_EndDate"));
 
                 //Get Product information
-                retDic["VA077_LicenceTracked"] = Util.GetValueOfString(prod.Get_Value("VA077_LicenceTracked"));
+                if (prod != null)
+                {
+                    retDic["VA077_LicenceTracked"] = Util.GetValueOfString(prod.Get_Value("VA077_LicenceTracked"));
+                }
 
             }
 
