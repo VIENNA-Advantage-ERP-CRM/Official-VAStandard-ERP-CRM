@@ -4470,6 +4470,7 @@ namespace VAdvantage.Process
                                         if (IsCostUpdation)
                                         {
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Shipment is {query.ToString()}");
                                         }
 
                                         _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -4722,6 +4723,7 @@ namespace VAdvantage.Process
                                         if (IsCostUpdation)
                                         {
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Customer Return is {query.ToString()}");
                                         }
 
                                         _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -4952,6 +4954,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return To Vendor is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5037,6 +5040,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return To Vendor is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5259,6 +5263,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for m_inoutline = " + inoutLine.GetM_InOutLine_ID());
@@ -5389,6 +5394,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for m_inoutline = " + inoutLine.GetM_InOutLine_ID());
@@ -5710,6 +5716,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5823,6 +5830,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -6004,6 +6012,7 @@ namespace VAdvantage.Process
                             if (IsCostUpdation)
                             {
                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                             }
                             Get_Trx().Commit();
                         }
@@ -6179,6 +6188,7 @@ namespace VAdvantage.Process
                     }
                 }
                 sql += $@" WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}";
+                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Invoice is {sql}");
                 return DB.ExecuteQuery(sql, null, Get_Trx()) >= 0;
             }
             return true;
@@ -6473,6 +6483,7 @@ namespace VAdvantage.Process
                                     if (IsCostUpdation)
                                     {
                                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Internal Use Inventory is {query.ToString()}");
                                     }
 
                                     _log.Fine("Cost Calculation updated for M_InventoryLine = " + inventoryLine.GetM_InventoryLine_ID());
@@ -6599,6 +6610,7 @@ namespace VAdvantage.Process
                                     if (IsCostUpdation)
                                     {
                                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Physical Inventory is {query.ToString()}");
                                     }
 
                                     _log.Fine("Cost Calculation updated for M_InventoryLine = " + inventoryLine.GetM_InventoryLine_ID());
@@ -6732,6 +6744,7 @@ namespace VAdvantage.Process
                         if (IsCostUpdation)
                         {
                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for AssetDisposal is {query.ToString()}");
                         }
 
                         _log.Fine("Cost Calculation updated for VAFAM_AssetDispoal= " + VAFAM_AssetDisposal_ID);
@@ -6961,6 +6974,8 @@ namespace VAdvantage.Process
                                 {
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                     DB.ExecuteQuery(queryTo.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for From Inventory Move is {query.ToString()}");
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for To Inventory Move is {queryTo.ToString()}");
                                 }
 
                                 _log.Fine("Cost Calculation updated for M_MovementLine = " + movementLine.GetM_MovementLine_ID());
@@ -7197,7 +7212,7 @@ namespace VAdvantage.Process
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Production Execution is {query.ToString()}");
                                     Get_Trx().Commit();
                                 }
                             }
@@ -7249,7 +7264,7 @@ namespace VAdvantage.Process
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Production Execution is {query.ToString()}");
                                     Get_Trx().Commit();
                                 }
                             }

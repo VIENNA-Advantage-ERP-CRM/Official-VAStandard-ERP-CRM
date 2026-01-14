@@ -3496,6 +3496,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
                                     // VIS_045: 19-Mar-2025, Update Match Invoice record (Differenec Price of (AP - PO))
                                     DB.ExecuteQuery($@"UPDATE M_MatchInv 
@@ -3610,6 +3611,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
                                     // calculate cost of Invoice if invoice created before this MR
                                     if (matchedInvoice.Count > 0)
@@ -3760,6 +3762,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                 }
                                 #endregion
                             }
@@ -3848,6 +3851,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                 }
                                 #endregion
                             }
@@ -4456,6 +4460,7 @@ namespace VAdvantage.Model
                         query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Shipment is {query.ToString()}");
                     }
                     #endregion
                 }
@@ -4537,6 +4542,7 @@ namespace VAdvantage.Model
                         query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Customer Return is {query.ToString()}");
                     }
                     #endregion
                 }
