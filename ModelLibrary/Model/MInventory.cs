@@ -2119,6 +2119,7 @@ namespace VAdvantage.Model
                         }
                         sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                         DB.ExecuteQuery(sql, null, Get_Trx());
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Physical Inventory is {sql.ToString()}");
                     }
                 }
                 else // Internal Use Inventory
@@ -2186,6 +2187,7 @@ namespace VAdvantage.Model
                             }
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
+                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Internal Use Inventory is {sql.ToString()}");
                         }
                         else
                         {
@@ -2198,6 +2200,7 @@ namespace VAdvantage.Model
                             sql += " , VAS_PostingCost = " + line.GetPostCurrentCostPrice();
                             sql += " WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID;
                             DB.ExecuteQuery(sql, null, Get_Trx());
+                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Internal Use Inventory (Reversal) is {sql.ToString()}");
                         }
 
                     }

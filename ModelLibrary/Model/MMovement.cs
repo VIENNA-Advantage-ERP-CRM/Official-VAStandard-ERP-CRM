@@ -2028,7 +2028,8 @@ namespace VAdvantage.Model
                         sqlTransactionTo.Append(" , VAS_PostingCost = " + line.GetPostCurrentCostPrice());
                         sqlTransactionTo.Append(" WHERE M_Transaction_ID = " + costingCheck.M_TransactionTo_ID);
                         DB.ExecuteQuery(sqlTransactionTo.ToString(), null, Get_Trx());
-
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for From Material Trf is {sqlTransaction.ToString()}");
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for From Material to is {sqlTransactionTo.ToString()}");
                     }
                 }
             }
