@@ -4067,6 +4067,8 @@ namespace VAdvantage.Model
                                                         query.Append(" , VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
                                                         query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                                     }
                                                 }
                                             }
@@ -4775,6 +4777,8 @@ namespace VAdvantage.Model
                                                     query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
                                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                                 }
                                             }
                                         }
