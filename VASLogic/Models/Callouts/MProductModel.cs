@@ -1231,7 +1231,7 @@ namespace VIS.Models
             MClient client = MClient.Get(ctx);
             StringBuilder _msg = new StringBuilder();
             DateTime? _movementDate = CommonFunctions.CovertMilliToDate(ctx.GetContextAsTime("#Date"));
-
+            bool isAllowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
 
             // check container functionality applicable into system or not
             bool isContainerApplicable = MTransaction.ProductContainerApplicable(ctx);
@@ -1321,6 +1321,23 @@ namespace VIS.Models
                     //	Nothing to Deliver
                     if (product != null && Env.Signum(toDeliver) == 0)
                     {
+                        continue;
+                    }
+                    // Get the lines of Order based on the setting taken on Tenant to allow non item Product     
+                    if (line.GetC_Charge_ID() != 0 && (!isAllowNonItem || Env.Signum(toDeliver) == 0))
+                    {
+                        continue;
+                    }
+
+                    //	Comments & lines w/o product & services
+                    if ((product == null || !product.IsStocked())
+                        && (Env.Signum(line.GetQtyOrdered()) == 0   //	comments
+                            || Env.Signum(toDeliver) != 0))     //	lines w/o product
+                    {
+                        if (!MOrder.DELIVERYRULE_CompleteOrder.Equals(order.GetDeliveryRule())) //	printed later
+                        {
+                            CreateLine(order, line, toDeliver, null, false, false, ctx, trx);
+                        }
                         continue;
                     }
 
@@ -2007,7 +2024,7 @@ namespace VIS.Models
                         if (Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"]) > 0)
                         {
                             //objLine.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ds.Tables[0].Rows[i]["VAS_HSN_SACCode"]));
-                            MOrderLine.SetProductHSNCode(objLine, MProduct.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"])), 
+                            MOrderLine.SetProductHSNCode(objLine, MProduct.Get(ctx, Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_Product_ID"])),
                                 Util.GetValueOfString(ds.Tables[0].Rows[i]["VAS_HSN_SACCode"]), true);
                         }
 
