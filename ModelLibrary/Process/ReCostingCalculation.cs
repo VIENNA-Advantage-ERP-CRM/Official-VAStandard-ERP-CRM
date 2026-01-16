@@ -2376,6 +2376,12 @@ namespace VAdvantage.Process
                     sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ReCostingCalculationTransaction.ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -2789,6 +2795,12 @@ namespace VAdvantage.Process
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ReCostingCalculationTransaction.ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -3123,6 +3135,12 @@ namespace VAdvantage.Process
                     sql.Append($@" AND M_Production_ID IN (SELECT m.M_Production_ID FROM M_Production m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ReCostingCalculationTransaction.ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                sql.Append($@" AND AD_Client_ID IN ({ GetAD_Client_ID() })");
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 sql.Clear();
                 sql.Append($@"UPDATE M_Production  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
