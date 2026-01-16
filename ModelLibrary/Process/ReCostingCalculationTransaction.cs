@@ -2383,6 +2383,12 @@ namespace VAdvantage.Process
                     sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -2796,6 +2802,12 @@ namespace VAdvantage.Process
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -3131,6 +3143,12 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                sql.Append($@" AND AD_Client_ID IN ({ GetAD_Client_ID() })");
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 sql.Clear();
                 sql.Append($@"UPDATE M_Production  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
                 sql.Append(@" , Posted ='N' ");
@@ -3261,6 +3279,60 @@ namespace VAdvantage.Process
 
             Get_Trx().Commit();
 
+        }
+
+        /// <summary>
+        /// This function is used to create the query to set Amt = 0 for the Charge Line for the reversal record 
+        /// </summary>
+        /// <param name="fromDate">Date From</param>
+        /// <param name="productCategoryIDs">Product Category IDs</param>
+        /// <param name="productIDs">Product IDs</param>
+        /// <param name="ASI">Attributesetinstance id</param>
+        /// <returns>Sql Query</returns>
+        /// <author>VIS_045: 16-Jan-2025</author>
+        public static string ResetAssemblyChargeCost(DateTime? fromDate, string productCategoryIDs, string productIDs, int ASI)
+        {
+            StringBuilder queryAssembly = new StringBuilder();
+            queryAssembly.Clear();
+            queryAssembly.AppendLine("UPDATE m_productionline mpl ");
+            queryAssembly.AppendLine(" SET Amt = 0");
+            queryAssembly.AppendLine(" WHERE COALESCE(mpl.C_Charge_ID, 0) > 0");
+            if (fromDate != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                        SELECT M_Production_ID
+                        FROM M_Production m
+                        WHERE m.M_Production_ID = mpl.M_Production_ID
+                        AND m.MovementDate >= {GlobalVariable.TO_DATE(fromDate, true)} )");
+            }
+            if (productCategoryIDs != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID FROM M_ProductionLine pl WHERE pl.M_Product_ID IN (
+                    SELECT M_Product_ID FROM M_Product p
+                    WHERE p.M_Product_Category_ID IN ({productCategoryIDs}))");
+                if (ASI > 0)
+                {
+                    queryAssembly.Append($@" AND M_AttributeSetInstance_ID = {ASI} ");
+                }
+                queryAssembly.Append(")");
+            }
+            else if (productIDs != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID FROM M_ProductionLine pl WHERE pl.M_Product_ID IN ({productIDs})");
+                if (ASI > 0)
+                {
+                    queryAssembly.Append($@" AND M_AttributeSetInstance_ID = {ASI} ");
+                }
+                queryAssembly.Append(")");
+            }
+            queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID 
+                    FROM M_Production m
+                    WHERE m.M_Production_ID = mpl.M_Production_ID
+                    AND m.IsReversed = 'Y' )");
+            return queryAssembly.ToString();
         }
 
         /// <summary>
