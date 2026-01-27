@@ -277,6 +277,7 @@
     <Compile Include="Model\MRegion.cs" />
     <Compile Include="Model\MSalesRegion.cs" />
     <Compile Include="ModelAD\MSetup.cs" />
+    <Compile Include="Model\MTeam.cs" />
     <Compile Include="Model\MVASContractLine.cs" />
     <Compile Include="Model\MVASContractTerms.cs" />
     <Compile Include="Model\MVASContractOwner.cs" />
@@ -581,6 +582,7 @@
     <Compile Include="Model\Storage.cs" />
     <Compile Include="Model\Tax.cs" />
     <Compile Include="Model\UserPricingVO.cs" />
+    <Compile Include="Model\X_C_Team.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\CopyFromProjectLine.cs" />
     <Compile Include="Process\CostClosing.cs" />
