@@ -164,7 +164,7 @@ namespace VAdvantage.Model
 
                     if (childCount > 0)
                     {
-                        log.SaveError("",Msg.GetMsg(GetCtx(),"VA137_RecordNotSaved"));
+                        log.SaveError("",Msg.GetMsg(GetCtx(), "VA137_ChildExistRecordNotSaved"));
                         return false;
                     }
                 }
