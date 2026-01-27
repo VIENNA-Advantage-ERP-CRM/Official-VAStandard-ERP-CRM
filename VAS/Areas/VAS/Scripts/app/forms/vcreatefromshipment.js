@@ -66,9 +66,10 @@
             // New column added to fill invoice which drop ship is true
             // Added by Vivek on 09/10/2017 advised by Pradeep
             var _isdrop = "Y".equals(VIS.Env.getCtx().getWindowContext(selfChild.windowNo, "IsDropShip"));
+            var _isSoTrx = "Y".equals(VIS.Env.getCtx().getWindowContext(selfChild.windowNo, "IsSOTrx"));
 
             var sql = " C_Invoice.C_Invoice_ID IN (SELECT i.C_Invoice_ID FROM C_Invoice i INNER JOIN C_DocType d ON (i.C_DocType_ID = d.C_DocType_ID) "
-                + "WHERE i.C_BPartner_ID=" + C_BPartner_ID + " AND i.IsSOTrx='N' AND i.IsDropShip='" + (_isdrop ? "Y" : "N") + "' "
+                + "WHERE i.C_BPartner_ID=" + C_BPartner_ID + " AND i.IsSOTrx='" + (_isSoTrx ? "Y" : "N") + "' AND i.IsDropShip='" + (_isdrop ? "Y" : "N") + "' "
                 + "AND d.IsReturnTrx='" + (isReturnTrx ? "Y" : "N") + "' AND i.DocStatus IN ('CL','CO') AND i.TreatAsDiscount = 'N' AND i.C_Invoice_ID IN "
                 + "(SELECT C_Invoice_ID FROM (SELECT il.C_Invoice_ID,il.C_InvoiceLine_ID,il.QtyInvoiced,mi.Qty FROM C_InvoiceLine il "
                 + " LEFT OUTER JOIN M_MatchInv mi ON (il.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) ";
