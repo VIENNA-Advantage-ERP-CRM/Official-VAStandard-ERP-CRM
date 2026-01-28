@@ -60,46 +60,46 @@ namespace VAdvantage.Model
         /// <param name="teamLevel"></param>
         /// <returns>Team Code</returns>
         /// <author>VIS_427</author>
-        private string GenerateTeamCode(int parentTeamId, string teamType, int teamLevel)
+        private string GenerateTeamCode(int parentTeamId, string teamType, int pickListLineId)
         {
-            string sql = "";
+            string parentCode = "";
+            int nextNo;
 
-            // ROOT TEAM (Level 1)
-            if (parentTeamId <= 0 && teamLevel == 1)
+            /* ================= PARENT CODE (ONLY FOR STRUCTURE) ================= */
+            if (parentTeamId > 0)
             {
-                sql = @"
-            SELECT
-                   VA137_TEAMTYPE
-                   || '-' ||
-                   TO_CHAR(COUNT(C_TEAM_ID) + 1)
+                parentCode = Util.GetValueOfString(DB.ExecuteScalar(@"
+            SELECT VALUE
             FROM C_TEAM
-            WHERE VA137_TEAMTYPE = '" + teamType + @"'
-            AND VA137_TEAM_ID IS NULL
-            GROUP BY VA137_TEAMTYPE";
-            }
-            // CHILD TEAM (Level >= 2)
-            else
-            {
-                sql = @"
-            SELECT
-                   p.VALUE
-                   || '-' ||
-                   TO_CHAR(NVL(c.cnt, 0) + 1)
-            FROM C_TEAM p
-            LEFT JOIN (
-                    SELECT
-                           VA137_TEAM_ID,
-                           COUNT(C_TEAM_ID) cnt
-                    FROM C_TEAM
-                    WHERE VA137_TEAMTYPE = '" + teamType + @"'
-                    GROUP BY VA137_TEAM_ID
-            ) c
-            ON c.VA137_TEAM_ID = p.C_TEAM_ID
-            WHERE p.C_TEAM_ID = " + parentTeamId;
+            WHERE C_TEAM_ID = " + parentTeamId, null, Get_Trx()));
             }
 
-            return Util.GetValueOfString(DB.ExecuteScalar(sql,null,Get_Trx()));
+            /*picked the next code based on maximum value of previous record*/
+            string sql = @"
+        SELECT COALESCE(
+                 MAX(
+                   CAST(
+                     REGEXP_REPLACE(VALUE, '.*-', '') AS INTEGER
+                   )
+                 ), 0
+               ) + 1
+        FROM C_TEAM
+        WHERE VA137_TEAMTYPE = '" + teamType + @"'
+        AND VA137_PICKLISTLINE_ID = " + pickListLineId;
+
+            nextNo = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+
+            /* ================= ROOT TEAM ================= */
+            if (parentTeamId <= 0)
+                return teamType + "-" + nextNo;
+
+            /* ================= CHILD TEAM ================= */
+            return parentCode + "-" + nextNo;
         }
+
+
+
+
         /// <summary>
         /// This function used to get team id of level2 team
         /// </summary>
@@ -171,13 +171,36 @@ namespace VAdvantage.Model
                 if (newRecord || Is_ValueChanged("VA137_PickListLine_ID") || Is_ValueChanged("VA137_Team_ID"))
                 {
                     //Team Code
-                    string teamCode = GenerateTeamCode(parentTeamId, GetVA137_TeamType(), teamLevel);
-                    SetValue(teamCode);
+                    string teamCode = GenerateTeamCode(parentTeamId, GetVA137_TeamType(), GetVA137_PickListLine_ID());
+                    SetValue(teamCode) ;
                 }
             }
 
             return true;
         }
+        /// <summary>
+        /// This function is used to delete the record
+        /// </summary>
+        /// <returns>true</returns>
+        protected override bool BeforeDelete()
+        {
+            if (Env.IsModuleInstalled("VA137_"))
+            {
+                int childCount = Util.GetValueOfInt(DB.ExecuteScalar(@"
+        SELECT COUNT(C_TEAM_ID)
+        FROM C_TEAM
+        WHERE VA137_TEAM_ID = " + GetC_Team_ID(), null, Get_Trx()));
+
+                if (childCount > 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_ChildExistRecordNotDeleted"));
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
 
 
     }
