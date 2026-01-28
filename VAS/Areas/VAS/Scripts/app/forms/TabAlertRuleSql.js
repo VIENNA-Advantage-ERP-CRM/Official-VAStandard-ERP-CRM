@@ -3335,10 +3335,36 @@
             var columnName = self.attr("DBColumnName");
             var tableName = self.attr("TableName");
             var refrenceValue = self.attr('refvalid');
-            if (!VIS.DisplayType.IsLookup(displayType)) {
+            /*if (!VIS.DisplayType.IsLookup(displayType)) {
                 for (var i = 0; i < record.length; i++) {
                     if (record[i][columnName]) {
                         htmlString += '<div class="vas-filterValItem" isNameExist="' + false + '"DBColumnName="' + columnName + '" tableName="' + tableName + '" value="' + record[i][columnName] + '">' + record[i][columnName] + '</div>';
+                    }
+                }
+            }*/
+
+            if (!VIS.DisplayType.IsLookup(displayType)) {
+                for (var i = 0; i < record.length; i++) {
+                    var keys = Object.keys(record[i]);
+                    var matchKey = null;
+                    for (var k = 0; k < keys.length; k++) {
+                        if (keys[k].toLowerCase() === columnName.toLowerCase()) {
+                            matchKey = keys[k];
+                            break;
+                        }
+                    }
+                    if (matchKey == null)
+                        continue;
+
+                    var value = record[i][matchKey];
+                    if (value != null && value !== "") {
+                        htmlString +=
+                            '<div class="vas-filterValItem" isNameExist="' +
+                            false +
+                            '" DBColumnName="' + columnName +
+                            '" tableName="' + tableName +
+                            '" value="' + value +
+                            '">' + value + '</div>';
                     }
                 }
             }

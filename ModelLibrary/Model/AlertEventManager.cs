@@ -564,7 +564,7 @@ namespace VAdvantage.Alert
                 borderColor = "rgb(254, 202, 202)";
             }
             string performerImageUrl = GetUserImageUrl(document.GetCtx(), document.GetCtx().GetAD_User_ID());
-
+            string userEmail= GetUserEmail(document.GetCtx(), document.GetCtx().GetAD_User_ID());
             string firstLetter = "U";
             if (string.IsNullOrEmpty(performerName))
             {
@@ -622,7 +622,8 @@ namespace VAdvantage.Alert
                       <td style='padding-left: 12px; vertical-align: middle;'>
                         <div style='font-size: 14px; color: #475569;'>{Msg.Translate(document.GetCtx(), "VAS_Performeby")}</div>
                         <div style='font-size: 14px; color: #0f172a; font-weight: bold; margin: 2px 0;'>{performerName}</div>
-                      </td>
+                        <div style='font-size: 12px; color: rgb(100, 116, 139); '>{userEmail}</div>
+                         </td>
                     </tr>
                   </table>
                   <div style='height: 1px; background-color: #e2e8f0; margin: 12px 0;'></div>
@@ -690,6 +691,23 @@ namespace VAdvantage.Alert
 
             string base64Svg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svg));
             return $"data:image/svg+xml;base64,{base64Svg}";*/
+        }
+
+
+        /// <summary>
+        /// Get User Email
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="userId">AD_User_ID</param>
+        /// <returns>Email</returns>
+        private string GetUserEmail(Ctx ctx, int userId)
+        {
+            MUser user = MUser.Get(ctx, userId);
+            if (user != null)
+            {
+                return user.GetEMail();
+            }
+            return "";
         }
 
         /// <summary>
