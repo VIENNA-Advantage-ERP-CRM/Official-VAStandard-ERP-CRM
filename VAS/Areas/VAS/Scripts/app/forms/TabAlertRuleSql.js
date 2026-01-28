@@ -991,10 +991,12 @@
                     else if (obj.chkDynamic === 'Y') {
                         data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
                     }
-                    else if (VIS.DisplayType.String == dataType || VIS.DisplayType.List == dataType ||
-                        VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType ||
-                        VIS.DisplayType.DateTime == dataType || VIS.DisplayType.Date == dataType) {
+                    else if (VIS.DisplayType.String == dataType || VIS.DisplayType.YesNo == dataType || VIS.DisplayType.List == dataType ||
+                        VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType) {
                         data += '<span class="vas-filter-price-value">\'' + obj.filterValue + '\'</span>';
+                    }
+                    else if (VIS.DisplayType.DateTime == dataType || VIS.DisplayType.Date == dataType) {
+                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
                     }
                     else {
                         data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
@@ -1177,7 +1179,7 @@
                     });
                     var obj = filterArray[filterItem.index()];
 
-                    if (obj.chkDynamic) {
+                    if (obj.chkDynamic=='Y') {
                         isDynamic.prop("checked", true);
                         $filterOperator.val(">=");
                         $filterOperator.addClass('vas-disabled-icon');
@@ -1195,9 +1197,10 @@
                        
                     }
                     else {
-                        isDynamic.prop("checked", false);
-                        $filterOperator.removeClass('vas-disabled-icon');
-                        $filterDateList.prop("disabled", true);
+                      //  isDynamic.prop("checked", false);
+                       // $filterOperator.removeClass('vas-disabled-icon');
+                       // $filterDateList.prop("disabled", true);
+                        resetDynamicControls();
                     }
 
 
@@ -2491,7 +2494,6 @@
             });
         }
 
-
         /*
             Onchange function to get the table data
         */
@@ -2675,8 +2677,26 @@
             $filterCurrentDate.find('input').prop('checked', false);
             $filterValue.prop('checked', false);
             $filterValueDiv.show();
+            resetDynamicControls();
         }
 
+        //reset the dynamic controls
+        function resetDynamicControls() {
+            isDynamic.prop("checked", false);
+            $filterOperator.val(''); // or its default
+            $filterOperator.removeClass('vas-disabled-icon');
+
+            $filterDateList.prop("disabled", true);
+            $filterDateList.prop("selectedIndex", 0);
+
+            txtYear.val('');
+            txtMonth.val('');
+            txtDay.val('');
+
+            divYear.hide();
+            divMonth.hide();
+            divDay.hide();
+        }
 
         function GetLookup(columnDatatype, columnID, columnName, refrenceID, isParent, tableName) {
             var result = "";
@@ -2945,7 +2965,7 @@
                                 "WindowID='" + result[i].WindowID + "' " +
                                 "tabID='" + tabID + "' " +
                                 "DBColumnName='" + result[i].DBColumn + "' " +
-                                "TableName='" + mainTableName + "' " +
+                                "TableName='" + joinTable + "' " +
                                 "fieldName='" + result[i].FieldName + "' " +
                                 "columnID='" + result[i].ColumnID + "' " +
                                 "datatype='" + result[i].DataType + "' " +
