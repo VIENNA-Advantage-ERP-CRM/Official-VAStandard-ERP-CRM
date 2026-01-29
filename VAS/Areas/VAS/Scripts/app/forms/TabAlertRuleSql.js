@@ -953,11 +953,12 @@
 
                     var obj = filterArray[i];
                     var dataType = obj.dataType;
+                    var filterValue = obj.filterValue;
 
                     data += '<div class="vas-filter-item" value="' + obj.filterVal +
                         '" colVersion="' + obj.columnVersion +
                         '" dataType="' + dataType +
-                        '" filterId="' + obj.filterValue +
+                        '" filterId="' + filterValue +
                         '" index="' + i + '">';
 
                     data += '<div class="vas-filter-whitebg" style="background-color:' + randomColor() + '">';
@@ -987,17 +988,13 @@
                     // VALUE
                     if (obj.filterCondition == 'IS NULL' || obj.filterCondition == 'IS NOT NULL') {
                         data += '<span class="vas-filter-price-value"></span>';
-                    }
-                    else if (obj.chkDynamic === 'Y') {
-                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
-                    }
-                    else if (VIS.DisplayType.String == dataType || VIS.DisplayType.List == dataType ||
-                        VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType ||
-                        VIS.DisplayType.DateTime == dataType || VIS.DisplayType.Date == dataType) {
-                        data += '<span class="vas-filter-price-value">\'' + obj.filterValue + '\'</span>';
+                    }                  
+                    else if (VIS.DisplayType.String == dataType || VIS.DisplayType.YesNo == dataType || VIS.DisplayType.List == dataType ||
+                        VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType) {
+                        data += '<span class="vas-filter-price-value">\'' + filterValue + '\'</span>';
                     }
                     else {
-                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
+                        data += '<span class="vas-filter-price-value">' + filterValue + '</span>';
                     }
 
                     data += '</div>';
@@ -1177,7 +1174,7 @@
                     });
                     var obj = filterArray[filterItem.index()];
 
-                    if (obj.chkDynamic) {
+                    if (obj.chkDynamic=='Y') {
                         isDynamic.prop("checked", true);
                         $filterOperator.val(">=");
                         $filterOperator.addClass('vas-disabled-icon');
@@ -1195,9 +1192,10 @@
                        
                     }
                     else {
-                        isDynamic.prop("checked", false);
-                        $filterOperator.removeClass('vas-disabled-icon');
-                        $filterDateList.prop("disabled", true);
+                      //  isDynamic.prop("checked", false);
+                       // $filterOperator.removeClass('vas-disabled-icon');
+                       // $filterDateList.prop("disabled", true);
+                        resetDynamicControls();
                     }
 
 
@@ -2491,7 +2489,6 @@
             });
         }
 
-
         /*
             Onchange function to get the table data
         */
@@ -2675,8 +2672,26 @@
             $filterCurrentDate.find('input').prop('checked', false);
             $filterValue.prop('checked', false);
             $filterValueDiv.show();
+            resetDynamicControls();
         }
 
+        //reset the dynamic controls
+        function resetDynamicControls() {
+            isDynamic.prop("checked", false);
+            $filterOperator.val(''); // or its default
+            $filterOperator.removeClass('vas-disabled-icon');
+
+            $filterDateList.prop("disabled", true);
+            $filterDateList.prop("selectedIndex", 0);
+
+            txtYear.val('');
+            txtMonth.val('');
+            txtDay.val('');
+
+            divYear.hide();
+            divMonth.hide();
+            divDay.hide();
+        }
 
         function GetLookup(columnDatatype, columnID, columnName, refrenceID, isParent, tableName) {
             var result = "";
@@ -2945,7 +2960,7 @@
                                 "WindowID='" + result[i].WindowID + "' " +
                                 "tabID='" + tabID + "' " +
                                 "DBColumnName='" + result[i].DBColumn + "' " +
-                                "TableName='" + mainTableName + "' " +
+                                "TableName='" + joinTable + "' " +
                                 "fieldName='" + result[i].FieldName + "' " +
                                 "columnID='" + result[i].ColumnID + "' " +
                                 "datatype='" + result[i].DataType + "' " +
@@ -3315,10 +3330,36 @@
             var columnName = self.attr("DBColumnName");
             var tableName = self.attr("TableName");
             var refrenceValue = self.attr('refvalid');
-            if (!VIS.DisplayType.IsLookup(displayType)) {
+            /*if (!VIS.DisplayType.IsLookup(displayType)) {
                 for (var i = 0; i < record.length; i++) {
                     if (record[i][columnName]) {
                         htmlString += '<div class="vas-filterValItem" isNameExist="' + false + '"DBColumnName="' + columnName + '" tableName="' + tableName + '" value="' + record[i][columnName] + '">' + record[i][columnName] + '</div>';
+                    }
+                }
+            }*/
+
+            if (!VIS.DisplayType.IsLookup(displayType)) {
+                for (var i = 0; i < record.length; i++) {
+                    var keys = Object.keys(record[i]);
+                    var matchKey = null;
+                    for (var k = 0; k < keys.length; k++) {
+                        if (keys[k].toLowerCase() === columnName.toLowerCase()) {
+                            matchKey = keys[k];
+                            break;
+                        }
+                    }
+                    if (matchKey == null)
+                        continue;
+
+                    var value = record[i][matchKey];
+                    if (value != null && value !== "") {
+                        htmlString +=
+                            '<div class="vas-filterValItem" isNameExist="' +
+                            false +
+                            '" DBColumnName="' + columnName +
+                            '" tableName="' + tableName +
+                            '" value="' + value +
+                            '">' + value + '</div>';
                     }
                 }
             }
