@@ -953,11 +953,12 @@
 
                     var obj = filterArray[i];
                     var dataType = obj.dataType;
+                    var filterValue = obj.filterValue;
 
                     data += '<div class="vas-filter-item" value="' + obj.filterVal +
                         '" colVersion="' + obj.columnVersion +
                         '" dataType="' + dataType +
-                        '" filterId="' + obj.filterValue +
+                        '" filterId="' + filterValue +
                         '" index="' + i + '">';
 
                     data += '<div class="vas-filter-whitebg" style="background-color:' + randomColor() + '">';
@@ -987,19 +988,13 @@
                     // VALUE
                     if (obj.filterCondition == 'IS NULL' || obj.filterCondition == 'IS NOT NULL') {
                         data += '<span class="vas-filter-price-value"></span>';
-                    }
-                    else if (obj.chkDynamic === 'Y') {
-                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
-                    }
+                    }                  
                     else if (VIS.DisplayType.String == dataType || VIS.DisplayType.YesNo == dataType || VIS.DisplayType.List == dataType ||
                         VIS.DisplayType.Text == dataType || VIS.DisplayType.TextLong == dataType) {
-                        data += '<span class="vas-filter-price-value">\'' + obj.filterValue + '\'</span>';
-                    }
-                    else if (VIS.DisplayType.DateTime == dataType || VIS.DisplayType.Date == dataType) {
-                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
+                        data += '<span class="vas-filter-price-value">\'' + filterValue + '\'</span>';
                     }
                     else {
-                        data += '<span class="vas-filter-price-value">' + obj.filterValue + '</span>';
+                        data += '<span class="vas-filter-price-value">' + filterValue + '</span>';
                     }
 
                     data += '</div>';

@@ -566,7 +566,7 @@ namespace VAdvantage.Alert
             string performerImageUrl = GetUserImageUrl(document.GetCtx(), document.GetCtx().GetAD_User_ID());
             string userEmail= GetUserEmail(document.GetCtx(), document.GetCtx().GetAD_User_ID());
             string firstLetter = "U";
-            if (string.IsNullOrEmpty(performerName))
+            if (!string.IsNullOrEmpty(performerName))
             {
                 firstLetter = performerName.Substring(0, 1).ToUpper();
             }
