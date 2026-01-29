@@ -164,7 +164,7 @@ namespace VAdvantage.Alert
         FROM AD_Field f
         INNER JOIN AD_Column c ON c.AD_Column_ID = f.AD_Column_ID
         WHERE f.AD_Tab_ID = " + tabID + @" 
-          AND f.IsActive = 'Y' ORDER BY f.Name";
+          AND f.IsActive = 'Y' ORDER BY f.SeqNo";
 
             DataSet ds = DB.ExecuteDataset(sql);
 
@@ -564,6 +564,27 @@ namespace VAdvantage.Alert
                 borderColor = "rgb(254, 202, 202)";
             }
             string performerImageUrl = GetUserImageUrl(document.GetCtx(), document.GetCtx().GetAD_User_ID());
+            string userEmail= GetUserEmail(document.GetCtx(), document.GetCtx().GetAD_User_ID());
+            string firstLetter = "U";
+            if (!string.IsNullOrEmpty(performerName))
+            {
+                firstLetter = performerName.Substring(0, 1).ToUpper();
+            }
+
+            string performerAvatarHtml = performerImageUrl != null
+                ? $"<img src='{performerImageUrl}' alt='User' style='width: 32px; height: 32px; border-radius: 50%; display: block;'>"
+                : $@"<div style='
+            width:32px;
+            height:32px;
+            border-radius:50%;
+            background:#6366f1;
+            color:white;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            font-size:14px;
+            font-weight:bold;
+        '>{firstLetter}</div>";
 
             // Full HTML email
             string html = $@"
@@ -596,13 +617,13 @@ namespace VAdvantage.Alert
                   <table cellpadding='0' cellspacing='0' border='0' style='width: 100%;'>
                     <tr>
                       <td style='width: 32px; vertical-align: top;'>
-                        <img src='{performerImageUrl}' 
-     alt='User' style='width: 32px; height: 32px; border-radius: 50%; display: block;'>
+                        {performerAvatarHtml}
                       </td>
                       <td style='padding-left: 12px; vertical-align: middle;'>
                         <div style='font-size: 14px; color: #475569;'>{Msg.Translate(document.GetCtx(), "VAS_Performeby")}</div>
                         <div style='font-size: 14px; color: #0f172a; font-weight: bold; margin: 2px 0;'>{performerName}</div>
-                      </td>
+                        <div style='font-size: 12px; color: rgb(100, 116, 139); '>{userEmail}</div>
+                         </td>
                     </tr>
                   </table>
                   <div style='height: 1px; background-color: #e2e8f0; margin: 12px 0;'></div>
@@ -652,9 +673,10 @@ namespace VAdvantage.Alert
                     return "data:image/*;base64, " + Convert.ToBase64String((byte[])img.GetBinaryData());
                 }
             }
+            return null;
 
             // Fallback SVG if no image URL found
-            string firstLetter = user != null
+            /*string firstLetter = user != null
                 ? user.GetName().Substring(0, 1).ToUpper()
                 : "U";
 
@@ -668,7 +690,24 @@ namespace VAdvantage.Alert
 </svg>";
 
             string base64Svg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svg));
-            return $"data:image/svg+xml;base64,{base64Svg}";
+            return $"data:image/svg+xml;base64,{base64Svg}";*/
+        }
+
+
+        /// <summary>
+        /// Get User Email
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="userId">AD_User_ID</param>
+        /// <returns>Email</returns>
+        private string GetUserEmail(Ctx ctx, int userId)
+        {
+            MUser user = MUser.Get(ctx, userId);
+            if (user != null)
+            {
+                return user.GetEMail();
+            }
+            return "";
         }
 
         /// <summary>
