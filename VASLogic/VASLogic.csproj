@@ -143,6 +143,7 @@
     <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
     <Compile Include="Models\VAS_PaymentWidgetModel.cs" />
+    <Compile Include="Models\VAS_RequestModel.cs" />
     <Compile Include="Models\VAS_TimeSheetInvoice.cs" />
     <Compile Include="Models\VBOMDropModel.cs" />
     <Compile Include="Models\VChargeModel.cs" />
