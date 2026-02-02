@@ -1115,6 +1115,7 @@ namespace VAdvantage.Model
 
             if (_changed)
             {
+                Set_Value("VAS_IsRead", true);
                 if (sendInfo.Count > 0)
                 {
                     // get the columns which were changed.

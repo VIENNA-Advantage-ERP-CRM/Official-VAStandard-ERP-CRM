@@ -237,9 +237,9 @@
     float: left;
 }
 
-    .vas-select-plus-btn input[type='button'] {
-        margin: 0px;
-    }
+.vas-select-plus-btn input[type='button'] {
+    margin: 0px;
+}
 
 .vis-ad-w-p-actionpanel-r .vas-sqlgenerator-column2 textarea {
     width: 100%;
@@ -318,12 +318,12 @@
             margin-bottom: 0px;
         }
 
-    .vas-filters .vas-filter-item .vas-filter-item-inner {
-        float: left;
-        width: 100%;
-        background: rgba(var(--v-c-on-primary));
-        padding: 10px 10px;
-    }
+        .vas-filters .vas-filter-item .vas-filter-item-inner {
+            float: left;
+            width: 100%;
+            background: rgba(var(--v-c-on-primary));
+            padding: 10px 10px;
+        }
 
     .vas-filters .vas-filter-item {
         background: rgba(var(--v-c-on-primary));
@@ -375,6 +375,7 @@
     position: relative;
     font-size: 83%;
 }
+
     .vas-filters-block div {
         border-radius: 3px;
         float: left;
@@ -515,7 +516,7 @@
     }
 
 .vas-alert-emailmsg {
-    margin-top:15px;
+    margin-top: 15px;
 }
 
 .vas-grid-div1 {
@@ -542,7 +543,7 @@
 }
 
 .vas-root-main {
-    height:100%;
+    height: 100%;
 }
 
 .vas-control-wrap {
@@ -696,13 +697,13 @@
         color: rgba(var(--v-c-on-primary));
     }
 
-    .vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
-        display: none;
-    }
+.vas-add-isnulloption option:last-child, .vas-add-isnulloption option:nth-last-child(2) {
+    display: none;
+}
 
-    .vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
-        display: block;
-    }
+.vas-add-isnulloption option:nth-child(1), .vas-add-isnulloption option:nth-child(2), .vas-add-isnulloption option:nth-last-child(4), .vas-add-isnulloption option:nth-last-child(3), .vas-add-isnulloption option:nth-last-child(2), .vas-add-isnulloption option:last-child {
+    display: block;
+}
 
 .vas-remove-likeoption option:nth-last-child(3), .vas-remove-likeoption option:nth-last-child(4) {
     display: none;
@@ -1194,6 +1195,7 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-root-eventmain {
     padding: 20px;
 }
+
 .vas-tis-gridimg {
     display: flex;
     /* justify-content: center; */
@@ -1214,9 +1216,9 @@ html[dir="rtl"] .vas-sql-result-msg {
 }
 
 .vas-tis-filter .dropdown-toggle::after {
-    display: none ;
-
+    display: none;
 }
+
 .vas-tis-filter {
     margin: -9px;
     display: inline-block;
@@ -1251,30 +1253,36 @@ html[dir="rtl"] .vas-sql-result-msg {
     overflow-x: hidden;
     background: rgb(235 235 235);
 }
+
 .vas-tis-lablels {
     background: rgb(235 235 235);
 }
+
 .vas-tis-leftbuttondiv {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 10px;
 }
+
 .vas-tis-leftbtnInvdiv {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     padding-bottom: 10px;
 }
+
 .vas-tis-subtotal {
     width: calc(100% - 50%);
     float: right;
     padding: 4px 12px;
     text-align: right;
 }
+
 .vas-tis-leftsidewrap .vas-tis-top-fields label.vas-tis-lablels {
     background: rgb(235,235,235) !important;
 }
+
 .vas-tis-iconcolor {
     display: inline-block;
     font-size: 16px;
@@ -1286,6 +1294,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .w-25 {
     width: 25%;
 }
@@ -1306,6 +1315,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     background-color: #f1f1f1;
     min-height: 75px;
 }
+
 .vas-tis-requestsummary {
     background-color: #f1f1f1;
 }
@@ -1615,12 +1625,15 @@ html[dir="rtl"] .vas-sql-result-msg {
     /* Add specific styling for span elements here */
     color: #b2b2b2; /* Grey color */
 }
+
 .vas-tis-steps-col.vas-tis-step-drafted:nth-child(3)::after {
     background-color: #d9a117a6;
 }
+
 .vas-tis-next-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
     background-color: #d9a117a6;
 }
+
 .vas-tis-steps-col.vas-tis-step-null:nth-child(3)::after {
     background-color: #b2b2b2;
 }
@@ -1628,9 +1641,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-tis-next-row .vas-tis-steps-col.vas-tis-step-null:first-child::after {
     background-color: #b2b2b2;
 }
+
 .vas-tis-next-row .vas-tis-steps-col.vas-tis-step-inprogress:first-child::after {
     background-color: #BC7C7A;
 }
+
 .vas-tis-reverse-row .vas-tis-steps-col.vas-tis-step-drafted:first-child::after {
     background-color: #d9a117a6;
 }
@@ -1640,14 +1655,17 @@ html[dir="rtl"] .vas-sql-result-msg {
     width: 19rem;
     float: left;
 }
-.vas-tis-btnmargin{
-    margin-top:0;
+
+.vas-tis-btnmargin {
+    margin-top: 0;
 }
+
 .vas-tis-refreshicon {
     margin: 7px 10px 0 0;
     display: inline-block;
 }
-.vas-tis-icondiv{
+
+.vas-tis-icondiv {
     float: left;
 }
 
@@ -1657,6 +1675,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     float: none;
     width: auto;
 }
+
 .vas-dateBlock .vis-advancedSearchInput {
     flex-basis: 33%;
     margin-right: 0;
@@ -1672,9 +1691,11 @@ html[dir="rtl"] .vas-sql-result-msg {
 .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] {
     margin-right: 4px;
 }
+
     .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] + label {
         margin-right: 7px;
     }
+
 .vas-dateBlock .vis-advancedSearchInput select {
     margin: 0;
 }
@@ -1708,6 +1729,7 @@ html[dir="rtl"] .vas-sql-result-msg {
     justify-content: space-between;
     align-items: center;*/
 }
+
     .VAS-pagingDiv li:first-child {
         background: rgba(var(--v-c-common), 1);
         border: 1px solid rgba(0, 0, 0, .18);
@@ -1716,27 +1738,47 @@ html[dir="rtl"] .vas-sql-result-msg {
         border-bottom-left-radius: 5px;
         border-top-left-radius: 5px;
     }
+
     .VAS-pagingDiv li:nth-child(2) {
         margin: 0;
         border-radius: 0;
         border-left: 0;
         padding: 0px;
     }
+
     .VAS-pagingDiv li i {
         font-size: 12px;
     }
+
     .VAS-pagingDiv li select {
         font-size: 15px;
     }
-        .VAS-pagingDiv li select:focus{
+
+        .VAS-pagingDiv li select:focus {
             border-color: transparent;
         }
-        .VAS-pagingDiv li:last-child {
-            min-width: 24px;
-        }
+
+    .VAS-pagingDiv li:last-child {
+        min-width: 24px;
+    }
+
 .vas-single-input .vas-select-col.vas-disable-filtercolumn {
-    background-color: #d3d3d342;
+    background-color: #d3d3d342;    
 }
+
+.VAS-ticket-highlight {
+    border-color: rgba(var(--v-c-primary), .4);
+    box-shadow: 0 0 4px 2px rgba(var(--v-c-primary), .3);    
+}
+
+    .VAS-ticket-highlight .vis-w-feedTitleBar {
+        background-color: #B2E0FD;
+    }
+
+        .VAS-ticket-highlight .vis-w-feedTitleBar h3 {
+            font-weight: bold;
+        }
+
 html[dir=rtl] .vas-filters-editdelete-btns {
     float: left;
 }
