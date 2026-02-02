@@ -226,7 +226,17 @@ namespace VAdvantage.Model
                 return;
             //
             int dueDateTolerance = GetRequestType().GetDueDateTolerance();
-            DateTime overdue = TimeUtil.AddDays(due, dueDateTolerance);
+            DateTime overdue;
+
+            //VIS0060: Changes done to exclude non business days based on setting on request type.
+            if (Util.GetValueOfString(_requestType.Get_Value("VAS_ExcludeNBDays")).Equals("Y"))
+            {
+                overdue = MNonBusinessDay.ExcludeNonBusinessDay(GetCtx(), due, dueDateTolerance, GetAD_Org_ID());
+            }
+            else
+            {
+                overdue = TimeUtil.AddDays(due, dueDateTolerance);
+            }
             DateTime now = System.DateTime.Now;
             //
             String DueType = DUETYPE_Due;
@@ -907,10 +917,17 @@ namespace VAdvantage.Model
                     if (IsInvoiced() != _requestType.IsInvoiced())
                         SetIsInvoiced(_requestType.IsInvoiced());
                     if (GetDateNextAction() == null && _requestType.GetAutoDueDateDays() > 0)
-                        //VIS_427-Bug Id 2105: calculated the according the system time
-                        SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
-
+                        //VIS0060: Changes done to exclude non business days based on setting on request type.
+                        if (Util.GetValueOfString(_requestType.Get_Value("VAS_ExcludeNBDays")).Equals("Y"))
+                        {
+                            SetDateNextAction(MNonBusinessDay.ExcludeNonBusinessDay(GetCtx(), DateTime.Now, _requestType.GetAutoDueDateDays(), GetAD_Org_ID()));
+                        }
+                        else
+                        {
+                            SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
+                        }
                 }
+
                 //	Is Status Valid
                 if (GetR_Status_ID() != 0)
                 {
