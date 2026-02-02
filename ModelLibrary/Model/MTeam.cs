@@ -44,11 +44,17 @@ namespace VAdvantage.Model
         /// <returns></returns>
         protected override bool AfterSave(bool newRecord, bool success)
         {
+            if (!success)
+                return success;
+
             if (Env.IsModuleInstalled("VA137_"))
             {
                 //Level-2 Team ID
                 int level2TeamId = GetLevel2TeamID(parentTeamId, teamLevel);
-                int count = DB.ExecuteQuery("UPDATE C_TEAM SET VA137_LEVEL2TEAM_ID=" + level2TeamId + " WHERE C_Team_ID=" + GetC_Team_ID(), null, Get_Trx());
+                if (level2TeamId > 0)
+                {
+                    int count = DB.ExecuteQuery("UPDATE C_TEAM SET VA137_LEVEL2TEAM_ID=" + level2TeamId + " WHERE C_Team_ID=" + GetC_Team_ID(), null, Get_Trx());
+                }
             }
             return true;
         }
@@ -57,10 +63,9 @@ namespace VAdvantage.Model
         /// </summary>
         /// <param name="parentTeamId"></param>
         /// <param name="teamType"></param>
-        /// <param name="teamLevel"></param>
         /// <returns>Team Code</returns>
         /// <author>VIS_427</author>
-        private string GenerateTeamCode(int parentTeamId, string teamType, int pickListLineId)
+        private string GenerateTeamCode(int parentTeamId, string teamType)
         {
             string parentCode = "";
             int nextNo;
@@ -79,13 +84,14 @@ namespace VAdvantage.Model
         SELECT COALESCE(
                  MAX(
                    CAST(
-                     REGEXP_REPLACE(VALUE, '.*-', '') AS INTEGER
+                     REGEXP_REPLACE(t.VALUE, '.*-', '') AS INTEGER
                    )
                  ), 0
                ) + 1
-        FROM C_TEAM
-        WHERE VA137_TEAMTYPE = '" + teamType + @"'
-        AND VA137_PICKLISTLINE_ID = " + pickListLineId;
+        FROM C_TEAM t
+        INNER JOIN VA137_PickListLine p ON (t.VA137_TeamLevel = p.Value)
+        WHERE t.VA137_TEAMTYPE = '" + teamType + @"'
+        AND p.VALUE ='" +Util.GetValueOfString(Get_Value("VA137_TeamLevel")) + "'";
 
             nextNo = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
 
@@ -152,7 +158,7 @@ namespace VAdvantage.Model
                  teamLevel = Util.GetValueOfInt(DB.ExecuteScalar(@"
         SELECT VA137_TEAMLEVEL
         FROM VA137_PickListLine
-        WHERE VA137_PickListLine_ID = " + GetVA137_PickListLine_ID(), null,Get_Trx()));
+        WHERE Value ='" + Util.GetValueOfString(Get_Value("VA137_TeamLevel"))+"'", null,Get_Trx()));
 
                 /* ================= PARENT CHANGE VALIDATION ================= */
                 if (!newRecord && parentTeamId != oldParentTeamId)
@@ -171,7 +177,7 @@ namespace VAdvantage.Model
                 if (newRecord || Is_ValueChanged("VA137_PickListLine_ID") || Is_ValueChanged("VA137_Team_ID"))
                 {
                     //Team Code
-                    string teamCode = GenerateTeamCode(parentTeamId, GetVA137_TeamType(), GetVA137_PickListLine_ID());
+                    string teamCode = GenerateTeamCode(parentTeamId, GetVA137_TeamType());
                     SetValue(teamCode) ;
                 }
             }
