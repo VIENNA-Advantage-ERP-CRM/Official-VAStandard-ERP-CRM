@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlTypes;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
@@ -1715,13 +1716,76 @@ namespace VIS.Controllers
                 int M_InOutLine_ID = 0;
                 bool IsLineFromShipment = false;
                 MProduct product = null;
+                int M_AttributeSetInstance_ID = 0;                
 
-                //Double d = Convert.ToDouble(model[i]["Quantity"]);                      //  1-Qty
                 Double d = 0;
                 if (Util.GetValueOfBool(model[i]["Select"]) == true)
                 {
+                    string SqlIOL = "";
+                    MInvoiceLine selectedInvoiceLine = null;
+                    int C_InvoiceLine_ID = 0;
+
+                    if (model[i].Keys.Contains("QuantityEntered"))
+                    {
+                        d = Convert.ToDouble(model[i]["QuantityEntered"]);
+                    }
+                    else if (model[i].Keys.Contains("Quantity"))
+                    {
+                        d = Convert.ToDouble(model[i]["Quantity"]);
+                    }
+                    Decimal QtyEnt = Convert.ToDecimal(d);
+
+                    // when Qty Entered is ZERO then return
+                    if (QtyEnt == 0)
+                    {
+                        continue;
+                    }
+
+                    if (model[i]["M_Product_ID_K"] != "")
+                        M_Product_ID = Convert.ToInt32((model[i]["M_Product_ID_K"]));       //  3-Product
+                    if (model[i]["C_Order_ID_K"] != "")
+                        C_OrderLine_ID = Convert.ToInt32((model[i]["C_Order_ID_K"]));       //  4-OrderLine
+                    if (model[i]["M_InOut_ID_K"] != "")
+                        M_InOutLine_ID = Convert.ToInt32((model[i]["M_InOut_ID_K"]));   //  5-ShipmentLine
+                    if (model[i].Keys.Contains("M_AttributeSetInstance_ID"))
+                    {
+                        if (model[i]["M_AttributeSetInstance_ID"] != "")
+                            M_AttributeSetInstance_ID = Convert.ToInt32((model[i]["M_AttributeSetInstance_ID"]));
+                    }
+
+                    if (C_OrderLine_ID > 0 || M_InOutLine_ID > 0)
+                    {
+                        if (C_InvoiceLine_ID == 0)
+                        {
+                            SqlIOL = $@"SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE C_Invoice_ID = { C_Invoice_ID } 
+                                        AND M_Product_ID = { M_Product_ID }
+                                        AND NVL(M_AttributeSetInstance_ID , 0) = { M_AttributeSetInstance_ID } ";
+                            if (C_OrderLine_ID > 0)
+                            {
+                                SqlIOL += $" AND C_OrderLine_ID = { C_OrderLine_ID}";
+                            }
+                            else if (M_InOutLine_ID > 0)
+                            {
+                                SqlIOL += $" AND M_InOutLine_ID = { M_InOutLine_ID}";
+                            }
+
+                            C_InvoiceLine_ID = Util.GetValueOfInt(DB.ExecuteScalar(SqlIOL));
+                            if (C_InvoiceLine_ID == 0)
+                                goto newRecord;
+                        }
+
+                        selectedInvoiceLine = new MInvoiceLine(ctx, C_InvoiceLine_ID, null);
+                        selectedInvoiceLine.SetQtyEntered(QtyEnt);
+                        selectedInvoiceLine.SetQtyInvoiced(QtyEnt);
+                        if (!selectedInvoiceLine.Save())
+                        {
+
+                        }
+                    }
                     continue;
                 }
+
+            newRecord:
                 if (model[i].Keys.Contains("QuantityEntered"))
                 {
                     d = Convert.ToDouble(model[i]["QuantityEntered"]);
@@ -1739,6 +1803,11 @@ namespace VIS.Controllers
                     C_OrderLine_ID = Convert.ToInt32((model[i]["C_Order_ID_K"]));       //  4-OrderLine
                 if (model[i]["M_InOut_ID_K"] != "")
                     M_InOutLine_ID = Convert.ToInt32((model[i]["M_InOut_ID_K"]));   //  5-Shipment
+                if (model[i].Keys.Contains("M_AttributeSetInstance_ID"))
+                {
+                    if (model[i]["M_AttributeSetInstance_ID"] != "")
+                        M_AttributeSetInstance_ID = Convert.ToInt32((model[i]["M_AttributeSetInstance_ID"]));
+                }
 
                 if (M_InOutLine_ID != 0)
                 {
@@ -1881,6 +1950,14 @@ namespace VIS.Controllers
                                     invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 }
                             }
+                        }
+                    }
+                    else
+                    {
+                        /* VIS_045: 30-Jan-2026, When Attributesetinstance is selected on create line form then need to overwrite it */
+                        if (M_AttributeSetInstance_ID > 0)
+                        {
+                            invoiceLine.SetM_AttributeSetInstance_ID(M_AttributeSetInstance_ID);
                         }
                     }
 
