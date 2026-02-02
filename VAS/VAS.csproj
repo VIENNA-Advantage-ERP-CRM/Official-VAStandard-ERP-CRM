@@ -217,6 +217,7 @@
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\VBOMDropController.cs" />
     <Compile Include="Areas\VAS\Controllers\VChargeController.cs" />
@@ -309,6 +310,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
@@ -391,6 +393,7 @@
     <Folder Include="Areas\VAS\Views\AlertRuleSQLGenerate\" />
     <Folder Include="Areas\VAS\Views\OrderLineTabPanel\" />
     <Folder Include="Areas\VAS\Views\Shared\" />
+    <Folder Include="Areas\VAS\Views\VAS_Request\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
