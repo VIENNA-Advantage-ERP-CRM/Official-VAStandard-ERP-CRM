@@ -702,6 +702,7 @@ namespace VIS.Controllers
                     decimal SavedQty = 0;
                     bool select = false;
                     string qry = "";
+                    bool IsQtyEnteredReduced = false;
 
                     recid += 1;
                     item = new DataObject();
@@ -747,8 +748,8 @@ namespace VIS.Controllers
                                 {
                                     // Change By Mohit 30/06/2016
                                     select = true;
-                                    item.QuantityEntered -= rec;
-
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.QuantityEntered = rec;
                                 }
                             }
                             else
@@ -776,12 +777,14 @@ namespace VIS.Controllers
                                 {
                                     // Change By Mohit 30/06/2016
                                     select = true;
-                                    item.QuantityEntered -= rec;
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.QuantityEntered = rec;
                                 }
                             }
                             else
                             {
-                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID + " AND M_Product_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]) +
+                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID + 
+                                    " AND M_Product_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]) +
                                     " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_attributesetinstance_id"]);
                                 rec = Util.GetValueOfDecimal(DB.ExecuteScalar(qry));
                                 if (rec > 0)
@@ -808,6 +811,7 @@ namespace VIS.Controllers
                                 {
                                     select = true;
                                     item.QuantityEntered -= rec;
+                                    IsQtyEnteredReduced = true;
                                 }
                             }
                             else
@@ -913,6 +917,8 @@ namespace VIS.Controllers
                                     // Change By Mohit 30/06/2016
                                     select = true;
                                     item.QuantityEntered = rec;
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.Quantity += rec;
                                 }
                             }
                             else
@@ -937,7 +943,16 @@ namespace VIS.Controllers
                         item.C_Invoice_ID_K = 0;
                     }
 
-                    item.QuantityPending = item.QuantityEntered;
+                    if (select && !IsQtyEnteredReduced)
+                    {
+                        /* When selected true, at that time Quantity entered contain the Quanity which is available on selected trx line */
+                        item.QuantityPending = item.Quantity;
+                    }
+                    else
+                    {
+                        item.QuantityPending = item.QuantityEntered;
+                    }
+
                     item.C_UOM_ID_K = Util.GetValueOfInt(data.Tables[0].Rows[i]["c_uom_id"]);
                     item.M_Product_ID_K = Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]);
 
@@ -1716,7 +1731,7 @@ namespace VIS.Controllers
                 int M_InOutLine_ID = 0;
                 bool IsLineFromShipment = false;
                 MProduct product = null;
-                int M_AttributeSetInstance_ID = 0;                
+                int M_AttributeSetInstance_ID = 0;
 
                 Double d = 0;
                 if (Util.GetValueOfBool(model[i]["Select"]) == true)
