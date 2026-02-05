@@ -27,6 +27,8 @@ namespace VAdvantage.Model
         /**	Payment Schedule children			*/
         private MPaySchedule[] _schedule;
 
+        private static CCache<int, bool> s_cache_45DaysExceed = new CCache<int, bool>("MSMEDays", 40);
+
         /**
 	     * 	Standard Constructor
 	     *	@param ctx context
@@ -1557,6 +1559,57 @@ namespace VAdvantage.Model
             //VA230:Copy Cash Line Id discussed with amit
             schedule.SetC_CashLine_ID(Util.GetValueOfInt(_ds["C_CashLine_ID"]));
             schedule.SetProcessed(true);
+        }
+
+        /// <summary>
+        /// This function is used to check the Schedule days is greater than 45 Days or not
+        /// </summary>
+        /// <param name="C_PaymentTerm_ID">Payment Term ID</param>
+        /// <returns>True When MSME Days Exceed</returns>
+        /// <author>VIS_045: 04-Feb-2026</author>
+        public static bool CheckMSMEDaysExceedForVendor(Ctx ctx, int C_PaymentTerm_ID, int C_BPartner_ID, int C_DocType_ID)
+        {
+            bool is45DaysExceed = false;
+            MDocType docType = MDocType.Get(ctx, C_DocType_ID);
+            if (docType.GetDocBaseType().Equals("POO") || docType.GetDocBaseType().Equals("API"))
+            {
+                MBPartner bPartner = MBPartner.Get(ctx, C_BPartner_ID);
+                if (bPartner.Get_ColumnIndex("VA106_IsMSME") >= 0 && Util.GetValueOfBool(bPartner.Get_Value("VA106_IsMSME")))
+                {
+                    if (s_cache_45DaysExceed.Count == 0 || !s_cache_45DaysExceed.ContainsKey(C_PaymentTerm_ID))
+                    {
+                        string sql = $@"SELECT C_PaymentTerm_ID
+                            FROM C_PaymentTerm pt
+                            WHERE pt.C_PaymentTerm_ID = {C_PaymentTerm_ID}
+                            AND (
+                                    /* Case 1: No child records → check parent NetDays */
+                                    (
+                                        NOT EXISTS (
+                                            SELECT 1
+                                            FROM C_PaySchedule ps
+                                            WHERE ps.C_PaymentTerm_ID = pt.C_PaymentTerm_ID
+                                        )
+                                        AND pt.NetDays > 45
+                                    )
+                                    OR
+                                    /* Case 2: Child exists → check any child NetDays > 45 */
+                                    EXISTS (
+                                        SELECT 1
+                                        FROM C_PaySchedule ps
+                                        WHERE ps.C_PaymentTerm_ID = pt.C_PaymentTerm_ID
+                                        AND ps.NetDays > 45
+                                    )
+                                )";
+                        is45DaysExceed = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0;
+                        s_cache_45DaysExceed.Add(C_PaymentTerm_ID, is45DaysExceed);
+                    }
+                    else
+                    {
+                        is45DaysExceed = s_cache_45DaysExceed[C_PaymentTerm_ID];
+                    }
+                }
+            }
+            return is45DaysExceed;
         }
 
     }
