@@ -37,6 +37,7 @@ namespace VIS.Controllers
 
         /// <summary>
         /// get c_order_id or c_orderline_id
+        /// This function is called from create line form (vcreatefrom) when "Related to Organization" checkbox is selected
         /// </summary>
         /// <param name="keyColumnName"></param>
         /// <param name="tableName"></param>
@@ -112,6 +113,7 @@ namespace VIS.Controllers
 
         /// <summary>
         /// Get Org data and other.
+        /// This function is called from create line form (vcreatefrom) when "Related to Organization" checkbox is false
         /// </summary>
         /// <param name="keyColumnName">Primary Key Column of Table</param>
         /// <param name="tableName">Table Name</param>
@@ -127,7 +129,7 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
-            string sql = VcreateFormSqlQryOrg(forInvoicees, C_Ord_IDs, isBaseLangess, MProductIDss, DelivDates, keyColumnName.Equals("C_ProvisionalInvoice_ID"));
+            string sql = VcreateFormSqlQryOrg(forInvoicees, C_Ord_IDs, isBaseLangess, MProductIDss, DelivDates, keyColumnName.Equals("C_ProvisionalInvoice_ID"), tableName, recordID);
             var stValue = obj.GetData(sql, keyColumnName, tableName, recordID, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
         }
@@ -142,7 +144,8 @@ namespace VIS.Controllers
         /// <param name="DelivDates">Delivery Date</param>
         /// <param name="isProvisionalInvoice">Is Provisional Invoice</param>
         /// <returns>String, Query</returns>
-        private string VcreateFormSqlQryOrg(bool forInvoicees, int? C_Ord_IDs, string isBaseLangess, string MProductIDss, string DelivDates, bool isProvisionalInvoice)
+        private string VcreateFormSqlQryOrg(bool forInvoicees, int? C_Ord_IDs, string isBaseLangess, string MProductIDss, string DelivDates, bool isProvisionalInvoice,
+            string tableName, int recordID)
         {
             var ctx = Session["ctx"] as Ctx;
             bool isAllownonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
@@ -159,9 +162,11 @@ namespace VIS.Controllers
             }
 
             StringBuilder sql = new StringBuilder("SELECT "
-               + " ROUND((l.QtyOrdered-CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) * "
+               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " SUM(coalesce(mi.QtyCreated, 0))) "
+               : " CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) ")} * "
                + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QUANTITY,"
-               + " ROUND((l.QtyOrdered-CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0) ELSE SUM(COALESCE(m.qty, 0)) END) * "
+               + $@" ROUND((l.QtyOrdered - {(!isProvisionalInvoice ? " SUM(coalesce(mi.QtyCreated, 0))) "
+               : " CASE WHEN o.IsSoTrx = 'Y' THEN NVL(l.QtyDelivered, 0)  ELSE SUM(COALESCE(m.qty, 0))  END) ")} * "
                + " (CASE WHEN l.QtyOrdered=0 THEN 0 ELSE l.QtyEntered/l.QtyOrdered END ), " + precision + ") AS QTYENTER,"
                + " l.C_UOM_ID  as C_UOM_ID  ,COALESCE(uom.UOMSymbol,uom.Name) as UOM,"
                + " COALESCE(l.M_Product_ID,0) as M_PRODUCT_ID ,p.Name as PRODUCT, p.Value as PRODUCTSEARCHKEY,"
@@ -195,6 +200,24 @@ namespace VIS.Controllers
             {
                 sql.Append(isBaseLangess);
             }
+
+            if (forInvoicees)
+            {
+                /*VIS_045: 02-Feb-2026, this block is used to get the total QtyInvoiced against orderline */
+                sql.Append($@" LEFT JOIN (SELECT il.QtyInvoiced AS QtyCreated, il.C_OrderLine_ID, i.documentno
+		                                FROM C_InvoiceLine il
+		                                INNER JOIN C_Invoice I on (I.C_INVOICE_ID = il.C_INVOICE_ID)
+		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.C_Invoice_ID <> {recordID} ) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
+            }
+            else if (!forInvoicees && !isProvisionalInvoice)
+            {
+                /*VIS_045: 02-Feb-2026, this block is used to get the total QtyInvoiced against orderline */
+                sql.Append($@" LEFT JOIN (SELECT il.MovementQty AS QtyCreated, il.C_OrderLine_ID, i.documentno
+		                                FROM M_InOutLine il
+		                                INNER JOIN M_InOut I on (I.M_InOut_ID = il.M_InOut_ID)
+		                                WHERE i.DocStatus NOT IN ('VO', 'RE') AND I.M_InOut_ID <> {recordID} ) mi on (l.C_OrderLine_ID = mi.C_OrderLine_ID)");
+            }
+
             //Hanlded case: order not exist for the selected Business partner and on the change/selection of deliverydate excception's coming  missing expression
             sql.Append(" LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID =l.M_AttributeSetInstance_ID) WHERE l.C_Order_ID=" + (C_Ord_IDs == null ? 0 : C_Ord_IDs) + " AND l.M_Product_ID>0");
 
@@ -292,6 +315,7 @@ namespace VIS.Controllers
 
         /// <summary>
         /// get data for c_orderline with organization
+        /// This function is called from create line form (vcreatefrom) when "Related to Organization" checkbox is selected
         /// </summary>
         /// <param name="forInvoices"></param>
         /// <param name="isBaseLangs"></param>
@@ -363,6 +387,7 @@ namespace VIS.Controllers
 
         /// <summary>
         /// get data for c_orderline without organization
+        /// This function is called from create line form (vcreatefrom) when "Related to Organization" checkbox is false
         /// </summary>
         /// <param name="forInvoices"></param>
         /// <param name="isBaseLangs"></param>
@@ -672,44 +697,6 @@ namespace VIS.Controllers
         /// <returns></returns>
         private string getSQlforGetInvoicesData(string isBaseLangss, int cInvoiceID, string mProductIDs)
         {
-            #region[Commented By Sukhwinder on 17-Nov-2017 and updated the query below to prevent displaying product with "Cost adjustment on loss" with already MR.]
-            //string sql = "SELECT "
-            //            + "(l.QtyInvoiced-SUM(COALESCE(mi.Qty,0))) * "					//	1               
-            //            + "(CASE WHEN l.QtyInvoiced=0 THEN 0 ELSE l.QtyEntered/l.QtyInvoiced END ) as QUANTITY,"	//	2
-            //            + "(l.QtyInvoiced-SUM(COALESCE(mi.Qty,0))) * "					//	1               
-            //            + "(CASE WHEN l.QtyInvoiced=0 THEN 0 ELSE l.QtyEntered/l.QtyInvoiced END ) as QTYENTER,"	//	2
-            //            + " l.C_UOM_ID,COALESCE(uom.UOMSymbol,uom.Name) as UOM,"			//  3..4
-            //            + " l.M_Product_ID,p.Name as PRODUCT, l.C_InvoiceLine_ID,l.Line,"      //  5..8
-            //            + " l.C_OrderLine_ID,"                   					//  9
-            //            + " l.M_AttributeSetInstance_ID AS M_ATTRIBUTESETINSTANCE_ID,"
-            //            + " ins.description ";
-            //if (isBaseLangss)
-            //{
-            //    //sql += " " + isBaseLangss + " ";
-            //    sql += "FROM C_UOM uom INNER JOIN C_InvoiceLine l ON (l.C_UOM_ID=uom.C_UOM_ID) ";
-            //}
-            //else
-            //{
-            //    sql += "FROM C_UOM_Trl uom INNER JOIN C_InvoiceLine l ON (l.C_UOM_ID=uom.C_UOM_ID AND uom.AD_Language='" + Env.GetAD_Language(ctx) + "') ";
-            //}
-
-            //sql += "INNER JOIN M_Product p ON (l.M_Product_ID=p.M_Product_ID) "
-            //    + "LEFT OUTER JOIN M_MatchInv mi ON (l.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) "
-            //    + "LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID =l.M_AttributeSetInstance_ID) "
-            //    + "WHERE l.C_Invoice_ID=" + cInvoiceID;
-            //if (mProductIDs != "")
-            //{
-            //    sql += " " + mProductIDs + " ";
-            //}
-            //sql += " GROUP BY l.QtyInvoiced,l.QtyEntered, l.C_UOM_ID,COALESCE(uom.UOMSymbol,uom.Name),"
-            //    + "l.M_Product_ID,p.Name, l.C_InvoiceLine_ID,l.Line,l.C_OrderLine_ID,l.M_AttributeSetInstance_ID,ins.description "
-            //+ "ORDER BY l.Line";
-
-            //return sql;
-            #endregion
-
-            //Updated Query by Sukhwinder for "Cost adjustment on loss"
-
             string precision = "3";
             if (isBaseLangss.ToUpper().Contains("C_UOM_TRL"))
             {
@@ -765,11 +752,11 @@ namespace VIS.Controllers
                 sql.Append(") ");
             }
 
-            sql.Append(" LEFT JOIN C_Invoice o ON o.C_Invoice_ID = l.C_Invoice_ID LEFT JOIN C_PaymentTerm pt ON pt.C_PaymentTerm_ID = o.C_PaymentTerm_ID "
-             + " LEFT OUTER JOIN M_MatchInv mi ON (l.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) "
-             + " "
-             + " LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID =l.M_AttributeSetInstance_ID) "
-             + " WHERE l.C_Invoice_ID=" + cInvoiceID + " AND l.M_Product_ID>0");
+            sql.Append(@" LEFT JOIN C_Invoice o ON (o.C_Invoice_ID = l.C_Invoice_ID) 
+                          LEFT JOIN C_PaymentTerm pt ON pt.C_PaymentTerm_ID = o.C_PaymentTerm_ID "
+                      + " LEFT OUTER JOIN M_MatchInv mi ON (l.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) "
+                      + " LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID =l.M_AttributeSetInstance_ID) ");
+            sql.Append(" WHERE l.C_Invoice_ID=" + cInvoiceID + " AND l.M_Product_ID > 0");
 
             if (mProductIDs != "")
             {
