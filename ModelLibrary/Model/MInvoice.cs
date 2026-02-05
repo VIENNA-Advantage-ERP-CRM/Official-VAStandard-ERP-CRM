@@ -1923,6 +1923,18 @@ namespace VAdvantage.Model
                         log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
                     }
                 }
+
+                //VIS_045: 05-feb-2026, Check Vendor is MSME Applicable, if yes, then payment term days can't be exceed greater than 45 Days
+                if (Env.IsModuleInstalled("VA106_"))
+                {
+                    if ((!IsSOTrx() && !IsReturnTrx()) && (newRecord || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_PaymentTerm_ID")))
+                    {
+                        if (MPaymentTerm.CheckMSMEDaysExceedForVendor(GetCtx(), GetC_PaymentTerm_ID(), GetC_BPartner_ID(), GetC_DocTypeTarget_ID()))
+                        {
+                            log.SaveWarning("VA106_ExceedMSMEDays", "");
+                        }
+                    }
+                }
             }
 
             return success;
