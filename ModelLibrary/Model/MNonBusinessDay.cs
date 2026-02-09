@@ -143,8 +143,8 @@ namespace VAdvantage.Model
                 qry.Clear();
                 qry.Append(MRole.GetDefault(ctx, false).AddAccessSQL(
                    "SELECT COUNT(C_NonBusinessDay_ID) FROM C_NonBusinessDay WHERE ISACTIVE = 'Y' AND C_Calendar_ID=" + Calender_ID
-                   + (AD_Org_ID > 0 ? " AND AD_Org_ID IN (0, " + AD_Org_ID + ")" : "") + " AND DATE1 BETWEEN TO_DATE('" + dt.Value.ToShortDateString() +
-                   "', 'MM-DD-YY') AND TO_DATE('" + dt.Value.AddDays(days).ToShortDateString() + "', 'MM-DD-YY')",
+                   + (AD_Org_ID > 0 ? " AND AD_Org_ID IN (0, " + AD_Org_ID + ")" : "") + " AND DATE1 > TO_DATE('" + dt.Value.ToShortDateString() +
+                   "', 'MM-DD-YY') AND DATE1 <= TO_DATE('" + dt.Value.AddDays(days).ToShortDateString() + "', 'MM-DD-YY')",
                    "C_NonBusinessDay", false, false));
                 dt = dt.Value.AddDays(days);
                 count = Util.GetValueOfInt(DB.ExecuteScalar(qry.ToString(), null, null));
