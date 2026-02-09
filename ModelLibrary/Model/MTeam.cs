@@ -78,29 +78,39 @@ namespace VAdvantage.Model
             FROM C_TEAM
             WHERE C_TEAM_ID = " + parentTeamId, null, Get_Trx()));
             }
-
-            /*picked the next code based on maximum value of previous record*/
-            string sql = @"
-        SELECT COALESCE(
-                 MAX(
-                   CAST(
-                     REGEXP_REPLACE(t.VALUE, '.*-', '') AS INTEGER
-                   )
-                 ), 0
-               ) + 1
-        FROM C_TEAM t
-        INNER JOIN VA137_PickListLine p ON (t.VA137_TeamLevel = p.Value)
-        WHERE t.VA137_TEAMTYPE = '" + teamType + @"'
-        AND p.VALUE ='" +Util.GetValueOfString(Get_Value("VA137_TeamLevel")) + "'";
-
-            nextNo = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
-
-            /* ================= ROOT TEAM ================= */
+            /* ================= LEVEL 1 ================= */
             if (parentTeamId <= 0)
+            {
+                nextNo = Util.GetValueOfInt(DB.ExecuteScalar(@"
+            SELECT NVL(COUNT(*),0) + 1
+            FROM C_TEAM
+            WHERE VA137_TEAMTYPE = '" + teamType + @"'
+            AND VA137_TeamLevel ='" + Util.GetValueOfString(Get_Value("VA137_TeamLevel")) + "'", null, Get_Trx()));
+
                 return teamType + "-" + nextNo;
+            }
+            //next number for other level
+            else
+            {
+                string sql = @"SELECT NVL(COUNT(*),0) + 1
+                         FROM C_TEAM c
+                         WHERE c.VA137_TEAM_ID IN (
+                             SELECT C_TEAM_ID
+                             FROM C_TEAM
+                             WHERE VA137_TeamLevel = (
+                                 SELECT VA137_TeamLevel
+                                 FROM C_TEAM
+                                 WHERE C_TEAM_ID = " + parentTeamId + @")
+                             AND VA137_TEAMTYPE = (
+                                 SELECT VA137_TEAMTYPE
+                                 FROM C_TEAM
+                                 WHERE C_TEAM_ID = " + parentTeamId + @"))";
+
+                nextNo = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
+            }
 
             /* ================= CHILD TEAM ================= */
-            return parentCode + "-" + nextNo;
+            return parentCode + "-" + nextNo + (GetVA137_SourceType() == "OO" ? "-"+ GetVA137_SourceType():"");
         }
 
 
@@ -150,15 +160,31 @@ namespace VAdvantage.Model
         {
             if (Env.IsModuleInstalled("VA137_"))
             {
-
                  parentTeamId = GetVA137_Team_ID();          // selected parent
-                int oldParentTeamId = Util.GetValueOfInt(Get_ValueOld("VA137_Team_ID"));
+                //if Source type is oustsid organization then return false
+                if (parentTeamId == 0 && GetVA137_SourceType() == "OO")
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgChildNotCreate"));
+                    return false;
+                }
+                else if (GetVA137_SourceType() == "OO")
+                {
+                    string sql = @"SELECT VA137_TeamLevel
+                                 FROM C_TEAM
+                                 WHERE C_TEAM_ID = " +  parentTeamId;
+                    if (string.IsNullOrEmpty(Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()))))
+                    {
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgChildNotCreate"));
+                        return false;
+                    }
+                }
+                    int oldParentTeamId = Util.GetValueOfInt(Get_ValueOld("VA137_Team_ID"));
 
                 /* ================= TEAM LEVEL ================= */
-                 teamLevel = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                teamLevel = Util.GetValueOfInt(DB.ExecuteScalar(@"
         SELECT VA137_TEAMLEVEL
         FROM VA137_PickListLine
-        WHERE Value ='" + Util.GetValueOfString(Get_Value("VA137_TeamLevel"))+"'", null,Get_Trx()));
+        WHERE Value ='" + Util.GetValueOfString(Get_Value("VA137_TeamLevel")) + "'", null, Get_Trx()));
 
                 /* ================= PARENT CHANGE VALIDATION ================= */
                 if (!newRecord && parentTeamId != oldParentTeamId)
