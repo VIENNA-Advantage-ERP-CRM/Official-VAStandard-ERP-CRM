@@ -917,8 +917,9 @@ namespace VAdvantage.Model
                     if (IsInvoiced() != _requestType.IsInvoiced())
                         SetIsInvoiced(_requestType.IsInvoiced());
                     if (GetDateNextAction() == null && _requestType.GetAutoDueDateDays() > 0)
+                    {
                         //VIS0060: Changes done to exclude non business days based on setting on request type.
-                        if (Util.GetValueOfString(_requestType.Get_Value("VAS_ExcludeNBDays")).Equals("Y"))
+                        if (Util.GetValueOfBool(_requestType.Get_Value("VAS_ExcludeNBDays")))
                         {
                             SetDateNextAction(MNonBusinessDay.ExcludeNonBusinessDay(GetCtx(), DateTime.Now, _requestType.GetAutoDueDateDays(), GetAD_Org_ID()));
                         }
@@ -926,6 +927,7 @@ namespace VAdvantage.Model
                         {
                             SetDateNextAction(DateTime.Now.AddDays(_requestType.GetAutoDueDateDays()));
                         }
+                    }
                 }
 
                 //	Is Status Valid
