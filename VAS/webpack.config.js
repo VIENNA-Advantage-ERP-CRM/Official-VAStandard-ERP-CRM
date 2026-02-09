@@ -19,15 +19,15 @@ deleteFilesByPattern(path.resolve(__dirname, 'Areas/VAS/Content'), /^VAS\.all\.m
 
 
 const versions = {
-    'VAS.all': '1.6.10.0',    
-    'VAS': '1.6.9.0' // CSS Version
+    'VAS.all': '1.6.11.0',
+    'VAS': '1.6.11.0' // CSS Version
 };
 
 module.exports = {
     //mode: 'development', // for debuggin
     mode: 'production',
     entry: {
-        'VAS.all': './Areas/VAS/Scripts/src/VASjs.js',        
+        'VAS.all': './Areas/VAS/Scripts/src/VASjs.js',
         'VAS': './Areas/VAS/Content/src/VAScss.css'
     },
     output: {
