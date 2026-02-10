@@ -104,8 +104,7 @@ namespace VAdvantage.Model
                              AND VA137_TEAMTYPE = (
                                  SELECT VA137_TEAMTYPE
                                  FROM C_TEAM
-                                 WHERE C_TEAM_ID = " + parentTeamId + @"))";
-
+                                 WHERE C_TEAM_ID = " + parentTeamId + @")) AND c.C_TEAM_ID <> " + GetC_Team_ID();
                 nextNo = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_Trx()));
             }
 
@@ -162,20 +161,23 @@ namespace VAdvantage.Model
             {
                  parentTeamId = GetVA137_Team_ID();          // selected parent
                 //if Source type is oustsid organization then return false
-                if (parentTeamId == 0 && GetVA137_SourceType() == "OO")
+                if (!newRecord || Is_ValueChanged("VA137_SourceType") || Is_ValueChanged("VA137_TEAM_ID"))
                 {
-                    log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgChildNotCreate"));
-                    return false;
-                }
-                else if (GetVA137_SourceType() == "OO")
-                {
-                    string sql = @"SELECT VA137_TeamLevel
-                                 FROM C_TEAM
-                                 WHERE C_TEAM_ID = " +  parentTeamId;
-                    if (string.IsNullOrEmpty(Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()))))
+                    if (parentTeamId == 0 && GetVA137_SourceType() == "OO")
                     {
-                        log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgChildNotCreate"));
+                        log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgParentNotCreate"));
                         return false;
+                    }
+                    else if (GetVA137_SourceType() == "OO")
+                    {
+                        string sql = @"SELECT VA137_TeamLevel
+                                 FROM C_TEAM
+                                 WHERE C_TEAM_ID = " + parentTeamId;
+                        if (string.IsNullOrEmpty(Util.GetValueOfString(DB.ExecuteScalar(sql, null, Get_Trx()))))
+                        {
+                            log.SaveError("", Msg.GetMsg(GetCtx(), "VA137_OutsideOrgChildNotCreate"));
+                            return false;
+                        }
                     }
                 }
                     int oldParentTeamId = Util.GetValueOfInt(Get_ValueOld("VA137_Team_ID"));
@@ -200,9 +202,8 @@ namespace VAdvantage.Model
                         return false;
                     }
                 }
-                if (newRecord || Is_ValueChanged("VA137_PickListLine_ID") || Is_ValueChanged("VA137_Team_ID"))
+                if (newRecord || Is_ValueChanged("VA137_TEAMLEVEL") || Is_ValueChanged("VA137_Team_ID") || Is_ValueChanged("VA137_SourceType")) 
                 {
-                    //Team Code
                     string teamCode = GenerateTeamCode(parentTeamId, GetVA137_TeamType());
                     SetValue(teamCode) ;
                 }
