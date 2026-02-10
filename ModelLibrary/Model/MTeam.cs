@@ -161,7 +161,7 @@ namespace VAdvantage.Model
             {
                  parentTeamId = GetVA137_Team_ID();          // selected parent
                 //if Source type is oustsid organization then return false
-                if (!newRecord || Is_ValueChanged("VA137_SourceType") || Is_ValueChanged("VA137_TEAM_ID"))
+                if (newRecord || Is_ValueChanged("VA137_SourceType") || Is_ValueChanged("VA137_TEAM_ID"))
                 {
                     if (parentTeamId == 0 && GetVA137_SourceType() == "OO")
                     {
