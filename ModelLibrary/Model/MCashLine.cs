@@ -164,7 +164,7 @@ namespace VAdvantage.Model
                     if (Env.IsModuleInstalled("VA009_"))
                     {
                         int invPaySchId = DB.GetSQLValue
-                            (null, "SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE VA009_TransCurrency= " + invoice.GetC_Currency_ID()
+                            (null, $@"SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE { DBFunctionCollection.TypecastColumnAsInt("VA009_TransCurrency") } = " + invoice.GetC_Currency_ID()
                               + " AND  C_Invoice_ID = " + GetC_Invoice_ID() + " AND  VA009_PaymentMethod_ID IN "
                               + " (SELECT p.VA009_PaymentMethod_ID FROM VA009_PaymentMethod p WHERE p.VA009_PaymentBaseType = "
                                              + " '" + X_C_Order.PAYMENTRULE_Cash + "' AND p.C_Currency_ID IS NULL AND p.IsActive = 'Y' AND p.AD_Client_ID = " + GetAD_Client_ID() + ") ");
@@ -680,7 +680,7 @@ namespace VAdvantage.Model
                     // Not to change currency with cashbook currency when Order selected 
                 }
                 //VIS_427 bypass the condition when cash type is charge and charge is contra
-                else if(CASHTYPE_Charge.Equals(GetCashType()) && Env.IsModuleInstalled("VA012_") && Util.GetValueOfBool(Get_Value("VA012_IsContra")))
+                else if (CASHTYPE_Charge.Equals(GetCashType()) && Env.IsModuleInstalled("VA012_") && Util.GetValueOfBool(Get_Value("VA012_IsContra")))
                 {
                     // Not to change currency with cashbook currency when  selected Charge is Contra
                 }
@@ -1041,7 +1041,7 @@ namespace VAdvantage.Model
                     if (Env.IsModuleInstalled("VA009_"))
                     {
                         int invPaySchId = DB.GetSQLValue
-                            (null, "SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE VA009_TransCurrency= " + invoice.GetC_Currency_ID()
+                            (null, $@"SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE { DBFunctionCollection.TypecastColumnAsInt("VA009_TransCurrency") } = " + invoice.GetC_Currency_ID()
                               + " AND  C_Invoice_ID = " + GetC_Invoice_ID() + " AND  VA009_PaymentMethod_ID IN "
                               + " (SELECT p.VA009_PaymentMethod_ID FROM VA009_PaymentMethod p WHERE p.VA009_PaymentBaseType = "
                                              + " '" + X_C_Order.PAYMENTRULE_Cash + "' AND p.C_Currency_ID IS NULL AND p.IsActive = 'Y' AND p.AD_Client_ID = " + GetAD_Client_ID() + ") ");
@@ -1085,12 +1085,12 @@ namespace VAdvantage.Model
         /// <param name="TableName">Name of Table</param>
         /// <param name="trx">Used for Transactions</param>
         /// <author>VIS_427</author>
-        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus,string TableName,Trx trx)
+        public static void UpdateExecutionStatus(int ScheduleId, string FromStatus, string ToStatus, string TableName, Trx trx)
         {
             if (ScheduleId > 0)
             {
-                int count = DB.ExecuteQuery(@"UPDATE "+ TableName+" SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
-                                              " ELSE VA009_ExecutionStatus END WHERE "+ TableName + "_ID = " + ScheduleId, null, trx);
+                int count = DB.ExecuteQuery(@"UPDATE " + TableName + " SET VA009_ExecutionStatus= CASE WHEN VA009_ExecutionStatus=" + GlobalVariable.TO_STRING(FromStatus) + " THEN " + GlobalVariable.TO_STRING(ToStatus) +
+                                              " ELSE VA009_ExecutionStatus END WHERE " + TableName + "_ID = " + ScheduleId, null, trx);
             }
         }
 
