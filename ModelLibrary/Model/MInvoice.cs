@@ -1101,6 +1101,9 @@ namespace VAdvantage.Model
                         line.Set_Value("VAFAM_ProfitLoss", decimal.Negate(Util.GetValueOfDecimal(fromLine.Get_Value("VAFAM_ProfitLoss"))));
                         line.Set_Value("VAFAM_AssetDisposal_ID", fromLine.Get_Value("VAFAM_AssetDisposal_ID"));
                     }
+
+                    // VIS_045: 09-Jan-2026, Set Product HSN Code of Original document on reversed document
+                    line.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(fromLine.Get_Value("VAS_HSN_SACCode")));
                 }
 
                 // enhanced by Amit 4-1-2016
@@ -1918,6 +1921,18 @@ namespace VAdvantage.Model
                     else if (bp.IsCreditWatch(GetC_BPartner_Location_ID()))
                     {
                         log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
+                    }
+                }
+
+                //VIS_045: 05-feb-2026, Check Vendor is MSME Applicable, if yes, then payment term days can't be exceed greater than 45 Days
+                if (Env.IsModuleInstalled("VA106_"))
+                {
+                    if ((!IsSOTrx() && !IsReturnTrx()) && (newRecord || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_PaymentTerm_ID")))
+                    {
+                        if (MPaymentTerm.CheckMSMEDaysExceedForVendor(GetCtx(), GetC_PaymentTerm_ID(), GetC_BPartner_ID(), GetC_DocTypeTarget_ID()))
+                        {
+                            log.SaveWarning("VA106_ExceedMSMEDays", "");
+                        }
                     }
                 }
             }
@@ -4064,6 +4079,8 @@ namespace VAdvantage.Model
                                                         query.Append(" , VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
                                                         query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                                        DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                                     }
                                                 }
                                             }
@@ -4772,6 +4789,8 @@ namespace VAdvantage.Model
                                                     query.Append(", VAS_LandedCost = " + costingCheck.ExpectedLandedCost);
                                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
+                                                    DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                                 }
                                             }
                                         }
@@ -7031,6 +7050,7 @@ namespace VAdvantage.Model
                         line.Save(Get_TrxName());
                     }
                 }
+                DeAllocateOrderScheduleAllocatedAmt(GetC_Invoice_ID(), Get_Trx());
                 DeAllocateTimeSheetInvoice();
                 DeAllocateFieldRequest();
                 AddDescription(Msg.GetMsg(GetCtx(), "Voided"));
@@ -7585,6 +7605,26 @@ namespace VAdvantage.Model
 
             return true;
         }
+
+        /// <summary>
+        /// This function is used to Reduce the ALlocated Amount from the order schedule 
+        /// when Invoice is voided after the Schedule creation.
+        /// </summary>
+        /// <param name="C_Invoice_ID">Invoice ID</param>
+        /// <param name="trxName">Trx</param>
+        private void DeAllocateOrderScheduleAllocatedAmt(int C_Invoice_ID, Trx trxName)
+        {
+            int no = DB.ExecuteQuery(@"UPDATE VA009_OrderPaySchedule osch SET VA009_AllocatedAmt = (NVL(VA009_AllocatedAmt , 0) -
+                             (SELECT SUM(NVL((DueAmt) , 0)) FROM C_InvoicePaySchedule isch
+                             WHERE isch.VA009_OrderPaySchedule_ID = osch.VA009_OrderPaySchedule_ID and isch.C_Invoice_ID = " + C_Invoice_ID + @" ))
+                             WHERE osch.VA009_OrderPaySchedule_ID IN (SELECT VA009_OrderPaySchedule_ID FROM C_InvoicePaySchedule WHERE C_Invoice_ID = " + C_Invoice_ID + @"
+                             AND VA009_OrderPaySchedule_ID > 0 )", null, trxName);
+            if (no > 0)
+            {
+                log.Info("DeAllocated VA009_AllocatedAmt on Order Schedule record against C_Invoice_ID=" + C_Invoice_ID + " - #" + no);
+            }
+        }
+
         /// <summary>
         /// This Method is used to set reference of invoice null on tables VA075_WorkOrderOperation and S_TimeExpenseLine
         /// </summary>
@@ -7597,6 +7637,7 @@ namespace VAdvantage.Model
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }
         }
+
         /// <summary>
         /// This Method is used to set reference of invoice null on tables VA075_WorkOrderOperation and VA075_WorkOrderComponent
         /// </summary>
@@ -7625,6 +7666,7 @@ namespace VAdvantage.Model
                 DB.ExecuteQuery("UPDATE VA075_WorkOrderOperation SET C_Invoice_ID = NULL WHERE C_Invoice_ID=" + GetC_Invoice_ID(), null, Get_Trx());
             }
         }
+
         //update Description
         private void UpdateDescriptionInOldExpnse(MInvoiceLine oldline, MInvoiceLine rLine)
         {
@@ -8396,7 +8438,7 @@ namespace VAdvantage.Model
             if (Env.IsModuleInstalled("VA009_"))
             {
                 int invPaySchId = DB.GetSQLValue
-                    (Get_Trx(), "SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE VA009_TransCurrency= " + C_Currency_ID
+                    (Get_Trx(), $@"SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE { DBFunctionCollection.TypecastColumnAsInt("VA009_TransCurrency") } = " + C_Currency_ID
                       + " AND  C_Invoice_ID = " + GetC_Invoice_ID() + " AND  VA009_PaymentMethod_ID IN "
                       + " (SELECT p.VA009_PaymentMethod_ID FROM VA009_PaymentMethod p WHERE p.VA009_PaymentBaseType = "
                                      + " '" + X_C_Order.PAYMENTRULE_Cash + "' AND p.C_Currency_ID IS NULL AND p.IsActive = 'Y' AND p.AD_Client_ID = " + GetAD_Client_ID() + ") ");

@@ -153,76 +153,84 @@ namespace VIS.Models
             {
                 RecordList = new List<Dictionary<string, string>>() // Initialize the list
             };
-            query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            // query += " FETCH FIRST 100 ROWS ONLY";
-
-            VLogger.Get().Severe("Alert=" + query);
-
-            if (ValidateSql(query))
+            try
             {
-                DataSet ds = new DataSet();
+                query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                // query += " FETCH FIRST 100 ROWS ONLY";
 
-                //if (pageNo == 1)
-                //{
-                //    ds = DB.ExecuteDataset(query);
-                //}
-                //else
-                //{
-                //    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
-                //}
+                VLogger.Get().Severe("Alert=" + query);
 
-                string sql = "SELECT COUNT(*) FROM ( " + query + " )";
-
-                if (VAdvantage.DataBase.DatabaseType.IsPostgre)
-
+                if (ValidateSql(query))
                 {
-                    sql += " as SQLQuery ";
+                    DataSet ds = new DataSet();
 
-                }
-
-
-                int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
-
-                ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
-
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                {
-                    DataTable table = ds.Tables[0];
-                    int rowCount = table.Rows.Count;
-                    int colCount = table.Columns.Count;
-
-                    //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
+                    //if (pageNo == 1)
                     //{
-                    //    results.TotalRecord = rowCount;
-                    //    rowCount = 100;
+                    //    ds = DB.ExecuteDataset(query);
                     //}
                     //else
                     //{
-                    //    results.TotalRecord = recordCount;
+                    //    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
                     //}
 
-                    results.TotalRecord = totalRec;
+                    string sql = "SELECT COUNT(*) FROM ( " + query + " )";
 
-                    for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
+                    if (VAdvantage.DataBase.DatabaseType.IsPostgre)
+
                     {
-                        Dictionary<string, string> rowResult = new Dictionary<string, string>();
-                        for (int colIndex = 0; colIndex < colCount; colIndex++)
-                        {
-                            rowResult["recid"] = Util.GetValueOfString(colIndex + 1);
-                            string columnName = table.Columns[colIndex].ColumnName;
-                            string columnValue = Util.GetValueOfString(table.Rows[rowIndex][columnName]);
-                            rowResult[columnName] = columnValue;
-                        }
-                        results.RecordList.Add(rowResult); // Add rowResult to the list
+                        sql += " as SQLQuery ";
+
                     }
 
-                    // results.TotalRecord = totatRecCount; // Set Totalrecord
-                    return results;
+
+                    int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+
+                    ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
+
+                    if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        DataTable table = ds.Tables[0];
+                        int rowCount = table.Rows.Count;
+                        int colCount = table.Columns.Count;
+
+                        //if (recordCount == 0 && pageNo == 1 && rowCount > 100)
+                        //{
+                        //    results.TotalRecord = rowCount;
+                        //    rowCount = 100;
+                        //}
+                        //else
+                        //{
+                        //    results.TotalRecord = recordCount;
+                        //}
+
+                        results.TotalRecord = totalRec;
+
+                        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
+                        {
+                            Dictionary<string, string> rowResult = new Dictionary<string, string>();
+                            for (int colIndex = 0; colIndex < colCount; colIndex++)
+                            {
+                                rowResult["recid"] = Util.GetValueOfString(colIndex + 1);
+                                string columnName = table.Columns[colIndex].ColumnName;
+                                string columnValue = Util.GetValueOfString(table.Rows[rowIndex][columnName]);
+                                rowResult[columnName] = columnValue;
+                            }
+                            results.RecordList.Add(rowResult); // Add rowResult to the list
+                        }
+
+                        // results.TotalRecord = totatRecCount; // Set Totalrecord
+                        return results;
+                    }
+                    else
+                    {
+                        return results;
+                    }
                 }
-                else
-                {
-                    return results;
-                }
+            }
+            catch (Exception e)
+            {
+                VAdvantage.Logging.VLogger.Get().Severe(e.Message);
+                return null;
             }
             return null;
         }
@@ -297,6 +305,53 @@ namespace VIS.Models
                 return Msg.GetMsg(ctx, "VAS_SQLProperformat");
             }
             return "";
+        }
+
+        /// <summary>
+        /// Save alert rule
+        /// </summary>
+        /// <param name="ctx">context</param>
+        /// <param name="alertRuleID">AD_AlertRule_ID</param>
+        /// <param name="alertID">AD_Alert_ID</param>
+        /// <param name="tableID">AD_Table_ID</param>
+        /// <param name="TabID">AD_Tab_ID</param>
+        /// <param name="ColumnID">AD_Column_ID</param>
+        /// <param name="IsInsert">IsInsert</param>
+        /// <param name="IsUpdate">IsUpdate</param>
+        /// <param name="IsDelete">IsDelete</param>
+        /// <returns></returns>
+
+        public string SaveAlertRule(Ctx ctx, int alertRuleID, int alertID, int tableID, int TabID, string ColumnID, bool IsInsert, bool IsUpdate, bool IsDelete)
+        {
+            MAlertRule obj = new MAlertRule(ctx, alertRuleID, null);
+            obj.SetAD_Client_ID(ctx.GetAD_Client_ID());
+            obj.SetAD_Org_ID(ctx.GetAD_Org_ID());
+            obj.SetAD_Alert_ID(Util.GetValueOfInt(alertID));
+            obj.SetSelectClause(Util.GetValueOfString("A"));
+            obj.SetFromClause(Util.GetValueOfString("A"));
+            obj.SetWhereClause(Util.GetValueOfString(""));
+            obj.SetOtherClause(Util.GetValueOfString(""));
+            obj.SetName(Util.GetValueOfString("AlertRule"));
+            obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
+            obj.SetIsActive(true);
+            obj.SetIsValid(true);
+            obj.Set_Value("IsEmail", Util.GetValueOfBool(false));
+            obj.Set_Value("EMail", Util.GetValueOfString(""));
+            obj.Set_Value("AD_Tab_ID", Util.GetValueOfInt(TabID));
+            obj.Set_Value("IsInsert", Util.GetValueOfBool(IsInsert));
+            obj.Set_Value("IsUpdate", Util.GetValueOfBool(IsUpdate));
+            obj.Set_Value("IsDeleted", Util.GetValueOfBool(IsDelete));
+            obj.Set_ValueNoCheck("AD_Column_ID", ColumnID);
+            if (obj.Save())
+            {
+                return Msg.GetMsg(ctx, "SavedSuccessfully");
+            }
+            else
+            {
+                ValueNamePair vnp = VLogger.RetrieveError();
+                string info = vnp.GetName();
+                return Msg.GetMsg(ctx, "NotSaved");
+            }
         }
 
         /// <summary>
@@ -387,7 +442,7 @@ namespace VIS.Models
             string fromClause = obj.GetFromClause();
             string whereClause = obj.GetWhereClause();
             string otherClause = obj.GetOtherClause();
-            if (selectClause != null && selectClause.Length > 0 && fromClause != null && fromClause.Length > 0)
+            if (selectClause != null && selectClause.Length > 0 && fromClause != null && fromClause.Length > 0 && fromClause!="A")
             {
                 sql = "SELECT " + selectClause + " FROM " + fromClause;
                 if (whereClause != null && whereClause.Length > 0)
@@ -406,17 +461,15 @@ namespace VIS.Models
                 details.BasedOn = basedOn;
                 details.IsEmail = Util.GetValueOfBool(obj.Get_Value("IsEmail"));
                 details.EmailColumnName = Util.GetValueOfString(obj.Get_Value("EMail"));
+                details.IsInsert = Util.GetValueOfBool(obj.Get_Value("IsInsert"));
+                details.IsUpdate = Util.GetValueOfBool(obj.Get_Value("IsUpdate"));
+                details.IsDelete = Util.GetValueOfBool(obj.Get_Value("IsDeleted"));
+                details.TabID = Util.GetValueOfInt(obj.Get_Value("AD_Tab_ID"));
+                details.ColumnID = Util.GetValueOfString(obj.Get_Value("AD_Column_ID"));
+                details.TableID = Util.GetValueOfInt(obj.Get_Value("AD_Table_ID"));
+                details.FieldID = Util.GetValueOfInt(obj.Get_Value("AD_Field_ID"));
             }
-            details.query = sql;
-            try
-            {
-                string decrypted = SecureEngine.Decrypt("ke9LjRIaP4Vsb9y66n1o18pQZUftEs692vGMirrMoME=:YN7RSxHiX54FDF7ucFYtFg==");
-                Console.WriteLine("Decrypted: " + decrypted);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error while decrypting: " + ex.Message);
-            }
+            details.Query = sql;
             return details;
         }
         /// <summary>
@@ -579,7 +632,14 @@ namespace VIS.Models
         public string EmailColumnName { get; set; }
         public string BasedOn { get; set; }
         public bool IsEmail { get; set; }
-        public string query { get; set; }
+        public string Query { get; set; }
+        public bool IsInsert { get; set; }
+        public bool IsUpdate { get; set; }
+        public bool IsDelete { get; set; }
+        public int TabID { get; set; }
+        public string ColumnID { get; set; }
+        public int FieldID { get; set; }
+        public int TableID { get; set; }
     }
 
     public class Tabs

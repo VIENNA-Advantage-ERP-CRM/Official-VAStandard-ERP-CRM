@@ -59,6 +59,10 @@ namespace VAdvantage.Process
             {
                 query.Append($" AND C_Currency_ID = {CommonCurrency_ID}");
             }
+            if (GetAD_Client_ID() > 0)
+            {
+                query.AppendLine($@" AND AD_Client_ID IN ({GetAD_Client_ID()})");
+            }
             dsobj = DB.ExecuteDataset(query.ToString());
             query.Clear();
 
@@ -73,8 +77,11 @@ namespace VAdvantage.Process
                         date = DateTime.Now.Date;
                     }
                     query.Append("SELECT AD_Org_ID,C_Currency_ID,ValidFrom,ValidTo,MultiplyRate FROM C_Conversion_Rate WHERE " + GlobalVariable.TO_DATE(date, true) +
-                        " BETWEEN ValidFrom AND ValidTo AND IsActive='Y' AND AD_Org_ID=" + Currobj.GetAD_Org_ID() + " AND C_ConversionType_ID=" + Currobj.GetC_ConversionType_ID() +
-                        " AND C_Currency_To_ID=" + Currobj.GetC_Currency_ID() + " AND C_Currency_ID IN ('" + Currobj.GetC_Currency_From_ID() + "','" + Currobj.GetC_Currency_To_ID() + "')");
+                        @" BETWEEN ValidFrom AND ValidTo AND IsActive='Y' AND AD_Org_ID=" + Currobj.GetAD_Org_ID() +
+                        @" AND C_ConversionType_ID=" + Currobj.GetC_ConversionType_ID() +
+                        @" AND AD_Client_ID = " + Currobj.GetAD_Client_ID() +
+                        " AND C_Currency_To_ID=" + Currobj.GetC_Currency_ID() +
+                        @" AND C_Currency_ID IN ('" + Currobj.GetC_Currency_From_ID() + "','" + Currobj.GetC_Currency_To_ID() + "')");
                     dsobj = DB.ExecuteDataset(query.ToString());
                     query.Clear();
                     if (dsobj != null && dsobj.Tables.Count > 0 && dsobj.Tables[0].Rows.Count == 2)

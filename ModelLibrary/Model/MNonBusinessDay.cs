@@ -93,5 +93,67 @@ namespace VAdvantage.Model
             }
             return nbDay;
         }
+
+        /// <summary>
+        /// Add days to date and Get next date after excluding non business days.
+        /// </summary>
+        /// <param name="ctx">Context</param>
+        /// <param name="dt">date</param>
+        /// <param name="days">no of days</param>
+        /// <param name="AD_Org_ID">organization</param>
+        /// <returns>date</returns>
+        public static DateTime ExcludeNonBusinessDay(Ctx ctx, DateTime? dt, int days, int AD_Org_ID)
+        {
+            if (dt == null)
+            {
+                dt = DateTime.Now;
+            }
+
+            if (days == 0)
+            {
+                return dt.Value;
+            }
+
+            int Calender_ID = 0;
+            int AD_Client_ID = ctx.GetAD_Client_ID();
+            StringBuilder qry = new StringBuilder();
+            if (AD_Org_ID > 0)
+            {
+                MOrgInfo orgInfo = MOrgInfo.Get(ctx, AD_Org_ID, null);
+                if (orgInfo.Get_ColumnIndex("C_Calendar_ID") >= 0)
+                {
+                    Calender_ID = orgInfo.GetC_Calendar_ID();
+                }
+            }
+
+            if (Calender_ID == 0)
+            {
+                qry.Append("SELECT C_Calendar_ID FROM AD_ClientInfo WHERE  IsActive = 'Y' AND AD_Client_ID=" + AD_Client_ID);
+                Calender_ID = Util.GetValueOfInt(DB.ExecuteScalar(qry.ToString()));
+            }
+
+            if (Calender_ID == 0)
+            {
+                return dt.Value.AddDays(days);
+            }
+
+            int count = 1;
+            while (count > 0)
+            {
+                qry.Clear();
+                qry.Append(MRole.GetDefault(ctx, false).AddAccessSQL(
+                   "SELECT COUNT(C_NonBusinessDay_ID) FROM C_NonBusinessDay WHERE ISACTIVE = 'Y' AND C_Calendar_ID=" + Calender_ID
+                   + (AD_Org_ID > 0 ? " AND AD_Org_ID IN (0, " + AD_Org_ID + ")" : "") + " AND DATE1 > TO_DATE('" + dt.Value.ToShortDateString() +
+                   "', 'MM-DD-YY') AND DATE1 <= TO_DATE('" + dt.Value.AddDays(days).ToShortDateString() + "', 'MM-DD-YY')",
+                   "C_NonBusinessDay", false, false));
+                dt = dt.Value.AddDays(days);
+                count = Util.GetValueOfInt(DB.ExecuteScalar(qry.ToString(), null, null));
+                if (count > 0)
+                {
+                    days = count;
+                }
+            }
+            return dt.Value;
+        }
     }
 }

@@ -484,14 +484,14 @@ namespace VIS.Models
             if (displayMATCH_INVOICEs != "")
             {
                 _sql.Append(@"SELECT hdr.C_Invoice_ID AS IDD,hdr.DocumentNo AS DocNum, hdr.DateInvoiced AS Dates, bp.Name AS BPNames,hdr.C_BPartner_ID AS BPartner_ID,
-                        lin.Line AS Lines,lin.C_InvoiceLine_ID AS lineK, p.Name as Product,lin.M_Product_ID AS productk, lin.QtyInvoiced AS qty,SUM(NVL(mi.Qty,0)) AS MATCH
+                        lin.Line AS Lines,lin.C_InvoiceLine_ID AS lineK, p.Name as Product,lin.M_Product_ID AS productk,lin.M_AttributeSetInstance_ID ,mattr.Description AS AttributeName, lin.QtyInvoiced AS qty,SUM(NVL(mi.Qty,0)) AS MATCH
                         FROM C_Invoice hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN C_InvoiceLine lin ON (hdr.C_Invoice_ID=lin.C_Invoice_ID)
-                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID and dt.DocBaseType in ('API','APC') 
+                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID and dt.DocBaseType in ('API','APC') 
                         AND dt.IsReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + @" FULL JOIN M_MatchInv mi ON (lin.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) 
                         WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? " AND lin.M_InOutLine_ID = " + MatchToID : ""));
 
                 _groupBy = " GROUP BY hdr.C_Invoice_ID,hdr.DocumentNo,hdr.DateInvoiced,bp.Name,hdr.C_BPartner_ID,"
-                    + " lin.Line,lin.C_InvoiceLine_ID,p.Name,lin.M_Product_ID,lin.QtyInvoiced "
+                    + " lin.Line,lin.C_InvoiceLine_ID,p.Name,lin.M_Product_ID,lin.QtyInvoiced,lin.M_AttributeSetInstance_ID ,mattr.Description  "
                     + "HAVING "
                     + (matched ? "0" : "lin.QtyInvoiced")
                     + "<>SUM(NVL(mi.Qty,0)) ORDER BY hdr.DocumentNo";
@@ -499,9 +499,9 @@ namespace VIS.Models
             else if (displayMATCH_ORDERs != "")
             {
                 _sql.Append(@"SELECT hdr.C_Order_ID AS IDD,hdr.DocumentNo AS Docnum, hdr.DateOrdered AS Dates, bp.Name AS BPNames,hdr.C_BPartner_ID AS Bpartner_Id,
-                        lin.Line AS Lines,lin.C_OrderLine_ID AS Linek, p.Name as Product,lin.M_Product_ID AS Productk,lin.QtyOrdered AS qty,SUM(COALESCE(mo.Qty,0)) AS MATCH
+                        lin.Line AS Lines,lin.C_OrderLine_ID AS Linek, p.Name as Product,lin.M_Product_ID AS Productk,lin.M_AttributeSetInstance_ID ,mattr.Description AS AttributeName,lin.QtyOrdered AS qty,SUM(COALESCE(mo.Qty,0)) AS MATCH
                         FROM C_Order hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN C_OrderLine lin ON (hdr.C_Order_ID=lin.C_Order_ID)
-                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID AND dt.DocBaseType='POO'
+                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID AND dt.DocBaseType='POO'
                         AND dt.isReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + @" FULL JOIN M_MatchPO mo ON (lin.C_OrderLine_ID=mo.C_OrderLine_ID)
                         WHERE  hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? " AND mo.M_InOutLine_ID = " + MatchToID : ""));
 
@@ -512,7 +512,7 @@ namespace VIS.Models
                 //    + " AND
 
                 _groupBy = " GROUP BY hdr.C_Order_ID,hdr.DocumentNo,hdr.DateOrdered,bp.Name,hdr.C_BPartner_ID,"
-                    + " lin.Line,lin.C_OrderLine_ID,p.Name,lin.M_Product_ID,lin.QtyOrdered "
+                    + " lin.Line,lin.C_OrderLine_ID,p.Name,lin.M_Product_ID,lin.QtyOrdered , lin.M_AttributeSetInstance_ID ,mattr.Description  "
                     + "HAVING "
                     + (matched ? "0" : "lin.QtyOrdered")
                     + "<>SUM(COALESCE(mo.Qty,0)) ORDER BY hdr.DocumentNo";
@@ -520,15 +520,15 @@ namespace VIS.Models
             else    //  Shipment
             {
                 _sql.Append(@"SELECT hdr.M_InOut_ID AS IDD,hdr.DocumentNo AS Docnum, hdr.MovementDate AS Dates, bp.Name AS BPNames,hdr.C_BPartner_ID AS Bpartner_Id,
-                        lin.Line AS Lines,lin.M_InOutLine_ID AS Linek, p.Name as Product,lin.M_Product_ID AS Productk, lin.MovementQty AS qty,SUM(NVL(m.Qty,0)) AS MATCH
+                        lin.Line AS Lines,lin.M_InOutLine_ID AS Linek, p.Name as Product,lin.M_Product_ID AS Productk,lin.M_AttributeSetInstance_ID ,mattr.Description AS AttributeName, lin.MovementQty AS qty,SUM(NVL(m.Qty,0)) AS MATCH
                         FROM M_InOut hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN M_InOutLine lin ON (hdr.M_InOut_ID=lin.M_InOut_ID)
-                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID = dt.C_DocType_ID AND dt.DocBaseType='MMR'
+                        INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID)  INNER JOIN C_DocType dt ON (hdr.C_DocType_ID = dt.C_DocType_ID AND dt.DocBaseType='MMR'
                         AND dt.isReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + " FULL JOIN " + (matchToTypes == MATCH_ORDERs ? "M_MatchPO" : "M_MatchInv")
                     + @" m ON (lin.M_InOutLine_ID=m.M_InOutLine_ID) WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? (matchToTypes == MATCH_ORDERs ? " AND m.C_OrderLine_ID = "
                     + MatchToID : " AND m.C_InvoiceLine_ID = " + MatchToID) : ""));
 
                 _groupBy = " GROUP BY hdr.M_InOut_ID,hdr.DocumentNo,hdr.MovementDate,bp.Name,hdr.C_BPartner_ID,"
-                    + " lin.Line,lin.M_InOutLine_ID,p.Name,lin.M_Product_ID,lin.MovementQty "
+                    + " lin.Line,lin.M_InOutLine_ID,p.Name,lin.M_Product_ID,lin.MovementQty,lin.M_AttributeSetInstance_ID ,mattr.Description  "
                     + "HAVING "
                     + (matched ? "0" : "lin.MovementQty")
                     + "<>SUM(NVL(m.Qty,0)) ORDER BY hdr.DocumentNo";
@@ -590,6 +590,8 @@ namespace VIS.Models
                     obj.MProductIDK = Util.GetValueOfString(ds.Tables[0].Rows[i]["Product"]);
                     obj.Qty = Util.GetValueOfDecimal(ds.Tables[0].Rows[i]["qty"]);
                     obj.Matched = Util.GetValueOfString(ds.Tables[0].Rows[i]["MATCH"]);
+                    obj.MAttributeSetInstance_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
+                    obj.AttributeName = Util.GetValueOfString(ds.Tables[0].Rows[i]["AttributeName"]);
                     objj.Add(obj);
                 }
             }
@@ -861,7 +863,7 @@ namespace VIS.Models
 
                         // Check if Requisition Qty are already delivered or ordered than skip that line.
                         if ((Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= OrdQty) ||
-                            (Env.IsModuleInstalled("VA097_") ?  (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= TenderQty ) : false))
+                            (Env.IsModuleInstalled("VA097_") ? (Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]) - DelQty <= TenderQty) : false))
                         {
                             continue;
                         }
@@ -875,7 +877,7 @@ namespace VIS.Models
                         res.ASI_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_AttributeSetInstance_ID"]);
                         res.ReqQty = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["QtyEntered"]);
                         res.Price = Util.GetValueOfDecimal(_ds.Tables[0].Rows[i]["PriceActual"]);
-                        res.EnteredQty = res.ReqQty - DelQty - OrdQty  + (Env.IsModuleInstalled("VA097_") ? (- TenderQty) : 0);
+                        res.EnteredQty = res.ReqQty - DelQty - OrdQty + (Env.IsModuleInstalled("VA097_") ? (-TenderQty) : 0);
                         res.PendingQty = res.EnteredQty;
                         res.M_ReqLine_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_RequisitionLine_ID"]);
                         res.M_Requisition_ID = Util.GetValueOfInt(_ds.Tables[0].Rows[i]["M_Requisition_ID"]);
@@ -1087,6 +1089,9 @@ namespace VIS.Models
         public string Line { get; set; }
         public string Line_K { get; set; }
         public int MProductID { get; set; }
+        public int MAttributeSetInstance_ID { get; set; }
+
+        public string AttributeName { get; set; }
         public string MProductIDK { get; set; }
         public decimal Qty { get; set; }
         public string Matched { get; set; }

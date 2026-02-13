@@ -44,10 +44,10 @@ namespace ModelLibrary.Classes
         {
             if (Env.IsModuleInstalled("VAI01_"))
             {
-                string windowName = "VAS_Opportunity";
+                string windowName = "Opportunity";
                 if (ToTableID == 291)
                 {
-                    windowName = "VAS_Prospects";
+                    windowName = "Prospects";
                 }
                 CreateAITabPanel(FromTableID, ToTableID, ToRecordID, FromRecordID, windowName, trx, ctx);
             }
@@ -601,7 +601,8 @@ namespace ModelLibrary.Classes
                     query = @"SELECT w.AD_Window_ID, t.AD_Tab_ID 
                           FROM AD_Window w
                           INNER JOIN AD_Tab t ON w.AD_Window_ID = t.AD_Window_ID
-                          WHERE w.Name = '" + WindowName + "' AND t.AD_Column_ID IS NULL AND t.AD_Table_ID=" + ToTableID;
+                          WHERE w.IsActive='Y' AND t.IsActive='Y' AND w.Name LIKE '%" + WindowName + 
+                          "%' AND t.AD_Column_ID IS NULL AND t.AD_Table_ID=" + ToTableID + " ORDER BY t.SeqNo ASC";
 
                     DataSet ds2 = DB.ExecuteDataset(query, null, trx);
                     if (ds2 != null && ds2.Tables.Count == 0 || ds2.Tables[0].Rows.Count == 0)

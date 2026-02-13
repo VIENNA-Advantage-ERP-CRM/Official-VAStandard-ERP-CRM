@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlTypes;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
@@ -701,6 +702,7 @@ namespace VIS.Controllers
                     decimal SavedQty = 0;
                     bool select = false;
                     string qry = "";
+                    bool IsQtyEnteredReduced = false;
 
                     recid += 1;
                     item = new DataObject();
@@ -746,8 +748,8 @@ namespace VIS.Controllers
                                 {
                                     // Change By Mohit 30/06/2016
                                     select = true;
-                                    item.QuantityEntered -= rec;
-
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.QuantityEntered = rec;
                                 }
                             }
                             else
@@ -775,12 +777,14 @@ namespace VIS.Controllers
                                 {
                                     // Change By Mohit 30/06/2016
                                     select = true;
-                                    item.QuantityEntered -= rec;
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.QuantityEntered = rec;
                                 }
                             }
                             else
                             {
-                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID + " AND M_Product_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]) +
+                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID + 
+                                    " AND M_Product_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]) +
                                     " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_attributesetinstance_id"]);
                                 rec = Util.GetValueOfDecimal(DB.ExecuteScalar(qry));
                                 if (rec > 0)
@@ -807,6 +811,7 @@ namespace VIS.Controllers
                                 {
                                     select = true;
                                     item.QuantityEntered -= rec;
+                                    IsQtyEnteredReduced = true;
                                 }
                             }
                             else
@@ -912,6 +917,8 @@ namespace VIS.Controllers
                                     // Change By Mohit 30/06/2016
                                     select = true;
                                     item.QuantityEntered = rec;
+                                    /* VIS_045: 02-Feb-26, Quantity Added because its already subtracted in query of the selected line*/
+                                    item.Quantity += rec;
                                 }
                             }
                             else
@@ -936,7 +943,16 @@ namespace VIS.Controllers
                         item.C_Invoice_ID_K = 0;
                     }
 
-                    item.QuantityPending = item.QuantityEntered;
+                    if (select && !IsQtyEnteredReduced)
+                    {
+                        /* When selected true, at that time Quantity entered contain the Quanity which is available on selected trx line */
+                        item.QuantityPending = item.Quantity;
+                    }
+                    else
+                    {
+                        item.QuantityPending = item.QuantityEntered;
+                    }
+
                     item.C_UOM_ID_K = Util.GetValueOfInt(data.Tables[0].Rows[i]["c_uom_id"]);
                     item.M_Product_ID_K = Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]);
 
@@ -1310,10 +1326,21 @@ namespace VIS.Controllers
                     string Description = ol.GetDescription();
                     if (Description != null && Description.Length > 255)
                     {
-
                         Description = Description.Substring(0, 255);
                     }
                     po.Set_Value("Description", Description);
+
+                    // VIS_045: 08-Jan-2026, Set Product HSN Code
+                    if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && M_Product_ID > 0)
+                    {
+                        //po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")));
+                        MOrderLine.SetProductHSNCode(po, MProduct.Get(ctx, M_Product_ID), Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")), true);
+                    }
+                    else if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && ol.GetC_Charge_ID() > 0)
+                    {
+                        MCharge.SetChargeHSNCode(po, null, ol.GetC_Charge_ID(), Util.GetValueOfString(ol.Get_Value("VAS_HSN_SACCode")), true);
+                    }
+
                     if (ol.GetC_Project_ID() <= 0)
                     {
                         po.Set_Value("C_Project_ID", null);
@@ -1410,10 +1437,21 @@ namespace VIS.Controllers
                     string Description = il.GetDescription();
                     if (Description != null && Description.Length > 255)
                     {
-
                         Description = Description.Substring(0, 255);
                     }
                     po.Set_Value("Description", Description);
+
+                    // VIS_045: 08-Jan-2026, Set Product HSN Code
+                    if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && M_Product_ID > 0)
+                    {
+                        //po.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")));
+                        MOrderLine.SetProductHSNCode(po, MProduct.Get(ctx, M_Product_ID), Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")), true);
+                    }
+                    else if (po.Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(po.Get_Value("VAS_HSN_SACCode"))) && il.GetC_Charge_ID() > 0)
+                    {
+                        MCharge.SetChargeHSNCode(po, null, il.GetC_Charge_ID(), Util.GetValueOfString(il.Get_Value("VAS_HSN_SACCode")), true);
+                    }
+
                     if (il.GetC_Project_ID() <= 0)
                     {
                         po.Set_Value("C_Project_ID", null);
@@ -1693,13 +1731,76 @@ namespace VIS.Controllers
                 int M_InOutLine_ID = 0;
                 bool IsLineFromShipment = false;
                 MProduct product = null;
+                int M_AttributeSetInstance_ID = 0;
 
-                //Double d = Convert.ToDouble(model[i]["Quantity"]);                      //  1-Qty
                 Double d = 0;
                 if (Util.GetValueOfBool(model[i]["Select"]) == true)
                 {
+                    string SqlIOL = "";
+                    MInvoiceLine selectedInvoiceLine = null;
+                    int C_InvoiceLine_ID = 0;
+
+                    if (model[i].Keys.Contains("QuantityEntered"))
+                    {
+                        d = Convert.ToDouble(model[i]["QuantityEntered"]);
+                    }
+                    else if (model[i].Keys.Contains("Quantity"))
+                    {
+                        d = Convert.ToDouble(model[i]["Quantity"]);
+                    }
+                    Decimal QtyEnt = Convert.ToDecimal(d);
+
+                    // when Qty Entered is ZERO then return
+                    if (QtyEnt == 0)
+                    {
+                        continue;
+                    }
+
+                    if (model[i]["M_Product_ID_K"] != "")
+                        M_Product_ID = Convert.ToInt32((model[i]["M_Product_ID_K"]));       //  3-Product
+                    if (model[i]["C_Order_ID_K"] != "")
+                        C_OrderLine_ID = Convert.ToInt32((model[i]["C_Order_ID_K"]));       //  4-OrderLine
+                    if (model[i]["M_InOut_ID_K"] != "")
+                        M_InOutLine_ID = Convert.ToInt32((model[i]["M_InOut_ID_K"]));   //  5-ShipmentLine
+                    if (model[i].Keys.Contains("M_AttributeSetInstance_ID"))
+                    {
+                        if (model[i]["M_AttributeSetInstance_ID"] != "")
+                            M_AttributeSetInstance_ID = Convert.ToInt32((model[i]["M_AttributeSetInstance_ID"]));
+                    }
+
+                    if (C_OrderLine_ID > 0 || M_InOutLine_ID > 0)
+                    {
+                        if (C_InvoiceLine_ID == 0)
+                        {
+                            SqlIOL = $@"SELECT C_InvoiceLine_ID FROM C_InvoiceLine WHERE C_Invoice_ID = { C_Invoice_ID } 
+                                        AND M_Product_ID = { M_Product_ID }
+                                        AND NVL(M_AttributeSetInstance_ID , 0) = { M_AttributeSetInstance_ID } ";
+                            if (C_OrderLine_ID > 0)
+                            {
+                                SqlIOL += $" AND C_OrderLine_ID = { C_OrderLine_ID}";
+                            }
+                            else if (M_InOutLine_ID > 0)
+                            {
+                                SqlIOL += $" AND M_InOutLine_ID = { M_InOutLine_ID}";
+                            }
+
+                            C_InvoiceLine_ID = Util.GetValueOfInt(DB.ExecuteScalar(SqlIOL));
+                            if (C_InvoiceLine_ID == 0)
+                                goto newRecord;
+                        }
+
+                        selectedInvoiceLine = new MInvoiceLine(ctx, C_InvoiceLine_ID, null);
+                        selectedInvoiceLine.SetQtyEntered(QtyEnt);
+                        selectedInvoiceLine.SetQtyInvoiced(QtyEnt);
+                        if (!selectedInvoiceLine.Save())
+                        {
+
+                        }
+                    }
                     continue;
                 }
+
+            newRecord:
                 if (model[i].Keys.Contains("QuantityEntered"))
                 {
                     d = Convert.ToDouble(model[i]["QuantityEntered"]);
@@ -1717,6 +1818,11 @@ namespace VIS.Controllers
                     C_OrderLine_ID = Convert.ToInt32((model[i]["C_Order_ID_K"]));       //  4-OrderLine
                 if (model[i]["M_InOut_ID_K"] != "")
                     M_InOutLine_ID = Convert.ToInt32((model[i]["M_InOut_ID_K"]));   //  5-Shipment
+                if (model[i].Keys.Contains("M_AttributeSetInstance_ID"))
+                {
+                    if (model[i]["M_AttributeSetInstance_ID"] != "")
+                        M_AttributeSetInstance_ID = Convert.ToInt32((model[i]["M_AttributeSetInstance_ID"]));
+                }
 
                 if (M_InOutLine_ID != 0)
                 {
@@ -1859,6 +1965,14 @@ namespace VIS.Controllers
                                     invoiceLine.SetPriceList(Decimal.Round(orderLine.GetPriceList() / rate, priceListPrcision, MidpointRounding.AwayFromZero));
                                 }
                             }
+                        }
+                    }
+                    else
+                    {
+                        /* VIS_045: 30-Jan-2026, When Attributesetinstance is selected on create line form then need to overwrite it */
+                        if (M_AttributeSetInstance_ID > 0)
+                        {
+                            invoiceLine.SetM_AttributeSetInstance_ID(M_AttributeSetInstance_ID);
                         }
                     }
 

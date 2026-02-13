@@ -1033,6 +1033,9 @@ namespace VAdvantage.Model
                         line.SetVAFAM_AssetValue(decimal.Negate(fromLine.GetVAFAM_AssetValue()));
                         line.SetVAFAM_DepAmount(decimal.Negate(fromLine.GetVAFAM_DepAmount()));
                     }
+
+                    // VIS_045: 09-Jan-2026, Set Product HSN Code of Original document on reversed document
+                    line.Set_Value("VAS_HSN_SACCode", Util.GetValueOfString(fromLine.Get_Value("VAS_HSN_SACCode")));
                 }
                 line.SetProcessed(false);
 
@@ -2132,15 +2135,19 @@ namespace VAdvantage.Model
                                 sql.Clear();
                                 if (!isContainrApplicable)
                                 {
-                                    sql.Append("SELECT SUM(QtyOnHand) FROM M_Storage WHERE M_Locator_ID = " + m_locator_id + " AND M_Product_ID = " + m_product_id);
+                                    sql.Append(@"SELECT DISTINCT First_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
+                                    ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
+                                    INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
+                                    " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                    " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID());
                                 }
                                 else
                                 {
                                     sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
-                                        " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
-                                        " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
+                                    " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                    " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
+                                    " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
                                 decimal qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
                                 decimal qtyToMove = iol.GetMovementQty();
@@ -2157,15 +2164,19 @@ namespace VAdvantage.Model
                                 sql.Clear();
                                 if (!isContainrApplicable)
                                 {
-                                    sql.Append("SELECT SUM(QtyOnHand) FROM M_Storage WHERE M_Locator_ID = " + m_locator_id + " AND M_Product_ID = " + m_product_id + " AND NVL(M_AttributeSetInstance_ID , 0) = " + iol.GetM_AttributeSetInstance_ID());
+                                    sql.Append(@"SELECT DISTINCT First_VALUE(t.CurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID
+                                        ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
+                                        INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
+                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                        " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID());
                                 }
                                 else
                                 {
                                     sql.Append(@"SELECT DISTINCT First_VALUE(t.ContainerCurrentQty) OVER (PARTITION BY t.M_Product_ID, t.M_AttributeSetInstance_ID, t.M_Locator_ID, NVL(t.M_ProductContainer_ID, 0) ORDER BY t.MovementDate DESC, t.M_Transaction_ID DESC) AS CurrentQty FROM m_transaction t 
                                         INNER JOIN M_Locator l ON t.M_Locator_ID = l.M_Locator_ID WHERE t.MovementDate <= " + GlobalVariable.TO_DATE(GetMovementDate(), true) +
-                                            " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
-                                            " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
-                                            " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
+                                        " AND t.MovementType NOT IN ('VI', 'IR') AND t.AD_Client_ID = " + GetAD_Client_ID() + " AND t.M_Locator_ID = " + iol.GetM_Locator_ID() +
+                                        " AND t.M_Product_ID = " + iol.GetM_Product_ID() + " AND NVL(t.M_AttributeSetInstance_ID,0) = " + iol.GetM_AttributeSetInstance_ID() +
+                                        " AND NVL(t.M_ProductContainer_ID, 0) = " + iol.GetM_ProductContainer_ID());
                                 }
                                 decimal qty = Util.GetValueOfDecimal(DB.ExecuteScalar(sql.ToString(), null, Get_TrxName()));
                                 decimal qtyToMove = iol.GetMovementQty();
@@ -3485,6 +3496,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
                                     // VIS_045: 19-Mar-2025, Update Match Invoice record (Differenec Price of (AP - PO))
                                     DB.ExecuteQuery($@"UPDATE M_MatchInv 
@@ -3599,6 +3611,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + costingCheck.OrderLineAmtinBaseCurrency);
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
 
                                     // calculate cost of Invoice if invoice created before this MR
                                     if (matchedInvoice.Count > 0)
@@ -3749,6 +3762,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                 }
                                 #endregion
                             }
@@ -3837,6 +3851,7 @@ namespace VAdvantage.Model
                                     query.Append(" , VAS_PostingCost = " + Math.Abs(costingCheck.OrderLineAmtinBaseCurrency));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return to Vendor is {query.ToString()}");
                                 }
                                 #endregion
                             }
@@ -4445,6 +4460,7 @@ namespace VAdvantage.Model
                         query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Shipment is {query.ToString()}");
                     }
                     #endregion
                 }
@@ -4526,6 +4542,7 @@ namespace VAdvantage.Model
                         query.Append(" , VAS_PostingCost = " + currentCostPrice);
                         query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Customer Return is {query.ToString()}");
                     }
                     #endregion
                 }

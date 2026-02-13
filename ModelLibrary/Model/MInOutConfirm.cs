@@ -77,15 +77,16 @@ namespace VAdvantage.Model
                 MInOutLine sLine = shipLines[i];
                 MInOutLineConfirm cLine = new MInOutLineConfirm(confirm1);
                 cLine.SetInOutLine(sLine);
-                //Arpit Start Here to Set UOM from the shipment/Receipt Line to Confirmation Lines
+                // Set UOM from the shipment/Receipt Line to Confirmation Lines
                 cLine.SetC_UOM_ID(sLine.GetC_UOM_ID());
+                // Set Attribute from the shipment/Receipt Line to Confirmation Lines
+                cLine.Set_Value("M_AttributeSetInstance_ID", Util.GetValueOfInt(sLine.GetM_AttributeSetInstance_ID()));
                 cLine.SetTargetQty(sLine.GetQtyEntered());
                 cLine.SetConfirmedQty(sLine.GetQtyEntered());
-                //Arpit 
                 cLine.Save(ship.Get_TrxName());
             }
-            // Change By Arpit Rai on 24th August,2017 To Check if VA Material Quality Control Module exists or not
-            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM AD_ModuleInfo WHERE Prefix='VA010_'", null, null)) > 0)
+            // Check if VA Material Quality Control Module exists or not
+            if (Env.IsModuleInstalled("VA010_"))
             {
                 if (confirmType == MInOutConfirm.CONFIRMTYPE_ShipReceiptConfirm)
                 {

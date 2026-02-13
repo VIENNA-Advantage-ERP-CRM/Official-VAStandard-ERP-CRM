@@ -1082,6 +1082,8 @@
                             line['Line_K'] = res[i].Line_K;
                             line['M_Product_ID'] = res[i].MProductIDK;
                             line['M_Product_ID_K'] = res[i].MProductID;
+                            line['MAttributeSetInstance_ID'] = res[i].MAttributeSetInstance_ID;
+                            line['AttributeName'] = res[i].AttributeName;
                             line['Qty'] = res[i].Qty;
                             line['Matched'] = res[i].Matched;
                             line['recid'] = count;
@@ -1208,7 +1210,10 @@
                 $self.arrListColumns.push({ field: "Line_K", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Line"), sortable: true, size: '11%', hidden: true });
                 $self.arrListColumns.push({ field: "M_Product_ID", caption: VIS.Msg.translate(VIS.Env.getCtx(), "M_Product_ID"), sortable: true, size: '11%', hidden: false });
                 $self.arrListColumns.push({ field: "M_Product_ID_K", caption: VIS.Msg.translate(VIS.Env.getCtx(), "M_Product_ID"), sortable: true, size: '11%', hidden: true });
+                $self.arrListColumns.push({ field: "MAttributeSetInstance_ID", caption: VIS.Msg.translate(VIS.Env.getCtx(), "ASI"), sortable: true, size: '11%', hidden: true });
+                $self.arrListColumns.push({ field: "AttributeName", caption: VIS.Msg.translate(VIS.Env.getCtx(), "ASI"), sortable: true, size: '11%', hidden: false });
                 $self.arrListColumns.push({
+                    
                     field: "Qty", caption: VIS.Msg.translate(VIS.Env.getCtx(), "Qty"), sortable: true, size: '11%', hidden: false,
                     render: function (record, index, col_index) {
                         var val = VIS.Utility.Util.getValueOfDecimal(record["Qty"]);

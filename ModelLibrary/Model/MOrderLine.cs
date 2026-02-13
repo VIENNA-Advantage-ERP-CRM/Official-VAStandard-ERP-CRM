@@ -3973,6 +3973,16 @@ namespace VAdvantage.Model
                 SetC_TaxExemptReason_ID(0);
             }
 
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (GetM_Product_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 && string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode"))))
+            {
+                SetProductHSNCode(this, GetProduct(), "", true);
+            }
+            else if (GetC_Charge_ID() > 0 && Get_ColumnIndex("VAS_HSN_SACCode") > -1 &&
+                (Is_ValueChanged("C_Charge_ID") || string.IsNullOrEmpty(Util.GetValueOfString(Get_Value("VAS_HSN_SACCode")))))
+            {
+                MCharge.SetChargeHSNCode(this, null, GetC_Charge_ID(), "", true);
+            }
 
             MOrder Ord = GetParent();
             MDocType docType = MDocType.Get(GetCtx(), Ord.GetC_DocTypeTarget_ID());
@@ -4823,6 +4833,23 @@ namespace VAdvantage.Model
         }
 
         /// <summary>
+        /// This function is used to set the Product HSN Value
+        /// </summary>
+        /// <param name="line">line object</param>
+        /// <param name="product">Product object</param>
+        /// <author>VIS_045: 08-Jan-2026</author>
+        public static void SetProductHSNCode(PO line, MProduct product, string oldHSNcode, bool isNewPriority)
+        {
+            if (product != null && product.Get_ID() > 0 && line != null)
+            {
+                string newHSNcode = Util.GetValueOfString(product.Get_Value("VAS_HSN_SACCode"));
+                /* Given priority to new HSN Code*/
+                newHSNcode = isNewPriority ? newHSNcode : (!string.IsNullOrEmpty(oldHSNcode) ? oldHSNcode : newHSNcode);
+                line.Set_Value("VAS_HSN_SACCode", newHSNcode);
+            }
+        }
+
+        /// <summary>
         /// Set IsTaxExempt and TaxExemptReason
         /// </summary>
         /// <writer>1052</writer>
@@ -4979,7 +5006,7 @@ namespace VAdvantage.Model
                     // VIS0060: Set maximum promise date from line to header tab.
                     if (Is_ValueChanged("DatePromised") && GetDatePromised() != null && Ord.GetDatePromised().Value.Date < GetDatePromised().Value.Date)
                     {
-                        string sql = "UPDATE C_Order SET DatePromised=" + GlobalVariable.TO_DATE(GetDatePromised(), true) + 
+                        string sql = "UPDATE C_Order SET DatePromised=" + GlobalVariable.TO_DATE(GetDatePromised(), true) +
                             " WHERE C_Order_ID=" + GetC_Order_ID();
                         int no = DB.ExecuteQuery(sql, null, Get_TrxName());
                     }

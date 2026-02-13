@@ -1398,12 +1398,12 @@ namespace VAdvantage.Model
                         fromLines[i].Save(Get_TrxName());
                     }
                     //VIS0336-changes done for FSR Generate Sales Quotation process 
-                    if (Env.IsModuleInstalled("VA075_") && line.Get_ColumnIndex("VA075_WorkOrderComponent_ID") > 0 && line.Get_ValueAsInt("VA075_WorkOrderComponent_ID") > 0 && line.GetC_OrderLine_ID()>0)
+                    if (Env.IsModuleInstalled("VA075_") && line.Get_ColumnIndex("VA075_WorkOrderComponent_ID") > 0 && line.Get_ValueAsInt("VA075_WorkOrderComponent_ID") > 0 && line.GetC_OrderLine_ID() > 0)
                     {
                         string query = "UPDATE VA075_WorkOrderComponent SET C_OrderLine_ID=" + line.GetC_OrderLine_ID() + " WHERE VA075_WorkOrderComponent_ID=" + line.Get_ValueAsInt("VA075_WorkOrderComponent_ID");
                         DB.ExecuteQuery(query, null, Get_Trx());
                     }
-                 
+
 
                 }
                 if (fromLines.Length != count)
@@ -2738,10 +2738,21 @@ namespace VAdvantage.Model
                         {
                             log.SaveWarning("Warning", Msg.GetMsg(GetCtx(), "VIS_BPCreditWatch"));
                         }
-
-
                     }
                 }
+
+                //VIS_045: 05-feb-2026, Check Vendor is MSME Applicable, if yes, then payment term days can't be exceed greater than 45 Days
+                if (Env.IsModuleInstalled("VA106_"))
+                {
+                    if ((!IsSOTrx() && !IsReturnTrx()) && (newRecord || Is_ValueChanged("C_BPartner_ID") || Is_ValueChanged("C_PaymentTerm_ID")))
+                    {
+                        if (MPaymentTerm.CheckMSMEDaysExceedForVendor(GetCtx(), GetC_PaymentTerm_ID(), GetC_BPartner_ID(), GetC_DocTypeTarget_ID()))
+                        {
+                            log.SaveWarning("VA106_ExceedMSMEDays", "");
+                        }
+                    }
+                }
+
             }
             catch (Exception ex)
             {
@@ -6537,7 +6548,7 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                         if (ship.VoidIt())
                             ship.SetDocStatus(MInOut.DOCSTATUS_Voided);
                     }
-                  
+
                     //	Create new Reversal with only that order
                     else if (!ship.IsOnlyForOrder(this))
                     {

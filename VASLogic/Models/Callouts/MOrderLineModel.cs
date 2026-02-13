@@ -22,7 +22,7 @@ namespace VIS.Models
         /// <returns></returns>
         public Dictionary<String, String> GetOrderLine(Ctx ctx, string param)
         {
-
+            MProduct prod = null;
             string[] paramValue = param.Split(',');
 
             Dictionary<String, String> retDic = new Dictionary<string, string>();
@@ -33,7 +33,10 @@ namespace VIS.Models
             //End Assign parameter value
 
             MOrderLine orderline = new MOrderLine(ctx, id, null);
-
+            if (orderline.GetM_Product_ID() > 0)
+            {
+                prod = orderline.GetProduct();
+            }
             retDic["C_Tax_ID"] = Util.GetValueOfString(orderline.GetC_Tax_ID());
             retDic["PriceList"] = Util.GetValueOfString(orderline.GetPriceList());
             retDic["PriceLimit"] = Util.GetValueOfString(orderline.GetPriceLimit());
@@ -72,6 +75,19 @@ namespace VIS.Models
             retDic["PrintDescription"] = Util.GetValueOfString(orderline.Get_Value("PrintDescription"));
             retDic["VAS_ContractLine_ID"] = Util.GetValueOfString(orderline.Get_Value("VAS_ContractLine_ID")); //VAI050-Get Contract Line Id
 
+            // VIS_045: 08-Jan-2026, Set Product HSN Code
+            if (orderline.Get_ColumnIndex("VAS_HSN_SACCode") > -1)
+            {
+                if (orderline.GetM_Product_ID() > 0 && prod != null)
+                {
+                    retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(prod.Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+                }
+                else if (orderline.GetC_Charge_ID() > 0)
+                {
+                    retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(MCharge.Get(ctx, orderline.GetC_Charge_ID()).Get_Value("VAS_HSN_SACCode")) ?? Util.GetValueOfString(orderline.Get_Value("VAS_HSN_SACCode"));
+                }
+            }
+
             if (Env.IsModuleInstalled("VA077_"))
             {
                 retDic["VA077_CNAutodesk"] = Util.GetValueOfString(orderline.Get_Value("VA077_CNAutodesk"));
@@ -90,8 +106,10 @@ namespace VIS.Models
                 retDic["VA077_EndDate"] = Util.GetValueOfString(orderline.Get_Value("VA077_EndDate"));
 
                 //Get Product information
-                MProduct prod = new MProduct(ctx, orderline.GetM_Product_ID(), null);
-                retDic["VA077_LicenceTracked"] = Util.GetValueOfString(prod.Get_Value("VA077_LicenceTracked"));
+                if (prod != null)
+                {
+                    retDic["VA077_LicenceTracked"] = Util.GetValueOfString(prod.Get_Value("VA077_LicenceTracked"));
+                }
 
             }
 
@@ -915,7 +933,7 @@ namespace VIS.Models
                                 }
                             }
                         }
-                    }                    
+                    }
                 }
             }
             return C_Tax_ID;
@@ -1873,7 +1891,7 @@ namespace VIS.Models
             retDic["purchasingUom"] = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, null));
             //VAI050-Get Purchase and Sales UOM from Product
             sql.Clear();
-            sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID FROM M_Product WHERE
+            sql.Append(@"SELECT ProductType, C_UOM_ID, IsDropShip, DocumentNote,VAS_PurchaseUOM_ID,VAS_SalesUOM_ID, VAS_HSN_SACCode FROM M_Product WHERE
                     IsActive = 'Y' AND M_Product_ID = " + _m_Product_Id);
 
             dsProductInfo = DB.ExecuteDataset(sql.ToString());
@@ -1885,6 +1903,7 @@ namespace VIS.Models
                 retDic["VAS_SalesUOM_ID"] = Util.GetValueOfInt(dsProductInfo.Tables[0].Rows[0]["VAS_SalesUOM_ID"]);
                 retDic["IsDropShip"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["IsDropShip"]);
                 retDic["DocumentNote"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["DocumentNote"]);
+                retDic["VAS_HSN_SACCode"] = Util.GetValueOfString(dsProductInfo.Tables[0].Rows[0]["VAS_HSN_SACCode"]);
             }
 
             if (Util.GetValueOfInt(retDic["purchasingUom"]) > 0 && !isSOTrx)

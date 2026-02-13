@@ -231,7 +231,7 @@ namespace VAdvantage.Process
 
                 sql.Append($@"WITH trx AS (
                        SELECT t.AD_Client_ID, t.AD_Org_ID , t.M_Product_ID, t.M_AttributeSetInstance_ID ,t.movementdate,  to_char(t.created, 'DD-MON-YY HH24:MI:SS') AS created ,t.M_Transaction_ID ,
-                        t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_productionline_ID, ");
+                        t.M_InOutline_ID  , t.M_Inventoryline_ID  , t.M_Movementline_ID , t.M_ProductionLine_ID, ");
                 if (count > 0)
                 {
                     sql.Append($@"t.VAMFG_M_wrkodrtransaction_ID  , t.VAMFG_M_wrkodrtrnsctionline_ID, ");
@@ -587,10 +587,11 @@ namespace VAdvantage.Process
                                     if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "M_Production")
                                     {
                                         sql.Clear();
-                                        sql.Append($@"SELECT COUNT(pl.M_ProductionLine_ID) FROM M_ProductionLine pl 
+                                        sql.Append($@"SELECT NVL(pl.M_ProductionPlan_ID, 0) FROM M_ProductionLine pl 
                                                    INNER JOIN M_Product pr ON (pr.M_Product_ID = pl.M_Product_ID)
                                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                                            $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} ");
+                                                            $@"pl.M_Production_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"])} 
+                                                            AND pl.M_ProductionLine_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["M_ProductionLine_ID"])}");
                                         if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
                                         {
                                             sql.Append(" AND pl.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) ) ");
@@ -599,7 +600,8 @@ namespace VAdvantage.Process
                                         {
                                             sql.Append(" AND pl.M_Product_ID IN (" + productID + " )");
                                         }
-                                        if (Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx())) > 0)
+                                        int M_ProductionPlan_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql.ToString(), null, Get_Trx()));
+                                        if (M_ProductionPlan_ID > 0)
                                         {
                                             DataSet dsCostingMethod = null;
                                             int v_definedcostelement_id = 0;
@@ -622,9 +624,10 @@ namespace VAdvantage.Process
                                                      INNER JOIN M_Transaction t ON (t.M_ProductionLine_ID = pl.M_ProductionLine_ID) 
                                                 WHERE " + (M_AttributeSetInstance_ID > 0 ? $" pl.M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                                              @"p.M_Production_ID = pp.M_Production_ID AND pp.M_ProductionPlan_ID=pl.M_ProductionPlan_ID AND pl.IsCostImmediate = 'N' 
-                                                      AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + @"
+                                                      AND pp.M_Production_ID    =" + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) + $@"
                                                       AND pl.M_Product_ID = prod.M_Product_ID AND prod.ProductType ='I' 
-                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID");
+                                                      AND pl.M_Locator_ID = loc.M_Locator_ID AND loc.M_Warehouse_ID = wh.M_Warehouse_ID 
+                                                      AND pl.M_ProductionPlan_ID = {M_ProductionPlan_ID}");
 
                                             prodSql.Clear();
                                             prodSql.Append(sql);
@@ -677,7 +680,8 @@ namespace VAdvantage.Process
                                                         INNER JOIN M_Product        pr ON ( pr.M_Product_ID = pl.M_Product_ID )
                                                     WHERE nvl(pl.Amt, 0) = 0
                                                         AND pl.IsActive = 'Y' AND pp.IsActive = 'Y' AND pl.MovementQty < 0 AND pr.IsFocItem = 'N'
-                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]), null, Get_Trx()));
+                                                        AND p.M_Production_ID = " + Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]) +
+                                                        " AND pl.M_ProductionPlan_ID = " + M_ProductionPlan_ID, null, Get_Trx()));
 
                                                     if ((CountCostNotAvialable == 0 && Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) > 0) ||
                                                         Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQty"]) < 0)
@@ -816,6 +820,7 @@ namespace VAdvantage.Process
                                                                     INNER JOIN m_product prod ON (prod.m_product_id = pp.m_product_id)
                                                                 WHERE
                                                                     pp.m_production_id = {Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Production_ID"])}
+                                                                    AND pp.M_ProductionPlan_ID = { M_ProductionPlan_ID }
                                                                     AND prod.isbom = 'Y'
                                                                     AND prod.isverified = 'Y' 
                                                                 ORDER BY
@@ -860,6 +865,13 @@ namespace VAdvantage.Process
                                                             Get_Trx().Rollback();
                                                         }
                                                         #endregion
+                                                    }
+                                                    else
+                                                    {
+                                                        _log.Info($@"Costing not calculated for Assembly Document - 
+                                                                        Production Plan ID = {M_ProductionPlan_ID}, 
+                                                                        M_ProductionLine_ID = {Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["M_ProductionLine_ID"])},
+                                                                        component cost not found");
                                                     }
                                                 }
                                             }
@@ -2015,6 +2027,7 @@ namespace VAdvantage.Process
 
         public string InsertClosingCostonCost()
         {
+            int M_CostElement_ID = GetStandardCostElement();
             sql.Clear();
             sql.Append($@"INSERT INTO M_COST(
                 M_Cost_ID, AD_CLIENT_ID, AD_ORG_ID, C_ACCTSCHEMA_ID, CREATED, CREATEDBY, CUMULATEDAMT, CUMULATEDQTY, CURRENTCOSTPRICE, CURRENTQTY,
@@ -2037,13 +2050,107 @@ namespace VAdvantage.Process
             {
                 sql.Append($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
             }
+            if (DateFrom != null && M_CostElement_ID > 0)
+            {
+                sql.Append($@" AND M_CostElement_ID NOT IN ({M_CostElement_ID})");
+            }
             int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
             if (no <= 0)
             {
+                _log.Info("VAS_CostClosingNotInserted from M_CostClosing to M_Cost");
                 return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotInserted");
             }
+
+            // For Standard Costing and Date From is not null 
+            if (DateFrom != null)
+            {
+                sql.Clear();
+                sql.Append(GetCostUpdateSQL(M_CostElement_ID, DateFrom.Value));
+                if (sql.Length > 0)
+                {
+                    no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                    if (no <= 0)
+                    {
+                        _log.Info("VAS_CostClosingNotInserted for Standard Costing from M_CostClosing to M_Cost");
+                        return Msg.GetMsg(GetCtx(), "VAS_CostClosingNotInserted");
+                    }
+                }
+            }
+
             return "";
         }
+
+        /// <summary>
+        /// This function is used to create update Query for updation of "Standard Costing" record from M_CostClosing to M_cost
+        /// </summary>
+        /// <param name="M_CostElement_ID">Standard Costing Element</param>
+        /// <param name="dateFrom">Date From</param>
+        /// <returns>Query</returns>
+        private string GetCostUpdateSQL(int M_CostElement_ID, DateTime dateFrom)
+        {
+            string sql = string.Empty;
+
+            if (M_CostElement_ID > 0)
+            {
+                // Common date expression for both databases
+                string dateCondition = GlobalVariable.TO_DATE(dateFrom.AddDays(-1), true);
+
+                int userId = GetCtx().GetAD_User_ID();
+
+                if (DB.IsOracle())
+                {
+                    sql = $@"
+                MERGE INTO M_Cost c
+                USING (
+                    SELECT *
+                    FROM M_CostClosing
+                    WHERE TRUNC(Created) = {dateCondition} AND M_CostElement_ID = {M_CostElement_ID}";
+                    if (!string.IsNullOrEmpty(productID))
+                    {
+                        sql += ($@" AND M_Product_ID IN ({productID})");
+                    }
+                    else if (!string.IsNullOrEmpty(productCategoryID))
+                    {
+                        sql += ($@" AND M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
+                    }
+
+                    sql += $@") cc ON (c.M_Cost_ID = cc.M_CostClosing_ID)
+                            WHEN MATCHED THEN
+                                UPDATE SET
+                                    c.CUMULATEDAMT = cc.CUMULATEDAMT,
+                                    c.CUMULATEDQTY = cc.CUMULATEDQTY,
+                                    c.CURRENTCOSTPRICE = cc.CURRENTCOSTPRICE,
+                                    c.CURRENTQTY = cc.CURRENTQTY,
+                                    c.UPDATED = sys_extract_utc(systimestamp),
+                                    c.UPDATEDBY = { userId} ";
+                }
+                else if (DB.IsPostgreSQL())
+                {
+                    sql = $@"
+                UPDATE M_Cost c
+                SET 
+                    CUMULATEDAMT = cc.CUMULATEDAMT,
+                    CUMULATEDQTY = cc.CUMULATEDQTY,
+                    CURRENTCOSTPRICE = cc.CURRENTCOSTPRICE,
+                    CURRENTQTY = cc.CURRENTQTY,
+                    UPDATED = NOW() at TIME zone 'UTC',
+                    UPDATEDBY = {userId}
+                FROM M_CostClosing cc
+                WHERE c.M_Cost_ID = cc.M_CostClosing_ID AND cc.M_CostElement_ID = {M_CostElement_ID}
+                  AND DATE_TRUNC('day', cc.Created) = {dateCondition}";
+                    if (!string.IsNullOrEmpty(productID))
+                    {
+                        sql += ($@" AND cc.M_Product_ID IN ({productID})");
+                    }
+                    else if (!string.IsNullOrEmpty(productCategoryID))
+                    {
+                        sql += ($@" AND cc.M_Product_ID IN (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({productCategoryID} ) )");
+                    }
+                }
+            }
+            return sql;
+        }
+
 
         /// <summary>
         /// we will update IsCostCalculation / IsReversedCostCalculation / IsCostImmediate on the Tansaction
@@ -2276,6 +2383,12 @@ namespace VAdvantage.Process
                     sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -2689,6 +2802,12 @@ namespace VAdvantage.Process
                 }
                 sql.Append($@" AND AD_client_ID IN ({ GetAD_Client_ID() })");
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 if (countRecord > 0)
                 {
                     sql.Clear();
@@ -3024,6 +3143,12 @@ namespace VAdvantage.Process
                 }
                 countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
+                // Reset Charge for the reversal record
+                sql.Clear();
+                sql.Append(ResetAssemblyChargeCost(DateFrom, productCategoryID, productID, M_AttributeSetInstance_ID));
+                sql.Append($@" AND AD_Client_ID IN ({ GetAD_Client_ID() })");
+                DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
                 sql.Clear();
                 sql.Append($@"UPDATE M_Production  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
                 sql.Append(@" , Posted ='N' ");
@@ -3157,6 +3282,60 @@ namespace VAdvantage.Process
         }
 
         /// <summary>
+        /// This function is used to create the query to set Amt = 0 for the Charge Line for the reversal record 
+        /// </summary>
+        /// <param name="fromDate">Date From</param>
+        /// <param name="productCategoryIDs">Product Category IDs</param>
+        /// <param name="productIDs">Product IDs</param>
+        /// <param name="ASI">Attributesetinstance id</param>
+        /// <returns>Sql Query</returns>
+        /// <author>VIS_045: 16-Jan-2025</author>
+        public static string ResetAssemblyChargeCost(DateTime? fromDate, string productCategoryIDs, string productIDs, int ASI)
+        {
+            StringBuilder queryAssembly = new StringBuilder();
+            queryAssembly.Clear();
+            queryAssembly.AppendLine("UPDATE m_productionline mpl ");
+            queryAssembly.AppendLine(" SET Amt = 0");
+            queryAssembly.AppendLine(" WHERE COALESCE(mpl.C_Charge_ID, 0) > 0");
+            if (fromDate != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                        SELECT M_Production_ID
+                        FROM M_Production m
+                        WHERE m.M_Production_ID = mpl.M_Production_ID
+                        AND m.MovementDate >= {GlobalVariable.TO_DATE(fromDate, true)} )");
+            }
+            if (productCategoryIDs != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID FROM M_ProductionLine pl WHERE pl.M_Product_ID IN (
+                    SELECT M_Product_ID FROM M_Product p
+                    WHERE p.M_Product_Category_ID IN ({productCategoryIDs}))");
+                if (ASI > 0)
+                {
+                    queryAssembly.Append($@" AND M_AttributeSetInstance_ID = {ASI} ");
+                }
+                queryAssembly.Append(")");
+            }
+            else if (productIDs != null)
+            {
+                queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID FROM M_ProductionLine pl WHERE pl.M_Product_ID IN ({productIDs})");
+                if (ASI > 0)
+                {
+                    queryAssembly.Append($@" AND M_AttributeSetInstance_ID = {ASI} ");
+                }
+                queryAssembly.Append(")");
+            }
+            queryAssembly.AppendLine($@" AND M_Production_ID IN (
+                    SELECT M_Production_ID 
+                    FROM M_Production m
+                    WHERE m.M_Production_ID = mpl.M_Production_ID
+                    AND m.IsReversed = 'Y' )");
+            return queryAssembly.ToString();
+        }
+
+        /// <summary>
         /// This function is used to update the Current Qunatity on Cost Queue when Re-Costing calculation process run with From data Parameter
         /// </summary>
         /// <returns></returns>
@@ -3170,7 +3349,7 @@ namespace VAdvantage.Process
                             SET CurrentQty =  (
                                 SELECT ABS(SUM(cqt.MovementQty))
                                 FROM M_CostQueueTransaction cqt
-                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @" cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@" cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)}
@@ -3178,7 +3357,7 @@ namespace VAdvantage.Process
                             WHERE EXISTS (
                                 SELECT 1
                                 FROM M_CostQueueTransaction cqt
-                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
+                                WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@"cq.M_CostQueue_ID = cqt.M_CostQueue_ID
                                   AND cq.M_Product_ID IN ({((!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID)) ? pc : productID)})
                                   AND NVL(cqt.C_Invoiceline_ID, 0) = 0 
                                   AND TRUNC(cqt.movementdate) < {GlobalVariable.TO_DATE(DateFrom, true)})");
@@ -3191,7 +3370,7 @@ namespace VAdvantage.Process
         {
             int M_CostElement_ID = 0;
             // get Costing element id where Costing Method is Standard Costing
-            if (DateFrom == null)
+            //if (DateFrom == null)
             {
                 sql.Clear();
                 sql.Append(@"SELECT M_CostElement_ID FROM M_CostElement ce ");
@@ -4363,6 +4542,7 @@ namespace VAdvantage.Process
                                         if (IsCostUpdation)
                                         {
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Shipment is {query.ToString()}");
                                         }
 
                                         _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -4615,6 +4795,7 @@ namespace VAdvantage.Process
                                         if (IsCostUpdation)
                                         {
                                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Customer Return is {query.ToString()}");
                                         }
 
                                         _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -4845,6 +5026,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return To Vendor is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -4930,6 +5112,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Return To Vendor is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5152,6 +5335,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for m_inoutline = " + inoutLine.GetM_InOutLine_ID());
@@ -5282,6 +5466,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for m_inoutline = " + inoutLine.GetM_InOutLine_ID());
@@ -5603,6 +5788,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5716,6 +5902,7 @@ namespace VAdvantage.Process
                                             if (IsCostUpdation)
                                             {
                                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                                             }
 
                                             _log.Fine("Cost Calculation updated for M_InoutLine = " + inoutLine.GetM_InOutLine_ID());
@@ -5897,6 +6084,7 @@ namespace VAdvantage.Process
                             if (IsCostUpdation)
                             {
                                 DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Material Receipt is {query.ToString()}");
                             }
                             Get_Trx().Commit();
                         }
@@ -6072,6 +6260,7 @@ namespace VAdvantage.Process
                     }
                 }
                 sql += $@" WHERE C_InvoiceLine_ID = {C_InvoiceLine_ID}";
+                log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Invoice is {sql}");
                 return DB.ExecuteQuery(sql, null, Get_Trx()) >= 0;
             }
             return true;
@@ -6366,6 +6555,7 @@ namespace VAdvantage.Process
                                     if (IsCostUpdation)
                                     {
                                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Internal Use Inventory is {query.ToString()}");
                                     }
 
                                     _log.Fine("Cost Calculation updated for M_InventoryLine = " + inventoryLine.GetM_InventoryLine_ID());
@@ -6492,6 +6682,7 @@ namespace VAdvantage.Process
                                     if (IsCostUpdation)
                                     {
                                         DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                                        log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Physical Inventory is {query.ToString()}");
                                     }
 
                                     _log.Fine("Cost Calculation updated for M_InventoryLine = " + inventoryLine.GetM_InventoryLine_ID());
@@ -6625,6 +6816,7 @@ namespace VAdvantage.Process
                         if (IsCostUpdation)
                         {
                             DB.ExecuteQuery(query.ToString(), null, Get_Trx());
+                            log.Info($"Costing Engine: Cost Updation Query on Product Transaction for AssetDisposal is {query.ToString()}");
                         }
 
                         _log.Fine("Cost Calculation updated for VAFAM_AssetDispoal= " + VAFAM_AssetDisposal_ID);
@@ -6854,6 +7046,8 @@ namespace VAdvantage.Process
                                 {
                                     DB.ExecuteQuery(query.ToString(), null, Get_Trx());
                                     DB.ExecuteQuery(queryTo.ToString(), null, Get_Trx());
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for From Inventory Move is {query.ToString()}");
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for To Inventory Move is {queryTo.ToString()}");
                                 }
 
                                 _log.Fine("Cost Calculation updated for M_MovementLine = " + movementLine.GetM_MovementLine_ID());
@@ -7090,7 +7284,7 @@ namespace VAdvantage.Process
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Production Execution is {query.ToString()}");
                                     Get_Trx().Commit();
                                 }
                             }
@@ -7142,7 +7336,7 @@ namespace VAdvantage.Process
                                     query.Append(" , CostingLevel = " + GlobalVariable.TO_STRING(costingCheck.costinglevel));
                                     query.Append(" WHERE M_Transaction_ID = " + costingCheck.M_Transaction_ID);
                                     int no = DB.ExecuteQuery(query.ToString(), null, Get_Trx());
-
+                                    log.Info($"Costing Engine: Cost Updation Query on Product Transaction for Production Execution is {query.ToString()}");
                                     Get_Trx().Commit();
                                 }
                             }
