@@ -35,7 +35,7 @@ namespace VAdvantage.Process
         protected override string DoIt()
         {
 
-            return CreateCrossCurrency();
+            return CreateCrossCurrency(0, null, GetAD_Client_ID());
         }
 
         protected override void Prepare()
@@ -51,7 +51,7 @@ namespace VAdvantage.Process
         /// <Date>01-May-2024</Date>
         /// <Task-ID>FEATURE 5703</Task-ID>
         /// <returns>Message</returns>
-        public string CreateCrossCurrency(int CommonCurrency_ID = 0, DateTime? date = null)
+        public string CreateCrossCurrency(int CommonCurrency_ID = 0, DateTime? date = null, int AD_Client_ID = 0)
         {
             // Getting records from cross rate setting
             query.Append("SELECT * FROM C_CurrCrossRate WHERE IsActive='Y'");
@@ -59,9 +59,9 @@ namespace VAdvantage.Process
             {
                 query.Append($" AND C_Currency_ID = {CommonCurrency_ID}");
             }
-            if (GetAD_Client_ID() > 0)
+            if (AD_Client_ID > 0)
             {
-                query.AppendLine($@" AND AD_Client_ID IN ({GetAD_Client_ID()})");
+                query.AppendLine($@" AND AD_Client_ID IN ({AD_Client_ID})");
             }
             dsobj = DB.ExecuteDataset(query.ToString());
             query.Clear();

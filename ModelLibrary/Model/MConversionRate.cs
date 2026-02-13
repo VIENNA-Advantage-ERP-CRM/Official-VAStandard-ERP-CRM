@@ -752,7 +752,7 @@ namespace VAdvantage.Model
         {
             log.Info("CreateCrossCurrency: Start creation of Cross Currency Rate");
             CalculateCrossCurrRate _objCrossCurrencyRate = new CalculateCrossCurrRate();
-            string Message = _objCrossCurrencyRate.CreateCrossCurrency(GetC_Currency_To_ID(), GetValidFrom());
+            string Message = _objCrossCurrencyRate.CreateCrossCurrency(GetC_Currency_To_ID(), GetValidFrom(), GetAD_Client_ID());
             if (!string.IsNullOrEmpty(Message))
             {
                 log.Info($"CreateCrossCurrency: Message -> {Message} ");
