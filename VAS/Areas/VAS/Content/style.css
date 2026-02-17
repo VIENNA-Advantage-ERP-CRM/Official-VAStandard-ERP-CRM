@@ -1779,6 +1779,19 @@ html[dir="rtl"] .vas-sql-result-msg {
             font-weight: bold;
         }
 
+.VAS-update-highlight {
+    border-color: #F9B41D;
+    /*box-shadow: 0 0 4px 2px #F9B41D;*/
+}
+
+    .VAS-update-highlight .vis-w-feedTitleBar {
+        background-color: #FFDC8F;
+    }
+
+        .VAS-update-highlight .vis-w-feedTitleBar h3 {
+            font-weight: bold;
+        }
+
 html[dir=rtl] .vas-filters-editdelete-btns {
     float: left;
 }
