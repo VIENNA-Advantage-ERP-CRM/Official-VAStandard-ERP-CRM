@@ -65,6 +65,8 @@ namespace VASLogic.Models
                           adl.Name           AS Priority,
                           rs.name            AS Status,
                           R_Request.VAS_IsRead,
+                          (SELECT COUNT(R_RequestUpdate_ID) FROM R_RequestUpdate WHERE R_Request_ID=R_Request.R_Request_ID
+                          AND VAS_IsRead='N') VAS_UnReadCount,
                           (SELECT AD_Table.TableName FROM AD_Table WHERE AD_Table.TableName='R_Request'
                           ) TableName,
                           (SELECT AD_Table.Ad_Window_ID
@@ -109,7 +111,7 @@ namespace VASLogic.Models
                     Alrt.Priority = Util.GetValueOfString(dsData.Tables[0].Rows[i]["Priority"]);
                     Alrt.Summary = Util.GetValueOfString(dsData.Tables[0].Rows[i]["Summary"]);
                     Alrt.IsRead = Util.GetValueOfString(dsData.Tables[0].Rows[i]["VAS_IsRead"]);
-
+                    Alrt.UnReadCount = Util.GetValueOfInt(dsData.Tables[0].Rows[i]["VAS_UnReadCount"]);
                     DateTime _DateNextAction = new DateTime();
                     if (dsData.Tables[0].Rows[i]["DateNextAction"].ToString() != null && dsData.Tables[0].Rows[i]["DateNextAction"].ToString() != "")
                     {
@@ -156,6 +158,7 @@ namespace VASLogic.Models
         public string Status { get; set; }
         public string Priority { get; set; }
         public string IsRead { get; set; }
+        public int UnReadCount { get; set; }
         public DateTime? NextActionDate { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime CreatedDate { get; set; }
