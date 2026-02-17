@@ -66,7 +66,7 @@ namespace VASLogic.Models
                           rs.name            AS Status,
                           R_Request.VAS_IsRead,
                           (SELECT COUNT(R_RequestUpdate_ID) FROM R_RequestUpdate WHERE R_Request_ID=R_Request.R_Request_ID
-                          AND VAS_IsRead='N') VAS_UnReadCount,
+                          AND VAS_IsRead='N' AND Created=R_Request.Created) VAS_UnReadCount,
                           (SELECT AD_Table.TableName FROM AD_Table WHERE AD_Table.TableName='R_Request'
                           ) TableName,
                           (SELECT AD_Table.Ad_Window_ID
