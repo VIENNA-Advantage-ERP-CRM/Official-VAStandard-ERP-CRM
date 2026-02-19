@@ -946,6 +946,22 @@ namespace VAdvantage.DataBase
             return listAggregation;
         }
 
+        public static string GetStringAggregationFunction(string columnName, string tableAlias)
+        {
+            // Determine column reference with or without alias
+            string columnReference = string.IsNullOrEmpty(tableAlias) ? columnName : $"{tableAlias}.{columnName}";
+
+            if (DB.IsOracle())
+            {
+                return $"LISTAGG({columnReference}, ',') WITHIN GROUP (ORDER BY {columnReference})";
+            }
+            else if (DB.IsPostgreSQL())
+            {
+                return $"STRING_AGG({columnReference}::text, ',')";
+            }
+            return columnReference;
+        }
+
         /// <summary>Updates the loc and name on bp header.</summary>
         /// <param name="C_BPartner_ID">C_BPartner_ID.</param>
         /// <returns>

@@ -538,8 +538,15 @@ namespace VAdvantage.Model
                     }
                     if (remainder.CompareTo(Env.ZERO) != 0 && schedule != null)
                     {
-                        schedule.SetDueAmt(Decimal.Add(schedule.GetDueAmt(), remainder));
-                        schedule.Save(invoice.Get_Trx());
+                        if (schedule.IsVA009_IsPaid() && schedule.GetVA009_OrderPaySchedule_ID() > 0)
+                        {
+                            CreateSchedulePendingAmount(remainder, invoice, schedule);
+                        }
+                        else
+                        {
+                            schedule.SetDueAmt(Decimal.Add(schedule.GetDueAmt(), remainder));
+                            schedule.Save(invoice.Get_Trx());
+                        }
                         log.Fine("Remainder=" + remainder + " - " + schedule);
                     }
 
@@ -556,6 +563,57 @@ namespace VAdvantage.Model
             }
             #endregion
             //return true;
+        }
+
+        /// <summary>
+        /// This function is user to create a ne schedule entry for the amount
+        /// </summary>
+        /// <param name="Amount">Schedule Due Amount</param>
+        /// <param name="Invoice">Invoice Object</param>
+        /// <param name="TobeCopied">Invoice Schedule object (which to be copied)</param>
+        /// <returns>MInvoicePaySchedule Object</returns>
+        /// <author>VIS_045: 18-Feb-2026</author>
+        private MInvoicePaySchedule CreateSchedulePendingAmount(decimal Amount, MInvoice Invoice, MInvoicePaySchedule TobeCopied)
+        {
+            MInvoicePaySchedule copySchedule = new MInvoicePaySchedule(TobeCopied.GetCtx(), 0, TobeCopied.Get_Trx());
+            PO.CopyValues(TobeCopied, copySchedule, TobeCopied.GetAD_Client_ID(), TobeCopied.GetAD_Org_ID());
+            copySchedule.SetDueAmt(Amount);
+            copySchedule.SetVA009_OpnAmntInvce(Amount);
+            copySchedule.SetVA009_PaidAmntInvce(0);
+            copySchedule.SetVA009_PaidAmnt(0);
+            copySchedule.SetVA009_ExecutionStatus("A");
+            copySchedule.SetVA009_IsPaid(false);
+            copySchedule.SetVA009_PaymentMethod_ID(Invoice.GetVA009_PaymentMethod_ID());
+            copySchedule.SetVA009_OrderPaySchedule_ID(0);
+            if (copySchedule.GetC_Payment_ID() > 0)
+            {
+                copySchedule.SetC_Payment_ID(0);
+            }
+            if (copySchedule.GetC_CashLine_ID() > 0)
+            {
+                copySchedule.SetC_CashLine_ID(0);
+            }
+            copySchedule.SetDiscountAmt(0);
+            copySchedule.SetDiscount2(0);
+            basecurrency(Invoice, copySchedule);
+            copySchedule.SetC_Currency_ID(Invoice.GetC_Currency_ID());
+            copySchedule.SetVA009_Variance(0);
+            if (!copySchedule.Save())
+            {
+                string val = string.Empty;
+                ValueNamePair vp = VLogger.RetrieveError();
+                if (vp != null)
+                {
+                    val = vp.GetName();
+                    if (String.IsNullOrEmpty(val))
+                    {
+                        val = vp.GetValue();
+                    }
+                }
+                log.Severe($@"Invoice Schedule record ot created for the Invoice {Invoice.GetDocumentNo()}, Retrievd Error : {val}");
+                return null;
+            }
+            return copySchedule;
         }
 
         /// <summary>
