@@ -175,8 +175,10 @@
                 casetype = casetype.substr(0, 30) + "..."
             }
             var isRead = data[s].IsRead;
+            var updCount = data[s].UnReadCount;
 
-            str += "<div class='vis-w-activityContainer " + (isRead == "N" ? "VAS-ticket-highlight" : "") + "'>"
+            str += "<div class='vis-w-activityContainer " + (updCount > 0 ? "VAS-update-highlight" :
+                (isRead == "N" ? "VAS-ticket-highlight" : "")) + "'>"
                 + "<div class='vis-w-feedTitleBar'>"
                 + "<h3>#" + data[s].DocumentNo + "</h3>";
             if (data[s].Name && data[s].Name.length > 0) {
