@@ -67,6 +67,17 @@ namespace VIS.Models
         }
 
         /// <summary>
+        /// Getting Table name
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="AD_Table_ID"></param>
+        /// <returns></returns>
+        public string getTableName(Ctx ctx, int AD_Table_ID) {
+            string TableName = MTable.GetTableName(ctx, Util.GetValueOfInt(AD_Table_ID));
+            return TableName;
+        }
+
+        /// <summary>
         /// Get All Columns From Table
         /// </summary>
         /// <param name="ctx">Contex</param>
@@ -155,6 +166,7 @@ namespace VIS.Models
             };
             try
             {
+                //tableName = MTable.GetTableName(ctx, Util.GetValueOfInt(dt.Rows[0]["AD_Table_ID"]));
                 query = MRole.GetDefault(ctx).AddAccessSQL(query, tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 // query += " FETCH FIRST 100 ROWS ONLY";
 
@@ -184,6 +196,15 @@ namespace VIS.Models
 
 
                     int totalRec = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+
+                    //    int totalRec = Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(*) FROM ( " + sql + " ) t", null, null));
+                    //pageSize = 50;
+                    PageSetting pSetting = new PageSetting();
+                    pSetting.CurrentPage = pageNo;
+                    pSetting.TotalRecords = totalRec;
+                    pSetting.PageSize = pageSize;
+                    pSetting.TotalPage = (totalRec % pageSize) == 0 ? (totalRec / pageSize) : ((totalRec / pageSize) + 1);
+                    results.pSetting = pSetting;
 
                     ds = DBase.DB.ExecuteDatasetPaging(query, pageNo, pageSize);
 
@@ -466,9 +487,14 @@ namespace VIS.Models
                 details.IsDelete = Util.GetValueOfBool(obj.Get_Value("IsDeleted"));
                 details.TabID = Util.GetValueOfInt(obj.Get_Value("AD_Tab_ID"));
                 details.ColumnID = Util.GetValueOfString(obj.Get_Value("AD_Column_ID"));
-                details.TableID = Util.GetValueOfInt(obj.Get_Value("AD_Table_ID"));
+               // details.TableID = Util.GetValueOfInt(obj.Get_Value("AD_Table_ID"));
                 details.FieldID = Util.GetValueOfInt(obj.Get_Value("AD_Field_ID"));
             }
+            details.SelectClause = Util.GetValueOfString(selectClause);
+            details.FromClause = Util.GetValueOfString(fromClause);
+            details.WhereClause = Util.GetValueOfString(whereClause);
+            details.OrderClause = Util.GetValueOfString(otherClause);
+            details.TableID = Util.GetValueOfInt(obj.GetAD_Table_ID());
             details.Query = sql;
             return details;
         }
@@ -633,6 +659,10 @@ namespace VIS.Models
         public string BasedOn { get; set; }
         public bool IsEmail { get; set; }
         public string Query { get; set; }
+        public string SelectClause { get; set; }
+        public string FromClause { get; set; }
+        public string WhereClause { get; set; }
+        public string OrderClause { get; set; }
         public bool IsInsert { get; set; }
         public bool IsUpdate { get; set; }
         public bool IsDelete { get; set; }
@@ -683,5 +713,30 @@ namespace VIS.Models
     {
         public List<Dictionary<string, string>> RecordList { get; set; }
         public int TotalRecord { get; set; }
+        public PageSetting pSetting {  get; set; }
+    }
+
+    public class PageSetting
+    {
+        public int CurrentPage
+        {
+            get;
+            set;
+        }
+        public int TotalPage
+        {
+            get;
+            set;
+        }
+        public int TotalRecords
+        {
+            get;
+            set;
+        }
+        public int PageSize
+        {
+            get;
+            set;
+        }
     }
 }

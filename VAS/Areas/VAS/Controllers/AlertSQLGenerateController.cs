@@ -46,6 +46,27 @@ namespace VAS.Areas.VAS.Controllers
             return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);
         }
 
+
+        /// <summary>
+        ///  Get Table information From Tab
+        /// </summary>
+        /// <param name="tabID">AD_Tab_ID</param>
+        /// <param name="windowNo">Window number</param>
+        /// <returns>TableName/AD_Table_ID</returns>
+        public JsonResult getTableName(int AD_Table_ID)
+        {
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                AlertSqlGenerate obj = new AlertSqlGenerate();
+                string result = obj.getTableName(ctx, AD_Table_ID);
+                var jsonResult = Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+                jsonResult.MaxJsonLength = int.MaxValue;
+                return jsonResult;
+            }
+            return Json(JsonConvert.SerializeObject("Session is null"), JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>
         /// Get Result Of Query
         /// </summary>
