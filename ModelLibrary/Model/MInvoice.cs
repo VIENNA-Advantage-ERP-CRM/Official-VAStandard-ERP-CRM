@@ -5592,8 +5592,7 @@ namespace VAdvantage.Model
                 //	User - Last Result/Contact
                 if (GetAD_User_ID() != 0)
                 {
-                    MUser user = new MUser(GetCtx(), GetAD_User_ID(), Get_TrxName());
-                    //user.SetLastContact(new DateTime(System.currentTimeMillis()));
+                    X_AD_User user = new X_AD_User(GetCtx(), GetAD_User_ID(), Get_TrxName());
                     user.SetLastContact(DateTime.Now);
                     user.SetLastResult(Msg.Translate(GetCtx(), "C_Invoice_ID") + ": " + GetDocumentNo());
                     if (!user.Save(Get_TrxName()))
