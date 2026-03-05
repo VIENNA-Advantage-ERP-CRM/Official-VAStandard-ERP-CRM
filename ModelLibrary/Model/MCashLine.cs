@@ -831,7 +831,7 @@ namespace VAdvantage.Model
             }
 
             // VIS_045: 05_Mar-2026, wgen we void the Cash journal, dont take impact on cash book from here
-            if (!GetDescription().Contains(Msg.GetMsg(GetCtx(), "Voided")))
+            if (string.IsNullOrEmpty(GetDescription()) || !GetDescription().Contains(Msg.GetMsg(GetCtx(), "Voided")))
             {
                 // Update Cashbook and CashbookLine
                 MCash parent = GetParent();
