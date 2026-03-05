@@ -519,7 +519,7 @@
                     mTab.setValue("C_UOM_ID", Util.getValueOfInt(invoiceRecord["headerUom"]));
                 }
             }
-
+            
             // set C_RevenueRecognition_ID if InvoiceLine Tab Contains C_RevenueRecognition_ID field
             if (mTab.findColumn("C_RevenueRecognition_ID") > -1) {
                 mTab.setValue("C_RevenueRecognition_ID", Util.getValueOfInt(invoiceRecord["C_RevenueRecognition_ID"]));
@@ -546,6 +546,11 @@
             if (countEd011 > 0 && purchasingUom > 0 && isSOTrx == false) {
                 // when record created with purchasing UOM, then set Qty Invoiced
                 mTab.setValue("QtyInvoiced", Util.getValueOfDecimal(invoiceRecord["QtyInvoiced"]));
+            }
+            /*VAI182 05/03/2026 if base UOM and UOM on screen is same and QtyEntered and QtyInvoiced is not same then set
+             QtyEntered to QtyInvoiced*/
+            if ((mTab.getValue("C_UOM_ID") == Util.getValueOfInt(invoiceRecord["headerUom"])) && (mTab.getValue("QtyInvoiced") != mTab.getValue("QtyEntered"))) {
+                mTab.setValue("QtyInvoiced", mTab.getValue("QtyEntered"));
             }
 
             ctx.setContext(windowNo, "EnforcePriceLimit", Util.getValueOfString(invoiceRecord["EnforcePriceLimit"]) ? "Y" : "N");
