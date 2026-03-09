@@ -43,27 +43,6 @@ namespace VAdvantage.Model
         /// <returns>true, when success</returns>
         protected override bool BeforeSave(bool newRecord)
         {
-            // VAS147: Work done to handle case when Product attribute is serial no enabled then
-            // production quantity can not be greater than 1.
-            decimal qty = GetProductionQty();
-            if (Util.GetValueOfBool(Get_Value("VAS_IsReverseAssembly")))
-            {
-                qty = decimal.Negate(GetProductionQty());
-            }
-            string IsReverse = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT IsReversed
-                                FROM M_Production WHERE M_Production_ID=" + GetM_Production_ID()));
-            if (IsReverse.Equals("N") && qty > 1 && Get_ValueAsInt("M_AttributeSetInstance_ID") > 0)
-            {
-                int serialCtl = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT at.M_SerNoCtl_ID FROM M_Product p 
-                                INNER JOIN M_AttributeSet at ON (p.M_AttributeSet_ID=at.M_AttributeSet_ID)
-                                WHERE at.IsSerNo='Y' AND p.M_Product_ID=" + GetM_Product_ID()));
-                if (serialCtl > 0)
-                {
-                    log.SaveError("VAS_ProductionQtyOne", "");
-                    return false;
-                }
-            }
-
             if (Get_ColumnIndex("VAS_IsReverseAssembly") >= 0)
             {
                 // check production plan record is reversal record or not
@@ -88,6 +67,26 @@ namespace VAdvantage.Model
                     else
                     {
                         Set_Value("VAS_IsReverseAssembly", false);
+                    }
+                }
+
+                // VAS147: Work done to handle case when Product attribute is serial no enabled then
+                // production quantity can not be greater than 1.
+                if (Util.GetValueOfBool(Get_Value("VAS_IsReverseAssembly")) && GetProductionQty() < 0)
+                {
+                    decimal qty = decimal.Negate(GetProductionQty());
+                    string IsReverse = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT IsReversed
+                                FROM M_Production WHERE M_Production_ID=" + GetM_Production_ID()));
+                    if (IsReverse.Equals("N") && qty > 1 && Get_ValueAsInt("M_AttributeSetInstance_ID") > 0)
+                    {
+                        int serialCtl = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT at.M_SerNoCtl_ID FROM M_Product p 
+                                INNER JOIN M_AttributeSet at ON (p.M_AttributeSet_ID=at.M_AttributeSet_ID)
+                                WHERE at.IsSerNo='Y' AND p.M_Product_ID=" + GetM_Product_ID()));
+                        if (serialCtl > 0)
+                        {
+                            log.SaveError("VAS_ProductionQtyOne", "");
+                            return false;
+                        }
                     }
                 }
             }
