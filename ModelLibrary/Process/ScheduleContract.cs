@@ -19,6 +19,7 @@ namespace ViennaAdvantageServer.Process
     class ScheduleContract : SvrProcess
     {
         int contractID;
+        decimal prorataQty = 0;
         protected override void Prepare()
         {
             contractID = GetRecord_ID();
@@ -28,16 +29,19 @@ namespace ViennaAdvantageServer.Process
         {
             VAdvantage.Model.X_C_Contract contract = new VAdvantage.Model.X_C_Contract(GetCtx(), contractID, Get_TrxName());
             DateTime start = (DateTime)contract.GetBillStartDate();
-            DateTime end = (DateTime)contract.GetEndDate();
+            DateTime toDate;
             int frequency = contract.GetC_Frequency_ID();
 
             string Sql = "SELECT NoofMonths FROM C_Frequency WHERE C_Frequency_ID=" + frequency;
             int months = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, Get_TrxName()));
             int count = Util.GetValueOfInt(contract.GetTotalInvoice());
-
+            if (contract.GetStartDate() < contract.GetBillStartDate())
+            {
+                start = (DateTime)contract.GetStartDate();
+                count++;
+            }
             for (int i = 1; i <= count; i++)
             {
-
                 VAdvantage.Model.X_C_ContractSchedule CSchedule = new VAdvantage.Model.X_C_ContractSchedule(GetCtx(), 0, Get_TrxName());
                 //Neha ---Set Tenant, Organization On Invoice Schedule when we create Invoice Schedule from Schedule Contract button on header--12 Sep,2018
                 CSchedule.SetAD_Client_ID(contract.GetAD_Client_ID());
@@ -49,40 +53,46 @@ namespace ViennaAdvantageServer.Process
                 CSchedule.SetProcessed(true);
                 CSchedule.SetUnitsDelivered(contract.GetQtyEntered());
                 CSchedule.SetFROMDATE(start);
-                DateTime toDate = start.AddMonths(months);
+                toDate = start.AddMonths(months);
+                start = start.AddMonths(months);
+                if (i == 1 && contract.GetStartDate() < contract.GetBillStartDate())
+                {
+                    start = (DateTime)contract.GetBillStartDate();
+                    toDate = (DateTime)contract.GetBillStartDate();
+                    int days = contract.GetBillStartDate().Value.Date.Subtract(contract.GetStartDate().Value.Date).Days;
+                    int month = DateTime.DaysInMonth(contract.GetStartDate().Value.Year, contract.GetStartDate().Value.Month);
+                    prorataQty = Math.Round((contract.GetQtyEntered() / month) * days, 2, MidpointRounding.AwayFromZero);
+                    CSchedule.SetUnitsDelivered(prorataQty);
+                }
+                else if (i == count && contract.GetEndDate() < toDate)
+                {
+                    CSchedule.SetUnitsDelivered(contract.GetQtyEntered() - prorataQty);
+                    toDate = ((DateTime)contract.GetEndDate()).AddDays(1);
+                }
                 toDate = toDate.AddDays(-1);
                 CSchedule.SetEndDate(toDate);
-                start = start.AddMonths(months);
-                // if (i != count)
-                // {
-
-                // CSchedule.SetNoOfDays(days);
-                // }
-                // else
-                // {
-                //     CSchedule.SetEndDate(end);
-                //     CSchedule.SetNoOfDays((end - start).Days+1);
-                // }
                 CSchedule.SetM_Product_ID(contract.GetM_Product_ID());
                 // Added by Vivek on 21/11/2017 asigned by Pradeep
                 CSchedule.SetM_AttributeSetInstance_ID(contract.GetM_AttributeSetInstance_ID());
-                CSchedule.SetTotalAmt(contract.GetLineNetAmt()); 
-                CSchedule.SetGrandTotal(contract.GetGrandTotal());
-                CSchedule.SetTaxAmt(contract.GetTaxAmt());
+                CSchedule.SetC_UOM_ID(contract.GetC_UOM_ID());
+                CSchedule.SetPriceEntered(contract.GetPriceEntered());
+                CSchedule.SetTotalAmt(contract.GetPriceEntered() * CSchedule.GetUnitsDelivered());// contract.GetLineNetAmt());
 
+                CSchedule.SetTaxAmt(contract.GetTaxAmt());
                 // if Surcharge Tax is selected on Tax, then set value in Surcharge Amount
                 if (CSchedule.Get_ColumnIndex("SurchargeAmt") > 0)
                 {
                     CSchedule.SetSurchargeAmt(contract.GetSurchargeAmt());
                 }
-
-                CSchedule.SetC_UOM_ID(contract.GetC_UOM_ID());
-                CSchedule.SetPriceEntered(contract.GetPriceEntered());
+                CSchedule.SetGrandTotal(CSchedule.GetTotalAmt() + CSchedule.GetTaxAmt() + CSchedule.GetSurchargeAmt());
                 if (CSchedule.Save())
                 {
-                    contract.SetProcessed(true);
-                    contract.SetScheduleContract("Y");
-                    contract.Save();
+                    if (i == count)
+                    {
+                        contract.SetProcessed(true);
+                        contract.SetScheduleContract("Y");
+                        contract.Save();
+                    }
                 }
                 else
                 {
@@ -92,7 +102,6 @@ namespace ViennaAdvantageServer.Process
                         throw new ArgumentException("Cannot save Invoice Schedule. " + pp.GetName());
                     throw new ArgumentException("Cannot save Invoice Schedule.");
                 }
-                 
             }
 
             return Msg.GetMsg(GetCtx(), "ContractScheduleDone");
@@ -108,7 +117,7 @@ namespace ViennaAdvantageServer.Process
 
         //    string Sql = "Select NoofDays from C_Frequency where C_Frequency_ID=" + frequency;
         //    int days = Util.GetValueOfInt(DB.ExecuteScalar(Sql, null, null));
-       
+
         //    int count = Util.GetValueOfInt(contract.GetTotalInvoice());
 
         //    for (int i = 1; i <= count; i++)

@@ -614,10 +614,15 @@ namespace VAdvantage.Model
                 {
                     return qtyPrice;
                 }
-                MUOM uom = MUOM.Get(ctx, C_UOM_To_ID);
-                if (uom != null)
+                //MUOM uom = MUOM.Get(ctx, C_UOM_To_ID);
+                //if (uom != null)
+                //{
+                //    return uom.Round(Decimal.Multiply(retValue.Value, qtyPrice.Value), true);
+                //}
+                int uomprecision = MProduct.Get(ctx, M_Product_ID).GetUOMPrecision();
+                if (uomprecision > 0)
                 {
-                    return uom.Round(Decimal.Multiply(retValue.Value, qtyPrice.Value), true);
+                    return Math.Round(Decimal.Multiply(retValue.Value, qtyPrice.Value), uomprecision, MidpointRounding.AwayFromZero);
                 }
                 //return retValue.multiply(qtyPrice);
                 return Decimal.Multiply(retValue.Value, (Decimal)qtyPrice);

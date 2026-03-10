@@ -157,13 +157,25 @@ namespace VAS
             //style.Include("~/Areas/VAS/Content/VIS.rtl.css");
 
 
+
             style.Include("~/Areas/VAS/Content/VAS.all.min.css");
             modScript.Include("~/Areas/VAS/Scripts/dist/VAS.all.min.js");
+            modScript.Include("~/Areas/VAS/Scripts/dist/React.min.js");
 
+            modScript.Transforms.Clear();
+            modScript.Transforms.Add(new NoTransform());
 
             VAdvantage.ModuleBundles.RegisterScriptBundle(modScript, "VAS", -9);
             VAdvantage.ModuleBundles.RegisterStyleBundle(style, "VAS", -9);
 
+        }
+    }
+
+    public sealed class NoTransform : IBundleTransform
+    {
+        public void Process(BundleContext context, BundleResponse response)
+        {
+            // Do nothing: keep content as-is (no minify, no parse)
         }
     }
 }

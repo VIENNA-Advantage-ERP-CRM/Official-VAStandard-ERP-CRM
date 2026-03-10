@@ -156,6 +156,10 @@ namespace VAdvantage.Process
                     {
                         count++;
                     }
+                    else
+                    {
+                        return GetRetrievedError(order, "Could not create Order");
+                    }
                 }	//	for all lines
 
                 if (order.Get_ColumnIndex("ConditionalFlag") > -1)

@@ -348,6 +348,9 @@
     <Content Include="Areas\VAS\Scripts\model\calloutTerm.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
+    <Content Include="Areas\VAS\Scripts\react\index.jsx" />
+    <Content Include="Areas\VAS\Scripts\react\component\ProductUOMComponent.jsx" />
+    <Content Include="Areas\VAS\Scripts\react\pages\VAS_ProductUomSetup.jsx" />
     <Content Include="Areas\VAS\Scripts\src\reactjs.js" />
     <Content Include="Areas\VAS\Scripts\src\VASjs.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
