@@ -153,7 +153,7 @@ namespace ViennaAdvantage.Process
             {
                 return product.GetName() + " @NotValid@ @M_BOM_ID@";
             }
-            
+
             _product = product;
             //	Check Old Product BOM Structure
             log.Config(_product.GetName());
@@ -161,7 +161,7 @@ namespace ViennaAdvantage.Process
 
             // Check applied if the product is of item type recipee, then bom should validate from second tab of product i.e Bill Of Material else from BOM and BM Components.
             // Change by mohit to validate the BOM if created from recipee manaement form.- 28 June 2019.
-            if (Env.IsModuleInstalled("VA019_") && !string.IsNullOrEmpty(product.GetVA019_ItemType()) 
+            if (Env.IsModuleInstalled("VA019_") && !string.IsNullOrEmpty(product.GetVA019_ItemType())
                 && product.GetVA019_ItemType().Equals(VAdvantage.Model.X_M_Product.VA019_ITEMTYPE_Recipe))
             {
                 if (!ValidateOldProduct(_product))
@@ -282,6 +282,13 @@ namespace ViennaAdvantage.Process
                 return false;
             }
 
+            // VAS147: Handle case when DeAssembly Cost Percentage is not 100 then do not validate the Product
+            decimal costPer = VAdvantage.Model.MBOMProduct.GetDeAssemblyCostPer(bom);
+            if (costPer > 0 && costPer != 100)
+            {
+                return false;
+            }
+
             for (int i = 0; i < BOMproducts.Length; i++)
             {
                 VAdvantage.Model.MBOMProduct BOMproduct = BOMproducts[i];
@@ -290,9 +297,9 @@ namespace ViennaAdvantage.Process
 
                 if (pp.IsBOM() && BOMproduct.GetM_ProductBOMVersion_ID() > 0)
                 {
-                //return ValidateProduct(pp, bom.GetBOMType(), bom.GetBOMUse());
+                    //return ValidateProduct(pp, bom.GetBOMType(), bom.GetBOMUse());
 
-               // VIS_336:changes made for verifying duplicate records in BOM Component tab. 
+                    // VIS_336:changes made for verifying duplicate records in BOM Component tab. 
 
                     //if (_products.Contains(pp))
                     //{
