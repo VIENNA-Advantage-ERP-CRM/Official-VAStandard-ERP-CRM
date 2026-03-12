@@ -158,6 +158,7 @@ namespace VAdvantage.Process
                                             toProdline.SetProcessed(false);
                                             //VAI050-set ProportionateCost column value because its not a copy record
                                             toProdline.Set_Value("VAS_IsProportionateCost", fromProdline.Get_Value("VAS_IsProportionateCost"));
+                                            toProdline.Set_Value("VAS_DeAssemblyCostPercent", fromProdline.Get_Value("VAS_DeAssemblyCostPercent"));
                                             if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(), toProdline.GetM_ProductContainer_ID(), toProdline.GetM_Product_ID(), toProdline.GetM_AttributeSetInstance_ID(), toProdline.GetMovementQty(), Get_Trx()))
                                             {
                                                 production.Get_Trx().Rollback();
