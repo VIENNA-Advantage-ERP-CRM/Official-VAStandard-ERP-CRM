@@ -453,7 +453,7 @@ namespace VAdvantage.Model
                                     SetIsBudgetBreach(true);
                                     SetIsBudgetBreachApproved(false);
                                 }
-                                return DocActionVariables.STATUS_INPROGRESS;
+                                return DocActionVariables.STATUS_INVALID;
                             }
                             SetIsBudgetBreach(false);
                             SetIsBudgetBreachApproved(true);
@@ -464,7 +464,7 @@ namespace VAdvantage.Model
                             log.Severe("Budget Control Issue " + ex.Message);
                             SetProcessed(false);
                             SetIsBudgetBreach(false);
-                            return DocActionVariables.STATUS_INPROGRESS;
+                            return DocActionVariables.STATUS_INVALID;
                         }
                     }
                 }
@@ -687,12 +687,12 @@ namespace VAdvantage.Model
                 WHERE GL_BudgetControl.IsActive = 'Y' AND GL_Budget.IsActive = 'Y' AND GL_BudgetControl.AD_Org_ID IN (0 , " + GetAD_Org_ID() + @")  
                    AND GL_BudgetControl.CommitmentType IN ('B' ) AND 
                   (( GL_Budget.BudgetControlBasis = 'P' AND GL_Budget.C_Period_ID =
-                  (SELECT C_Period.C_Period_ID FROM C_Period INNER JOIN c_year ON c_year.c_year_ID      = C_Period.c_year_ID
-                  WHERE C_Period.IsActive  = 'Y'  AND c_year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID
+                  (SELECT C_Period.C_Period_ID FROM C_Period INNER JOIN c_year ON c_year.c_year_ID = C_Period.c_year_ID
+                  WHERE C_Year.IsActive = 'Y' AND C_Period.IsActive  = 'Y' AND c_year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID
                   AND " + GlobalVariable.TO_DATE(GetDateDoc(), true) + @" BETWEEN C_Period.startdate AND C_Period.enddate )) 
                 OR ( GL_Budget.BudgetControlBasis = 'A' AND GL_Budget.C_Year_ID =
                   (SELECT C_Period.C_Year_ID FROM C_Period INNER JOIN c_year ON c_year.c_year_ID = C_Period.c_year_ID
-                  WHERE C_Period.IsActive  = 'Y'   AND c_year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID  
+                  WHERE C_Year.IsActive = 'Y' AND C_Period.IsActive  = 'Y' AND c_year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID  
                 AND " + GlobalVariable.TO_DATE(GetDateDoc(), true) + @" BETWEEN C_Period.startdate AND C_Period.enddate   ) ) ) 
                 AND (SELECT COUNT(fact_acct_id) FROM fact_acct
                 WHERE gl_budget_id = GL_Budget.GL_Budget_ID
