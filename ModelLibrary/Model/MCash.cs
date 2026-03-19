@@ -1814,7 +1814,7 @@ namespace VAdvantage.Model
                     //Arpit
                     // not checking if cashamt is less than zero
                     // Done by Vivek on 12/07/2017 as per discussion with Mandeep sir 
-                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt()+ line.GetWriteOffAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when amount is 0 
+                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt() + line.GetWriteOffAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when amount is 0 
                     {
                         //JID_0821: If Cashbook currency conversion is not found. On completion of cash journal System give error "IN".
                         MConversionType conv = MConversionType.Get(GetCtx(), line.GetC_ConversionType_ID());
@@ -1850,7 +1850,7 @@ namespace VAdvantage.Model
                 {
                     Decimal? cashAmt = VAdvantage.Model.MConversionRate.ConvertBase(GetCtx(), Decimal.Add(Decimal.Add(line.GetAmount(), line.GetDiscountAmt()), line.GetWriteOffAmt()),
                                        line.GetC_Currency_ID(), GetDateAcct(), line.GetC_ConversionType_ID(), GetAD_Client_ID(), GetAD_Org_ID());
-                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt()+ line.GetWriteOffAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when  amount is 0
+                    if ((cashAmt == null || cashAmt == 0) && (line.GetAmount() + line.GetDiscountAmt() + line.GetWriteOffAmt()) > 0)//VIS323 DevopsId-1769 special case for handle convert currency USD to base currency USD issue when  amount is 0
                     {
                         //_processMsg = "Could not convert C_Currency_ID=" + GetC_Currency_ID()
                         //        + " to base C_Currency_ID=" + MClient.Get(GetCtx()).GetC_Currency_ID();
@@ -2133,7 +2133,6 @@ namespace VAdvantage.Model
             string sql = "SELECT C_CASHBOOKLINE_ID FROM C_CASHBOOKLINE WHERE C_CASHBOOK_ID="
                             + GetC_CashBook_ID() + " AND DATEACCT="
                             + DB.TO_DATE(GetDateAcct()) + " AND AD_ORG_ID=" + GetAD_Org_ID();
-
             C_CASHBOOKLINE_ID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, Get_TrxName()));
 
             MCashbookLine cashbookLine = new MCashbookLine(GetCtx(), C_CASHBOOKLINE_ID, Get_TrxName());
@@ -2150,7 +2149,6 @@ namespace VAdvantage.Model
             }
             cashbookLine.SetDateAcct(GetDateAcct());
             cashbookLine.SetStatementDifference(Decimal.Subtract(cashbookLine.GetStatementDifference(), GetStatementDifference()));
-
             if (!cashbookLine.Save())
             {
                 ValueNamePair pp = VLogger.RetrieveError();
@@ -2162,7 +2160,6 @@ namespace VAdvantage.Model
             }
 
             cashbook.SetRunningBalance(Decimal.Subtract(cashbook.GetRunningBalance(), GetStatementDifference()));
-
             if (!cashbook.Save())
             {
                 ValueNamePair pp = VLogger.RetrieveError();
@@ -2172,6 +2169,47 @@ namespace VAdvantage.Model
                     _processMsg = Msg.GetMsg(GetCtx(), "CashbookNotSaved");
                 return false;
             }
+
+            // Reset Cash Journal Line with Amount as ZERO 
+            MCashLine[] lines = GetLines(false);
+            foreach (MCashLine line in lines)
+            {
+                line.AddDescription(Msg.GetMsg(GetCtx(), "Voided") + " (" + line.GetAmount() + ")");
+                line.SetAmount(0);
+                line.SetConvertedAmt("0");
+                line.SetDiscountAmt(0);
+                line.SetWriteOffAmt(0);
+                line.SetOverUnderAmt(0);
+                line.SetTaxAmt(0);
+                line.Set_Value("SurchargeAmt", 0);
+                if (!line.Save())
+                {
+                    ValueNamePair vp = VLogger.RetrieveError();
+                    if (vp != null)
+                    {
+                        _processMsg = vp.GetName();
+                        if (String.IsNullOrEmpty(_processMsg))
+                        {
+                            _processMsg = vp.GetValue();
+                        }
+                    }
+                    if (string.IsNullOrEmpty(_processMsg))
+                    {
+                        _processMsg = Msg.GetMsg(GetCtx(), "VAS_CashLineNotSaved");
+                    }
+                    return false;
+                }
+            }
+
+            // update Ending Balance as Beginning Balance
+            sql = "UPDATE C_Cash"
+                + " SET EndingBalance = BeginningBalance ,"
+                + " StatementDifference = 0"
+                + " WHERE C_Cash_ID=" + GetC_Cash_ID();
+            int no = DB.ExecuteQuery(sql, null, Get_Trx());
+
+            // Void Impact 
+            UpdateExcecutionStatus();
 
             //VIS-383: 29/04/2024 User Validation After VoidIt
             string valid = ModelValidationEngine.Get().FireDocValidate(this, ModelValidatorVariables.DOCTIMING_AFTER_VOID);
@@ -2183,6 +2221,30 @@ namespace VAdvantage.Model
 
             SetProcessed(true);
             SetDocAction(DOCACTION_None);
+            return true;
+        }
+
+        /// <summary>
+        /// This function is used to update the Execution status from "Assigned to journal" to "Awaited" on Invoice Schedule / Order Schedule
+        /// </summary>
+        /// <returns></returns>
+        public bool UpdateExcecutionStatus()
+        {
+            int no = DB.ExecuteQuery($@"UPDATE C_InvoicePaySchedule SET VA009_ExecutionStatus = 'A' 
+                    WHERE VA009_ExecutionStatus = 'J' AND C_InvoicePaySchedule_ID IN 
+                    (SELECT C_InvoicePaySchedule_ID FROM C_CashLine WHERE C_InvoicePaySchedule_ID> 0 AND C_Cash_ID = {GetC_Cash_ID()})", null, Get_Trx());
+            if (no < 0)
+            {
+                _log.Severe($"Exceution Status not updated on invoice Schedule for the Cash document no - {GetDocumentNo()}");
+            }
+
+            no = DB.ExecuteQuery($@"UPDATE VA009_OrderPaySchedule SET VA009_ExecutionStatus = 'A' 
+                    WHERE VA009_ExecutionStatus = 'J' AND VA009_OrderPaySchedule_ID IN 
+                    (SELECT VA009_OrderPaySchedule_ID FROM C_CashLine WHERE VA009_OrderPaySchedule_ID > 0 AND C_Cash_ID = {GetC_Cash_ID()})", null, Get_Trx());
+            if (no < 0)
+            {
+                _log.Severe($"Exceution Status not updated on order Schedule for the Cash document no - {GetDocumentNo()}");
+            }
             return true;
         }
 

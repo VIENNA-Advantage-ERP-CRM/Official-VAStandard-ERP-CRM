@@ -16,6 +16,10 @@ using System.Linq;
 using VAdvantage.Utility;
 using System.Text;
 using VAdvantage.Classes;
+using VAModelAD.AIHelper;
+using static VAModelAD.AIHelper.AIHelperDataContracts;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace VAdvantage.Alert
 {
@@ -194,6 +198,7 @@ namespace VAdvantage.Alert
         /// <returns>true/false</returns>
         public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)
         {
+            Dictionary<string, object> refValues = null;
             string windowName = "";
             string tabName = "";
             string subject = "";
@@ -202,7 +207,7 @@ namespace VAdvantage.Alert
 
             eventType = eventType.ToUpper();
             int tableID = pinfo.GetAD_Table_ID();
-
+             string tableName =pinfo.GetTableName();
             // -----------------------------------------
             // 1. WINDOW & TAB NAME FETCH
             // -----------------------------------------
@@ -213,47 +218,80 @@ namespace VAdvantage.Alert
                 tabName = Util.GetValueOfString(DB.ExecuteScalar(
                     "SELECT Name FROM AD_Tab WHERE AD_Tab_ID=" + document.GetWindowTabID()));
             }
-            else {
+            else
+            {
                 log.Severe("Window and tab ID not found");
                 return false;
             }
-            
-            // -----------------------------------------------------
-            // 2. FETCH FIELDNAME MAP (ColumnName → FieldName)
-            // -----------------------------------------------------
-            Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
 
-            // Create a sorted map: FieldName → ColumnName
-            SortedList<string, string> sortedByFieldName = new SortedList<string, string>();
-            foreach (KeyValuePair<string, string> kv in fieldMap)
+
+            //Called API for getting Names instead of IDS
+            ExecuteAlertDataIn dataObj = new ExecuteAlertDataIn();
+            AIApiService.InitAIEndPoint(document.GetCtx().GetContext("#AppFullUrl"));
+            RequestPayload.Get().SetDefaultParameters(dataObj);
+            dataObj.userID = document.GetCtx().GetAD_User_ID();
+            dataObj.sessionID = document.GetCtx().GetAD_Session_ID();
+            dataObj.window_name = windowName;
+            dataObj.table_name = tableName;
+            dataObj.record_id = document.Get_ID();
+            dataObj.exclude_null = false;
+            using (AIApiService service = new AIApiService(dataObj.token))
             {
-                sortedByFieldName[kv.Value] = kv.Key;
+                var outp = service.ExecuteRequest(dataObj, "GetRefValues");
+                if (outp.isError)
+                {
+                    log.SaveError("Error", " " + outp.result);
+                }
+                else
+                {
+                     refValues = new Dictionary<string, object>();
+
+                    if (!string.IsNullOrEmpty(outp.result))
+                    {
+                        refValues = JsonConvert.DeserializeObject<Dictionary<string, object>>(outp.result);
+                    }
+
+                }
+            }
+
+            if (refValues==null) {
+                log.SaveError("AlertEventManager","Record detail not found");
+                return false;
             }
 
 
             // -----------------------------------------------------
-            // 3. INSERT CASE
+            // 2. INSERT CASE
             // -----------------------------------------------------
 
             if (eventType.Equals("INSERT") && rule.IsInsert)
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowName;
-                foreach (KeyValuePair<string, string> kv in sortedByFieldName)
-                {
-                    string fieldName = kv.Key;
-                    string colName = kv.Value;
 
-                    List<object> row = new List<object>();
-                    row.Add(fieldName);
-                    row.Add(document.Get_ValueOld(colName));
-                    data.Add(row);
+                JObject newData = GetNewJsonData(refValues);
+
+                if (newData != null)
+                {
+                    foreach (var prop in newData.Properties())
+                    {
+                        List<object> row = new List<object>();
+
+                        string fieldName = prop.Name;
+                        string value = prop.Value?.ToString();
+
+                        row.Add(fieldName);
+                        row.Add(value);
+
+                        data.Add(row);
+                    }
                 }
             }
 
 
             // -----------------------------------------------------
-            // 4. UPDATE CASE
+            // 3. UPDATE CASE
             // -----------------------------------------------------
+
             else if (eventType.Equals("UPDATE") && rule.IsUpdate)
             {
                 List<string> updatedColumn = new List<string>();
@@ -272,57 +310,79 @@ namespace VAdvantage.Alert
                     }
                 }
 
+                // FETCH FIELDNAME MAP (ColumnName → FieldName)
+                Dictionary<string, string> fieldMap = GetFieldNamesByColumnName(document.GetWindowTabID());
+
+                // Create a sorted map: FieldName → ColumnName
+                SortedList<string, string> sortedByFieldName = new SortedList<string, string>();
+                foreach (KeyValuePair<string, string> kv in fieldMap)
+                {
+                    sortedByFieldName[kv.Value] = kv.Key;
+                }
+
                 if (updatedColumn.Count > 0)
                 {
                     subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowName;
-                    foreach (KeyValuePair<string, string> kv in sortedByFieldName)
+                    JObject newData = GetNewJsonData(refValues);
+                    if (newData != null)
                     {
-                        string fieldName = kv.Key;
-                        string colName = kv.Value;
-
-                        if (updatedColumn.Contains(colName))
+                        foreach (KeyValuePair<string, string> kv in sortedByFieldName)
                         {
-                            List<object> row = new List<object>();
-                            int index = document.Get_ColumnIndex(colName);
+                            string fieldName = kv.Key;
+                            string colName = kv.Value;
 
-                            row.Add(fieldName);
-                            row.Add(document.Get_ValueOld(index));
-                            row.Add(document.Get_Value(index));
+                            if (updatedColumn.Contains(colName))
+                            {
+                                // List<object> row = new List<object>();
+                                int index = document.Get_ColumnIndex(colName);
 
-                            data.Add(row);
+                                if (newData.ContainsKey(fieldName))
+                                {
+                                    List<object> row = new List<object>();
+
+                                    row.Add(fieldName);
+                                    // row.Add(document.Get_ValueOld(colName)); // old value
+                                    row.Add(newData[fieldName]?.ToString()); // new value
+
+                                    data.Add(row);
+                                }
+                            }
                         }
                     }
                 }
             }
 
             // -----------------------------------------------------
-            // 5. DELETE CASE
+            // 4. DELETE CASE
             // -----------------------------------------------------
+
             else if (eventType.Equals("DELETE") && rule.IsDeleted)
             {
                 subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowName;
-                foreach (KeyValuePair<string, string> kv in sortedByFieldName)
+
+                JObject newData = GetNewJsonData(refValues);
+
+                if (newData != null)
                 {
-                    string fieldName = kv.Key;
-                    string colName = kv.Value;
-                    List<object> row = new List<object>();
-                    int index = document.Get_ColumnIndex(colName);
+                    foreach (var prop in newData.Properties())
+                    {
+                        List<object> row = new List<object>();
 
-                    row.Add(fieldName);
-                    row.Add(document.Get_ValueOld(index));
-
-                    data.Add(row);
+                        row.Add(prop.Name);
+                        row.Add(prop.Value?.ToString());
+                        data.Add(row);
+                    }
                 }
             }
 
             // -----------------------------------------------------
-            // 6. IF NO SUBJECT → NO PROCESS
+            // 5. IF NO SUBJECT → NO PROCESS
             // -----------------------------------------------------
             if (string.IsNullOrEmpty(subject))
                 return false;
 
             // -----------------------------------------------------
-            // 7. COLLECT USERS (same as your code)
+            // 6. COLLECT USERS (same as your code)
             // -----------------------------------------------------
             List<int> users = new List<int>();
             int notificationTo = Util.GetValueOfInt(recipient.Get_Value("AD_Column_ID"));
@@ -359,7 +419,7 @@ namespace VAdvantage.Alert
             }
 
             // -----------------------------------------------------
-            // 8. SEND EMAIL
+            // 7. SEND EMAIL
             // -----------------------------------------------------
             List<FileInfo> files = new List<FileInfo>();
             if (attachment != null)
@@ -378,14 +438,28 @@ namespace VAdvantage.Alert
         }
 
         /// <summary>
-        /// Send Mail
+        /// Getting updated names of IDS
         /// </summary>
-        /// <param name="ctx">context</param>
-        /// <param name="recipientUsers">recipientUsers</param>
-        /// <param name="subject">subject</param>
-        /// <param name="htmlBody">htmlBody</param>
-        /// <returns>count</returns>
-        public int SendInfoHTML(Ctx ctx, List<int> recipientUsers, string subject, string htmlBody)
+        /// <param name="refValues"></param>
+        /// <returns></returns>
+
+        private JObject GetNewJsonData(Dictionary<string, object> refValues)
+        {
+            if (refValues != null && refValues.ContainsKey("new_json_data"))
+                return refValues["new_json_data"] as JObject;
+
+            return null;
+        }
+
+    /// <summary>
+    /// Send Mail
+    /// </summary>
+    /// <param name="ctx">context</param>
+    /// <param name="recipientUsers">recipientUsers</param>
+    /// <param name="subject">subject</param>
+    /// <param name="htmlBody">htmlBody</param>
+    /// <returns>count</returns>
+    public int SendInfoHTML(Ctx ctx, List<int> recipientUsers, string subject, string htmlBody)
         {
             int countMail = 0;
 
@@ -475,12 +549,11 @@ namespace VAdvantage.Alert
 
                     if (eventType.Equals("UPDATE") && row.Count > 2)
                     {
-                        string oldVal = Util.GetValueOfString(row[1]);
+                       // string oldVal = Util.GetValueOfString(row[1]);
                         string newVal = Util.GetValueOfString(row[2]);
                         detailRows.Append($@"
                 <tr>
-                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>
-                    <td style='font-size: 14px; color: #b91c1c; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{oldVal}</td>
+                    <td style='font-size: 14px; color: #475569; padding: 8px; border-bottom: 1px solid #e2e8f0;'>{field}</td>                 
                     <td style='font-size: 14px; color: #16a34a; padding: 8px; border-bottom: 1px solid #e2e8f0; text-align:right;'>{newVal}</td>
                 </tr>");
                     }
@@ -505,7 +578,7 @@ namespace VAdvantage.Alert
 
             // Header columns
             string headerColumns = eventType.Equals("UPDATE")
-                ? "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "OldValue") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "NewValue") + "</th>"
+                ? "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "NewValue") + "</th>"
                 : "<th style='text-align:left; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "Field") + "</th><th style='text-align:right; padding:8px; border-bottom:2px solid #e2e8f0;'>" + Msg.Translate(document.GetCtx(), "VAS_Value") + "</th>";
 
             // Record Window Details section (common)
@@ -620,7 +693,7 @@ namespace VAdvantage.Alert
                         {performerAvatarHtml}
                       </td>
                       <td style='padding-left: 12px; vertical-align: middle;'>
-                        <div style='font-size: 14px; color: #475569;'>{Msg.Translate(document.GetCtx(), "VAS_Performeby")}</div>
+                        <div style='font-size: 14px; color: #475569;'>{Msg.Translate(document.GetCtx(), "VAS_Performedby")}</div>
                         <div style='font-size: 14px; color: #0f172a; font-weight: bold; margin: 2px 0;'>{performerName}</div>
                         <div style='font-size: 12px; color: rgb(100, 116, 139); '>{userEmail}</div>
                          </td>
@@ -739,5 +812,13 @@ namespace VAdvantage.Alert
         public bool IsInsert { get; set; }
         public bool IsUpdate { get; set; }
         public bool IsDeleted { get; set; }
+    }
+
+    public class ExecuteAlertDataIn : AIHelperData
+    {
+        public string window_name { get; set; }
+        public string table_name { get; set; }
+        public int record_id { get; set; }
+        public bool exclude_null { get; set; }
     }
 }

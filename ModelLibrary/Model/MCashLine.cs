@@ -830,68 +830,72 @@ namespace VAdvantage.Model
                 return false;
             }
 
-            // Update Cashbook and CashbookLine
-            MCash parent = GetParent();
-            MCashBook cashbook = new MCashBook(GetCtx(), parent.GetC_CashBook_ID(), Get_TrxName());
-            if (cashbook.GetCompletedBalance() == 0)
+            // VIS_045: 05_Mar-2026, wgen we void the Cash journal, dont take impact on cash book from here
+            if (string.IsNullOrEmpty(GetDescription()) || !GetDescription().Contains(Msg.GetMsg(GetCtx(), "Voided")))
             {
-                cashbook.SetCompletedBalance(parent.GetBeginningBalance());
-            }
-            cashbook.SetRunningBalance(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt));
-            //if (cashbook.GetRunningBalance() == 0)
-            //{
-            //    cashbook.SetRunningBalance
-            //        (Decimal.Add(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt),cashbook.GetCompletedBalance()));
-            //}
-            //else
-            //{
-            //    cashbook.SetRunningBalance(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt));
-            //}
+                // Update Cashbook and CashbookLine
+                MCash parent = GetParent();
+                MCashBook cashbook = new MCashBook(GetCtx(), parent.GetC_CashBook_ID(), Get_TrxName());
+                if (cashbook.GetCompletedBalance() == 0)
+                {
+                    cashbook.SetCompletedBalance(parent.GetBeginningBalance());
+                }
+                cashbook.SetRunningBalance(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt));
+                //if (cashbook.GetRunningBalance() == 0)
+                //{
+                //    cashbook.SetRunningBalance
+                //        (Decimal.Add(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt),cashbook.GetCompletedBalance()));
+                //}
+                //else
+                //{
+                //    cashbook.SetRunningBalance(Decimal.Add(Decimal.Subtract(cashbook.GetRunningBalance(), old_ebAmt), new_ebAmt));
+                //}
 
-            if (!cashbook.Save())
-            {
-                log.Warning("Cannot update running balance.");
-                return false;
-            }
+                if (!cashbook.Save())
+                {
+                    log.Warning("Cannot update running balance.");
+                    return false;
+                }
 
-            DataTable dtCashbookLine;
-            int C_CASHBOOKLINE_ID = 0;
+                DataTable dtCashbookLine;
+                int C_CASHBOOKLINE_ID = 0;
 
-            string sql = "SELECT C_CASHBOOKLINE_ID FROM C_CASHBOOKLINE WHERE C_CASHBOOK_ID="
-                            + cashbook.GetC_CashBook_ID() + " AND DATEACCT="
-                            + DB.TO_DATE(parent.GetDateAcct()) + " AND AD_ORG_ID=" + GetAD_Org_ID();
+                string sql = "SELECT C_CASHBOOKLINE_ID FROM C_CASHBOOKLINE WHERE C_CASHBOOK_ID="
+                                + cashbook.GetC_CashBook_ID() + " AND DATEACCT="
+                                + DB.TO_DATE(parent.GetDateAcct()) + " AND AD_ORG_ID=" + GetAD_Org_ID();
 
-            dtCashbookLine = DB.ExecuteDataset(sql, null, null).Tables[0];
+                dtCashbookLine = DB.ExecuteDataset(sql, null, null).Tables[0];
 
-            if (dtCashbookLine.Rows.Count > 0)
-            {
-                C_CASHBOOKLINE_ID = Util.GetValueOfInt(dtCashbookLine.Rows[0]
-                    .ItemArray[0]);
-            }
+                if (dtCashbookLine.Rows.Count > 0)
+                {
+                    C_CASHBOOKLINE_ID = Util.GetValueOfInt(dtCashbookLine.Rows[0]
+                        .ItemArray[0]);
+                }
 
-            MCashbookLine cashbookLine = new MCashbookLine(GetCtx(), C_CASHBOOKLINE_ID, Get_TrxName());
+                MCashbookLine cashbookLine = new MCashbookLine(GetCtx(), C_CASHBOOKLINE_ID, Get_TrxName());
 
-            if (C_CASHBOOKLINE_ID == 0)
-            {
-                cashbookLine.SetC_CashBook_ID(cashbook.GetC_CashBook_ID());
-                // SI_0419 : Update org/client as on cash line
-                cashbookLine.SetAD_Org_ID(GetAD_Org_ID());
-                cashbookLine.SetAD_Client_ID(GetAD_Client_ID());
-                cashbookLine.SetEndingBalance
-                    (Decimal.Add(Decimal.Add(Decimal.Subtract(cashbookLine.GetEndingBalance(), old_ebAmt), new_ebAmt), cashbook.GetCompletedBalance()));
-            }
-            else
-            {
-                cashbookLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(cashbookLine.GetEndingBalance(), old_ebAmt), new_ebAmt));
-            }
-            cashbookLine.SetDateAcct(parent.GetDateAcct());
-            cashbookLine.SetStatementDifference(Decimal.Add(Decimal.Subtract(cashbookLine.GetStatementDifference(), old_sdAmt), new_sdAmt));
+                if (C_CASHBOOKLINE_ID == 0)
+                {
+                    cashbookLine.SetC_CashBook_ID(cashbook.GetC_CashBook_ID());
+                    // SI_0419 : Update org/client as on cash line
+                    cashbookLine.SetAD_Org_ID(GetAD_Org_ID());
+                    cashbookLine.SetAD_Client_ID(GetAD_Client_ID());
+                    cashbookLine.SetEndingBalance
+                        (Decimal.Add(Decimal.Add(Decimal.Subtract(cashbookLine.GetEndingBalance(), old_ebAmt), new_ebAmt), cashbook.GetCompletedBalance()));
+                }
+                else
+                {
+                    cashbookLine.SetEndingBalance(Decimal.Add(Decimal.Subtract(cashbookLine.GetEndingBalance(), old_ebAmt), new_ebAmt));
+                }
+                cashbookLine.SetDateAcct(parent.GetDateAcct());
+                cashbookLine.SetStatementDifference(Decimal.Add(Decimal.Subtract(cashbookLine.GetStatementDifference(), old_sdAmt), new_sdAmt));
 
 
-            if (!cashbookLine.Save())
-            {
-                log.Warning("Cannot create/update cashbook line.");
-                return false;
+                if (!cashbookLine.Save())
+                {
+                    log.Warning("Cannot create/update cashbook line.");
+                    return false;
+                }
             }
 
             return true;

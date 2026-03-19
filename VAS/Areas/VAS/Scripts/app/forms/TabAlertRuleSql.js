@@ -11,7 +11,7 @@
         var autoComValue = null;
         var pageNo = 1;
         var tableID, EventTable = 0;
-        var tabID = 0;
+        var tabID, mainTableID = 0;
         var joinData = null;
         var addedOptions = [];
         var joinColumnName = [];
@@ -25,7 +25,7 @@
         var filterIndex = null;
         var WhereCondition;
         var joinsArray, $filterCurrentDate, $filterDateList, isDynamic, txtYear, txtMonth, txtDay, txtIsInsert,
-            txtIsUpdate, txtIsDelete, windowTabCtrl, FiledColumnCtrl, okBtn, lblBottomMsg;
+            txtIsUpdate, txtIsDelete, windowTabCtrl, FiledColumnCtrl, okBtn, lblBottomMsg, generatorPaging, sqlPaging;
         var joinTable;
         var seletedJoinCloumn = [];
         var sortValuesArray = [];
@@ -35,6 +35,7 @@
         var gridDiv2 = $("<div class='vas-grid-div2'>");
         var $joinMultiSelect = $("<div class='vas-join-multiselect'>");
         var $sqlResultDiv = $("<div class='vas-sql-result-msg'>");
+        var sqlPagingDiv = $("<div class='vas-sql-result-bottom'>");
         var $sqlGeneratorBtn = null;
         var $testSqlGeneratorBtn = null;
         var $testSqlBtn = null;
@@ -46,16 +47,17 @@
         var sqlGridCols = [];
         var sqlGeneratorGridCols = [];
         var filterArray, isEmailCtrl, emailColNameCtrl, txtIsEmail, txtEmailColName, emailContentDiv,
-            isInserCtrl, isUpdateCtrl, isDeleteCtrl, CRUDContentCtrl, UpdateColumnCtrl, txtWindowTab, txtFiledColumn;
+            isInserCtrl, isUpdateCtrl, isDeleteCtrl, CRUDContentCtrl, UpdateColumnCtrl, txtWindowTab, txtFiledColumn, txtTableSql, sqlTxtContentWrap,
+            txtSqlSelect, txtSqlfrom, txtSqlWhere, txtSqlOther;
+        var divPaging;
         var sortedIndex = -1;
-        var pagePrev, pageNext = null;
         var totalPages = 1;
         var recordCount= 0;
         this.dGrid = null;
         this.dGridGen = null;
         this.BasedOn = "";
         var $windowTabDiv = $("<div class='vas-windowtab'><label>" + VIS.Msg.getMsg("VAS_WindowTab") + "</label>");
-        var $joinSearch = $("<div class='vas-windowtab vas-searchinput-block'><label>" + VIS.Msg.getMsg("VAS_WindowTabAddition") + "</label>");
+        var $joinSearch = $("<div class='vas-windowtab vas-searchinput-block'><label>" + VIS.Msg.getMsg("VAS_WindowTab") + "</label>");
         var $multiSelectArrow = $('<span class="vis vis-arrow-down vas-arrow-down"></span>');
         var $multiSelectJoinArrow = $('<span class="vis vis-arrow-down vas-arrow-down"></span>');
         var $windowTabSelect = null;
@@ -64,7 +66,8 @@
         var $joinsSelect = $("<div style='display: none;' class='vas-joins-select vas-common-style vas-windowtab'><label>" + VIS.Msg.getMsg("VAS_FieldColumn") + "</label>");
         var $selectGenQuerySqlText = $("<div class='vas-sqlquery-text'>")
         var $sqlGenDeleteIcon = $("<i class='vis vis-delete vas-filters-editdelete-btns'></i>");
-        var $selectQuery = $("<div class='vas-query-input vas-sql-query-input' id='query-input' contenteditable='true'>");
+        var $selectQuery = $('<div class="vas-query-input vas-sql-query-input vas-sql-content-div" id="selectquery-input" contenteditable="false"></div>');
+
         var $selectGeneratorQuery = $("<div class='vas-query-input' contenteditable='false'>");
         var $multiSelect = $("<div class='vas-multiselect'>");
         var $selectBox = $("<div class='vas-selectBox vas-windowtab'><select><option>" + VIS.Msg.getMsg("VAS_SelectAll") + "</option></select><div class='vas-overselect'></div></div>");
@@ -125,7 +128,7 @@
         var $sqlBtns = $("<div class='vas-sql-btns'>");
         var $contentArea = $("<div class='vas-content-area'>");
         var $queryMessage = $("<div class='vas-query-message'>");
-        var $sqlContent = $("<div class='vas-sql-content'><div class='vas-sqlquery-text'>" + VIS.Msg.getMsg("VAS_SQL") + "</div></div>");
+        var $sqlContent = $("<div class='vas-sql-content'></div>");
         var $queryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");
         var $sqlGeneratorContent = null;
         var $sqlGeneratorQueryResultGrid = $("<div style='display:none;' class='vas-queryresult-grid'></div>");
@@ -185,18 +188,17 @@
             $testSqlGeneratorBtn = $("<input style='display: none;' class='VIS_Pref_btn-2 vas-test-sql vas-test-sqlgenerator' id='vas-testsql-generatorbtn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_TestSql") + "'>");
             $testSqlBtn = $("<input class='VIS_Pref_btn-2 vas-test-sql' id='vas-testsql-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_TestSql") + "'>");
             $saveBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn' type='button' id='vas-save-btn" + $self.windowNo + "' value='" + VIS.Msg.getMsg("VAS_Save") + "'>");
-            $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn mt-0' id='vas-savegenerator-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_Save") + "'>");
-            pagingDiv = $('<div>' +
-                '<ul class="vis-ad-w-p-s-plst">' +
-                '<li style="opacity: 0.6;"><div><i class="vis vis-pageup" id="VAS_pageUp' + $self.windowNo + '"></i></div></li>' +
-                '<li>' +
-                '<select class="vis-statusbar-combo" id= "VAS_dropDownSelect' + $self.windowNo + '"><option>1</option></select>' +
-                '</li>' +
-                '<li style="opacity: 0.6;"><div><i class="vis vis-pagedown"  id= "VAS_pageDown' + $self.windowNo + '"></i></div></li>' +
-                '</ul>' +
-                '<div>');
+            $saveGeneratorBtn = $("<input class='VIS_Pref_btn-2 vas-save-btn mt-0' id='vas-savegenerator-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_Save") + "'>");            
+            divPaging = $('<div class="vis-info-pagingwrp vas-sql-result-bottom">');
 
-            pagingPlusBtnDiv = $('<div class="VAS-pagingDiv d-none">');
+             generatorPaging = createPageSettings();
+             sqlPaging = createPageSettings();
+
+            divPaging.append(generatorPaging.ulPaging).append($saveGeneratorBtn);
+            sqlPagingDiv.append(sqlPaging.ulPaging).append($saveBtn);
+
+
+            pagingPlusBtnDiv = $('<div style="display:none;" class="VAS-pagingDivbottom-div">');
             $addJoinBtn = $("<input class='VIS_Pref_btn-2 vas-add-join-btn' id='vas-addjoin-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_AddJoin") + "'>");
             $addFilterBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' id='vas-addfilter-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_AddFilter") + "'>");
             $addSortBtn = $("<input class='VIS_Pref_btn-2 vas-add-btn' id='vas-addsort-btn" + $self.windowNo + "' type='button' value='" + VIS.Msg.getMsg("VAS_AddSort") + "'>");
@@ -285,11 +287,55 @@
             $baseTableInputBlock.append($baseTableJoinInput).append($baseTableSelectArrow);
             $joiningTableInputBlock.append($joiningTableInput).append($joiningTableSelectArrow);
             $addSortBySelectWithButton.append($sortElements).append($addSortBtn);
-            $sqlContent.append($selectQuery).append($queryResultGrid);
+            $sqlContent.append($queryResultGrid);
+
+            $selectQuery.append($selectGenQuerySqlText.append($sqlGenDeleteIcon))
+            $sqlContent.append('<div id="sqlTextContent_' + $self.windowNo + '" class="vas-alert-emailmsg ">'
+                + '<div class="input-group vis-input-wrap" id="sqlSelectWrap_' + $self.windowNo + '"></div>'
+                + '<div class="input-group vis-input-wrap" id="sqlTableWrap_' + $self.windowNo + '"></div>'
+                + '<div class="input-group vis-input-wrap" id="sqlFromWrap_' + $self.windowNo + '"></div>'
+                + '<div class="input-group vis-input-wrap" id="sqlWhereWrap_' + $self.windowNo + '"></div>'
+                + '<div class="input-group vis-input-wrap" id="sqlOtherWrap_' + $self.windowNo + '"></div>'
+                + '</div>').append($selectQuery);
+
             $sqlContent.append('<div id="emailContent_' + $self.windowNo + '" class="vas-alert-emailmsg VIS_Pref_show vis-formouterwrpdiv">'
                 + '<div class= "VIS_Pref_dd"><div class="input-group vis-input-wrap" id="Is_Email_' + $self.windowNo + '"></div></div>'
                 + '<div class= "VIS_Pref_dd"><div style="display:none;" class="input-group vis-input-wrap" id="EmailColName_' + $self.windowNo + '"></div></div>'
                 + '</div>');
+
+            sqlTxtContentWrap = $sqlContent.find("#sqlTextContent_" + $self.windowNo);
+            var sqlSelectWrap = $sqlContent.find("#sqlSelectWrap_" + $self.windowNo);
+            var sqlFromWrap = $sqlContent.find("#sqlFromWrap_" + $self.windowNo);
+            var sqlwhereWrap = $sqlContent.find("#sqlWhereWrap_" + $self.windowNo);
+            var sqlOtherWrap = $sqlContent.find("#sqlOtherWrap_" + $self.windowNo);
+            var sqlTableWrap = $sqlContent.find("#sqlTableWrap_" + $self.windowNo);
+
+            var selectColCtrlWrap = $('<div class="vis-control-wrap">');
+            txtSqlSelect = new VIS.Controls.VTextArea("SelectClause", false, false, true);
+            sqlSelectWrap.append(selectColCtrlWrap);
+            selectColCtrlWrap.append(txtSqlSelect.getControl().css('font-size','15px').attr('title', VIS.Msg.getMsg("VAS_SQLSelectText")).attr('placeholder', ' ').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_SelectClause") + '</label>');
+
+            var TableColCtrlWrap = $('<div class="vis-control-wrap">');
+            var lookupTable = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.TableDir, "AD_Table_ID", 0, true, "IsActive='Y'");
+            txtTableSql = new VIS.Controls.VComboBox("AD_Table_ID", false, false, true, lookupTable);
+            sqlTableWrap.append(TableColCtrlWrap);
+            TableColCtrlWrap.append(txtTableSql.getControl()).append('<label>' + VIS.Msg.getMsg("Table") + '</label>');
+
+            var fromColCtrlWrap = $('<div class="vis-control-wrap">');
+            txtSqlfrom = new VIS.Controls.VTextArea("FromClause", false, false, true);
+            sqlFromWrap.append(fromColCtrlWrap);
+            fromColCtrlWrap.append(txtSqlfrom.getControl().css('font-size', '15px').attr('title', VIS.Msg.getMsg("VAS_SQLFROMText")).attr('placeholder', '').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_FromClause") + '</label>');
+
+            var sqlWherectrlWrap = $('<div class="vis-control-wrap">');
+            txtSqlWhere = new VIS.Controls.VTextArea("WhereClause", false, false, true);
+            sqlwhereWrap.append(sqlWherectrlWrap);
+            sqlWherectrlWrap.append(txtSqlWhere.getControl().css('font-size', '15px').attr('title', VIS.Msg.getMsg("VAS_SQLWhereText")).attr('placeholder', ' ').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_WhereClause") + '</label>');
+
+            var OtherColCtrlWrap = $('<div class="vis-control-wrap">');
+            txtSqlOther = new VIS.Controls.VTextArea("OtherClause", false, false, true);
+            sqlOtherWrap.append(OtherColCtrlWrap);
+            OtherColCtrlWrap.append(txtSqlOther.getControl().css('font-size', '15px').attr('title', VIS.Msg.getMsg("VAS_SQLOtherText")).attr('placeholder', '').attr('data-placeholder', '').attr("autocomplete", "off")).append('<label>' + VIS.Msg.getMsg("VAS_OtherClause") + '</label>');
+
 
 
             $EventMainDiv.append('<div class="vas-windowtab"><label>' + VIS.Msg.getMsg("VAS_WindowTab") + '</label>'
@@ -329,7 +375,7 @@
             okBtn = $EventMainDiv.find("#okBtn_" + $self.windowNo);
             lblBottomMsg = $EventMainDiv.find("#lblBottomMsg_" + $self.windowNo);
 
-            $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGenQuerySqlText.append($sqlGenDeleteIcon)).append($selectGeneratorQuery).append(gridDiv2);
+            $sqlGeneratorContent.find('.vas-sqlgenerator-column2').append($selectGeneratorQuery).append(gridDiv2);
 
             txtIsEmail = new VIS.Controls.VCheckBox("IsEmail", false, false, true, VIS.Msg.getMsg("VAS_SendMail"), null, false);
             isEmailCtrl.append(isEmailCtrlWrap);
@@ -629,7 +675,13 @@
            */
 
             $testSqlBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                if ($selectQuery && $selectQuery.text().length > 0) {
+                var query = buildSQLQuery();
+                var AD_Table_ID = txtTableSql.getValue();
+                if (query == "") {
+                    query = $selectQuery.text().trim();
+                    AD_Table_ID = mainTableID;
+                }
+                if (query.length > 0) {
                     if ($sqlBtn.hasClass('active')) {
                         $(this).toggleClass('vas-show-grid');
                         if (!$(this).hasClass('vas-show-grid')) {
@@ -637,24 +689,35 @@
                             $queryResultGrid.hide();
                             $query.show();
                             $selectQuery.show();
+                            sqlTxtContentWrap.show()
                             emailContentDiv.show();
-                            $sqlContent.find($saveBtn).hide();
+                           // $sqlContent.find($saveBtn).hide();
+                            sqlPagingDiv.hide();
                             $sqlResultDiv.hide();
                             $sqlContent.removeClass('vas-grid-height');
                         }
                         else {
                             $(this).val(sqlQuery);
-                            $sqlContent.append($saveBtn);
-                            $sqlContent.find($saveBtn).show();
+                            //$sqlContent.append($saveBtn);
+                            $sqlContent.append(sqlPagingDiv);
+                            //$sqlContent.find($saveBtn).show();
+                            sqlPagingDiv.show();
                             $sqlContent.addClass('vas-grid-height');
-                            var query = $selectQuery.text();
-                            var match = query.match(/\bFROM\b\s+([a-zA-Z0-9_."]+)/);
-                            if (match && match[1]) {
-                                mainTableName = match[1].replace(/"/g, ''); // remove quotes if any
-                                getResult(query);
+                            //var query = $selectQuery.text();
+                           // var query = buildSQLQuery();
+                           // var AD_Table_ID = txtTableSql.getValue();
+                            if (AD_Table_ID > 0) {
+                                tableName = getTableName();
+                                getResult(query, tableName, pageNo);
                             } else {
                                 VIS.ADialog.error("", "", VIS.Msg.getMsg("No table found"));
                             }
+                            /* var match = query.match(/\bFROM\b\s+([a-zA-Z0-9_."]+)/);
+                             if (match && match[1]) {
+                                 mainTableName = match[1].replace(/"/g, ''); // remove quotes if any
+                             } else {
+                                 VIS.ADialog.error("", "", VIS.Msg.getMsg("No table found"));
+                             }*/
                         }
                     }
                 }
@@ -684,10 +747,8 @@
                             $selectGeneratorQuery.show();
                             gridDiv2.hide();
                             $sqlGeneratorQueryResultGrid.hide();
-                            hideSaveGeneratorBtn.hide();
+                           // hideSaveGeneratorBtn.hide();
                             $sqlResultDiv.hide();
-                            pagingPlusBtnDiv.addClass('d-none');
-                            pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
 
                         }
                         else {
@@ -696,54 +757,10 @@
                             gridDiv2.show();
                             $sqlGeneratorQueryResultGrid.show();
                             sqlGeneratorColumn2.append(pagingPlusBtnDiv);
-                            pagingPlusBtnDiv.append(pagingDiv).append($saveGeneratorBtn)
-                            sqlGeneratorColumn2.find($saveGeneratorBtn).show();
+                            pagingPlusBtnDiv.append(divPaging);
+                            pagingPlusBtnDiv.show();
                             var query = $selectGeneratorQuery.text();
-                            getResult(query);
-                            pagePrev = $root.find('#VAS_pageUp' + $self.windowNo);
-                            pageNext = $root.find('#VAS_pageDown' + $self.windowNo);
-                            pagePrev.addClass('VA107-disablePage');
-                            pagePrev.parents('li').css('pointer-events', 'none');
-                            pagePrev.off(VIS.Events.onTouchStartOrClick);
-                            pagePrev.on(VIS.Events.onTouchStartOrClick, function () {
-                                pageNo = pagingDiv.find("select").val() - 1;
-                                if (pageNo <= 1) {
-                                    pagePrev.css("opacity", "0.6");
-                                    pageNext.removeClass('VA107-disablePage');
-                                    pageNext.css("opacity", "1");
-                                    if (pageNo < 1) {
-                                        return;
-                                    }
-                                }
-                                else if (pageNo > 1) {
-                                    pagePrev.removeClass('VA107-disablePage');
-                                    pagePrev.parents('li').css('pointer-events', 'all');
-                                    pageNext.removeClass('VA107-disablePage');
-                                    pagePrev.css("opacity", "1");
-                                    pageNext.css("opacity", "1");
-                                }
-                                pagingDiv.find("select").val(pageNo);
-                                var query = $selectGeneratorQuery.text();
-                                getResult(query);
-                            });
-
-                            pageNext.off(VIS.Events.onTouchStartOrClick);
-                            pageNext.on(VIS.Events.onTouchStartOrClick, function () {
-                                pageNo = parseInt(pagingDiv.find("select").val()) + 1;
-                                pagePrev.removeClass('VA107-disablePage');
-                                pagePrev.parents('li').css('pointer-events', 'all');
-                                pagePrev.css("opacity", "1");
-                                if (pageNo >= totalPages) {
-                                    pageNext.addClass('VA107-disablePage');
-                                    pageNext.css("opacity", "0.6");
-                                    if (pageNo > totalPages) {
-                                        return;
-                                    }
-                                }
-                                pagingDiv.find("select").val(pageNo);
-                                var query = $selectGeneratorQuery.text();
-                                getResult(query);
-                            });
+                            getResult(query, mainTableName, pageNo);
                         }
                     }
                 }
@@ -754,33 +771,6 @@
                 }
                 $fieldColDropdown.val('');
                 $fieldJoinColDropdown.val('');
-            });
-
-            pagingDiv.find("select").on("change", function () {
-                pageNo = parseInt($(this).val());
-                if (pageNo >= totalPages) {
-                    pageNext.css("opacity", "0.6");
-                    pageNext.addClass("VA107-disablePage");
-                    pagePrev.css("opacity", "1");
-                    pagePrev.removeClass("VA107-disablePage");
-                }
-                else {
-                    pageNext.css("opacity", "1");
-                    pageNext.removeClass("VA107-disablePage");
-                }
-                if (pageNo <= 1) {
-                    pagePrev.css("opacity", "0.6");
-                    pagePrev.addClass("VA107-disablePage");
-                    pageNext.css("opacity", "1");
-                    pageNext.removeClass("VA107-disablePage");
-                }
-                else {
-                    pagePrev.css("opacity", "1");
-                    pagePrev.removeClass("VA107-disablePage");
-                }
-                var query = $selectGeneratorQuery.text();
-                getResult(query);
-                /*   selectPage.find("option[value='" + pageNo + "']").prop("selected", true);*/
             });
 
 
@@ -1146,12 +1136,14 @@
                     filterItem.siblings().removeClass('active');
                     filterItem.addClass('active');
 
-                    if (filterItem.attr('datatype') != 15 && filterItem.attr('datatype') != 16) {
+                    if (filterItem.attr('datatype') != VIS.DisplayType.Date && filterItem.attr('datatype') != VIS.DisplayType.DateTime) {
                         $filterColumnInput.val(filterSelectTableVal);
                     }
                     else {
                         var itemValue = $filters.children('.vas-filter-item.active').attr('value');
                         $filterColumnInput.val(itemValue);
+                        $filterDateDiv.show();
+                        resetDynamicControls();
                     }
                     var filterCondition = filterItem.find(".vas-filter-condition.active").text().trim();
                     $filterOperator.val(filterCondition);
@@ -1191,12 +1183,12 @@
 
                        
                     }
-                    else {
+                   // else {
                       //  isDynamic.prop("checked", false);
                        // $filterOperator.removeClass('vas-disabled-icon');
                        // $filterDateList.prop("disabled", true);
-                        resetDynamicControls();
-                    }
+                    //    resetDynamicControls();
+                  //  }
 
 
 
@@ -1357,13 +1349,14 @@
             */
 
             $saveBtn.on(VIS.Events.onTouchStartOrClick, function () {
-                var query = $selectQuery.text().trim();
+               // var query = $selectQuery.text().trim();
+                var query = buildSQLQuery();
                 alertID = VIS.context.getContext($self.windowNo, 'AD_Alert_ID');
                 if (alertID > 0) {                    
                     UpdateAlertRule(query);
                 }
             });
-
+        
             /*
               Click event on Save Generator Button 
               to save the query
@@ -1594,6 +1587,8 @@
 
                 return newQuery.replace(/\s{2,}/g, ' '); // Clean up extra spaces
             }
+        
+
 
             /*
                Function to collect joins data to display
@@ -2035,7 +2030,8 @@
 
             //show query 
             $column1Div.on(VIS.Events.onTouchStartOrClick, function () {
-                $saveGeneratorBtn.hide();
+                pagingPlusBtnDiv.hide();
+               // $saveGeneratorBtn.hide();
                 $selectGeneratorQuery.show();
                 gridDiv2.hide();
                 $sqlGeneratorQueryResultGrid.hide();
@@ -2089,6 +2085,11 @@
                                 emailContentDiv.show();
                                 txtEmailColName.setValue(result.EmailColumnName);
                                 txtIsEmail.setValue(result.IsEmail);
+                                txtSqlSelect.setValue(result.SelectClause);
+                                txtSqlfrom.setValue(result.FromClause);
+                                txtSqlWhere.setValue(result.WhereClause);
+                                txtSqlOther.setValue(result.OrderClause);
+                                txtTableSql.setValue(result.TableID);
                                 if (result.IsEmail) {
                                     emailColNameCtrl.show();
                                 } else {
@@ -2096,6 +2097,7 @@
                                 }
                             }
                             $selectQuery.text(result.Query);
+                            mainTableID = result.TableID;
                             if (!result.Query) {
                                 $windowTabSelect.setValue(null);
                                 $selectQuery.text('');
@@ -2105,6 +2107,7 @@
                                 $queryResultGrid.hide();
                                 $query.show();
                                 $selectQuery.show();
+                                sqlTxtContentWrap.show();
                                 emailContentDiv.show();
                             }
                             if (result.BasedOn && result.BasedOn == 'E') {
@@ -2149,27 +2152,36 @@
                 $windowTabSelect.setValue(null);
                 OnChange(0, 'O');
                 $selectQuery.text('');
+                cleanSqlText();
                 $sqlGeneratorBtn.attr('disabled', false);
                 $sqlGeneratorBtn.css("opacity", 1);
                 $testSqlBtn.val(testSQL);
                 $queryResultGrid.hide();
                 $query.show();
                 $selectQuery.show();
+                sqlTxtContentWrap.show();
                 emailContentDiv.show();
-                $saveBtn.hide();
+                //$saveBtn.hide();
+                sqlPagingDiv.hide();
                 setBusy(false);
             }
         }
 
-        function pageCtrls() {
-            if (totalPages > 0) {
-                pagingDiv.find("select").empty();
-                for (var i = 0; i < totalPages; i++) {
-                    pagingDiv.find("select").append($("<option>").val(i + 1).text(i + 1));
-                }
-                pagingDiv.find("select").val(pageNo);
-            }
-        };
+        function getTableName() {
+            var tableName = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "AlertSQLGenerate/getTableName",
+                { "AD_Table_ID": txtTableSql.getValue() }, null);
+            return tableName;
+        }
+
+        function cleanSqlText() {
+            txtSqlSelect.setValue('');
+            txtSqlfrom.setValue('');
+            txtSqlWhere.setValue('');
+            txtSqlOther.setValue('');
+            txtTableSql.setValue(0);
+
+        }
+
 
         /*Getting last n days query*/
 
@@ -3029,6 +3041,187 @@
             });
         };
 
+        // Add Page numbering in sql
+        function createPageSettings(showText, ofText) {
+
+            var paging = {};
+            paging.showText = showText || "Showing";
+            paging.ofText = ofText || "of";
+
+            paging.ulPaging = $('<ul class="vis-statusbar-ul">');
+
+            paging.liPageNo = $('<li class="flex-fill"><section class="vis-ad-w-p-s-result"><span></span></section></li>');
+
+            paging.liFirstPage = $('<li style="opacity:0.6"><div><i class="vis vis-shiftleft"></i></div></li>');
+            paging.liPrevPage = $('<li style="opacity:0.6"><div><i class="vis vis-pageup"></i></div></li>');
+
+            paging.cmbPage = $("<select>");
+            paging.liCurrPage = $('<li>').append(paging.cmbPage);
+
+            paging.liNextPage = $('<li style="opacity:0.6"><div><i class="vis vis-pagedown"></i></div></li>');
+            paging.liLastPage = $('<li style="opacity:0.6"><div><i class="vis vis-shiftright"></i></div></li>');
+
+            paging.$spanPageResult = paging.liPageNo.find("span");
+
+            paging.ulPaging.append(paging.liPageNo)
+                .append(paging.liFirstPage)
+                .append(paging.liPrevPage)
+                .append(paging.liCurrPage)
+                .append(paging.liNextPage)
+                .append(paging.liLastPage);
+
+            attachPageEvents(paging);
+
+            return paging;
+        }
+
+        function attachPageEvents(paging) {
+
+            paging.liFirstPage.on("click", function () {
+                if ($(this).css("opacity") == "1") {
+                    getResult(getCurrentQuery(), getCurrentTable(), 1);
+                }
+            });
+
+            paging.liPrevPage.on("click", function () {
+                if ($(this).css("opacity") == "1") {
+                    var page = parseInt(paging.cmbPage.val()) - 1;
+                    if (page > 0)
+                        getResult(getCurrentQuery(), getCurrentTable(), page);
+                }
+            });
+
+            paging.liNextPage.on("click", function () {
+                if ($(this).css("opacity") == "1") {
+                    var page = parseInt(paging.cmbPage.val()) + 1;
+                    getResult(getCurrentQuery(), getCurrentTable(), page);
+                }
+            });
+
+            paging.liLastPage.on("click", function () {
+                if ($(this).css("opacity") == "1") {
+                    getResult(getCurrentQuery(), getCurrentTable(),
+                        parseInt(paging.cmbPage.find("option:last").val()));
+                }
+            });
+
+            paging.cmbPage.on("change", function () {
+                getResult(getCurrentQuery(), getCurrentTable(), paging.cmbPage.val());
+            });
+        }
+
+        function resetPageCtrls(psetting, paging) {
+
+            paging.cmbPage.empty();
+
+            if (psetting.TotalPage > 0) {
+
+                for (var i = 0; i < psetting.TotalPage; i++) {
+                    paging.cmbPage.append($("<option value=" + (i + 1) + ">" + (i + 1) + "</option>"));
+                }
+
+                paging.cmbPage.val(psetting.CurrentPage);
+
+                // Enable / Disable Next + Last
+                if (psetting.TotalPage > psetting.CurrentPage) {
+                    paging.liNextPage.css("opacity", "1");
+                    paging.liLastPage.css("opacity", "1");
+                }
+                else {
+                    paging.liNextPage.css("opacity", "0.6");
+                    paging.liLastPage.css("opacity", "0.6");
+                }
+
+                // Enable / Disable First + Prev
+                if (psetting.CurrentPage > 1) {
+                    paging.liFirstPage.css("opacity", "1");
+                    paging.liPrevPage.css("opacity", "1");
+                }
+                else {
+                    paging.liFirstPage.css("opacity", "0.6");
+                    paging.liPrevPage.css("opacity", "0.6");
+                }
+
+                // Only one page
+                if (psetting.TotalPage == 1) {
+                    paging.liFirstPage.css("opacity", "0.6");
+                    paging.liPrevPage.css("opacity", "0.6");
+                    paging.liNextPage.css("opacity", "0.6");
+                    paging.liLastPage.css("opacity", "0.6");
+                }
+
+            }
+            else {
+                paging.liFirstPage.css("opacity", "0.6");
+                paging.liPrevPage.css("opacity", "0.6");
+                paging.liNextPage.css("opacity", "0.6");
+                paging.liLastPage.css("opacity", "0.6");
+            }
+
+            // Page info text
+            var cp = psetting.CurrentPage;
+            var ps = psetting.PageSize;
+            var tr = psetting.TotalRecords;
+
+            var s = (cp - 1) * ps;
+            var e = s + ps;
+            if (e > tr) e = tr;
+            if (tr == 0) s -= 1;
+
+            var text = paging.showText + " " + (s + 1) + "-" + e + " " + paging.ofText + " " + tr;
+
+            paging.$spanPageResult.text(text);
+        }
+
+        function getCurrentQuery() {
+
+            if ($sqlGeneratorContent.is(":visible")) {
+                //  console.log("Generator detected");
+                return $selectGeneratorQuery.text();
+            }
+
+            else {
+                var query = buildSQLQuery();
+                return query;
+            }
+        }
+
+        function buildSQLQuery() {
+            var selectText = txtSqlSelect.getValue() || "";
+            var fromText = txtSqlfrom.getValue() || "";
+            var whereText = txtSqlWhere.getValue() || "";
+            var otherText = txtSqlOther.getValue() || "";
+
+            var sql = "";
+
+            if (selectText.trim())
+                sql += "SELECT " + selectText.trim() + " ";
+
+            if (fromText.trim())
+                sql += "FROM " + fromText.trim() + " ";
+
+            if (whereText.trim())
+                sql += "WHERE " + whereText.trim() + " ";
+
+            if (otherText.trim())
+                sql += otherText.trim();
+
+            return sql;
+        }
+
+        function getCurrentTable() {
+
+            if ($sqlGeneratorContent.is(":visible")) {
+                // console.log("Generator detected");
+                return mainTableName;
+            }
+
+            else {
+                // console.log("Manual SQL detected");
+                return getTableName();
+            }
+        }
+
         /*
             Search functionality for Joins
         */
@@ -3136,12 +3329,12 @@
             in SQL and SQL Generator Tab
         */
 
-        function getResult(query) {
+        function getResult(query, mainTableName, pNo) {
             if (query != null) {
                 query = query.replace(/\s{2,}/g, ' ').trim();
                 $.ajax({
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetResult",
-                    data: { Query: VIS.secureEngine.encrypt(query), pageNo: pageNo, pageSize: pageSize, tableName: mainTableName, recordCount: recordCount },
+                    data: { Query: VIS.secureEngine.encrypt(query), pageNo: pNo, pageSize: pageSize, tableName: mainTableName, recordCount: recordCount },
                     type: "POST",
                     async: false,
                     success: function (result) {
@@ -3149,18 +3342,17 @@
                         if (result != null && result != []) {
                             if (result.RecordList.length > 0) {
                                 recordCount = result.TotalRecord;
-                                totalPages = Math.ceil(recordCount / pageSize)
-                                pageCtrls();
+                                totalPages = Math.ceil(recordCount / pageSize);
                                 if (sqlFlag) {
                                     sqlGrid(result.RecordList);
+                                    resetPageCtrls(result.pSetting, sqlPaging);
                                     $sqlResultDiv.hide();
                                 }
                                 if (sqlGenerateFlag) {
                                     sqlGeneratorGrid(result.RecordList);
+                                    resetPageCtrls(result.pSetting, generatorPaging);
                                     $sqlResultDiv.hide();
                                 }
-                                pagingPlusBtnDiv.removeClass('d-none');
-                                pagingPlusBtnDiv.addClass('d-flex justify-content-between align-items-center');
                             }
                             else {
                                 if (sqlFlag) {
@@ -3168,8 +3360,10 @@
                                     $queryResultGrid.hide();
                                     $query.show();
                                     $selectQuery.show();
+                                    sqlTxtContentWrap.show();
                                     emailContentDiv.show();
-                                    $saveBtn.hide();
+                                   // $saveBtn.hide();
+                                    sqlPagingDiv.hide();
                                 }
                                 if (sqlGenerateFlag) {
                                     $selectGeneratorQuery.show();
@@ -3179,10 +3373,7 @@
                                 }
                                 $sqlResultDiv.show();
                                 $sqlResultDiv.text(VIS.Msg.getMsg("NoRecordFound"));
-                                $saveGeneratorBtn.hide();
-                                // Removed the paging if result is null
-                                pagingPlusBtnDiv.addClass('d-none');
-                                pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
+                                pagingPlusBtnDiv.hide();
                                 $testSqlGeneratorBtn.removeClass('vas-show-grid');
                                 $sqlResultDiv.addClass('vas-sql-result-error');
                             }
@@ -3193,8 +3384,10 @@
                                 $queryResultGrid.hide();
                                 $query.show();
                                 $selectQuery.show();
+                                sqlTxtContentWrap.show();
                                 emailContentDiv.show();
-                                $saveBtn.hide();
+                                //$saveBtn.hide();
+                                sqlPagingDiv.hide();
                             }
                             if (sqlGenerateFlag) {
                                 $selectGeneratorQuery.show();
@@ -3205,12 +3398,10 @@
                             $testSqlBtn.removeClass('vas-show-grid');
                             $sqlResultDiv.show();
                             $sqlResultDiv.text(VIS.Msg.getMsg("VAS_ValidQuery"));
-                            $saveGeneratorBtn.hide();
+                           // $saveGeneratorBtn.hide();
+                            pagingPlusBtnDiv.hide();
                             $testSqlGeneratorBtn.removeClass('vas-show-grid');
                             $sqlResultDiv.addClass('vas-sql-result-error');
-                            // Removed the paging if result is null
-                            pagingPlusBtnDiv.addClass('d-none');
-                            pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
                         }
                     },
                     error: function (error) {
@@ -3263,6 +3454,7 @@
                 records: w2utils.encodeTags(result)
             });
             $selectQuery.hide();
+            sqlTxtContentWrap.hide();
             emailContentDiv.hide();
             $query.hide();
             $queryResultGrid.show();
@@ -3621,7 +3813,8 @@
             $selectGeneratorQuery.show();
             gridDiv2.hide();
             $sqlGeneratorQueryResultGrid.hide();
-            $saveGeneratorBtn.hide();
+            //$saveGeneratorBtn.hide();
+            pagingPlusBtnDiv.hide();
             $testSqlGeneratorBtn.val(testSQL);
             $sqlResultDiv.hide();
             $filterDateDiv.hide();
@@ -3641,10 +3834,9 @@
             $filterValBlock.find('input').val('');
             $filterNewColumnInput.val('');
             whereJoinClause = '';
-            pagingPlusBtnDiv.addClass('d-none');
-            pagingPlusBtnDiv.removeClass('d-flex justify-content-between align-items-center');
             sortValuesArray = [];
             sortedIndex = -1;
+            mainTableID = 0;
         }
 
         function resetFilters() {
@@ -3704,6 +3896,7 @@
             $testSqlGeneratorBtn = null;
             $testSqlBtn = null;
             $saveBtn = null;
+            sqlPagingDiv.empty();
             $saveGeneratorBtn = null;
             $addJoinBtn = null;
             $addFilterBtn = null;

@@ -386,6 +386,19 @@
         overflow: hidden;
     }
 
+.vas-sql-result-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.vas-sql-content-div {
+    background: rgba(var(--v-c-secondary), 1);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
 .vas-filters-editdelete-btns div {
     float: left;
 }
