@@ -155,7 +155,7 @@ namespace VAdvantage.Model
             }
 
             // VAS147: Lines with Cost Percentage 0 cannot be added when other BOM lines have a value greater than 0, and vice versa.
-            if (newRecord || Is_ValueChanged("VAS_DeAssemblyCostPercent") || Is_ValueChanged("VAS_IsProportionateCost")
+            if ((newRecord || Is_ValueChanged("VAS_DeAssemblyCostPercent") || Is_ValueChanged("VAS_IsProportionateCost"))
                 && Util.GetValueOfBool(Get_Value("VAS_IsProportionateCost")))
             {
                 int cnt = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(M_BOMProduct_ID) FROM M_BOMProduct 
