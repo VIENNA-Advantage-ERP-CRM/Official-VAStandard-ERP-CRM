@@ -453,7 +453,8 @@ namespace VAdvantage.Model
                                     SetIsBudgetBreach(true);
                                     SetIsBudgetBreachApproved(false);
                                 }
-                                return DocActionVariables.STATUS_INVALID;
+                                ModelLibrary.PushNotif.SSEManager.Get().AddMessage(GetCtx().GetAD_Session_ID(), _processMsg);
+                                return DocActionVariables.STATUS_INPROGRESS;
                             }
                             SetIsBudgetBreach(false);
                             SetIsBudgetBreachApproved(true);
@@ -464,7 +465,8 @@ namespace VAdvantage.Model
                             log.Severe("Budget Control Issue " + ex.Message);
                             SetProcessed(false);
                             SetIsBudgetBreach(false);
-                            return DocActionVariables.STATUS_INVALID;
+                            ModelLibrary.PushNotif.SSEManager.Get().AddMessage(GetCtx().GetAD_Session_ID(), _processMsg);
+                            return DocActionVariables.STATUS_INPROGRESS;
                         }
                     }
                 }
