@@ -106,6 +106,13 @@ namespace VAdvantage.Model
                 return success;
             }
 
+            // VAS147: Work done to set record created false on Assembly, if any changes are made in Production Plan.
+            if (!newRecord && (Is_ValueChanged("M Warehouse_ID") || Is_ValueChanged("M_Locator_ID") || Is_ValueChanged("M_Product_ID")
+                || Is_ValueChanged("M_AttributeSetInstance_ID") || Is_ValueChanged("M_BOM_ID") || Is_ValueChanged("ProductionQty")))
+            {
+                DB.ExecuteQuery("UPDATE M_Production SET IsCreated='N' WHERE M_Production_ID=" + GetM_Production_ID(), null, Get_Trx());
+            }
+
             return true;
         }
 
