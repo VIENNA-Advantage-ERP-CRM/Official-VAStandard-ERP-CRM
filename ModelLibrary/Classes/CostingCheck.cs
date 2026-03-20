@@ -82,6 +82,8 @@ namespace ModelLibrary.Classes
         /* Cost after landed Cost / Trx Calculation */
         public decimal PostCurrentCostPrice = 0;
 
+        public string TableName = string.Empty;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -240,6 +242,8 @@ namespace ModelLibrary.Classes
 
             PostCurrentCostPrice = 0;
 
+            TableName = string.Empty;
+
         }
 
         /// <summary>
@@ -258,6 +262,12 @@ namespace ModelLibrary.Classes
             {
                 trxname.Commit();
             }
+        }
+
+        public void SetTableName(string tableName)
+        {
+            TableName = tableName;
+            return;
         }
 
         /// <summary>

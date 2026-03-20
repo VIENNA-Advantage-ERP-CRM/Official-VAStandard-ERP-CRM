@@ -122,6 +122,10 @@ namespace VAdvantage.Model
                 ced.SetM_ProductionLine_ID(cd.GetM_ProductionLine_ID());
                 ced.SetM_WorkOrderResourceTxnLine_ID(cd.GetM_WorkOrderResourceTxnLine_ID());
                 ced.SetM_WorkOrderTransactionLine_ID(cd.GetM_WorkOrderTransactionLine_ID());
+                if (windowName.Equals("In") || windowName.Equals("Out"))
+                {
+                    ced.Set_Value(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
+                }
                 if (Env.IsModuleInstalled("VAMFG_"))
                 {
                     if (ced.Get_ColumnIndex("VAMFG_M_WrkOdrRscTxnLine_ID") > -1)

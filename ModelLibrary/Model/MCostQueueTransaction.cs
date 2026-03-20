@@ -137,6 +137,10 @@ namespace VAdvantage.Model
                         ced.Set_Value("VAMFG_M_WrkOdrTrnsctionLine_ID", cd.GetVAMFG_M_WrkOdrTrnsctionLine_ID());
                     }
                 }
+                if (Env.IsModuleInstalled("VA143_") && costingCheck.TableName.Equals("VA143_JobWorkInOutLine"))
+                {
+                    ced.Set_Value(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
+                }
                 if (!ced.Save())
                 {
                     ValueNamePair pp = VLogger.RetrieveError();
