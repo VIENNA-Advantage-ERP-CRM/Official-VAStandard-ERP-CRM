@@ -91,12 +91,14 @@ namespace VAdvantage.Process
         int table_AssetDisposal = 0;
         MTable tbl_AssetDisposal = null;
         PO po_AssetDisposal = null;
+        int table_VA143_JobWorkInOut = 0;
 
         //Production
         int CountCostNotAvialable = 1;
 
         int countColumnExist = 0; //check IsCostAdjustmentOnLost exist on product 
         int count = 0; //check Manufacturing Modeule exist or not
+        int countVA143_ = 0; // Check JOB Work Order Module Exists or not
 
         string conversionNotFoundInvoice = "";
         string conversionNotFoundInOut = "";
@@ -176,6 +178,12 @@ namespace VAdvantage.Process
                 // check VAFAM Modeule exist or not
                 int countVAFAM = Env.IsModuleInstalled("VAFAM_") ? 1 : 0;
 
+                countVA143_ = Env.IsModuleInstalled("VA143_") ? 1 : 0;
+                if (countVA143_ > 0)
+                {
+                    table_VA143_JobWorkInOut = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_TABLE_ID  FROM AD_TABLE WHERE tablename = 'VA143_JobWorkInOut' AND IsActive = 'Y' "));
+                }
+
                 // Check Cost Closing Data found or not, if not then give message 
                 if (DateFrom != null)
                 {
@@ -248,6 +256,15 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" 0 AS VAFAM_assetdisposal_ID, ");
                 }
+                if (countVA143_ > 0)
+                {
+                    sql.Append($@" t.VA143_JobWorkInOutLine_ID, ");
+                }
+                else
+                {
+                    sql.Append($@" 0 AS VA143_JobWorkInOutLine_ID, ");
+                }
+
                 sql.Append($@" t.C_Invoiceline_ID, t.vas_iscreditnote, t.vas_islandedcost, t.treatasdiscount, 
                         CASE 
                         WHEN t.M_InOutline_ID IS NOT NULL THEN il.M_inout_ID
@@ -260,7 +277,11 @@ namespace VAdvantage.Process
                 }
                 if (countVAFAM > 0)
                 {
-                    sql.Append($@" WHEN t.VAFAM_AssetDisposal_ID IS NOT NULL THEN astd.VAFAM_AssetDisposal_ID");
+                    sql.Append($@" WHEN t.VAFAM_AssetDisposal_ID IS NOT NULL THEN astd.VAFAM_AssetDisposal_ID ");
+                }
+                if (countVA143_ > 0)
+                {
+                    sql.Append($@" WHEN t.VA143_JobWorkInOutLine_ID IS NOT NULL THEN t.VA143_JobWorkInOutLine_ID ");
                 }
                 sql.Append($@" WHEN t.C_Invoiceline_ID IS NOT NULL AND t.treatasdiscount = 'N' AND t.vas_islandedcost = 'N' AND hinvl.issotrx = 'N' AND hinvl.isreturntrx = 'N' THEN  mit.M_MatchInv_ID 
                         WHEN t.C_Invoiceline_ID IS NOT NULL AND t.treatasdiscount = 'N' AND t.vas_islandedcost = 'N' AND hinvl.issotrx = 'N' AND hinvl.isreturntrx = 'Y' THEN  mit.M_MatchInv_ID 
@@ -293,6 +314,10 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" WHEN t.VAFAM_assetdisposal_ID IS NOT NULL THEN astd.docstatus ");
                 }
+                if (countVA143_ > 0)
+                {
+                    sql.Append($@" WHEN t.VA143_JobWorkInOutLine_ID IS NOT NULL THEN jwio.docstatus ");
+                }
                 sql.Append($@" WHEN t.C_Invoiceline_ID IS NOT NULL THEN hinvl.docstatus
                         END as docstatus, 
                         CASE 
@@ -307,6 +332,10 @@ namespace VAdvantage.Process
                 if (countVAFAM > 0)
                 {
                     sql.Append($@" WHEN t.VAFAM_AssetDisposal_ID IS NOT NULL THEN 'VAFAM_AssetDisposal' ");
+                }
+                if (countVA143_ > 0)
+                {
+                    sql.Append($@" WHEN t.VA143_JobWorkInOutLine_ID IS NOT NULL THEN 'VA143_JobWorkInOut' ");
                 }
                 sql.Append($@" WHEN t.C_Invoiceline_ID IS NOT NULL AND t.treatasdiscount = 'N' AND t.vas_islandedcost = 'N' AND hinvl.issotrx = 'N' AND hinvl.isreturntrx = 'N' THEN  'M_MatchInv'
                         WHEN t.C_Invoiceline_ID IS NOT NULL AND t.treatasdiscount = 'N' AND t.vas_islandedcost = 'N' AND hinvl.issotrx = 'N' AND hinvl.isreturntrx = 'Y' THEN  'M_MatchInv' 
@@ -329,6 +358,11 @@ namespace VAdvantage.Process
                 if (countVAFAM > 0)
                 {
                     sql.Append($@" LEFT JOIN VAFAM_assetdisposal astd ON (t.VAFAM_assetdisposal_ID = astd.VAFAM_assetdisposal_ID) ");
+                }
+                if (countVA143_ > 0)
+                {
+                    sql.Append($@" LEFT JOIN VA143_JobWorkInOutLine jwiol ON (t.VA143_JobWorkInOutLine_ID = jwiol.VA143_JobWorkInOutLine_ID)
+                                   LEFT JOIN VA143_JobWorkInOut jwio ON (jwio.VA143_JobWorkInOut_ID  = jwiol.VA143_JobWorkInOut_ID) ");
                 }
                 sql.Append($@" LEFT JOIN C_Invoiceline invl ON (t.C_Invoiceline_ID = invl.C_Invoiceline_ID)
                                 LEFT JOIN C_Invoice hinvl ON (hinvl.C_Invoice_ID = invl.C_Invoice_ID)
@@ -353,7 +387,7 @@ namespace VAdvantage.Process
                                 (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  mi.M_Product_ID, mi.M_AttributeSetInstance_ID ,i.DateAcct as movementdate,  to_char(i.created, 'DD-MON-YY HH24:MI:SS') AS created  ,
                                 0 as M_Transaction_ID,  0 as M_InOutline_ID  , 0 as M_Inventoryline_ID  , 0 as M_Movementline_ID , 0 as M_Productionline_ID, 
                                 0 as VAMFG_M_wrkodrtransaction_ID  , 0 as VAMFG_M_wrkodrtrnsctionline_ID, 
-                                0 as VAFAM_assetdisposal_ID, mi.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, mi.M_MatchInv_Id AS Record_Id,
+                                0 as VAFAM_assetdisposal_ID, 0 AS VA143_JobWorkInOutLine_ID, mi.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, mi.M_MatchInv_Id AS Record_Id,
                                 i.issotrx ,  i.isreturntrx ,  ''           AS IsInternalUse,i.docstatus,  'M_MatchInv' AS TableName
                          FROM M_MatchInv mi 
                          INNER JOIN c_invoiceline il ON il.C_Invoiceline_ID = mi.C_Invoiceline_ID 
@@ -381,7 +415,7 @@ namespace VAdvantage.Process
                                 (SELECT i.ad_client_ID ,  i.AD_Org_ID ,  lca.M_Product_ID, lca.M_AttributeSetInstance_ID ,i.DateAcct as movementdate,  to_char(i.created, 'DD-MON-YY HH24:MI:SS') AS created  ,
                                 0 as M_Transaction_ID,  0 as M_InOutline_ID  , 0 as M_Inventoryline_ID  , 0 as M_Movementline_ID , 0 as M_productionline_ID, 
                                 0 as VAMFG_M_wrkodrtransaction_ID  , 0 as VAMFG_M_wrkodrtrnsctionline_ID, 
-                                0 as VAFAM_assetdisposal_ID, lca.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, lca.C_LANDEDCOSTALLOCATION_ID AS Record_Id,
+                                0 as VAFAM_assetdisposal_ID, 0 AS VA143_JobWorkInOutLine_ID, lca.C_Invoiceline_ID, '' as vas_iscreditnote, '' as vas_islandedcost, '' as treatasdiscount, lca.C_LANDEDCOSTALLOCATION_ID AS Record_Id,
                                 '' as issotrx ,  i.isreturntrx ,  '' AS IsInternalUse,i.docstatus,  'LandedCost' AS TableName
                          FROM C_LANDEDCOSTALLOCATION lca 
                          INNER JOIN c_invoiceline il ON il.C_Invoiceline_ID = lca.C_Invoiceline_ID 
@@ -978,6 +1012,28 @@ namespace VAdvantage.Process
                                 catch (Exception exProductionExecution)
                                 {
                                     _log.Info("Error Occured during Production Execution costing " + exProductionExecution.ToString());
+                                }
+
+
+                                #endregion
+
+                                #region Component Reduce for JOB Work IN / Out --
+                                try
+                                {
+                                    if (countVA143_ > 0)
+                                    {
+                                        if (Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["TableName"]) == "VA143_JobWorkInOut")
+                                        {
+
+                                            _log.Info("costng calculation start for Job Work IN / OUT for ID =  " + Util.GetValueOfString(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                            CalculateCostForJobWork(Util.GetValueOfInt(dsRecord.Tables[0].Rows[z]["Record_Id"]));
+                                            continue;
+                                        }
+                                    }
+                                }
+                                catch (Exception exjobWork)
+                                {
+                                    _log.Info("Error Occured during Job Work IN / OUT costing " + exjobWork.ToString());
                                 }
 
 
@@ -2489,6 +2545,43 @@ namespace VAdvantage.Process
                     DeleteFactDetails(MTable.Get_Table_ID("M_VAMFG_M_WrkOdrTransaction"), "M_VAMFG_M_WrkOdrTransaction");
                 }
 
+                if (countVA143_ > 0)
+                {
+                    // for VA143_JobWorkInOut / VA143_JobWorkInOutLine
+                    sql.Clear();
+                    sql.Append($@"UPDATE VA143_JobWorkInOutLine SET  VA143_TrxCost = 0 ");
+                    sql.Append(@", iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N'");
+                    sql.Append($@" WHERE M_Product_ID IN 
+                                (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");
+                    if (DateFrom != null)
+                    {
+                        sql.Append($@" AND VA143_JobWorkInOut_ID IN (SELECT m.VA143_JobWorkInOut_ID 
+                            FROM VA143_JobWorkInOut m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                    }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID}");
+                    }
+                    countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                    if (countRecord > 0)
+                    {
+                        sql.Clear();
+                        sql.Append($@"UPDATE VA143_JobWorkInOut  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
+                        sql.Append(@" , Posted ='N' ");
+                        sql.Append($@" WHERE VA143_JobWorkInOut_ID IN ( 
+                                   SELECT VA143_JobWorkInOut_ID FROM VA143_JobWorkInOutLine WHERE  M_Product_ID IN 
+                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID}) ) )");
+                        if (DateFrom != null)
+                        {
+                            sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                        }
+                        countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                        DeleteFactDetails(table_VA143_JobWorkInOut, "VA143_JobWorkInOut");
+                    }
+                }
+
                 // Update Transaction
                 sql.Clear();
                 sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0, VAS_PostingCost = 0    
@@ -2506,11 +2599,11 @@ namespace VAdvantage.Process
 
                 // Delete Query 
                 int M_CostElement_ID = GetStandardCostElement();
-                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"m_product_id IN 
+                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@"m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
                 DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                    @"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
+                                    $@"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
                 //DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN 
                 //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
                 sql.Clear();
@@ -2908,6 +3001,41 @@ namespace VAdvantage.Process
                     DeleteFactDetails(MTable.Get_Table_ID("M_VAMFG_M_WrkOdrTransaction"), "M_VAMFG_M_WrkOdrTransaction");
                 }
 
+                if (countVA143_ > 0)
+                {
+                    // for VA143_JobWorkInOut / VA143_JobWorkInOutLine
+                    sql.Clear();
+                    sql.Append($@"UPDATE VA143_JobWorkInOutLine SET  VA143_TrxCost = 0 ");
+                    sql.Append(@", iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N'");
+                    sql.Append($@" WHERE M_Product_ID IN ({ productID } )");
+                    if (DateFrom != null)
+                    {
+                        sql.Append($@" AND VA143_JobWorkInOut_ID IN (SELECT m.VA143_JobWorkInOut_ID 
+                            FROM VA143_JobWorkInOut m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                    }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID}");
+                    }
+                    countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                    if (countRecord > 0)
+                    {
+                        sql.Clear();
+                        sql.Append($@"UPDATE VA143_JobWorkInOut SET iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
+                        sql.Append(@" , Posted ='N' ");
+                        sql.Append($@" WHERE VA143_JobWorkInOut_ID IN ( 
+                                   SELECT VA143_JobWorkInOut_ID FROM VA143_JobWorkInOutLine WHERE  M_Product_ID IN ({ productID})  )");
+                        if (DateFrom != null)
+                        {
+                            sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                        }
+                        countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                        DeleteFactDetails(table_VA143_JobWorkInOut, "VA143_JobWorkInOut");
+                    }
+                }
+
                 // Update Transaction
                 sql.Clear();
                 sql.Append($@"UPDATE M_Transaction SET ProductApproxCost = 0, ProductCost = 0, M_CostElement_ID = null, CostingLevel = null, VAS_LandedCost = 0, VAS_PostingCost = 0  WHERE M_Product_ID IN ({ productID })");
@@ -3218,6 +3346,40 @@ namespace VAdvantage.Process
                     countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                     DeleteFactDetails(MTable.Get_Table_ID("M_VAMFG_M_WrkOdrTransaction"), "M_VAMFG_M_WrkOdrTransaction");
+                }
+
+                if (countVA143_ > 0)
+                {
+                    // for VA143_JobWorkInOut / VA143_JobWorkInOutLine
+                    sql.Clear();
+                    sql.Append($@"UPDATE VA143_JobWorkInOutLine SET  VA143_TrxCost = 0 ");
+                    sql.Append(@", iscostimmediate = 'N' , iscostcalculated = 'N',  isreversedcostcalculated = 'N'");
+                    sql.Append($@" WHERE AD_client_ID IN ({ GetAD_Client_ID() } )");
+                    if (DateFrom != null)
+                    {
+                        sql.Append($@" AND VA143_JobWorkInOut_ID IN (SELECT m.VA143_JobWorkInOut_ID 
+                            FROM VA143_JobWorkInOut m WHERE trunc(m.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)})");
+                    }
+                    if (M_AttributeSetInstance_ID > 0)
+                    {
+                        sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID}");
+                    }
+                    countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                    if (countRecord > 0)
+                    {
+                        sql.Clear();
+                        sql.Append($@"UPDATE VA143_JobWorkInOut  SET  iscostcalculated = 'N',  isreversedcostcalculated = 'N' ");
+                        sql.Append(@" , Posted ='N' ");
+                        sql.Append($@" WHERE AD_client_ID = { GetAD_Client_ID() }");
+                        if (DateFrom != null)
+                        {
+                            sql.Append($@" AND trunc(MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                        }
+                        countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+
+                        DeleteFactDetails(table_VA143_JobWorkInOut, "VA143_JobWorkInOut");
+                    }
                 }
 
                 // Update Transaction
@@ -3614,6 +3776,29 @@ namespace VAdvantage.Process
                 if (DateFrom != null)
                 {
                     sql.Append($@" AND trunc(io.VAMFG_DateAcct) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
+                }
+            }
+            else if (TableName.Equals("VA143_JobWorkInOut"))
+            {
+                sql.Clear();
+                sql.Append($@"SELECT DISTINCT io.VA143_JobWorkInOut_ID FROM VA143_JobWorkInOut io
+                                    INNER JOIN VA143_JobWorkInOutLine iol ON (io.VA143_JobWorkInOut_ID = iol.VA143_JobWorkInOut_ID)
+                                    INNER JOIN M_Product p ON (p.M_Product_ID = iol.M_Product_ID)");
+                if (!String.IsNullOrEmpty(productCategoryID) && String.IsNullOrEmpty(productID))
+                {
+                    sql.Append($@" WHERE p.M_Product_Category_ID IN ({productCategoryID})");
+                }
+                else if (!String.IsNullOrEmpty(productID))
+                {
+                    sql.Append($@" WHERE p.M_Product_ID IN ({productID})");
+                }
+                else
+                {
+                    sql.Append($@" WHERE io.AD_Client_ID = ({GetAD_Client_ID()})");
+                }
+                if (DateFrom != null)
+                {
+                    sql.Append($@" AND trunc(io.MovementDate) >= {GlobalVariable.TO_DATE(DateFrom, true)} ");
                 }
             }
 
@@ -6373,6 +6558,85 @@ namespace VAdvantage.Process
                                                                  product.GetM_Product_ID(), invoiceLine.GetM_AttributeSetInstance_ID(), Get_Trx(), inout.GetM_Warehouse_ID());
                         UpdateTransactionCostForInvoice(currentCostPrice, invoiceLine.GetC_InvoiceLine_ID(), costingCheck);
                         Get_Trx().Commit();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Is used to calculate cost for Stock IN or Out functionality for Job Work Order
+        /// </summary>
+        /// <param name="VA143_JobWorkInOutLine_ID">Job Work Order Line ID </param>
+        /// <author>VIS_045: 18-03-2026</author>
+        private void CalculateCostForJobWork(int VA143_JobWorkInOutLine_ID)
+        {
+            sql.Clear();
+            sql.Append($@"SELECT il.* , il.AD_Client_ID, il.VA143_JobWorkInOut_ID, ilma.M_AttributeSetInstance_ID AS M_AttributeSetInstance_IDMA,
+                                ilma.M_Transaction_ID, ilma.MovementQty AS MovementQtyMA 
+                            FROM VA143_JobWorkInOutLine il 
+                            INNER JOIN VA143_JWInOutLineMA ilma ON (il.VA143_JobWorkInOutLine_ID = ilma.VA143_JobWorkInOutLine_ID) 
+                            INNER JOIN VA143_JobWorkInOut i ON (i.VA143_JobWorkInOut_ID = il.VA143_JobWorkInOut_ID) 
+                            WHERE il.IsActive = 'Y' AND il.VA143_JobWorkInOutLine_ID = { VA143_JobWorkInOutLine_ID}  ");
+            sql.Append($@" AND ( CASE 
+                              WHEN NVL(i.ReversalDoc_ID, 0)  != 0 THEN 
+                                CASE 
+                                  WHEN (il.iscostcalculated = 'Y' OR il.IsCostImmediate = 'Y') AND il.IsReversedCostCalculated = 'N' 
+                                  THEN 1 ELSE 0 
+                                END
+                              ELSE 
+                                CASE 
+                                    WHEN il.iscostcalculated = 'N' AND il.iscostImmediate = 'N' 
+                                    THEN 1 ELSE 0 
+                              END
+                             END ) = 1 ");
+            sql.Append(" AND il.M_Product_ID IN (" + productID + " )");
+            if (M_AttributeSetInstance_ID > 0)
+            {
+                sql.Append(" AND NVL(ilma.M_AttributeSetInstance_ID, 0) = " + M_AttributeSetInstance_ID);
+            }
+            sql.Append(" ORDER BY il.Line");
+            dsChildRecord = DB.ExecuteDataset(sql.ToString(), null, Get_Trx());
+            if (dsChildRecord != null && dsChildRecord.Tables.Count > 0 && dsChildRecord.Tables[0].Rows.Count > 0)
+            {
+                PO _jwInOut = MTable.GetPO(GetCtx(), "VA143_JobWorkInOut", Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[0]["VA143_JobWorkInOut_ID"]), Get_Trx());
+                PO _jwInOutLine = MTable.GetPO(GetCtx(), "VA143_JobWorkInOutLine", VA143_JobWorkInOutLine_ID, Get_Trx());
+                MClient client = MClient.Get(GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[0]["AD_Client_ID"]));
+                bool result = false;
+
+
+                Type type = null;
+                MethodInfo methodInfo = null;
+                string className = "VA143.Model.MVA143JobWorkInOut";
+                type = ClassTypeContainer.GetClassType(className, "VA143Svc");
+                if (type != null)
+                {
+                    object[] constructorPara = new object[] { GetCtx(), Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[0]["VA143_JobWorkInOut_ID"]), Get_Trx() };
+                    object objInstanceConstructor = Activator.CreateInstance(type, constructorPara);
+
+                    methodInfo = type.GetMethod("CostingCalculation");
+                    if (methodInfo != null)
+                    {
+                        ParameterInfo[] parameters = methodInfo.GetParameters();
+                        if (parameters.Length == 9)
+                        {
+                            for (int j = 0; j < dsChildRecord.Tables[0].Rows.Count; j++)
+                            {
+
+                                object[] parametersArray = new object[] { client,
+                                                                _jwInOut,
+                                                                _jwInOutLine,
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_AttributeSetInstance_IDMA"]),
+                                                                Util.GetValueOfDecimal(dsChildRecord.Tables[0].Rows[j]["MovementQtyMA"]),
+                                                                Util.GetValueOfInt(dsChildRecord.Tables[0].Rows[j]["M_Transaction_ID"]),
+                                                                true,
+                                                                false, Get_Trx() };
+                                result = (bool)methodInfo.Invoke(objInstanceConstructor, parametersArray);
+                                if (result)
+                                {
+                                    Get_Trx().Commit();
+                                }
+                            }
+                        }
                     }
                 }
             }
