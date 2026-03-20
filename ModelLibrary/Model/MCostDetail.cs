@@ -118,6 +118,14 @@ namespace VAdvantage.Model
             int M_AttributeSetInstance_ID, string WindowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
             MInvoiceLine invoiceline, PO po, int M_CostElement_ID, Decimal Amt, Decimal Qty, String Description, Trx trxName, int M_Warehouse_ID = 0)
         {
+            return CreateCostDetail(mas, AD_Org_ID, M_Product_ID, M_AttributeSetInstance_ID, WindowName, inventoryLine, inoutline, movementline,
+             invoiceline, po, M_CostElement_ID, Amt, Qty, Description, trxName, null, M_Warehouse_ID);
+        }
+
+        public static MCostDetail CreateCostDetail(MAcctSchema mas, int AD_Org_ID, int M_Product_ID,
+        int M_AttributeSetInstance_ID, string WindowName, MInventoryLine inventoryLine, MInOutLine inoutline, MMovementLine movementline,
+        MInvoiceLine invoiceline, PO po, int M_CostElement_ID, Decimal Amt, Decimal Qty, String Description, Trx trxName, CostingCheck costingCheck, int M_Warehouse_ID = 0)
+        {
             try
             {
                 Amt = Decimal.Round(Amt, mas.GetCostingPrecision(), MidpointRounding.AwayFromZero);
@@ -132,6 +140,15 @@ namespace VAdvantage.Model
                     if (AD_Org_ID == 0)
                     {
                         cd.SetAD_Org_ID(inventoryLine.GetAD_Org_ID());
+                    }
+                }
+                if ((WindowName.Equals("Out") || WindowName.Equals("In")) && costingCheck != null && costingCheck.po != null)
+                {
+                    cd.Set_Value("MovementDate", costingCheck != null && costingCheck.movementDate != null ? costingCheck.movementDate : Util.GetValueOfDateTime(po.Get_Value("DateAcct")));
+                    cd.Set_Value(costingCheck.po.GetTableName() + "_ID", costingCheck.po.Get_ID());
+                    if (AD_Org_ID == 0)
+                    {
+                        cd.SetAD_Org_ID(po.GetAD_Org_ID());
                     }
                 }
                 if (WindowName == "AssetDisposal")
@@ -662,7 +679,8 @@ namespace VAdvantage.Model
                 || GetM_WorkOrderTransactionLine_ID() != 0
                 || GetVAMFG_M_WrkOdrTrnsctionLine_ID() != 0
                 || GetM_WorkOrderResourceTxnLine_ID() != 0
-                || Util.GetValueOfInt(Get_Value("VAFAM_AssetDisposal_ID")) != 0)
+                || Util.GetValueOfInt(Get_Value("VAFAM_AssetDisposal_ID")) != 0
+                || ((windowName.Equals("Out") || windowName.Equals("In")) && Util.GetValueOfInt(Get_Value(costingCheck.TableName + "_ID")) != 0))
             {
                 #region Material transaction Detail Record
                 cost = MaterialMovementTrx(cost, costFrom, mas, product, ce, inout, inoutline, movement, movementline, Org_ID, M_ASI_ID, A_Asset_ID, cq_AD_Org_ID,
@@ -1470,6 +1488,10 @@ namespace VAdvantage.Model
                     amt = cost.GetCurrentCostPrice() * qty;
                 }
             }
+            else if (windowName.Equals("In") || windowName.Equals("Out"))
+            {
+                amt = amt;
+            }
             else if (!windowName.Equals("PE-FinishGood") && cost.GetCurrentCostPrice() != 0)
             {
                 amt = cost.GetCurrentCostPrice() * qty;
@@ -1481,7 +1503,7 @@ namespace VAdvantage.Model
             {
                 #region Av. invoice
 
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -1560,7 +1582,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -1742,7 +1764,7 @@ namespace VAdvantage.Model
             else if (ce.IsWeightedAverageCost())
             {
                 #region Weighted Av. invoice
-                if (windowName.Equals("PE-FinishGood") || windowName.Equals("Material Receipt"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("Material Receipt") || windowName.Equals("In"))
                 {
                     cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
                     cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
@@ -1858,7 +1880,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         // Quantity to be increased
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
@@ -2132,7 +2154,7 @@ namespace VAdvantage.Model
             else if (ce.IsAveragePO())
             {
                 #region Av. Purchase Order
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -2203,7 +2225,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -2395,7 +2417,7 @@ namespace VAdvantage.Model
             else if (ce.IsWeightedAveragePO())
             {
                 #region Weighted Av. PO
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     cost.SetCumulatedAmt(Decimal.Add(cost.GetCumulatedAmt(), amt));
                     cost.SetCumulatedQty(Decimal.Add(cost.GetCumulatedQty(), qty));
@@ -2550,7 +2572,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Subtract(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         // Quantity to be increased
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
@@ -2771,7 +2793,7 @@ namespace VAdvantage.Model
             {
                 #region Lifo / Fifo
                 if (windowName.Equals("PE-FinishGood")
-                   || windowName.Equals("Material Receipt"))
+                   || windowName.Equals("Material Receipt") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -2840,7 +2862,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -3004,7 +3026,7 @@ namespace VAdvantage.Model
             else if (ce.IsLastInvoice())
             {
                 #region Last Invoice
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -3069,7 +3091,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -3215,7 +3237,7 @@ namespace VAdvantage.Model
             else if (ce.IsLastPOPrice())
             {
                 #region Last PO
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -3250,7 +3272,7 @@ namespace VAdvantage.Model
                     #region when qty > 0
                     if ((windowName.Equals("Shipment") && inout.GetDescription() != null && inout.GetDescription().Contains("{->")) ||
                         (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal")) ||
-                        (windowName.Equals("Production Execution")))
+                        (windowName.Equals("Production Execution")) || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
@@ -3454,7 +3476,7 @@ namespace VAdvantage.Model
             else if (ce.IsStandardCosting())
             {
                 #region Std Costing
-                if (windowName.Equals("PE-FinishGood"))
+                if (windowName.Equals("PE-FinishGood") || windowName.Equals("In"))
                 {
                     if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                     {
@@ -3540,7 +3562,7 @@ namespace VAdvantage.Model
                             cost.SetCurrentQty(Decimal.Add(cost.GetCurrentQty(), qty));
                         }
                     }
-                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal"))
+                    else if (windowName.Equals("Internal Use Inventory") || windowName.Equals("AssetDisposal") || windowName.Equals("Out"))
                     {
                         if (costingCheck.IsQunatityValidated && Decimal.Add(cost.GetCurrentQty(), qty) < 0)
                         {
