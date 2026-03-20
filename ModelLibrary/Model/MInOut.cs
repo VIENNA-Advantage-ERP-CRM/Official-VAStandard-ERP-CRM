@@ -4252,7 +4252,18 @@ namespace VAdvantage.Model
             // VIS0060: Update Order Status on Order Header tab based on delivered and Invoiced qty on Order Line.
             if (GetC_Order_ID() > 0)
             {
-                MOrder.UpdateOrderStatus(GetCtx(), GetC_Order_ID(), Get_Trx());
+                query.Clear().Append($@"SELECT DISTINCT ol.C_Order_ID FROM C_Order o 
+                                            INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID)
+                                            INNER JOIN M_InOutLine il ON (il.C_OrderLine_ID = ol.C_OrderLine_ID)
+                                            WHERE il.M_InOut_ID = {GetM_InOut_ID()}");
+                DataSet ds = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                    {
+                        MOrder.UpdateOrderStatus(GetCtx(), Util.GetValueOfInt(ds.Tables[0].Rows[i]["C_Order_ID"]), Get_Trx());
+                    }
+                }
             }
 
             SetProcessed(true);
