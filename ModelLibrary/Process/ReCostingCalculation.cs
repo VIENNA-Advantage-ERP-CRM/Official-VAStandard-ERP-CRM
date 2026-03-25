@@ -2499,13 +2499,11 @@ namespace VAdvantage.Process
 
                 // Delete Query 
                 int M_CostElement_ID = GetStandardCostElement();
-                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + @"m_product_id IN 
+                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@" m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
                 DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
-                                    @"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
-                //DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN 
-                //                   (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )", null, Get_Trx());
+                                    $@"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
                 sql.Clear();
                 sql.Append($@"delete from m_costdetail WHERE m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN (" + productCategoryID + " ) )");

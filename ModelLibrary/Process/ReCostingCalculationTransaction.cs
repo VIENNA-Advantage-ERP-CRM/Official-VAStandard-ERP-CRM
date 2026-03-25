@@ -2599,9 +2599,9 @@ namespace VAdvantage.Process
 
                 // Delete Query 
                 int M_CostElement_ID = GetStandardCostElement();
-                DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@"m_product_id IN 
+                countRecord = DB.ExecuteQuery($@"delete from m_cost where " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") + $@"m_product_id IN 
                                    (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) ) AND M_CostElement_ID != {M_CostElement_ID}", null, Get_Trx());
-                DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
+                countRecord = DB.ExecuteQuery($@"UPDATE M_Cost SET CurrentQty= 0, CumulatedAmt = 0, CumulatedQty = 0 
                                     WHERE " + (M_AttributeSetInstance_ID > 0 ? $" M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} AND " : "") +
                                     $@"m_product_id IN  (SELECT M_Product_ID FROM M_Product WHERE M_Product_Category_ID IN ({ productCategoryID } ) )  AND M_CostElement_ID = {M_CostElement_ID}", null, Get_Trx());
                 //DB.ExecuteQuery(@"delete from m_costdetail  where m_product_id IN 
@@ -2617,6 +2617,7 @@ namespace VAdvantage.Process
                 {
                     sql.Append($@" AND M_AttributeSetInstance_ID = {M_AttributeSetInstance_ID} ");
                 }
+                countRecord = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
 
                 // Update Current Stock which is affected after the from date on Cost Queue
                 if (DateFrom != null)
