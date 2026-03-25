@@ -159,14 +159,25 @@ namespace VAdvantage.Process
                                             //VAI050-set ProportionateCost column value because its not a copy record
                                             toProdline.Set_Value("VAS_IsProportionateCost", fromProdline.Get_Value("VAS_IsProportionateCost"));
                                             toProdline.Set_Value("VAS_DeAssemblyCostPercent", fromProdline.Get_Value("VAS_DeAssemblyCostPercent"));
-                                            if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(), toProdline.GetM_ProductContainer_ID(), toProdline.GetM_Product_ID(), toProdline.GetM_AttributeSetInstance_ID(), toProdline.GetMovementQty(), Get_Trx()))
+                                            DataSet ds = DB.ExecuteDataset(@"SELECT M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, -1 * MovementQty AS MovementQty
+                                                            FROM M_ProductionLineMA WHERE M_ProductionLine_ID=" + fromProdline.GetM_ProductionLine_ID());
+                                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                                             {
-                                                production.Get_Trx().Rollback();
-                                                ValueNamePair pp = VLogger.RetrieveError();
-                                                if (!string.IsNullOrEmpty(pp.GetName()))
-                                                    throw new Exception("Could not create Production line reverse entry, " + pp.GetName());
-                                                else
-                                                    throw new Exception("Could not create Production line reverse entry");
+                                                for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
+                                                {
+                                                    if (!CheckQtyAvailablity(GetCtx(), toProdline.GetM_Warehouse_ID(), toProdline.GetM_Locator_ID(),
+                                                        Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_ProductContainer_ID"]), toProdline.GetM_Product_ID(),
+                                                        Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_AttributeSetInstance_ID"]),
+                                                        Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["MovementQty"]), Get_Trx()))
+                                                    {
+                                                        production.Get_Trx().Rollback();
+                                                        ValueNamePair pp = VLogger.RetrieveError();
+                                                        if (!string.IsNullOrEmpty(pp.GetName()))
+                                                            throw new Exception("Could not create Production line reverse entry, " + pp.GetName());
+                                                        else
+                                                            throw new Exception("Could not create Production line reverse entry");
+                                                    }
+                                                }
                                             }
                                             if (!toProdline.Save(production.Get_Trx()))
                                             {
@@ -178,16 +189,27 @@ namespace VAdvantage.Process
                                             else
                                             {
                                                 // Create New record of Production line Policy (Material Policy) with Reverse Entry
-                                                sql.Clear();
-                                                sql.Append(@"INSERT INTO M_ProductionLineMA 
-                                                                  (  AD_CLIENT_ID, AD_ORG_ID , CREATED , CREATEDBY , ISACTIVE , UPDATED , UPDATEDBY ,
-                                                                    M_PRODUCTIONLINE_ID , M_ATTRIBUTESETINSTANCE_ID , MMPOLICYDATE , M_PRODUCTCONTAINER_ID, MOVEMENTQTY )
-                                                                  (SELECT AD_CLIENT_ID, AD_ORG_ID , sysdate , CREATEDBY , ISACTIVE , sysdate , UPDATEDBY ,
-                                                                      " + toProdline.GetM_ProductionLine_ID() + @" , M_ATTRIBUTESETINSTANCE_ID , MMPOLICYDATE , M_PRODUCTCONTAINER_ID,  -1 * MOVEMENTQTY
-                                                                    FROM M_ProductionLineMA  WHERE M_ProductionLine_ID = " + fromProdline.GetM_ProductionLine_ID() + @" ) ");
-                                                int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
-                                                _log.Info("No of records saved on Meterial Policy against Production line ID : " + toProdline.GetM_ProductionLine_ID() + " are : " + no);
-
+                                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                                                {
+                                                    int productionlinema_id = 0;
+                                                    for (int k = 0; k < ds.Tables[0].Rows.Count; k++)
+                                                    {
+                                                        productionlinema_id = MSequence.GetNextID(GetAD_Client_ID(), "M_ProductionLineMA", Get_Trx());
+                                                        sql.Clear();
+                                                        sql.Append(@"INSERT INTO M_ProductionLineMA 
+                                                                    (AD_Client_ID, AD_Org_ID, Created, CreatedBy, Updated, UpdatedBy, M_ProductionLineMA_ID, 
+                                                                    M_ProductionLine_ID, M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, MovementQty)
+                                                                    VALUES (" + toProdline.GetAD_Client_ID() + ", " + toProdline.GetAD_Org_ID() +
+                                                                    ", Current_Date, " + toProdline.GetCreatedBy() + ", Current_Date, " + toProdline.GetUpdatedBy() +
+                                                                    ", " + productionlinema_id + ", " + toProdline.GetM_ProductionLine_ID() +
+                                                                    ", " + Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_AttributeSetInstance_ID"]) +
+                                                                    ", " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["MMPolicyDate"]), true) +
+                                                                    ", " + Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_ProductContainer_ID"]) +
+                                                                    ", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["MovementQty"]) + ")");
+                                                        int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
+                                                        _log.Info("No of records saved on Meterial Policy against Production line ID : " + toProdline.GetM_ProductionLine_ID() + " are : " + no);
+                                                    }
+                                                }
                                             }
                                             //}
                                             //catch (Exception ex)
