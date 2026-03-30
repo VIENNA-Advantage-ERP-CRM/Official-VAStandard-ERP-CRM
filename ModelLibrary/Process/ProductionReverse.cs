@@ -159,7 +159,8 @@ namespace VAdvantage.Process
                                             //VAI050-set ProportionateCost column value because its not a copy record
                                             toProdline.Set_Value("VAS_IsProportionateCost", fromProdline.Get_Value("VAS_IsProportionateCost"));
                                             toProdline.Set_Value("VAS_DeAssemblyCostPercent", fromProdline.Get_Value("VAS_DeAssemblyCostPercent"));
-                                            DataSet ds = DB.ExecuteDataset(@"SELECT M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, -1 * MovementQty AS MovementQty
+                                            DataSet ds = DB.ExecuteDataset(@"SELECT M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, -1 * MovementQty AS MovementQty,
+                                                            IsCostImmediate, CurrentCostPrice
                                                             FROM M_ProductionLineMA WHERE M_ProductionLine_ID=" + fromProdline.GetM_ProductionLine_ID());
                                             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                                             {
@@ -198,14 +199,17 @@ namespace VAdvantage.Process
                                                         sql.Clear();
                                                         sql.Append(@"INSERT INTO M_ProductionLineMA 
                                                                     (AD_Client_ID, AD_Org_ID, Created, CreatedBy, Updated, UpdatedBy, M_ProductionLineMA_ID, 
-                                                                    M_ProductionLine_ID, M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, MovementQty)
+                                                                    M_ProductionLine_ID, M_AttributeSetInstance_ID, MMPolicyDate, M_ProductContainer_ID, MovementQty,
+                                                                    IsCostImmediate, CurrentCostPrice)
                                                                     VALUES (" + toProdline.GetAD_Client_ID() + ", " + toProdline.GetAD_Org_ID() +
                                                                     ", Current_Date, " + toProdline.GetCreatedBy() + ", Current_Date, " + toProdline.GetUpdatedBy() +
                                                                     ", " + productionlinema_id + ", " + toProdline.GetM_ProductionLine_ID() +
                                                                     ", " + Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_AttributeSetInstance_ID"]) +
-                                                                    ", " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["MMPolicyDate"]), true) +
+                                                                    ", " + GlobalVariable.TO_DATE(Util.GetValueOfDateTime(ds.Tables[0].Rows[k]["MMPolicyDate"]), true) +
                                                                     ", " + Util.GetValueOfInt(ds.Tables[0].Rows[k]["M_ProductContainer_ID"]) +
-                                                                    ", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["MovementQty"]) + ")");
+                                                                    ", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["MovementQty"]) +
+                                                                    ", " + DB.TO_STRING(Util.GetValueOfString(ds.Tables[0].Rows[k]["IsCostImmediate"])) +
+                                                                    ", " + Util.GetValueOfDecimal(ds.Tables[0].Rows[k]["CurrentCostPrice"]) + ")");
                                                         int no = DB.ExecuteQuery(sql.ToString(), null, Get_Trx());
                                                         _log.Info("No of records saved on Meterial Policy against Production line ID : " + toProdline.GetM_ProductionLine_ID() + " are : " + no);
                                                     }
