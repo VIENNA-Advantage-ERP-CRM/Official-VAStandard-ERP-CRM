@@ -40,11 +40,14 @@ namespace ModelLibrary.Classes
         /// <param name="FromRecordID"></param>
         /// <param name="trx"></param>
         /// <param name="ctx"></param>
-        public static void CopyHistorRecordData(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, Trx trx, Ctx ctx)
+        public static void CopyHistorRecordData(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, Trx trx, Ctx ctx, string windowName)
         {
             if (Env.IsModuleInstalled("VAI01_"))
             {
-                string windowName = "Opportunity";
+                if (string.IsNullOrEmpty(windowName))
+                {
+                    windowName = "Opportunity";
+                }
                 if (ToTableID == 291)
                 {
                     windowName = "Prospects";
@@ -87,7 +90,6 @@ namespace ModelLibrary.Classes
                             log.SaveError("ERROR:", "Error in Copying Email");
                     }
                 }
-
 
                 // Copy History Records
 
@@ -146,12 +148,11 @@ namespace ModelLibrary.Classes
                                     }
 
                                 }
-
                             }
                         }
                     }
-
                 }
+
                 // Copy Chat Data
                 int[] chatIDs = MChat.GetAllIDs("CM_Chat",
                     "AD_Table_ID=" + FromTableID + " AND Record_ID=" + FromRecordID, trx);
@@ -225,8 +226,21 @@ namespace ModelLibrary.Classes
                         }
                     }
                 }
-
             }
+        }
+
+        /// <summary>
+        /// VAI050-This method used to copy history record data
+        /// </summary>
+        /// <param name="FromTableID"></param>
+        /// <param name="ToTableID"></param>
+        /// <param name="ToRecordID"></param>
+        /// <param name="FromRecordID"></param>
+        /// <param name="trx"></param>
+        /// <param name="ctx"></param>
+        public static void CopyHistorRecordData(int FromTableID, int ToTableID, int ToRecordID, int FromRecordID, Trx trx, Ctx ctx)
+        {
+            CopyHistorRecordData(FromTableID, ToTableID, ToRecordID, FromRecordID, trx, ctx, "");
         }
 
         #region Reversal Document creation for Amount Dimension Control
