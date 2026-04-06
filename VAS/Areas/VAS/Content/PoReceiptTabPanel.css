@@ -695,16 +695,17 @@ span.vas-arwidg-cur-symbol {
     --width-100: calc(1920px/9);
     --width-70: calc(1366px*0.7/9);
 }
-
+/* applied common style for heading */
 .vas-igtwidg-vendors-heading {
-    font-size: 0.9em;
-    font-weight: 600;
-    margin-bottom: 0.5em;
-    font-family: 'Verdana';
+    /*font-size: 1rem;
+    font-weight: 400;
+    margin-bottom: 0.5em;*/
+    /*font-family: 'Verdana';*/
 }
 
 .vas-igtwidg-top-vendors-col {
-    background-color: rgba(var(--v-c-readonly), 1);
+    /*VAI154*/
+    /*background-color: rgba(var(--v-c-readonly), 1);*/
     padding: 0.5em;
     height: 100%;
 }
@@ -718,7 +719,8 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-invoices-box {
-    background-color: rgba(var(--v-c-common), 1);
+    /*VAI154*/
+    /*background-color: rgba(var(--v-c-common), 1);*/
     padding: 0.5em;
 }
 
@@ -741,9 +743,9 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-vendor-w-date .vas-igtwidg-vendor-name {
-    font-size: 0.875em;
-    font-weight: 600;
-    font-family: 'Verdana';
+    font-size: 0.875rem;
+    font-weight: 400;
+    /*font-family: 'Verdana';*/
 }
 
 .vas-igtwidg-vendor-w-date .vas-igtwidg-invoiceDate {
@@ -784,10 +786,10 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-amt-val {
-    font-size: 1em;
-    font-weight: 600;
-    color: #093756;
-    font-family: 'Verdana';
+    font-size: 0.875rem;
+    font-weight: 400;
+    /*color: #093756;
+    font-family: 'Verdana';*/
 }
 
 
@@ -1130,23 +1132,26 @@ span.vas-arwidg-cur-symbol {
 .vas-psdwidg-unit {
     padding-left: 1px;
 }
-
+.vas-igtwidg-img-size {
+    font-size: 0.7rem;
+}
 .vas-igtwidg-img-icon {
     align-items: center;
     background-color: rgba(var(--v-c-primary), .4);
     border-radius: 100%;
     display: inline-flex;
-    height: 2.5em;
+    height: 2rem;
     justify-content: center;
     /* margin: 0 .4rem; */
     /*min-height: 32px;
     min-width: 32px;*/
     overflow: hidden;
-    width: 2.5em;
+    width: 2rem;
 }
 
 .vas-igtwidg-vendor-bgColor {
-    background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);
+    /*VAI154*/
+    /*background: linear-gradient( 145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);*/
 }
 
 .vas-igtwidg-customer-bgColor {
@@ -1513,9 +1518,10 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-igtwidg-top-vendors-col .VAS-YearBasedDataListDiv select {
+    width:138px;
     height: auto;
     /*width: calc(100% - 20px);*/
-    font-size: 14px;
+    font-size: 0.9em;
     border: 0;
 }
 
@@ -1596,16 +1602,16 @@ span.vas-arwidg-cur-symbol {
 }
 
 .vas-piechartexpense-container select.vis-ev-col-mandatory {
-    width: 100%;
+    width: 160px;
     height: auto;
 }
-
-.vas-t10exp-heading {
+/*applied common heading class*/
+/*.vas-t10exp-heading {
     font-size: 0.9em;
     font-weight: 600;
     margin-bottom: 0.5em;
     font-family: 'Verdana';
-}
+}*/
 
 .vas-piechartexpense-container {
     /*background: linear-gradient(145deg, rgb(206 183 212) 0%, rgb(248 245 186) 100%);*/
@@ -1637,28 +1643,30 @@ html[dir="rtl"] .vas-piechartexpense-container select {
     }
 
     .vas-barline-ExRePr-container select.vis-ev-col-mandatory {
-        width: 100%;
+        width: 110px;
         height: auto;
         border: none;
+        float: right;
     }
 
 .vas-barline-ExRePr-canvas {
     /*height: 100% !important*/
 }
-
+/*applied common heading*/
 .vas-ExRePr-heading {
-    font-weight: 600;
+    /*font-weight: 600;
     margin-bottom: 0.5em;
-    font-family: 'Verdana';
+    font-family: 'Verdana';*/
     /*color: rgba(var(--v-c-common), 1);*/
-    font-size: 1.1em;
-    box-shadow: 0 8px 6px -6px #ffffff;
+    /*font-size: 0.9em;
+    box-shadow: 0 8px 6px -6px #ffffff;*/
     /*padding: 1em;*/
 }
 
 .vas-ExRePr-background {
-    background: rgb(245,245,245);
-    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    /*VAI154*/
+    /*background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);*/
     position: relative;
 }
 
@@ -1927,19 +1935,21 @@ html[dir="rtl"] .vas-piechartexpense-container select {
 }
 
 .vas-t10exp-background {
-    background: rgb(245,245,245);
-    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+    /*VAI154*/
+/*    background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);*/
     position: relative;
 }
 
 .vas-t10exp-div {
     padding: 5px 10px 0;
-    box-shadow: 0 8px 6px -6px #0000001f;
+    /*VAI154*/
+    /*box-shadow: 0 8px 6px -6px #0000001f;*/
 }
 
 canvas.vas-t10exp-canvas {
-    height: 100% !important;
-    width: 100% !important;
+    height: auto !important;
+    width: 90% !important;
 }
 
 .vas-exinvd-emptydiv {

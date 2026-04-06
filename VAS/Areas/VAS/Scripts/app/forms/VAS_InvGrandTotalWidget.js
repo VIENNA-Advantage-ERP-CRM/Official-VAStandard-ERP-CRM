@@ -18,7 +18,7 @@
         var $YearBasedDataListLookUp = null;
         var widgetID = null;
         var unit = null;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-top-vendorroot vas-widget-bg">');
         var $maindiv = null;
         var TotalAmtArray = [];
         var culture = new VIS.CultureSeparator();
@@ -37,7 +37,7 @@
             var classTop5 = (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? 'vas-igtwidg-customer-bgColor' : 'vas-igtwidg-vendor-bgColor');
             $maindiv = $('<div class="vas-igtwidg-top-vendors-col ' + classTop5 + '">');
             //Getting list to fiter the data base on year
-            var HeadingComboDiv = $('<div class="d-flex justify-content-between">');
+            var HeadingComboDiv = $('<div class="d-flex justify-content-between vas-common-heading">');
             var HeadingDiv = $('<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5")) + '</div>');
             YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $YearBasedDataListDiv = $('<div class="input-group vis-input-wrap">');
@@ -46,6 +46,10 @@
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             $self.vYearBasedDataList = new VIS.Controls.VComboBox("VAS_YearBasedData", true, false, true, $YearBasedDataListLookUp, 20);
             $self.vYearBasedDataList.setValue("02");
+            //$self.vYearBasedDataList.getControl().width('100px');
+            //Remove mandatory class as we are only removing the color not the validation
+            $self.vYearBasedDataList.getControl().addClass('vas-removemandatory');
+
             var $YearBasedDataListControlWrap = $('<div class="vis-control-wrap">');
             $YearBasedDataListDiv.append($YearBasedDataListControlWrap);
             $YearBasedDataListControlWrap.append($self.vYearBasedDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
@@ -64,7 +68,7 @@
             $bsyDiv[0].style.visibility = "visible";
         };
         function createDummyDiv() {
-            $dummDiv = '<div class="vas-igtwidg-invoices-box vas-idtwidg-emptydiv">'+
+            $dummDiv = '<div class="vas-igtwidg-invoices-box vas-idtwidg-emptydiv vas-separator-row">'+
                 '<div class="vas-igtwidg-invoices-detail" >'+
                 '<div class="vas-igtwidg-thumb-w-txt">'+
                 '<img src="" alt="" class="vas-igtwidg-emptyimg">'+
@@ -111,7 +115,7 @@
 
                         //convertAmountToDotFormat(formatLargeNumber(gridDataResult[i].GrandTotalAmt, gridDataResult[i].stdPrecision));
                         // Create the widget data design element
-                        var widgetDataDesign = '<div class="vas-igtwidg-invoices-box">' +
+                        var widgetDataDesign = '<div class="vas-igtwidg-invoices-box vas-separator-row">' +
                             '<div class= "vas-igtwidg-invoices-detail">' +
                             '<div class="vas-igtwidg-thumb-w-txt">'
 
@@ -122,8 +126,8 @@
 
                             // Append initial if image is not available
                             widgetDataDesign +=
-                                '<div style="float:left; background-color:' + pastel + '" class="vas-igtwidg-img-icon">' +
-                                '<span style="font-size: 16px;">' + custChar + '</span>' +
+                                '<div style="float:left; /*background-color:' + pastel + '"*/ class="vas-igtwidg-img-icon">' +
+                                '<span class="vas-igtwidg-img-size" /*style="font-size: 16px;*/">' + custChar + '</span>' +
                                 '</div>';
                         }
                         widgetDataDesign +=
