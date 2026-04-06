@@ -67,7 +67,7 @@
         };
         /** Create dummy div to append in structure */
         function createDummyDiv() {
-            $dummyBankDiv = '<div class="VAS-bankBalDetail-box VAS-bankDummy-div">' +
+            $dummyBankDiv = '<div class="VAS-bankBalDetail-box VAS-bankDummy-div vas-separator-row">' +
                 '<div class="VAS-bankbal-name">-</div>' +
                 '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">-' +
                 '</div> <div class="VAS-totalbankbal-amount">-' +
@@ -90,7 +90,7 @@
                 $pageInfo.html(TxtPageFooter);
                 var width = $divBankBal.width();
                 for (var i = start; i < end; i++) {
-                    $divBankBody.append('<div class="VAS-bankBalDetail-box" id="div_bankDetail_' + widgetID + '">'
+                    $divBankBody.append('<div class="VAS-bankBalDetail-box vas-separator-row" id="div_bankDetail_' + widgetID + '">'
                         + '<div class="VAS-bankbal-name" title="' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '">' + bankBalData[i].Name + ' - ' + bankBalData[i].AccountNo + '</div>'
                         + '<div class="VAS-BankBaldata"><div class="VAS-bankbalISOCode">' + bankBalData[i].CurSymbol + '</div> <div class="VAS-totalbankbal-amount">'
                         + bankBalData[i].EndingBalance.toLocaleString(window.navigator.language,
@@ -197,7 +197,8 @@
             if (widgetID == 0) {
                 widgetID = $self.windowNo;
             }
-            $root = $('<div class="VAS-bankBalroot" id="VAS_root_"></div>');
+            //Added vas-widget-bg class to apply background color to widget as per theme
+            $root = $('<div class="VAS-bankBalroot vas-widget-bg" id="VAS_root_"></div>');
             $root.append('<div class="VAS-bankbalance-container" id="div_bankBal_widget_' + widgetID + '">' +
                 '<div class="VAS-bankbalwidget-header">' +
                 '<h1>' + VIS.Msg.getMsg("VAS_BankBalance") + '</h1>' +

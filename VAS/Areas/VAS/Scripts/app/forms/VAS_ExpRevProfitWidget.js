@@ -17,7 +17,7 @@
         var $self = this;
         var $maindiv = null;
         var vDifferentYearDataList = null;
-        var $root = $('<div class="h-100 w-100 vas-ExRePr-background">');
+        var $root = $('<div class="h-100 w-100 vas-ExRePr-background vas-widget-bg">');
 
         /** Load Design on Load */
         this.initalize = function () {
@@ -28,7 +28,7 @@
             createBusyIndicator();
 
             $maindiv = $('<div id="VAS-BarLine-ERP_' + widgetID + '" class="vas-barline-ExRePr-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-ExRePr-heading">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-ExRePr-heading vas-common-heading">');
             var HeadingDiv = $('<div class= "">' + VIS.Msg.getMsg("VAS_ExpRevProfitWid") + '</div>');
 
             // Create Control Div
@@ -38,6 +38,11 @@
             // Parameters are: columnName, mandatory, isReadOnly, isUpdateable, lookup,display length
             vDifferentYearDataList = new VIS.Controls.VComboBox("VAS_ExpRevProfitWidget", true, false, true, $DifferentYearDataListLookUp, 20);
             vDifferentYearDataList.setValue("01");
+            //Remove mandatory class as we are only removing the color not the validation
+            vDifferentYearDataList.getControl().addClass('vas-removemandatory');
+            //vDifferentYearDataList.getControl().addClass('vas-common-heading');
+
+
             var $DifferentYearDataListControlWrap = $('<div class="vis-control-wrap">');
             $DifferentYearDataListDiv.append($DifferentYearDataListControlWrap);
             $DifferentYearDataListControlWrap.append(vDifferentYearDataList.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' '));
