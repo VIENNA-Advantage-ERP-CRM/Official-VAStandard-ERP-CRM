@@ -201,7 +201,7 @@
             $root = $('<div class="VAS-bankBalroot vas-widget-bg" id="VAS_root_"></div>');
             $root.append('<div class="VAS-bankbalance-container" id="div_bankBal_widget_' + widgetID + '">' +
                 '<div class="VAS-bankbalwidget-header">' +
-                '<h1>' + VIS.Msg.getMsg("VAS_BankBalance") + '</h1>' +
+                '<div>' + VIS.Msg.getMsg("VAS_BankBalance") + '</div>' +
                 '<div class="VAS-bankBalarrow-control">' +
                 '<a href="#"><i id="VAS_BankBalPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left vas-bankbalwidget-leftar" aria-hidden="true"></i></a>' +
                 '<span id="VAS_PageInfo_' + widgetID + '" class="vas-bankbalwidget-pageInfo"></span>' +

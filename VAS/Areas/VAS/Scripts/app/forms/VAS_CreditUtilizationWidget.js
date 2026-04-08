@@ -14,7 +14,7 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0, referenceID = 0;

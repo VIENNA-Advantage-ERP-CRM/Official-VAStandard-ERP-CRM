@@ -27,7 +27,7 @@
             GetColumnID();
             createBusyIndicator();
             $maindiv = $('<div id="vas_pieChartExpense_' + widgetID + '" class="vas-piechartexpense-container">');
-            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-t10exp-div vas-separator-row vas-common-heading">');
+            var MainHeadingComboDiv = $('<div class="d-flex justify-content-between vas-t10exp-div vas-common-heading">');
             var HeadingDiv = $('<div class= "vas-t10exp-heading">' + VIS.Msg.getMsg("VAS_Top10Expenses") + '</div>');
             // YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $DifferentYearDataListDiv = $('<div class="input-group vis-input-wrap">');

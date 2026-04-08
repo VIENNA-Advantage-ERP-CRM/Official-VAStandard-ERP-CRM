@@ -3,14 +3,14 @@
     position: relative;
     width: 100%;
     height: 100%;
-    background: rgb(249,253,169);
-    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%);
+    /*background: rgb(249,253,169);
+    background: linear-gradient(145deg, rgba(249,253,169,1) 0%, rgba(186,224,248,1) 100%);*/
     padding: 0.75em;
 }
 
 .VAS-org-lowest-unitsales-col {
-    background: rgb(245,245,245);
-    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+ /*   background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);*/
     position: relative;
     width: 100%;
     height: 100%;
@@ -18,8 +18,8 @@
 }
 
 .VAS-sales-heading {
-    font-size: 0.875em;
-    font-weight: 600;
+    font-size: 1.1em;
+    font-weight: 400;
     margin-bottom: 0.5em;
     padding-bottom: 5px;
 }
@@ -41,14 +41,14 @@
 .VAS-graph-details {
     width: 100%;
     height: calc(100% - 5.75em);
-    background-color: rgba(var(--v-c-common), 1);
+    /*background-color: rgba(var(--v-c-common), 1);*/
     border-radius: 6px;
-    padding: 0.5em;
+    padding: 0.4em;
 }
 
 .VAS-salesGraph-heading {
     font-size: 1.1em;
-    font-weight: 600;
+    font-weight: 400;
     margin-bottom: 0.5em;
 }
 
@@ -74,21 +74,29 @@
 }
 
 .VAS-org-lowest-unitsales-col .VAS-startSale-box {
-    background-color: #EEB645;
+    background-color: #eeb64570;
+    color: #000000;
+    /*background-color: rgba(var(--v-c-primary), 1);*/
 }
 
 
 .VAS-org-unitsales-col .VAS-startSale-box {
-    background-color: #797F1E;
+    background-color: #f0f2c5;
+    color: #000000;
+    /*background-color: rgba(var(--v-c-primary), 1);*/
 }
 
 .VAS-org-lowest-unitsales-col .VAS-endSale-box {
-    background-color: #F83D3D;
+    background-color: #f0f2c5;
+    color: #000000;
+    /*background-color: rgba(var(--v-c-primary), 1);*/
 }
 
 
 .VAS-org-unitsales-col .VAS-endSale-box {
-    background-color: #156195;
+    background-color: #d1eafc;
+    color: #000000;
+    /*background-color: rgba(var(--v-c-primary), 1);*/
 }
 
 .VAS-yearTxt {
@@ -96,8 +104,8 @@
 }
 
 .VAS-totalSale {
-    font-size: 1em;
-    font-weight: 600;
+    font-size: 0.875em;
+    font-weight: 400;
 }
 
 .VAS-graph-result {
@@ -117,7 +125,7 @@
 
 .VAS-pagination-col {
     position: relative;
-    width: 50px;
+    /*width: 50px;*/
     text-align: center;
  /*   margin: 12px auto auto;*/
 }
@@ -129,13 +137,15 @@
 }
 
     .VAS-arrow-col a {
-        color: rgba(var(--v-c-on-secondary), .8);
+        color: rgba(var(--v-c-primary), 1);
         text-decoration: none !important;
-        font-size: 1em;
+        font-size: 1.5em;
     }
-
+.VAS-page-count span {
+    padding: 0.3em;
+}
 .VAS-page-count {
-    font-size: 0.875em;
+    font-size: 1em;
 }
 
 .VAS-graph-col {
@@ -224,12 +234,13 @@
     display: inline-block;
 }
 
-.VAS-organization-block .VAS_OrgUnitControl > .input-group {
-    width: 100%;
-}
+    .VAS-organization-block .VAS_OrgUnitControl > .input-group {
+        width: 100%;
+        margin-bottom: 0.3em;
+    }
 
 .VAS-organization-block .VAS-pagination-container {
-    width: 44%;
+    width: 49%;
     display: inline-block;
     vertical-align: middle;
 }

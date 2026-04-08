@@ -38,7 +38,7 @@
             $maindiv = $('<div class="vas-igtwidg-top-vendors-col ' + classTop5 + '">');
             //Getting list to fiter the data base on year
             var HeadingComboDiv = $('<div class="d-flex justify-content-between vas-common-heading">');
-            var HeadingDiv = $('<div class= "vas-igtwidg-vendors-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5")) + '</div>');
+            var HeadingDiv = $('<div class= "vas-igtwidg-vendors-heading vas-common-heading">' + (VIS.Env.getCtx().isSOTrx($self.windowNo) == true ? VIS.Msg.getMsg("VAS_Top5") : VIS.Msg.getMsg("VAS_TopPurchase5")) + '</div>');
             YearBasedDataListDiv = $('<div class="VAS-YearBasedDataListDiv">');
             $YearBasedDataListDiv = $('<div class="input-group vis-input-wrap">');
             /* parameters are: context, windowno., coloumn id, display type, DB coloumn name, Reference key, Is parent, Validation Code*/
