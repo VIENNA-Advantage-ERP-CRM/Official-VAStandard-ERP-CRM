@@ -15,6 +15,33 @@
         background: rgba(var(--v-c-primary));
     }
 
+.vas-widget-bg {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 1) 100%);
+    border: 2px solid #FFFFFF;
+    border-radius: 0.875em;
+}
+/*VAI154*/
+.vas-separator-row {
+    border-top: 1px solid rgba(236, 236, 236, 0.9);
+}
+.vas-removemandatory {
+    color: rgba(var(--v-c-on-secondary), 1) !important;
+    width: 130px;
+}
+.vas-common-heading {
+    font-size: 1rem;
+    font-weight: 400;
+    margin-bottom: 0.5em;
+    /*font-family: 'Verdana';*/
+}
+    .vas-common-heading .vis-input-wrap {
+        margin: 0 !important
+    }
+
+    .vas-common-heading select {
+        font-size: 1rem !important
+    }
+
 .vas-add-label-content .vas-select-plus-btn .vas-add-btn {
     color: rgba(var(--v-c-primary)) !important;
     border: 1px solid rgba(var(--v-c-primary));

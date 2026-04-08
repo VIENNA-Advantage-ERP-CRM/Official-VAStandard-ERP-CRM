@@ -3,15 +3,17 @@
     width: 100%;
 }
 
+
 .VAS-bankbalance-container {
-    background: linear-gradient(145deg, rgba(216, 234, 235, 1) 0%, rgb(116 144 188) 100%);
+    /*VAI154*/
+    /*background: linear-gradient(145deg, rgba(216, 234, 235, 1) 0%, rgb(116 144 188) 100%);*/
     height: 100%;
     padding: 0.75em;
 }
 
 .VAS-bankbalwidget-header h1 {
-    font-size: 1em;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 400;
     margin: 0;
 }
 
@@ -23,7 +25,8 @@
 }
 
 .VAS-bankBalDetail-box {
-    background-color: #EAF3FC;
+    /*VAI154*/
+    /*background-color: #EAF3FC;*/
     border-radius: 6px;
     padding: 0.50em;
     display: flex;
@@ -33,7 +36,7 @@
 
 .VAS-bankbal-name {
     font-size: 1.0em;
-    font-weight: 600;
+    font-weight: 400;
     max-width: 230px;
     white-space: nowrap;
     overflow: hidden;
@@ -69,7 +72,8 @@
 }
 
     .VAS-bankBalarrow-control a {
-        color: #1C75AF;
+        /*VAI154*/
+        /*color: #1C75AF;*/
         display: flex;
         font-size: 1.4em;
         text-decoration: none !important;
@@ -83,10 +87,10 @@
         cursor: not-allowed;
         opacity: 0;
     }
-
-    .VAS-bankBalarrow-control a:hover {
+    /*VAI154*/
+    /*.VAS-bankBalarrow-control a:hover {
         color: #fcfcfc;
-    }
+    }*/
 
 .VAS-bankDummy-div {
     background-color: unset;

@@ -196,7 +196,7 @@ namespace VAdvantage.Alert
         /// <param name="pinfo">PO info</param>
         /// <param name="eventType">Event type</param>
         /// <returns>true/false</returns>
-        public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)
+        public bool EventAlertProcessing(MAlertRecipient recipient, RuleDetail rule, PO document, POInfo pinfo, string eventType)        
         {
             Dictionary<string, object> refValues = null;
             string windowName = "";
@@ -214,7 +214,7 @@ namespace VAdvantage.Alert
             if (document.GetAD_Window_ID() > 0 && document.GetWindowTabID() > 0)
             {
                 windowName = Util.GetValueOfString(DB.ExecuteScalar(
-                    "SELECT DisplayName FROM AD_Window WHERE AD_Window_ID=" + document.GetAD_Window_ID()));
+                    "SELECT Name FROM AD_Window WHERE AD_Window_ID=" + document.GetAD_Window_ID()));
                 tabName = Util.GetValueOfString(DB.ExecuteScalar(
                     "SELECT Name FROM AD_Tab WHERE AD_Tab_ID=" + document.GetWindowTabID()));
             }
@@ -390,6 +390,10 @@ namespace VAdvantage.Alert
                 users.Add(notificationTo);
 
             string sql = Util.GetValueOfString(recipient.Get_Value("VAS_NotificationSQL"));
+            if (sql.IndexOf("@") != -1)
+            {
+                sql=Utility.Env.ParseContext(document.GetCtx(), document.GetAD_Window_ID(), sql, false);
+            }
             if (ValidateSql(sql))
             {
                 DataSet ds = DB.ExecuteDataset(sql);
