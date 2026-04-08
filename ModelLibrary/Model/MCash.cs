@@ -2127,6 +2127,14 @@ namespace VAdvantage.Model
                 return false;
             }
 
+            // VIS_045: 06-Mar-2026, When no line found then not allow to void teh record. (By Savita)
+            MCashLine[] lines = GetLines(false);
+            if (lines.Length == 0)
+            {
+                _processMsg = "@NoLines@";
+                return false;
+            }
+
             MCashBook cashbook = new MCashBook(GetCtx(), GetC_CashBook_ID(), Get_TrxName());
             int C_CASHBOOKLINE_ID = 0;
 
@@ -2171,7 +2179,6 @@ namespace VAdvantage.Model
             }
 
             // Reset Cash Journal Line with Amount as ZERO 
-            MCashLine[] lines = GetLines(false);
             foreach (MCashLine line in lines)
             {
                 line.AddDescription(Msg.GetMsg(GetCtx(), "Voided") + " (" + line.GetAmount() + ")");

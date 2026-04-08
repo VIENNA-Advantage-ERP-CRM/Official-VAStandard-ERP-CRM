@@ -4057,6 +4057,7 @@ namespace VAdvantage.Model
                                     SetIsBudgetBreach(true);
                                     SetIsBudgetBreachApproved(false);
                                 }
+                                ModelLibrary.PushNotif.SSEManager.Get().AddMessage(GetCtx().GetAD_Session_ID(), _processMsg);
                                 return DocActionVariables.STATUS_INPROGRESS;
                             }
                             SetIsBudgetBreach(false);
@@ -4068,6 +4069,7 @@ namespace VAdvantage.Model
                             log.Severe("Budget Control Issue " + ex.Message);
                             SetProcessed(false);
                             SetIsBudgetBreach(false);
+                            ModelLibrary.PushNotif.SSEManager.Get().AddMessage(GetCtx().GetAD_Session_ID(), _processMsg);
                             return DocActionVariables.STATUS_INPROGRESS;
                         }
                     }
@@ -4724,13 +4726,13 @@ INNER JOIN C_Order o ON (o.C_Order_ID=ol.C_Order_ID)
                    AND GL_BudgetControl.CommitmentType IN('B', 'C') AND
                   ((GL_Budget.BudgetControlBasis = 'P' AND GL_Budget.C_Period_ID =
                   (SELECT C_Period.C_Period_ID FROM C_Period INNER JOIN C_Year ON C_Year.C_Year_ID = C_Period.C_Year_ID
-                  WHERE C_Period.IsActive = 'Y'  AND C_Year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID
+                  WHERE C_Year.IsActive = 'Y' AND C_Period.IsActive = 'Y' AND C_Year.C_Calendar_ID = Ad_ClientInfo.C_Calendar_ID
                   AND " + GlobalVariable.TO_DATE(GetDateAcct(), true) + @" BETWEEN C_Period.StartDate AND C_Period.EndDate))
                 OR(GL_Budget.BudgetControlBasis = 'A' AND GL_Budget.C_Year_ID =
                   (SELECT C_Period.C_Year_ID FROM C_Period INNER JOIN C_Year ON C_Year.C_Year_ID = C_Period.C_Year_ID
-                  WHERE C_Period.IsActive = 'Y'   AND C_Year.C_Calendar_ID = AD_ClientInfo.C_Calendar_ID
+                  WHERE C_Year.IsActive = 'Y' AND C_Period.IsActive = 'Y' AND C_Year.C_Calendar_ID = AD_ClientInfo.C_Calendar_ID
                 AND " + GlobalVariable.TO_DATE(GetDateAcct(), true) + @" BETWEEN C_Period.StartDate AND C_Period.EndDate) ) ) 
-                AND(SELECT COUNT(Fact_Acct_ID) FROM Fact_Acct
+                AND (SELECT COUNT(Fact_Acct_ID) FROM Fact_Acct
                 WHERE GL_Budget_ID = GL_Budget.GL_Budget_ID
                 AND(C_Period_ID  IN (NVL(GL_Budget.C_Period_ID, 0))
                 OR C_Period_ID    IN (SELECT C_Period_ID FROM C_Period   WHERE C_Year_ID = NVL(GL_Budget.C_Year_ID, 0)))) > 0");

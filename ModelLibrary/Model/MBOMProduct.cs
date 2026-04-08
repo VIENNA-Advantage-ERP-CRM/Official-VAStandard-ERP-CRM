@@ -153,6 +153,23 @@ namespace VAdvantage.Model
                 log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@NotFound@ @SeqNo@"));
                 return false;
             }
+
+            // VAS147: Lines with Cost Percentage 0 cannot be added when other BOM lines have a value greater than 0, and vice versa.
+            if ((newRecord || Is_ValueChanged("VAS_DeAssemblyCostPercent") || Is_ValueChanged("VAS_IsProportionateCost"))
+                && Util.GetValueOfBool(Get_Value("VAS_IsProportionateCost")))
+            {
+                int cnt = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(M_BOMProduct_ID) FROM M_BOMProduct 
+                            WHERE M_BOM_ID = " + GetM_BOM_ID() + " AND M_BOMProduct_ID !=" + Get_ID() +
+                            @" AND VAS_IsProportionateCost='Y' AND ((" + Util.GetValueOfDecimal(Get_Value("VAS_DeAssemblyCostPercent")) +
+                            "=0 AND NVL(VAS_DeAssemblyCostPercent, 0)>0) OR (" + Util.GetValueOfDecimal(Get_Value("VAS_DeAssemblyCostPercent"))
+                            + ">0 AND NVL(VAS_DeAssemblyCostPercent, 0)=0))"));
+                if (cnt > 0)
+                {
+                    log.SaveError("", Msg.GetMsg(GetCtx(), "VAS_InvalidDeAssemCostPercent"));
+                    return false;
+                }
+            }
+
             //	Product Attribute Instance
             // Commented by Bharat on 30 June 2018 as issue given by Pradeep
             //if (GetM_AttributeSetInstance_ID() != 0)
@@ -425,6 +442,12 @@ namespace VAdvantage.Model
             return retValue;
         }
 
+        public static decimal GetDeAssemblyCostPer(MBOM bom)
+        {
+            return Util.GetValueOfDecimal(DB.ExecuteScalar(@"SELECT SUM(NVL(VAS_DeAssemblyCostPercent, 0)) 
+                        FROM M_BOMProduct WHERE M_BOM_ID=" + bom.GetM_BOM_ID() + " AND VAS_IsProportionateCost='Y' AND IsActive='Y'"));
+        }
+
         /// <summary>
         /// Info
         /// </summary>
@@ -572,7 +595,8 @@ namespace VAdvantage.Model
         {
             //	BOM Component Line was changed
             if (newRecord || Is_ValueChanged("M_ProductBOM_ID") || Is_ValueChanged("M_ProductBOMVersion_ID") || Is_ValueChanged("IsActive")
-                || Is_ValueChanged("BOMQty") || Is_ValueChanged("SupplyType"))
+                || Is_ValueChanged("BOMQty") || Is_ValueChanged("SupplyType") || Is_ValueChanged("VAS_IsProportionateCost")
+                || Is_ValueChanged("VAS_DeAssemblyCostPercent"))
             {
                 MBOM mbom = new MBOM(GetCtx(), GetM_BOM_ID(), Get_Trx());
                 //	Invalidate BOM
