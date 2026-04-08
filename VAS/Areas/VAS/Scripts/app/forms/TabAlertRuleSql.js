@@ -2451,7 +2451,7 @@
 
         function saveAlertRule() {
             lblBottomMsg.text("");
-            if (txtWindowTab.getValue() == 0) {
+            if (txtWindowTab.getValue() == 0 || EventTable==0 ) {
                 setBusy(false);
                 VIS.ADialog.error("", "", VIS.Msg.getMsg("VAS_EnterWindowTab"));
                 isProcessing = false;
@@ -2517,7 +2517,7 @@
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
                     type: "POST",
                     async: false,
-                    data: { tabID: tabID, windowNo: self.windowNo },
+                    data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result && result.length > 0) {
@@ -2559,7 +2559,7 @@
                     url: VIS.Application.contextUrl + "AlertSQLGenerate/GetTable",
                     type: "POST",
                     async: false,
-                    data: { tabID: tabID, windowNo: self.windowNo },
+                    data: { tabID: tabID, windowNo: $self.windowNo },
                     success: function (result) {
                         result = JSON.parse(result);
                         if (result && result.length > 0) {
