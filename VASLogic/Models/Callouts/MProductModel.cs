@@ -2430,7 +2430,7 @@ namespace VIS.Models
                     FROM C_BPartner bp INNER JOIN C_BPartner_Location cl ON (bp.C_BPartner_ID = cl.C_BPartner_ID)
                     INNER JOIN AD_Ref_List ref ON (ref.Value = CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SOCreditStatus ELSE cl.SOCreditStatus END 
                     AND ref.AD_Reference_ID = 289)
-                    LEFT JOIN AD_Image img ON (bp.Pic = img.AD_Image_ID)
+                    LEFT JOIN AD_Image img ON (CAST(bp.Pic AS INTEGER) = img.AD_Image_ID)
                     WHERE CASE WHEN (bp.CreditStatusSettingOn = 'CH') THEN bp.SO_CreditLimit ELSE cl.SO_CreditLimit END > 0",
                     "bp", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO));
 
