@@ -1,22 +1,23 @@
 .VAS-selling-container {
     width: 100%;
     height: 100%;
-    padding: 0.75em;
+    padding: 0.85em;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /*justify-content: space-between;*/
+    gap:1.2em;
     position: relative;
 }
 
 .VAS-highest-selling-prod {
-    background: rgb(245,245,245);
+    /*background: rgb(245,245,245);*/
     /*background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(243,254,243,1) 100%);*/
-    background: linear-gradient(145deg, rgba(249, 253, 169, 1) 0%, rgba(186, 224, 248, 1) 100%);
+   /* background: linear-gradient(145deg, rgba(249, 253, 169, 1) 0%, rgba(186, 224, 248, 1) 100%);*/
 }
 
 .VAS-lowest-selling-prod {
-    background: rgb(245,245,245);
-    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);
+   /* background: rgb(245,245,245);
+    background: linear-gradient(145deg, rgba(245,245,245,1) 0%, rgba(255,236,236,1) 100%);*/
 }
 
 .VAS-container-heading {
@@ -29,23 +30,24 @@
     grid-template-columns: auto 6.25em;
     width: 100%;
     align-items: center;
+    padding-top: 1.5em;
 }
 
 .VAS-orgName-col {
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding-top: 0.5em;
+    /*padding-top: 1.5em;*/
 }
 
-    .VAS-orgName-col h1 {
-        font-size: 5em;
+    .VAS-orgName-col div {
+        font-size: 1.5em;
         margin: 0;
-        font-weight: 600;
+        font-weight: 400;
     }
 
 .VAS-org-name {
-    font-size: 2em;
+    font-size: 1.5em;
     line-height: 1.1em;
 }
 
@@ -65,20 +67,20 @@
 .VAS-yearly-revenue {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    padding-right: 3em;
+    /*padding-right: 3em;*/
     position: relative;
     gap: 0.75em;
 }
 
-.VAS-lastRevenue h1, .VAS-currentRevenue h1 {
+.VAS-lastRevenue div, .VAS-currentRevenue div {
     margin: 0;
-    font-weight: 600;
-    font-size: 1.75em;
+    font-weight: 400;
+    font-size: 1.35em;
     justify-content: center;
     align-items: center;
 }
 
-    .VAS-lastRevenue h1 .VAS-sale-Qty, .VAS-currentRevenue h1 .VAS-sale-Qty {
+    .VAS-lastRevenue div .VAS-sale-Qty, .VAS-currentRevenue div .VAS-sale-Qty {
         font-size: 0.6em;
         margin-left: 0.2em;
     }
@@ -110,35 +112,41 @@
     font-size: 0.875em;
 }
 
-.VAS-highest-selling-prod .VAS-lastRevenue h1 {
-    color: #8AC96B;
+.VAS-highest-selling-prod .VAS-lastRevenue div {
+    /*color: #8AC96B;*/
+    color: rgba(var(--v-c-primary), 1);
     display: flex;
 }
 
-.VAS-highest-selling-prod .VAS-currentRevenue h1 {
-    color: #296B29;
+.VAS-highest-selling-prod .VAS-currentRevenue div {
+    /*color: #296B29;*/
+    color: rgba(var(--v-c-primary), 1);
     display: flex;
 }
 
-.VAS-highest-selling-prod .VAS-orgName-col h1 {
+.VAS-highest-selling-prod .VAS-orgName-col div {
     color: #343A3F;
 }
 
 .VAS-highest-selling-prod .VAS-org-name {
-    color: #9F9E9E;
+    /*color: #9F9E9E;*/
 }
 
-.VAS-lowest-selling-prod .VAS-lastRevenue h1 {
-    color: #EEB645;
+.VAS-lowest-selling-prod .VAS-lastRevenue div {
+    /*color: #EEB645;*/
+    /*color: #8ac96b;*/
+    color: rgba(var(--v-c-primary), 1);
     display: flex;
 }
 
-.VAS-lowest-selling-prod .VAS-currentRevenue h1 {
-    color: #F83D3D;
+.VAS-lowest-selling-prod .VAS-currentRevenue div {
+    /*color: #F83D3D;*/
+    /*color: #296b29;*/
+    color: rgba(var(--v-c-primary), 1);
     display: flex;
 }
 
-.VAS-lowest-selling-prod .VAS-orgName-col h1 {
+.VAS-lowest-selling-prod .VAS-orgName-col div {
     color: #343A3F;
 }
 

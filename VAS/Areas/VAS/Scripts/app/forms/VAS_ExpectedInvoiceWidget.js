@@ -30,7 +30,7 @@
         var arrayPageSize = 4;
         var countRecord = 4;
         var C_BPartner_ID = null;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var $maindiv = null;
         var gridDataResult = null;
         var TotalAmtArray = [];
@@ -65,8 +65,8 @@
             createBusyIndicator();
             widgetID = (VIS.Utility.Util.getValueOfInt(this.widgetInfo.AD_UserHomeWidgetID) != 0 ? this.widgetInfo.AD_UserHomeWidgetID : $self.windowNo);
             $maindiv = $('<div class="vas-exinvd-expected-invoice">')
-            var headingDiv = $('<div class="vas-exinvd-expected-heading">');
-            var filterDiv = $('<h6>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</h6>');
+            var headingDiv = $('<div class="vas-exinvd-expected-heading vas-common-heading">');
+            var filterDiv = $('<div>' + VIS.Msg.getMsg("VAS_ExpectedInvoice") + '</div>');
             filetrDivExpectedInv = $("<div class='vas-exinvd-filter dropdown'>" +
                 "<div class='vas-exinvd-icondiv'>" +
                 "<span class='vas-exinvd-filterspn btn d-flex position-relative' type='button' id='vas_exinvd_dropdownMenu_" + $self.windowNo + "'>" +
@@ -320,7 +320,7 @@
                     }
                 }
                 // Create the widget data design element
-                var widgetDataDesign = '<div class="vas-exinvd-invoices-box">' +
+                var widgetDataDesign = '<div class="vas-exinvd-invoices-box vas-separator-row">' +
                     '<div class="vas-exinvd-amtdiv">' +
                     '<h6 class="vas-exinvd-trxtype vas-exinvd-ovrflow" title="' + VIS.Msg.getMsg("VAS_Type") + ': ' + headingText + '">' + headingText + '</h6>';
                 /*if document is GRN then add generate invoice button*/
@@ -407,9 +407,13 @@
             var arrowDiv = $(
                 '<div class="vas-exinvd-pagingdiv">' +
                 '<div class="vas-exinvd-slider-arrows" id="vas_arrawcontainer_' + widgetID + '">' +
+                '<a href="#">' +
                 '<i class= "fa fa-arrow-circle-left vas-exinvd-leftar" aria-hidden="true"></i>' +
-                '<span class="vas-exinvd-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>'+'</span > ' +
+                '</a>' +
+                '<span class="vas-exinvd-pagespan">' + '<span>' + CurrentPage + ' ' + '</span>' + '<span>' + VIS.Msg.getMsg("VAS_Of") + ' ' + '</span>' + '<span>' + TotalPagesofrecords + '</span>' + '</span > ' +
+                '<a href="#">' +
                 '<i class="fa fa-arrow-circle-right vas-exinvd-rightar" aria-hidden="true"></i>' +
+                '</a>' +
                 '</div>' +
                 '</div>');
             $maindiv.append(listDesign).append(arrowDiv);

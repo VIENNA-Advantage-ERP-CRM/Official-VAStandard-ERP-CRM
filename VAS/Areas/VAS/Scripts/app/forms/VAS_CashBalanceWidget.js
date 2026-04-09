@@ -199,7 +199,7 @@
             createBusyIndicator();
             $root.append('<div class="VAS-cashbalance-container" id="div_cashBal_widget_' + widgetID + '">' +
                 '<div class="VAS-cashwidget-header">' +
-                '<h1>' + VIS.Msg.getMsg("VAS_CashBalance") + '</h1>' +
+                '<div>' + VIS.Msg.getMsg("VAS_CashBalance") + '</div>' +
                 '<div class="VAS-casharrow-control">' +
                 '<a href="#"><i id="VAS_CashPrevArrow_' + widgetID + '" class="fa fa-arrow-circle-left VAS-cashwidget-leftar" aria-hidden="true"></i></a>' +
                 '<span id="VAS_PageInfo_' + widgetID + '" class="vas-cashwidget-pageInfo"></span>' +

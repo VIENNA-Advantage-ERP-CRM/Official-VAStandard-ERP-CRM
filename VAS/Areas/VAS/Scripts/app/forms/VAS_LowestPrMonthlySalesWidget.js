@@ -16,7 +16,7 @@
         var $bsyDiv;
         var $self = this;
         var ctx = this.ctx;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         var orgControlDiv;
         var unit = null;
         var sqlWHERE = "";
@@ -161,10 +161,10 @@
                 $self.totalPages = productList.length; // Update totalPages
                 var $pagination = $('<div class="VAS-pagination-col">' +
                     '<div class="VAS-arrow-col">' +
-                    '<a href="#" id="VAS_Prev_Page_' + widgetID + '"><span class="fa fa-arrow-left"></span></a>' +
-                    '<a href="#" id="VAS_Next_Page_' + widgetID + '"><span class="fa fa-arrow-right"></span></a>' +
-                    '</div>' +
+                    '<a href="#" id="VAS_Prev_Page_' + widgetID + '"><span class="fa fa-arrow-circle-left"></span></a>' +
                     '<div class="VAS-page-count"><span id="VAS_PageCount_' + widgetID + '">1 of ' + $self.totalPages + '</span></div>' +
+                    '<a href="#" id="VAS_Next_Page_' + widgetID + '"><span class="fa fa-arrow-circle-right"></span></a>' +
+                    '</div>' +                    
                     '</div>');
 
                 // Add event listeners for arrows

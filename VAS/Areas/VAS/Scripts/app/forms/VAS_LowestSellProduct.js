@@ -14,7 +14,7 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var $divProduct = "", $divCurrentRevenue = "", $divLastRevenue = "";
         var ProductData = [];
         var culture = new VIS.CultureSeparator();
@@ -38,11 +38,11 @@
                 '<div class="VAS-currentRevenue" id="VAS_divCurrentYear_' + widgetID + '">' +
                 '</div>' +
                 '<div class="VAS-pagination-sell">' +
-                '<div class= "VAS-arrow-col">' +
-                '<a href="javascript:void(0);"><span class="fa fa-arrow-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
-                '<a href="javascript:void(0);"><span class="fa fa-arrow-right" id="VAS_Next_' + widgetID + '"></span></a>' +
-                '</div>' +
-                '<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">1 of 10</div>' +
+                //'<div class= "VAS-arrow-col">' +
+                //'<a href="javascript:void(0);"><span class="fa fa-arrow-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
+                //'<a href="javascript:void(0);"><span class="fa fa-arrow-right" id="VAS_Next_' + widgetID + '"></span></a>' +
+                //'</div>' +
+                //'<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">1 of 10</div>' +
                 '</div>' +
                 '</div>' +
                 '</div>');
@@ -94,21 +94,26 @@
 
         function setProductData() {
             $divProduct.append('<div class="VAS-orgName-col">' +
-                '<h1>#' + (count + 1) + '</h1>' +
+                '<div>#' + (count + 1) + '</div>' +
                 '<div class="VAS-org-name"><span>' + ProductData[count].Name + '</span></div>' +
                 '</div>' +
-                '<img src="' + (ProductData[count].ImageUrl != "" ? VIS.Application.contextUrl + ProductData[count].ImageUrl :
-                    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/cube-icon.png') + '" alt="">');
+                //'<img src="' + (ProductData[count].ImageUrl != "" ? VIS.Application.contextUrl + ProductData[count].ImageUrl :
+                //    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/cube-icon.png') + '" alt="">');
+                '<div class= "VAS-arrow-col">' +
+                '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
+                '<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">1 of 10</div>' +
+                '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-right" id="VAS_Next_' + widgetID + '"></span></a>' +
+                '</div>');
 
-            $divLastRevenue.append('<h1><span style="margin-right:0.2em;">' + ProductData[count].Symbol + '</span>' + formatLargeNumber(ProductData[count].PreviousTotal, ProductData[count].StdPrecision) +
+            $divLastRevenue.append('<div><span style="margin-right:0.2em;">' + ProductData[count].Symbol + '</span>' + formatLargeNumber(ProductData[count].PreviousTotal, ProductData[count].StdPrecision) +
                 ((unit != null) ? '<span>' + unit + '</span>' : '') + '<span class="VAS-sale-Qty">(' + ProductData[count].PreviousQty + ' ' +
                 ProductData[count].UOM + ')</span>' +
-                '</h1><span>' + VIS.Msg.getMsg("VAS_LastYear") + '</span>');
+                '</div><span>' + VIS.Msg.getMsg("VAS_LastYear") + '</span>');
 
-            $divCurrentRevenue.append('<h1><span style="margin-right:0.2em;">' + ProductData[count].Symbol + '</span>' + formatLargeNumber(ProductData[count].CurrentTotal, ProductData[count].StdPrecision) +
+            $divCurrentRevenue.append('<div><span style="margin-right:0.2em;">' + ProductData[count].Symbol + '</span>' + formatLargeNumber(ProductData[count].CurrentTotal, ProductData[count].StdPrecision) +
                 ((unit != null) ? '<span>' + unit + '</span>' : '') + '<span class="VAS-sale-Qty"">(' + ProductData[count].CurrentQty + ' ' +
                 ProductData[count].UOM + ')</span>' +
-                '</h1><span>' + VIS.Msg.getMsg("VAS_CurrentYear") + '</span>');
+                '</div><span>' + VIS.Msg.getMsg("VAS_CurrentYear") + '</span>');
 
             if (count > 0) {
                 prevPage.css("opacity", "1");
