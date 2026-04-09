@@ -457,7 +457,12 @@
 }
 
 /*-------------------------------------------- Credit Utilization Widget CSS ------------------------------------------------------*/
-
+.VAS-inputWbtn .vis-input-wrap select ~ label {
+     background: transparent !important;
+}
+.vas-progress-bar {
+    background-color: #f09da5 !important;
+}
 .VAS-creditLimit-container {
     /*background: linear-gradient(145deg, rgba(237,245,250,1) 0%, rgba(240,240,240,1) 100%);*/
     padding: 0.75em;
@@ -514,8 +519,8 @@
 }
 
 .VAS-credit-img {
-    width: 3em;
-    height: 3em;
+    width: 2.5em;
+    height: 2.5em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -523,8 +528,8 @@
 }
 
     .VAS-credit-img span {
-        font-weight: bold;
-        font-size: 1.2em;
+        font-weight: 400;
+        font-size: 1em;
     }
 
 .VAS-userCredit-detail .VAS-userCredit-name {
@@ -546,7 +551,8 @@
 }
 
 .VAS-credit-limit-nav .progress {
-    background-color: #A7DB6C;
+    /*background-color: #A7DB6C;*/
+    background-color: #cae3f8;
     height: 0.5em;
     width: 100%;
 }

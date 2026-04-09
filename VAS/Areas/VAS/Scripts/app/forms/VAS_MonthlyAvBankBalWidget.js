@@ -53,6 +53,7 @@
             $BankAccountButtonWrap.append(cmbBankAccount.getBtn(0));
             $BankAccountDiv.append($BankAccountButtonWrap);
             BankAccountDiv.append($BankAccountDiv);
+            cmbBankAccount.getControl().addClass("vas-avr-ctl-size");
             //Get lookUp Data
             var data = BankAccountlookUp.getData(true, true, false, false);
             if (data != null && data != undefined && data.length > 0) {

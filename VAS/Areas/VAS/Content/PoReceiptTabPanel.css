@@ -1701,7 +1701,7 @@ html[dir="rtl"] .vas-piechartexpense-container select {
     }
 
     .vas-barline-ExRePr-container select.vis-ev-col-mandatory {
-        width: 110px;
+        /*width: 110px;*/
         height: auto;
         border: none;
         float: right;
@@ -1797,7 +1797,7 @@ html[dir="rtl"] .vas-piechartexpense-container select {
 }
 
 .vas-fdi-reqGen-Txt, .vas-fdi-woGen-Txt {
-    font-size: 1.5em;
+    /*font-size: 1.5em;*/
     color: rgba(var(--v-c-common), 1);
 }
 
@@ -3057,7 +3057,9 @@ hr.vas-paymentData-underline {
 .vas-exinvd-filterPopupWrap {
     padding-top: 36px;
 }
-
+.vas-avr-ctl-size{
+    font-size:0.9em !important;
+}
 .vas-exinvd-main-filter-flyout {
     position: absolute;
     top: 42px;

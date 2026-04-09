@@ -64,6 +64,7 @@
             lookupCredit = VIS.MLookupFactory.get(VIS.Env.getCtx(), $self.windowNo, 0, VIS.DisplayType.List, "CreditValidation", referenceID, false, "AD_Ref_List.IsActive = 'Y'");
             ctrlCredit = new VIS.Controls.VComboBox("CreditValidation", true, false, true, lookupCredit, 50);
             $cmbCredit.prepend(ctrlCredit.getControl());
+            ctrlCredit.getControl().addClass('vas-removemandatory');
 
             // Add event listeners for arrows
             $divCustContainer.find('#VAS_Prev_' + widgetID).on('click', function (e) {
@@ -147,7 +148,7 @@
                                 highlightChar = txt[0].substring(0, 2).toUpper();
                             }
 
-                            divCustomer.append('<div class="VAS-credit-limit-nav ' + (i == 0 ? "active" : "") + '" aria-controls="credit-limit" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
+                            divCustomer.append('<div class="VAS-credit-limit-nav /*' + (i == 0 ? "active" : "") + '*/" aria-controls="credit-limit" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
                                 '" data-creditused="' + response.Customers[i]["SO_CreditUsed"] + '" data-bpid="' + response.Customers[i]["C_BPartner_ID"] +
                                 '" data-locid="' + response.Customers[i]["Location_ID"] + '" data-creditsetting="' + response.Customers[i]["CreditSetting"] +
                                 '" data-creditval="' + response.Customers[i]["CreditValidation"] + '">' +
@@ -163,7 +164,7 @@
                                 '</div>' +
                                 '</div>' +
                                 '<div class="progress">' +
-                                '<div class="progress-bar bg-danger" role="progressbar" style="width:' + response.Customers[i].CreditUtil + '%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>' +
+                                '<div class="progress-bar vas-progress-bar bg-danger" role="progressbar" style="width:' + response.Customers[i].CreditUtil + '%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>' +
                                 '</div>' +
                                 '</div>');
 
@@ -190,7 +191,7 @@
                             $bsyDiv.css('visibility', 'visible');
 
                             divCustomer.find('.VAS-credit-limit-nav').removeClass('active');
-                            $(this).addClass('active');
+                            //$(this).addClass('active');
 
                             bp_ID = $(this).data('bpid');
                             loc_ID = $(this).data('locid');
