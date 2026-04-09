@@ -80,7 +80,7 @@
     }
 
     .VAS-bankBalarrow-control span {
-        font-size: 1.1em;
+        /*font-size: 1.1em;*/
     }
 
     .VAS-bankBalarrow-control .fa.disabled {
@@ -135,7 +135,7 @@
 
 @media screen and (max-width: 1366px) {
     .VAS-bankbalance-container {
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .vis-editModeWidget .VAS-bankbalance-container {

@@ -14,7 +14,7 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
@@ -28,11 +28,12 @@
             const orderContainer =
                 '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-deliveries-container">' +
                 '    <div class="VAS-deliveries-heading">' +
-                '        <h6>' + VIS.Msg.getMsg("VAS_Expecteddeliveries") + '</h6>' +
+                '        <div>' + VIS.Msg.getMsg("VAS_Expecteddeliveries") + '</div>' +
+                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span>' +
                 '    </div>' +
-                '    <div class="VAS-delivery-count">' +
-                '        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Deliveries") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
-                '    </div>' +
+                //'    <div class="VAS-delivery-count">' +
+                //'        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Deliveries") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
+                //'    </div>' +
                 '    <div class="VAS-delivery-detail">' +
                 '        <div class="VAS-box-heading">' +
                 '        </div>' +

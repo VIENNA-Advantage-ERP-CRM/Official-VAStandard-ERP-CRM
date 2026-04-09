@@ -14,7 +14,7 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">'); // Root container
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
@@ -28,24 +28,25 @@
             // Create busy indicator
             createBusyIndicator();
             var reqContainer = '<div id="VAS_TransferContainer_' + widgetID + '" class="VAS-deliveries-container">' +
-                            '<div class="VAS-deliveries-heading">' +
-                            '<h6>' + VIS.Msg.getMsg("VAS_ExpectedTransfers") + '</h6>' +
-                            '</div>' +
-                            '<div class="VAS-delivery-count">' +
-                            '<div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Transfers") + ' <span id="VAS_TransferCount_' + widgetID + '">0</span></div>' +
-                            '</div>' +
-                            '<div class="VAS-delivery-detail">' +
-                            '<div class="VAS-box-heading">' +
-                            '</div>' +
-                            '</div>' +
-                            '<div class="VAS-height-container">' +
-                            '<div id="VAS_TransferBox_' + widgetID + '" class="VAS-deliveries-listing">' +
-                            '</div>' +
-                            '<div id="VAS_ProductDetail_' + widgetID + '" class="VAS-deliveries-listing">' +
-                            '</div>' +
-                            '</div>' +
-                            '<div class="VAS-pagination-container"></div>' +
-                            '</div>';
+                '<div class="VAS-deliveries-heading">' +
+                '<div>' + VIS.Msg.getMsg("VAS_ExpectedTransfers") + '</div>' +
+                ' <span id="VAS_TransferCount_' + widgetID + '">0</span>' +
+                '</div>' +
+                //'<div class="VAS-delivery-count">' +
+                //'<div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_Transfers") + ' <span id="VAS_TransferCount_' + widgetID + '">0</span></div>' +
+                //'</div>' +
+                '<div class="VAS-delivery-detail">' +
+                '<div class="VAS-box-heading">' +
+                '</div>' +
+                '</div>' +
+                '<div class="VAS-height-container">' +
+                '<div id="VAS_TransferBox_' + widgetID + '" class="VAS-deliveries-listing">' +
+                '</div>' +
+                '<div id="VAS_ProductDetail_' + widgetID + '" class="VAS-deliveries-listing">' +
+                '</div>' +
+                '</div>' +
+                '<div class="VAS-pagination-container"></div>' +
+                '</div>';
             $root.append(reqContainer);
         };
 

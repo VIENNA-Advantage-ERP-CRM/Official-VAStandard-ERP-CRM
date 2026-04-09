@@ -79,7 +79,7 @@
     }
 
     .VAS-casharrow-control span {
-        font-size: 1.1em;
+        /*font-size: 1.1em;*/
     }
 
     .VAS-casharrow-control .fa.disabled {
@@ -134,7 +134,7 @@
 
 @media screen and (max-width: 1366px) {
     .VAS-cashbalance-container {
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .vis-editModeWidget .VAS-cashbalance-container {

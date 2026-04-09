@@ -22,14 +22,15 @@
 }
 /*VAI154*/
 .vas-separator-row {
-    border-top: 1px solid rgba(236, 236, 236, 0.9);
+    /*border-top: 1px solid rgba(236, 236, 236, 0.9);*/
+    border-top: 1px solid rgba(var(--v-c-on-secondary), 0.2);
 }
 .vas-removemandatory {
     color: rgba(var(--v-c-on-secondary), 1) !important;
     width: 130px;
 }
 .vas-common-heading {
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     margin-bottom: 0.5em;
     /*font-family: 'Verdana';*/
@@ -39,7 +40,7 @@
     }
 
     .vas-common-heading select {
-        font-size: 1rem !important
+        font-size: 1em !important
     }
 
 .vas-add-label-content .vas-select-plus-btn .vas-add-btn {

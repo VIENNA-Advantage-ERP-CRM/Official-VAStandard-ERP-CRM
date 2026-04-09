@@ -13,7 +13,7 @@
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg">');
         var $maindiv = $('<div class="vas-psdwidg-purchase-state-col">');
         var ctx = VIS.Env.getCtx();
         var unit = null;
@@ -38,10 +38,10 @@
                     var HeadingDesign = '<div class="vas-psdwidg-whiteBoxhead vas-psdwidg-tile-heading vas-psdwidg-heading-item">';
                     //If isSotrx tru means sale transaction then will show sale as label else will be purchase
                     if (VIS.Env.getCtx().isSOTrx($self.windowNo)) {
-                        HeadingDesign += '<h1><span>' + VAS.translatedTexts.VAS_Sale + '</span><span>' + VAS.translatedTexts.VAS_SaleState + '</span></h1>';
+                        HeadingDesign += '<div><span>' + VAS.translatedTexts.VAS_Sale + '</span><span>' + VAS.translatedTexts.VAS_SaleState + '</span></div>';
                     }
                     else {
-                        HeadingDesign += '<h1 class="vas-psdwidg-stateheading"><span>' + VAS.translatedTexts.VAS_Purchase + '</span><span>' + VAS.translatedTexts.VAS_State + '</span></h1>';
+                        HeadingDesign += '<div class="vas-psdwidg-stateheading"><span>' + VAS.translatedTexts.VAS_Purchase + '</span><span>' + VAS.translatedTexts.VAS_State + '</span></div>';
                     }
                     HeadingDesign += '</div>';
                     $maindiv.append(HeadingDesign);
