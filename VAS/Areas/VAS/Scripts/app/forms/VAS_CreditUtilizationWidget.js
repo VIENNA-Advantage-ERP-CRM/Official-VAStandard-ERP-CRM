@@ -148,7 +148,7 @@
                                 highlightChar = txt[0].substring(0, 2).toUpper();
                             }
 
-                            divCustomer.append('<div class="VAS-credit-limit-nav /*' + (i == 0 ? "active" : "") + '*/" aria-controls="credit-limit" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
+                            divCustomer.append('<div class="VAS-credit-limit-nav ' + (i == 0 ? "vas-credit-active" : "") + '" aria-controls="credit-limit" data-creditlimit="' + response.Customers[i]["SO_CreditLimit"] +
                                 '" data-creditused="' + response.Customers[i]["SO_CreditUsed"] + '" data-bpid="' + response.Customers[i]["C_BPartner_ID"] +
                                 '" data-locid="' + response.Customers[i]["Location_ID"] + '" data-creditsetting="' + response.Customers[i]["CreditSetting"] +
                                 '" data-creditval="' + response.Customers[i]["CreditValidation"] + '">' +
@@ -190,8 +190,9 @@
                         divCustomer.on('click', '.VAS-credit-limit-nav', function () {
                             $bsyDiv.css('visibility', 'visible');
 
-                            divCustomer.find('.VAS-credit-limit-nav').removeClass('active');
-                            //$(this).addClass('active');
+                            divCustomer.find('.VAS-credit-limit-nav').removeClass('vas-credit-active');
+                            divCustomer.find('.VAS-credit-limit-nav').removeClass('vas-credit-active');
+                            $(this).addClass('vas-credit-active');
 
                             bp_ID = $(this).data('bpid');
                             loc_ID = $(this).data('locid');

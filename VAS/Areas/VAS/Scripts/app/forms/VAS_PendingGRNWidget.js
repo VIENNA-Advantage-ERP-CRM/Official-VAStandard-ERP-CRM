@@ -20,7 +20,7 @@
         var widgetID = 0;
         // Create a map to store child records by document number
         var childRecordsMap = {};
-        var pageSize = 4;
+        var pageSize = 5;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
         this.initalize = function () {

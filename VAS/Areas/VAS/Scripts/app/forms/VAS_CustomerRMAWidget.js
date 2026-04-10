@@ -20,7 +20,7 @@
         var widgetID = 0;
         // Create a map to store child records by document number
         var childRecordsMap = {};
-        var pageSize = 4;
+        var pageSize = 5;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
 
@@ -31,7 +31,7 @@
                 '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-customer-container-pending">' +
                 '    <div class="VAS-deliveries-heading">' +
                 '        <div>' + VIS.Msg.getMsg("VAS_CustomerRMA") + '</div>' +
-                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span>' +
+                ' <span id="VAS_DeliveryCountCustRMA_' + widgetID + '">0</span>' +
                 '    </div>' +
                 //'    <div class="VAS-delivery-count">' +
                 //'        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_CustomerRMACount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
@@ -108,7 +108,7 @@
                         });
                         /* Add Pagination div on first tym data load*/
                         if (pageNo == 1) {
-                            $('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
+                            $('#VAS_DeliveryCountCustRMA_' + widgetID).text(response.RecordCount);
                             buildPagination(response.RecordCount);
                             AD_Window_ID = response.AD_Window_ID;
                         }

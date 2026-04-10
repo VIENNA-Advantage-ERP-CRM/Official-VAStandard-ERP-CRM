@@ -457,8 +457,13 @@
 }
 
 /*-------------------------------------------- Credit Utilization Widget CSS ------------------------------------------------------*/
+.vas-credit-active{
+    background-color: rgba(var(--v-c-primary), 0.05);
+
+}
+
 .VAS-inputWbtn .vis-input-wrap select ~ label {
-     background: transparent !important;
+    background: transparent !important;
 }
 .vas-progress-bar {
     background-color: #f09da5 !important;
