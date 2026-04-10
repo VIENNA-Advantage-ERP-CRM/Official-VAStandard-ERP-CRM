@@ -51,30 +51,9 @@
             $divLastRevenue = $root.find("#VAS_divLastYear_" + widgetID);
             $divCurrentRevenue = $root.find("#VAS_divCurrentYear_" + widgetID);
             spnPageCount = $root.find("#VAS_spnPageCount_" + widgetID);
-            prevPage = $root.find("#VAS_Prev_" + widgetID);
-            nextPage = $root.find("#VAS_Next_" + widgetID);
+            
 
-            prevPage.on(VIS.Events.onTouchStartOrClick, function () {
-                if (count > 0) {
-                    $bsyDiv[0].style.visibility = "visible";
-                    count--;
-                    $divProduct.empty();
-                    $divLastRevenue.empty();
-                    $divCurrentRevenue.empty();
-                    setProductData();
-                }
-            });
-
-            nextPage.on(VIS.Events.onTouchStartOrClick, function () {
-                if (count < ProductData.length - 1) {
-                    $bsyDiv[0].style.visibility = "visible";
-                    count++;
-                    $divProduct.empty();
-                    $divLastRevenue.empty();
-                    $divCurrentRevenue.empty();
-                    setProductData();
-                }
-            });
+            
         };
 
         /*This function will load data in widget */
@@ -101,7 +80,7 @@
                 //    VIS.Application.contextUrl + 'Areas/VAS/Content/Images/cube-icon.png') + '" alt="">');
                 '<div class= "VAS-arrow-col">' +
                 '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-left" id="VAS_Prev_' + widgetID + '"></span></a>' +
-                '<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">1 of 10</div>' +
+                '<div class="VAS-page-count" id="VAS_spnPageCount_' + widgetID + '">' + (count + 1 )+' of 10</div>' +
                 '<a href="javascript:void(0);"><span class="fa fa-arrow-circle-right" id="VAS_Next_' + widgetID + '"></span></a>' +
                 '</div>');
 
@@ -114,6 +93,30 @@
                 ((unit != null) ? '<span>' + unit + '</span>' : '') + '<span class="VAS-sale-Qty"">(' + ProductData[count].CurrentQty + ' ' +
                 ProductData[count].UOM + ')</span>' +
                 '</div><span>' + VIS.Msg.getMsg("VAS_CurrentYear") + '</span>');
+            prevPage = $divProduct.find("#VAS_Prev_" + widgetID);
+            nextPage = $divProduct.find("#VAS_Next_" + widgetID);
+
+            prevPage.on(VIS.Events.onTouchStartOrClick, function () {
+                if (count > 0) {
+                    $bsyDiv[0].style.visibility = "visible";
+                    count--;
+                    $divProduct.empty();
+                    $divLastRevenue.empty();
+                    $divCurrentRevenue.empty();
+                    setProductData();
+                }
+            });
+
+            nextPage.on(VIS.Events.onTouchStartOrClick, function () {
+                if (count < ProductData.length - 1) {
+                    $bsyDiv[0].style.visibility = "visible";
+                    count++;
+                    $divProduct.empty();
+                    $divLastRevenue.empty();
+                    $divCurrentRevenue.empty();
+                    setProductData();
+                }
+            });
 
             if (count > 0) {
                 prevPage.css("opacity", "1");
