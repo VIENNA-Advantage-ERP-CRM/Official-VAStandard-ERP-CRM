@@ -165,14 +165,18 @@ namespace VAdvantage.Model
             List<MPaySelectionCheck> list = new List<MPaySelectionCheck>();
 
             int docNo = startDocumentNo;
+
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@param1", C_PaySelection_ID);
+            param[1] = new SqlParameter("@param2", PaymentRule);
+
             String sql = "SELECT * FROM C_PaySelectionCheck "
-                + "WHERE C_PaySelection_ID=" + C_PaySelection_ID + " AND PaymentRule='"
-                + PaymentRule + "'";
+                + "WHERE C_PaySelection_ID=@param1 AND PaymentRule=@param2";
             DataTable dt;
             IDataReader idr = null;
             try
             {
-                idr = DataBase.DB.ExecuteReader(sql, null, trxName);
+                idr = DataBase.DB.ExecuteReader(sql, param, trxName);
                 dt = new DataTable();
                 dt.Load(idr);
                 idr.Close();

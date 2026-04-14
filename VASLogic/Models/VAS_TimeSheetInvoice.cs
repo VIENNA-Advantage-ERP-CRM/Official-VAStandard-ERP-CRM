@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using VAdvantage.DataBase;
@@ -678,17 +679,19 @@ namespace VASLogic.Models
         public Dictionary<string, int> GetColumnIds(Ctx ct, dynamic columnDataArray)
         {
             Dictionary<string, int> ColumnInfo = new Dictionary<string, int>();
+            SqlParameter[] param = new SqlParameter[2];
             foreach (var item in columnDataArray)
             {
                 // Extract column name and table name
                 string ColumnName = item.ColumnName;
                 string TableName = item.TableName;
-
+                param[0] = new SqlParameter("@param1", ColumnName);
+                param[1] = new SqlParameter("@param2", TableName);
                 // Construct SQL query to retrieve AD_Column_ID
                 string sql = @"SELECT AD_Column_ID FROM AD_Column 
-                               WHERE ColumnName ='" + ColumnName + @"' 
-                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName='" + TableName + @"')";
-                ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql));
+                               WHERE ColumnName =@param1 
+                               AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName=@param2)";
+                ColumnInfo[ColumnName] = Util.GetValueOfInt(DB.ExecuteScalar(sql , param , null));
             }
             if (Env.IsModuleInstalled("VA075_"))
             {

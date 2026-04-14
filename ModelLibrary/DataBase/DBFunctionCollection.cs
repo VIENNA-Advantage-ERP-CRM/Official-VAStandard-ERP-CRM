@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -838,7 +839,7 @@ namespace VAdvantage.DataBase
             return sql.ToString();
         }
 
-       
+
 
         /// <summary>
         /// Create Query, which will check table exitence into Schema
@@ -858,6 +859,34 @@ namespace VAdvantage.DataBase
                 return "SELECT COUNT(*) FROM all_objects WHERE object_type IN ('TABLE') AND (object_name)  = UPPER('" + tableName + "')" +
                    " AND OWNER LIKE '" + table_catalog + "'";
             }
+        }
+
+        /// <summary>
+        /// This function is used to get the view and table into DB User
+        /// </summary>
+        /// <param name="table_catalog">DB User Name(Database Schema)</param>
+        /// <param name="tableName">Tab leName / View Name</param>
+        /// <returns>result when found</returns>
+        /// <author>VIS_045: 14-April-2026</author>
+        public static int CheckTableViewExistence(string table_catalog, string tableName)
+        {
+            int result = 0;
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@param1", table_catalog.ToUpper());
+            param[1] = new SqlParameter("@param2", tableName.ToUpper());
+            if (DB.IsPostgreSQL())
+            {
+                result = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(*) FROM information_schema.tables 
+                         WHERE UPPER(table_catalog) = @param1
+                         AND UPPER(table_name) = @param2  AND table_type IN ('BASE TABLE','VIEW')", param, null));
+            }
+            else
+            {
+                result = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT COUNT(*) FROM all_objects 
+                         WHERE object_type IN ('TABLE','VIEW') AND OWNER = @param1
+                         AND (object_name) = @param2 ", param, null));
+            }
+            return result;
         }
 
         static Classes.CCache<string, bool> _cacheTblName = new Classes.CCache<string, bool>("DBColl_TablesExist", 100);
