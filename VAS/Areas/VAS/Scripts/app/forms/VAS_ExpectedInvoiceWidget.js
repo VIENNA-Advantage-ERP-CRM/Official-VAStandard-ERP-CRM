@@ -591,7 +591,7 @@
                 var $isGenChargesControlWrap = $('<div class="vis-control-wrap">');
                 var $isGenChargesButtonWrap = $('<div class="input-group-append">');
                 $isGenChargesDiv.append($isGenChargesControlWrap);
-                $isGenChargesControlWrap.append($isGenChargescheckbox.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label>' + VIS.Msg.getMsg("VAS_GenerateCharges") + '</label>');
+                $isGenChargesControlWrap.append($isGenChargescheckbox.getControl().attr('placeholder', ' ').attr('data-placeholder', '').attr('data-hasbtn', ' ')).append('<label style="margin-top:-8px;">' + VIS.Msg.getMsg("VAS_GenerateCharges") + '</label>');
                 $isGenChargesDiv.append($isGenChargesControlWrap);
                 //  $isGenChargesButtonWrap.append($self.cmbisGenCharges.getBtn(0));
                 $isGenChargesDiv.append($isGenChargesButtonWrap);
