@@ -227,6 +227,8 @@
             $selectGeneratorQuery.attr('disabled', true);
             $SQLMainDiv.append($sqlBtns).append($contentArea).append(gridDiv).append(gridDiv2);
             $root.append($SQLMainDiv).append($EventMainDiv);
+            createBusyIndicator();
+            setBusy(true);
             $contentArea.append($sqlContent)
                 .append($sqlGeneratorContent)
                 .append($queryMessage);
@@ -352,9 +354,7 @@
                 + '<input id="okBtn_' + $self.windowNo + '" class="VIS_Pref_btn-2" type="button" value="' + VIS.Msg.getMsg("OK") + '">'
                 + '<div class="vis-ad-w-p-s-main pull-left"><div class="vis-ad-w-p-s-infoline"></div><div class="vis-ad-w-p-s-msg" style="align-items:flex-end;" id="lblBottomMsg_' + $self.windowNo + '"></div></div>'
                 + '</div>');
-
-            createBusyIndicator();
-
+           
             isEmailCtrl = $sqlContent.find("#Is_Email_" + $self.windowNo);
             emailColNameCtrl = $sqlContent.find("#EmailColName_" + $self.windowNo);
             emailContentDiv = $sqlContent.find("#emailContent_" + $self.windowNo);
@@ -2057,114 +2057,114 @@
             AJAX Call to get Alert Data
         */
         this.SqlQuery = function (ParentId) {
-            setBusy(true);
-            var event = VIS.context.getContext(windowNo, 'BasedOn');
-            UpdateColumnCtrl.hide()
-            $sqlResultDiv.text("");
-            $SQLMainDiv.show();
-            $EventMainDiv.hide();
-            if (event == 'E') {
+                setBusy(true);
+                var event = VIS.context.getContext($self.windowNo, 'BasedOn');
+                UpdateColumnCtrl.hide()
+                $sqlResultDiv.text("");
                 $SQLMainDiv.hide();
-                $EventMainDiv.show();
-            }
-            emailContentDiv.hide();
-            alertRuleID = ParentId;
-            if (alertRuleID > 0) {
-                $sqlGeneratorBtn.attr('disabled', true);
-                $sqlGeneratorBtn.css("opacity", .3);
-                $.ajax({
-                    url: VIS.Application.contextUrl + "AlertSQLGenerate/GetAlertData",
-                    type: "POST",
-                    data: { alertRuleID: alertRuleID },
-                    async: false,
-                    success: function (result) {
-                        result = JSON.parse(result);
-                        if (result) {
-                            $self.BasedOn = result.BasedOn;
-                            if (result.BasedOn && result.BasedOn == 'S') {
-                                emailContentDiv.show();
-                                txtEmailColName.setValue(result.EmailColumnName);
-                                txtIsEmail.setValue(result.IsEmail);
-                                txtSqlSelect.setValue(result.SelectClause);
-                                txtSqlfrom.setValue(result.FromClause);
-                                txtSqlWhere.setValue(result.WhereClause);
-                                txtSqlOther.setValue(result.OrderClause);
-                                txtTableSql.setValue(result.TableID);
-                                if (result.IsEmail) {
-                                    emailColNameCtrl.show();
-                                } else {
-                                    emailColNameCtrl.hide();
+                $EventMainDiv.hide();
+                emailContentDiv.hide();
+                alertRuleID = ParentId;
+                if (alertRuleID > 0) {
+                    $sqlGeneratorBtn.attr('disabled', true);
+                    $sqlGeneratorBtn.css("opacity", .3);
+                    $.ajax({
+                        url: VIS.Application.contextUrl + "AlertSQLGenerate/GetAlertData",
+                        type: "POST",
+                        data: { alertRuleID: alertRuleID },
+                        async: false,
+                        success: function (result) {
+                            result = JSON.parse(result);
+                            if (result) {
+                                $self.BasedOn = result.BasedOn;
+                                if (result.BasedOn && result.BasedOn == 'S') {
+                                    $SQLMainDiv.show();
+                                    $EventMainDiv.hide();
+                                    emailContentDiv.show();
+                                    txtEmailColName.setValue(result.EmailColumnName);
+                                    txtIsEmail.setValue(result.IsEmail);
+                                    txtSqlSelect.setValue(result.SelectClause);
+                                    txtSqlfrom.setValue(result.FromClause);
+                                    txtSqlWhere.setValue(result.WhereClause);
+                                    txtSqlOther.setValue(result.OrderClause);
+                                    txtTableSql.setValue(result.TableID);
+                                    if (result.IsEmail) {
+                                        emailColNameCtrl.show();
+                                    } else {
+                                        emailColNameCtrl.hide();
+                                    }
+                                }
+                                $selectQuery.text(result.Query);
+                                mainTableID = result.TableID;
+                                if (!result.Query) {
+                                    $windowTabSelect.setValue(null);
+                                    $selectQuery.text('');
+                                    $sqlGeneratorBtn.attr('disabled', false);
+                                    $sqlGeneratorBtn.css("opacity", 1);
+                                    $testSqlBtn.val(testSQL);
+                                    $queryResultGrid.hide();
+                                    $query.show();
+                                    $selectQuery.show();
+                                    sqlTxtContentWrap.show();
+                                    emailContentDiv.show();
+                                }
+                                if (result.BasedOn && result.BasedOn == 'E') {
+                                    txtWindowTab.setValue(result.TabID);
+                                    txtIsInsert.setValue(result.IsInsert);
+                                    txtIsUpdate.setValue(result.IsUpdate);
+                                    txtIsDelete.setValue(result.IsDelete);
+                                    if (result.IsUpdate && result.TabID > 0) {
+                                        getEventColumn(result.TabID);
+                                        txtFiledColumn.setValue(result.ColumnID);
+                                        UpdateColumnCtrl.show();
+                                    } else {
+                                        UpdateColumnCtrl.hide();
+                                    }
+                                    EventTable = result.TableID;
+                                    $SQLMainDiv.hide();
+                                    $EventMainDiv.show();
                                 }
                             }
-                            $selectQuery.text(result.Query);
-                            mainTableID = result.TableID;
-                            if (!result.Query) {
-                                $windowTabSelect.setValue(null);
-                                $selectQuery.text('');
-                                $sqlGeneratorBtn.attr('disabled', false);
-                                $sqlGeneratorBtn.css("opacity", 1);
-                                $testSqlBtn.val(testSQL);
-                                $queryResultGrid.hide();
-                                $query.show();
-                                $selectQuery.show();
-                                sqlTxtContentWrap.show();
-                                emailContentDiv.show();
-                            }
-                            if (result.BasedOn && result.BasedOn == 'E') {
-                                txtWindowTab.setValue(result.TabID);
-                                txtIsInsert.setValue(result.IsInsert);
-                                txtIsUpdate.setValue(result.IsUpdate);
-                                txtIsDelete.setValue(result.IsDelete);
-                                if (result.IsUpdate && result.TabID>0) {
-                                    getEventColumn(result.TabID);
-                                    txtFiledColumn.setValue(result.ColumnID);
-                                    UpdateColumnCtrl.show();
-                                } else {
-                                    UpdateColumnCtrl.hide();
-                                }
-                                EventTable = result.TableID;
-                                $SQLMainDiv.hide();
-                                $EventMainDiv.show();
-                            }
+                            setBusy(false);
+                        },
+                        error: function (error) {
+                            console.log(error);
+                            setBusy(false);
                         }
-                        setBusy(false);
-                    },
-                    error: function (error) {
-                        console.log(error);
-                        setBusy(false);
-                    }
-                });
-                $sqlBtn.trigger('click');
-                $sqlResultDiv.show();
-            
-            } else if (event == 'E') {
-                $SQLMainDiv.hide();
-                $EventMainDiv.show();
-                txtWindowTab.setValue(null);
-                txtIsInsert.setValue(false);
-                txtIsUpdate.setValue(false);
-                txtIsDelete.setValue(false);
-                txtFiledColumn.setValue(null);
-                EventTable = 0;
-                setBusy(false);
-            }
-            else {
-                $windowTabSelect.setValue(null);
-                OnChange(0, 'O');
-                $selectQuery.text('');
-                cleanSqlText();
-                $sqlGeneratorBtn.attr('disabled', false);
-                $sqlGeneratorBtn.css("opacity", 1);
-                $testSqlBtn.val(testSQL);
-                $queryResultGrid.hide();
-                $query.show();
-                $selectQuery.show();
-                sqlTxtContentWrap.show();
-                emailContentDiv.show();
-                //$saveBtn.hide();
-                sqlPagingDiv.hide();
-                setBusy(false);
-            }
+                    });
+                    $sqlBtn.trigger('click');
+                    $sqlResultDiv.show();
+
+                } else if (event == 'E') {
+                    $SQLMainDiv.hide();
+                    $EventMainDiv.show();
+                    txtWindowTab.setValue(null);
+                    txtIsInsert.setValue(false);
+                    txtIsUpdate.setValue(false);
+                    txtIsDelete.setValue(false);
+                    txtFiledColumn.setValue(null);
+                    EventTable = 0;
+                    setBusy(false);
+                }
+                else {
+                    $SQLMainDiv.show();
+                    $EventMainDiv.hide();
+                    $windowTabSelect.setValue(null);
+                    OnChange(0, 'S');
+                    $selectQuery.text('');
+                    cleanSqlText();
+                    $sqlGeneratorBtn.attr('disabled', false);
+                    $sqlGeneratorBtn.css("opacity", 1);
+                    $testSqlBtn.val(testSQL);
+                    $queryResultGrid.hide();
+                    $query.show();
+                    $selectQuery.show();
+                    sqlTxtContentWrap.show();
+                    emailContentDiv.show();
+                    //$saveBtn.hide();
+                    sqlPagingDiv.hide();
+                    setBusy(false);
+                }
         }
 
         function getTableName() {
