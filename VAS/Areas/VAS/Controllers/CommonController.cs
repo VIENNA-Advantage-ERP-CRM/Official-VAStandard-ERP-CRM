@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.Dynamic;
 using System.IO;
@@ -783,7 +784,7 @@ namespace VIS.Controllers
                             }
                             else
                             {
-                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID + 
+                                qry = "SELECT QtyEntered FROM C_InvoiceLine WHERE C_Invoice_ID = " + recordID +
                                     " AND M_Product_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_product_id"]) +
                                     " AND M_AttributeSetInstance_ID = " + Util.GetValueOfInt(data.Tables[0].Rows[i]["m_attributesetinstance_id"]);
                                 rec = Util.GetValueOfDecimal(DB.ExecuteScalar(qry));
@@ -3920,7 +3921,9 @@ namespace VIS.Controllers
         /// <returns>returns Y or N </returns>
         public string CheckTableDeletable(Ctx ctx, string TableName)
         {
-            return Util.GetValueOfString(DB.ExecuteScalar("Select IsDeleteable from AD_Table WHERE TableName = '" + TableName + "'"));
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", TableName);
+            return Util.GetValueOfString(DB.ExecuteScalar("SELECT IsDeleteable FROM AD_Table WHERE TableName=@param1", param, null));
         }
 
         /// <summary>
@@ -3962,7 +3965,9 @@ namespace VIS.Controllers
         /// <returns>Reference ID</returns>
         public int GetReference(Ctx ctx, string Name)
         {
-            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Reference_ID FROM AD_Reference WHERE Name = '" + Name + "'", null, null));
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", Name);
+            return Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Reference_ID FROM AD_Reference WHERE Name=@param1", param, null));
         }
 
         /// <summary>
