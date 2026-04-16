@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -188,13 +189,17 @@ namespace VIS.Models
                 + "FROM C_PaySelectionCheck "
                 + "WHERE C_PaySelection_ID=" + C_PaySelection_ID;
 
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@param1", m_C_BankAccount_ID);
+            param[1] = new SqlParameter("@param2", paymentMethod_ID);
             //  DocumentNo
             String sql1 = "SELECT CurrentNext "
                 + "FROM C_BankAccountDoc "
-                + "WHERE C_BankAccount_ID=" + m_C_BankAccount_ID + " AND PaymentRule  = '" + paymentMethod_ID + "' AND IsActive='Y'";
+                + "WHERE C_BankAccount_ID=@param1 AND PaymentRule  = @param2 AND IsActive='Y'";
 
 
-            int count = DB.GetSQLValue(null, sql);
+            //int count = DB.GetSQLValue(null, sql);
+            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null));
 
             int next = DB.GetSQLValue(null, sql1);
             objPInfo.NoOfPayments = Util.GetValueOfString(count);
@@ -577,7 +582,7 @@ namespace VIS.Models
                     .Append(x).Append(account[i][BA_Name]).Append(x).Append(",")          // Bank Name
                     .Append(x).Append(account[i][BA_RoutingNo]).Append(x).Append(",")     // Bank RoutingNo
                     .Append(x).Append(account[i][BA_SwitftCode]).Append(x).Append(",")    // SwiftCode
-                    //  Payment Info
+                                                                                          //  Payment Info
                     .Append(x).Append(docNo[i]).Append(x).Append(",")    // DocumentNo
                     .Append(payDate[i]).Append(",")               // PayDate
                     .Append(x).Append(ISOCode[i]).Append(x).Append(",")    // Currency

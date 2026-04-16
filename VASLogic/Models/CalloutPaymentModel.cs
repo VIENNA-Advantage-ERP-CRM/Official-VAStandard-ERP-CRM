@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -31,7 +32,9 @@ namespace VIS.Models
         // Payment callout- Invoice selection
         public bool CheckedModuleInfo(string Prefix)
         {
-            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_MODULEINFO_ID) FROM AD_MODULEINFO WHERE PREFIX='" + Prefix + "'  AND IsActive = 'Y'", null, null)) > 0)
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", Prefix);
+            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT COUNT(AD_ModuleInfo_ID) FROM AD_ModuleInfo WHERE Prefix=@param1  AND IsActive = 'Y'", param, null)) > 0)
             {
                 return true;
             }

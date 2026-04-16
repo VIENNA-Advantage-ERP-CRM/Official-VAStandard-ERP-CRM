@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -2258,11 +2259,17 @@ namespace VIS.Models
 
             try
             {
-                retValue["M_AttributeSet_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_AttributeSet_ID FROM M_Product WHERE M_Product_ID = " + Util.GetValueOfInt(paramValues[0]), null, null));
+                retValue["M_AttributeSet_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_AttributeSet_ID FROM M_Product WHERE M_Product_ID=" 
+                    + Util.GetValueOfInt(paramValues[0]), null, null));
 
                 if (Util.GetValueOfInt(retValue["M_AttributeSet_ID"]) > 0)
                 {
-                    retValue["Attribute_ID"] = Util.GetValueOfInt(DB.ExecuteScalar("SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC = '" + Util.GetValueOfString(paramValues[1]) + "' AND M_Product_ID = " + Util.GetValueOfInt(paramValues[0]), null, null));
+                    SqlParameter[] param = new SqlParameter[2];
+                    param[0] = new SqlParameter("@param1", Util.GetValueOfInt(paramValues[0]));
+                    param[1] = new SqlParameter("@param2", paramValues[1]);
+
+                    retValue["Attribute_ID"] = Util.GetValueOfInt(DB.ExecuteScalar(@"SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes 
+                    WHERE M_Product_ID=@param1 AND UPC=@param2", param, null));
                 }
                 else
                 {

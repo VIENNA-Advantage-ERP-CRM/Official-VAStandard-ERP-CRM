@@ -141,8 +141,11 @@ namespace VIS.Models
         public int GetProductAttribute(Ctx ctx, string fields)
         {
             string[] paramValue = fields.Split(',');
-            string sql = "SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC = '" + paramValue[0] + "' AND M_Product_ID = " + Util.GetValueOfInt(paramValue[1]);
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@param1", paramValue[0]);
+            param[1] = new SqlParameter("@param2", Util.GetValueOfInt(paramValue[1]));
+            string sql = @"SELECT M_AttributeSetInstance_ID FROM M_ProductAttributes WHERE UPC=@param1 AND M_Product_ID=@param2";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null));
         }
 
         /// <summary>
@@ -188,13 +191,16 @@ namespace VIS.Models
         public int GetPOUOM(string fields)
         {
             string[] paramValue = fields.Split(',');
-            string sql = "SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive = 'Y' AND  C_BPartner_ID = " + paramValue[0] + " AND M_Product_ID = " + paramValue[1];
+            string sql = @"SELECT C_UOM_ID FROM M_Product_PO WHERE IsActive='Y' AND C_BPartner_ID="
+                        + Util.GetValueOfInt(paramValue[0]) + " AND M_Product_ID=" + Util.GetValueOfInt(paramValue[1]);
             //VAI050-Get Purchase UOM form Product if Purchasing not found
-            if (Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null)) > 0)
-                return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
-            else
-                sql = "SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID=" + paramValue[1];
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            int uomID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            if (uomID == 0)
+            {
+                sql = "SELECT VAS_PurchaseUOM_ID FROM M_Product WHERE M_Product_ID=" + Util.GetValueOfInt(paramValue[1]);
+                uomID = Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            }
+            return uomID;
         }
         /// <summary>
         /// GetUOMID
@@ -204,7 +210,7 @@ namespace VIS.Models
         public int GetUOMID(string fields)
         {
             string[] paramValue = fields.Split(',');
-            string sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive = 'Y' AND M_Product_ID = " + paramValue[0];
+            string sql = "SELECT C_UOM_ID FROM M_Product WHERE IsActive='Y' AND M_Product_ID=" + Util.GetValueOfInt(paramValue[0]);
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
         }
         /// <summary>
@@ -214,8 +220,10 @@ namespace VIS.Models
         /// <returns>Count</returns>
         public int GetManufacturer(string fields)
         {
-            string sql = "SELECT Count(M_Manufacturer_ID) FROM M_Manufacturer WHERE IsActive = 'Y' AND UPC = '" + fields + "'";
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, null, null));
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", Util.GetValueOfInt(fields));
+            string sql = "SELECT COUNT(M_Manufacturer_ID) FROM M_Manufacturer WHERE IsActive='Y' AND UPC=@param1";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null));
         }
 
         /// <summary>
@@ -728,7 +736,7 @@ namespace VIS.Models
                                   LEFT JOIN previous_year py ON cy.M_Product_ID = py.M_Product_ID
                                   LEFT JOIN current_yearReturn cyr ON cyr.M_Product_ID = cy.M_Product_ID
                                  LEFT JOIN previous_yearReturn lyr ON lyr.M_Product_ID = cy.M_Product_ID
-                                  ORDER BY CurrentTotal " + Type + @"
+                                  ORDER BY CurrentTotal " + (Type.ToUpper().Equals("ASC") ? Type : "DESC") + @"
                                   FETCH FIRST 10 ROWS ONLY");
             DataSet ds = DB.ExecuteDataset(queryBuilder.ToString(), null, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -1301,9 +1309,9 @@ namespace VIS.Models
             // Credit Limit End
 
             DateTime? minGuaranteeDate = _movementDate;
-
+            var ids = OrderLinesIDs.Split(',').Select(id => int.Parse(id.Trim())).ToList();
             //	Deadlock Prevention - Order by M_Product_ID
-            MOrderLine[] lines = order.GetLines(" AND C_OrderLine_ID IN (" + OrderLinesIDs + ")", " ORDER BY C_BPartner_Location_ID, M_Product_ID");
+            MOrderLine[] lines = order.GetLines(" AND C_OrderLine_ID IN (" + string.Join(",", ids) + ")", " ORDER BY C_BPartner_Location_ID, M_Product_ID");
             for (int i = 0; i < lines.Length; i++)
             {
                 MOrderLine line = lines[i];
@@ -1924,6 +1932,7 @@ namespace VIS.Models
                 MInOut obj = null;
                 int M_Locator_ID = 0;
                 trx = Trx.Get("VAS_GenerateGRN" + DateTime.Now.Ticks);
+                var ids = Order_LineIDs.Split(',').Select(id => int.Parse(id.Trim())).ToList();
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT  o.DateOrdered,o.AD_Org_ID, o.C_BPartner_ID, o.C_BPartner_Location_ID, o.M_Warehouse_ID,
                             o.AD_User_ID, o.SalesRep_ID, o.IsDropShip AS DropShip, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID,
@@ -1938,7 +1947,7 @@ namespace VIS.Models
                             FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
                             LEFT JOIN M_Product prd ON (ol.M_Product_ID = prd.M_Product_ID)
                             LEFT JOIN C_UOM u ON (ol.C_UOM_ID=u.C_UOM_ID)  
-                            WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
+                            WHERE ol.C_OrderLine_ID IN (" + string.Join(",", ids) + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -2124,12 +2133,13 @@ namespace VIS.Models
                 int DocType_ID;
                 int LocatorFrom, LocatorTo;
                 trx = VAdvantage.DataBase.Trx.Get("VAS_GenMaterialTransfer" + DateTime.Now.Ticks);
+                var ids = M_RequisitionLines_IDs.Split(',').Select(id => int.Parse(id.Trim())).ToList();
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT r.DateRequired, r.AD_Org_ID, r.DTD001_MWarehouseSource_ID, r.M_Warehouse_ID, r.C_IncoTerm_ID, r.C_BPartner_ID,
                            rl.M_RequisitionLine_ID, rl.M_Product_ID, rl.M_AttributeSetInstance_ID, rl.C_UOM_ID, Round((rl.Qty/rl.QtyEntered),12) AS ConversionRate,
                            r.AD_OrgTrx_ID, (rl.Qty - rl.DTD001_ReservedQty - rl.DTD001_DeliveredQty) AS QtyRemianing
                            FROM M_Requisition r INNER JOIN M_RequisitionLine rl ON(r.M_Requisition_ID = rl.M_Requisition_ID)
-                           WHERE rl.M_RequisitionLine_ID IN (" + M_RequisitionLines_IDs + ")");
+                           WHERE rl.M_RequisitionLine_ID IN (" + string.Join(",", ids) + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
 
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -2321,11 +2331,12 @@ namespace VIS.Models
                         + from.Get_ValueAsInt("VA075_FieldServiceReq_ID"), null, trx);
                 }
 
+                var ids = Order_LineIDs.Split(',').Select(id => int.Parse(id.Trim())).ToList();
                 StringBuilder query = new StringBuilder();
                 query.Append(@"SELECT ol.AD_Org_ID, ol.C_OrderLine_ID, ol.M_AttributeSetInstance_ID, ol.M_Product_ID, ol.C_UOM_ID, 
                             ol.QtyEntered, ol.QtyOrdered, ol.PriceEntered, ol.PriceActual, ol.PriceList, ol.C_Tax_ID
                             FROM C_Order o INNER JOIN C_OrderLine ol ON (o.C_Order_ID = ol.C_Order_ID)
-                            WHERE ol.C_OrderLine_ID IN (" + Order_LineIDs + ")");
+                            WHERE ol.C_OrderLine_ID IN (" + string.Join(",", ids) + ")");
                 DataSet ds = DB.ExecuteDataset(query.ToString(), null, null);
                 if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                 {
@@ -2479,8 +2490,10 @@ namespace VIS.Models
         public int UpdateCreditValidation(Ctx ctx, int BP_ID, int Loc_ID, string CreditSetting, string CreditValidation)
         {
             string tableName = CreditSetting == "CH" ? "C_BPartner" : "C_BPartner_Location";
-            return DB.ExecuteQuery(@"UPDATE " + tableName + " SET CreditValidation = '" + CreditValidation + "' WHERE " + tableName + "_ID = " +
-                (CreditSetting == "CH" ? BP_ID : Loc_ID));
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", CreditValidation);
+            return DB.ExecuteQuery(@"UPDATE " + tableName + " SET CreditValidation=@param1 WHERE " + tableName + "_ID = " +
+                (CreditSetting == "CH" ? BP_ID : Loc_ID), param, null);
         }
 
 
