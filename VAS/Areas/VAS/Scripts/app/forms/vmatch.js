@@ -1047,12 +1047,12 @@
                 chkSameQtyss: chkSameQtys,
                 from_ss: from_s,
                 fromIfs: fromIf,
-                to_Dats: to_Dat,
+                to_Dats: VIS.secureEngine.encrypt(to_Dat),
                 matchToTypes: matchToTypees,
                 MATCH_SHIPMENTs: MATCH_SHIPMENT,
                 MATCH_ORDERs: MATCH_ORDER,
-                onlyProduct_ss: onlyProduct_s,
-                onlyVendor_ss: onlyVendor_s,
+                onlyProduct_ss: VIS.secureEngine.encrypt(onlyProduct_s),
+                onlyVendor_ss: VIS.secureEngine.encrypt(onlyVendor_s),
                 MatchToID: _match_ID
             };
 
