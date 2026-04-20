@@ -105,24 +105,29 @@ namespace VASLogic.Models
             }
             if (C_BPartner_ID.Length > 0)
             {
-                sql.Append(" AND st.C_BPartner_ID IN (" + C_BPartner_ID + ") ");
+                var ids = C_BPartner_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                sql.Append(" AND st.C_BPartner_ID IN (" + string.Join(",", ids) + ") ");
             }
             if (S_Resource_ID.Length > 0)
             {
+                var ids = S_Resource_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
                 sql.Append(" AND sc.C_BPartner_ID IN (SELECT ad.C_BPartner_ID FROM AD_User ad INNER JOIN S_Resource rs ON (rs.AD_User_ID=ad.AD_User_ID) " +
-                    "WHERE rs.S_Resource_ID IN (" + S_Resource_ID + "))");
+                    "WHERE rs.S_Resource_ID IN (" + string.Join(",", ids) + "))");
             }
             if (C_Project_ID.Length > 0)
             {
-                sql.Append(" AND st.C_Project_ID IN (" + C_Project_ID + ") ");
+                var ids = C_Project_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                sql.Append(" AND st.C_Project_ID IN (" + string.Join(",", ids) + ") ");
             }
             if (TimExpenSeDoc.Length > 0)
             {
-                sql.Append(" AND sc.S_TimeExpense_ID IN (" + TimExpenSeDoc + ") ");
+                var ids = TimExpenSeDoc.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                sql.Append(" AND sc.S_TimeExpense_ID IN (" + string.Join(",", ids) + ") ");
             }
             if (R_Request_ID.Length > 0)
             {
-                sql.Append(" AND st.R_Request_ID IN (" + R_Request_ID + ") ");
+                var ids = R_Request_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                sql.Append(" AND st.R_Request_ID IN (" + string.Join(",", ids) + ") ");
             }
             if (FromDate != string.Empty && toDate != string.Empty)
             {
@@ -173,23 +178,28 @@ namespace VASLogic.Models
                 }
                 if (C_BPartner_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.C_BPartner_ID IN (" + C_BPartner_ID + ")");
+                    var ids = C_BPartner_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.C_BPartner_ID IN (" + string.Join(",", ids) + ")");
                 }
                 if (S_Resource_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.S_Resource_ID IN (" + S_Resource_ID + ") ");
+                    var ids = S_Resource_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.S_Resource_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (C_Project_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.C_Project_ID IN (" + C_Project_ID + ") ");
+                    var ids = C_Project_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.C_Project_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (C_Task_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.VA075_Task_ID IN (" + C_Task_ID + ") ");
+                    var ids = C_Task_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.VA075_Task_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (R_Request_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.R_Request_ID IN (" + R_Request_ID + ") ");
+                    var ids = R_Request_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.R_Request_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 /*Here If tasktype is billable then records shown will be billabe else it will show non billable records
                 if task type is null then it will return all records*/
@@ -249,23 +259,28 @@ namespace VASLogic.Models
                 }
                 if (C_BPartner_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.C_BPartner_ID IN (" + C_BPartner_ID + ")");
+                    var ids = C_BPartner_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.C_BPartner_ID IN (" + string.Join(",", ids) + ")");
                 }
                 if (S_Resource_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.S_Resource_ID IN (" + S_Resource_ID + ") ");
+                    var ids = S_Resource_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.S_Resource_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (C_Project_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.C_Project_ID IN (" + C_Project_ID + ") ");
+                    var ids = C_Project_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.C_Project_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (C_Task_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.VA075_Task_ID IN (" + C_Task_ID + ") ");
+                    var ids = C_Task_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.VA075_Task_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 if (R_Request_ID.Length > 0)
                 {
-                    sql.Append(" AND wo.R_Request_ID IN (" + R_Request_ID + ") ");
+                    var ids = R_Request_ID.Split(',').Select(id => int.Parse(id.Trim())).ToList();
+                    sql.Append(" AND wo.R_Request_ID IN (" + string.Join(",", ids) + ") ");
                 }
                 /*Here If tasktype is billable then records shown will be billabe else it will show non billable records
                 if task type is null then it will return all records*/
