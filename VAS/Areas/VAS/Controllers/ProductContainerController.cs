@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Web.Mvc;
 using VAdvantage.Utility;
+using VIS.Classes;
 using VIS.Models;
 using VISLogic.Filters;
 
@@ -128,6 +129,14 @@ namespace VIS.Controllers
         public JsonResult LoadContainerAsTree(int warehouse, int locator, int container, string validation)
         {
             Ctx ctx = Session["ctx"] as Ctx;
+            if (!string.IsNullOrEmpty(validation))
+            {
+                validation = SecureEngineBridge.DecryptByClientKey(validation, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(validation))
+                {
+                    return Json(null);
+                }
+            }
             ProductContainerModel model = new ProductContainerModel(ctx);
             return Json(JsonConvert.SerializeObject(model.GetContainerAsTree(warehouse, locator, container, validation)), JsonRequestBehavior.AllowGet);
         }
@@ -154,6 +163,14 @@ namespace VIS.Controllers
         public JsonResult GetProductContainer(string text, string validation)
         {
             Ctx ctx = Session["ctx"] as Ctx;
+            if (!string.IsNullOrEmpty(validation))
+            {
+                validation = SecureEngineBridge.DecryptByClientKey(validation, ctx.GetSecureKey());
+                if (!QueryValidator.IsValid(validation))
+                {
+                    return Json(null);
+                }
+            }
             ProductContainerModel model = new ProductContainerModel(ctx);
             return Json(JsonConvert.SerializeObject(model.GetProductContainer(text, validation)), JsonRequestBehavior.AllowGet);
         }

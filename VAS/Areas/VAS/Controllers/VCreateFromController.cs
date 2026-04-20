@@ -9,6 +9,8 @@ using VAdvantage.DataBase;
 using VAdvantage.Utility;
 using VAdvantage.Model;
 using VIS.Models;
+using VIS.Classes;
+using System.Data.SqlClient;
 
 namespace VIS.Controllers
 {
@@ -27,13 +29,13 @@ namespace VIS.Controllers
         /// <param name="forInvoices">For Invoice</param>
         ///  <param name="recordID">C_Invoice_ID</param>
         /// <returns>List of Orders in Json Format</returns>
-        public JsonResult VCreateGetOrders(string displays, string columns, int C_BPartner_IDs, bool isReturnTrxs, int OrgIds, bool IsDrop, bool IsSOTrx, bool forInvoices, int recordID)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            VCreateFromModel obj = new VCreateFromModel();
-            var value = obj.VCreateGetOrders(ctx, displays, columns, C_BPartner_IDs, isReturnTrxs, OrgIds, IsDrop, IsSOTrx, forInvoices, recordID);
-            return Json(new { result = value }, JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult VCreateGetOrders(string displays, string columns, int C_BPartner_IDs, bool isReturnTrxs, int OrgIds, bool IsDrop, bool IsSOTrx, bool forInvoices, int recordID)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    VCreateFromModel obj = new VCreateFromModel();
+        //    var value = obj.VCreateGetOrders(ctx, displays, columns, C_BPartner_IDs, isReturnTrxs, OrgIds, IsDrop, IsSOTrx, forInvoices, recordID);
+        //    return Json(new { result = value }, JsonRequestBehavior.AllowGet);
+        //}
 
         /// <summary>
         /// get c_order_id or c_orderline_id
@@ -54,6 +56,21 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLangess = SecureEngineBridge.DecryptByClientKey(isBaseLangess, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLangess))
+            {
+                return Json(null);
+            }
+            MProductIDss = SecureEngineBridge.DecryptByClientKey(MProductIDss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(MProductIDss))
+            {
+                return Json(null);
+            }
+            DelivDates = SecureEngineBridge.DecryptByClientKey(DelivDates, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(DelivDates))
+            {
+                return Json(null);
+            }
             string sql = VcreateFormSqlQry(forInvoicees, C_Ord_IDs, isBaseLangess, MProductIDss, DelivDates, adOrgIDSs);
             var stValue = obj.GetData(sql, keyColumnName, tableName, recordID, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -89,7 +106,7 @@ namespace VIS.Controllers
                 sql += " " + isBaseLangess;
             }
 
-            sql += " LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID =l.M_AttributeSetInstance_ID) "
+            sql += " LEFT OUTER JOIN M_AttributeSetInstance ins ON (ins.M_AttributeSetInstance_ID=l.M_AttributeSetInstance_ID) "
              + " WHERE l.C_Order_ID=" + C_Ord_IDs;
 
             if (MProductIDss != "")
@@ -129,6 +146,21 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLangess = SecureEngineBridge.DecryptByClientKey(isBaseLangess, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLangess))
+            {
+                return Json(null);
+            }
+            MProductIDss = SecureEngineBridge.DecryptByClientKey(MProductIDss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(MProductIDss))
+            {
+                return Json(null);
+            }
+            DelivDates = SecureEngineBridge.DecryptByClientKey(DelivDates, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(DelivDates))
+            {
+                return Json(null);
+            }
             string sql = VcreateFormSqlQryOrg(forInvoicees, C_Ord_IDs, isBaseLangess, MProductIDss, DelivDates, keyColumnName.Equals("C_ProvisionalInvoice_ID"), tableName, recordID);
             var stValue = obj.GetData(sql, keyColumnName, tableName, recordID, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -327,6 +359,11 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLangs = SecureEngineBridge.DecryptByClientKey(isBaseLangs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLangs))
+            {
+                return Json(null);
+            }
             string sql = OrderDataCommonsSqlQry(forInvoices, isBaseLangs, C_OrderID, orggetVals, langs);
             var stValue = obj.GetOrderDataCommons(ctx, sql);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -398,6 +435,11 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLangs = SecureEngineBridge.DecryptByClientKey(isBaseLangs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLangs))
+            {
+                return Json(null);
+            }
             string sql = GetOrderDataCommonsNotOrgSQL(forInvoices, isBaseLangs, C_OrderID, langs);
             var stValue = obj.GetOrderDataCommons(ctx, sql);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -455,13 +497,13 @@ namespace VIS.Controllers
             return sqlNew;
         }
 
-        public JsonResult GetOrderDataCommonsNotOrg(int M_Product_ID_Ks)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            CommonModel obj = new CommonModel();
-            var stValue = obj.GetOrderDataCommonsNotOrg(ctx, M_Product_ID_Ks);
-            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult GetOrderDataCommonsNotOrg(int M_Product_ID_Ks)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    CommonModel obj = new CommonModel();
+        //    var stValue = obj.GetOrderDataCommonsNotOrg(ctx, M_Product_ID_Ks);
+        //    return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        //}
 
         /// <summary>
         /// Get Shipment data (for old signature)
@@ -471,10 +513,10 @@ namespace VIS.Controllers
         /// <param name="IsDrop">drop shipment</param>
         /// <param name="IsSOTrx">is trx sales or not</param>
         /// <returns>Shipment data</returns>
-        public JsonResult GetShipments(string displays, int CBPartnerIDs, bool IsDrop, bool IsSOTrx)
-        {
-            return GetShipmentsData(displays, CBPartnerIDs, IsDrop, IsSOTrx);
-        }
+        //public JsonResult GetShipments(string displays, int CBPartnerIDs, bool IsDrop, bool IsSOTrx)
+        //{
+        //    return GetShipmentsData(displays, CBPartnerIDs, IsDrop, IsSOTrx);
+        //}
         /// <summary>
         /// Author:VA230
         /// Get Shipment data
@@ -486,13 +528,13 @@ namespace VIS.Controllers
         /// <param name="isReturnTrxs">transaction is returned or not</param>
         /// <param name="isProvisionlInvoices">record selected is Provisionl nvoice or not</param>
         /// <returns>Get shipment data</returns>
-        public JsonResult GetShipmentsData(string displays, int CBPartnerIDs, bool IsDrop, bool IsSOTrx, bool isReturnTrxs = false, bool isProvisionlInvoices = false)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            VCreateFromModel obj = new VCreateFromModel();
-            var stValue = obj.GetShipments(ctx, displays, CBPartnerIDs, IsDrop, IsSOTrx, isReturnTrxs, isProvisionlInvoices);
-            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult GetShipmentsData(string displays, int CBPartnerIDs, bool IsDrop, bool IsSOTrx, bool isReturnTrxs = false, bool isProvisionlInvoices = false)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    VCreateFromModel obj = new VCreateFromModel();
+        //    var stValue = obj.GetShipments(ctx, displays, CBPartnerIDs, IsDrop, IsSOTrx, isReturnTrxs, isProvisionlInvoices);
+        //    return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        //}
 
         /// <summary>
         /// get c_order_id or c_orderline_id
@@ -505,10 +547,21 @@ namespace VIS.Controllers
         /// <param name="isBaseLanguages"></param>
         /// <param name="mProductIDD"></param>
         /// <returns></returns>
-        public JsonResult GetDataVCreateFrom(string keyColumnName, string tableName, int recordID, int pageNo, string mInOutId, string isBaseLanguages, string mProductIDD)
+        public JsonResult GetDataVCreateFrom(string keyColumnName, string tableName, int recordID, int pageNo, int mInOutId, string isBaseLanguages, string mProductIDD)
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLanguages = SecureEngineBridge.DecryptByClientKey(isBaseLanguages, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLanguages))
+            {
+                return Json(null);
+            }
+
+            mProductIDD = SecureEngineBridge.DecryptByClientKey(mProductIDD, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(mProductIDD))
+            {
+                return Json(null);
+            }
             var sql = GetDataSqlQueries(mInOutId, isBaseLanguages, mProductIDD, keyColumnName.Equals("C_ProvisionalInvoice_ID"));
             var stValue = obj.GetData(sql, keyColumnName, tableName, recordID, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -521,7 +574,7 @@ namespace VIS.Controllers
         /// <param name="mProductIDD"></param>
         /// <param name="isProvisionalInvoice">Is Provisional Invoice</param>
         /// <returns></returns>
-        private string GetDataSqlQueries(string mInOutId, string isBaseLanguages, string mProductIDD, bool isProvisionalInvoice)
+        private string GetDataSqlQueries(int mInOutId, string isBaseLanguages, string mProductIDD, bool isProvisionalInvoice)
         {
             var ctx = Session["ctx"] as Ctx;
             bool isAllownonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
@@ -645,13 +698,13 @@ namespace VIS.Controllers
         /// <param name="MInOutIDs"></param>
         /// <param name="isBaseLanguageUmos"></param>
         /// <returns></returns>
-        public JsonResult GetShipmentDatas(string MInOutIDs, string isBaseLanguageUmos)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            VCreateFromModel obj = new VCreateFromModel();
-            var stValue = obj.GetShipmentDatas(ctx, MInOutIDs, isBaseLanguageUmos);
-            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult GetShipmentDatas(string MInOutIDs, string isBaseLanguageUmos)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    VCreateFromModel obj = new VCreateFromModel();
+        //    var stValue = obj.GetShipmentDatas(ctx, MInOutIDs, isBaseLanguageUmos);
+        //    return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        //}
 
         /// <summary>
         /// Get Invoice Data
@@ -660,13 +713,13 @@ namespace VIS.Controllers
         /// <param name="cBPartnerId"></param>
         /// <param name="isReturnTrxs"></param>
         /// <returns></returns>
-        public JsonResult GetInvoicesVCreate(string displays, int cBPartnerId, bool isReturnTrxs, bool IsDrops)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            VCreateFromModel obj = new VCreateFromModel();
-            var stValue = obj.GetInvoicesVCreate(ctx, displays, cBPartnerId, isReturnTrxs, IsDrops);
-            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult GetInvoicesVCreate(string displays, int cBPartnerId, bool isReturnTrxs, bool IsDrops)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    VCreateFromModel obj = new VCreateFromModel();
+        //    var stValue = obj.GetInvoicesVCreate(ctx, displays, cBPartnerId, isReturnTrxs, IsDrops);
+        //    return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        //}
 
 
         /// <summary>
@@ -684,6 +737,17 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
+            isBaseLangss = SecureEngineBridge.DecryptByClientKey(isBaseLangss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(isBaseLangss))
+            {
+                return Json(null);
+            }
+
+            mProductIDs = SecureEngineBridge.DecryptByClientKey(mProductIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(mProductIDs))
+            {
+                return Json(null);
+            }
             string sql = getSQlforGetInvoicesData(isBaseLangss, cInvoiceID, mProductIDs);
             var stValue = obj.GetData(sql, keyColumnName, tableName, recordID, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
@@ -858,8 +922,34 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             CommonModel obj = new CommonModel();
-            string sql = GetBankAccountsDataSql(dates, trxDatess, trxDatesUnions, cBPartnerIDs, DocumentNos, DocumentNoUnions, DepositSlips, AuthCodes, CheckNos, Amounts, cBankAccountId);
-            var stValue = obj.GetAccountData(sql, pageNo, ctx);
+            trxDatess = SecureEngineBridge.DecryptByClientKey(trxDatess, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(trxDatess))
+            {
+                return Json(null);
+            }
+            trxDatesUnions = SecureEngineBridge.DecryptByClientKey(trxDatesUnions, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(trxDatesUnions))
+            {
+                return Json(null);
+            }
+            cBPartnerIDs = SecureEngineBridge.DecryptByClientKey(cBPartnerIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(cBPartnerIDs))
+            {
+                return Json(null);
+            }
+            DocumentNos = SecureEngineBridge.DecryptByClientKey(DocumentNos, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(DocumentNos))
+            {
+                return Json(null);
+            }
+            DocumentNoUnions = SecureEngineBridge.DecryptByClientKey(DocumentNoUnions, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(DocumentNoUnions))
+            {
+                return Json(null);
+            }
+            string sql = GetBankAccountsDataSql(dates, trxDatess, trxDatesUnions, cBPartnerIDs, DocumentNos, DocumentNoUnions,
+                DepositSlips, AuthCodes, CheckNos, Amounts, cBankAccountId, out SqlParameter[] param);
+            var stValue = obj.GetAccountData(sql, param, pageNo, ctx);
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
         }
 
@@ -878,9 +968,10 @@ namespace VIS.Controllers
         /// <param name="cBankAccountId">Bank Account</param>
         /// <returns>String Query</returns>
         private string GetBankAccountsDataSql(string dates, string trxDatess, string trxDatesUnions, string cBPartnerIDs, string DocumentNos, string DocumentNoUnions, string DepositSlips,
-            string AuthCodes, string CheckNos, string Amounts, int cBankAccountId)
+            string AuthCodes, string CheckNos, string Amounts, int cBankAccountId, out SqlParameter[] param)
         {
             bool countVA034 = Env.IsModuleInstalled("VA034_"); //Util.GetValueOfInt(DB.ExecuteScalar("SELECT Count(AD_ModuleInfo_ID) FROM AD_ModuleInfo WHERE PREFIX='VA034_' AND IsActive = 'Y'"));
+            List<SqlParameter> paramList = new List<SqlParameter>();
             StringBuilder sql = new StringBuilder();
             // JID_0084: Create line from is always picking curreny type that is default. It should pick currency type that is on payment.
             sql.Append("SELECT p.DateAcct AS DateTrx, p.C_Payment_ID, p.DocumentNo, ba.C_Currency_ID, c.ISO_Code, p.PayAmt,"
@@ -910,19 +1001,23 @@ namespace VIS.Controllers
             }
             if (DepositSlips != "")
             {
-                sql.Append(" AND p.va034_depositslipno LIKE '" + DepositSlips + "'");
+                paramList.Add(new SqlParameter("@param1", DepositSlips));
+                sql.Append(" AND p.va034_depositslipno LIKE @param1");
             }
             if (AuthCodes != "")
             {
-                sql.Append(" AND p.TrxNo LIKE '" + AuthCodes + "'");
+                paramList.Add(new SqlParameter("@param2", AuthCodes));
+                sql.Append(" AND p.TrxNo LIKE @param2");
             }
             if (CheckNos != "")
             {
-                sql.Append(" AND p.CheckNo LIKE '%" + CheckNos + "%'");
+                paramList.Add(new SqlParameter("@param3", CheckNos));
+                sql.Append(" AND p.CheckNo LIKE @param3");
             }
             if (Amounts != "0")
             {
-                sql.Append(" AND p.PayAmt = " + Amounts);
+                paramList.Add(new SqlParameter("@param4", Amounts));
+                sql.Append(" AND p.PayAmt=@param4");
             }
             if (trxDatess != "")
             {
@@ -962,7 +1057,7 @@ namespace VIS.Controllers
                 }
                 sql.Append(" AND NOT EXISTS (SELECT * FROM C_BankStatementLine l WHERE cl.C_CashLine_ID=l.C_CashLine_ID AND l.StmtAmt <> 0)");      //	Voided Bank Statements have 0 StmtAmt
             }
-
+            param = paramList.ToArray();
             return sql.ToString();
         }
 
@@ -978,6 +1073,21 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             VCreateFromModel obj = new VCreateFromModel();
+            mWarehouseIDs = SecureEngineBridge.DecryptByClientKey(mWarehouseIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(mWarehouseIDs))
+            {
+                return Json(null);
+            }
+            cBPartnerIDs = SecureEngineBridge.DecryptByClientKey(cBPartnerIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(cBPartnerIDs))
+            {
+                return Json(null);
+            }
+            cOrderIDSearchs = SecureEngineBridge.DecryptByClientKey(cOrderIDSearchs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(cOrderIDSearchs))
+            {
+                return Json(null);
+            }
             var value = obj.ExecuteQueryVinoutgen(ctx, adClientID, mWarehouseIDs, cBPartnerIDs, cOrderIDSearchs);
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
@@ -994,6 +1104,21 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             VCreateFromModel obj = new VCreateFromModel();
+            adOrgIDs = SecureEngineBridge.DecryptByClientKey(adOrgIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(adOrgIDs))
+            {
+                return Json(null);
+            }
+            cBPartnerIDs = SecureEngineBridge.DecryptByClientKey(cBPartnerIDs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(cBPartnerIDs))
+            {
+                return Json(null);
+            }
+            ordShipmentids = SecureEngineBridge.DecryptByClientKey(ordShipmentids, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(ordShipmentids))
+            {
+                return Json(null);
+            }
             var value = obj.ExecuteQueryVInvoiceGen(ctx, adClientID, adOrgIDs, cBPartnerIDs, ordShipmentids);
             // return Json(new { result = value }, JsonRequestBehavior.AllowGet);
 
@@ -1021,11 +1146,53 @@ namespace VIS.Controllers
         /// <param name="onlyVendor_ss"></param>
         /// <param name="MatchToID"></param>
         /// <returns></returns>
-        public JsonResult GetTableLoadVmatch(string displayMATCH_INVOICEs, bool chkIsReturnTrxProps, string displayMATCH_ORDERs, string matchToTypeMATCH_SHIPMENTs,
-                                             bool matchedsss, string chkSameBPartnerss, string chkSameProductss, string chkSameQtyss, string from_ss, string fromIfs, string to_Dats, string matchToTypes, string MATCH_SHIPMENTs, string MATCH_ORDERs, string onlyProduct_ss, string onlyVendor_ss, string MatchToID)
+        public JsonResult GetTableLoadVmatch(string displayMATCH_INVOICEs, bool chkIsReturnTrxProps, string displayMATCH_ORDERs, bool matchToTypeMATCH_SHIPMENTs,
+                                             bool matchedsss, string chkSameBPartnerss, string chkSameProductss, string chkSameQtyss, string from_ss, string fromIfs,
+                                             string to_Dats, int matchToTypes, int MATCH_SHIPMENTs, int MATCH_ORDERs, string onlyProduct_ss, string onlyVendor_ss,
+                                             int MatchToID)
         {
             var ctx = Session["ctx"] as Ctx;
             VCreateFromModel obj = new VCreateFromModel();
+            chkSameBPartnerss = SecureEngineBridge.DecryptByClientKey(chkSameBPartnerss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(chkSameBPartnerss))
+            {
+                return Json(null);
+            }
+            chkSameProductss = SecureEngineBridge.DecryptByClientKey(chkSameProductss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(chkSameProductss))
+            {
+                return Json(null);
+            }
+            chkSameQtyss = SecureEngineBridge.DecryptByClientKey(chkSameQtyss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(chkSameQtyss))
+            {
+                return Json(null);
+            }
+            from_ss = SecureEngineBridge.DecryptByClientKey(from_ss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(from_ss))
+            {
+                return Json(null);
+            }
+            fromIfs = SecureEngineBridge.DecryptByClientKey(fromIfs, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(fromIfs))
+            {
+                return Json(null);
+            }
+            to_Dats = SecureEngineBridge.DecryptByClientKey(to_Dats, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(to_Dats))
+            {
+                return Json(null);
+            }
+            onlyProduct_ss = SecureEngineBridge.DecryptByClientKey(onlyProduct_ss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(onlyProduct_ss))
+            {
+                return Json(null);
+            }
+            onlyVendor_ss = SecureEngineBridge.DecryptByClientKey(onlyVendor_ss, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(onlyVendor_ss))
+            {
+                return Json(null);
+            }
             var res = obj.GetTableLoadVmatch(ctx, displayMATCH_INVOICEs, chkIsReturnTrxProps, displayMATCH_ORDERs, matchToTypeMATCH_SHIPMENTs, matchedsss,
                           chkSameBPartnerss, chkSameProductss, chkSameQtyss, from_ss, fromIfs, to_Dats, matchToTypes, MATCH_SHIPMENTs, MATCH_ORDERs, onlyProduct_ss, onlyVendor_ss, MatchToID);
             return Json(JsonConvert.SerializeObject(res), JsonRequestBehavior.AllowGet);
@@ -1073,13 +1240,13 @@ namespace VIS.Controllers
         /// <param name="OrgIds">Organization</param>
         ///  <param name="recordID">C_Invoice_ID</param>
         /// <returns>List of Provisonal in Json Format Bind to Combo</returns>
-        public JsonResult VCreateGetProvisionalInvoices(string displays, int C_BPartner_IDs, bool isReturnTrxs, int OrgIds, int recordID)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            VCreateFromModel obj = new VCreateFromModel();
-            var value = obj.VCreateGetProvosionalInvoice(ctx, displays, C_BPartner_IDs, OrgIds, isReturnTrxs, recordID);
-            return Json(new { result = value }, JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult VCreateGetProvisionalInvoices(string displays, int C_BPartner_IDs, bool isReturnTrxs, int OrgIds, int recordID)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    VCreateFromModel obj = new VCreateFromModel();
+        //    var value = obj.VCreateGetProvosionalInvoice(ctx, displays, C_BPartner_IDs, OrgIds, isReturnTrxs, recordID);
+        //    return Json(new { result = value }, JsonRequestBehavior.AllowGet);
+        //}
         /// <summary>
         /// get data from common model
         /// </summary>
@@ -1257,6 +1424,11 @@ namespace VIS.Controllers
         {
             var ctx = Session["ctx"] as Ctx;
             VCreateFromModel obj = new VCreateFromModel();
+            Table = SecureEngineBridge.DecryptByClientKey(Table, ctx.GetSecureKey());
+            if (!QueryValidator.IsValid(Table))
+            {
+                return Json(null);
+            }
             var value = obj.GetConversionWhere(columns, forInvoices, recordID, Table);
             return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }

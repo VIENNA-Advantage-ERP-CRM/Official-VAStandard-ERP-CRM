@@ -325,9 +325,9 @@
                 //async: false,
                 data: {
                     adClientID: AD_Client_ID,
-                    mWarehouseIDs: mWarehouseID,
-                    cBPartnerIDs: cBPartnerID,
-                    cOrderIDSearchs: cOrderIDSearch
+                    mWarehouseIDs: VIS.secureEngine.encrypt(mWarehouseID),
+                    cBPartnerIDs: VIS.secureEngine.encrypt(cBPartnerID),
+                    cOrderIDSearchs: VIS.secureEngine.encrypt(cOrderIDSearch)
                 },
                 success: function (res) {
                     var ress = JSON.parse(res);

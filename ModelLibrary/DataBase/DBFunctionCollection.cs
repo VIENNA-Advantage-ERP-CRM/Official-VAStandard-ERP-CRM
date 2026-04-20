@@ -1126,5 +1126,21 @@ namespace VAdvantage.DataBase
             }
             return columnName;
         }
+
+        /// <summary>
+        /// Get standard screen name from client screen
+        /// </summary>
+        /// <param name="screenName">Client Screen Name</param>
+        /// <returns>Standard Screen Name</returns>
+        public static string GetOldScreen(string screenName)
+        {
+            if (MTable.Get_Table_ID("VAS_ZoomScreenConfig") > 0)
+            {
+                string sql = "SELECT Name FROM VAS_ZoomScreenConfig WHERE IsActive='Y' AND UPPER(Value)=" + DB.TO_STRING(screenName.ToUpper());
+                return Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+            }
+            return "";
+        }
+
     }
 }

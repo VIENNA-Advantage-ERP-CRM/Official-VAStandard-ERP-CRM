@@ -39,13 +39,13 @@ namespace VIS.Controllers
             return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
         }
 
-        public JsonResult GetAccountData(string sql, int pageNo)
-        {
-            var ctx = Session["ctx"] as Ctx;
-            CommonModel obj = new CommonModel();
-            var stValue = obj.GetAccountData(sql, pageNo, ctx);
-            return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
-        }
+        //public JsonResult GetAccountData(string sql, int pageNo)
+        //{
+        //    var ctx = Session["ctx"] as Ctx;
+        //    CommonModel obj = new CommonModel();
+        //    var stValue = obj.GetAccountData(sql, pageNo, ctx);
+        //    return Json(JsonConvert.SerializeObject(stValue), JsonRequestBehavior.AllowGet);
+        //}
 
         /// <summary>
         /// save/create lines from shipment form
@@ -970,7 +970,7 @@ namespace VIS.Controllers
             }
         }
 
-        public AccountData GetAccountData(string sql, int pageNo, VAdvantage.Utility.Ctx ctx)
+        public AccountData GetAccountData(string sql, SqlParameter[] param, int pageNo, VAdvantage.Utility.Ctx ctx)
         {
             AccountData _iData = new AccountData();
             try
@@ -982,6 +982,7 @@ namespace VIS.Controllers
                 pSetting.TotalPage = (totalRec % pageSize) == 0 ? (totalRec / pageSize) : ((totalRec / pageSize) + 1);
                 _iData.pSetting = pSetting;
 
+                //DataSet data = DBase.DB.ExecuteDatasetPaging(sql, param, null, pageNo, pageSize);
                 DataSet data = DBase.DB.ExecuteDatasetPaging(sql, pageNo, pageSize);
                 if (data == null)
                 {

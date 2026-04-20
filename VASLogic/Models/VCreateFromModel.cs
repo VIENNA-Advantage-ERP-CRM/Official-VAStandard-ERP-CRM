@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -469,9 +470,9 @@ namespace VIS.Models
         /// <param name="MatchToID"></param>
         /// <returns>List of Property Class "GetTableLoadVmatch"</returns>
         public List<GetTableLoadVmatch> GetTableLoadVmatch(Ctx ctx, string displayMATCH_INVOICEs, bool chkIsReturnTrxProps, string displayMATCH_ORDERs,
-                                                             string matchToTypeMATCH_SHIPMENTs, bool matchedsss, string chkSameBPartnerss,
-                                                             string chkSameProductss, string chkSameQtyss, string from_ss, string fromIfs, string to_Dats, string matchToTypes,
-                                                             string MATCH_SHIPMENTs, string MATCH_ORDERs, string onlyProduct_ss, string onlyVendor_ss, string MatchToID)
+                                                             bool matchToTypeMATCH_SHIPMENTs, bool matchedsss, string chkSameBPartnerss,
+                                                             string chkSameProductss, string chkSameQtyss, string from_ss, string fromIfs, string to_Dats, int matchToTypes,
+                                                             int MATCH_SHIPMENTs, int MATCH_ORDERs, string onlyProduct_ss, string onlyVendor_ss, int MatchToID)
         {
             List<GetTableLoadVmatch> objj = new List<GetTableLoadVmatch>();
 
@@ -488,7 +489,7 @@ namespace VIS.Models
                         FROM C_Invoice hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN C_InvoiceLine lin ON (hdr.C_Invoice_ID=lin.C_Invoice_ID)
                         INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID and dt.DocBaseType in ('API','APC') 
                         AND dt.IsReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + @" FULL JOIN M_MatchInv mi ON (lin.C_InvoiceLine_ID=mi.C_InvoiceLine_ID) 
-                        WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? " AND lin.M_InOutLine_ID = " + MatchToID : ""));
+                        WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID > 0 ? " AND lin.M_InOutLine_ID = " + MatchToID : ""));
 
                 _groupBy = " GROUP BY hdr.C_Invoice_ID,hdr.DocumentNo,hdr.DateInvoiced,bp.Name,hdr.C_BPartner_ID,"
                     + " lin.Line,lin.C_InvoiceLine_ID,p.Name,lin.M_Product_ID,lin.QtyInvoiced,lin.M_AttributeSetInstance_ID ,mattr.Description  "
@@ -503,7 +504,7 @@ namespace VIS.Models
                         FROM C_Order hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN C_OrderLine lin ON (hdr.C_Order_ID=lin.C_Order_ID)
                         INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID) INNER JOIN C_DocType dt ON (hdr.C_DocType_ID=dt.C_DocType_ID AND dt.DocBaseType='POO'
                         AND dt.isReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + @" FULL JOIN M_MatchPO mo ON (lin.C_OrderLine_ID=mo.C_OrderLine_ID)
-                        WHERE  hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? " AND mo.M_InOutLine_ID = " + MatchToID : ""));
+                        WHERE  hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID > 0 ? " AND mo.M_InOutLine_ID = " + MatchToID : ""));
 
                 //Conneted this condition because of partialy received qty from MR In case of Purcahse Order : Done by Manjot issue assigned by Puneet and Mukesh Sir
                 //mo."
@@ -524,7 +525,7 @@ namespace VIS.Models
                         FROM M_InOut hdr INNER JOIN C_BPartner bp ON (hdr.C_BPartner_ID=bp.C_BPartner_ID) INNER JOIN M_InOutLine lin ON (hdr.M_InOut_ID=lin.M_InOut_ID)
                         INNER JOIN M_Product p ON (lin.M_Product_ID=p.M_Product_ID) LEFT JOIN M_AttributeSetInstance mattr ON (lin.M_AttributeSetInstance_ID=mattr.M_AttributeSetInstance_ID)  INNER JOIN C_DocType dt ON (hdr.C_DocType_ID = dt.C_DocType_ID AND dt.DocBaseType='MMR'
                         AND dt.isReturnTrx = " + (chkIsReturnTrxProps ? "'Y')" : "'N')") + " FULL JOIN " + (matchToTypes == MATCH_ORDERs ? "M_MatchPO" : "M_MatchInv")
-                    + @" m ON (lin.M_InOutLine_ID=m.M_InOutLine_ID) WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID != "" ? (matchToTypes == MATCH_ORDERs ? " AND m.C_OrderLine_ID = "
+                    + @" m ON (lin.M_InOutLine_ID=m.M_InOutLine_ID) WHERE hdr.DocStatus IN ('CO','CL')" + (matched && MatchToID > 0 ? (matchToTypes == MATCH_ORDERs ? " AND m.C_OrderLine_ID = "
                     + MatchToID : " AND m.C_InvoiceLine_ID = " + MatchToID) : ""));
 
                 _groupBy = " GROUP BY hdr.M_InOut_ID,hdr.DocumentNo,hdr.MovementDate,bp.Name,hdr.C_BPartner_ID,"
@@ -800,9 +801,10 @@ namespace VIS.Models
         /// <returns>Requisition Lines Data</returns>
         public List<ReqLineData> GetReqLineData(Ctx ctx, string Requisition_ID, int M_Product_ID)
         {
-
             List<ReqLineData> result = new List<ReqLineData>();
             DataSet _ds = null;
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@param1", Requisition_ID);
             StringBuilder sql = new StringBuilder(@" SELECT t.*");
             if (Env.IsModuleInstalled("VA097_"))
             {
@@ -821,7 +823,7 @@ namespace VIS.Models
 
             LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
 
-            WHERE reqln.M_Requisition_ID IN(" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID = " + M_Product_ID : "")
+            WHERE reqln.M_Requisition_ID IN (@param1)" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID = " + M_Product_ID : "")
             + @" AND reqln.IsActive='Y' 
                         AND cl.M_RequisitionLine_ID IS NULL
 
@@ -832,9 +834,9 @@ namespace VIS.Models
                         FROM M_RequisitionLine reqln INNER JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID = cl.M_RequisitionLine_ID
                         INNER JOIN C_RfqLineQty rl ON (rl.C_RfqLine_ID=cl.C_RfqLine_ID) LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
                         LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
-                        WHERE reqln.M_Requisition_ID IN (" + Requisition_ID + @") AND reqln.IsActive = 'Y' 
+                        WHERE reqln.M_Requisition_ID IN (@param1) AND reqln.IsActive = 'Y' 
                         AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
-                        WHERE req.M_Requisition_ID IN (" + Requisition_ID + @")" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
+                        WHERE req.M_Requisition_ID IN (@param1)" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
             + @" AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
                         AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
                         reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
