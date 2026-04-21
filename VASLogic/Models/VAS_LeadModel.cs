@@ -10,13 +10,14 @@ using VAdvantage.ProcessEngine;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using System.Dynamic;
+using System.Data.SqlClient;
 
 namespace VASLogic.Models
 {
     public class VAS_LeadModel
     {
         private static VLogger log = VLogger.GetVLogger(typeof(VAS_LeadModel).FullName);
-        public string UserImage(string rec_ID)
+        public string UserImage(int rec_ID)
         {
             string imgurl = Util.GetValueOfString(DB.ExecuteScalar(@"SELECT i.imageurl FROM C_Lead c 
             INNER JOIN AD_User u ON (c.SalesRep_ID = u.AD_User_ID) LEFT JOIN AD_Image i ON (u.AD_Image_ID = i.AD_Image_ID)
@@ -42,7 +43,10 @@ namespace VASLogic.Models
         public bool UpdateThreadID(string fields)
         {
             string[] val = fields.Split(',');
-            if (Util.GetValueOfInt(DB.ExecuteQuery("UPDATE C_Lead SET VA061_ThreadID='" + val[1] + "' WHERE C_Lead_ID=" + Util.GetValueOfInt(val[0]))) > 0)
+            SqlParameter[] param = new SqlParameter[2];
+            param[0] = new SqlParameter("@param1", val[1]);
+            param[1] = new SqlParameter("@param2", Util.GetValueOfInt(val[0]));
+            if (Util.GetValueOfInt(DB.ExecuteQuery("UPDATE C_Lead SET VA061_ThreadID=@param1 WHERE C_Lead_ID=@param2")) > 0)
             {
                 return true;
             }

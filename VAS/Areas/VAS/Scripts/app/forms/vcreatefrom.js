@@ -1000,7 +1000,7 @@
 
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
-                { "columns": column, "forInvoices": forInvoice, "recordID": recordId, "Table": "C_Order" }, null);
+                { "columns": column, "forInvoices": forInvoice, "recordID": recordId, "Table": VIS.secureEngine.encrypt("C_Order") }, null);
         }
 
         if (whereCondition != null && whereCondition != "") {
@@ -1106,7 +1106,7 @@
 
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
-                { "columns": "", "forInvoices": false, "recordID": recordId, "Table": "i" }, null);
+                { "columns": "", "forInvoices": false, "recordID": recordId, "Table": VIS.secureEngine.encrypt("i") }, null);
         }
 
         if (whereCondition != null && whereCondition != "") {
@@ -1184,7 +1184,7 @@
 
         if (recordId > 0) {
             whereCondition = VIS.dataContext.getJSONData("VCreateFrom/GetConversionWhere",
-                { "columns": column, "forInvoices": false, "recordID": recordId, "Table": "C_Order" }, null);
+                { "columns": column, "forInvoices": false, "recordID": recordId, "Table": VIS.secureEngine.encrypt("C_Order") }, null);
         }
 
         if (whereCondition != null && whereCondition != "") {
@@ -2571,9 +2571,9 @@
                     pageNo: pNo,
                     forInvoicees: forInvoice,
                     C_Ord_IDs: C_Order_ID,
-                    isBaseLangess: isBaseLanges,
-                    MProductIDss: MProductIDs,
-                    DelivDates: DelivDate,
+                    isBaseLangess: VIS.secureEngine.encrypt(isBaseLanges),
+                    MProductIDss: VIS.secureEngine.encrypt(MProductIDs),
+                    DelivDates: VIS.secureEngine.encrypt(DelivDate),
                     adOrgIDSs: adOrgIDS,
                 },
                 error: function (e) {
@@ -2632,9 +2632,9 @@
 
                     forInvoicees: forInvoice,
                     C_Ord_IDs: C_Order_ID,
-                    isBaseLangess: isBaseLanges,
-                    MProductIDss: MProductIDs,
-                    DelivDates: DelivDate,
+                    isBaseLangess: VIS.secureEngine.encrypt(isBaseLanges),
+                    MProductIDss: VIS.secureEngine.encrypt(MProductIDs),
+                    DelivDates: VIS.secureEngine.encrypt(DelivDate),
                 },
                 error: function (e) {
                     alert(VIS.Msg.getMsg('ErrorWhileGettingData'));
@@ -2934,7 +2934,7 @@
                 async: false,
                 data: {
                     forInvoices: forInvoice,
-                    isBaseLangs: isBaseLang,
+                    isBaseLangs: VIS.secureEngine.encrypt(isBaseLang),
                     C_OrderID: C_Order_ID,
                     orggetVals: orggetVal,
                     langs: lang
@@ -2997,7 +2997,7 @@
                 async: false,
                 data: {
                     forInvoices: forInvoice,
-                    isBaseLangs: isBaseLang,
+                    isBaseLangs: VIS.secureEngine.encrypt(isBaseLang),
                     C_OrderID: C_Order_ID,
                     langs: lang
                 },

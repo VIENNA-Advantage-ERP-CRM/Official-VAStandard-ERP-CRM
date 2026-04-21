@@ -74,22 +74,7 @@ namespace VAS.Models
             }
             return user;
         }
-
-        /// <summary>
-        /// Get standard screen name from client screen
-        /// </summary>
-        /// <param name="screenName">Client Screen Name</param>
-        /// <returns>Standard Screen Name</returns>
-        public string GetOldScreen(string screenName)
-        {
-            if (MTable.Get_Table_ID("VAS_ZoomScreenConfig") > 0)
-            {
-                string sql = "SELECT Name FROM VAS_ZoomScreenConfig WHERE IsActive='Y' AND UPPER(Value)=" + DB.TO_STRING(screenName.ToUpper());
-                return Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
-            }
-            return "";
-        }
-
+        
         // VIS0336-using this method for fetching the cart names and detail for inventory form
         /// </summary>
         /// <param name="CartName"></param>
@@ -110,7 +95,7 @@ namespace VAS.Models
                              " (SELECT AD_Reference_ID FROM AD_Reference WHERE Name='VAICNT_TransactionType') AND ISActive='Y' AND Value=VAICNT_TransactionType) AS TransactionType, c.VAICNT_ReferenceNo," +
                              " (SELECT COUNT(VAICNT_InventoryCount_ID) FROM VAICNT_InventoryCountLine l inner join M_Product p on l.M_Product_ID=p.M_Product_ID");
 
-            string oldScreen = GetOldScreen(WindowName);
+            string oldScreen = DBFunctionCollection.GetOldScreen(WindowName);
             if (!string.IsNullOrEmpty(oldScreen))
             {
                 WindowName = oldScreen;
@@ -246,7 +231,7 @@ namespace VAS.Models
                         " ON po.M_Product_ID= prd.M_Product_ID LEFT JOIN M_AttributeSetInstance ats ON po.M_AttributeSetInstance_ID = ats.M_AttributeSetInstance_ID" +
                         " WHERE po.IsActive = 'Y' AND po.VAICNT_InventoryCount_ID = " + CartId);
 
-            string oldScreen = GetOldScreen(ScreenName);
+            string oldScreen = DBFunctionCollection.GetOldScreen(ScreenName);
             if (!string.IsNullOrEmpty(oldScreen))
             {
                 ScreenName = oldScreen;
@@ -302,7 +287,7 @@ namespace VAS.Models
             query.Clear();
             query.Append("SELECT Name FROM AD_Window WHERE AD_Window_ID=" + windowID);
             string WindowName = Util.GetValueOfString(DB.ExecuteScalar(query.ToString(), null, null));
-            string oldScreen = GetOldScreen(WindowName);
+            string oldScreen = DBFunctionCollection.GetOldScreen(WindowName);
             if (!string.IsNullOrEmpty(oldScreen))
             {
                 WindowName = oldScreen;
@@ -826,7 +811,7 @@ namespace VAS.Models
                         fetchedUOMConv = true;
                     }
 
-                    string oldScreen = GetOldScreen(WindowName);
+                    string oldScreen = DBFunctionCollection.GetOldScreen(WindowName);
                     if (!string.IsNullOrEmpty(oldScreen))
                     {
                         WindowName = oldScreen;

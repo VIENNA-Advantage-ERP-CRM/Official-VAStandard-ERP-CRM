@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Web;
@@ -39,6 +40,7 @@ namespace VIS.Models
         public List<PContainer> ProductContainer(string Name, int WarehouseId, int LocatorId)
         {
             List<PContainer> listOverHead = new List<PContainer>();
+            SqlParameter[] param = new SqlParameter[1];
             string sqlQry = @"SELECT M_ProductContainer_ID,
                                      Name, 
                                      Ref_M_Container_ID ,
@@ -49,10 +51,11 @@ namespace VIS.Models
                               @" AND M_Locator_ID=" + LocatorId;
             if (!String.IsNullOrEmpty(Name))
             {
-                sqlQry += "  AND UPPER(Name) LIKE UPPER('%" + Name + "%')";
+                param[0] = new SqlParameter("@name", "%" + Name + "%");
+                sqlQry += "  AND UPPER(Name) LIKE UPPER(@name)";
             }
-            DataSet ds = DB.ExecuteDataset(sqlQry, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            DataSet ds = DB.ExecuteDataset(sqlQry, param, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                 {
@@ -198,8 +201,9 @@ namespace VIS.Models
             DataSet ds = null;
             if (DatabaseType.IsOracle)
             {
-                sql = @"SELECT value ,   '.'   || LPAD (' ', LEVEL * 1)   || Name AS Name,
-                            LEVEL ,   name   || '_'   || value AS ContainerName , m_productcontainer_id
+                SqlParameter[] param = new SqlParameter[1];
+                sql = @"SELECT value, '.' || LPAD(' ', LEVEL * 1) || Name AS Name,
+                            LEVEL, name   || '_'   || value AS ContainerName, m_productcontainer_id
                          FROM m_productcontainer WHERE IsActive = 'Y'";
                 if (warehouse > 0)
                 {
@@ -479,7 +483,7 @@ namespace VIS.Models
                         #region Create new record of movement line
                         lineNo += 10;
                         moveline.SetAD_Client_ID(move.GetAD_Client_ID());
-                        moveline.SetAD_Org_ID(move.GetAD_Org_ID());                        
+                        moveline.SetAD_Org_ID(move.GetAD_Org_ID());
                         moveline.SetM_Movement_ID(move.GetM_Movement_ID());
                         moveline.SetLine(lineNo);
                         moveline.SetM_Product_ID(Util.GetValueOfInt(mData[i]["M_Product_ID"]));
@@ -831,19 +835,19 @@ namespace VIS.Models
             return "";
         }
 
-
         public string GetProductContainer(string text, string validation)
         {
-            text = text.ToUpper();
-            string sql = @"SELECT Value || '_' || Name as des, M_ProductContainer_ID FROM M_ProductContainer WHERE IsActive='Y'
-            AND (Upper(VALUE) like '%" + text + "%' OR UPPER(Name) LIKE '%" + text + "%')";
-            sql = MRole.GetDefault(_ctx).AddAccessSQL(sql, "M_ProductContainer", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            SqlParameter[] param = new SqlParameter[1];
+            param[0] = new SqlParameter("@text", "%" + text.ToUpper() + "%");
 
+            string sql = @"SELECT Value || '_' || Name as des, M_ProductContainer_ID FROM M_ProductContainer WHERE IsActive='Y'
+            AND (Upper(VALUE) LIKE @text OR UPPER(Name) LIKE @text)";
+            sql = MRole.GetDefault(_ctx).AddAccessSQL(sql, "M_ProductContainer", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             sql += " AND " + validation;
 
             VLogger.Get().Log(Level.SEVERE, sql);
-            DataSet ds = DB.ExecuteDataset(sql);
-            if (ds == null || ds.Tables[0].Rows.Count == 0 || ds.Tables[0].Rows.Count > 1)
+            DataSet ds = DB.ExecuteDataset(sql, param, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0 || ds.Tables[0].Rows.Count > 1)
             {
                 return null;
             }
