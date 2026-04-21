@@ -982,8 +982,7 @@ namespace VIS.Controllers
                 pSetting.TotalPage = (totalRec % pageSize) == 0 ? (totalRec / pageSize) : ((totalRec / pageSize) + 1);
                 _iData.pSetting = pSetting;
 
-                //DataSet data = DBase.DB.ExecuteDatasetPaging(sql, param, null, pageNo, pageSize);
-                DataSet data = DBase.DB.ExecuteDatasetPaging(sql, pageNo, pageSize);
+                DataSet data = DBase.DB.ExecuteDatasetPaging(sql, param, null, pageNo, pageSize);                
                 if (data == null)
                 {
                     return null;
