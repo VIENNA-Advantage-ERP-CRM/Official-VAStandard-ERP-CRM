@@ -197,11 +197,8 @@ namespace VIS.Models
                 + "FROM C_BankAccountDoc "
                 + "WHERE C_BankAccount_ID=@param1 AND PaymentRule  = @param2 AND IsActive='Y'";
 
-
-            //int count = DB.GetSQLValue(null, sql);
-            int count = Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null));
-
-            int next = DB.GetSQLValue(null, sql1);
+            int count = DB.GetSQLValue(null, sql);     
+            int next = Util.GetValueOfInt(DB.ExecuteScalar(sql1, param, null));
             objPInfo.NoOfPayments = Util.GetValueOfString(count);
             // btnEFT.IsEnabled = PaymentRule.Equals("T");
 
