@@ -810,7 +810,7 @@ namespace VIS.Models
             {
                 sql.Append(@", (SELECT SUM(cl.VA097_TenderQuantity) AS OrdQty FROM VA097_RequisitionLines cl 
                             INNER JOIN VA097_TenderLine tl ON (tl.VA097_TenderLine_ID=cl.VA097_TenderLine_ID) 
-                            INNER JOIN VA097_Tender t ON (tr.VA097_Tender_ID=tl.VA097_Tender_ID)
+                            INNER JOIN VA097_Tender tr ON (tr.VA097_Tender_ID=tl.VA097_Tender_ID)
                             WHERE cl.M_RequisitionLine_ID=t.M_RequisitionLine_ID AND tr.DocStatus NOT IN ('RE', 'VO')) AS TenderQty");
             }
 
