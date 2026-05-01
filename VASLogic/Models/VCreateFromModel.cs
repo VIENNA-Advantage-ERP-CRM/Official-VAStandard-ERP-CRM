@@ -843,7 +843,7 @@ namespace VIS.Models
                         reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty)t");
             try
             {
-                _ds = DB.ExecuteDataset(sql.ToString());
+                _ds = DB.ExecuteDataset(sql.ToString(), param, null);
                 decimal TenderQty = 0;
                 if (_ds != null && _ds.Tables[0].Rows.Count > 0)
                 {
