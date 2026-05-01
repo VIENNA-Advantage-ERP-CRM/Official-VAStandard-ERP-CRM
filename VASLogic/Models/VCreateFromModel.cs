@@ -808,39 +808,35 @@ namespace VIS.Models
             StringBuilder sql = new StringBuilder(@" SELECT t.*");
             if (Env.IsModuleInstalled("VA097_"))
             {
-                sql.Append(",(SELECT SUM(cl.VA097_TenderQuantity) AS OrdQty FROM VA097_RequisitionLines cl " +
-                           " INNER JOIN VA097_TenderLine tl ON(tl.VA097_TenderLine_ID= cl.VA097_TenderLine_ID) INNER JOIN VA097_Tender t ON" +
-                          " t.VA097_Tender_ID = tl.VA097_Tender_ID WHERE cl.M_RequisitionLine_ID = t.M_RequisitionLine_ID AND t.DocStatus NOT IN('RE', 'VO')) AS TenderQty");
+                sql.Append(@", (SELECT SUM(cl.VA097_TenderQuantity) AS OrdQty FROM VA097_RequisitionLines cl 
+                            INNER JOIN VA097_TenderLine tl ON (tl.VA097_TenderLine_ID=cl.VA097_TenderLine_ID) 
+                            INNER JOIN VA097_Tender t ON (tr.VA097_Tender_ID=tl.VA097_Tender_ID)
+                            WHERE cl.M_RequisitionLine_ID=t.M_RequisitionLine_ID AND tr.DocStatus NOT IN ('RE', 'VO')) AS TenderQty");
             }
 
             sql.Append(@" FROM( SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
             reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
             reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, 0 AS OrdQty
-
-            FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID = cl.M_RequisitionLine_ID
-
-            LEFT JOIN C_Charge crg ON(reqln.C_Charge_ID = crg.C_Charge_ID)
-
-            LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
-
+            FROM M_RequisitionLine reqln LEFT JOIN C_RfqLine cl ON (reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID)
+            LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
+            LEFT JOIN M_Product pro ON (reqln.M_Product_ID = pro.M_Product_ID) 
+            LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID = uom.C_UOM_ID)
             WHERE reqln.M_Requisition_ID IN (@param1)" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID = " + M_Product_ID : "")
-            + @" AND reqln.IsActive='Y' 
-                        AND cl.M_RequisitionLine_ID IS NULL
-
-                        UNION
-                        SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
-                        reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
-                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, SUM(rl.Qty) AS OrdQty
-                        FROM M_RequisitionLine reqln INNER JOIN C_RfqLine cl ON reqln.M_RequisitionLine_ID = cl.M_RequisitionLine_ID
-                        INNER JOIN C_RfqLineQty rl ON (rl.C_RfqLine_ID=cl.C_RfqLine_ID) LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
-                        LEFT JOIN M_Product pro ON(reqln.M_Product_ID = pro.M_Product_ID) LEFT JOIN C_UOM uom ON(reqln.C_UOM_ID = uom.C_UOM_ID)
-                        WHERE reqln.M_Requisition_ID IN (@param1) AND reqln.IsActive = 'Y' 
-                        AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
-                        WHERE req.M_Requisition_ID IN (@param1)" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
+            + @" AND reqln.IsActive='Y' AND cl.M_RequisitionLine_ID IS NULL
+            UNION
+            SELECT reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END AS ProdName,
+            reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name AS UOM, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END AS ProdUOM,
+            reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty AS DelQty, SUM(rl.Qty) AS OrdQty
+            FROM M_RequisitionLine reqln INNER JOIN C_RfqLine cl ON (reqln.M_RequisitionLine_ID=cl.M_RequisitionLine_ID)
+            INNER JOIN C_RfqLineQty rl ON (rl.C_RfqLine_ID=cl.C_RfqLine_ID) LEFT JOIN C_Charge crg ON (reqln.C_Charge_ID = crg.C_Charge_ID)
+            LEFT JOIN M_Product pro ON (reqln.M_Product_ID=pro.M_Product_ID) LEFT JOIN C_UOM uom ON (reqln.C_UOM_ID = uom.C_UOM_ID)
+            WHERE reqln.M_Requisition_ID IN (@param1) AND reqln.IsActive = 'Y' 
+            AND reqln.M_RequisitionLine_ID IN (SELECT req.M_RequisitionLine_ID FROM M_RequisitionLine req INNER JOIN C_RfqLine oline ON(req.M_RequisitionLine_ID = oline.M_RequisitionLine_ID)
+            WHERE req.M_Requisition_ID IN (@param1)" + (M_Product_ID > 0 ? " AND reqln.M_Product_ID=" + M_Product_ID : "")
             + @" AND oline.C_Rfq_ID IN (SELECT C_Rfq_ID FROM C_Rfq WHERE C_Rfq_ID IN (oline.C_Rfq_ID)
-                        AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
-                        reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
-                        reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty)t");
+            AND DocStatus NOT IN('RE', 'VO'))) GROUP BY reqln.M_Requisition_ID, reqln.M_RequisitionLine_ID, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.Name ELSE crg.Name END,
+            reqln.M_Product_ID, reqln.C_Charge_ID, reqln.C_UOM_ID, uom.Name, CASE WHEN NVL(reqln.M_Product_ID, 0) > 0 THEN pro.C_UOM_ID ELSE reqln.C_UOM_ID END, 
+            reqln.M_AttributeSetInstance_ID, reqln.QtyEntered, reqln.PriceActual, reqln.DTD001_DeliveredQty)t");
             try
             {
                 _ds = DB.ExecuteDataset(sql.ToString(), param, null);
