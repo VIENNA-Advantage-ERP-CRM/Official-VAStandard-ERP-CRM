@@ -618,7 +618,7 @@
                     return;
                 }
                 obj.$super.setBusy(false);
-                alert(returnValue);
+                VIS.ADialog.info('VAS_BankStatementNotSaved');
             },
             error: function (jqXHR, textStatus, errorThrown) {
                 debugger;
