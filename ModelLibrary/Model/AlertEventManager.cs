@@ -200,6 +200,7 @@ namespace VAdvantage.Alert
         {
             Dictionary<string, object> refValues = null;
             string windowName = "";
+            string windowDisplayName = "";
             string tabName = "";
             string subject = "";
             List<List<object>> data = new List<List<object>>();
@@ -213,10 +214,19 @@ namespace VAdvantage.Alert
             // -----------------------------------------
             if (document.GetAD_Window_ID() > 0 && document.GetWindowTabID() > 0)
             {
-                windowName = Util.GetValueOfString(DB.ExecuteScalar(
-                    "SELECT Name FROM AD_Window WHERE AD_Window_ID=" + document.GetAD_Window_ID()));
-                tabName = Util.GetValueOfString(DB.ExecuteScalar(
-                    "SELECT Name FROM AD_Tab WHERE AD_Tab_ID=" + document.GetWindowTabID()));
+                string Query = @"SELECT w.Name, w.DisplayName, t.Name AS TabName
+                                 FROM AD_Window w
+                                 INNER JOIN AD_Tab t ON t.AD_Tab_ID = " + document.GetWindowTabID() + @"
+                                 WHERE w.AD_Window_ID = " + document.GetAD_Window_ID();
+
+                DataSet ds = DB.ExecuteDataset(Query);
+                if (ds != null && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow dr = ds.Tables[0].Rows[0];
+                    windowName = Util.GetValueOfString(dr["Name"]);
+                    windowDisplayName = Util.GetValueOfString(dr["DisplayName"]);
+                    tabName = Util.GetValueOfString(dr["TabName"]);
+                }                
             }
             else
             {
@@ -266,7 +276,7 @@ namespace VAdvantage.Alert
 
             if (eventType.Equals("INSERT") && rule.IsInsert)
             {
-                subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowName;
+                subject = Msg.Translate(document.GetCtx(), "VAS_RecordCreateNotification") + " - " + windowDisplayName;
 
                 JObject newData = GetNewJsonData(refValues);
 
@@ -322,7 +332,7 @@ namespace VAdvantage.Alert
 
                 if (updatedColumn.Count > 0)
                 {
-                    subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowName;
+                    subject = Msg.Translate(document.GetCtx(), "VAS_RecordUpdateNotification") + " - " + windowDisplayName;
                     JObject newData = GetNewJsonData(refValues);
                     if (newData != null)
                     {
@@ -358,7 +368,7 @@ namespace VAdvantage.Alert
 
             else if (eventType.Equals("DELETE") && rule.IsDeleted)
             {
-                subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowName;
+                subject = Msg.Translate(document.GetCtx(), "VAS_RecordDeletedNotification") + " - " + windowDisplayName;
 
                 JObject newData = GetNewJsonData(refValues);
 
@@ -429,7 +439,7 @@ namespace VAdvantage.Alert
             if (attachment != null)
                 files.Add(attachment);
 
-            string htmlBody = GenerateHtmlEmail(windowName, tabName, document, eventType, data);
+            string htmlBody = GenerateHtmlEmail(windowDisplayName, tabName, document, eventType, data);
 
             int count = SendInfoHTML(document.GetCtx(), users, subject, htmlBody);
 
