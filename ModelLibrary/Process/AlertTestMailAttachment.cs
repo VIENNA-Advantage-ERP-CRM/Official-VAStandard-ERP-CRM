@@ -231,12 +231,12 @@ namespace ViennaAdvantage.Process
                         row[col] = rs[col];
                     }
                     data.Rows.Add(row);
-                    if (!string.IsNullOrEmpty(emailColumnName) && data.Columns.Contains(emailColumnName) && row[emailColumnName] != DBNull.Value)
+                    /*if (!string.IsNullOrEmpty(emailColumnName) && data.Columns.Contains(emailColumnName) && row[emailColumnName] != DBNull.Value)
                     {
                         string email = row[emailColumnName].ToString();
                         emailAddresses.Add(email);
                         emailRows.Add(row);
-                    }
+                    }*/
                 }
             }
             catch (Exception e)
@@ -322,7 +322,7 @@ namespace ViennaAdvantage.Process
             }
             if (SendInfo(AD_User_ID, alert.GetAlertSubject(), finalMsg.ToString(), attachments))
             {
-                if (emailAddresses.Count > 0)
+               /* if (emailAddresses.Count > 0)
                 {
 
                     for (int i = 0; i < emailAddresses.Count; i++)
@@ -338,7 +338,7 @@ namespace ViennaAdvantage.Process
                             emailObj.Send();
                         }
                     }
-                }
+                }*/
                 return true;
             }
             return false;

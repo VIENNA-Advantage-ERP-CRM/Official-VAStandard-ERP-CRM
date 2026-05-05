@@ -426,7 +426,10 @@ namespace VIS.Models
                     obj.SetFromClause(Util.GetValueOfString(fromClause));
                     obj.SetWhereClause(Util.GetValueOfString(whereClause + " "));
                     obj.SetOtherClause(Util.GetValueOfString(" " + otherClause));
-                    obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
+                    if (tableID > 0)
+                    {
+                        obj.SetAD_Table_ID(Util.GetValueOfInt(tableID));
+                    }
                     obj.Set_Value("IsEmail", Util.GetValueOfBool(isEmail));
                     obj.Set_Value("EMail", Util.GetValueOfString(emailColumn));
                     obj.SetIsActive(true);
