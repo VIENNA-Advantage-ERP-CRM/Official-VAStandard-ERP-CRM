@@ -232,7 +232,7 @@
             $contentArea.append($sqlContent)
                 .append($sqlGeneratorContent)
                 .append($queryMessage);
-            $queryResultGrid.append(gridDiv);
+            $queryResultGrid.append(gridDiv).append(sqlPagingDiv);
             $sqlGeneratorQueryResultGrid.append(gridDiv2);
             $sqlGeneratorContent.find(".vas-sqlgenerator-column1").append($column1Div);
             $column1Div
@@ -692,32 +692,18 @@
                             sqlTxtContentWrap.show()
                             emailContentDiv.show();
                            // $sqlContent.find($saveBtn).hide();
-                            sqlPagingDiv.hide();
                             $sqlResultDiv.hide();
                             $sqlContent.removeClass('vas-grid-height');
                         }
                         else {
-                            $(this).val(sqlQuery);
-                            //$sqlContent.append($saveBtn);
-                            $sqlContent.append(sqlPagingDiv);
-                            //$sqlContent.find($saveBtn).show();
-                            sqlPagingDiv.show();
-                            $sqlContent.addClass('vas-grid-height');
-                            //var query = $selectQuery.text();
-                           // var query = buildSQLQuery();
-                           // var AD_Table_ID = txtTableSql.getValue();
                             if (AD_Table_ID > 0) {
                                 tableName = getTableName();
                                 getResult(query, tableName, pageNo);
                             } else {
                                 VIS.ADialog.error("", "", VIS.Msg.getMsg("No table found"));
+                                return;
                             }
-                            /* var match = query.match(/\bFROM\b\s+([a-zA-Z0-9_."]+)/);
-                             if (match && match[1]) {
-                                 mainTableName = match[1].replace(/"/g, ''); // remove quotes if any
-                             } else {
-                                 VIS.ADialog.error("", "", VIS.Msg.getMsg("No table found"));
-                             }*/
+                          
                         }
                     }
                 }
@@ -747,6 +733,7 @@
                             $selectGeneratorQuery.show();
                             gridDiv2.hide();
                             $sqlGeneratorQueryResultGrid.hide();
+                            pagingPlusBtnDiv.hide();
                            // hideSaveGeneratorBtn.hide();
                             $sqlResultDiv.hide();
 
@@ -1352,7 +1339,8 @@
                // var query = $selectQuery.text().trim();
                 var query = buildSQLQuery();
                 alertID = VIS.context.getContext($self.windowNo, 'AD_Alert_ID');
-                if (alertID > 0) {                    
+                if (alertID > 0) {
+                    tableID = txtTableSql.getValue();
                     UpdateAlertRule(query);
                 }
             });
@@ -2063,7 +2051,6 @@
                 $sqlResultDiv.text("");
                 $SQLMainDiv.hide();
                 $EventMainDiv.hide();
-                emailContentDiv.hide();
                 alertRuleID = ParentId;
                 if (alertRuleID > 0) {
                     $sqlGeneratorBtn.attr('disabled', true);
@@ -2072,15 +2059,24 @@
                         url: VIS.Application.contextUrl + "AlertSQLGenerate/GetAlertData",
                         type: "POST",
                         data: { alertRuleID: alertRuleID },
-                        async: false,
+                        async: true,
                         success: function (result) {
                             result = JSON.parse(result);
                             if (result) {
                                 $self.BasedOn = result.BasedOn;
                                 if (result.BasedOn && result.BasedOn == 'S') {
                                     $SQLMainDiv.show();
-                                    $EventMainDiv.hide();
+                                    $testSqlBtn.val(testSQL);
+                                    $queryResultGrid.hide();
+                                    $query.show();
+                                    $selectQuery.show();
+                                    sqlTxtContentWrap.show()
                                     emailContentDiv.show();
+                                    // $sqlContent.find($saveBtn).hide();
+                                    $sqlResultDiv.hide();
+                                    $sqlContent.removeClass('vas-grid-height');
+                                    $EventMainDiv.hide();
+                                  //  emailContentDiv.show();
                                     txtEmailColName.setValue(result.EmailColumnName);
                                     txtIsEmail.setValue(result.IsEmail);
                                     txtSqlSelect.setValue(result.SelectClause);
@@ -2162,7 +2158,6 @@
                     sqlTxtContentWrap.show();
                     emailContentDiv.show();
                     //$saveBtn.hide();
-                    sqlPagingDiv.hide();
                     setBusy(false);
                 }
         }
@@ -3265,7 +3260,7 @@
             if (query != null) {             
                 var obj = {
                     query: VIS.secureEngine.encrypt(query),
-                    tableID: tableID || 0,
+                    tableID: tableID,
                     alertID: alertID,
                     alertRuleID: alertRuleID,
                     isEmail: txtIsEmail.getValue(),
@@ -3363,7 +3358,6 @@
                                     sqlTxtContentWrap.show();
                                     emailContentDiv.show();
                                    // $saveBtn.hide();
-                                    sqlPagingDiv.hide();
                                 }
                                 if (sqlGenerateFlag) {
                                     $selectGeneratorQuery.show();
@@ -3387,7 +3381,6 @@
                                 sqlTxtContentWrap.show();
                                 emailContentDiv.show();
                                 //$saveBtn.hide();
-                                sqlPagingDiv.hide();
                             }
                             if (sqlGenerateFlag) {
                                 $selectGeneratorQuery.show();
@@ -3458,6 +3451,7 @@
             emailContentDiv.hide();
             $query.hide();
             $queryResultGrid.show();
+            $testSqlBtn.val(sqlQuery);
         }
 
 
