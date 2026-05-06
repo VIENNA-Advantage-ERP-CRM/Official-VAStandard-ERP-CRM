@@ -1016,7 +1016,7 @@ namespace VIS.Controllers
             }
             if (Amounts != "0")
             {
-                paramList.Add(new SqlParameter("@param4", Amounts));
+                paramList.Add(new SqlParameter("@param4", Util.GetValueOfDecimal(Amounts)));
                 sql.Append(" AND p.PayAmt=@param4");
             }
             if (trxDatess != "")
