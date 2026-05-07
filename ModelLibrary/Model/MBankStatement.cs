@@ -928,6 +928,12 @@ namespace VAdvantage.Model
                         payment.SetIsReconciled(false);
                         payment.Save(Get_TrxName());
                     }
+                    if (line.GetC_CashLine_ID() != 0)
+                    {
+                        MCashLine cashLine = new MCashLine(GetCtx(), line.GetC_CashLine_ID(), Get_TrxName());
+                        cashLine.SetVA012_IsReconciled(false);
+                        cashLine.Save(Get_TrxName());
+                    }
                 }
             }
             AddDescription(Msg.Translate(GetCtx(), "Voided"));
