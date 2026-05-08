@@ -934,10 +934,10 @@ namespace VAdvantage.Model
                     if (Env.IsModuleInstalled("VA012_") && line.GetC_CashLine_ID() != 0)
                     {
                         sql = @"UPDATE C_CashLine SET VA012_IsReconciled='N' WHERE C_CashLine_ID=" + line.GetC_CashLine_ID();
-                        count = DB.ExecuteQuery(sql, null, null);
+                        count = DB.ExecuteQuery(sql, null, Get_Trx());
                         if (count <= 0)
                         {
-                            log.Info("CashLine is not updated for VA012_IsReconciled='N'");
+                            log.Info("Reconcile is not reset on CashLine ID = " + line.GetC_CashLine_ID());
                         }
                     }
                 }
