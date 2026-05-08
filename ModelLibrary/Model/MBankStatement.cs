@@ -930,9 +930,12 @@ namespace VAdvantage.Model
                     }
                     if (line.GetC_CashLine_ID() != 0)
                     {
-                        MCashLine cashLine = new MCashLine(GetCtx(), line.GetC_CashLine_ID(), Get_TrxName());
-                        cashLine.SetVA012_IsReconciled(false);
-                        cashLine.Save(Get_TrxName());
+                        string sql = @"UPDATE C_CashLine SET VA012_IsReconciled='N' WHERE C_CashLine_ID=" + line.GetC_CashLine_ID();
+                        int count = DB.ExecuteQuery(sql, null, null);
+                        if (count <= 0)
+                        {
+                            log.Info("CashLine is not updated for VA012_IsReconciled='N'");
+                        }
                     }
                 }
             }
