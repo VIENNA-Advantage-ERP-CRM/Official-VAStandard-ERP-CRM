@@ -100,6 +100,7 @@ import "../app/forms/VAS_ExpenseAmountWidget.js";
 import "../app/forms/VAS_ExpRevProfitWidget.js";
 import "../app/forms/VAS_FinDInsights.js";
 import "../app/forms/VAS_FinDInsightsGridView.js";
+import "../app/forms/VAS_SentEmailDoc.js";
 import "../app/forms/VAS_ScheduleDetail.js";
 import "../model/CalloutBudget.js";
 import "../app/forms/VAS_ExpectedPayments.js";
