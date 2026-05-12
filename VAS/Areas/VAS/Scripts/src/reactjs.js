@@ -1,1 +1,1 @@
-﻿import "../react/index.jsx";
+﻿//import "../react/index.jsx";
