@@ -137,7 +137,7 @@ namespace VAdvantage.Model
             //    if (GetM_ProductBOM_ID() != 0)
             //        SetM_ProductBOM_ID(0);
             //}
-            else if (GetM_ProductBOM_ID() == 0)
+            if (GetM_ProductBOM_ID() == 0)
             {
                 log.SaveError("Error", Msg.ParseTranslation(GetCtx(), "@NotFound@ @M_ProductBOM_ID@"));
                 return false;
