@@ -206,6 +206,7 @@
     <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentController.cs" />
@@ -280,6 +281,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_OpenQuotationWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsights.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_FinDInsightsGridView.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_SentEmailDoc.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ScheduleDetail.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
