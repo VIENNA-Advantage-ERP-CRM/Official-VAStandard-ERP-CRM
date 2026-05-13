@@ -105,7 +105,19 @@ import "../model/CalloutBudget.js";
 import "../app/forms/VAS_ExpectedPayments.js";
 import "../app/forms/VAS_InvoiceMatchedTabPanel.js";
 import "../app/forms/VAS_CashFlowWidget.js";
+
 import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
+
+
+
 import "../app/widgets/RequestWidget.js";
+
+import "../app/widgets/AgingReceivablesWidget.js";
+import "../app/widgets/AvgDaysToPayWidget.js";
+import "../app/widgets/InvoicesWidget.js";
+import "../app/widgets/OutstandingSalesOrderWidget.js";
+import "../app/widgets/OverdueWidget.js";
+import "../app/widgets/PaidthismonthWidget.js";
+import "../app/widgets/TopDebtorsWidget.js";

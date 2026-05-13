@@ -26,6 +26,16 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            string overdueDateCondition = "";
+            if (DB.IsPostgreSQL())
+            {
+                overdueDateCondition = " AND CAST(ips.DueDate AS DATE) < CAST(CURRENT_DATE AS DATE) ";
+            }
+            else
+            {
+                overdueDateCondition = " AND TRUNC(ips.DueDate) < TRUNC(SYSDATE) ";
+            }
+
             string sql = @"
                 WITH schema_currency AS (
                     SELECT ci.ad_client_id,
@@ -69,7 +79,7 @@ namespace VIS.Controllers
                 JOIN   C_Invoice      i   ON ips.C_Invoice_ID = i.C_Invoice_ID
                 JOIN   schema_currency sc  ON sc.ad_client_id  = i.ad_client_id
                 WHERE  ips.VA009_IsPaid = 'N'
-                  AND  ips.DueDate < CURRENT_DATE
+                  " + overdueDateCondition + @"
                   AND  i.DocStatus IN ('CO', 'CL')
                   AND  i.IsSoTrx   = 'Y'
                   AND  i.AD_Client_ID = " + ctx.GetAD_Client_ID();

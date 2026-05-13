@@ -93,7 +93,7 @@
                         /* Banner — summary of all pairs */
                         var total = data.length;
                         var first = data[0];
-                        var amt   = '$' + parseFloat(first.amount).toLocaleString('en-US');
+                        var amt   = parseFloat(first.amount).toLocaleString('en-US');
                         var title = total === 1
                             ? lbl("VIS_DuplicateSuspected", 'Duplicate suspected:') + ' ' + first.invoiceA + ' ' + lbl("VIS_MatchesAmountCustomer", 'matches') + ' ' + first.invoiceB + ' amount + customer'
                             : total + ' ' + lbl("VIS_DuplicatePairsSuspected", 'duplicate pairs suspected') + ' — ' + total + ' ' + lbl("VIS_CustomersAffected", 'customers affected');
@@ -208,7 +208,7 @@
                                 cfg.label +
                             '</span>' +
                         '</span>' +
-                        '<span style="font-size:14px;font-weight:700;color:#102C3F;text-align:right;">$' + inv.amount.toLocaleString('en-US') + '</span>' +
+                        '<span style="font-size:14px;font-weight:700;color:#102C3F;text-align:right;">' + inv.amount.toLocaleString('en-US') + '</span>' +
                     '</div>'
                 );
 

@@ -3,6 +3,7 @@ using System.Data;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
+using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -22,89 +23,102 @@ namespace VIS.Controllers
         public JsonResult GetAvgDaysToPay()
         {
             if (Session["ctx"] == null)
+            {
                 return Json(new { error = "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            string currentPeriodDateCondition = "";
+            string daysToPayCondition = "";
+            
+            if (DB.IsPostgreSQL())
+            {
+                currentPeriodDateCondition = " CAST(CURRENT_DATE AS DATE) BETWEEN CAST(p.StartDate AS DATE) AND CAST(p.EndDate AS DATE) ";
+                daysToPayCondition = " GREATEST(CAST(pay.DateAcct AS DATE) - CAST(ips.DueDate AS DATE), 0) ";
+            }
+            else
+            {
+                currentPeriodDateCondition = " TRUNC(SYSDATE) BETWEEN TRUNC(p.StartDate) AND TRUNC(p.EndDate) ";
+                daysToPayCondition = " GREATEST(TRUNC(pay.DateAcct) - TRUNC(ips.DueDate), 0) ";
+            }
+
+            string currentPeriodSql = @"
+                SELECT p.C_Year_ID,
+                       CAST(TO_CHAR(p.StartDate, 'Q') AS NUMERIC) AS CurrentQuarter,
+                       CAST(TO_CHAR(p.StartDate, 'YYYY') AS NUMERIC) AS CurrentYear
+                FROM AD_ClientInfo ci
+                INNER JOIN C_Calendar cal ON (ci.C_Calendar_ID=cal.C_Calendar_ID)
+                INNER JOIN C_Year yr ON (cal.C_Calendar_ID=yr.C_Calendar_ID)
+                INNER JOIN C_Period p ON (yr.C_Year_ID=p.C_Year_ID)
+                WHERE ci.AD_Client_ID=" + ctx.GetAD_Client_ID() + @"
+                AND " + currentPeriodDateCondition + @"
+                FETCH FIRST 1 ROW ONLY";
+
+            string quarterDataSql = @"
+                SELECT CASE
+                           WHEN CAST(TO_CHAR(pay.DateAcct, 'Q') AS NUMERIC)=cp.CurrentQuarter
+                           AND CAST(TO_CHAR(pay.DateAcct, 'YYYY') AS NUMERIC)=cp.CurrentYear THEN 'Current'
+                           WHEN CAST(TO_CHAR(pay.DateAcct, 'Q') AS NUMERIC)=(CASE WHEN cp.CurrentQuarter=1 THEN 4 ELSE cp.CurrentQuarter - 1 END)
+                           AND ((cp.CurrentQuarter > 1 AND CAST(TO_CHAR(pay.DateAcct, 'YYYY') AS NUMERIC)=cp.CurrentYear)
+                           OR (cp.CurrentQuarter=1 AND CAST(TO_CHAR(pay.DateAcct, 'YYYY') AS NUMERIC)=cp.CurrentYear - 1)) THEN 'Previous'
+                       END AS QuarterFlag,
+                       " + daysToPayCondition + @" AS Days_To_Pay,
+                       NVL(al.Amount, 0) AS Amount
+                FROM C_Invoice i
+                INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID=i.C_Invoice_ID)
+                INNER JOIN C_AllocationLine al ON (al.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID)
+                INNER JOIN C_Payment pay ON (al.C_Payment_ID=pay.C_Payment_ID)
+                CROSS JOIN CurrentPeriod cp
+                WHERE i.IsSoTrx='Y'
+                AND i.DocStatus IN ('CO', 'CL')
+                AND al.C_Payment_ID IS NOT NULL
+                AND i.IsActive='Y'
+                AND ips.IsActive='Y'
+                AND pay.IsActive='Y'";
+
+            quarterDataSql = MRole.GetDefault(ctx).AddAccessSQL(
+                quarterDataSql,
+                "i",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string quarterAggSql = @"
+                SELECT QuarterFlag,
+                       NVL(SUM(Days_To_Pay * Amount) / NULLIF(SUM(Amount), 0), 0) AS AvgDaysToPay
+                FROM QuarterData
+                WHERE QuarterFlag IS NOT NULL
+                GROUP BY QuarterFlag";
+
+            string finalCalcSql = @"
+                SELECT ROUND(NVL(MAX(CASE WHEN QuarterFlag='Current' THEN AvgDaysToPay END), 0), 0) AS Curr,
+                       ROUND(NVL(MAX(CASE WHEN QuarterFlag='Previous' THEN AvgDaysToPay END), 0), 0) AS Prev
+                FROM QuarterAgg";
+
             string sql = @"
                 WITH CurrentPeriod AS (
-                    SELECT
-                        p.C_Year_ID,
-                        TO_NUMBER(TO_CHAR(p.StartDate, 'Q'))    AS CurrentQuarter,
-                        TO_NUMBER(TO_CHAR(p.StartDate, 'YYYY')) AS CurrentYear
-                    FROM AD_ClientInfo ci
-                    JOIN C_Calendar cal ON ci.C_Calendar_ID  = cal.C_Calendar_ID
-                    JOIN C_Year     yr  ON cal.C_Calendar_ID = yr.C_Calendar_ID
-                    JOIN C_Period   p   ON yr.C_Year_ID      = p.C_Year_ID
-                    WHERE ci.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                      AND TRUNC(SYSDATE) BETWEEN TRUNC(p.StartDate) AND TRUNC(p.EndDate)
-                    FETCH FIRST 1 ROW ONLY
+                    " + currentPeriodSql + @"
                 ),
                 QuarterData AS (
-                    SELECT
-                        CASE
-                            WHEN TO_NUMBER(TO_CHAR(pay.DateAcct, 'Q'))    = cp.CurrentQuarter
-                             AND TO_NUMBER(TO_CHAR(pay.DateAcct, 'YYYY')) = cp.CurrentYear
-                                THEN 'Current'
-
-                            WHEN TO_NUMBER(TO_CHAR(pay.DateAcct, 'Q')) =
-                                 CASE WHEN cp.CurrentQuarter = 1 THEN 4 ELSE cp.CurrentQuarter - 1 END
-                             AND (
-                                 (cp.CurrentQuarter > 1 AND TO_NUMBER(TO_CHAR(pay.DateAcct, 'YYYY')) = cp.CurrentYear)
-                                 OR
-                                 (cp.CurrentQuarter = 1 AND TO_NUMBER(TO_CHAR(pay.DateAcct, 'YYYY')) = cp.CurrentYear - 1)
-                             )
-                                THEN 'Previous'
-                        END AS QuarterFlag,
-
-                        GREATEST(TRUNC(pay.DateAcct) - TRUNC(ips.DueDate), 0) AS Days_To_Pay,
-                        NVL(al.Amount, 0) AS Amount
-
-                    FROM C_Invoice i
-                    JOIN C_InvoicePaySchedule ips ON ips.C_Invoice_ID            = i.C_Invoice_ID
-                    JOIN C_AllocationLine     al  ON al.C_InvoicePaySchedule_ID  = ips.C_InvoicePaySchedule_ID
-                    JOIN C_Payment            pay ON al.C_Payment_ID             = pay.C_Payment_ID
-                    CROSS JOIN CurrentPeriod cp
-                    WHERE i.IsSoTrx    = 'Y'
-                      AND i.DocStatus IN ('CO', 'CL')
-                      AND al.C_Payment_ID IS NOT NULL
-                      AND i.IsActive   = 'Y'
-                      AND ips.IsActive = 'Y'
-                      AND pay.IsActive = 'Y'
-                      --AND i.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
+                    " + quarterDataSql + @"
                 ),
                 QuarterAgg AS (
-                    SELECT
-                        QuarterFlag,
-                        NVL(
-                            SUM(Days_To_Pay * Amount) / NULLIF(SUM(Amount), 0),
-                            0
-                        ) AS AvgDaysToPay
-                    FROM QuarterData
-                    WHERE QuarterFlag IS NOT NULL
-                    GROUP BY QuarterFlag
+                    " + quarterAggSql + @"
                 ),
                 FinalCalc AS (
-                    SELECT
-                        ROUND(NVL(MAX(CASE WHEN QuarterFlag = 'Current'  THEN AvgDaysToPay END), 0), 0) AS curr,
-                        ROUND(NVL(MAX(CASE WHEN QuarterFlag = 'Previous' THEN AvgDaysToPay END), 0), 0) AS prev
-                    FROM QuarterAgg
+                    " + finalCalcSql + @"
                 )
-                SELECT
-                    curr AS Current_Quarter_Avg_Days,
-                    prev AS Previous_Quarter_Avg_Days,
-                    curr - prev AS Difference_Days,
-                    CASE
-                        WHEN curr - prev < 0 THEN ABS(curr - prev) || ' days faster than last quarter'
-                        WHEN curr - prev > 0 THEN (curr - prev)    || ' days slower than last quarter'
-                        ELSE 'No change'
-                    END AS Display_Text
+                SELECT Curr AS Current_Quarter_Avg_Days,
+                       Prev AS Previous_Quarter_Avg_Days,
+                       Curr - Prev AS Difference_Days
                 FROM FinalCalc";
 
-            int    currentAvg   = 0;
-            int    previousAvg  = 0;
-            int    diffDays     = 0;
-            string displayText  = "No change";
+            int currentAvg = 0;
+            int previousAvg = 0;
+            int diffDays = 0;
+            string displayText = "No change";
 
             IDataReader dr = null;
             try
@@ -112,23 +126,38 @@ namespace VIS.Controllers
                 dr = DB.ExecuteReader(sql);
                 if (dr != null && dr.Read())
                 {
-                    currentAvg  = Util.GetValueOfInt(dr["Current_Quarter_Avg_Days"]);
+                    currentAvg = Util.GetValueOfInt(dr["Current_Quarter_Avg_Days"]);
                     previousAvg = Util.GetValueOfInt(dr["Previous_Quarter_Avg_Days"]);
-                    diffDays    = Util.GetValueOfInt(dr["Difference_Days"]);
-                    displayText = dr["Display_Text"]?.ToString() ?? "No change";
+                    diffDays = Util.GetValueOfInt(dr["Difference_Days"]);
+                    
+                    if (diffDays < 0)
+                    {
+                        displayText = System.Math.Abs(diffDays).ToString() + " days faster than last quarter";
+                    }
+                    else if (diffDays > 0)
+                    {
+                        displayText = diffDays.ToString() + " days slower than last quarter";
+                    }
+                    else
+                    {
+                        displayText = "No change";
+                    }
                 }
             }
             finally
             {
-                dr?.Close();
+                if (dr != null)
+                {
+                    dr.Close();
+                }
             }
 
             var result = new
             {
-                currentAvgDays  = currentAvg,
+                currentAvgDays = currentAvg,
                 previousAvgDays = previousAvg,
-                differenceDays  = diffDays,
-                displayText     = displayText
+                differenceDays = diffDays,
+                displayText = displayText
             };
 
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

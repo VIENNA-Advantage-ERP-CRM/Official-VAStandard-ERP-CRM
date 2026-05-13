@@ -1,29 +1,6 @@
 /**
  * Aging Receivables Widget
- * Purpose - Table showing outstanding sales orders with delivery/invoice status and aging.
- *
- * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                                    | Message Key                      | MsgText
- * ----+-------------------------------------------------+----------------------------------+-------------------------------------------------
- *  1  | Aging Receivables                               | VIS_AgingReceivables             | Aging Receivables
- *  2  | Who owes, how old                               | VIS_WhoOwesHowOld                | Who owes, how old
- *  3  | #                                               | VIS_ColNo                        | #
- *  4  | Order No                                        | VIS_ColOrderNo                   | Order No
- *  5  | Customer                                        | VIS_Customer                     | Customer
- *  6  | Delivery                                        | VIS_ColDelivery                  | Delivery
- *  7  | Invoice                                         | VIS_Invoice                      | Invoice
- *  8  | Value                                           | VIS_ColValue                     | Value
- *  9  | Pending                                         | VIS_ColPending                   | Pending
- * 10  | Loading…                                        | VIS_Loading                      | Loading…
- * 11  | No data                                         | VIS_NoData                       | No data
- * 12  | WHY                                             | VIS_Why                          | WHY
- * 13  | Older invoices are harder to collect...         | VIS_AgingWhyText                 | Older invoices are harder to collect. Focus on the 61+ buckets.
- * 14  | Full                                            | VIS_StatusFull                   | Full
- * 15  | Partial                                         | VIS_StatusPartial                | Partial
- * 16  | Partial Raised                                  | VIS_StatusPartialRaised          | Partial Raised
- * 17  | Not Delivered                                   | VIS_StatusNotDelivered           | Not Delivered
- * 18  | Not Raised                                      | VIS_StatusNotRaised              | Not Raised
- * ──────────────────────────────────────────────────────────────────────────────────────
+ * Purpose - Shows bucketted outstanding invoices in an aging chart format.
  */
 ; VIS = window.VIS || {};
 
@@ -36,7 +13,7 @@
         var $self = this;
         var $root = $('<div style="height:100%;font-family:Roboto,sans-serif;">');
 
-        var $tbody;
+        var $contentArea;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -56,7 +33,7 @@
                 type: 'GET',
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
-                    if (Array.isArray(data)) {
+                    if (data && typeof data === 'object') {
                         renderRows(data);
                     }
                 },
@@ -66,155 +43,114 @@
 
         /* ── Format currency ── */
         function formatCurrency(value) {
-            if (value >= 1000000) {
-                return '$' + (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            var sign = value < 0 ? '-' : '';
+            var absVal = Math.abs(value);
+
+            if (absVal >= 1000000) {
+                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
-            if (value >= 1000) {
-                return '$' + Math.round(value / 1000) + 'k';
+            if (absVal >= 1000) {
+                return sign + Math.round(absVal / 1000) + 'k';
             }
-            return '$' + Math.round(value).toLocaleString('en-US');
+            return sign + Math.round(absVal).toLocaleString('en-US');
         }
 
-        /* ── Status chip ── */
-        function statusChip(text) {
-            var bg, color, label;
-            switch (text) {
-                case 'Full':
-                    bg = '#CCEFDD'; color = '#0C5D38'; label = lbl("VIS_StatusFull",          text); break;
-                case 'Partial':
-                    bg = '#FFF3CD'; color = '#7A5000'; label = lbl("VIS_StatusPartial",       text); break;
-                case 'Partial Raised':
-                    bg = '#FFF3CD'; color = '#7A5000'; label = lbl("VIS_StatusPartialRaised", text); break;
-                case 'Not Delivered':
-                    bg = '#FAD7D7'; color = '#8F2D2D'; label = lbl("VIS_StatusNotDelivered",  text); break;
-                case 'Not Raised':
-                    bg = '#FAD7D7'; color = '#8F2D2D'; label = lbl("VIS_StatusNotRaised",     text); break;
-                default:
-                    bg = '#E1E1E1'; color = '#505050';  label = text;
-            }
-            return '<span style="' +
-                'display:inline-block;padding:2px 8px;border-radius:999px;' +
-                'font-size:10px;font-weight:600;white-space:nowrap;' +
-                'background:' + bg + ';color:' + color + ';' +
-            '">' + label + '</span>';
-        }
+        /* ── Render bucket chart ── */
+        function renderRows(data) {
+            if (!$contentArea) return;
+            $contentArea.empty();
 
-        /* ── Render table rows ── */
-        function renderRows(rows) {
-            if (!$tbody) return;
-            $tbody.empty();
-
-            if (rows.length === 0) {
-                $tbody.append(
-                    '<tr><td colspan="7" style="text-align:center;padding:16px;color:#748494;font-size:12px;">' + lbl("VIS_NoData", 'No data') + '</td></tr>'
-                );
+            if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
+                $contentArea.append('<div style="text-align:center;padding:16px;color:#748494;font-size:12px;">' + lbl("VIS_NoData", 'No data') + '</div>');
                 return;
             }
 
-            for (var i = 0; i < rows.length; i++) {
-                var r = rows[i];
-                var $tr = $(
-                    '<tr style="border-bottom:1px solid #EDF2F6;">' +
-                        '<td style="padding:8px 10px;font-size:12px;color:#748494;">' + r.srNo + '</td>' +
-                        '<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#102C3F;">' + (r.orderNo || '—') + '</td>' +
-                        '<td style="padding:8px 10px;font-size:12px;color:#102C3F;">' + (r.customerName || '—') + '</td>' +
-                        '<td style="padding:8px 10px;">' + statusChip(r.deliveryStatus) + '</td>' +
-                        '<td style="padding:8px 10px;">' + statusChip(r.invoiceStatus) + '</td>' +
-                        '<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#102C3F;text-align:right;font-variant-numeric:tabular-nums;">' + formatCurrency(r.orderValue) + '</td>' +
-                        '<td style="padding:8px 10px;font-size:12px;color:#748494;text-align:right;">' + (r.daysPending || '—') + '</td>' +
-                    '</tr>'
-                );
-                $tbody.append($tr);
+            var r = Array.isArray(data) ? data[0] : data; // Handle both arrays and single objects safely
+
+            var notDue = r.notDueAmount || 0;
+            var days1_30 = r.days1To30Amount || 0;
+            var days31_60 = r.days31To60Amount || 0;
+            var days61_90 = r.days61To90Amount || 0;
+            var days90Plus = (r.days91To120Amount || 0) + (r.daysOver120Amount || 0);
+
+            var maxVal = Math.max(notDue, days1_30, days31_60, days61_90, days90Plus);
+            if (maxVal <= 0) maxVal = 1;
+
+            var html = '';
+
+            function buildBucket(label, val, color) {
+                var width = (val / maxVal * 100);
+                if (width > 100) width = 100;
+                if (width < 0) width = 0;
+
+                return '<div style="margin-bottom: 10px;">' +
+                    '<div style="display: flex; font-size: 12px; margin-bottom: 4px; color: #102C3F;">' +
+                    '<span>' + label + '</span>' +
+                    '<span style="margin-left: auto; font-weight: 600; font-family: monospace;">' + formatCurrency(val) + '</span>' +
+                    '</div>' +
+                    '<div style="height: 8px; background: #EDF2F6; border-radius: 3px;">' +
+                    '<div style="width: ' + width + '%; height: 100%; background: ' + color + '; border-radius: 3px; transition: width 0.8s ease-out;"></div>' +
+                    '</div>' +
+                    '</div>';
             }
+
+            html += buildBucket(lbl("VIS_NotYetDue", 'Not yet due'), notDue, 'oklch(0.6 0.16 155)');
+            html += buildBucket(lbl("VIS_Days1_30", '1–30 days late'), days1_30, 'oklch(0.6 0.16 70)');
+            html += buildBucket(lbl("VIS_Days31_60", '31–60 days'), days31_60, 'oklch(0.6 0.16 40)');
+            html += buildBucket(lbl("VIS_Days61_90", '61–90 days'), days61_90, 'oklch(0.6 0.16 25)');
+            html += buildBucket(lbl("VIS_Days90Plus", '90+ days'), days90Plus, 'oklch(0.6 0.16 20)');
+
+            // WHY block
+            html += '<div style="font-size: 11px; color: #748494; margin-top: 6px; line-height: 1.45; font-style: normal;">' +
+                '<span style="display: inline-flex; align-items: center; gap: 4px; background: oklch(0.96 0.03 220); padding: 1px 6px; border-radius: 100px; margin-right: 6px; font-family: monospace; font-size: 9px; color: oklch(0.45 0.15 220); letter-spacing: 0.05em; font-weight: bold;">' + lbl("VIS_Why", "WHY") + '</span>' +
+                lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
+                '</div>';
+
+            $contentArea.append(html);
         }
 
         /* ── Build DOM ── */
         function createWidget() {
             var $card = $(
                 '<div style="' +
-                    'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                    'border:2px solid #fff;' +
-                    'border-radius:14px;' +
-                    'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                    'padding:16px 18px 18px;' +
-                    'height:100%;' +
-                    'box-sizing:border-box;' +
-                    'display:flex;flex-direction:column;' +
+                'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
+                'border:2px solid #fff;' +
+                'border-radius:14px;' +
+                'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
+                'padding:16px 18px 18px;' +
+                'height:100%;' +
+                'box-sizing:border-box;' +
+                'display:flex;flex-direction:column;' +
                 '">'
             );
 
             /* ── Header ── */
             var $header = $(
                 '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">' +
-                    '<div style="' +
-                        'width:36px;height:36px;border-radius:8px;flex-shrink:0;' +
-                        'background:oklch(0.96 0.03 220);' +
-                        'display:flex;align-items:center;justify-content:center;' +
-                    '">' +
-                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
-                            'stroke="oklch(0.45 0.15 220)" stroke-width="1.6" ' +
-                            'stroke-linecap="round" stroke-linejoin="round">' +
-                            '<circle cx="12" cy="12" r="10"/>' +
-                            '<polyline points="12 6 12 12 16 14"/>' +
-                        '</svg>' +
-                    '</div>' +
-                    '<div>' +
-                        '<div style="font-size:13px;font-weight:600;color:#102C3F;line-height:1.2;">' + lbl("VIS_AgingReceivables", 'Aging Receivables') + '</div>' +
-                        '<div style="font-size:11px;color:#748494;letter-spacing:0.3px;text-transform:uppercase;margin-top:1px;">' + lbl("VIS_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
-                    '</div>' +
+                '<div style="' +
+                'width:32px;height:32px;border-radius:8px;flex-shrink:0;' +
+                'background:#BAEAFB;' +
+                'display:flex;align-items:center;justify-content:center;' +
+                'color:#0C7DB4;' +
+                '">' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="12" cy="12" r="10"/>' +
+                '<polyline points="12 6 12 12 16 14"/>' +
+                '</svg>' +
+                '</div>' +
+                '<div>' +
+                '<div style="font-size:14px;font-weight:700;color:#102C3F;line-height:1.2;margin-bottom:2px;">' + lbl("VIS_AgingReceivables", 'Aging Receivables') + '</div>' +
+                '<div style="font-size:11px;color:#748494;letter-spacing:1px;text-transform:uppercase;font-family:monospace;">' + lbl("VIS_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
+                '</div>' +
                 '</div>'
             );
 
-            /* ── Scrollable table ── */
-            var $scroll = $(
-                '<div style="flex:1;overflow-y:auto;margin:0 -2px;">'
-            );
+            $contentArea = $('<div style="flex:1; display:flex; flex-direction:column; justify-content:center;">');
+            $contentArea.append('<div style="text-align:center;color:#748494;font-size:12px;">' + lbl("VIS_Loading", 'Loading…') + '</div>');
 
-            var $table = $(
-                '<table style="width:100%;border-collapse:collapse;">'
-            );
-
-            var $thead = $(
-                '<thead>' +
-                    '<tr style="border-bottom:1px solid #E4EDF4;">' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:left;">'  + lbl("VIS_ColNo",       '#')        + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:left;">'  + lbl("VIS_ColOrderNo",  'Order No') + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:left;">'  + lbl("VIS_Customer",    'Customer') + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:left;">'  + lbl("VIS_ColDelivery", 'Delivery') + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:left;">'  + lbl("VIS_Invoice",     'Invoice')  + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:right;">' + lbl("VIS_ColValue",    'Value')    + '</th>' +
-                        '<th style="padding:6px 10px;font-size:11px;font-weight:400;color:#748494;text-align:right;">' + lbl("VIS_ColPending",  'Pending')  + '</th>' +
-                    '</tr>' +
-                '</thead>'
-            );
-
-            $tbody = $('<tbody><tr><td colspan="7" style="text-align:center;padding:16px;color:#748494;font-size:12px;">' + lbl("VIS_Loading", 'Loading…') + '</td></tr></tbody>');
-
-            $table.append($thead).append($tbody);
-            $scroll.append($table);
-
-            /* ── WHY pill + text ── */
-            var $why = $('<div style="display:flex;align-items:flex-start;gap:6px;padding-top:10px;flex-shrink:0;">');
-
-            var $pill = $(
-                '<span style="' +
-                    'display:inline-flex;align-items:center;' +
-                    'background:oklch(0.96 0.03 220);' +
-                    'padding:1px 7px;border-radius:999px;flex-shrink:0;margin-top:2px;' +
-                    'font-size:9px;font-weight:700;letter-spacing:0.08em;' +
-                    'color:oklch(0.45 0.15 220);font-family:Roboto,monospace;' +
-                '">' + lbl("VIS_Why", 'WHY') + '</span>'
-            );
-
-            var $whyText = $(
-                '<span style="font-size:11px;color:#748494;line-height:1.45;">' +
-                    lbl("VIS_AgingWhyText", 'Older invoices are harder to collect. Focus on the 61+ buckets.') +
-                '</span>'
-            );
-
-            $why.append($pill).append($whyText);
-
-            $card.append($header).append($scroll).append($why);
+            $card.append($header).append($contentArea);
             $root.append($card);
         }
 
@@ -233,17 +169,17 @@
         };
     };
 
-    VIS.AgingReceivablesWidget.prototype.refreshWidget = function () {};
+    VIS.AgingReceivablesWidget.prototype.refreshWidget = function () { };
 
     VIS.AgingReceivablesWidget.prototype.init = function (windowNo, frame) {
-        this.frame               = frame;
+        this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
-        this.windowNo            = windowNo;
+        this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.AgingReceivablesWidget.prototype.widgetSizeChange = function (height, width) {};
+    VIS.AgingReceivablesWidget.prototype.widgetSizeChange = function (height, width) { };
 
     VIS.AgingReceivablesWidget.prototype.dispose = function () {
         this.disposeComponent();

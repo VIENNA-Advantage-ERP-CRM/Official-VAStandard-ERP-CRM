@@ -62,12 +62,12 @@
         /* ── Format currency ── */
         function formatCurrency(value) {
             if (value >= 1000000) {
-                return '$' + (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+                return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
             if (value >= 1000) {
-                return '$' + Math.round(value / 1000) + 'k';
+                return Math.round(value / 1000) + 'k';
             }
-            return '$' + Math.round(value).toLocaleString('en-US');
+            return Math.round(value).toLocaleString('en-US');
         }
 
         /* ── Render metric values ── */
