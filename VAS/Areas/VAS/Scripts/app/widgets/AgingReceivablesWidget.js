@@ -84,9 +84,9 @@
                 if (width < 0) width = 0;
 
                 return '<div style="margin-bottom: 10px;">' +
-                    '<div style="display: flex; font-size: 12px; margin-bottom: 4px; color: #102C3F;">' +
+                    '<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #102C3F;">' +
                     '<span>' + label + '</span>' +
-                    '<span style="margin-left: auto; font-weight: 600; font-family: monospace;">' + formatCurrency(val) + '</span>' +
+                    '<span style="font-weight: 600; font-family: monospace;">' + formatCurrency(val) + '</span>' +
                     '</div>' +
                     '<div style="height: 8px; background: #EDF2F6; border-radius: 3px;">' +
                     '<div style="width: ' + width + '%; height: 100%; background: ' + color + '; border-radius: 3px; transition: width 0.8s ease-out;"></div>' +
@@ -102,7 +102,7 @@
 
             // WHY block
             html += '<div style="font-size: 11px; color: #748494; margin-top: 6px; line-height: 1.45; font-style: normal;">' +
-                '<span style="display: inline-flex; align-items: center; gap: 4px; background: oklch(0.96 0.03 220); padding: 1px 6px; border-radius: 100px; margin-right: 6px; font-family: monospace; font-size: 9px; color: oklch(0.45 0.15 220); letter-spacing: 0.05em; font-weight: bold;">' + lbl("VIS_Why", "WHY") + '</span>' +
+                '<span style="display: inline-flex; align-items: center; gap: 4px; background: oklch(0.96 0.03 220); padding: 1px 6px; border-radius: 100px; margin-inline-end: 6px; font-family: monospace; font-size: 9px; color: oklch(0.45 0.15 220); letter-spacing: 0.05em; font-weight: bold;">' + lbl("VIS_Why", "WHY") + '</span>' +
                 lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
                 '</div>';
 
