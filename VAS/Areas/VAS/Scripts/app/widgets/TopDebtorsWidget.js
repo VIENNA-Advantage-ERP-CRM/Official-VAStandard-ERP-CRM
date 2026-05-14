@@ -63,7 +63,7 @@
             if (value >= 1000) {
                 return (value / 1000).toFixed(0) + ',' + (value % 1000 < 100 ? (value % 1000 < 10 ? '00' : '0') : '') + (value % 1000);
             }
-            return Math.round(value).toLocaleString('en-US');
+            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         /* ── Avatar initials ── */

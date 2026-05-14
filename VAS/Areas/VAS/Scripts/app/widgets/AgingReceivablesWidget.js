@@ -52,7 +52,7 @@
             if (absVal >= 1000) {
                 return sign + Math.round(absVal / 1000) + 'k';
             }
-            return sign + Math.round(absVal).toLocaleString('en-US');
+            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         /* ── Render bucket chart ── */
