@@ -17,7 +17,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Json(new { error = "Session Expired" }, JsonRequestBehavior.AllowGet);
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;

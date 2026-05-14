@@ -24,7 +24,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Json(new { error = "Session Expired" }, JsonRequestBehavior.AllowGet);
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -133,7 +133,7 @@ namespace VIS.Controllers
                         customerName = dr["Customer_Name"]?.ToString(),
                         unpaidBalance = Util.GetValueOfDecimal(dr["Total_Outstanding_Amount"]),
                         daysOverdue = Util.GetValueOfInt(dr["Max_Days_Overdue"]),
-                        statusText = Util.GetValueOfInt(dr["Max_Days_Overdue"]) <= 0 ? "Not yet due" : Util.GetValueOfInt(dr["Max_Days_Overdue"]).ToString() + " days overdue"
+                        statusText = Util.GetValueOfInt(dr["Max_Days_Overdue"]) <= 0 ? (Msg.GetMsg(ctx, "NotYetDue") ?? "Not yet due") : Util.GetValueOfInt(dr["Max_Days_Overdue"]).ToString() + (Msg.GetMsg(ctx, "DaysOverdue") ?? " days overdue")
                     });
                 }
             }

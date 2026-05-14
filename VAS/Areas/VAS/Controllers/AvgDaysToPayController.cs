@@ -24,7 +24,7 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Json(new { error = "Session Expired" }, JsonRequestBehavior.AllowGet);
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
             }
 
 
@@ -118,7 +118,7 @@ namespace VIS.Controllers
             int currentAvg = 0;
             int previousAvg = 0;
             int diffDays = 0;
-            string displayText = "No change";
+            string displayText = Msg.GetMsg(ctx, "NoChange") ?? "No change";
 
             IDataReader dr = null;
             try
@@ -132,15 +132,15 @@ namespace VIS.Controllers
                     
                     if (diffDays < 0)
                     {
-                        displayText = System.Math.Abs(diffDays).ToString() + " days faster than last quarter";
+                        displayText = System.Math.Abs(diffDays).ToString() + (Msg.GetMsg(ctx, "DaysFasterThanLastQuarter") ?? " days faster than last quarter");
                     }
                     else if (diffDays > 0)
                     {
-                        displayText = diffDays.ToString() + " days slower than last quarter";
+                        displayText = diffDays.ToString() + (Msg.GetMsg(ctx, "DaysSlowerThanLastQuarter") ?? " days slower than last quarter");
                     }
                     else
                     {
-                        displayText = "No change";
+                        displayText = Msg.GetMsg(ctx, "NoChange") ?? "No change";
                     }
                 }
             }
