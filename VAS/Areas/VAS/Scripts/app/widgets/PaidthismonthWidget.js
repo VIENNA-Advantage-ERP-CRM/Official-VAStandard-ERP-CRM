@@ -26,7 +26,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;width:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-ptm-root">');
 
         var $metricEl;
         var $whyText;
@@ -91,28 +91,15 @@
             var uid = $self.AD_UserHomeWidgetID || 'ptm';
 
             var $card = $(
-                '<div style="' +
-                'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                'border:2px solid #fff;' +
-                'border-radius:14px;' +
-                'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                'padding:16px 18px 18px;' +
-                'height:100%;' +
-                'box-sizing:border-box;' +
-                'display:flex;flex-direction:column;justify-content:space-between;' +
-                '">'
+                '<div class="vas-ptm-card">'
             );
 
             /* ── Header row: icon + label ── */
             var $header = $(
-                '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">' +
+                '<div class="vas-ptm-header">' +
 
                 /* Icon well — pale green/success tint matching design2.md semantic success surface */
-                '<div style="' +
-                'width:36px;height:36px;border-radius:8px;flex-shrink:0;' +
-                'background:oklch(0.96 0.04 155);' +
-                'display:flex;align-items:center;justify-content:center;' +
-                '">' +
+                '<div class="vas-ptm-icon">' +
                 /* Checkmark icon (lucide-style inline SVG) */
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
                 'stroke="oklch(0.40 0.14 155)" stroke-width="1.8" ' +
@@ -122,37 +109,30 @@
                 '</div>' +
 
                 '<div>' +
-                '<div style="font-size:13px;font-weight:600;color:#102C3F;line-height:1.2;">' + lbl("VIS_PaidThisMonth", 'Paid this month') + '</div>' +
-                '<div style="font-size:11px;color:#748494;letter-spacing:0.3px;text-transform:uppercase;margin-top:1px;">' + lbl("VIS_CashReceived", 'Cash received') + '</div>' +
+                '<div class="vas-ptm-title">' + lbl("VIS_PaidThisMonth", 'Paid this month') + '</div>' +
+                '<div class="vas-ptm-subtitle">' + lbl("VIS_CashReceived", 'Cash received') + '</div>' +
                 '</div>' +
                 '</div>'
             );
 
             /* ── Metric value — success green ── */
             $metricEl = $(
-                '<div id="vis-ptm-metric-' + uid + '" ' +
-                'style="font-size:40px;font-weight:700;color:#019D89;line-height:1;margin-bottom:8px;">' +
+                '<div id="vis-ptm-metric-' + uid + '" class="vas-ptm-metric">' +
                 '—' +
                 '</div>'
             );
 
             /* ── WHY pill + explanatory text ── */
             var $why = $(
-                '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:auto;">'
+                '<div class="vas-ptm-why-wrap">'
             );
 
             var $pill = $(
-                '<span style="' +
-                'display:inline-flex;align-items:center;' +
-                'background:oklch(0.96 0.03 220);' +
-                'padding:1px 7px;border-radius:999px;flex-shrink:0;margin-top:2px;' +
-                'font-size:9px;font-weight:700;letter-spacing:0.08em;' +
-                'color:oklch(0.45 0.15 220);font-family:Roboto,monospace;' +
-                '">' + lbl("VIS_Why", 'WHY') + '</span>'
+                '<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
             );
 
             $whyText = $(
-                '<span id="vis-ptm-why-' + uid + '" style="font-size:11px;color:#748494;line-height:1.45;">' +
+                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text">' +
                 lbl("VIS_Loading", 'Loading…') +
                 '</span>'
             );
@@ -177,7 +157,9 @@
         };
     };
 
-    VIS.PaidthismonthWidget.prototype.refreshWidget = function () { };
+    VIS.PaidthismonthWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.PaidthismonthWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;

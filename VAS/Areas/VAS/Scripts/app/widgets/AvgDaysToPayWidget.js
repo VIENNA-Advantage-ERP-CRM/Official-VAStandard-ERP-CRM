@@ -22,7 +22,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;width:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-adtp-root">');
 
         var $metricEl;
         var $subtitleEl;
@@ -57,10 +57,10 @@
         function renderMetric(days, displayText) {
             if ($metricEl) {
                 $metricEl.html(
-                    '<span style="font-size:40px;font-weight:700;color:#FFFFFF;line-height:1;">' +
+                    '<span class="vas-adtp-metric-val">' +
                         (days || 0) +
                     '</span>' +
-                    '<span style="font-size:20px;color:#9AA3B5;margin-left:2px;">d</span>'
+                    '<span class="vas-adtp-metric-suffix">d</span>'
                 );
             }
             if ($subtitleEl) {
@@ -74,28 +74,15 @@
 
             /* Dark navy card surface to match the UI mockup */
             var $card = $(
-                '<div style="' +
-                    'background:#1B2A3B;' +
-                    'border:2px solid rgba(255,255,255,0.08);' +
-                    'border-radius:14px;' +
-                    'box-shadow:0 10px 24px rgba(15,61,97,0.12);' +
-                    'padding:16px 18px 18px;' +
-                    'height:100%;' +
-                    'box-sizing:border-box;' +
-                    'display:flex;flex-direction:column;justify-content:space-between;' +
-                '">'
+                '<div class="vas-adtp-card">'
             );
 
             /* ── Header row: icon + label ── */
             var $header = $(
-                '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">' +
+                '<div class="vas-adtp-header">' +
 
                     /* Target/bullseye icon well — matches the SVG in the HTML mockup */
-                    '<div style="' +
-                        'width:36px;height:36px;border-radius:8px;flex-shrink:0;' +
-                        'background:rgba(255,255,255,0.08);' +
-                        'display:flex;align-items:center;justify-content:center;' +
-                    '">' +
+                    '<div class="vas-adtp-icon">' +
                         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
                             'stroke="#9AA3B5" stroke-width="1.6" ' +
                             'stroke-linecap="round" stroke-linejoin="round">' +
@@ -105,7 +92,7 @@
                         '</svg>' +
                     '</div>' +
 
-                    '<div style="font-size:13px;font-weight:600;color:#FFFFFF;line-height:1.3;">' +
+                    '<div class="vas-adtp-title">' +
                         lbl('VIS_AvgDaysToPay', 'Avg days to pay') +
                     '</div>' +
 
@@ -114,16 +101,14 @@
 
             /* ── Metric: large number + 'd' suffix ── */
             $metricEl = $(
-                '<div id="vis-adtp-metric-' + uid + '" ' +
-                    'style="display:flex;align-items:baseline;gap:0;margin-bottom:8px;">' +
-                    '<span style="font-size:40px;font-weight:700;color:#FFFFFF;line-height:1;">—</span>' +
+                '<div id="vis-adtp-metric-' + uid + '" class="vas-adtp-metric-wrap">' +
+                    '<span class="vas-adtp-metric-val">—</span>' +
                 '</div>'
             );
 
             /* ── Subtitle: comparison vs last quarter ── */
             $subtitleEl = $(
-                '<div id="vis-adtp-subtitle-' + uid + '" ' +
-                    'style="font-size:11px;color:#9AA3B5;margin-top:auto;line-height:1.4;">' +
+                '<div id="vis-adtp-subtitle-' + uid + '" class="vas-adtp-subtitle">' +
                     lbl('VIS_Loading', 'Loading…') +
                 '</div>'
             );
@@ -136,7 +121,7 @@
         this.refreshWidget = function () {
             if ($metricEl) {
                 $metricEl.html(
-                    '<span style="font-size:40px;font-weight:700;color:#FFFFFF;line-height:1;">—</span>'
+                    '<span class="vas-adtp-metric-val">—</span>'
                 );
             }
             if ($subtitleEl) {
@@ -155,7 +140,9 @@
         };
     };
 
-    VIS.AvgDaysToPayWidget.prototype.refreshWidget = function () {};
+    VIS.AvgDaysToPayWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.AvgDaysToPayWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

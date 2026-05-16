@@ -11,7 +11,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-ar-root">');
 
         var $contentArea;
 
@@ -61,7 +61,7 @@
             $contentArea.empty();
 
             if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
-                $contentArea.append('<div style="text-align:center;padding:16px;color:#748494;font-size:12px;">' + lbl("VIS_NoData", 'No data') + '</div>');
+                $contentArea.append('<div class="vas-ar-nodata">' + lbl("VIS_NoData", 'No data') + '</div>');
                 return;
             }
 
@@ -83,13 +83,13 @@
                 if (width > 100) width = 100;
                 if (width < 0) width = 0;
 
-                return '<div style="margin-bottom: 10px;">' +
-                    '<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #102C3F;">' +
+                return '<div class="vas-ar-bucket">' +
+                    '<div class="vas-ar-bucket-label-wrap">' +
                     '<span>' + label + '</span>' +
-                    '<span style="font-weight: 600; font-family: monospace;">' + formatCurrency(val) + '</span>' +
+                    '<span class="vas-ar-bucket-val">' + formatCurrency(val) + '</span>' +
                     '</div>' +
-                    '<div style="height: 8px; background: #EDF2F6; border-radius: 3px;">' +
-                    '<div style="width: ' + width + '%; height: 100%; background: ' + color + '; border-radius: 3px; transition: width 0.8s ease-out;"></div>' +
+                    '<div class="vas-ar-bucket-track">' +
+                    '<div class="vas-ar-bucket-bar" style="width: ' + width + '%; background: ' + color + ';"></div>' +
                     '</div>' +
                     '</div>';
             }
@@ -101,8 +101,8 @@
             html += buildBucket(lbl("VIS_Days90Plus", '90+ days'), days90Plus, 'oklch(0.6 0.16 20)');
 
             // WHY block
-            html += '<div style="font-size: 11px; color: #748494; margin-top: 6px; line-height: 1.45; font-style: normal;">' +
-                '<span style="display: inline-flex; align-items: center; gap: 4px; background: oklch(0.96 0.03 220); padding: 1px 6px; border-radius: 100px; margin-inline-end: 6px; font-family: monospace; font-size: 9px; color: oklch(0.45 0.15 220); letter-spacing: 0.05em; font-weight: bold;">' + lbl("VIS_Why", "WHY") + '</span>' +
+            html += '<div class="vas-ar-why-block">' +
+                '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +
                 lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
                 '</div>';
 
@@ -112,27 +112,13 @@
         /* ── Build DOM ── */
         function createWidget() {
             var $card = $(
-                '<div style="' +
-                'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                'border:2px solid #fff;' +
-                'border-radius:14px;' +
-                'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                'padding:16px 18px 18px;' +
-                'height:100%;' +
-                'box-sizing:border-box;' +
-                'display:flex;flex-direction:column;' +
-                '">'
+                '<div class="vas-ar-card">'
             );
 
             /* ── Header ── */
             var $header = $(
-                '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">' +
-                '<div style="' +
-                'width:32px;height:32px;border-radius:8px;flex-shrink:0;' +
-                'background:#BAEAFB;' +
-                'display:flex;align-items:center;justify-content:center;' +
-                'color:#0C7DB4;' +
-                '">' +
+                '<div class="vas-ar-header">' +
+                '<div class="vas-ar-icon">' +
                 '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" ' +
                 'stroke="currentColor" stroke-width="1.8" ' +
                 'stroke-linecap="round" stroke-linejoin="round">' +
@@ -141,14 +127,14 @@
                 '</svg>' +
                 '</div>' +
                 '<div>' +
-                '<div style="font-size:14px;font-weight:700;color:#102C3F;line-height:1.2;margin-bottom:2px;">' + lbl("VIS_AgingReceivables", 'Aging Receivables') + '</div>' +
-                '<div style="font-size:11px;color:#748494;letter-spacing:1px;text-transform:uppercase;font-family:monospace;">' + lbl("VIS_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
+                '<div class="vas-ar-title">' + lbl("VIS_AgingReceivables", 'Aging Receivables') + '</div>' +
+                '<div class="vas-ar-subtitle">' + lbl("VIS_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
                 '</div>' +
                 '</div>'
             );
 
-            $contentArea = $('<div style="flex:1; display:flex; flex-direction:column; justify-content:center;">');
-            $contentArea.append('<div style="text-align:center;color:#748494;font-size:12px;">' + lbl("VIS_Loading", 'Loading…') + '</div>');
+            $contentArea = $('<div class="vas-ar-content-area">');
+            $contentArea.append('<div class="vas-ar-loading">' + lbl("VIS_Loading", 'Loading…') + '</div>');
 
             $card.append($header).append($contentArea);
             $root.append($card);
@@ -169,7 +155,9 @@
         };
     };
 
-    VIS.AgingReceivablesWidget.prototype.refreshWidget = function () { };
+    VIS.AgingReceivablesWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.AgingReceivablesWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;

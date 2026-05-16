@@ -25,7 +25,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-oso-root">');
 
         var $metricEl;
         var $whyText;
@@ -95,28 +95,15 @@
             var uid = $self.AD_UserHomeWidgetID || 'oso';
 
             var $card = $(
-                '<div style="' +
-                'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                'border:2px solid #fff;' +
-                'border-radius:14px;' +
-                'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                'padding:16px 18px 18px;' +
-                'height:100%;' +
-                'box-sizing:border-box;' +
-                'display:flex;flex-direction:column;justify-content:space-between;' +
-                '">'
+                '<div class="vas-oso-card">'
             );
 
             /* ── Header row: icon + labels ── */
             var $header = $(
-                '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">' +
+                '<div class="vas-oso-header">' +
 
                 /* Icon well — pale blue, matching design2.md KPI tinted info surface */
-                '<div style="' +
-                'width:36px;height:36px;border-radius:8px;flex-shrink:0;' +
-                'background:oklch(0.92 0.07 220);' +
-                'display:flex;align-items:center;justify-content:center;' +
-                '">' +
+                '<div class="vas-oso-icon">' +
                 /* Dollar-circle icon (lucide-style inline SVG) */
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
                 'stroke="oklch(0.45 0.17 220)" stroke-width="1.8" ' +
@@ -127,37 +114,30 @@
                 '</div>' +
 
                 '<div>' +
-                '<div style="font-size:13px;font-weight:600;color:#102C3F;line-height:1.2;">' + lbl("VIS_Outstanding", 'Outstanding') + '</div>' +
-                '<div style="font-size:11px;color:#748494;letter-spacing:0.3px;text-transform:uppercase;margin-top:1px;">' + lbl("VIS_MoneyOwedToYou", 'Money owed to you') + '</div>' +
+                '<div class="vas-oso-title">' + lbl("VIS_Outstanding", 'Outstanding') + '</div>' +
+                '<div class="vas-oso-subtitle">' + lbl("VIS_MoneyOwedToYou", 'Money owed to you') + '</div>' +
                 '</div>' +
                 '</div>'
             );
 
             /* ── Metric value ── */
             $metricEl = $(
-                '<div id="vis-oso-metric-' + uid + '" ' +
-                'style="font-size:40px;font-weight:700;color:#102C3F;line-height:1;margin-bottom:8px;">' +
+                '<div id="vis-oso-metric-' + uid + '" class="vas-oso-metric">' +
                 '—' +
                 '</div>'
             );
 
             /* ── WHY pill + explanatory text ── */
             var $why = $(
-                '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:auto;">'
+                '<div class="vas-oso-why-wrap">'
             );
 
             var $pill = $(
-                '<span style="' +
-                'display:inline-flex;align-items:center;' +
-                'background:oklch(0.96 0.03 220);' +
-                'padding:1px 7px;border-radius:999px;flex-shrink:0;margin-top:2px;' +
-                'font-size:9px;font-weight:700;letter-spacing:0.08em;' +
-                'color:oklch(0.45 0.15 220);font-family:Roboto,monospace;' +
-                '">' + lbl("VIS_Why", 'WHY') + '</span>'
+                '<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
             );
 
             $whyText = $(
-                '<span style="font-size:11px;color:#748494;line-height:1.45;">' +
+                '<span class="vas-oso-why-text">' +
                 lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.') +
                 '</span>'
             );
@@ -182,7 +162,9 @@
         };
     };
 
-    VIS.OutstandingSalesOrderWidget.prototype.refreshWidget = function () { };
+    VIS.OutstandingSalesOrderWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.OutstandingSalesOrderWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;

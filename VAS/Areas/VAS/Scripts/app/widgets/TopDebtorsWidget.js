@@ -25,7 +25,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;width:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-td-root">');
 
         var $listBody;
 
@@ -92,16 +92,12 @@
             var bg    = isHighRisk ? '#FAD7D7' : '#CCEFDD';
             var color = isHighRisk ? '#8F2D2D' : '#0C5D38';
             var label = isHighRisk ? lbl("VIS_HighRisk", 'HIGH RISK') : lbl("VIS_OnTrack", 'ON TRACK');
-            return '<span style="' +
-                'display:inline-block;padding:3px 10px;border-radius:999px;' +
-                'font-size:10px;font-weight:700;white-space:nowrap;letter-spacing:0.4px;' +
-                'background:' + bg + ';color:' + color + ';' +
-            '">' + label + '</span>';
+            return '<span class="vas-td-chip" style="background:' + bg + ';color:' + color + ';">' + label + '</span>';
         }
 
         /* ── Overdue label ── */
         function overdueLabel(statusText) {
-            return '<span style="font-size:12px;color:#748494;">' + (statusText || '') + '</span>';
+            return '<span class="vas-td-overdue-label">' + (statusText || '') + '</span>';
         }
 
         /* ── Render rows ── */
@@ -111,7 +107,7 @@
 
             if (!rows || rows.length === 0) {
                 $listBody.append(
-                    '<div style="text-align:center;padding:24px 16px;color:#748494;font-size:12px;">' +
+                    '<div class="vas-td-nodata">' +
                         lbl("VIS_NoData", 'No data') +
                     '</div>'
                 );
@@ -125,30 +121,21 @@
                 var initials = avatarInitials(r.customerName);
 
                 var $row = $(
-                    '<div style="' +
-                        'display:flex;align-items:center;gap:12px;' +
-                        'padding:12px 16px;' +
+                    '<div class="vas-td-list-row" style="' +
                         (isLast ? '' : 'border-bottom:1px solid #EDF2F6;') +
-                        'transition:background 0.15s;cursor:pointer;' +
                     '">' +
                         /* Avatar */
-                        '<div style="' +
-                            'width:36px;height:36px;border-radius:50%;flex-shrink:0;' +
-                            'background:' + ac.bg + ';color:' + ac.color + ';' +
-                            'display:flex;align-items:center;justify-content:center;' +
-                            'font-size:12px;font-weight:700;letter-spacing:0.3px;' +
-                        '">' + initials + '</div>' +
+                        '<div class="vas-td-avatar" style="background:' + ac.bg + ';color:' + ac.color + ';">' + initials + '</div>' +
                         /* Name + overdue */
-                        '<div style="flex:1;min-width:0;">' +
-                            '<div style="font-size:14px;font-weight:700;color:#102C3F;' +
-                                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+                        '<div class="vas-td-name-wrap">' +
+                            '<div class="vas-td-name">' +
                                 (r.customerName || '—') +
                             '</div>' +
-                            '<div style="margin-top:2px;">' + overdueLabel(r.statusText) + '</div>' +
+                            '<div class="vas-td-overdue-wrap">' + overdueLabel(r.statusText) + '</div>' +
                         '</div>' +
                         /* Amount + chip */
-                        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">' +
-                            '<span style="font-size:15px;font-weight:700;color:#102C3F;font-variant-numeric:tabular-nums;">' +
+                        '<div class="vas-td-amount-wrap">' +
+                            '<span class="vas-td-amount">' +
                                 formatCurrency(r.unpaidBalance) +
                             '</span>' +
                             riskChip(r.daysOverdue) +
@@ -166,28 +153,15 @@
         /* ── Build DOM ── */
         function createWidget() {
             var $card = $(
-                '<div style="' +
-                    'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                    'border:2px solid #fff;' +
-                    'border-radius:14px;' +
-                    'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                    'overflow:hidden;' +
-                    'height:100%;' +
-                    'box-sizing:border-box;' +
-                    'display:flex;flex-direction:column;' +
-                '">'
+                '<div class="vas-td-card">'
             );
 
             /* ── Header ── */
             var $header = $(
-                '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;">' +
+                '<div class="vas-td-header">' +
                     /* Left: icon + title */
-                    '<div style="display:flex;align-items:center;gap:10px;">' +
-                        '<div style="' +
-                            'width:36px;height:36px;border-radius:8px;flex-shrink:0;' +
-                            'background:#EAF8FF;' +
-                            'display:flex;align-items:center;justify-content:center;' +
-                        '">' +
+                    '<div class="vas-td-header-left">' +
+                        '<div class="vas-td-icon">' +
                             '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" ' +
                                 'stroke="#0083DA" stroke-width="1.8" ' +
                                 'stroke-linecap="round" stroke-linejoin="round">' +
@@ -198,17 +172,17 @@
                             '</svg>' +
                         '</div>' +
                         '<div>' +
-                            '<div style="font-size:14px;font-weight:700;color:#102C3F;line-height:1.2;">' +
+                            '<div class="vas-td-title">' +
                                 lbl("VIS_TopDebtors", 'Top Debtors') +
                             '</div>' +
-                            '<div style="font-size:10px;color:#748494;letter-spacing:0.6px;text-transform:uppercase;margin-top:2px;">' +
+                            '<div class="vas-td-subtitle">' +
                                 lbl("VIS_LargestUnpaidBalances", 'LARGEST UNPAID BALANCES') +
                             '</div>' +
                         '</div>' +
                     '</div>' +
                     /* Right: Chase all link */
-                    '<div style="display:flex;align-items:center;gap:4px;cursor:pointer;" id="vis-topdebtors-chaseall-' + ($self.AD_UserHomeWidgetID || '') + '">' +
-                        '<span style="font-size:13px;font-weight:600;color:#0083DA;">' +
+                    '<div class="vas-td-header-right" id="vis-topdebtors-chaseall-' + ($self.AD_UserHomeWidgetID || '') + '">' +
+                        '<span class="vas-td-chase-all">' +
                             lbl("VIS_ChaseAll", 'Chase all') +
                         '</span>' +
                         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
@@ -223,8 +197,8 @@
 
             /* ── Scrollable list body ── */
             $listBody = $(
-                '<div style="flex:1;overflow-y:auto;padding-bottom:4px;">' +
-                    '<div style="text-align:center;padding:24px 16px;color:#748494;font-size:12px;">' +
+                '<div class="vas-td-list-body">' +
+                    '<div class="vas-td-nodata">' +
                         lbl("VIS_Loading", 'Loading…') +
                     '</div>' +
                 '</div>'
@@ -238,7 +212,7 @@
         this.refreshWidget = function () {
             if ($listBody) {
                 $listBody.html(
-                    '<div style="text-align:center;padding:24px 16px;color:#748494;font-size:12px;">' +
+                    '<div class="vas-td-nodata">' +
                         lbl("VIS_Loading", 'Loading…') +
                     '</div>'
                 );
@@ -256,7 +230,9 @@
         };
     };
 
-    VIS.TopDebtorsWidget.prototype.refreshWidget = function () {};
+    VIS.TopDebtorsWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.TopDebtorsWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

@@ -1,0 +1,87 @@
+.vas-ptm-root {
+    height: 100%;
+    width: 100%;
+    font-family: Roboto, sans-serif;
+}
+
+.vas-ptm-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    padding: 16px 18px 18px;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.vas-ptm-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.vas-ptm-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: oklch(0.96 0.04 155);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-ptm-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-ptm-subtitle {
+    font-size: 11px;
+    color: #748494;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    margin-top: 1px;
+}
+
+.vas-ptm-metric {
+    font-size: 40px;
+    font-weight: 700;
+    color: #019D89;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.vas-ptm-why-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: auto;
+}
+
+.vas-ptm-why-pill {
+    display: inline-flex;
+    align-items: center;
+    background: oklch(0.96 0.03 220);
+    padding: 1px 7px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: oklch(0.45 0.15 220);
+    font-family: Roboto, monospace;
+}
+
+.vas-ptm-why-text {
+    font-size: 11px;
+    color: #748494;
+    line-height: 1.45;
+}

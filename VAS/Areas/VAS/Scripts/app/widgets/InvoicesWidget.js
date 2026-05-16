@@ -29,7 +29,7 @@
         this.frame;
         this.windowNo;
         var $self = this;
-        var $root = $('<div style="height:100%;font-family:Roboto,sans-serif;">');
+        var $root = $('<div class="vas-inv-root">');
 
         var $tableBody;
         var $alertBanner;
@@ -118,22 +118,14 @@
         /* ── Build DOM ── */
         function createWidget() {
             var $card = $(
-                '<div style="' +
-                'background:linear-gradient(180deg,rgba(255,255,255,0.82) 0%,rgba(255,255,255,0.58) 100%);' +
-                'border:2px solid #fff;' +
-                'border-radius:14px;' +
-                'box-shadow:0 10px 24px rgba(15,61,97,0.06);' +
-                'overflow:hidden;' +
-                'height:100%;' +
-                'display:flex;flex-direction:column;' +
-                '">'
+                '<div class="vas-inv-card">'
             );
 
             /* Header */
             var $header = $(
-                '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 14px;">' +
-                '<div style="display:flex;align-items:center;gap:10px;">' +
-                '<div style="width:36px;height:36px;border-radius:8px;background:#EAF8FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+                '<div class="vas-inv-header">' +
+                '<div class="vas-inv-header-left">' +
+                '<div class="vas-inv-icon">' +
                 '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0083DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
                 '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
                 '<polyline points="14 2 14 8 20 8"/>' +
@@ -142,7 +134,7 @@
                 '<polyline points="10 9 9 9 8 9"/>' +
                 '</svg>' +
                 '</div>' +
-                '<span style="font-size:16px;font-weight:700;color:#102C3F;">' + lbl("VIS_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
+                '<span class="vas-inv-title">' + lbl("VIS_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
                 '</div>' +
                 '</div>'
             );
@@ -150,29 +142,29 @@
             /* Duplicate alert banner */
             $alertBanner = $(
                 '<div id="vis-inv-alert-' + $self.AD_UserHomeWidgetID + '" ' +
-                'style="display:none;margin:0 16px 12px;background:#FFF8E6;border:1px solid #F5C94E;border-radius:10px;padding:10px 14px;align-items:flex-start;gap:10px;">' +
-                '<svg style="flex-shrink:0;margin-top:2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D78B10" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+                'class="vas-inv-alert-banner" style="display:none;">' +
+                '<svg class="vas-inv-alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D78B10" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
                 '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>' +
                 '<line x1="4" y1="22" x2="4" y2="15"/>' +
                 '</svg>' +
-                '<div style="flex:1;">' +
-                '<div class="vis-inv-dup-title" style="font-size:13px;font-weight:700;color:#7A4F00;margin-bottom:2px;"></div>' +
-                '<div class="vis-inv-dup-sub"   style="font-size:12px;color:#9A6500;"></div>' +
+                '<div class="vas-inv-alert-text">' +
+                '<div class="vis-inv-dup-title vas-inv-dup-title"></div>' +
+                '<div class="vis-inv-dup-sub vas-inv-dup-sub"></div>' +
                 '</div>' +
                 '</div>'
             );
 
             /* Table wrapper */
-            var $tableWrap = $('<div style="padding:0 4px 4px;flex:1;overflow-y:auto;overflow-x:hidden;">');
+            var $tableWrap = $('<div class="vas-inv-table-wrap">');
 
             /* Table header row */
             var $tableHead = $(
-                '<div style="display:grid;grid-template-columns:' + COL_TMPL + ';align-items:center;padding:6px 16px;border-bottom:1px solid #EDF2F6;">' +
-                '<span style="font-size:11px;font-weight:600;color:#748494;letter-spacing:0.6px;text-transform:uppercase;">' + lbl("VIS_Invoice", 'INVOICE') + '</span>' +
-                '<span style="font-size:11px;font-weight:600;color:#748494;letter-spacing:0.6px;text-transform:uppercase;padding-left:16px;">' + lbl("VIS_Customer", 'CUSTOMER') + '</span>' +
-                '<span style="font-size:11px;font-weight:600;color:#748494;letter-spacing:0.6px;text-transform:uppercase;">' + lbl("VIS_Due", 'DUE') + '</span>' +
-                '<span style="font-size:11px;font-weight:600;color:#748494;letter-spacing:0.6px;text-transform:uppercase;">' + lbl("VIS_Status", 'STATUS') + '</span>' +
-                '<span style="font-size:11px;font-weight:600;color:#748494;letter-spacing:0.6px;text-transform:uppercase;">' + lbl("VIS_Amount", 'AMOUNT') + '</span>' +
+                '<div class="vas-inv-table-head" style="grid-template-columns:' + COL_TMPL + ';">' +
+                '<span class="vas-inv-th">' + lbl("VIS_Invoice", 'INVOICE') + '</span>' +
+                '<span class="vas-inv-th-customer">' + lbl("VIS_Customer", 'CUSTOMER') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VIS_Due", 'DUE') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VIS_Status", 'STATUS') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VIS_Amount", 'AMOUNT') + '</span>' +
                 '</div>'
             );
 
@@ -196,19 +188,19 @@
 
                 var $row = $(
                     '<div data-invid="' + inv.id + '" ' +
-                    'style="display:grid;grid-template-columns:' + COL_TMPL + ';align-items:center;' +
-                    'padding:13px 16px;cursor:pointer;background:' + rowBg + ';transition:background 0.15s;' +
+                    'class="vas-inv-row" style="grid-template-columns:' + COL_TMPL + ';' +
+                    'background:' + rowBg + ';' +
                     (isLast ? '' : 'border-bottom:1px solid #EDF2F6;') + '">' +
-                    '<span style="font-size:13px;font-weight:700;color:#102C3F;">' + inv.id + '</span>' +
-                    '<span style="font-size:13px;color:#3D5166;padding-left:16px;">' + inv.customer + '</span>' +
-                    '<span style="font-size:13px;color:#5F7283;">' + inv.due + '</span>' +
+                    '<span class="vas-inv-cell-id">' + inv.id + '</span>' +
+                    '<span class="vas-inv-cell-customer">' + inv.customer + '</span>' +
+                    '<span class="vas-inv-cell-due">' + inv.due + '</span>' +
                     '<span>' +
-                    '<span style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;' +
-                    'background:' + cfg.bg + ';color:' + cfg.color + ';white-space:nowrap;">' +
+                    '<span class="vas-inv-status-chip" style="' +
+                    'background:' + cfg.bg + ';color:' + cfg.color + ';">' +
                     cfg.label +
                     '</span>' +
                     '</span>' +
-                    '<span style="font-size:14px;font-weight:700;color:#102C3F;text-align:right;">' + inv.amount.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' +
+                    '<span class="vas-inv-cell-amount">' + inv.amount.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' +
                     '</div>'
                 );
 
@@ -289,7 +281,9 @@
         };
     };
 
-    VIS.InvoicesWidget.prototype.refreshWidget = function () { };
+    VIS.InvoicesWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VIS.InvoicesWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;

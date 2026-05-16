@@ -255,6 +255,7 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_AgingReceivablesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
