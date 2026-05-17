@@ -15,4 +15,9 @@
 
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
+@import "../AutoAllocatedWidget.css";
+@import "../BouncedChequesWidget.css";
+@import "../CustomerPaidMethodWidget.css";
+
+@import "../CollectionEfficiencyWidget.css";
 

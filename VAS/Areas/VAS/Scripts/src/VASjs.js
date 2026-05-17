@@ -115,3 +115,10 @@ import "../app/widgets/RequestWidget.js";
 import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
 
 import "../app/widgets/ExpectedThisWeekWidget.js";
+import "../app/widgets/AutoAllocatedWidget.js";
+import "../app/widgets/BouncedChequesWidget.js";
+
+import "../app/widgets/CustomerPaidMethodWidget.js";
+
+import "../app/widgets/CollectionEfficiencyWidget.js";
+

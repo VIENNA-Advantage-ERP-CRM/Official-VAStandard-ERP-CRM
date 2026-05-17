@@ -61,8 +61,8 @@ namespace VIS.Controllers
                 AND Payment.IsActive='Y'
                 AND Payment.DocStatus IN ('CO', 'CL')
                 AND Payment.Posted='Y'
-                AND p.DateAcct >= TRUNC(SYSDATE, 'YYYY')
-                AND p.DateAcct < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 1)";
+                AND Payment.DateAcct >= TRUNC(SYSDATE, 'YYYY')
+                AND Payment.DateAcct < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 1)";
 
             receivedJanuarySql = MRole.GetDefault(ctx).AddAccessSQL(
                 receivedJanuarySql,
