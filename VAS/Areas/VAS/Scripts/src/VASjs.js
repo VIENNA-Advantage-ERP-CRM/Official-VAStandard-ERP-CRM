@@ -110,3 +110,8 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 import "../app/widgets/RequestWidget.js";
+
+
+import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
+
+import "../app/widgets/ExpectedThisWeekWidget.js";

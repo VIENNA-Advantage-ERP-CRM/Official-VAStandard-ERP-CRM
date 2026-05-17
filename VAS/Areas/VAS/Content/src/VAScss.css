@@ -12,3 +12,7 @@
 @import "../VAS_HighestSellingWidget.css";
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
+
+@import "../TotalAmountReceivedThisMonthWidget.css";
+@import "../ExpectedThisWeekWidget.css";
+
