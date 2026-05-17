@@ -14,10 +14,10 @@
 @import "../VAS_LeadConversation.css";
 @import "../VAS_AgingReceivablesWidget.css";
 
-@import "../VAS_AgingReceivablesWidget.css";
-@import "../VAS_AvgDaysToPayWidget.css";
-@import "../VAS_InvoicesWidget.css";
-@import "../VAS_OutstandingSalesOrderWidget.css";
-@import "../VAS_OverdueWidget.css";
-@import "../VAS_PaidthismonthWidget.css";
-@import "../VAS_TopDebtorsWidget.css";
+@import "../AgingReceivablesWidget.css";
+@import "../AvgDaysToPayWidget.css";
+@import "../InvoicesWidget.css";
+@import "../OutstandingSalesOrderWidget.css";
+@import "../OverdueWidget.css";
+@import "../PaidthismonthWidget.css";
+@import "../TopDebtorsWidget.css";
