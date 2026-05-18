@@ -1,0 +1,300 @@
+.vas-er-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.vas-er-card {
+    width: 100%;
+    min-height: 560px;
+    box-sizing: border-box;
+    padding: 34px 36px 24px 36px;
+    border-radius: 28px;
+    border: 4px solid rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, #FFFFFF 0%, #FBFFFB 58%, #F8FFF0 100%);
+    box-shadow: 0 18px 38px rgba(31, 61, 100, 0.08);
+    position: relative;
+}
+
+.vas-er-topbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.vas-er-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.vas-er-icon-wrap {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    border-radius: 15px;
+    background: #DCEBFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-er-title {
+    font-size: 31px;
+    font-weight: 800;
+    color: #1F3347;
+}
+
+.vas-er-subtitle {
+    margin-top: 22px;
+    font-size: 23px;
+    color: #7A8798;
+    letter-spacing: 3px;
+    font-weight: 600;
+}
+
+.vas-er-filter-wrap {
+    position: relative;
+}
+
+.vas-er-filter-btn {
+    border: 0;
+    background: #FFF8F8;
+    color: #D94D42;
+    font-size: 21px;
+    padding: 12px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.vas-er-filter-arrow {
+    color: #4F8EEA;
+    margin-left: 12px;
+}
+
+.vas-er-filter-menu {
+    display: none;
+    position: absolute;
+    top: 54px;
+    right: 0;
+    min-width: 190px;
+    background: #FFFFFF;
+    border: 1px solid #E3E8EF;
+    box-shadow: 0 14px 34px rgba(31, 61, 100, 0.18);
+    border-radius: 12px;
+    z-index: 20;
+    overflow: hidden;
+}
+
+.vas-er-filter-menu-show {
+    display: block;
+}
+
+.vas-er-filter-item {
+    padding: 14px 18px;
+    font-size: 17px;
+    color: #1F3347;
+    cursor: pointer;
+}
+
+    .vas-er-filter-item:hover {
+        background: #F3F7FB;
+    }
+
+.vas-er-tools {
+    margin-top: 26px;
+    display: flex;
+    gap: 10px;
+}
+
+.vas-er-search {
+    flex: 1;
+    height: 42px;
+    border: 1px solid #D9E1EA;
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 16px;
+    color: #1F3347;
+}
+
+.vas-er-search-btn {
+    border: 0;
+    background: #111827;
+    color: #FFFFFF;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.vas-er-custom-panel {
+    display: none;
+    position: absolute;
+    top: 96px;
+    right: 36px;
+    width: 520px;
+    background: #F7F7F7;
+    border: 1px solid #D6D6D6;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+    border-radius: 4px;
+    z-index: 22;
+    padding: 22px;
+    box-sizing: border-box;
+}
+
+.vas-er-custom-panel-show {
+    display: block;
+}
+
+.vas-er-custom-row {
+    display: inline-flex;
+    flex-direction: column;
+    width: 48%;
+    margin-right: 2%;
+}
+
+    .vas-er-custom-row label {
+        font-size: 18px;
+        color: #111827;
+        margin-bottom: 8px;
+    }
+
+    .vas-er-custom-row input {
+        height: 52px;
+        border: 1px solid #D1D5DB;
+        border-radius: 5px;
+        font-size: 20px;
+        padding: 0 12px;
+    }
+
+.vas-er-custom-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.vas-er-clear-btn,
+.vas-er-apply-btn {
+    border: 0;
+    background: #5898EA;
+    color: #FFFFFF;
+    font-size: 21px;
+    border-radius: 12px;
+    padding: 14px 24px;
+    cursor: pointer;
+}
+
+.vas-er-list {
+    margin-top: 34px;
+}
+
+.vas-er-row {
+    min-height: 104px;
+    display: flex;
+    align-items: center;
+    gap: 26px;
+}
+
+.vas-er-line {
+    width: 5px;
+    height: 72px;
+    border-radius: 8px;
+}
+
+.vas-er-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas-er-invoice {
+    font-size: 27px;
+    font-weight: 800;
+    color: #1F3347;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-er-meta {
+    margin-top: 10px;
+    font-size: 24px;
+    color: #7A8798;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-er-amount {
+    min-width: 170px;
+    text-align: right;
+    font-size: 29px;
+    font-weight: 800;
+    color: #34724B;
+}
+
+.vas-er-pager {
+    margin-top: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.vas-er-prev,
+.vas-er-next {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    background: #EEF4FA;
+    color: #1F3347;
+    font-size: 26px;
+    cursor: pointer;
+}
+
+.vas-er-page-text {
+    font-size: 17px;
+    font-weight: 700;
+    color: #5B6878;
+}
+
+.vas-er-nodata {
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5B6878;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+@media (max-width: 760px) {
+    .vas-er-card {
+        min-height: 620px;
+        padding: 24px;
+    }
+
+    .vas-er-topbar {
+        flex-direction: column;
+    }
+
+    .vas-er-custom-panel {
+        width: calc(100% - 48px);
+        right: 24px;
+    }
+
+    .vas-er-invoice {
+        font-size: 21px;
+    }
+
+    .vas-er-meta {
+        font-size: 18px;
+    }
+
+    .vas-er-amount {
+        font-size: 22px;
+        min-width: 110px;
+    }
+}
