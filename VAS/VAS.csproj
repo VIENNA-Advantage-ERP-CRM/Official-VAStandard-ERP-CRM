@@ -312,7 +312,14 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\CollectionEfficiencyWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\CustomerPaidMethodWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedReceiptsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
