@@ -43,6 +43,8 @@
 
         /* ── Format currency ── */
         function formatCurrency(value) {
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+
             var sign = value < 0 ? '-' : '';
             var absVal = Math.abs(value);
 
@@ -52,7 +54,7 @@
             if (absVal >= 1000) {
                 return sign + Math.round(absVal / 1000) + 'k';
             }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
         /* ── Render bucket chart ── */

@@ -246,31 +246,31 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\AgingReceivablesWidget.css" />
+    <Content Include="Areas\VAS\Content\AvgDaysToPayWidget.css" />
     <Content Include="Areas\VAS\Content\Images\AI.png" />
     <Content Include="Areas\VAS\Content\Images\arrow.png" />
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
+    <Content Include="Areas\VAS\Content\InvoicesWidget.css" />
+    <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
+    <Content Include="Areas\VAS\Content\OverdueWidget.css" />
+    <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\src\VAScss.css" />
+    <Content Include="Areas\VAS\Content\TopDebtorsWidget.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
-    <Content Include="Areas\VAS\Content\VAS_AgingReceivablesWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_AvgDaysToPayWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
-    <Content Include="Areas\VAS\Content\VAS_InvoicesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_LeadConversation.css" />
-    <Content Include="Areas\VAS\Content\VAS_OutstandingSalesOrderWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_OverdueWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_PaidthismonthWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
-    <Content Include="Areas\VAS\Content\VAS_TopDebtorsWidget.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />

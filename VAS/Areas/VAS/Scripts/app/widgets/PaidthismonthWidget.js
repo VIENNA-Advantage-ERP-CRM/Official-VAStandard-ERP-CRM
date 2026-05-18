@@ -61,13 +61,18 @@
 
         /* ── Format currency ── */
         function formatCurrency(value) {
-            if (value >= 1000000) {
-                return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+
+            var sign = value < 0 ? '-' : '';
+            var absVal = Math.abs(value);
+
+            if (absVal >= 1000000) {
+                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
-            if (value >= 1000) {
-                return Math.round(value / 1000) + 'k';
+            if (absVal >= 1000) {
+                return sign + Math.round(absVal / 1000) + 'k';
             }
-            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
         /* ── Render metric values ── */

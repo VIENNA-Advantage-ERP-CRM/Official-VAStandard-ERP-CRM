@@ -57,13 +57,15 @@
 
         /* ── Format currency ── */
         function formatCurrency(value) {
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+
             if (value >= 1000000) {
                 return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
             if (value >= 1000) {
                 return (value / 1000).toFixed(0) + ',' + (value % 1000 < 100 ? (value % 1000 < 10 ? '00' : '0') : '') + (value % 1000);
             }
-            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
         /* ── Avatar initials ── */

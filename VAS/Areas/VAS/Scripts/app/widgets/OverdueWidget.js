@@ -61,13 +61,18 @@
 
         /* ── Format currency ── */
         function formatCurrency(value) {
-            if (value >= 1000000) {
-                return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+
+            var sign = value < 0 ? '-' : '';
+            var absVal = Math.abs(value);
+
+            if (absVal >= 1000000) {
+                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
-            if (value >= 1000) {
-                return Math.round(value / 1000) + 'k';
+            if (absVal >= 1000) {
+                return sign + Math.round(absVal / 1000) + 'k';
             }
-            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
         /* ── Render metric values ── */
@@ -78,7 +83,7 @@
             if ($whyText) {
                 var invoiceLabel = count !== 1
                     ? lbl("VIS_Invoices", 'invoices')
-                    : lbl("VIS_Invoice",  'invoice');
+                    : lbl("VIS_Invoice", 'invoice');
                 var countStr = count > 0
                     ? count + ' ' + invoiceLabel + ' · ' + lbl("VIS_ChaseFirst", 'chase these first.')
                     : lbl("VIS_NoOverdueInvoices", 'No overdue invoices.');
@@ -98,28 +103,28 @@
             var $header = $(
                 '<div class="vas-ovd-header">' +
 
-                    /* Icon well — pale red/danger tint matching design2.md semantic danger surface */
-                    '<div class="vas-ovd-icon">' +
-                        /* Clock icon (lucide-style inline SVG) */
-                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
-                            'stroke="oklch(0.45 0.17 25)" stroke-width="1.8" ' +
-                            'stroke-linecap="round" stroke-linejoin="round">' +
-                            '<circle cx="12" cy="12" r="10"/>' +
-                            '<polyline points="12 6 12 12 16 14"/>' +
-                        '</svg>' +
-                    '</div>' +
+                /* Icon well — pale red/danger tint matching design2.md semantic danger surface */
+                '<div class="vas-ovd-icon">' +
+                /* Clock icon (lucide-style inline SVG) */
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="oklch(0.45 0.17 25)" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="12" cy="12" r="10"/>' +
+                '<polyline points="12 6 12 12 16 14"/>' +
+                '</svg>' +
+                '</div>' +
 
-                    '<div>' +
-                        '<div id="VIS_Overdue" class="vas-ovd-title">' + lbl("VIS_OverDue", 'Overdue') + '</div>' +
-                        '<div class="vas-ovd-subtitle">' + lbl("VIS_PastDueDate", 'Past due date') + '</div>' +
-                    '</div>' +
+                '<div>' +
+                '<div id="VIS_Overdue" class="vas-ovd-title">' + lbl("VIS_OverDue", 'Overdue') + '</div>' +
+                '<div class="vas-ovd-subtitle">' + lbl("VIS_PastDueDate", 'Past due date') + '</div>' +
+                '</div>' +
                 '</div>'
             );
 
             /* ── Metric value — danger red to match the screenshot ── */
             $metricEl = $(
                 '<div id="vis-ovd-metric-' + uid + '" class="vas-ovd-metric">' +
-                    '—' +
+                '—' +
                 '</div>'
             );
 
@@ -134,7 +139,7 @@
 
             $whyText = $(
                 '<span id="vis-ovd-why-' + uid + '" class="vas-ovd-why-text">' +
-                    lbl("VIS_PastDueDateLoading", 'Past due date · loading…') +
+                lbl("VIS_PastDueDateLoading", 'Past due date · loading…') +
                 '</span>'
             );
 
@@ -163,14 +168,14 @@
     };
 
     VIS.OverdueWidget.prototype.init = function (windowNo, frame) {
-        this.frame               = frame;
+        this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
-        this.windowNo            = windowNo;
+        this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.OverdueWidget.prototype.widgetSizeChange = function (height, width) {};
+    VIS.OverdueWidget.prototype.widgetSizeChange = function (height, width) { };
 
     VIS.OverdueWidget.prototype.dispose = function () {
         this.disposeComponent();

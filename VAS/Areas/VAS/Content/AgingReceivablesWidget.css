@@ -63,10 +63,10 @@
 }
 
 .vas-ar-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 2px solid #fff;
     border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     padding: 16px 18px 18px;
     height: 100%;
     box-sizing: border-box;

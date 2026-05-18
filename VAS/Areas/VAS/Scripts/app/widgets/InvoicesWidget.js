@@ -93,7 +93,8 @@
                         /* Banner — summary of all pairs */
                         var total = data.length;
                         var first = data[0];
-                        var amt = parseFloat(first.amount).toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                        var amt = parseFloat(first.amount).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
                         var title = total === 1
                             ? lbl("VIS_DuplicateSuspected", 'Duplicate suspected:') + ' ' + first.invoiceA + ' ' + lbl("VIS_MatchesAmountCustomer", 'matches') + ' ' + first.invoiceB + ' amount + customer'
                             : total + ' ' + lbl("VIS_DuplicatePairsSuspected", 'duplicate pairs suspected') + ' — ' + total + ' ' + lbl("VIS_CustomersAffected", 'customers affected');
@@ -180,6 +181,8 @@
         /* ── Render rows ── */
         function renderRows() {
             $tableBody.empty();
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+
             $.each(INVOICES, function (i, inv) {
                 var cfg = STATUS_CONFIG[inv.status] || { label: inv.status, bg: '#EDEDED', color: '#505050' };
                 var isLast = (i === INVOICES.length - 1);
@@ -200,7 +203,7 @@
                     cfg.label +
                     '</span>' +
                     '</span>' +
-                    '<span class="vas-inv-cell-amount">' + inv.amount.toLocaleString(window.navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' +
+                    '<span class="vas-inv-cell-amount">' + inv.amount.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision }) + '</span>' +
                     '</div>'
                 );
 
