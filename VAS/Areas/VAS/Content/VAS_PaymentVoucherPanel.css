@@ -1,0 +1,886 @@
+/* Payment Voucher tab panel — matches section 4 of the design spec */
+
+.vas-pvp-root {
+    position: relative;
+    box-sizing: border-box;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: transparent;
+    color: #102C3F;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- Right Detail Panel Header Bar (design.md §3) ---- */
+.vas-pvp-paneHeader {
+    flex: 0 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: #FFFFFF;
+    border-bottom: 1px solid #E4EDF4;
+    box-sizing: border-box;
+    gap: 16px;
+}
+
+.vas-pvp-paneTitle {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: #141414;
+    line-height: 1.2;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-pvp-paneMeta {
+    flex: 0 0 auto;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+}
+
+/* ---- Scrollable content region below the pane header ---- */
+.vas-pvp-scroll {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 18px;
+    box-sizing: border-box;
+}
+
+.vas-pvp-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Inner sub-card surface used by every section card */
+.vas-pvp-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58));
+    border: 2px solid #FFFFFF;
+    border-radius: 12px;
+    box-sizing: border-box;
+}
+
+/* ---- Empty / not-found / error states ---- */
+.vas-pvp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    text-align: center;
+}
+
+.vas-pvp-emptyTitle {
+    font-size: 14px;
+    color: #5F7283;
+}
+
+.vas-pvp-retry {
+    background: none;
+    border: none;
+    color: #1F83FF;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 6px 12px;
+}
+
+    .vas-pvp-retry:hover {
+        text-decoration: underline;
+    }
+
+/* ---- Identity strip (record context near the top of the content) ---- */
+.vas-pvp-identityRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 0 4px;
+    /* design.md: keep a clear gap between pane header and the first summary block */
+    margin-top: 2px;
+}
+
+.vas-pvp-identityLeft {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-pvp-subline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas-pvp-dot {
+    color: #748494;
+}
+
+.vas-pvp-headerRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    flex: 0 0 auto;
+}
+
+/* Status capsule pill */
+.vas-pvp-statusPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #DFF1FF;
+    color: #0E5DA8;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.vas-pvp-statusDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #1F83FF;
+    flex: 0 0 auto;
+}
+
+/* Status tone variants — color the dot + pill to reflect resolved status */
+.vas-pvp-statusPill[data-tone="released"] {
+    background: #CCEFDD;
+    color: #0C5D38;
+}
+    .vas-pvp-statusPill[data-tone="released"] .vas-pvp-statusDot { background: #0B6B45; }
+
+/* Approved + awaiting release reads as a positive/ready state in the mockup */
+.vas-pvp-statusPill[data-tone="approved"] {
+    background: #CCEFDD;
+    color: #0C5D38;
+}
+    .vas-pvp-statusPill[data-tone="approved"] .vas-pvp-statusDot { background: #0B6B45; }
+
+.vas-pvp-statusPill[data-tone="submitted"] {
+    background: #FAEEDA;
+    color: #9A6500;
+}
+    .vas-pvp-statusPill[data-tone="submitted"] .vas-pvp-statusDot { background: #D78B10; }
+
+.vas-pvp-statusPill[data-tone="reviewed"] {
+    background: #DFF1FF;
+    color: #0E5DA8;
+}
+
+.vas-pvp-statusPill[data-tone="draft"] {
+    background: #EDF2F6;
+    color: #5F7283;
+}
+    .vas-pvp-statusPill[data-tone="draft"] .vas-pvp-statusDot { background: #748494; }
+
+/* Header icon-only buttons */
+.vas-pvp-iconBtns {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vas-pvp-iconBtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.8);
+    color: #586575;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+    .vas-pvp-iconBtn:hover {
+        background: #FFFFFF;
+        color: #102C3F;
+    }
+
+    .vas-pvp-iconBtn:focus {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 1px;
+    }
+
+    .vas-pvp-iconBtn i {
+        font-size: 14px;
+    }
+
+/* ---- Section 4.3 — summary metric cards ---- */
+.vas-pvp-summaryGrid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.vas-pvp-summaryCell {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.vas-pvp-cell-approval {
+    border-color: #BFE4FF;
+}
+
+.vas-pvp-cellLabel {
+    font-size: 11px;
+    color: #5F7283;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+/* Cell 1 — payee */
+.vas-pvp-payeeName {
+    font-size: 17px;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.vas-pvp-bankLine {
+    font-size: 12px;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+.vas-pvp-ytdPill {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: 8px;
+    background: #EEF8FF;
+    color: #106AB0;
+    font-size: 11px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    line-height: 1.2;
+}
+
+/* Cell 2 — amount */
+.vas-pvp-amountValue {
+    font-size: 22px;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+}
+
+.vas-pvp-amountSub {
+    font-size: 11px;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+/* Cell 3 — payment date */
+.vas-pvp-dateValue {
+    font-size: 17px;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-pvp-dateSub {
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 500;
+}
+
+    .vas-pvp-dateSub.tone-scheduled { color: #D78B10; }
+    .vas-pvp-dateSub.tone-paid      { color: #0B6B45; }
+    .vas-pvp-dateSub.tone-overdue   { color: #A33F3F; }
+
+/* Cell 4 — approval */
+.vas-pvp-apprValue {
+    font-size: 15px;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-pvp-apprFinal {
+    font-size: 11px;
+    color: #0B6B45;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+/* ---- Section 4.4 — approval workflow card ---- */
+.vas-pvp-apprCard {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-pvp-stageTracker {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.vas-pvp-stageCell {
+    padding: 10px 6px;
+    border-radius: 8px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vas-pvp-stageCell[data-state="complete"] {
+    background: #EAF8FF;
+}
+
+.vas-pvp-stageCell[data-state="active"] {
+    background: linear-gradient(109deg, #EAF8FF 0%, #CAEDFF 100%);
+    border-color: #BFE4FF;
+}
+
+.vas-pvp-stageLabel {
+    font-size: 11px;
+    color: #5F7283;
+    line-height: 1.2;
+}
+
+.vas-pvp-stageCell[data-state="active"] .vas-pvp-stageLabel {
+    font-weight: 500;
+    color: #0E5DA8;
+}
+
+.vas-pvp-stageCell[data-state="pending"] .vas-pvp-stageLabel {
+    color: #748494;
+}
+
+.vas-pvp-stageValue {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.vas-pvp-stageCell[data-state="complete"] .vas-pvp-stageValue { color: #0B6B45; }
+.vas-pvp-stageCell[data-state="active"]   .vas-pvp-stageValue { color: #1F83FF; }
+.vas-pvp-stageCell[data-state="pending"]  .vas-pvp-stageValue { color: #748494; }
+
+/* Approval log rows below the stage tracker */
+.vas-pvp-apprLog {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-pvp-apprRow {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 12px;
+    font-size: 13px;
+    padding-top: 8px;
+    align-items: baseline;
+}
+
+.vas-pvp-apprLog .vas-pvp-apprRow:first-child {
+    border-top: 1px solid #EDF2F6;
+    padding-top: 14px;
+    margin-top: 14px;
+}
+
+.vas-pvp-apprRole {
+    color: #5F7283;
+}
+
+.vas-pvp-apprActor {
+    color: #102C3F;
+    min-width: 0;
+}
+
+.vas-pvp-apprActorRole {
+    color: #5F7283;
+}
+
+.vas-pvp-apprDot {
+    color: #748494;
+}
+
+.vas-pvp-apprWhen {
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Release queue row */
+.vas-pvp-releaseRow {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding-top: 14px;
+    margin-top: 8px;
+    border-top: 1px solid #EDF2F6;
+    font-size: 13px;
+}
+
+.vas-pvp-releaseRole {
+    color: #D78B10;
+    font-weight: 500;
+}
+
+.vas-pvp-releaseQueue {
+    color: #5F7283;
+}
+
+.vas-pvp-releaseRight {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.vas-pvp-releaseBtn {
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #1F83FF;
+    border: 1px solid #1F83FF;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    line-height: 1.2;
+}
+
+    .vas-pvp-releaseBtn:hover:not(:disabled) {
+        background: #0069AE;
+        border-color: #0069AE;
+    }
+
+    .vas-pvp-releaseBtn:disabled {
+        opacity: 0.7;
+        cursor: progress;
+    }
+
+    .vas-pvp-releaseBtn:focus {
+        outline: 2px solid #BFE4FF;
+        outline-offset: 2px;
+    }
+
+.vas-pvp-releaseErr {
+    color: #A33F3F;
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+/* ---- Section 4.5 — allocated invoices card ---- */
+.vas-pvp-allocCard {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.vas-pvp-allocHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.vas-pvp-allocTitle {
+    font-size: 15px;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.vas-pvp-matchPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.vas-pvp-matchPill[data-state="fully_matched"] {
+    background: #CCEFDD;
+    color: #0C5D38;
+}
+
+.vas-pvp-matchPill[data-state="partially_matched"] {
+    background: #FAEEDA;
+    color: #9A6500;
+}
+
+.vas-pvp-matchPill[data-state="unmatched"] {
+    background: rgba(250, 215, 215, 0.55);
+    color: #8F2D2D;
+}
+
+.vas-pvp-matchIcon {
+    font-size: 12px;
+    stroke-width: 3;
+}
+
+.vas-pvp-allocCols {
+    display: grid;
+    grid-template-columns: 1fr 0.8fr 0.7fr 0.8fr 0.8fr 0.6fr;
+    gap: 8px;
+    padding: 8px 4px;
+    font-size: 11px;
+    color: #5F7283;
+    font-weight: 500;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+    .vas-pvp-allocCols .is-num {
+        text-align: right;
+    }
+
+.vas-pvp-allocRow {
+    display: grid;
+    grid-template-columns: 1fr 0.8fr 0.7fr 0.8fr 0.8fr 0.6fr;
+    gap: 8px;
+    padding: 10px 4px;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;
+    background: transparent;
+    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
+    color: inherit;
+    cursor: pointer;
+    align-items: center;
+    width: 100%;
+}
+
+    .vas-pvp-allocRow:last-of-type {
+        border-bottom: none;
+    }
+
+    .vas-pvp-allocRow:hover {
+        background: rgba(234, 248, 255, 0.4);
+    }
+
+    .vas-pvp-allocRow:focus {
+        outline: 2px solid #BFE4FF;
+        outline-offset: -2px;
+    }
+
+.vas-pvp-allocInvNo {
+    font-size: 14px;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-pvp-allocInvDesc {
+    font-size: 11px;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 2px;
+}
+
+.vas-pvp-allocDate {
+    color: #5F7283;
+    font-size: 13px;
+}
+
+.vas-pvp-allocAmt,
+.vas-pvp-allocAlloc,
+.vas-pvp-allocBal {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+}
+
+.vas-pvp-allocAlloc {
+    font-weight: 500;
+}
+
+.vas-pvp-allocBal.tone-zero      { color: #0B6B45; }
+.vas-pvp-allocBal.tone-remaining { color: #D78B10; font-weight: 500; }
+.vas-pvp-allocBal.tone-over      { color: #A33F3F; font-weight: 500; }
+
+.vas-pvp-allocStatusPill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.vas-pvp-allocStatusPill[data-state="closed"] {
+    background: #CCEFDD;
+    color: #0C5D38;
+}
+
+.vas-pvp-allocStatusPill[data-state="partial"] {
+    background: #FAEEDA;
+    color: #9A6500;
+}
+
+.vas-pvp-allocStatusPill[data-state="open"] {
+    background: #DFF1FF;
+    color: #0E5DA8;
+}
+
+.vas-pvp-allocEmpty {
+    padding: 18px 4px;
+    text-align: center;
+    font-size: 13px;
+    color: #748494;
+}
+
+.vas-pvp-allocTotals {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 2px solid #EDF2F6;
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+.vas-pvp-allocTotalsLabel {
+    font-size: 12px;
+    color: #5F7283;
+}
+
+.vas-pvp-allocTotalsValue {
+    font-size: 14px;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Section 4.6 — bottom 2-column grid ---- */
+.vas-pvp-bottomGrid {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 10px;
+}
+
+/* Notes card */
+.vas-pvp-notesCard {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-pvp-notesHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.vas-pvp-notesTitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.vas-pvp-notesEdit {
+    background: none;
+    border: none;
+    color: #1F83FF;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .vas-pvp-notesEdit:hover {
+        text-decoration: underline;
+    }
+
+.vas-pvp-notesBody {
+    font-size: 13px;
+    color: #102C3F;
+    line-height: 1.5;
+    margin-top: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+    .vas-pvp-notesBody.is-empty {
+        color: #748494;
+    }
+
+.vas-pvp-notesMeta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    border-top: 1px solid #EDF2F6;
+    margin-top: 12px;
+    padding-top: 12px;
+    font-size: 12px;
+}
+
+.vas-pvp-metaField {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vas-pvp-metaLabel {
+    color: #5F7283;
+}
+
+.vas-pvp-metaValue {
+    font-weight: 500;
+    color: #102C3F;
+    word-break: break-word;
+}
+
+/* Activity card */
+.vas-pvp-activityCard {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-pvp-activityHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.vas-pvp-activityTitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.vas-pvp-activityCount {
+    font-size: 11px;
+    color: #5F7283;
+}
+
+.vas-pvp-activityEmpty {
+    padding: 14px 4px;
+    font-size: 12px;
+    color: #748494;
+    text-align: center;
+}
+
+.vas-pvp-actRow {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 8px;
+    padding: 8px 0;
+    align-items: center;
+}
+
+.vas-pvp-actIconWell {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+    .vas-pvp-actIconWell i {
+        font-size: 12px;
+    }
+
+.vas-pvp-actIconWell[data-tone="blue"] {
+    background: #DFF1FF;
+    color: #1F83FF;
+}
+
+.vas-pvp-actIconWell[data-tone="neutral"] {
+    background: #EEF6FF;
+    color: #586575;
+}
+
+.vas-pvp-actIconWell[data-tone="red"] {
+    background: #FCEBEB;
+    color: #A33F3F;
+}
+
+.vas-pvp-actDesc {
+    font-size: 12px;
+    color: #102C3F;
+    min-width: 0;
+    word-break: break-word;
+}
+
+    .vas-pvp-actDesc strong {
+        font-weight: 500;
+    }
+
+.vas-pvp-actWhen {
+    font-size: 12px;
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Responsive ---- */
+@media screen and (max-width: 1100px) {
+    .vas-pvp-summaryGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .vas-pvp-bottomGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-pvp-summaryGrid {
+        grid-template-columns: 1fr;
+    }
+    .vas-pvp-stageTracker {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .vas-pvp-allocCols,
+    .vas-pvp-allocRow {
+        grid-template-columns: 1fr 0.8fr 0.8fr 0.6fr;
+    }
+        .vas-pvp-allocCols > :nth-child(3),
+        .vas-pvp-allocCols > :nth-child(4),
+        .vas-pvp-allocRow .vas-pvp-allocAmt,
+        .vas-pvp-allocRow .vas-pvp-allocAlloc {
+            display: none;
+        }
+    .vas-pvp-apprRow,
+    .vas-pvp-releaseRow {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+}
