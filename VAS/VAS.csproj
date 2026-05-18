@@ -152,7 +152,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Areas\VAS\Controllers\AcctViewerDataController.cs" />
+    <Compile Include="Areas\VAS\Controllers\AgingReceivablesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AlertSQLGenerateController.cs" />
+    <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MAcctSchemaController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MBankStatementController.cs" />
@@ -204,7 +206,12 @@
     <Compile Include="Areas\VAS\Controllers\GlJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
     <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
+    <Compile Include="Areas\VAS\Controllers\InvoicesController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\OutstandingSalesOrderController.cs" />
+    <Compile Include="Areas\VAS\Controllers\OverdueController.cs" />
+    <Compile Include="Areas\VAS\Controllers\PaidThisMonthController.cs" />
+    <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
@@ -240,12 +247,19 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\AgingReceivablesWidget.css" />
+    <Content Include="Areas\VAS\Content\AvgDaysToPayWidget.css" />
     <Content Include="Areas\VAS\Content\Images\AI.png" />
     <Content Include="Areas\VAS\Content\Images\arrow.png" />
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
+    <Content Include="Areas\VAS\Content\InvoicesWidget.css" />
+    <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
+    <Content Include="Areas\VAS\Content\OverdueWidget.css" />
+    <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\src\VAScss.css" />
+    <Content Include="Areas\VAS\Content\TopDebtorsWidget.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
@@ -312,7 +326,15 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\OutstandingSalesOrderWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\OverdueWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
