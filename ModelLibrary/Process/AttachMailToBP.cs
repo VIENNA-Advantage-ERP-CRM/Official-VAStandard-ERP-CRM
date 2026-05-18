@@ -1,5 +1,6 @@
 ﻿using Limilabs.Client.IMAP;
 using Limilabs.Mail;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,6 +15,9 @@ using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.ProcessEngine;
 using VAdvantage.Utility;
+using VAModelAD.AIHelper;
+using static VAModelAD.AIHelper.AIHelperDataContracts;
+using static VAModelAD.AIHelper.AIPayload;
 
 namespace VAdvantage.Process
 {
@@ -238,6 +242,11 @@ namespace VAdvantage.Process
                 }
                 DB.ExecuteQuery("UPDATE AD_UserMailConfigration SET DateLastRun = " + GlobalVariable.TO_DATE(DateTime.Now.AddDays(-1), true)
                     + " WHERE AD_UserMailConfigration_ID = " + Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_UserMailConfigration_ID"]));
+
+                if (Env.IsModuleInstalled("VAI01_"))
+                {
+                    ExecuteMailSuggestion(AD_Client_ID, "VAI01_AISuggestionOnReceivedMsg", 1000003, 0, AD_User_ID, GetCtx());
+                }
             }
             return retVal.ToString();
         }
@@ -276,6 +285,14 @@ namespace VAdvantage.Process
             List<object> result = enumerable.Cast<object>().ToList();
             if (result != null && result.Count > 0)
             {
+                bool hasFolderName = result[0].GetType().GetProperty("Folder") != null;
+                List<object> inboxMails = hasFolderName
+                    ? result.Where(m => Util.GetValueOfString(((dynamic)m).Folder).IndexOf("sent", StringComparison.OrdinalIgnoreCase) < 0).ToList()
+                    : result;
+                List<object> sentMails = hasFolderName
+                    ? result.Where(m => Util.GetValueOfString(((dynamic)m).Folder).IndexOf("sent", StringComparison.OrdinalIgnoreCase) >= 0).ToList()
+                    : new List<object>();
+
                 int _tableID = -1;
                 int existRec = -1;
                 StringBuilder attachmentID = new StringBuilder();
@@ -288,7 +305,7 @@ namespace VAdvantage.Process
                     "yandex.ru", "tutanota.com", "tutanota.de", "comcast.net", "verizon.net", "cox.net", "sbcglobal.net", "bellsouth.net", "btinternet.com",
                     "orange.fr", "mailinator.com", "10minutemail.com", "guerrillamail.com", "tempmail.net", "trashmail.com"
                 };
-                foreach (dynamic mail in result)
+                foreach (dynamic mail in inboxMails)
                 {
                     try
                     {
@@ -298,6 +315,16 @@ namespace VAdvantage.Process
                         string to = mail.To;
                         string mailDomain = from.Contains("@") ? from.Split('@').Last().Trim().ToLower() : string.Empty;
                         string attachType = "I";
+
+                        existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
+                        if (existRec > 0)// Is mail already attached
+                        {
+                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                            continue;
+                        }
+                        AttachMail(mail, 0, 0, attachType, "", "", "");
+                        continue;
+
                         if (!String.IsNullOrEmpty(subJect) && subJect.IndexOf("(●") > -1)
                         {
                             string documentNO = subJect.Substring(subJect.IndexOf(":") + 1, subJect.IndexOf("(●") - (subJect.IndexOf(":") + 1));
@@ -369,7 +396,7 @@ namespace VAdvantage.Process
                             from = match.Groups["email"].Value.Trim().ToLower();
                             pattern = @"(?i)\{AttachTo:\s*[^}]+\}";
                             subJect = Regex.Replace(subJect, pattern, "").Trim();
-                        }                       
+                        }
                         else if (Util.GetValueOfString(mail.Cc).ToLower().Contains(userEmail))
                         {
                             bool internalmail = true;
@@ -450,53 +477,6 @@ namespace VAdvantage.Process
                             idr.Close();
                         }
 
-                        //if (dt.Rows.Count <= 0 && tableName == "C_Lead")
-                        //{
-                        //    string[] tomails = to.ToLower().Split(';').ToArray();
-                        //    foreach (var tomail in tomails)
-                        //    {
-                        //        if (userDomain.Equals(tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty))
-                        //        {
-                        //            continue;
-                        //        }
-                        //        else
-                        //        {
-                        //            mailDomain = tomail.Contains("@") ? tomail.Split('@').Last().Trim().ToLower() : string.Empty;
-                        //            sql.Clear();
-                        //            sql.Append(@"SELECT c.C_Lead_ID, c.Name, c.DocumentNo AS Value, 
-                        //                c.Email FROM C_Lead c WHERE c.IsActive='Y' AND c.IsArchive='N' 
-                        //                AND (LOWER(c.Email) LIKE " + "'%" + tomail.Trim() + "%'");
-                        //            if (!emailDomains.Contains(mailDomain))
-                        //            {
-                        //                sql.Append(" OR LOWER(c.Email) LIKE " + "'%" + mailDomain + "%'");
-                        //            }
-                        //            sql.Append(") AND c.AD_Client_ID=" + AD_Client_ID);
-
-                        //            idr = DB.ExecuteReader(sql.ToString());
-                        //            dt = new DataTable();
-                        //            dt.Load(idr);
-                        //            idr.Close();
-                        //            if (dt.Rows.Count <= 0)
-                        //            {
-                        //                existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
-
-                        //                if (existRec > 0)// Is mail already attached
-                        //                {
-                        //                    retVal.Append("MailAlreadyAttachedWithParticularRecord");
-                        //                    continue;
-                        //                }
-                        //                AttachMail(mail, 0, 0, attachType, "", "", "");
-                        //            }
-                        //            else
-                        //            {
-                        //                AttachToLead(mail, dt, attachType, tomail.Trim());
-                        //            }
-                        //            continue;
-                        //        }
-                        //    }
-                        //}
-                        //else
-                                                
                         if (dt.Rows.Count <= 0)
                         {
                             existRec = GetAttachedRecord(0, 0, mail.MessageID, folderName);
@@ -574,7 +554,103 @@ namespace VAdvantage.Process
                     {
                     }
                 }
+
+                // Process Sent mails - save as unlinked items with AttachmentType "S"
+                foreach (dynamic mail in sentMails)
+                {
+                    try
+                    {
+                        existRec = GetAttachedRecord(0, 0, Util.GetValueOfString(mail.MessageID), "Sent");
+                        if (existRec > 0)
+                        {
+                            retVal.Append("MailAlreadyAttachedWithParticularRecord");
+                            continue;
+                        }
+                        folderName = "Sent";
+                        AttachMail(mail, 0, 0, "M", "", "", "");
+                        folderName = "Inbox";
+                    }
+                    catch (Exception ex)
+                    {
+                        folderName = "Inbox";
+                    }
+                }
             }
+        }
+
+        public bool ExecuteMailSuggestion(
+            int clientID,
+            string orchestrationID,
+            int tableID,
+            int recordID,
+            int userID,
+            Ctx ctx)
+        {
+            MailSuggestionDataIn mailDataIn = new MailSuggestionDataIn();
+            AIApiService.InitAIEndPoint(ctx.GetContext("#AppFullUrl"));
+            RequestPayload.Get().SetDefaultParameters(mailDataIn);
+            mailDataIn.orchestrationID = orchestrationID;
+            mailDataIn.table_id = tableID;
+            mailDataIn.record_id = recordID;
+            mailDataIn.sessionID = ctx.GetAD_Session_ID();
+            mailDataIn.userID = userID;
+
+            // vis0008 Handled case for the API being called from VServer
+            if (Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Role_ID FROM AD_Session WHERE AD_Session_ID = " + mailDataIn.sessionID)) == 0)
+            {
+                int AD_Role_ID = Util.GetValueOfInt(DB.ExecuteScalar("SELECT AD_Role_ID FROM AD_Role WHERE AD_Client_ID = " + clientID + " AND IsAdministrator = 'Y' ORDER BY Created"));
+                Ctx _newCtx = new Ctx();
+                _newCtx.SetAD_Client_ID(clientID);
+                // Fixed for Organization *
+                _newCtx.SetAD_Org_ID(0);
+                _newCtx.SetAD_Role_ID(AD_Role_ID);
+                // Fixed user for SuperUser
+                _newCtx.SetAD_User_ID(100);
+                MSession s = MSession.Get(_newCtx, true, mailDataIn.endPoints);
+                //s.SetDescription("By Web Service");
+                if (s.Save())
+                {
+                    mailDataIn.sessionID = s.GetAD_Session_ID();
+                }
+                else
+                {
+                    ValueNamePair vnp = VLogger.RetrieveError();
+                    string error = "";
+                    if (vnp != null)
+                    {
+                        error = vnp.GetName();
+                        if (error == "" && vnp.GetValue() != null)
+                            error = vnp.GetValue();
+                    }
+                    log.SaveError("AI Chat Session Creation Error : ", "Session Not Created : " + mailDataIn.sessionID + ", Error Description : " + error);
+                    return false;
+                }
+            }
+
+            using (AIApiService service = new AIApiService(mailDataIn.token))
+            {
+                var outp = service.ExecuteRequest(mailDataIn, "callOrchestrationForEmail");
+                if (!outp.isError)
+                {
+                    try
+                    {
+                        JObject jObj = JObject.Parse(outp.result);
+                        if (jObj.ContainsKey("is_error") && jObj.ContainsKey("success"))
+                        {
+                            return Util.GetValueOfString(jObj["is_error"]).ToLower() == "false" && Util.GetValueOfString(jObj["success"]).ToLower() == "true";
+                        }
+                    }
+                    catch (Newtonsoft.Json.JsonException ex)
+                    {
+                        log.SaveError("AI Chat API Error : ", "Exception : " + ex.Message);
+                    }
+                }
+                else
+                {
+                    log.SaveError("AI Chat API Error : ", "Error while creating thread");
+                }
+            }
+            return false;
         }
 
         private void AttachToLead(dynamic mail, DataTable dt, string attachType, string from)
@@ -1274,6 +1350,12 @@ namespace VAdvantage.Process
 
 
 
+    }
+    public class MailSuggestionDataIn : AIHelperData
+    {
+        public int table_id { get; set; }
+        public int record_id { get; set; }
+        public string orchestrationID { get; set; }
     }
 
     public class UserInformation
