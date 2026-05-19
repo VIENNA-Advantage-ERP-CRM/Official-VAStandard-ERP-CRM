@@ -1,127 +1,209 @@
 .vas-ce-root {
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
     box-sizing: border-box;
     padding: 0;
+    font-family: 'Inter', Roboto, 'Segoe UI', sans-serif;
+}
+
+.vas-ce-root,
+.vas-ce-root * {
+    box-sizing: border-box;
 }
 
 .vas-ce-card {
     width: 100%;
-    min-height: 560px;
-    box-sizing: border-box;
-    padding: 34px 36px;
-    border-radius: 28px;
-    border: 4px solid rgba(255, 255, 255, 0.95);
-    background: linear-gradient(135deg, #FFFFFF 0%, #FEFFF7 58%, #F8FFF0 100%);
-    box-shadow: 0 18px 38px rgba(31, 61, 100, 0.08);
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
     overflow: visible;
     position: relative;
+    background: #F9FBEA; /* Light cream/greenish background matching the image */
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.01);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    border: none;
+    transition: box-shadow 0.3s ease;
+}
+
+.vas-ce-card:hover {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .vas-ce-topbar {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 20px;
+    gap: 16px;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .vas-ce-header {
     display: flex;
-    align-items: flex-start;
-    gap: 20px;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .vas-ce-icon-wrap {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    border-radius: 15px;
-    background: #DCEBFF;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 10px;
+    background: #e0f2fe; /* light blue */
     display: flex;
     align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.vas-ce-card:hover .vas-ce-icon-wrap {
+    transform: scale(1.05);
+}
+
+.vas-ce-icon-wrap svg {
+    width: 18px;
+    height: 18px;
+    stroke: #3b82f6;
+}
+
+.vas-ce-header > div:last-child {
+    display: flex;
+    flex-direction: column;
     justify-content: center;
 }
 
 .vas-ce-title {
-    font-size: 31px;
+    font-size: 16px;
     font-weight: 800;
-    color: #1F3347;
-    line-height: 1.2;
+    color: #111827; /* Dark navy */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-ce-subtitle {
-    margin-top: 22px;
-    font-size: 23px;
-    font-weight: 500;
-    color: #7A8798;
-    letter-spacing: 3px;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8B95A5; /* exact gray from image */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-ce-filter-wrap {
     position: relative;
+    flex-shrink: 0;
+    margin-top: 4px; /* align with subtitle */
 }
 
 .vas-ce-filter-btn {
-    border: 0;
-    background: #FFF8F8;
-    color: #D94D42;
-    font-size: 23px;
-    font-weight: 500;
-    padding: 14px 20px;
+    border: none;
+    background: transparent;
+    color: #8B95A5;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 4px;
     border-radius: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+}
+
+.vas-ce-filter-btn:hover {
+    color: #111827;
+}
+
+.vas-ce-filter-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-ce-filter-arrow {
-    color: #4F8EEA;
-    font-size: 18px;
+    color: #8B95A5;
+    font-size: 11px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.vas-ce-filter-btn:hover .vas-ce-filter-arrow {
+    transform: translateY(1px);
+    color: #111827;
 }
 
 .vas-ce-filter-menu {
     display: none;
     position: absolute;
-    top: 58px;
+    top: 24px;
     right: 0;
-    min-width: 210px;
+    min-width: 140px;
     background: #FFFFFF;
-    border: 1px solid #E3E8EF;
-    box-shadow: 0 14px 34px rgba(31, 61, 100, 0.18);
-    border-radius: 12px;
-    z-index: 10;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    z-index: 20;
     overflow: hidden;
+    transform-origin: top right;
 }
 
 .vas-ce-filter-menu-show {
     display: block;
+    animation: dropdownMenu 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownMenu {
+    from { opacity: 0; transform: scale(0.95) translateY(-5px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .vas-ce-filter-item {
-    padding: 14px 18px;
-    font-size: 17px;
-    color: #1F3347;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #334155;
     cursor: pointer;
+    white-space: nowrap;
+    text-transform: none; /* reset uppercase from button */
+    letter-spacing: normal;
+    transition: background 0.1s ease, color 0.1s ease;
 }
 
-    .vas-ce-filter-item:hover {
-        background: #F3F7FB;
-    }
+.vas-ce-filter-item:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
 
 .vas-ce-custom-panel {
     display: none;
     position: absolute;
-    top: 96px;
-    right: 36px;
-    width: 520px;
-    background: #F7F7F7;
-    border: 1px solid #D6D6D6;
-    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
-    border-radius: 4px;
-    z-index: 12;
-    padding: 22px;
-    box-sizing: border-box;
+    top: 50px;
+    right: 12px;
+    left: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    z-index: 30;
+    padding: 16px;
+    animation: dropdownMenu 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vas-ce-custom-panel-show {
@@ -129,76 +211,112 @@
 }
 
 .vas-ce-custom-row {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
-    width: 48%;
-    margin-right: 2%;
+    width: 100%;
+    margin-bottom: 12px;
 }
 
-    .vas-ce-custom-row label {
-        font-size: 19px;
-        color: #111827;
-        margin-bottom: 8px;
-    }
+.vas-ce-custom-row label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 6px;
+}
 
-    .vas-ce-custom-row input {
-        height: 54px;
-        border: 1px solid #D1D5DB;
-        border-radius: 5px;
-        font-size: 22px;
-        padding: 0 12px;
-        box-sizing: border-box;
-        background: #FFFFFF;
-    }
+.vas-ce-custom-row input {
+    height: 36px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    padding: 0 10px;
+    background: #f8fafc;
+    color: #0f172a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vas-ce-custom-row input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
 
 .vas-ce-custom-actions {
-    margin-top: 18px;
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 10px;
+    margin-top: 16px;
 }
 
 .vas-ce-clear-btn,
 .vas-ce-apply-btn {
     border: 0;
-    background: #5898EA;
-    color: #FFFFFF;
-    font-size: 22px;
-    border-radius: 12px;
-    padding: 16px 24px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 8px 16px;
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vas-ce-clear-btn {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.vas-ce-clear-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.vas-ce-apply-btn {
+    background: #3b82f6;
+    color: #FFFFFF;
+}
+
+.vas-ce-apply-btn:hover {
+    background: #2563eb;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
 }
 
 .vas-ce-content {
-    margin-top: 92px;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 54px;
+    gap: 24px;
 }
 
 .vas-ce-ring-wrap {
-    width: 280px;
-    height: 280px;
+    width: 120px;
+    height: 120px;
+    min-width: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .vas-ce-ring {
-    width: 250px;
-    height: 250px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
-    background: conic-gradient(#4FA08E 0deg 338deg, transparent 338deg 360deg);
+    /* Colors exactly matching image: filled is #4b9080, empty is #e9edea */
+    background: conic-gradient(#4b9080 0deg, #4b9080 var(--ce-percent, 94%), #e9edea var(--ce-percent, 94%), #e9edea 360deg);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    transition: background 0.5s ease;
 }
 
 .vas-ce-ring-inner {
-    width: 196px;
-    height: 196px;
+    width: 96px; /* 120 - 96 = 24 / 2 = 12px stroke */
+    height: 96px;
     border-radius: 50%;
-    background: #FFFFFB;
+    background: #F9FBEA; /* EXACT MATCH to card background, making ring look hollow */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -206,86 +324,102 @@
 }
 
 .vas-ce-percent {
-    font-size: 52px;
+    font-size: 28px;
     font-weight: 800;
-    color: #34724B;
-    line-height: 1;
+    color: #2b594e; /* Dark teal matching image */
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .vas-ce-on-time {
-    margin-top: 16px;
-    font-size: 20px;
-    font-weight: 800;
-    color: #7A8798;
-    letter-spacing: 5px;
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #8B95A5;
+    letter-spacing: 1px;
+    margin-top: 2px;
 }
 
 .vas-ce-details {
+    min-width: 0;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
 }
 
 .vas-ce-dso {
-    font-size: 31px;
-    color: #1F3347;
-    margin-bottom: 16px;
+    font-size: 15px;
+    color: #374151; /* Dark gray */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    font-weight: 500;
 }
 
-    .vas-ce-dso strong {
-        font-weight: 900;
-    }
+.vas-ce-dso strong {
+    font-weight: 800;
+    color: #111827; /* Darkest navy */
+    font-size: 16px;
+}
 
 .vas-ce-overdue {
-    font-size: 25px;
-    color: #7A8798;
-    margin-bottom: 32px;
+    font-size: 13px;
+    color: #8B95A5; /* Match subtitle gray */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .vas-ce-review-btn {
+    margin-top: 4px;
     border: 0;
-    background: #111827;
+    background: #111827; /* Almost black matching image */
     color: #FFFFFF;
-    font-size: 24px;
-    font-weight: 800;
-    border-radius: 34px;
-    padding: 18px 32px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 20px; /* Fully rounded pill */
+    padding: 8px 18px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 14px;
+    gap: 6px;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: all 0.2s ease;
 }
 
-@media (max-width: 760px) {
-    .vas-ce-card {
-        min-height: 620px;
-        padding: 24px;
-    }
+.vas-ce-review-btn:hover {
+    background: #1f2937;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
 
-    .vas-ce-topbar {
-        flex-direction: column;
-    }
+.vas-ce-review-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
 
-    .vas-ce-content {
-        margin-top: 60px;
-        flex-direction: column;
-        align-items: flex-start;
-    }
+.vas-ce-review-btn span {
+    flex-shrink: 0;
+    font-size: 14px;
+    transition: transform 0.2s ease;
+}
 
-    .vas-ce-custom-panel {
-        width: calc(100% - 48px);
-        right: 24px;
-    }
-
-    .vas-ce-title {
-        font-size: 25px;
-    }
-
-    .vas-ce-dso {
-        font-size: 24px;
-    }
-
-    .vas-ce-overdue {
-        font-size: 20px;
-    }
+.vas-ce-review-btn:hover span {
+    transform: translate(2px, -2px);
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Collection Efficiency Widget
  * Purpose - Show collection efficiency, DSO and overdue AR invoices.
  *
@@ -118,6 +118,10 @@ function setNoData()
     if ($percentText) {
                 $percentText.text("0%");
     }
+    
+    if ($root) {
+        $root.find('.vas-ce-ring').css('background', 'conic-gradient(#529b88 0deg 0deg, #f1f5f9 0deg 360deg)');
+    }
 
     if ($dsoText) {
                 $dsoText.text("DSO 0 days · target 22");
@@ -183,6 +187,11 @@ function renderData(data)
 
     if ($percentText) {
                 $percentText.text(percent.toFixed(0) + "%");
+    }
+    
+    if ($root) {
+        var deg = (percent * 3.6).toFixed(0);
+        $root.find('.vas-ce-ring').css('background', 'conic-gradient(#529b88 0deg ' + deg + 'deg, #f1f5f9 ' + deg + 'deg 360deg)');
     }
 
     if ($dsoText) {

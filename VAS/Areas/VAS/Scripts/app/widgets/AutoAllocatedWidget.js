@@ -149,10 +149,11 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        var $grid = this.frame.getContentGrid();
+        this.widgetSizeChange($grid.height(), $grid.width());
     };
 
-    VIS.AutoAllocatedWidget.prototype.widgetSizeChange = function (height, width) {
-    };
 
     VIS.AutoAllocatedWidget.prototype.refreshWidget = function () {
         this.refreshWidget();

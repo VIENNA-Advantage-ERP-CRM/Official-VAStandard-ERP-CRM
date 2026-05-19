@@ -240,12 +240,19 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\AutoAllocatedWidget.css" />
+    <Content Include="Areas\VAS\Content\BouncedChequesWidget.css" />
+    <Content Include="Areas\VAS\Content\CollectionEfficiencyWidget.css" />
+    <Content Include="Areas\VAS\Content\CustomerPaidMethodWidget.css" />
+    <Content Include="Areas\VAS\Content\ExpectedReceiptsWidget.css" />
+    <Content Include="Areas\VAS\Content\ExpectedThisWeekWidget.css" />
     <Content Include="Areas\VAS\Content\Images\AI.png" />
     <Content Include="Areas\VAS\Content\Images\arrow.png" />
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\src\VAScss.css" />
+    <Content Include="Areas\VAS\Content\TotalAmountReceivedThisMonthWidget.css" />
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
