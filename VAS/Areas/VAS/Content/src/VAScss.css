@@ -20,4 +20,7 @@
 @import "../CustomerPaidMethodWidget.css";
 
 @import "../CollectionEfficiencyWidget.css";
+@import "../ExpectedReceiptsWidget.css";
+@import "../ExpectedThisWeekWidget.css";
+@import "../TotalAmountReceivedThisMonthWidget.css";
 

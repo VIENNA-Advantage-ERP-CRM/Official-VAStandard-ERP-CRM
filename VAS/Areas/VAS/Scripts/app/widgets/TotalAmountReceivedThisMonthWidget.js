@@ -112,42 +112,40 @@
 
         function createWidget() {
             var $card = $(
-                '<div class="vas-tarm-card">' +
-                '<div class="vas-tarm-header">' +
-                '<div class="vas-tarm-icon-wrap">' +
-                '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" ' +
-                'stroke="#3F66AE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M21 8V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v1"/>' +
-                '<path d="M3 8h18l-2 9H5L3 8z"/>' +
-                '<path d="M8 12h8"/>' +
+                '<div class="widget kpi tint-info span-3x1">' +
+
+                '<div class="kpi-head">' +
+                '<div class="kpi-icon">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>' +
+                '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>' +
                 '</svg>' +
                 '</div>' +
-                '<div class="vas-tarm-title">' +
+                '<span class="kpi-label">' +
                 lbl("VIS_ReceivedThisMonth", "Received this month") +
-                '</div>' +
+                '</span>' +
                 '</div>' +
 
-                '<div class="vas-tarm-amount-row">' +
-                '<span class="vas-tarm-amount">' +
+                '<span class="kpi-value">' +
                 lbl("VIS_Loading", "Loading…") +
                 '</span>' +
-                '</div>' +
 
-                '<div class="vas-tarm-footer">' +
-                '<span class="vas-tarm-why">' +
+                '<div class="kpi-why">' +
+                '<span class="kpi-why-tag">' +
                 lbl("VIS_Why", "WHY") +
                 '</span>' +
-                '<span class="vas-tarm-desc">' +
+                '<span>' +
                 lbl("VIS_CustomerCollectionsPosted", "Customer collections posted so far") +
                 '</span>' +
                 '</div>' +
+
                 '</div>'
             );
 
-            $amountText = $card.find('.vas-tarm-amount');
+            $amountText = $card.find('.kpi-value');
             $root.append($card);
         }
-
         this.refreshWidget = function () {
             loadData();
         };

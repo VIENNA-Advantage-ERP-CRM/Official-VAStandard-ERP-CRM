@@ -121,4 +121,7 @@ import "../app/widgets/BouncedChequesWidget.js";
 import "../app/widgets/CustomerPaidMethodWidget.js";
 
 import "../app/widgets/CollectionEfficiencyWidget.js";
+import "../app/widgets/ExpectedReceiptsWidget.js";
+import "../app/widgets/ExpectedThisWeekWidget.js";
+import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
 

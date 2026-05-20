@@ -1,151 +1,259 @@
-.vas-cpm-root {
+﻿.vas-cpm-root {
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
     box-sizing: border-box;
     padding: 0;
+    font-family: Roboto, sans-serif;
 }
+
+    .vas-cpm-root,
+    .vas-cpm-root * {
+        box-sizing: border-box;
+    }
 
 .vas-cpm-card {
     width: 100%;
-    min-height: 530px;
-    box-sizing: border-box;
-    padding: 34px 36px 28px 36px;
-    border-radius: 28px;
-    border: 4px solid rgba(255, 255, 255, 0.95);
-    background: linear-gradient(135deg, #FFFFFF 0%, #FEFFF7 58%, #F8FFF0 100%);
-    box-shadow: 0 18px 38px rgba(31, 61, 100, 0.08);
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
+    position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    padding: 16px 16px 18px;
+    display: flex;
+    flex-direction: column;
 }
 
+/* Header */
 .vas-cpm-header {
     display: flex;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 24px;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .vas-cpm-icon-wrap {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    border-radius: 15px;
-    background: #DCEBFF;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #DFF1FF, #BFE4FF);
+    color: #0083DA;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
+
+    .vas-cpm-icon-wrap svg {
+        width: 14px;
+        height: 14px;
+        stroke: #0083DA;
+    }
 
 .vas-cpm-title {
-    font-size: 31px;
-    font-weight: 800;
-    color: #1F3347;
+    font-size: 17px;
+    font-weight: 700;
+    color: #102C3F;
     line-height: 1.2;
+    letter-spacing: -0.2px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
+/* Body */
 .vas-cpm-list {
-    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
 }
 
 .vas-cpm-row {
-    margin-bottom: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
 }
 
 .vas-cpm-row-head {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 14px;
+    gap: 10px;
+    min-width: 0;
 }
 
 .vas-cpm-method {
-    font-size: 26px;
-    font-weight: 800;
-    color: #1F3347;
+    font-size: 13px;
+    font-weight: 500;
+    color: #102C3F;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-cpm-percent {
-    font-size: 26px;
-    font-weight: 800;
-    color: #1F3347;
+    font-size: 13px;
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
 }
 
 .vas-cpm-track {
     width: 100%;
-    height: 12px;
-    border-radius: 20px;
-    background: #EDF2F7;
+    height: 6px;
+    background: #EDF2F6;
+    border-radius: 999px;
     overflow: hidden;
 }
 
 .vas-cpm-fill {
-    height: 12px;
-    border-radius: 20px;
+    height: 100%;
+    border-radius: 999px;
+    transition: width 600ms ease;
 }
 
+/* لأن اللون يجي inline من JS، هذا فقط fallback */
+.vas-cpm-row:nth-child(1) .vas-cpm-fill {
+    background: linear-gradient(90deg, #1F83FF, #0083DA);
+}
+
+.vas-cpm-row:nth-child(2) .vas-cpm-fill {
+    background: linear-gradient(90deg, #5DCAA5, #019D89);
+}
+
+.vas-cpm-row:nth-child(3) .vas-cpm-fill {
+    background: linear-gradient(90deg, #F0B055, #D78B10);
+}
+
+.vas-cpm-row:nth-child(4) .vas-cpm-fill {
+    background: linear-gradient(90deg, #B7A8FF, #5F4AA6);
+}
+
+/* Footer */
 .vas-cpm-divider {
     height: 1px;
-    background: #E6EDF2;
-    margin-top: 6px;
-    margin-bottom: 24px;
+    background: #EDF2F6;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
 }
 
 .vas-cpm-footer {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #586575;
 }
 
 .vas-cpm-why {
-    min-width: 78px;
-    height: 38px;
-    padding: 0 14px;
-    box-sizing: border-box;
-    border-radius: 7px;
-    background: #F3FAFF;
-    color: #4B80D9;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(0,131,218,0.08);
+    color: #0083DA;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-weight: 700;
+    flex-shrink: 0;
 }
 
 .vas-cpm-desc {
-    font-size: 24px;
-    font-weight: 400;
-    color: #5B6878;
+    font-size: 12px;
+    color: #586575;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+/* Loading / No Data */
 .vas-cpm-nodata {
-    min-height: 280px;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #5B6878;
-    font-size: 22px;
+    color: #748494;
+    font-size: 13px;
     font-weight: 600;
+    text-align: center;
 }
 
+/* Responsive */
 @media (max-width: 620px) {
     .vas-cpm-card {
-        min-height: 450px;
-        padding: 24px;
-        border-radius: 22px;
+        padding: 14px;
     }
 
     .vas-cpm-title {
-        font-size: 24px;
+        font-size: 16px;
+    }
+
+    .vas-cpm-list {
+        gap: 12px;
     }
 
     .vas-cpm-method,
     .vas-cpm-percent {
-        font-size: 21px;
+        font-size: 12px;
     }
 
     .vas-cpm-desc {
-        font-size: 18px;
         white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+}
+
+@media (max-width: 360px) {
+    .vas-cpm-card {
+        padding: 12px;
+    }
+
+    .vas-cpm-icon-wrap {
+        width: 26px;
+        height: 26px;
+        min-width: 26px;
+    }
+
+        .vas-cpm-icon-wrap svg {
+            width: 13px;
+            height: 13px;
+        }
+
+    .vas-cpm-title {
+        font-size: 15px;
+    }
+
+    .vas-cpm-list {
+        gap: 10px;
+    }
+
+    .vas-cpm-track {
+        height: 5px;
+    }
+
+    .vas-cpm-footer {
+        font-size: 11px;
     }
 }

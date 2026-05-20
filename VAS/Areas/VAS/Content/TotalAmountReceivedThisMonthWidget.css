@@ -1,107 +1,162 @@
-.vas-tarm-root {
+﻿.vas-tarm-root {
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
     box-sizing: border-box;
     padding: 0;
+    font-family: Roboto, sans-serif;
 }
+
+    .vas-tarm-root,
+    .vas-tarm-root * {
+        box-sizing: border-box;
+    }
 
 .vas-tarm-card {
     width: 100%;
-    min-height: 230px;
-    box-sizing: border-box;
-    padding: 34px 36px;
-    border-radius: 28px;
-    border: 4px solid rgba(255, 255, 255, 0.95);
-    background: linear-gradient(135deg, #DDEFFF 0%, #F4FBFF 58%, #F5FFF6 100%);
-    box-shadow: 0 18px 38px rgba(31, 61, 100, 0.08);
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
+    /* هذا أقرب لون للصورة */
+    background: linear-gradient(135deg, #DCEEFF 0%, #EAF5FB 58%, #F7FBFC 100%);
+    border: 3px solid #FFFFFF;
+    border-radius: 22px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 16px 18px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .vas-tarm-header {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .vas-tarm-icon-wrap {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    border-radius: 15px;
-    background: rgba(255, 255, 255, 0.92);
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
+
+    .vas-tarm-icon-wrap svg {
+        width: 22px;
+        height: 22px;
+        stroke: #1567B7;
+    }
 
 .vas-tarm-title {
-    font-size: 29px;
+    font-size: 20px;
     font-weight: 700;
-    color: #22364A;
+    color: #163247;
     line-height: 1.2;
-}
-
-.vas-tarm-amount-row {
-    margin-top: 22px;
-    display: flex;
-    align-items: baseline;
-    color: #3F66AE;
-    line-height: 1;
-}
-
-.vas-tarm-amount {
-    font-size: 72px;
-    font-weight: 800;
-    letter-spacing: -2px;
-}
-
-.vas-tarm-footer {
-    margin-top: 24px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-}
-
-.vas-tarm-why {
-    min-width: 78px;
-    height: 38px;
-    padding: 0 14px;
-    box-sizing: border-box;
-    border-radius: 7px;
-    background: rgba(255, 255, 255, 0.94);
-    color: #4B80D9;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.vas-tarm-desc {
-    font-size: 24px;
-    font-weight: 400;
-    color: #5B6878;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-@media (max-width: 520px) {
+.vas-tarm-amount-row {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+}
+
+.vas-tarm-amount {
+    display: block;
+    font-size: 58px;
+    font-weight: 800;
+    color: #1567B7;
+    line-height: 1;
+    letter-spacing: -2px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-tarm-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-tarm-why {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(21, 103, 183, 0.14);
+    border-radius: 8px;
+    color: #1677D3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    line-height: 1;
+    padding: 5px 10px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.vas-tarm-desc {
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 400;
+    color: #5E6E7E;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* للأحجام الصغيرة */
+@media (max-width: 340px) {
     .vas-tarm-card {
-        min-height: 190px;
-        padding: 24px 24px;
-        border-radius: 22px;
+        padding: 12px 14px 10px;
+        border-radius: 16px;
     }
 
+    .vas-tarm-icon-wrap {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: 10px;
+    }
+
+        .vas-tarm-icon-wrap svg {
+            width: 18px;
+            height: 18px;
+        }
+
     .vas-tarm-title {
-        font-size: 23px;
+        font-size: 15px;
     }
 
     .vas-tarm-amount {
-        font-size: 54px;
+        font-size: 36px;
+        letter-spacing: -1px;
+    }
+
+    .vas-tarm-why {
+        font-size: 9px;
+        padding: 4px 7px;
     }
 
     .vas-tarm-desc {
-        font-size: 18px;
-        white-space: normal;
+        font-size: 12px;
     }
 }
