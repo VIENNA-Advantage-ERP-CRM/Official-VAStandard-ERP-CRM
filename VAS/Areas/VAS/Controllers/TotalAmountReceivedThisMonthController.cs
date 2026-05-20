@@ -29,6 +29,12 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            DateTime monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            DateTime nextMonthStart = monthStart.AddMonths(1);
+
+            string monthStartSql = DB.TO_DATE(monthStart, true);
+            string nextMonthStartSql = DB.TO_DATE(nextMonthStart, true);
+
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
@@ -63,8 +69,8 @@ namespace VIS.Controllers
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
-                  AND Payment.DateAcct >= TRUNC(SYSDATE, 'MM')
-                  AND Payment.DateAcct < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)";
+                  AND Payment.DateAcct >= " + monthStartSql + @"
+                  AND Payment.DateAcct < " + nextMonthStartSql;
 
             receivedThisMonthSql = MRole.GetDefault(ctx).AddAccessSQL(
                 receivedThisMonthSql,

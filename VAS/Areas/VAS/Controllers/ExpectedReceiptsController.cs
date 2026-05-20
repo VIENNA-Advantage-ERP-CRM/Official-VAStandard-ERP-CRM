@@ -15,7 +15,9 @@ namespace VIS.Controllers
     {
         /// <summary>
         /// Returns AR invoices/pay schedules expected to be received, with pagination and date filters.
-        /// Default range is last 7 days.
+        /// Default range is next 7 days.
+        /// Supported filters: Next7Days, NextMonth, Custom.
+        /// Compatible with Oracle and PostgreSQL.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -56,9 +58,9 @@ namespace VIS.Controllers
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision
                 FROM AD_ClientInfo ClientInfo
-                INNER JOIN C_AcctSchema AcctSchema 
+                INNER JOIN C_AcctSchema AcctSchema
                     ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                INNER JOIN C_Currency Currency 
+                INNER JOIN C_Currency Currency
                     ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
 
             string expectedReceiptsBaseSql = @"
@@ -68,6 +70,10 @@ namespace VIS.Controllers
                        InvoicePaySchedule.DueDate,
                        SchemaCurrency.C_Currency_ID,
                        SchemaCurrency.StdPrecision,
+
+                       Invoice.PaymentRule,
+                       PaymentRuleList.Name AS PaymentRuleName,
+
                        CASE
                            WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
                            ELSE CurrencyConvert(
@@ -79,22 +85,31 @@ namespace VIS.Controllers
                                Invoice.AD_Client_ID,
                                Invoice.AD_Org_ID
                            )
-                       END AS ExpectedAmount,
-                       CASE
-                           WHEN Invoice.PaymentRule = 'B' THEN 'Direct Debit'
-                           WHEN Invoice.PaymentRule = 'K' THEN 'Cheque'
-                           WHEN Invoice.PaymentRule = 'S' THEN 'Check'
-                           WHEN Invoice.PaymentRule = 'T' THEN 'Bank Transfer'
-                           WHEN Invoice.PaymentRule = 'P' THEN 'On Credit'
-                           ELSE 'Expected'
-                       END AS PaymentMethodName
+                       END AS ExpectedAmount
+
                 FROM C_Invoice Invoice
-                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule 
+
+                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule
                     ON InvoicePaySchedule.C_Invoice_ID = Invoice.C_Invoice_ID
-                INNER JOIN C_BPartner BusinessPartner 
+
+                INNER JOIN C_BPartner BusinessPartner
                     ON Invoice.C_BPartner_ID = BusinessPartner.C_BPartner_ID
-                INNER JOIN SchemaCurrency SchemaCurrency 
+
+                INNER JOIN SchemaCurrency SchemaCurrency
                     ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+
+                LEFT JOIN AD_Table InvoiceTable
+                    ON InvoiceTable.TableName = 'C_Invoice'
+
+                LEFT JOIN AD_Column PaymentRuleColumn
+                    ON PaymentRuleColumn.AD_Table_ID = InvoiceTable.AD_Table_ID
+                   AND PaymentRuleColumn.ColumnName = 'PaymentRule'
+
+                LEFT JOIN AD_Ref_List PaymentRuleList
+                    ON PaymentRuleList.AD_Reference_ID = PaymentRuleColumn.AD_Reference_Value_ID
+                   AND PaymentRuleList.Value = Invoice.PaymentRule
+                   AND PaymentRuleList.IsActive = 'Y'
+
                 WHERE Invoice.IsSoTrx = 'Y'
                   AND Invoice.IsActive = 'Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')
@@ -111,6 +126,7 @@ namespace VIS.Controllers
                   AND (
                       UPPER(Invoice.DocumentNo) LIKE '%" + safeSearchText + @"%'
                       OR UPPER(BusinessPartner.Name) LIKE '%" + safeSearchText + @"%'
+                      OR UPPER(Invoice.PaymentRule) LIKE '%" + safeSearchText + @"%'
                   )";
             }
 
@@ -141,7 +157,8 @@ namespace VIS.Controllers
                            COALESCE(ExpectedReceiptData.ExpectedAmount, 0),
                            ExpectedReceiptData.StdPrecision
                        ) AS ExpectedAmount,
-                       ExpectedReceiptData.PaymentMethodName,
+                       ExpectedReceiptData.PaymentRule,
+                       ExpectedReceiptData.PaymentRuleName,
                        CountData.TotalRecords
                 FROM ExpectedReceiptData
                 CROSS JOIN CountData
@@ -169,6 +186,19 @@ namespace VIS.Controllers
                         dueDate = Convert.ToDateTime(dr["DueDate"]);
                     }
 
+                    string paymentRule = dr["PaymentRule"] == null || dr["PaymentRule"] == DBNull.Value
+                        ? ""
+                        : dr["PaymentRule"].ToString();
+
+                    string paymentMethodName = dr["PaymentRuleName"] == null || dr["PaymentRuleName"] == DBNull.Value
+                        ? ""
+                        : dr["PaymentRuleName"].ToString();
+
+                    if (string.IsNullOrEmpty(paymentMethodName))
+                    {
+                        paymentMethodName = GetPaymentRuleName(paymentRule);
+                    }
+
                     rows.Add(new
                     {
                         cInvoiceId = Util.GetValueOfInt(dr["C_Invoice_ID"]),
@@ -177,7 +207,8 @@ namespace VIS.Controllers
                         dueDate = dueDate == DateTime.MinValue ? "" : dueDate.ToString("yyyy-MM-dd"),
                         cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
                         expectedAmount = Util.GetValueOfDecimal(dr["ExpectedAmount"]),
-                        paymentMethodName = dr["PaymentMethodName"] == null ? "" : dr["PaymentMethodName"].ToString()
+                        paymentRule = paymentRule,
+                        paymentMethodName = paymentMethodName
                     });
                 }
 
@@ -209,10 +240,40 @@ namespace VIS.Controllers
             }
         }
 
+        private string GetPaymentRuleName(string paymentRule)
+        {
+            if (paymentRule == "B")
+            {
+                return "Direct Debit";
+            }
+
+            if (paymentRule == "K")
+            {
+                return "Cheque";
+            }
+
+            if (paymentRule == "S")
+            {
+                return "Check";
+            }
+
+            if (paymentRule == "T")
+            {
+                return "Bank Transfer";
+            }
+
+            if (paymentRule == "P")
+            {
+                return "On Credit";
+            }
+
+            return "Expected";
+        }
+
         private void GetDateRange(string filterType, string fromDate, string toDate, out DateTime startDate, out DateTime endDate)
         {
             DateTime today = DateTime.Today;
-            string selectedFilter = string.IsNullOrEmpty(filterType) ? "Last7Days" : filterType;
+            string selectedFilter = string.IsNullOrEmpty(filterType) ? "Next7Days" : filterType;
 
             if (selectedFilter == "Next7Days")
             {
@@ -221,17 +282,13 @@ namespace VIS.Controllers
                 return;
             }
 
-            if (selectedFilter == "Last7Days")
+            if (selectedFilter == "NextMonth")
             {
-                startDate = today.AddDays(-6);
-                endDate = today.AddDays(1);
-                return;
-            }
+                DateTime nextMonthStart = new DateTime(today.Year, today.Month, 1).AddMonths(1);
+                DateTime nextMonthEnd = nextMonthStart.AddMonths(1);
 
-            if (selectedFilter == "ThisMonth")
-            {
-                startDate = new DateTime(today.Year, today.Month, 1);
-                endDate = startDate.AddMonths(1);
+                startDate = nextMonthStart;
+                endDate = nextMonthEnd;
                 return;
             }
 
@@ -248,9 +305,8 @@ namespace VIS.Controllers
                 }
             }
 
-            startDate = today.AddDays(-6);
-            endDate = today.AddDays(1);
+            startDate = today;
+            endDate = today.AddDays(7);
         }
-    
     }
 }

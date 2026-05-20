@@ -12,6 +12,13 @@
  *  5  | No data                              | VIS_NoData
  * ─────────────────────────────────────────────────────────────────────
  */
+
+
+/**
+ * Auto Allocated Widget
+ * Purpose - Show percentage of AR receipts auto-matched to invoices.
+ */
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
@@ -21,6 +28,7 @@
         this.frame;
         this.windowNo;
 
+        var self = this;
         var $root = $('<div class="vas-aa-root">');
         var $percentText;
 
@@ -40,6 +48,7 @@
             $.ajax({
                 url: VIS.Application.contextUrl + 'AutoAllocated/GetAutoAllocated',
                 type: 'GET',
+                cache: false,
                 success: function (res) {
                     var data = res;
 
@@ -78,7 +87,17 @@
 
         function formatPercent(value) {
             var absVal = Number(value || 0);
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            var stdPrecision = 2;
+
+            try {
+                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                }
+            }
+            catch (e) {
+                stdPrecision = 2;
+            }
+
             return absVal.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
@@ -134,7 +153,7 @@
             $root.append($card);
         }
 
-        this.refreshWidget = function () {
+        this.doRefresh = function () {
             loadData();
         };
 
@@ -151,16 +170,22 @@
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
+
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
 
         var $grid = this.frame.getContentGrid();
-        this.widgetSizeChange($grid.height(), $grid.width());
+
+        if (this.widgetSizeChange) {
+            this.widgetSizeChange($grid.height(), $grid.width());
+        }
     };
 
+    VIS.AutoAllocatedWidget.prototype.widgetSizeChange = function (height, width) {
+    };
 
     VIS.AutoAllocatedWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
+        this.doRefresh();
     };
 
     VIS.AutoAllocatedWidget.prototype.dispose = function () {

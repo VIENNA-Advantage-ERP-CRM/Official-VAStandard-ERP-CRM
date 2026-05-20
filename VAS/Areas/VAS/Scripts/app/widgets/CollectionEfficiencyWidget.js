@@ -44,7 +44,7 @@
         var $fromDate;
         var $toDate;
 
-        var selectedFilter = "Last30Days";
+        var selectedFilter = "ThisMonth";
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);

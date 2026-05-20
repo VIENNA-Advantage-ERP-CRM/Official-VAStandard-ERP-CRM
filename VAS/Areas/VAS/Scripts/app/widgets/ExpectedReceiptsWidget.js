@@ -1,3 +1,4 @@
+
 /**
  * Expected Receipts Widget
  * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
@@ -20,12 +21,6 @@
  * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
  */
 
-
-
-/**
- * Expected Receipts Widget
- * Purpose - Show AR receipts expected from unpaid invoice pay schedules.
- */
 
 ; VIS = window.VIS || {};
 
@@ -52,8 +47,7 @@
         var $closePopupBtn;
 
         var $next7Btn;
-        var $last7Btn;
-        var $monthBtn;
+        var $nextMonthBtn;
 
         var selectedFilter = "Next7Days";
         var customFromDate = "";
@@ -308,12 +302,8 @@
                 return "Next 7 days";
             }
 
-            if (selectedFilter === "Last7Days") {
-                return "Last 7 days";
-            }
-
-            if (selectedFilter === "ThisMonth") {
-                return lbl("VIS_ThisMonth", "This Month");
+            if (selectedFilter === "NextMonth") {
+                return "Next Month";
             }
 
             return "Next 7 days";
@@ -324,12 +314,8 @@
                 return "NEXT 7 DAYS ▾";
             }
 
-            if (selectedFilter === "Last7Days") {
-                return "LAST 7 DAYS ▾";
-            }
-
-            if (selectedFilter === "ThisMonth") {
-                return "THIS MONTH ▾";
+            if (selectedFilter === "NextMonth") {
+                return "NEXT MONTH ▾";
             }
 
             if (selectedFilter === "Custom") {
@@ -340,22 +326,18 @@
         }
 
         function setActiveQuickFilter() {
-            if (!$next7Btn || !$last7Btn || !$monthBtn) {
+            if (!$next7Btn || !$nextMonthBtn) {
                 return;
             }
 
             $next7Btn.removeClass("active");
-            $last7Btn.removeClass("active");
-            $monthBtn.removeClass("active");
+            $nextMonthBtn.removeClass("active");
 
             if (selectedFilter === "Next7Days") {
                 $next7Btn.addClass("active");
             }
-            else if (selectedFilter === "Last7Days") {
-                $last7Btn.addClass("active");
-            }
-            else if (selectedFilter === "ThisMonth") {
-                $monthBtn.addClass("active");
+            else if (selectedFilter === "NextMonth") {
+                $nextMonthBtn.addClass("active");
             }
         }
 
@@ -394,28 +376,10 @@
             }
         }
 
-        function setDefaultLast7Days() {
+        function setDefaultNextMonth() {
             var today = new Date();
-            var from = new Date();
-
-            from.setDate(today.getDate() - 6);
-
-            customFromDate = toInputDate(from);
-            customToDate = toInputDate(today);
-
-            if ($fromDateInput) {
-                $fromDateInput.val(customFromDate);
-            }
-
-            if ($toDateInput) {
-                $toDateInput.val(customToDate);
-            }
-        }
-
-        function setDefaultThisMonth() {
-            var today = new Date();
-            var from = new Date(today.getFullYear(), today.getMonth(), 1);
-            var to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            var from = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            var to = new Date(today.getFullYear(), today.getMonth() + 2, 0);
 
             customFromDate = toInputDate(from);
             customToDate = toInputDate(to);
@@ -485,8 +449,7 @@
 
                 '<div class="vas-er-quick-filters">' +
                 '<button type="button" class="vas-er-quick-filter vas-er-next7-btn active">Next 7 Days</button>' +
-                '<button type="button" class="vas-er-quick-filter vas-er-last7-btn">Last 7 Days</button>' +
-                '<button type="button" class="vas-er-quick-filter vas-er-month-btn">This Month</button>' +
+                '<button type="button" class="vas-er-quick-filter vas-er-next-month-btn">Next Month</button>' +
                 '</div>' +
 
                 '<div class="vas-er-date-grid">' +
@@ -533,8 +496,7 @@
             $closePopupBtn = $card.find('.vas-er-popup-close');
 
             $next7Btn = $card.find('.vas-er-next7-btn');
-            $last7Btn = $card.find('.vas-er-last7-btn');
-            $monthBtn = $card.find('.vas-er-month-btn');
+            $nextMonthBtn = $card.find('.vas-er-next-month-btn');
 
             $filterBtn.on('click', function () {
                 $datePopup.toggle();
@@ -552,17 +514,9 @@
                 loadData();
             });
 
-            $last7Btn.on('click', function () {
-                selectedFilter = "Last7Days";
-                setDefaultLast7Days();
-                pageNo = 1;
-                $datePopup.hide();
-                loadData();
-            });
-
-            $monthBtn.on('click', function () {
-                selectedFilter = "ThisMonth";
-                setDefaultThisMonth();
+            $nextMonthBtn.on('click', function () {
+                selectedFilter = "NextMonth";
+                setDefaultNextMonth();
                 pageNo = 1;
                 $datePopup.hide();
                 loadData();
@@ -620,11 +574,8 @@
             if (selectedFilter === "Next7Days") {
                 setDefaultNext7Days();
             }
-            else if (selectedFilter === "Last7Days") {
-                setDefaultLast7Days();
-            }
-            else if (selectedFilter === "ThisMonth") {
-                setDefaultThisMonth();
+            else if (selectedFilter === "NextMonth") {
+                setDefaultNextMonth();
             }
 
             loadData();

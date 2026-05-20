@@ -67,7 +67,7 @@
 
         function setLoading() {
             if ($amountText) {
-                $amountText.text(lbl("VIS_Loading", "Loading…"));
+                $amountText.text("…");
             }
         }
 

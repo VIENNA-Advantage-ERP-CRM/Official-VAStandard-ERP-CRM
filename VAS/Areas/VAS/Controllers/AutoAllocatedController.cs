@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Web.Mvc;
 using VAdvantage.Classes;
@@ -13,7 +14,7 @@ namespace VIS.Controllers
     public class AutoAllocatedController : Controller
     {
         /// <summary>
-        /// Returns percentage of AR receipts auto-allocated/matched to invoices.
+        /// Returns AR receipts allocated to invoices for the current month.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -21,79 +22,137 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            DateTime monthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            DateTime nextMonthStart = monthStart.AddMonths(1);
 
-            string autoAllocatedSql = @"
-                    SELECT COUNT(DISTINCT Payment.C_Payment_ID) AS TotalReceiptCount,
-                           COUNT(DISTINCT CASE
-                               WHEN AllocationHdr.C_AllocationHdr_ID IS NOT NULL
-                               AND Invoice.C_Invoice_ID IS NOT NULL THEN Payment.C_Payment_ID
-                               ELSE NULL
-                           END) AS AutoAllocatedReceiptCount
-                    FROM C_Payment Payment
-                    LEFT OUTER JOIN C_AllocationLine AllocationLine ON (AllocationLine.C_Payment_ID=Payment.C_Payment_ID AND AllocationLine.IsActive='Y')
-                    LEFT OUTER JOIN C_AllocationHdr AllocationHdr ON (AllocationLine.C_AllocationHdr_ID=AllocationHdr.C_AllocationHdr_ID AND AllocationHdr.IsActive='Y' AND AllocationHdr.DocStatus IN ('CO', 'CL') AND AllocationHdr.IsManual='N')
-                    LEFT OUTER JOIN C_Invoice Invoice ON (AllocationLine.C_Invoice_ID=Invoice.C_Invoice_ID AND Invoice.IsSoTrx='Y' AND Invoice.IsActive='Y' AND Invoice.DocStatus IN ('CO', 'CL'))
-                    WHERE Payment.IsReceipt='Y'
-                    AND Payment.IsActive='Y'
-                    AND Payment.DocStatus IN ('CO', 'CL')
-                    AND Payment.Posted='Y'";
+            /*
+             * IMPORTANT:
+             * This SQL body is only the CTE body.
+             * MRole must be applied here, on the main physical table alias: Payment.
+             * Do NOT apply MRole to the final WITH query.
+             * Do NOT apply MRole to the CTE alias: AllocatedReceiptsThisMonth.
+             */
+            string allocatedReceiptsCteBodySql = @"
+                SELECT Payment.C_Payment_ID,
+                       SchemaCurrency.C_Currency_ID,
+                       SchemaCurrency.StdPrecision,
 
-            autoAllocatedSql = MRole.GetDefault(ctx).AddAccessSQL(
-                autoAllocatedSql,
+                       CASE
+                           WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID
+                           THEN COALESCE(Payment.PayAmt, 0)
+                           ELSE CurrencyConvert(
+                               COALESCE(Payment.PayAmt, 0),
+                               Payment.C_Currency_ID,
+                               SchemaCurrency.C_Currency_ID,
+                               Payment.DateAcct,
+                               Payment.C_ConversionType_ID,
+                               Payment.AD_Client_ID,
+                               Payment.AD_Org_ID
+                           )
+                       END AS ReceiptAmount
+
+                FROM C_Payment Payment
+                INNER JOIN SchemaCurrency SchemaCurrency
+                    ON SchemaCurrency.AD_Client_ID = Payment.AD_Client_ID
+
+                WHERE Payment.IsReceipt = 'Y'
+                  AND Payment.IsActive = 'Y'
+                  AND Payment.DocStatus IN ('CO', 'CL')
+
+                  AND Payment.Created >= " + DB.TO_DATE(monthStart, true) + @"
+                  AND Payment.Created < " + DB.TO_DATE(nextMonthStart, true) + @"
+
+                  AND Payment.C_Invoice_ID IS NOT NULL ";
+
+            allocatedReceiptsCteBodySql = MRole.GetDefault(ctx).AddAccessSQL(
+                allocatedReceiptsCteBodySql,
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
 
             string sql = @"
-                WITH AutoAllocated AS (
-                    " + autoAllocatedSql + @"
-                )
-                SELECT AutoAllocated.TotalReceiptCount,
-                       AutoAllocated.AutoAllocatedReceiptCount,
-                       CASE
-                           WHEN AutoAllocated.TotalReceiptCount=0 THEN 0
-                           ELSE ROUND((AutoAllocated.AutoAllocatedReceiptCount*100.0)/AutoAllocated.TotalReceiptCount, 0)
-                       END AS AutoAllocatedPercent
-                FROM AutoAllocated";
+                WITH SchemaCurrency AS (
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID
+                ),
 
-            decimal autoAllocatedPercent = 0;
-            int totalReceiptCount = 0;
-            int autoAllocatedReceiptCount = 0;
+                AllocatedReceiptsThisMonth AS (
+                    " + allocatedReceiptsCteBodySql + @"
+                )
+
+                SELECT AllocatedReceiptsThisMonth.C_Currency_ID,
+
+                       COUNT(*) AS AllocatedReceiptCount,
+
+                       ROUND(
+                           SUM(AllocatedReceiptsThisMonth.ReceiptAmount),
+                           AllocatedReceiptsThisMonth.StdPrecision
+                       ) AS AllocatedReceiptAmount
+
+                FROM AllocatedReceiptsThisMonth
+                GROUP BY AllocatedReceiptsThisMonth.C_Currency_ID,
+                         AllocatedReceiptsThisMonth.StdPrecision";
 
             IDataReader dr = null;
+
             try
             {
                 dr = DB.ExecuteReader(sql);
 
-                if (dr != null && dr.Read())
+                List<object> receipts = new List<object>();
+
+                if (dr != null)
                 {
-                    totalReceiptCount = Util.GetValueOfInt(dr["TotalReceiptCount"]);
-                    autoAllocatedReceiptCount = Util.GetValueOfInt(dr["AutoAllocatedReceiptCount"]);
-                    autoAllocatedPercent = Util.GetValueOfDecimal(dr["AutoAllocatedPercent"]);
+                    while (dr.Read())
+                    {
+                        receipts.Add(new
+                        {
+                            cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
+                            allocatedReceiptCount = Util.GetValueOfInt(dr["AllocatedReceiptCount"]),
+                            allocatedReceiptAmount = Util.GetValueOfDecimal(dr["AllocatedReceiptAmount"])
+                        });
+                    }
                 }
+
+                var result = new
+                {
+                    monthStart = monthStart.ToString("yyyy-MM-dd"),
+                    nextMonthStart = nextMonthStart.ToString("yyyy-MM-dd"),
+                    allocatedReceipts = receipts
+                };
+
+                return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    error = ex.Message
+                }, JsonRequestBehavior.AllowGet);
             }
             finally
             {
                 if (dr != null)
                 {
                     dr.Close();
+                    dr.Dispose();
                 }
             }
-
-            var result = new
-            {
-                totalReceiptCount = totalReceiptCount,
-                autoAllocatedReceiptCount = autoAllocatedReceiptCount,
-                autoAllocatedPercent = autoAllocatedPercent
-            };
-
-            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
     }
 }
