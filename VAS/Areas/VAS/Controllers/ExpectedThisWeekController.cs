@@ -1,228 +1,135 @@
-﻿/**
- * Expected This Week Widget
- * Purpose - Show expected AR invoice amount due in the next 7 days.
- *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                 | Message Key
- * ----+------------------------------+--------------------------------
- *  1  | Expected this week           | VIS_ExpectedThisWeek
- *  2  | WHY                          | VIS_Why
- *  3  | Invoices due in next 7 days  | VIS_InvoicesDueNext7Days
- *  4  | Loading…                     | VIS_Loading
- *  5  | No data                      | VIS_NoData
- * ─────────────────────────────────────────────────────────────────────
- */
-/**
- * Expected This Week Widget
- * Purpose - Show expected AR invoice amount due in the next 7 days.
- */
-; VIS = window.VIS || { }
-;
+using System;
+using System.Data;
+using System.Web.Mvc;
+using VAdvantage.Classes;
+using VAdvantage.DataBase;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
 
-; (function(VIS, $) {
-
-    VIS.ExpectedThisWeekWidget = function() {
-
-        this.frame;
-        this.windowNo;
-
-        var $root = $('<div class="vas-etw-root">');
-        var $valueText;
-        var $whyText;
-
-        function lbl(key, fallback)
+namespace VIS.Controllers
+{
+    public class ExpectedThisWeekController : Controller
+    {
+        /// <summary>
+        /// Returns expected AR invoice amount due in the next 7 days,
+        /// converted to Accounting Schema currency.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetExpectedThisWeek()
         {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
-        }
-
-        this.Initalize = function() {
-            createWidget();
-            loadData();
-        }
-        ;
-
-        function loadData()
-        {
-            setLoading();
-
-            $.ajax({
-            url: VIS.Application.contextUrl + 'ExpectedThisWeek/GetExpectedThisWeek',
-                type: 'GET',
-                success: function(res) {
-                    var data = res;
-
-                    if (typeof data === 'string')
-                    {
-                        data = JSON.parse(data);
-                    }
-
-                    if (typeof data === 'string')
-                    {
-                        data = JSON.parse(data);
-                    }
-
-                    if (data && data.error)
-                    {
-                        setNoData();
-                        return;
-                    }
-
-                    renderData(data);
-                },
-                error: function() {
-                    setNoData();
-                }
-            });
-        }
-
-        function setLoading()
-        {
-            if ($valueText) {
-                $valueText.text("...");
-            }
-
-            if ($whyText) {
-                $whyText.text(lbl("VIS_Loading", "Loading…"));
-            }
-        }
-
-        function setNoData()
-        {
-            if ($valueText) {
-                $valueText.text("₹0.00");
-            }
-
-            if ($whyText) {
-                $whyText.text(lbl("VIS_NoData", "No data"));
-            }
-        }
-
-        function renderData(data)
-        {
-            var amount = Number(data && data.expectedAmountThisWeek || 0);
-
-            if ($valueText) {
-                $valueText.text(formatCompactAmount(amount));
-            }
-
-            if ($whyText) {
-                $whyText.text(lbl("VIS_InvoicesDueNext7Days", "Invoices due in next 7 days"));
-            }
-        }
-
-        function formatCompactAmount(value)
-        {
-            value = Number(value || 0);
-
-            if (value >= 10000000)
+            if (Session["ctx"] == null)
             {
-                return "₹" + (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
+                return Json(new
+                {
+                    error = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
             }
 
-            if (value >= 100000)
-            {
-                return "₹" + (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
+            Ctx ctx = Session["ctx"] as Ctx;
 
-            if (value >= 1000)
-            {
-                return "₹" + (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
+            string schemaCurrencySql = @"
+                SELECT ClientInfo.AD_Client_ID,
+                       AcctSchema.C_Currency_ID AS C_Currency_ID,
+                       Currency.StdPrecision
+                FROM AD_ClientInfo ClientInfo
+                INNER JOIN C_AcctSchema AcctSchema 
+                    ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                INNER JOIN C_Currency Currency 
+                    ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
 
-            return "₹" + value.toLocaleString("en-IN", {
-            minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
+            string expectedThisWeekSql = @"
+                SELECT SchemaCurrency.C_Currency_ID,
+                       SchemaCurrency.StdPrecision,
+                       SUM(
+                           CASE
+                               WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                               THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+                               ELSE CurrencyConvert(
+                                   COALESCE(InvoicePaySchedule.DueAmt, 0),
+                                   Invoice.C_Currency_ID,
+                                   SchemaCurrency.C_Currency_ID,
+                                   Invoice.DateAcct,
+                                   Invoice.C_ConversionType_ID,
+                                   Invoice.AD_Client_ID,
+                                   Invoice.AD_Org_ID
+                               )
+                           END
+                       ) AS ExpectedAmount
+                FROM C_InvoicePaySchedule InvoicePaySchedule
+                INNER JOIN C_Invoice Invoice 
+                    ON InvoicePaySchedule.C_Invoice_ID = Invoice.C_Invoice_ID
+                INNER JOIN SchemaCurrency SchemaCurrency 
+                    ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+                WHERE Invoice.IsSoTrx = 'Y'
+                  AND Invoice.IsActive = 'Y'
+                  AND Invoice.DocStatus IN ('CO', 'CL')
+                  AND InvoicePaySchedule.VA009_IsPaid = 'N'
+                  AND InvoicePaySchedule.DueDate >= TRUNC(SYSDATE)
+                  AND InvoicePaySchedule.DueDate < TRUNC(SYSDATE) + 7";
 
-        function createWidget()
-        {
-            var $card = $(
-                '<div class="vas-etw-card">' +
-
-                '<div class="vas-etw-head">' +
-                '<div class="vas-etw-icon">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>' +
-                '<line x1="16" y1="2" x2="16" y2="6"></line>' +
-                '<line x1="8" y1="2" x2="8" y2="6"></line>' +
-                '<line x1="3" y1="10" x2="21" y2="10"></line>' +
-                '</svg>' +
-                '</div>' +
-
-                '<span class="vas-etw-label">' +
-                lbl("VIS_ExpectedThisWeek", "Expected this week") +
-                '</span>' +
-                '</div>' +
-
-                '<div class="vas-etw-value">...</div>' +
-
-                '<div class="vas-etw-foot">' +
-                '<span class="vas-etw-why-tag">' +
-                lbl("VIS_Why", "WHY") +
-                '</span>' +
-                '<span class="vas-etw-why-text">' +
-                lbl("VIS_InvoicesDueNext7Days", "Invoices due in next 7 days") +
-                '</span>' +
-                '</div>' +
-
-                '</div>'
+            expectedThisWeekSql = MRole.GetDefault(ctx).AddAccessSQL(
+                expectedThisWeekSql,
+                "Invoice",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
             );
 
-            $valueText = $card.find('.vas-etw-value');
-            $whyText = $card.find('.vas-etw-why-text');
+            expectedThisWeekSql += @"
+                GROUP BY SchemaCurrency.C_Currency_ID,
+                         SchemaCurrency.StdPrecision";
 
-            $root.append($card);
+            string sql = @"
+                WITH SchemaCurrency AS (
+                    " + schemaCurrencySql + @"
+                ),
+                ExpectedThisWeek AS (
+                    " + expectedThisWeekSql + @"
+                )
+                SELECT ExpectedThisWeek.C_Currency_ID,
+                       ROUND(
+                           COALESCE(ExpectedThisWeek.ExpectedAmount, 0),
+                           ExpectedThisWeek.StdPrecision
+                       ) AS ExpectedAmountThisWeek
+                FROM ExpectedThisWeek";
+
+            decimal expectedAmountThisWeek = 0;
+            int currencyId = 0;
+
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql);
+
+                if (dr != null && dr.Read())
+                {
+                    currencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
+                    expectedAmountThisWeek = Util.GetValueOfDecimal(dr["ExpectedAmountThisWeek"]);
+                }
+
+                return Json(new
+                {
+                    c_Currency_ID = currencyId,
+                    expectedAmountThisWeek = expectedAmountThisWeek
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    error = ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
         }
-
-        this.refreshWidget = function() {
-            loadData();
-        }
-        ;
-
-        this.getRoot = function() {
-            return $root;
-        }
-        ;
-
-        this.disposeComponent = function() {
-            $root.remove();
-        }
-        ;
     }
-    ;
-
-    VIS.ExpectedThisWeekWidget.prototype.init = function(windowNo, frame) {
-        this.frame = frame;
-        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
-        this.windowNo = windowNo;
-
-        this.Initalize();
-        this.frame.getContentGrid().append(this.getRoot());
-    }
-    ;
-
-    VIS.ExpectedThisWeekWidget.prototype.widgetSizeChange = function(height, width) {
-    }
-    ;
-
-    VIS.ExpectedThisWeekWidget.prototype.refreshWidget = function() {
-        this.refreshWidget();
-    }
-    ;
-
-    VIS.ExpectedThisWeekWidget.prototype.dispose = function() {
-        this.disposeComponent();
-
-        if (this.frame)
-        {
-            this.frame.dispose();
-        }
-
-        this.frame = null;
-    }
-    ;
-
-})(VIS, jQuery);
+}

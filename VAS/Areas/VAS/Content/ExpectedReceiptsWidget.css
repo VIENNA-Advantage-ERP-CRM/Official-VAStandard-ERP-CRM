@@ -30,14 +30,15 @@
     display: flex;
     flex-direction: column;
     font-size: var(--vas-er-base);
+    position: relative;
 }
 
 .vas-er-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 0.8em;
-    margin-bottom: 0.75em;
+    margin-bottom: 0.45em;
     flex-shrink: 0;
     min-width: 0;
 }
@@ -75,24 +76,12 @@
 
 .vas-er-title {
     min-width: 0;
+    max-width: 100%;
     font-size: 1.08em;
     line-height: 1.2;
     font-weight: 700;
     color: #102C3F;
     letter-spacing: -0.2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-er-subtitle {
-    margin-top: 0.48em;
-    font-size: 0.72em;
-    line-height: 1.2;
-    font-weight: 500;
-    color: #748494;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -137,6 +126,168 @@
     font-weight: 600;
 }
 
+.vas-er-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin: 0.15em 0 0.65em;
+    padding-left: calc(1.75em + 0.65em);
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.vas-er-filter-btn {
+    border: 1px solid #DDE7F0;
+    background: #FFFFFF;
+    color: #748494;
+    border-radius: 9px;
+    font-size: 0.72em;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0.5em 0.75em;
+    white-space: nowrap;
+    max-width: 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .vas-er-filter-btn:hover {
+        border-color: #BBDCEF;
+        background: #F6FBFF;
+        color: #0083DA;
+    }
+
+.vas-er-subtitle {
+    font-size: 0.72em;
+    line-height: 1.2;
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-er-date-popup {
+    position: absolute;
+    top: 5em;
+    right: 1em;
+    left: 1em;
+    z-index: 50;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: #FFFFFF;
+    border: 1px solid #DDE6EF;
+    box-shadow: 0 18px 45px rgba(15, 61, 97, 0.14);
+}
+
+.vas-er-popup-close {
+    position: absolute;
+    top: 0.45em;
+    right: 0.65em;
+    border: 0;
+    background: transparent;
+    color: #748494;
+    font-size: 1.35em;
+    line-height: 1;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.vas-er-quick-filters {
+    display: flex;
+    gap: 0.45em;
+    margin-bottom: 0.85em;
+    padding-right: 1.6em;
+}
+
+.vas-er-quick-filter {
+    border: 0;
+    border-radius: 11px;
+    background: #EEF3F7;
+    color: #102C3F;
+    font-size: 0.76em;
+    font-weight: 800;
+    padding: 4px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-er-quick-filter:hover,
+    .vas-er-quick-filter.active {
+        background: #DFF1FF;
+        color: #0083DA;
+    }
+
+.vas-er-date-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75em;
+    margin-bottom: 0.75em;
+}
+
+.vas-er-date-field {
+    min-width: 0;
+}
+
+.vas-er-date-label {
+    display: block;
+    margin-bottom: 0.35em;
+    color: #526273;
+    font-size: 0.78em;
+    font-weight: 700;
+}
+
+.vas-er-date-input {
+    width: 100%;
+    height: 2.55em;
+    border: 1px solid #CDD8E3;
+    border-radius: 9px;
+    background: #FFFFFF;
+    color: #102C3F;
+    font-size: 0.86em;
+    padding: 0 0.65em;
+    outline: none;
+    margin-bottom: 0;
+}
+
+    .vas-er-date-input:focus {
+        border-color: #0083DA;
+        box-shadow: 0 0 0 3px rgba(0, 131, 218, 0.12);
+    }
+
+.vas-er-popup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6em;
+    margin-top: 0.15em;
+}
+
+.vas-er-clear-btn,
+.vas-er-apply-btn {
+    border: 0;
+    border-radius: 10px;
+    height: 2.6em;
+    padding: 0 1.1em;
+    font-size: 0.84em;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.vas-er-clear-btn {
+    background: #EEF3F7;
+    color: #102C3F;
+}
+
+.vas-er-apply-btn {
+    background: #0083DA;
+    color: #FFFFFF;
+}
+
 .vas-er-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -150,7 +301,7 @@
     display: flex;
     align-items: center;
     gap: 0.85em;
-    padding: 0.78em 0;
+    padding: 0.72em 0;
     border-bottom: 1px solid #EDF2F6;
     min-width: 0;
 }
@@ -162,7 +313,7 @@
 .vas-er-bar {
     width: 0.22em;
     min-width: 0.22em;
-    height: 2.6em;
+    height: 2.45em;
     border-radius: 999px;
     flex-shrink: 0;
 }
@@ -184,15 +335,11 @@
     min-width: 0;
 }
 
-.vas-er-title,
-.vas-er-row .vas-er-title {
+.vas-er-row-title {
     font-size: 0.92em;
     line-height: 1.25;
     font-weight: 700;
     color: #102C3F;
-}
-
-.vas-er-row .vas-er-title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -232,28 +379,67 @@
     text-align: center;
 }
 
-/* Medium widget width */
 @media (max-width: 620px) {
     .vas-er-card {
         --vas-er-base: clamp(12px, 1vw + 7px, 15px);
         padding: 0.95em;
     }
 
-    .vas-er-head {
-        margin-bottom: 0.6em;
+    .vas-er-filter-row {
+        padding-left: 0;
+        flex-wrap: wrap;
+        gap: 0.45em;
+    }
+
+    .vas-er-filter-btn {
+        max-width: 100%;
+        font-size: 0.7em;
+    }
+
+    .vas-er-date-popup {
+        top: 6.5em;
+        right: 0.75em;
+        left: 0.75em;
+        padding: 0.95em;
+    }
+
+    .vas-er-quick-filters {
+        flex-wrap: wrap;
+        gap: 0.45em;
+    }
+
+    .vas-er-quick-filter {
+        font-size: 0.74em;
+        padding: 0.52em 0.7em;
+    }
+
+    .vas-er-date-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.55em;
+    }
+
+    .vas-er-date-input {
+        height: 2.45em;
+        font-size: 0.82em;
     }
 
     .vas-er-row {
         gap: 0.7em;
-        padding: 0.65em 0;
+        padding: 0.62em 0;
     }
 
     .vas-er-bar {
-        height: 2.3em;
+        height: 2.25em;
     }
 }
 
-/* Small widget width */
+@media (max-width: 430px) {
+    .vas-er-date-grid {
+        grid-template-columns: 1fr;
+        gap: 0.55em;
+    }
+}
+
 @media (max-width: 360px) {
     .vas-er-card {
         --vas-er-base: 12px;
@@ -270,7 +456,7 @@
         font-size: 16px;
     }
 
-    .vas-er-row .vas-er-title {
+    .vas-er-row-title {
         font-size: 12px;
     }
 

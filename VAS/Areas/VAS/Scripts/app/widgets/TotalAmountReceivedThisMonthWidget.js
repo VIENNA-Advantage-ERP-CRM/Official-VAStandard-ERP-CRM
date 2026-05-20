@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Total Amount Received This Month Widget
  * Purpose - Show total AR receipt amount received this month.
  *
@@ -92,9 +92,11 @@
                 return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
             }
 
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+            var absVal = value;
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            return absVal.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 

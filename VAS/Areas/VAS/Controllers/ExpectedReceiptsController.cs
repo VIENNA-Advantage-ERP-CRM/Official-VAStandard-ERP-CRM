@@ -14,7 +14,8 @@ namespace VIS.Controllers
     public class ExpectedReceiptsController : Controller
     {
         /// <summary>
-        /// Returns AR invoices/pay schedules expected to be received, with pagination and filters.
+        /// Returns AR invoices/pay schedules expected to be received, with pagination and date filters.
+        /// Default range is last 7 days.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -22,7 +23,10 @@ namespace VIS.Controllers
         {
             if (Session["ctx"] == null)
             {
-                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+                return Json(new
+                {
+                    error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
@@ -39,6 +43,7 @@ namespace VIS.Controllers
 
             DateTime startDate;
             DateTime endDate;
+
             GetDateRange(filterType, fromDate, toDate, out startDate, out endDate);
 
             string startDateSql = DB.TO_DATE(startDate, true);
@@ -51,8 +56,10 @@ namespace VIS.Controllers
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision
                 FROM AD_ClientInfo ClientInfo
-                INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
+                INNER JOIN C_AcctSchema AcctSchema 
+                    ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                INNER JOIN C_Currency Currency 
+                    ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
 
             string expectedReceiptsBaseSql = @"
                 SELECT Invoice.C_Invoice_ID,
@@ -62,7 +69,7 @@ namespace VIS.Controllers
                        SchemaCurrency.C_Currency_ID,
                        SchemaCurrency.StdPrecision,
                        CASE
-                           WHEN Invoice.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+                           WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
                            ELSE CurrencyConvert(
                                COALESCE(InvoicePaySchedule.DueAmt, 0),
                                Invoice.C_Currency_ID,
@@ -74,34 +81,37 @@ namespace VIS.Controllers
                            )
                        END AS ExpectedAmount,
                        CASE
-                           WHEN Invoice.PaymentRule='B' THEN 'Direct Debit'
-                           WHEN Invoice.PaymentRule='K' THEN 'Cheque'
-                           WHEN Invoice.PaymentRule='S' THEN 'Check'
-                           WHEN Invoice.PaymentRule='T' THEN 'Bank Transfer'
-                           WHEN Invoice.PaymentRule='P' THEN 'On Credit'
+                           WHEN Invoice.PaymentRule = 'B' THEN 'Direct Debit'
+                           WHEN Invoice.PaymentRule = 'K' THEN 'Cheque'
+                           WHEN Invoice.PaymentRule = 'S' THEN 'Check'
+                           WHEN Invoice.PaymentRule = 'T' THEN 'Bank Transfer'
+                           WHEN Invoice.PaymentRule = 'P' THEN 'On Credit'
                            ELSE 'Expected'
                        END AS PaymentMethodName
                 FROM C_Invoice Invoice
-                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
-                INNER JOIN C_BPartner BusinessPartner ON (Invoice.C_BPartner_ID=BusinessPartner.C_BPartner_ID)
-                INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Invoice.AD_Client_ID)
-                WHERE Invoice.IsSoTrx='Y'
-                AND Invoice.IsActive='Y'
-                AND Invoice.DocStatus IN ('CO', 'CL')
-                AND InvoicePaySchedule.IsActive='Y'
-                AND InvoicePaySchedule.VA009_IsPaid='N'
-                AND InvoicePaySchedule.DueDate>=" + startDateSql + @"
-                AND InvoicePaySchedule.DueDate<" + endDateSql;
+                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule 
+                    ON InvoicePaySchedule.C_Invoice_ID = Invoice.C_Invoice_ID
+                INNER JOIN C_BPartner BusinessPartner 
+                    ON Invoice.C_BPartner_ID = BusinessPartner.C_BPartner_ID
+                INNER JOIN SchemaCurrency SchemaCurrency 
+                    ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+                WHERE Invoice.IsSoTrx = 'Y'
+                  AND Invoice.IsActive = 'Y'
+                  AND Invoice.DocStatus IN ('CO', 'CL')
+                  AND InvoicePaySchedule.IsActive = 'Y'
+                  AND InvoicePaySchedule.VA009_IsPaid = 'N'
+                  AND InvoicePaySchedule.DueDate >= " + startDateSql + @"
+                  AND InvoicePaySchedule.DueDate < " + endDateSql;
 
             if (!string.IsNullOrEmpty(searchText))
             {
                 string safeSearchText = searchText.Replace("'", "''").Trim().ToUpper();
 
                 expectedReceiptsBaseSql += @"
-                AND (
-                    UPPER(Invoice.DocumentNo) LIKE '%" + safeSearchText + @"%'
-                    OR UPPER(BusinessPartner.Name) LIKE '%" + safeSearchText + @"%'
-                )";
+                  AND (
+                      UPPER(Invoice.DocumentNo) LIKE '%" + safeSearchText + @"%'
+                      OR UPPER(BusinessPartner.Name) LIKE '%" + safeSearchText + @"%'
+                  )";
             }
 
             expectedReceiptsBaseSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -127,7 +137,10 @@ namespace VIS.Controllers
                        ExpectedReceiptData.CustomerName,
                        ExpectedReceiptData.DueDate,
                        ExpectedReceiptData.C_Currency_ID,
-                       ROUND(COALESCE(ExpectedReceiptData.ExpectedAmount, 0), ExpectedReceiptData.StdPrecision) AS ExpectedAmount,
+                       ROUND(
+                           COALESCE(ExpectedReceiptData.ExpectedAmount, 0),
+                           ExpectedReceiptData.StdPrecision
+                       ) AS ExpectedAmount,
                        ExpectedReceiptData.PaymentMethodName,
                        CountData.TotalRecords
                 FROM ExpectedReceiptData
@@ -140,6 +153,7 @@ namespace VIS.Controllers
             int totalRecords = 0;
 
             IDataReader dr = null;
+
             try
             {
                 dr = DB.ExecuteReader(sql);
@@ -167,31 +181,52 @@ namespace VIS.Controllers
                     });
                 }
 
+                var result = new
+                {
+                    rows = rows,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
+                };
+
+                return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    error = ex.Message
+                }, JsonRequestBehavior.AllowGet);
             }
             finally
             {
                 if (dr != null)
                 {
                     dr.Close();
+                    dr.Dispose();
                 }
             }
-
-            var result = new
-            {
-                rows = rows,
-                pageNo = pageNo,
-                pageSize = pageSize,
-                totalRecords = totalRecords,
-                totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
-            };
-
-            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
         private void GetDateRange(string filterType, string fromDate, string toDate, out DateTime startDate, out DateTime endDate)
         {
             DateTime today = DateTime.Today;
-            string selectedFilter = string.IsNullOrEmpty(filterType) ? "Next7Days" : filterType;
+            string selectedFilter = string.IsNullOrEmpty(filterType) ? "Last7Days" : filterType;
+
+            if (selectedFilter == "Next7Days")
+            {
+                startDate = today;
+                endDate = today.AddDays(7);
+                return;
+            }
+
+            if (selectedFilter == "Last7Days")
+            {
+                startDate = today.AddDays(-6);
+                endDate = today.AddDays(1);
+                return;
+            }
 
             if (selectedFilter == "ThisMonth")
             {
@@ -213,8 +248,9 @@ namespace VIS.Controllers
                 }
             }
 
-            startDate = today;
-            endDate = today.AddDays(7);
+            startDate = today.AddDays(-6);
+            endDate = today.AddDays(1);
         }
+    
     }
 }

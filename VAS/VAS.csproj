@@ -153,6 +153,8 @@
   <ItemGroup>
     <Compile Include="Areas\VAS\Controllers\AcctViewerDataController.cs" />
     <Compile Include="Areas\VAS\Controllers\AlertSQLGenerateController.cs" />
+    <Compile Include="Areas\VAS\Controllers\AutoAllocatedController.cs" />
+    <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MAcctSchemaController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MBankStatementController.cs" />
@@ -199,12 +201,17 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMConversionController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MVASContractController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MWarehouseController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CollectionEfficiencyController.cs" />
     <Compile Include="Areas\VAS\Controllers\CommonController.cs" />
+    <Compile Include="Areas\VAS\Controllers\CustomerPaidMethodController.cs" />
+    <Compile Include="Areas\VAS\Controllers\ExpectedReceiptsController.cs" />
+    <Compile Include="Areas\VAS\Controllers\ExpectedThisWeekController.cs" />
     <Compile Include="Areas\VAS\Controllers\ForecastFormController.cs" />
     <Compile Include="Areas\VAS\Controllers\GlJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
     <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />

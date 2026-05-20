@@ -19,10 +19,12 @@
  * 12  | Apply                        | VIS_Apply
  * ─────────────────────────────────────────────────────────────────────
  */
+
 /**
- * Collection Efficiency Widget
- * Purpose - Show collection efficiency, DSO and overdue AR invoices.
- */
+* Collection Efficiency Widget
+* Purpose - Show collection efficiency, DSO and overdue AR invoices.
+*/
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
@@ -37,11 +39,12 @@
         var $dsoText;
         var $overdueText;
         var $filterText;
+        var $subtitleText;
         var $customPanel;
         var $fromDate;
         var $toDate;
 
-        var selectedFilter = "ThisMonth";
+        var selectedFilter = "Last30Days";
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -50,6 +53,7 @@
 
         this.Initalize = function () {
             createWidget();
+            updateFilterTexts();
             loadData();
         };
 
@@ -106,6 +110,7 @@
                 $overdueText.text("");
             }
 
+            updateFilterTexts();
             updateRing(0);
         }
 
@@ -122,10 +127,7 @@
                 $overdueText.text("0.00 overdue across 0 invoices");
             }
 
-            if ($filterText) {
-                $filterText.text(getFilterLabel());
-            }
-
+            updateFilterTexts();
             updateRing(0);
         }
 
@@ -154,13 +156,32 @@
                 return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
             }
 
-            return value.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+            var stdPrecision = 2;
+
+            try {
+                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                }
+            }
+            catch (e) {
+                stdPrecision = 2;
+            }
+
+            return value.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 
         function getFilterLabel() {
+            if (selectedFilter === "Last30Days") {
+                return lbl("VIS_Last30Days", "LAST 30 DAYS");
+            }
+
+            if (selectedFilter === "ThisMonth") {
+                return lbl("VIS_ThisMonth", "This Month");
+            }
+
             if (selectedFilter === "LastMonth") {
                 return lbl("VIS_LastMonth", "Last Month");
             }
@@ -173,7 +194,19 @@
                 return lbl("VIS_CustomDate", "Custom Date");
             }
 
-            return lbl("VIS_ThisMonth", "This Month");
+            return lbl("VIS_Last30Days", "LAST 30 DAYS");
+        }
+
+        function updateFilterTexts() {
+            var label = getFilterLabel();
+
+            if ($filterText) {
+                $filterText.text(label);
+            }
+
+            if ($subtitleText) {
+                $subtitleText.text(label);
+            }
         }
 
         function renderData(data) {
@@ -184,7 +217,21 @@
             var overdueInvoiceCount = Number(data && data.overdueInvoiceCount || 0);
 
             if ($percentText) {
-                $percentText.text(percent.toFixed(0) + "%");
+                var stdPrecision = 2;
+
+                try {
+                    if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                        stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                    }
+                }
+                catch (e) {
+                    stdPrecision = 2;
+                }
+
+                $percentText.text(percent.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: stdPrecision,
+                    maximumFractionDigits: stdPrecision
+                }) + "%");
             }
 
             updateRing(percent);
@@ -202,9 +249,7 @@
                 );
             }
 
-            if ($filterText) {
-                $filterText.text(getFilterLabel());
-            }
+            updateFilterTexts();
         }
 
         function createWidget() {
@@ -212,6 +257,7 @@
                 '<div class="vas-ce-card">' +
 
                 '<div class="vas-ce-topbar">' +
+
                 '<div class="vas-ce-header">' +
                 '<div class="vas-ce-icon-wrap">' +
                 '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" ' +
@@ -226,7 +272,11 @@
                 lbl("VIS_CollectionEfficiency", "Collection efficiency") +
                 '</div>' +
                 '<div class="vas-ce-subtitle">' +
-                '<strong>' + lbl("VIS_DSO", "DSO") + '</strong>' + ' · ' + lbl("VIS_Last30Days", "LAST 30 DAYS") +
+                '<strong>' + lbl("VIS_DSO", "DSO") + '</strong>' +
+                ' · ' +
+                '<span class="vas-ce-subtitle-filter">' +
+                lbl("VIS_Last30Days", "LAST 30 DAYS") +
+                '</span>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
@@ -234,30 +284,41 @@
                 '<div class="vas-ce-filter-wrap">' +
                 '<button type="button" class="vas-ce-filter-btn">' +
                 '<span class="vas-ce-filter-text">' +
-                lbl("VIS_ThisMonth", "This Month") +
+                lbl("VIS_Last30Days", "LAST 30 DAYS") +
                 '</span>' +
                 '<span class="vas-ce-filter-arrow">▾</span>' +
                 '</button>' +
 
                 '<div class="vas-ce-filter-menu">' +
+
+                '<div class="vas-ce-filter-item" data-filter="Last30Days">' +
+                lbl("VIS_Last30Days", "LAST 30 DAYS") +
+                '</div>' +
+
                 '<div class="vas-ce-filter-item" data-filter="ThisMonth">' +
                 lbl("VIS_ThisMonth", "This Month") +
                 '</div>' +
+
                 '<div class="vas-ce-filter-item" data-filter="LastMonth">' +
                 lbl("VIS_LastMonth", "Last Month") +
                 '</div>' +
+
                 '<div class="vas-ce-filter-item" data-filter="LastQuarter">' +
                 lbl("VIS_LastQuarter", "Last Quarter") +
                 '</div>' +
+
                 '<div class="vas-ce-filter-item" data-filter="Custom">' +
                 lbl("VIS_CustomDate", "Custom Date") +
                 '</div>' +
+
                 '</div>' +
                 '</div>' +
+
                 '</div>' +
 
                 '<div class="vas-ce-custom-panel">' +
                 '<span class="vas-ce-custom-close">&times;</span>' +
+
                 '<div class="vas-ce-custom-row">' +
                 '<label>' + lbl("VIS_FromDate", "From Date") + '</label>' +
                 '<input type="date" class="vas-ce-from-date" />' +
@@ -276,9 +337,11 @@
                 lbl("VIS_Apply", "Apply") +
                 '</button>' +
                 '</div>' +
+
                 '</div>' +
 
                 '<div class="vas-ce-content">' +
+
                 '<div class="vas-ce-ring-wrap">' +
                 '<div class="vas-ce-ring">' +
                 '<div class="vas-ce-ring-inner">' +
@@ -296,6 +359,7 @@
                 '<span>↗</span>' +
                 '</button>' +
                 '</div>' +
+
                 '</div>' +
 
                 '</div>'
@@ -305,6 +369,7 @@
             $dsoText = $card.find('.vas-ce-dso');
             $overdueText = $card.find('.vas-ce-overdue');
             $filterText = $card.find('.vas-ce-filter-text');
+            $subtitleText = $card.find('.vas-ce-subtitle-filter');
             $customPanel = $card.find('.vas-ce-custom-panel');
             $fromDate = $card.find('.vas-ce-from-date');
             $toDate = $card.find('.vas-ce-to-date');
@@ -321,9 +386,7 @@
                 selectedFilter = $(this).data('filter');
                 $card.find('.vas-ce-filter-menu').removeClass('vas-ce-filter-menu-show');
 
-                if ($filterText) {
-                    $filterText.text(getFilterLabel());
-                }
+                updateFilterTexts();
 
                 if (selectedFilter === "Custom") {
                     $customPanel.addClass('vas-ce-custom-panel-show');
@@ -334,7 +397,8 @@
                 loadData();
             });
 
-            $card.find('.vas-ce-clear-btn').on('click', function () {
+            $card.find('.vas-ce-clear-btn').on('click', function (e) {
+                e.stopPropagation();
                 $fromDate.val("");
                 $toDate.val("");
             });
@@ -344,16 +408,15 @@
                 $customPanel.removeClass('vas-ce-custom-panel-show');
             });
 
-            $card.find('.vas-ce-apply-btn').on('click', function () {
+            $card.find('.vas-ce-apply-btn').on('click', function (e) {
+                e.stopPropagation();
+
                 if (!$fromDate.val() || !$toDate.val()) {
                     return;
                 }
 
                 selectedFilter = "Custom";
-
-                if ($filterText) {
-                    $filterText.text(getFilterLabel());
-                }
+                updateFilterTexts();
 
                 $customPanel.removeClass('vas-ce-custom-panel-show');
                 loadData();
@@ -365,11 +428,9 @@
 
             $card.on('click', function (e) {
                 e.stopPropagation();
-                $card.find('.vas-ce-filter-menu').removeClass('vas-ce-filter-menu-show');
-                $customPanel.removeClass('vas-ce-custom-panel-show');
             });
 
-            $(document).on('click.vas-ce', function () {
+            $(document).off('click.vas-ce').on('click.vas-ce', function () {
                 $card.find('.vas-ce-filter-menu').removeClass('vas-ce-filter-menu-show');
                 $customPanel.removeClass('vas-ce-custom-panel-show');
             });

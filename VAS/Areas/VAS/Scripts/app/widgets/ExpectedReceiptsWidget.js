@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Expected Receipts Widget
  * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
  *
@@ -20,6 +20,13 @@
  * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
  */
 
+
+
+/**
+ * Expected Receipts Widget
+ * Purpose - Show AR receipts expected from unpaid invoice pay schedules.
+ */
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
@@ -36,7 +43,22 @@
         var $nextBtn;
         var $pageText;
 
+        var $filterBtn;
+        var $datePopup;
+        var $fromDateInput;
+        var $toDateInput;
+        var $clearBtn;
+        var $applyBtn;
+        var $closePopupBtn;
+
+        var $next7Btn;
+        var $last7Btn;
+        var $monthBtn;
+
         var selectedFilter = "Next7Days";
+        var customFromDate = "";
+        var customToDate = "";
+
         var pageNo = 1;
         var pageSize = 3;
         var totalPages = 0;
@@ -48,6 +70,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setDefaultNext7Days();
             loadData();
         };
 
@@ -59,6 +82,8 @@
                 type: 'GET',
                 data: {
                     filterType: selectedFilter,
+                    fromDate: customFromDate,
+                    toDate: customToDate,
                     pageNo: pageNo,
                     pageSize: pageSize
                 },
@@ -148,7 +173,7 @@
                 '<div class="vas-er-row">' +
                 '<span class="vas-er-bar ' + barClass + '"></span>' +
                 '<div class="vas-er-info">' +
-                '<div class="vas-er-title">' +
+                '<div class="vas-er-row-title">' +
                 escapeHtml(documentNo) + ' · ' + escapeHtml(customerName) +
                 '</div>' +
                 '<div class="vas-er-meta">' +
@@ -223,11 +248,21 @@
         }
 
         function formatAmount(value) {
-            var amount = Number(value || 0);
+            var absVal = Number(value || 0);
+            var stdPrecision = 2;
 
-            return "₹" + amount.toLocaleString("en-IN", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
+            try {
+                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                }
+            }
+            catch (e) {
+                stdPrecision = 2;
+            }
+
+            return absVal.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 
@@ -235,6 +270,12 @@
             if ($subtitle) {
                 $subtitle.text(getSubtitle());
             }
+
+            if ($filterBtn) {
+                $filterBtn.text(getFilterButtonText());
+            }
+
+            setActiveQuickFilter();
 
             if ($pageText) {
                 if (totalPages > 1) {
@@ -255,11 +296,145 @@
         }
 
         function getSubtitle() {
+            if (selectedFilter === "Custom") {
+                if (customFromDate && customToDate) {
+                    return formatShortDate(customFromDate) + " - " + formatShortDate(customToDate);
+                }
+
+                return "Custom date";
+            }
+
+            if (selectedFilter === "Next7Days") {
+                return "Next 7 days";
+            }
+
+            if (selectedFilter === "Last7Days") {
+                return "Last 7 days";
+            }
+
             if (selectedFilter === "ThisMonth") {
                 return lbl("VIS_ThisMonth", "This Month");
             }
 
-            return lbl("VIS_Next7Days", "Next 7 days");
+            return "Next 7 days";
+        }
+
+        function getFilterButtonText() {
+            if (selectedFilter === "Next7Days") {
+                return "NEXT 7 DAYS ▾";
+            }
+
+            if (selectedFilter === "Last7Days") {
+                return "LAST 7 DAYS ▾";
+            }
+
+            if (selectedFilter === "ThisMonth") {
+                return "THIS MONTH ▾";
+            }
+
+            if (selectedFilter === "Custom") {
+                return "CUSTOM DATE ▾";
+            }
+
+            return "NEXT 7 DAYS ▾";
+        }
+
+        function setActiveQuickFilter() {
+            if (!$next7Btn || !$last7Btn || !$monthBtn) {
+                return;
+            }
+
+            $next7Btn.removeClass("active");
+            $last7Btn.removeClass("active");
+            $monthBtn.removeClass("active");
+
+            if (selectedFilter === "Next7Days") {
+                $next7Btn.addClass("active");
+            }
+            else if (selectedFilter === "Last7Days") {
+                $last7Btn.addClass("active");
+            }
+            else if (selectedFilter === "ThisMonth") {
+                $monthBtn.addClass("active");
+            }
+        }
+
+        function formatShortDate(value) {
+            if (!value) {
+                return "";
+            }
+
+            var d = new Date(value);
+
+            if (isNaN(d.getTime())) {
+                return value;
+            }
+
+            return d.toLocaleDateString(window.navigator.language, {
+                day: "2-digit",
+                month: "short"
+            });
+        }
+
+        function setDefaultNext7Days() {
+            var today = new Date();
+            var to = new Date();
+
+            to.setDate(today.getDate() + 6);
+
+            customFromDate = toInputDate(today);
+            customToDate = toInputDate(to);
+
+            if ($fromDateInput) {
+                $fromDateInput.val(customFromDate);
+            }
+
+            if ($toDateInput) {
+                $toDateInput.val(customToDate);
+            }
+        }
+
+        function setDefaultLast7Days() {
+            var today = new Date();
+            var from = new Date();
+
+            from.setDate(today.getDate() - 6);
+
+            customFromDate = toInputDate(from);
+            customToDate = toInputDate(today);
+
+            if ($fromDateInput) {
+                $fromDateInput.val(customFromDate);
+            }
+
+            if ($toDateInput) {
+                $toDateInput.val(customToDate);
+            }
+        }
+
+        function setDefaultThisMonth() {
+            var today = new Date();
+            var from = new Date(today.getFullYear(), today.getMonth(), 1);
+            var to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+            customFromDate = toInputDate(from);
+            customToDate = toInputDate(to);
+
+            if ($fromDateInput) {
+                $fromDateInput.val(customFromDate);
+            }
+
+            if ($toDateInput) {
+                $toDateInput.val(customToDate);
+            }
+        }
+
+        function toInputDate(date) {
+            var y = date.getFullYear();
+            var m = String(date.getMonth() + 1).padStart(2, "0");
+            var d = String(date.getDate()).padStart(2, "0");
+
+            return y + "-" + m + "-" + d;
         }
 
         function escapeHtml(value) {
@@ -291,15 +466,46 @@
                 lbl("VIS_ExpectedReceipts", "Expected receipts") +
                 '</span>' +
                 '</div>' +
-                '<div class="vas-er-subtitle">' +
-                lbl("VIS_Next7Days", "Next 7 days") +
-                '</div>' +
                 '</div>' +
 
                 '<div class="vas-er-pager">' +
                 '<button type="button" class="vas-er-page-btn vas-er-prev" aria-label="Previous">‹</button>' +
                 '<span class="vas-er-page-text"></span>' +
                 '<button type="button" class="vas-er-page-btn vas-er-next" aria-label="Next">›</button>' +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-er-filter-row">' +
+                '<button type="button" class="vas-er-filter-btn">NEXT 7 DAYS ▾</button>' +
+                '<span class="vas-er-subtitle">Next 7 days</span>' +
+                '</div>' +
+
+                '<div class="vas-er-date-popup" style="display:none;">' +
+                '<button type="button" class="vas-er-popup-close">×</button>' +
+
+                '<div class="vas-er-quick-filters">' +
+                '<button type="button" class="vas-er-quick-filter vas-er-next7-btn active">Next 7 Days</button>' +
+                '<button type="button" class="vas-er-quick-filter vas-er-last7-btn">Last 7 Days</button>' +
+                '<button type="button" class="vas-er-quick-filter vas-er-month-btn">This Month</button>' +
+                '</div>' +
+
+                '<div class="vas-er-date-grid">' +
+
+                '<div class="vas-er-date-field">' +
+                '<label class="vas-er-date-label">From Date</label>' +
+                '<input type="date" class="vas-er-date-input vas-er-from-date" />' +
+                '</div>' +
+
+                '<div class="vas-er-date-field">' +
+                '<label class="vas-er-date-label">To Date</label>' +
+                '<input type="date" class="vas-er-date-input vas-er-to-date" />' +
+                '</div>' +
+
+                '</div>' +
+
+                '<div class="vas-er-popup-actions">' +
+                '<button type="button" class="vas-er-clear-btn">Clear</button>' +
+                '<button type="button" class="vas-er-apply-btn">Apply</button>' +
                 '</div>' +
                 '</div>' +
 
@@ -317,6 +523,75 @@
             $prevBtn = $card.find('.vas-er-prev');
             $nextBtn = $card.find('.vas-er-next');
             $pageText = $card.find('.vas-er-page-text');
+
+            $filterBtn = $card.find('.vas-er-filter-btn');
+            $datePopup = $card.find('.vas-er-date-popup');
+            $fromDateInput = $card.find('.vas-er-from-date');
+            $toDateInput = $card.find('.vas-er-to-date');
+            $clearBtn = $card.find('.vas-er-clear-btn');
+            $applyBtn = $card.find('.vas-er-apply-btn');
+            $closePopupBtn = $card.find('.vas-er-popup-close');
+
+            $next7Btn = $card.find('.vas-er-next7-btn');
+            $last7Btn = $card.find('.vas-er-last7-btn');
+            $monthBtn = $card.find('.vas-er-month-btn');
+
+            $filterBtn.on('click', function () {
+                $datePopup.toggle();
+            });
+
+            $closePopupBtn.on('click', function () {
+                $datePopup.hide();
+            });
+
+            $next7Btn.on('click', function () {
+                selectedFilter = "Next7Days";
+                setDefaultNext7Days();
+                pageNo = 1;
+                $datePopup.hide();
+                loadData();
+            });
+
+            $last7Btn.on('click', function () {
+                selectedFilter = "Last7Days";
+                setDefaultLast7Days();
+                pageNo = 1;
+                $datePopup.hide();
+                loadData();
+            });
+
+            $monthBtn.on('click', function () {
+                selectedFilter = "ThisMonth";
+                setDefaultThisMonth();
+                pageNo = 1;
+                $datePopup.hide();
+                loadData();
+            });
+
+            $clearBtn.on('click', function () {
+                selectedFilter = "Next7Days";
+                setDefaultNext7Days();
+                pageNo = 1;
+                $datePopup.hide();
+                loadData();
+            });
+
+            $applyBtn.on('click', function () {
+                var fromValue = $fromDateInput.val();
+                var toValue = $toDateInput.val();
+
+                if (!fromValue || !toValue) {
+                    return;
+                }
+
+                customFromDate = fromValue;
+                customToDate = toValue;
+                selectedFilter = "Custom";
+                pageNo = 1;
+
+                $datePopup.hide();
+                loadData();
+            });
 
             $prevBtn.on('click', function () {
                 if (pageNo <= 1) {
@@ -341,6 +616,17 @@
 
         this.refreshWidget = function () {
             pageNo = 1;
+
+            if (selectedFilter === "Next7Days") {
+                setDefaultNext7Days();
+            }
+            else if (selectedFilter === "Last7Days") {
+                setDefaultLast7Days();
+            }
+            else if (selectedFilter === "ThisMonth") {
+                setDefaultThisMonth();
+            }
+
             loadData();
         };
 

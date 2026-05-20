@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Auto Allocated Widget
  * Purpose - Show percentage of AR receipts auto-matched to invoices.
  *
@@ -77,8 +77,12 @@
         }
 
         function formatPercent(value) {
-            value = Number(value || 0);
-            return value.toFixed(0) + "%";
+            var absVal = Number(value || 0);
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            return absVal.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            }) + "%";
         }
 
         function renderPercent(data) {

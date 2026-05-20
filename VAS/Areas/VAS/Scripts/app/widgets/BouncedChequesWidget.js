@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Bounced Cheques Widget
  * Purpose - Show count of bounced cheques from AR receipts.
  *
@@ -84,7 +84,12 @@
             }
 
             if ($countText) {
-                $countText.text(count);
+                var absVal = count;
+                var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                $countText.text(absVal.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: stdPrecision,
+                    maximumFractionDigits: stdPrecision
+                }));
             }
         }
 

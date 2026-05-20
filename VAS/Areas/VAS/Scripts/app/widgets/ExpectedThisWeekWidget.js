@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Expected This Week Widget
  * Purpose - Show AR invoice amount due in the next 7 days.
  *
@@ -101,20 +101,22 @@
             value = Number(value || 0);
 
             if (value >= 10000000) {
-                return "₹" + (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
+                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
             }
 
             if (value >= 100000) {
-                return "₹" + (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
+                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
             }
 
             if (value >= 1000) {
-                return "₹" + (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
+                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
             }
 
-            return "₹" + value.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+            var absVal = value;
+            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            return absVal.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 

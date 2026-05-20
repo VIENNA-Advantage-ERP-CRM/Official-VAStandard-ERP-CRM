@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Customer Paid Method Widget
  * Purpose - Show how customers paid through AR receipts.
  *
@@ -143,11 +143,18 @@
 
                 var color = METHOD_COLORS[i % METHOD_COLORS.length];
 
+                var absVal = percent;
+                var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                var formattedPercent = absVal.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: stdPrecision,
+                    maximumFractionDigits: stdPrecision
+                }) + '%';
+
                 var $row = $(
                     '<div class="vas-cpm-row">' +
                     '<div class="vas-cpm-row-head">' +
                     '<span class="vas-cpm-method">' + methodName + '</span>' +
-                    '<span class="vas-cpm-percent">' + percent.toFixed(0) + '%</span>' +
+                    '<span class="vas-cpm-percent">' + formattedPercent + '</span>' +
                     '</div>' +
                     '<div class="vas-cpm-track">' +
                     '<div class="vas-cpm-fill" style="width:' + percent + '%;background:' + color + ';"></div>' +

@@ -249,6 +249,12 @@ namespace VIS.Controllers
                 endDate = thisMonthStart;
                 return;
             }
+            if (selectedFilter == "Last30Days")
+            {
+                startDate = today.AddDays(-29);
+                endDate = today.AddDays(1);
+                return;
+            }
 
             if (selectedFilter == "LastQuarter")
             {
