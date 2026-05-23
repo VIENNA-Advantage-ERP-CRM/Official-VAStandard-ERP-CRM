@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -70,8 +71,8 @@ namespace VIS.Controllers
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
 
-                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.Created") + @" >= " + WidgetDateSqlHelper.ToSqlDate(monthStart) + @"
-                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.Created") + @" < " + WidgetDateSqlHelper.ToSqlDate(nextMonthStart) + @"
+                  AND " + TruncColumn("Payment.Created") + @" >= " + ToSqlDate(monthStart) + @"
+                  AND " + TruncColumn("Payment.Created") + @" < " + ToSqlDate(nextMonthStart) + @"
 
                   AND Payment.C_Invoice_ID IS NOT NULL ";
 
@@ -157,5 +158,33 @@ namespace VIS.Controllers
                 }
             }
         }
+
+
+        internal static string ToSqlDate(DateTime date)
+        {
+            DateTime day = date.Date;
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('"
+                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + "','YYYY-MM-DD')";
+            }
+
+            return DB.TO_DATE(day, true);
+        }
+
+        internal static string TruncColumn(string columnExpression)
+        {
+            if (DB.IsOracle())
+            {
+                return "TRUNC(" + columnExpression + ")";
+            }
+
+            return columnExpression;
+        }
+
     }
+
+
 }

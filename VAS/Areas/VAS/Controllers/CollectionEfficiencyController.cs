@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -68,7 +69,7 @@ namespace VIS.Controllers
                        SUM(
                            CASE
                                WHEN InvoicePaySchedule.VA009_IsPaid = 'N'
-                                AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(todayDate) + @"
+                                AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" < " + ToSqlDate(todayDate) + @"
                                THEN
                                    CASE
                                        WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID 
@@ -89,7 +90,7 @@ namespace VIS.Controllers
 
                        COUNT(DISTINCT CASE
                            WHEN InvoicePaySchedule.VA009_IsPaid = 'N'
-                            AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(todayDate) + @"
+                            AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" < " + ToSqlDate(todayDate) + @"
                            THEN Invoice.C_Invoice_ID
                            ELSE NULL
                        END) AS OverdueInvoiceCount
@@ -104,8 +105,8 @@ namespace VIS.Controllers
                   AND Invoice.IsActive = 'Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND InvoicePaySchedule.IsActive = 'Y'
-                   AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
-                   AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
+                   AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + ToSqlDate(startDate) + @"
+                   AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" < " + ToSqlDate(endDate);
 
             invoiceScheduleSql = MRole.GetDefault(ctx).AddAccessSQL(
                 invoiceScheduleSql,
@@ -153,7 +154,7 @@ namespace VIS.Controllers
                                            )
                                        END
                                    ) * (
-                                       " + WidgetDateSqlHelper.AllocationToInvoiceDayDiffSql() + @"
+                                       " + AllocationToInvoiceDayDiffSql() + @"
                                    )
                                ) / SUM(
                                    CASE
@@ -188,8 +189,8 @@ namespace VIS.Controllers
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND AllocationHdr.IsActive = 'Y'
                   AND AllocationHdr.DocStatus IN ('CO', 'CL')
-                   AND " + WidgetDateSqlHelper.TruncColumn("AllocationHdr.DateAcct") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
-                   AND " + WidgetDateSqlHelper.TruncColumn("AllocationHdr.DateAcct") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
+                   AND " + TruncColumn("AllocationHdr.DateAcct") + @" >= " + ToSqlDate(startDate) + @"
+                   AND " + TruncColumn("AllocationHdr.DateAcct") + @" < " + ToSqlDate(endDate);
 
             dsoSql = MRole.GetDefault(ctx).AddAccessSQL(
                 dsoSql,
@@ -336,5 +337,42 @@ namespace VIS.Controllers
             startDate = new DateTime(today.Year, today.Month, 1);
             endDate = startDate.AddMonths(1);
         }
+
+
+        internal static string ToSqlDate(DateTime date)
+        {
+            DateTime day = date.Date;
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('"
+                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + "','YYYY-MM-DD')";
+            }
+
+            return DB.TO_DATE(day, true);
+        }
+
+        internal static string TruncColumn(string columnExpression)
+        {
+            if (DB.IsOracle())
+            {
+                return "TRUNC(" + columnExpression + ")";
+            }
+
+            return columnExpression;
+        }
+
+        internal static string AllocationToInvoiceDayDiffSql()
+        {
+            if (DB.IsOracle())
+            {
+                return "(TRUNC(AllocationHdr.DateAcct) - TRUNC(Invoice.DateInvoiced))";
+            }
+
+            return "(CAST(AllocationHdr.DateAcct AS DATE) - CAST(Invoice.DateInvoiced AS DATE))";
+        }
+
+
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -99,8 +100,8 @@ namespace VIS.Controllers
                   AND InvoicePaySchedule.IsActive = 'Y'
                   AND InvoicePaySchedule.VA009_IsPaid = 'N'
 
-                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
-                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
+                  AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + ToSqlDate(startDate) + @"
+                  AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" < " + ToSqlDate(endDate);
 
             upcomingRunsSql = MRole.GetDefault(ctx).AddAccessSQL(
                 upcomingRunsSql,
@@ -260,6 +261,31 @@ namespace VIS.Controllers
         }
 
 
-        
+
+        internal static string ToSqlDate(DateTime date)
+        {
+            DateTime day = date.Date;
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('"
+                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + "','YYYY-MM-DD')";
+            }
+
+            return DB.TO_DATE(day, true);
+        }
+
+        internal static string TruncColumn(string columnExpression)
+        {
+            if (DB.IsOracle())
+            {
+                return "TRUNC(" + columnExpression + ")";
+            }
+
+            return columnExpression;
+        }
+
+
     }
 }
