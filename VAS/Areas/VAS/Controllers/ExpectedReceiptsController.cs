@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -48,10 +49,12 @@ namespace VIS.Controllers
 
             GetDateRange(filterType, fromDate, toDate, out startDate, out endDate);
 
-            string startDateSql = DB.TO_DATE(startDate, true);
-            string endDateSql = DB.TO_DATE(endDate, true);
-
             int offset = (pageNo - 1) * pageSize;
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+
+            parameters.Add(new SqlParameter("@Offset", offset));
+            parameters.Add(new SqlParameter("@PageSize", pageSize));
 
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
@@ -115,19 +118,19 @@ namespace VIS.Controllers
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND InvoicePaySchedule.IsActive = 'Y'
                   AND InvoicePaySchedule.VA009_IsPaid = 'N'
-                  AND InvoicePaySchedule.DueDate >= " + startDateSql + @"
-                  AND InvoicePaySchedule.DueDate < " + endDateSql;
+                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
+                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
 
             if (!string.IsNullOrEmpty(searchText))
             {
-                string safeSearchText = searchText.Replace("'", "''").Trim().ToUpper();
-
                 expectedReceiptsBaseSql += @"
                   AND (
-                      UPPER(Invoice.DocumentNo) LIKE '%" + safeSearchText + @"%'
-                      OR UPPER(BusinessPartner.Name) LIKE '%" + safeSearchText + @"%'
-                      OR UPPER(Invoice.PaymentRule) LIKE '%" + safeSearchText + @"%'
+                      UPPER(Invoice.DocumentNo) LIKE @SearchText
+                      OR UPPER(BusinessPartner.Name) LIKE @SearchText
+                      OR UPPER(Invoice.PaymentRule) LIKE @SearchText
                   )";
+
+                parameters.Add(new SqlParameter("@SearchText", "%" + searchText.Trim().ToUpper() + "%"));
             }
 
             expectedReceiptsBaseSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -153,6 +156,7 @@ namespace VIS.Controllers
                        ExpectedReceiptData.CustomerName,
                        ExpectedReceiptData.DueDate,
                        ExpectedReceiptData.C_Currency_ID,
+                       ExpectedReceiptData.StdPrecision,
                        ROUND(
                            COALESCE(ExpectedReceiptData.ExpectedAmount, 0),
                            ExpectedReceiptData.StdPrecision
@@ -164,7 +168,7 @@ namespace VIS.Controllers
                 CROSS JOIN CountData
                 ORDER BY ExpectedReceiptData.DueDate,
                          ExpectedReceiptData.DocumentNo
-                OFFSET " + offset + @" ROWS FETCH NEXT " + pageSize + @" ROWS ONLY";
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             var rows = new List<object>();
             int totalRecords = 0;
@@ -173,7 +177,7 @@ namespace VIS.Controllers
 
             try
             {
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
 
                 while (dr != null && dr.Read())
                 {
@@ -196,7 +200,7 @@ namespace VIS.Controllers
 
                     if (string.IsNullOrEmpty(paymentMethodName))
                     {
-                        paymentMethodName = GetPaymentRuleName(paymentRule);
+                        paymentMethodName = GetPaymentRuleName(ctx, paymentRule);
                     }
 
                     rows.Add(new
@@ -206,6 +210,7 @@ namespace VIS.Controllers
                         customerName = dr["CustomerName"] == null ? "" : dr["CustomerName"].ToString(),
                         dueDate = dueDate == DateTime.MinValue ? "" : dueDate.ToString("yyyy-MM-dd"),
                         cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]),
                         expectedAmount = Util.GetValueOfDecimal(dr["ExpectedAmount"]),
                         paymentRule = paymentRule,
                         paymentMethodName = paymentMethodName
@@ -240,34 +245,35 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetPaymentRuleName(string paymentRule)
+        private static readonly Dictionary<string, (string MessageKey, string DefaultName)> PaymentRuleNames =
+                new Dictionary<string, (string MessageKey, string DefaultName)>
+                {
+                    { "B", ("DirectDebit", "Direct Debit") },
+                    { "K", ("Cheque", "Cheque") },
+                    { "S", ("Check", "Check") },
+                    { "T", ("BankTransfer", "Bank Transfer") },
+                    { "P", ("OnCredit", "On Credit") }
+                };
+
+        private string GetPaymentRuleName(Ctx ctx, string paymentRule)
         {
-            if (paymentRule == "B")
+            if (PaymentRuleNames.TryGetValue(paymentRule, out var paymentRuleInfo))
             {
-                return "Direct Debit";
+                return GetMsg(ctx, paymentRuleInfo.MessageKey, paymentRuleInfo.DefaultName);
             }
 
-            if (paymentRule == "K")
-            {
-                return "Cheque";
-            }
+            return GetMsg(ctx, "Expected", "Expected");
+        }
 
-            if (paymentRule == "S")
-            {
-                return "Check";
-            }
 
-            if (paymentRule == "T")
+        private string GetMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(msg) || (msg.StartsWith("[") && msg.EndsWith("]")))
             {
-                return "Bank Transfer";
+                return fallback;
             }
-
-            if (paymentRule == "P")
-            {
-                return "On Credit";
-            }
-
-            return "Expected";
+            return msg;
         }
 
         private void GetDateRange(string filterType, string fromDate, string toDate, out DateTime startDate, out DateTime endDate)
@@ -294,13 +300,13 @@ namespace VIS.Controllers
 
             if (selectedFilter == "Custom")
             {
-                DateTime parsedFromDate;
-                DateTime parsedToDate;
+                DateTime? parsedFromDate = Util.GetValueOfDateTime(fromDate);
+                DateTime? parsedToDate = Util.GetValueOfDateTime(toDate);
 
-                if (DateTime.TryParse(fromDate, out parsedFromDate) && DateTime.TryParse(toDate, out parsedToDate))
+                if (parsedFromDate.HasValue && parsedToDate.HasValue)
                 {
-                    startDate = parsedFromDate.Date;
-                    endDate = parsedToDate.Date.AddDays(1);
+                    startDate = parsedFromDate.Value.Date;
+                    endDate = parsedToDate.Value.Date.AddDays(1);
                     return;
                 }
             }

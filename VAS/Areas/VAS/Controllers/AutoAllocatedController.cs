@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -32,6 +33,8 @@ namespace VIS.Controllers
 
             DateTime monthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             DateTime nextMonthStart = monthStart.AddMonths(1);
+
+
 
             /*
              * IMPORTANT:
@@ -67,8 +70,8 @@ namespace VIS.Controllers
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
 
-                  AND Payment.Created >= " + DB.TO_DATE(monthStart, true) + @"
-                  AND Payment.Created < " + DB.TO_DATE(nextMonthStart, true) + @"
+                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.Created") + @" >= " + WidgetDateSqlHelper.ToSqlDate(monthStart) + @"
+                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.Created") + @" < " + WidgetDateSqlHelper.ToSqlDate(nextMonthStart) + @"
 
                   AND Payment.C_Invoice_ID IS NOT NULL ";
 

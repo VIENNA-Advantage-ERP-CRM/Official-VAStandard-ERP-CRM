@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -30,6 +31,10 @@ namespace VIS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+
+            parameters.Add(new SqlParameter("@ADUserID", ctx.GetAD_User_ID()));
 
             string paymentMethodSql = @"
                 SELECT PaymentMethod.VA009_Name AS PaymentMethodName,
@@ -62,7 +67,7 @@ namespace VIS.Controllers
                           INNER JOIN AD_Table TableInfo
                               ON TableInfo.AD_Table_ID = PrivateAccess.AD_Table_ID
                           WHERE TableInfo.TableName = 'VA009_PaymentMethod'
-                            AND PrivateAccess.AD_User_ID <> " + ctx.GetAD_User_ID() + @"
+                            AND PrivateAccess.AD_User_ID <> @ADUserID
                             AND PrivateAccess.IsActive = 'Y'
                       )
                   )
@@ -95,7 +100,7 @@ namespace VIS.Controllers
 
             try
             {
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
 
                 while (dr != null && dr.Read())
                 {
@@ -115,7 +120,7 @@ namespace VIS.Controllers
                             tenderType = dr["TenderType"].ToString();
                         }
 
-                        paymentMethodName = GetTenderTypeName(tenderType);
+                        paymentMethodName = GetTenderTypeName(ctx , tenderType);
                     }
 
                     rows.Add(new
@@ -145,34 +150,68 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetTenderTypeName(string tenderType)
+
+        private static readonly Dictionary<string, (string MessageKey, string DefaultName)> TenderTypeNames =
+            new Dictionary<string, (string MessageKey, string DefaultName)>
+            {
+                { "K", ("Cheque", "Cheque") },
+                { "C", ("Card", "Card") },
+                { "A", ("ACH", "ACH") },
+                { "D", ("DirectDebit", "Direct Debit") },
+                { "T", ("BankTransfer", "Bank Transfer") }
+            };
+
+        private string GetTenderTypeName(Ctx ctx, string tenderType)
         {
-            if (tenderType == "K")
+            if (TenderTypeNames.TryGetValue(tenderType, out var tenderTypeInfo))
             {
-                return "Cheque";
+                return GetMsg(ctx, tenderTypeInfo.MessageKey, tenderTypeInfo.DefaultName);
             }
 
-            if (tenderType == "C")
-            {
-                return "Card";
-            }
-
-            if (tenderType == "A")
-            {
-                return "ACH";
-            }
-
-            if (tenderType == "D")
-            {
-                return "Direct Debit";
-            }
-
-            if (tenderType == "T")
-            {
-                return "Bank Transfer";
-            }
-
-            return "Other";
+            return GetMsg(ctx, "Other", "Other");
         }
+
+        private string GetMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+
+            if (string.IsNullOrEmpty(msg) || (msg.StartsWith("[") && msg.EndsWith("]")))
+            {
+                return fallback;
+            }
+
+            return msg;
+        }
+
+
+        //private string GetTenderTypeName(string tenderType)
+        //{
+        //    if (tenderType == "K")
+        //    {
+        //        return "Cheque";
+        //    }
+
+        //    if (tenderType == "C")
+        //    {
+        //        return "Card";
+        //    }
+
+        //    if (tenderType == "A")
+        //    {
+        //        return "ACH";
+        //    }
+
+        //    if (tenderType == "D")
+        //    {
+        //        return "Direct Debit";
+        //    }
+
+        //    if (tenderType == "T")
+        //    {
+        //        return "Bank Transfer";
+        //    }
+
+        //    return "Other";
+        //}
     }
 }

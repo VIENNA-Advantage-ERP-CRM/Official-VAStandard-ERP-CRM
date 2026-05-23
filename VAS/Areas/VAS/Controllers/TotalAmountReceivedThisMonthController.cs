@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -32,8 +34,7 @@ namespace VIS.Controllers
             DateTime monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             DateTime nextMonthStart = monthStart.AddMonths(1);
 
-            string monthStartSql = DB.TO_DATE(monthStart, true);
-            string nextMonthStartSql = DB.TO_DATE(nextMonthStart, true);
+
 
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
@@ -69,8 +70,8 @@ namespace VIS.Controllers
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
-                  AND Payment.DateAcct >= " + monthStartSql + @"
-                  AND Payment.DateAcct < " + nextMonthStartSql;
+                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.DateAcct") + @" >= " + WidgetDateSqlHelper.ToSqlDate(monthStart) + @"
+                  AND " + WidgetDateSqlHelper.TruncColumn("Payment.DateAcct") + @" < " + WidgetDateSqlHelper.ToSqlDate(nextMonthStart);
 
             receivedThisMonthSql = MRole.GetDefault(ctx).AddAccessSQL(
                 receivedThisMonthSql,

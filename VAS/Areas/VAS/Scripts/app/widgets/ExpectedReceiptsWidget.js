@@ -1,4 +1,3 @@
-
 /**
  * Expected Receipts Widget
  * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
@@ -9,18 +8,19 @@
  *  1  | Expected receipts            | VIS_ExpectedReceipts
  *  2  | Next 7 days                  | VIS_Next7Days
  *  3  | This Month                   | VIS_ThisMonth
- *  4  | Loading…                     | VIS_Loading
- *  5  | No data                      | VIS_NoData
- *  6  | Expected                     | VIS_Expected
- *  7  | Previous                     | VIS_Previous
- *  8  | Next                         | VIS_Next
+ *  4  | Next Month                   | VIS_NextMonth
+ *  5  | Custom date                  | VIS_CustomDate
+ *  6  | Loading…                     | VIS_Loading
+ *  7  | No data                      | VIS_NoData
+ *  8  | Expected                     | VIS_Expected
+ *  9  | Previous                     | VIS_Previous
+ * 10  | Next                         | VIS_Next
+ * 11  | From Date                    | VIS_FromDate
+ * 12  | To Date                      | VIS_ToDate
+ * 13  | Clear                        | VIS_Clear
+ * 14  | Apply                        | VIS_Apply
  * ─────────────────────────────────────────────────────────────────────
  */
-/**
- * Expected Receipts Widget
- * Purpose - Show upcoming AR receipts expected from unpaid invoice pay schedules.
- */
-
 
 ; VIS = window.VIS || {};
 
@@ -49,7 +49,14 @@
         var $next7Btn;
         var $nextMonthBtn;
 
-        var selectedFilter = "Next7Days";
+        var FilterKey = {
+            ThisMonth: "ThisMonth",
+            Next7Days: "Next7Days",
+            NextMonth: "NextMonth",
+            Custom: "Custom"
+        };
+
+        var selectedFilter = FilterKey.Next7Days;
         var customFromDate = "";
         var customToDate = "";
 
@@ -187,19 +194,19 @@
             var n = name.toString().trim();
 
             if (n === "Bank Transfer") {
-                return "NEFT expected";
+                return lbl("VIS_NEFTExpected", "NEFT expected");
             }
 
             if (n === "Direct Debit") {
-                return "UPI auto-debit";
+                return lbl("VIS_UPIAutoDebit", "UPI auto-debit");
             }
 
             if (n === "Cheque" || n === "Check") {
-                return "Cheque expected";
+                return lbl("VIS_ChequeExpected", "Cheque expected");
             }
 
             if (n === "On Credit") {
-                return "Credit expected";
+                return lbl("VIS_CreditExpected", "Credit expected");
             }
 
             return n;
@@ -243,15 +250,10 @@
 
         function formatAmount(value) {
             var absVal = Number(value || 0);
-            var stdPrecision = 2;
+            var stdPrecision = 0;
 
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            }
-            catch (e) {
-                stdPrecision = 2;
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = VIS.Env.getCtx().getStdPrecision();
             }
 
             return absVal.toLocaleString(window.navigator.language, {
@@ -290,39 +292,47 @@
         }
 
         function getSubtitle() {
-            if (selectedFilter === "Custom") {
+            if (selectedFilter === FilterKey.Custom) {
                 if (customFromDate && customToDate) {
                     return formatShortDate(customFromDate) + " - " + formatShortDate(customToDate);
                 }
 
-                return "Custom date";
+                return lbl("VIS_CustomDate", "Custom date");
             }
 
-            if (selectedFilter === "Next7Days") {
-                return "Next 7 days";
+            if (selectedFilter === FilterKey.ThisMonth) {
+                return lbl("VIS_ThisMonth", "This Month");
             }
 
-            if (selectedFilter === "NextMonth") {
-                return "Next Month";
+            if (selectedFilter === FilterKey.Next7Days) {
+                return lbl("VIS_Next7Days", "Next 7 days");
             }
 
-            return "Next 7 days";
+            if (selectedFilter === FilterKey.NextMonth) {
+                return lbl("VIS_NextMonth", "Next Month");
+            }
+
+            return lbl("VIS_Next7Days", "Next 7 days");
         }
 
         function getFilterButtonText() {
-            if (selectedFilter === "Next7Days") {
-                return "NEXT 7 DAYS ▾";
+            if (selectedFilter === FilterKey.ThisMonth) {
+                return lbl("VIS_ThisMonth", "This Month").toUpperCase() + " ▾";
             }
 
-            if (selectedFilter === "NextMonth") {
-                return "NEXT MONTH ▾";
+            if (selectedFilter === FilterKey.Next7Days) {
+                return lbl("VIS_Next7Days", "Next 7 days").toUpperCase() + " ▾";
             }
 
-            if (selectedFilter === "Custom") {
-                return "CUSTOM DATE ▾";
+            if (selectedFilter === FilterKey.NextMonth) {
+                return lbl("VIS_NextMonth", "Next Month").toUpperCase() + " ▾";
             }
 
-            return "NEXT 7 DAYS ▾";
+            if (selectedFilter === FilterKey.Custom) {
+                return lbl("VIS_CustomDate", "Custom date").toUpperCase() + " ▾";
+            }
+
+            return lbl("VIS_Next7Days", "Next 7 days").toUpperCase() + " ▾";
         }
 
         function setActiveQuickFilter() {
@@ -333,10 +343,10 @@
             $next7Btn.removeClass("active");
             $nextMonthBtn.removeClass("active");
 
-            if (selectedFilter === "Next7Days") {
+            if (selectedFilter === FilterKey.Next7Days) {
                 $next7Btn.addClass("active");
             }
-            else if (selectedFilter === "NextMonth") {
+            else if (selectedFilter === FilterKey.NextMonth) {
                 $nextMonthBtn.addClass("active");
             }
         }
@@ -433,42 +443,49 @@
                 '</div>' +
 
                 '<div class="vas-er-pager">' +
-                '<button type="button" class="vas-er-page-btn vas-er-prev" aria-label="Previous">‹</button>' +
+                '<button type="button" class="vas-er-page-btn vas-er-prev" aria-label="' + lbl("VIS_Previous", "Previous") + '">‹</button>' +
                 '<span class="vas-er-page-text"></span>' +
-                '<button type="button" class="vas-er-page-btn vas-er-next" aria-label="Next">›</button>' +
+                '<button type="button" class="vas-er-page-btn vas-er-next" aria-label="' + lbl("VIS_Next", "Next") + '">›</button>' +
                 '</div>' +
                 '</div>' +
 
                 '<div class="vas-er-filter-row">' +
-                '<button type="button" class="vas-er-filter-btn">NEXT 7 DAYS ▾</button>' +
-                '<span class="vas-er-subtitle">Next 7 days</span>' +
+                '<button type="button" class="vas-er-filter-btn">' +
+                lbl("VIS_Next7Days", "Next 7 days").toUpperCase() + ' ▾</button>' +
+                '<span class="vas-er-subtitle">' +
+                lbl("VIS_Next7Days", "Next 7 days") +
+                '</span>' +
                 '</div>' +
 
                 '<div class="vas-er-date-popup" style="display:none;">' +
                 '<button type="button" class="vas-er-popup-close">×</button>' +
 
                 '<div class="vas-er-quick-filters">' +
-                '<button type="button" class="vas-er-quick-filter vas-er-next7-btn active">Next 7 Days</button>' +
-                '<button type="button" class="vas-er-quick-filter vas-er-next-month-btn">Next Month</button>' +
+                '<button type="button" class="vas-er-quick-filter vas-er-next7-btn active">' +
+                lbl("VIS_Next7Days", "Next 7 days") +
+                '</button>' +
+                '<button type="button" class="vas-er-quick-filter vas-er-next-month-btn">' +
+                lbl("VIS_NextMonth", "Next Month") +
+                '</button>' +
                 '</div>' +
 
                 '<div class="vas-er-date-grid">' +
 
                 '<div class="vas-er-date-field">' +
-                '<label class="vas-er-date-label">From Date</label>' +
+                '<label class="vas-er-date-label">' + lbl("VIS_FromDate", "From Date") + '</label>' +
                 '<input type="date" class="vas-er-date-input vas-er-from-date" />' +
                 '</div>' +
 
                 '<div class="vas-er-date-field">' +
-                '<label class="vas-er-date-label">To Date</label>' +
+                '<label class="vas-er-date-label">' + lbl("VIS_ToDate", "To Date") + '</label>' +
                 '<input type="date" class="vas-er-date-input vas-er-to-date" />' +
                 '</div>' +
 
                 '</div>' +
 
                 '<div class="vas-er-popup-actions">' +
-                '<button type="button" class="vas-er-clear-btn">Clear</button>' +
-                '<button type="button" class="vas-er-apply-btn">Apply</button>' +
+                '<button type="button" class="vas-er-clear-btn">' + lbl("VIS_Clear", "Clear") + '</button>' +
+                '<button type="button" class="vas-er-apply-btn">' + lbl("VIS_Apply", "Apply") + '</button>' +
                 '</div>' +
                 '</div>' +
 
@@ -507,7 +524,7 @@
             });
 
             $next7Btn.on('click', function () {
-                selectedFilter = "Next7Days";
+                selectedFilter = FilterKey.Next7Days;
                 setDefaultNext7Days();
                 pageNo = 1;
                 $datePopup.hide();
@@ -515,7 +532,7 @@
             });
 
             $nextMonthBtn.on('click', function () {
-                selectedFilter = "NextMonth";
+                selectedFilter = FilterKey.NextMonth;
                 setDefaultNextMonth();
                 pageNo = 1;
                 $datePopup.hide();
@@ -523,7 +540,7 @@
             });
 
             $clearBtn.on('click', function () {
-                selectedFilter = "Next7Days";
+                selectedFilter = FilterKey.Next7Days;
                 setDefaultNext7Days();
                 pageNo = 1;
                 $datePopup.hide();
@@ -540,7 +557,7 @@
 
                 customFromDate = fromValue;
                 customToDate = toValue;
-                selectedFilter = "Custom";
+                selectedFilter = FilterKey.Custom;
                 pageNo = 1;
 
                 $datePopup.hide();
@@ -571,10 +588,10 @@
         this.refreshWidget = function () {
             pageNo = 1;
 
-            if (selectedFilter === "Next7Days") {
+            if (selectedFilter === FilterKey.Next7Days) {
                 setDefaultNext7Days();
             }
-            else if (selectedFilter === "NextMonth") {
+            else if (selectedFilter === FilterKey.NextMonth) {
                 setDefaultNextMonth();
             }
 

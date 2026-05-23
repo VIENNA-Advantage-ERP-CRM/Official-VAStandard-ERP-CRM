@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -34,8 +35,9 @@ namespace VIS.Controllers
             DateTime startDate = DateTime.Today;
             DateTime endDate = startDate.AddDays(7);
 
-            string startDateSql = DB.TO_DATE(startDate, true);
-            string endDateSql = DB.TO_DATE(endDate, true);
+            List<SqlParameter> parameters = new List<SqlParameter>();
+
+            parameters.Add(new SqlParameter("@ADUserID", ctx.GetAD_User_ID()));
 
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
@@ -97,8 +99,8 @@ namespace VIS.Controllers
                   AND InvoicePaySchedule.IsActive = 'Y'
                   AND InvoicePaySchedule.VA009_IsPaid = 'N'
 
-                  AND InvoicePaySchedule.DueDate >= " + startDateSql + @"
-                  AND InvoicePaySchedule.DueDate < " + endDateSql;
+                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
+                  AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
 
             upcomingRunsSql = MRole.GetDefault(ctx).AddAccessSQL(
                 upcomingRunsSql,
@@ -117,7 +119,7 @@ namespace VIS.Controllers
                           INNER JOIN AD_Table TableInfo
                               ON TableInfo.AD_Table_ID = PrivateAccess.AD_Table_ID
                           WHERE TableInfo.TableName = 'C_Payment'
-                            AND PrivateAccess.AD_User_ID <> " + ctx.GetAD_User_ID() + @"
+                            AND PrivateAccess.AD_User_ID <> @ADUserID
                             AND PrivateAccess.IsActive = 'Y'
                       )
                   )
@@ -130,7 +132,7 @@ namespace VIS.Controllers
                           INNER JOIN AD_Table TableInfo
                               ON TableInfo.AD_Table_ID = PrivateAccess.AD_Table_ID
                           WHERE TableInfo.TableName = 'VA009_PaymentMethod'
-                            AND PrivateAccess.AD_User_ID <> " + ctx.GetAD_User_ID() + @"
+                            AND PrivateAccess.AD_User_ID <> @ADUserID
                             AND PrivateAccess.IsActive = 'Y'
                       )
                   )
@@ -168,7 +170,7 @@ namespace VIS.Controllers
 
             try
             {
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
 
                 while (dr != null && dr.Read())
                 {
@@ -195,7 +197,7 @@ namespace VIS.Controllers
                             paymentRule = dr["PaymentRule"].ToString();
                         }
 
-                        paymentMethodName = GetPaymentRuleName(paymentRule);
+                        paymentMethodName = GetPaymentRuleName(ctx, paymentRule);
                     }
 
                     rows.Add(new
@@ -227,34 +229,37 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetPaymentRuleName(string paymentRule)
+        private static readonly Dictionary<string, (string MessageKey, string DefaultName)> PaymentRuleNames =
+             new Dictionary<string, (string MessageKey, string DefaultName)>
+             {
+                    { "B", ("DirectDebit", "Direct Debit") },
+                    { "K", ("Cheque", "Cheque") },
+                    { "S", ("Check", "Check") },
+                    { "T", ("BankTransfer", "Bank Transfer") },
+                    { "P", ("OnCredit", "On Credit") }
+             };
+
+        private string GetPaymentRuleName(Ctx ctx, string paymentRule)
         {
-            if (paymentRule == "B")
+            if (PaymentRuleNames.TryGetValue(paymentRule, out var paymentRuleInfo))
             {
-                return "Direct Debit";
+                return GetMsg(ctx, paymentRuleInfo.MessageKey, paymentRuleInfo.DefaultName);
             }
 
-            if (paymentRule == "K")
-            {
-                return "Cheque";
-            }
-
-            if (paymentRule == "S")
-            {
-                return "Check";
-            }
-
-            if (paymentRule == "T")
-            {
-                return "Bank Transfer";
-            }
-
-            if (paymentRule == "P")
-            {
-                return "On Credit";
-            }
-
-            return "Expected";
+            return GetMsg(ctx, "Expected", "Expected");
         }
+
+        private string GetMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(msg) || (msg.StartsWith("[") && msg.EndsWith("]")))
+            {
+                return fallback;
+            }
+            return msg;
+        }
+
+
+        
     }
 }

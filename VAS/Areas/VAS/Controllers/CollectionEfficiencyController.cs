@@ -1,6 +1,8 @@
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -30,24 +32,27 @@ namespace VIS.Controllers
             DateTime endDate;
             GetDateRange(filterType, fromDate, toDate, out startDate, out endDate);
 
-            string startDateSql = DB.TO_DATE(startDate, true);
-            string endDateSql = DB.TO_DATE(endDate, true);
-            string todaySql = DB.TO_DATE(DateTime.Today, true);
+            DateTime todayDate = DateTime.Today;
+
+
 
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision
                 FROM AD_ClientInfo ClientInfo
-                INNER JOIN C_AcctSchema AcctSchema ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                INNER JOIN C_Currency Currency ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+                INNER JOIN C_AcctSchema AcctSchema 
+                    ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                INNER JOIN C_Currency Currency 
+                    ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
 
             string invoiceScheduleSql = @"
                 SELECT SchemaCurrency.C_Currency_ID,
                        SchemaCurrency.StdPrecision,
                        SUM(
                            CASE
-                               WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+                               WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                               THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
                                ELSE CurrencyConvert(
                                    COALESCE(InvoicePaySchedule.DueAmt, 0),
                                    Invoice.C_Currency_ID,
@@ -59,13 +64,15 @@ namespace VIS.Controllers
                                )
                            END
                        ) AS TotalDueAmount,
+
                        SUM(
                            CASE
                                WHEN InvoicePaySchedule.VA009_IsPaid = 'N'
-                                AND InvoicePaySchedule.DueDate < " + todaySql + @"
+                                AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(todayDate) + @"
                                THEN
                                    CASE
-                                       WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+                                       WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                                       THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
                                        ELSE CurrencyConvert(
                                            COALESCE(InvoicePaySchedule.DueAmt, 0),
                                            Invoice.C_Currency_ID,
@@ -79,21 +86,26 @@ namespace VIS.Controllers
                                ELSE 0
                            END
                        ) AS OverdueAmount,
+
                        COUNT(DISTINCT CASE
                            WHEN InvoicePaySchedule.VA009_IsPaid = 'N'
-                            AND InvoicePaySchedule.DueDate < " + todaySql + @"
+                            AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(todayDate) + @"
                            THEN Invoice.C_Invoice_ID
                            ELSE NULL
                        END) AS OverdueInvoiceCount
+
                 FROM C_Invoice Invoice
-                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON InvoicePaySchedule.C_Invoice_ID = Invoice.C_Invoice_ID
-                INNER JOIN SchemaCurrency SchemaCurrency ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+                INNER JOIN C_InvoicePaySchedule InvoicePaySchedule 
+                    ON InvoicePaySchedule.C_Invoice_ID = Invoice.C_Invoice_ID
+                INNER JOIN SchemaCurrency SchemaCurrency 
+                    ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+
                 WHERE Invoice.IsSoTrx = 'Y'
                   AND Invoice.IsActive = 'Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND InvoicePaySchedule.IsActive = 'Y'
-                  AND InvoicePaySchedule.DueDate >= " + startDateSql + @"
-                  AND InvoicePaySchedule.DueDate < " + endDateSql;
+                   AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
+                   AND " + WidgetDateSqlHelper.TruncColumn("InvoicePaySchedule.DueDate") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
 
             invoiceScheduleSql = MRole.GetDefault(ctx).AddAccessSQL(
                 invoiceScheduleSql,
@@ -111,7 +123,8 @@ namespace VIS.Controllers
                        CASE
                            WHEN SUM(
                                CASE
-                                   WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(AllocationLine.Amount, 0)
+                                   WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                                   THEN COALESCE(AllocationLine.Amount, 0)
                                    ELSE CurrencyConvert(
                                        COALESCE(AllocationLine.Amount, 0),
                                        AllocationHdr.C_Currency_ID,
@@ -127,7 +140,8 @@ namespace VIS.Controllers
                                SUM(
                                    (
                                        CASE
-                                           WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(AllocationLine.Amount, 0)
+                                           WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                                           THEN COALESCE(AllocationLine.Amount, 0)
                                            ELSE CurrencyConvert(
                                                COALESCE(AllocationLine.Amount, 0),
                                                AllocationHdr.C_Currency_ID,
@@ -139,11 +153,12 @@ namespace VIS.Controllers
                                            )
                                        END
                                    ) * (
-                                       CAST(AllocationHdr.DateAcct AS DATE) - CAST(Invoice.DateInvoiced AS DATE)
+                                       " + WidgetDateSqlHelper.AllocationToInvoiceDayDiffSql() + @"
                                    )
                                ) / SUM(
                                    CASE
-                                       WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(AllocationLine.Amount, 0)
+                                       WHEN AllocationHdr.C_Currency_ID = SchemaCurrency.C_Currency_ID 
+                                       THEN COALESCE(AllocationLine.Amount, 0)
                                        ELSE CurrencyConvert(
                                            COALESCE(AllocationLine.Amount, 0),
                                            AllocationHdr.C_Currency_ID,
@@ -158,17 +173,23 @@ namespace VIS.Controllers
                                0
                            )
                        END AS DsoDays
+
                 FROM C_Invoice Invoice
-                INNER JOIN C_AllocationLine AllocationLine ON AllocationLine.C_Invoice_ID = Invoice.C_Invoice_ID AND AllocationLine.IsActive = 'Y'
-                INNER JOIN C_AllocationHdr AllocationHdr ON AllocationLine.C_AllocationHdr_ID = AllocationHdr.C_AllocationHdr_ID
-                INNER JOIN SchemaCurrency SchemaCurrency ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+                INNER JOIN C_AllocationLine AllocationLine 
+                    ON AllocationLine.C_Invoice_ID = Invoice.C_Invoice_ID 
+                   AND AllocationLine.IsActive = 'Y'
+                INNER JOIN C_AllocationHdr AllocationHdr 
+                    ON AllocationLine.C_AllocationHdr_ID = AllocationHdr.C_AllocationHdr_ID
+                INNER JOIN SchemaCurrency SchemaCurrency 
+                    ON SchemaCurrency.AD_Client_ID = Invoice.AD_Client_ID
+
                 WHERE Invoice.IsSoTrx = 'Y'
                   AND Invoice.IsActive = 'Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND AllocationHdr.IsActive = 'Y'
                   AND AllocationHdr.DocStatus IN ('CO', 'CL')
-                  AND AllocationHdr.DateAcct >= " + startDateSql + @"
-                  AND AllocationHdr.DateAcct < " + endDateSql;
+                   AND " + WidgetDateSqlHelper.TruncColumn("AllocationHdr.DateAcct") + @" >= " + WidgetDateSqlHelper.ToSqlDate(startDate) + @"
+                   AND " + WidgetDateSqlHelper.TruncColumn("AllocationHdr.DateAcct") + @" < " + WidgetDateSqlHelper.ToSqlDate(endDate);
 
             dsoSql = MRole.GetDefault(ctx).AddAccessSQL(
                 dsoSql,
@@ -216,7 +237,8 @@ namespace VIS.Controllers
                            )
                        END AS CollectionEfficiencyPercent
                 FROM InvoiceScheduleData
-                LEFT OUTER JOIN DsoData ON InvoiceScheduleData.C_Currency_ID = DsoData.C_Currency_ID";
+                LEFT OUTER JOIN DsoData 
+                    ON InvoiceScheduleData.C_Currency_ID = DsoData.C_Currency_ID";
 
             int currencyId = 0;
             decimal overdueAmount = 0;
@@ -300,13 +322,13 @@ namespace VIS.Controllers
 
             if (selectedFilter == "Custom")
             {
-                DateTime parsedFromDate;
-                DateTime parsedToDate;
+                DateTime? parsedFromDate = Util.GetValueOfDateTime(fromDate);
+                DateTime? parsedToDate = Util.GetValueOfDateTime(toDate);
 
-                if (DateTime.TryParse(fromDate, out parsedFromDate) && DateTime.TryParse(toDate, out parsedToDate))
+                if (parsedFromDate.HasValue && parsedToDate.HasValue)
                 {
-                    startDate = parsedFromDate.Date;
-                    endDate = parsedToDate.Date.AddDays(1);
+                    startDate = parsedFromDate.Value.Date;
+                    endDate = parsedToDate.Value.Date.AddDays(1);
                     return;
                 }
             }
