@@ -1,0 +1,194 @@
+/* ============================================================
+   VAS_TotalPurchasesWidget — scoped styles
+   All custom tokens are prefixed vas-tpwidg- to avoid
+   clashing with app-shell or parent-page variables.
+   Content uses em units so the widget scales gracefully.
+   Base font-size is set on .vas-tpwidg-container and all
+   inner sizes derive from it.
+   ============================================================ */
+
+.vas-tpwidg-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-tpwidg-container {
+    height: 100%;
+    width: 100%;
+    padding: 1em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    font-size: 14px;
+    /* Pale blue info-variant background per design system KPI rule */
+    background: linear-gradient(148deg, rgba(234, 248, 255, .9), rgba(255, 255, 255, .6));
+    border-radius: 0.85em;
+    box-sizing: border-box;
+}
+
+/* ---- Label (top) ---- */
+.vas-tpwidg-label {
+    font-size: 0.86em;
+    font-weight: 400;
+    color: #5F7283;
+    font-family: Roboto, sans-serif;
+    line-height: 1.3;
+    margin-bottom: 0.15em;
+}
+
+/* ---- Primary KPI value ---- */
+.vas-tpwidg-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #0B5EA8;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.3em;
+    font-family: Roboto, sans-serif;
+}
+
+/* ---- Pills row ---- */
+.vas-tpwidg-pills-row {
+    display: flex;
+    gap: 0.45em;
+    flex-wrap: wrap;
+    margin-bottom: 0.35em;
+}
+
+.vas-tpwidg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    padding: 0.22em 0.65em;
+    font-size: 0.78em;
+    font-family: Roboto, sans-serif;
+    white-space: nowrap;
+}
+
+.vas-tpwidg-pill-label {
+    color: #5F7283;
+    font-weight: 400;
+    font-size: 0.95em;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.vas-tpwidg-pill-value {
+    color: #102C3F;
+    font-weight: 700;
+}
+
+/* ---- Trend row (bottom-left) ---- */
+.vas-tpwidg-trend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.8em;
+    font-family: Roboto, sans-serif;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.vas-tpwidg-trend-icon {
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+}
+
+.vas-tpwidg-trend-up {
+    color: #019D89;
+}
+
+.vas-tpwidg-trend-down {
+    color: #ED1C24;
+}
+
+/* ---- Sparkline (bottom-right, decorative) ---- */
+.vas-tpwidg-sparkline {
+    position: absolute;
+    bottom: 0.4em;
+    right: 0.5em;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ============================================================
+   Responsive — matches the pattern in VAS_ProductWidgets.css
+   ============================================================ */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .vas-tpwidg-container {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .vas-tpwidg-container {
+        font-size: 12px;
+    }
+
+    .vis-editModeWidget .vas-tpwidg-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-tpwidg-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-tpwidg-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 900px) {
+    .vas-tpwidg-container {
+        font-size: 11px;
+    }
+
+    .vis-editModeWidget .vas-tpwidg-container {
+        font-size: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-tpwidg-container {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .vas-tpwidg-container {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .vas-tpwidg-container {
+        font-size: 9px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-tpwidg-container {
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 320px) {
+    .vas-tpwidg-container {
+        font-size: 9px;
+    }
+}

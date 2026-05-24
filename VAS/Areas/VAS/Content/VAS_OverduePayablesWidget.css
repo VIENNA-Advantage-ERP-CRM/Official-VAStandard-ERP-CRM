@@ -1,0 +1,154 @@
+/* ==========================================================
+   VAS Overdue Payables Widget  —  vas-opwdg-* namespace
+   ========================================================== */
+
+.vas-opwdg-root {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-opwdg-container {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 1.14em 1.14em 1.28em;
+    background: linear-gradient(148deg, rgba(255, 242, 218, .9), rgba(255, 255, 255, .6));
+    border-radius: 12px;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+
+
+.vas-opwdg-label {
+    font-size: 0.86em;
+    color: #5F7283;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.36em;
+    line-height: 1.2;
+}
+
+.vas-opwdg-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #D78B10;
+    line-height: 1.15;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.01em;
+}
+
+/* ---- Pills row ---- */
+.vas-opwdg-pills-row {
+    display: flex;
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+    flex-wrap: wrap;
+}
+
+.vas-opwdg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid #F5D98A;
+    border-radius: 999px;
+    padding: 0.28em 0.7em;
+    font-size: 0.78em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-opwdg-pill-label {
+    color: #748494;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.85em;
+}
+
+.vas-opwdg-pill-value {
+    color: #9A6500;
+    font-weight: 700;
+}
+
+/* ---- Trend row ---- */
+.vas-opwdg-trend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.78em;
+    font-weight: 600;
+    padding-top: 0.3em;
+}
+
+/* Critical = danger red (financial health going down) */
+.vas-opwdg-trend-down {
+    color: #D14545;
+}
+
+/* Improving = success green */
+.vas-opwdg-trend-up {
+    color: #019D89;
+}
+
+.vas-opwdg-trend-icon {
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+}
+
+/* ---- Sparkline (bottom-right corner, decorative) ---- */
+.vas-opwdg-sparkline {
+    position: absolute;
+    bottom: 0.4em;
+    right: 0.5em;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1920px) {
+    .vas-opwdg-container { font-size: 14px; }
+}
+
+@media (max-width: 1366px) {
+    .vas-opwdg-container { font-size: 13px; }
+}
+
+@media (max-width: 1024px) {
+    .vas-opwdg-container { font-size: 12px; }
+}
+
+@media (max-width: 900px) {
+    .vas-opwdg-container { font-size: 11.5px; }
+}
+
+@media (max-width: 768px) {
+    .vas-opwdg-container { font-size: 11px; }
+    .vas-opwdg-pills-row { gap: 0.35em; }
+}
+
+@media (max-width: 680px) {
+    .vas-opwdg-container { font-size: 10.5px; }
+}
+
+@media (max-width: 480px) {
+    .vas-opwdg-container { font-size: 10px; }
+    .vas-opwdg-value { font-size: 2em; }
+}
+
+@media (max-width: 320px) {
+    .vas-opwdg-container { font-size: 9px; }
+}

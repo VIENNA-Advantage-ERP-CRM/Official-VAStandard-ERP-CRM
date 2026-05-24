@@ -1,0 +1,217 @@
+/* ==========================================================
+   VAS Top Five Vendors Widget  —  vas-t5vwdg-* namespace
+   ========================================================== */
+
+.vas-t5vwdg-root {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-t5vwdg-container {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em 1.14em 0.86em;
+    background: linear-gradient(148deg, rgba(220, 240, 255, .90), rgba(255, 255, 255, .60));
+    border-radius: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ---- Header ---- */
+.vas-t5vwdg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.55em;
+    flex-shrink: 0;
+}
+
+.vas-t5vwdg-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.86em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-t5vwdg-title-icon {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    color: #5F7283;
+}
+
+.vas-t5vwdg-fy-chip {
+    flex-shrink: 0;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #0E5DA8;
+    background: #DFF1FF;
+    border-radius: 999px;
+    padding: 0.15em 0.65em;
+    white-space: nowrap;
+    border: 1px solid #BFE4FF;
+}
+
+/* ---- Vendor list ---- */
+.vas-t5vwdg-list {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0.45em;
+}
+
+.vas-t5vwdg-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.28em 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.vas-t5vwdg-row:last-child {
+    border-bottom: none;
+}
+
+.vas-t5vwdg-rank {
+    flex-shrink: 0;
+    width: 1.1em;
+    font-size: 0.72em;
+    font-weight: 700;
+    color: #9FB3C8;
+    text-align: right;
+}
+
+.vas-t5vwdg-avatar {
+    flex-shrink: 0;
+    width: 1.9em;
+    height: 1.9em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.vas-t5vwdg-avatar--r1 { background: #EAF8FF; color: #0E5DA8; }
+.vas-t5vwdg-avatar--r2 { background: #EEEAFF; color: #4A3A9A; }
+.vas-t5vwdg-avatar--r3 { background: #FFF0D0; color: #7A4A00; }
+.vas-t5vwdg-avatar--r4 { background: #FAD7D7; color: #8F2D2D; }
+.vas-t5vwdg-avatar--r5 { background: #CCEFDD; color: #0C5D38; }
+
+.vas-t5vwdg-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas-t5vwdg-name {
+    font-size: 0.80em;
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-cat {
+    font-size: 0.68em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-metrics {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.vas-t5vwdg-amt {
+    font-size: 0.80em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.vas-t5vwdg-yoy {
+    font-size: 0.68em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vas-t5vwdg-yoy-pos { color: #019D89; }
+.vas-t5vwdg-yoy-neg { color: #ED1C24; }
+
+/* ---- Divider ---- */
+.vas-t5vwdg-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.09);
+    flex-shrink: 0;
+    margin-bottom: 0.38em;
+}
+
+/* ---- Chart section header ---- */
+.vas-t5vwdg-chart-header {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #5F7283;
+    flex-shrink: 0;
+    margin-bottom: 0.25em;
+}
+
+.vas-t5vwdg-chart-icon {
+    width: 0.95em;
+    height: 0.95em;
+    flex-shrink: 0;
+    color: #5F7283;
+}
+
+/* ---- Canvas ---- */
+.vas-t5vwdg-chart-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}
+
+.vas-t5vwdg-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1920px) { .vas-t5vwdg-container { font-size: 14px; } }
+@media (max-width: 1366px) { .vas-t5vwdg-container { font-size: 13px; } }
+@media (max-width: 1024px) { .vas-t5vwdg-container { font-size: 12px; } }
+@media (max-width: 900px)  { .vas-t5vwdg-container { font-size: 11.5px; } }
+@media (max-width: 768px)  { .vas-t5vwdg-container { font-size: 11px; } }
+@media (max-width: 680px)  { .vas-t5vwdg-container { font-size: 10.5px; } }
+@media (max-width: 480px)  { .vas-t5vwdg-container { font-size: 10px; } }
+@media (max-width: 320px)  { .vas-t5vwdg-container { font-size: 9px; } }

@@ -1,0 +1,243 @@
+/* ==========================================================
+   VAS Payable Aging Widget  —  vas-pawdg-* namespace
+   ========================================================== */
+
+.vas-pawdg-root {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-pawdg-container {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.14em 1.14em 1.28em;
+    background: linear-gradient(148deg, rgba(215, 245, 250, .9), rgba(255, 255, 255, .6));
+    border-radius: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ---- Section headers ---- */
+.vas-pawdg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.72em;
+}
+
+.vas-pawdg-title,
+.vas-pawdg-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.86em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-pawdg-section-header {
+    margin-bottom: 0.5em;
+}
+
+.vas-pawdg-title-icon {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    color: #5F7283;
+}
+
+/* ---- Overdue chip ---- */
+.vas-pawdg-chip {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid #F5D98A;
+    border-radius: 999px;
+    padding: 0.25em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #9A6500;
+    white-space: nowrap;
+}
+
+/* ---- Aging bars ---- */
+.vas-pawdg-aging-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.46em;
+    margin-bottom: 0.3em;
+}
+
+.vas-pawdg-aging-row {
+    display: grid;
+    grid-template-columns: 2.6em 1fr 3.8em 2.6em;
+    align-items: center;
+    gap: 0.45em;
+}
+
+.vas-pawdg-ag-lbl {
+    font-size: 0.76em;
+    color: #5F7283;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vas-pawdg-ag-track {
+    height: 0.38em;
+    background: rgba(0, 0, 0, 0.07);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas-pawdg-ag-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vas-pawdg-ag-fill--green  { background: #20A464; }
+.vas-pawdg-ag-fill--amber  { background: #D78B10; }
+.vas-pawdg-ag-fill--orange { background: #ED8B3A; }
+.vas-pawdg-ag-fill--red    { background: #ED1C24; }
+
+.vas-pawdg-ag-val {
+    font-size: 0.76em;
+    font-weight: 700;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.vas-pawdg-ag-cnt {
+    font-size: 0.72em;
+    color: #748494;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ---- Divider ---- */
+.vas-pawdg-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.07);
+    margin: 0.55em 0 0.65em;
+}
+
+/* ---- Donut chart (Chart.js) ---- */
+.vas-pawdg-health-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.6em;
+}
+
+.vas-pawdg-donut-wrap {
+    position: relative;
+    width: 8em;
+    height: 8em;
+}
+
+.vas-pawdg-donut-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ---- Legend rows ---- */
+.vas-pawdg-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: auto;
+}
+
+.vas-pawdg-legend-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8em;
+    padding: 0.32em 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.vas-pawdg-legend-row:last-child {
+    border-bottom: none;
+}
+
+.vas-pawdg-legend-lhs {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+}
+
+.vas-pawdg-legend-dot {
+    display: inline-block;
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 0.15em;
+    flex-shrink: 0;
+}
+
+.vas-pawdg-dot--ok   { background: #20A464; }
+.vas-pawdg-dot--info { background: #0083DA; }
+.vas-pawdg-dot--err  { background: #D14545; }
+
+.vas-pawdg-legend-label {
+    color: #5F7283;
+    font-weight: 400;
+}
+
+.vas-pawdg-legend-value {
+    font-weight: 700;
+}
+
+.vas-pawdg-lv-ok   { color: #019D89; }
+.vas-pawdg-lv-info { color: #0083DA; }
+.vas-pawdg-lv-err  { color: #D14545; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1920px) {
+    .vas-pawdg-container { font-size: 14px; }
+}
+
+@media (max-width: 1366px) {
+    .vas-pawdg-container { font-size: 13px; }
+}
+
+@media (max-width: 1024px) {
+    .vas-pawdg-container { font-size: 12px; }
+}
+
+@media (max-width: 900px) {
+    .vas-pawdg-container { font-size: 11.5px; }
+}
+
+@media (max-width: 768px) {
+    .vas-pawdg-container { font-size: 11px; }
+}
+
+@media (max-width: 680px) {
+    .vas-pawdg-container { font-size: 10.5px; }
+}
+
+@media (max-width: 480px) {
+    .vas-pawdg-container { font-size: 10px; }
+}
+
+@media (max-width: 320px) {
+    .vas-pawdg-container { font-size: 9px; }
+}

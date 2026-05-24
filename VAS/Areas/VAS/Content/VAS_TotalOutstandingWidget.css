@@ -1,0 +1,151 @@
+/* ==========================================================
+   VAS Total Outstanding Widget  —  vas-towdg-* namespace
+   ========================================================== */
+
+.vas-towdg-root {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-towdg-container {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 1.14em 1.14em 1.28em;
+    background: linear-gradient(148deg, rgba(255, 228, 228, .9), rgba(255, 255, 255, .6));
+    border-radius: 12px;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+
+.vas-towdg-label {
+    font-size: 0.86em;
+    color: #5F7283;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.36em;
+    line-height: 1.2;
+}
+
+.vas-towdg-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #D14545;
+    line-height: 1.15;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.01em;
+}
+
+/* ---- Pills row ---- */
+.vas-towdg-pills-row {
+    display: flex;
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+    flex-wrap: wrap;
+}
+
+.vas-towdg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid #FFBFBF;
+    border-radius: 999px;
+    padding: 0.28em 0.7em;
+    font-size: 0.78em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-towdg-pill-label {
+    color: #748494;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.85em;
+}
+
+.vas-towdg-pill-value {
+    color: #A33F3F;
+    font-weight: 700;
+}
+
+/* ---- Trend row ---- */
+.vas-towdg-trend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.78em;
+    font-weight: 600;
+    padding-top: 0.3em;
+}
+
+.vas-towdg-trend-up {
+    color: #019D89;
+}
+
+.vas-towdg-trend-down {
+    color: #D14545;
+}
+
+.vas-towdg-trend-icon {
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+}
+
+/* ---- Sparkline ---- */
+.vas-towdg-sparkline {
+    position: absolute;
+    bottom: 0.6em;
+    right: 0.6em;
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1920px) {
+    .vas-towdg-container { font-size: 14px; }
+}
+
+@media (max-width: 1366px) {
+    .vas-towdg-container { font-size: 13px; }
+}
+
+@media (max-width: 1024px) {
+    .vas-towdg-container { font-size: 12px; }
+}
+
+@media (max-width: 900px) {
+    .vas-towdg-container { font-size: 11.5px; }
+}
+
+@media (max-width: 768px) {
+    .vas-towdg-container { font-size: 11px; }
+    .vas-towdg-pills-row { gap: 0.35em; }
+}
+
+@media (max-width: 680px) {
+    .vas-towdg-container { font-size: 10.5px; }
+}
+
+@media (max-width: 480px) {
+    .vas-towdg-container { font-size: 10px; }
+    .vas-towdg-value { font-size: 2em; }
+}
+
+@media (max-width: 320px) {
+    .vas-towdg-container { font-size: 9px; }
+}
