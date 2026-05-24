@@ -1,0 +1,309 @@
+.vas-payment-methods-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    font-family: Roboto, Arial, sans-serif;
+    overflow: hidden;
+}
+
+    .vas-payment-methods-root,
+    .vas-payment-methods-root * {
+        box-sizing: border-box;
+    }
+
+.vas-payment-methods-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border-radius: 14px;
+    border: 2px solid #ffffff;
+    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58) );
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102c3f;
+}
+
+.vas-payment-methods-head {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+
+.vas-payment-methods-icon-box {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #dff1ff, #bfe4ff);
+    color: #0083da;
+}
+
+.vas-payment-methods-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
+    color: currentColor;
+}
+
+.vas-payment-methods-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.2px;
+    color: #102c3f;
+}
+
+.vas-payment-methods-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    overflow: hidden;
+}
+
+.vas-payment-methods-row {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vas-payment-methods-row-top {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vas-payment-methods-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: #102c3f;
+}
+
+.vas-payment-methods-percent {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    color: #102c3f;
+}
+
+.vas-payment-methods-track {
+    width: 100%;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #edf2f6;
+}
+
+.vas-payment-methods-fill {
+    height: 100%;
+    width: 0;
+    max-width: 100%;
+    border-radius: 999px;
+    transition: width 600ms ease;
+    background: linear-gradient(90deg, #1f83ff, #0083da);
+}
+
+.vas-payment-methods-fill-neft,
+.vas-payment-methods-fill-rtgs {
+    background: linear-gradient(90deg, #1f83ff, #0083da);
+}
+
+.vas-payment-methods-fill-upi {
+    background: linear-gradient(90deg, #8b7cff, #5f4aa6);
+}
+
+.vas-payment-methods-fill-card {
+    background: linear-gradient(90deg, #f0b055, #d78b10);
+}
+
+.vas-payment-methods-fill-cheque {
+    background: linear-gradient(90deg, #e78989, #d14545);
+}
+
+.vas-payment-methods-foot {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #edf2f6;
+    overflow: hidden;
+    font-size: 12px;
+    color: #586575;
+}
+
+.vas-payment-methods-why-tag {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: rgba(0, 131, 218, 0.08);
+    color: #0083da;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.vas-payment-methods-foot-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.25;
+    color: #586575;
+}
+
+.vas-payment-methods-state {
+    width: 100%;
+    padding: 24px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #748494;
+}
+
+@media (max-width: 360px), (max-height: 260px) {
+    .vas-payment-methods-card {
+        padding: 14px;
+        border-radius: 14px;
+    }
+
+    .vas-payment-methods-head {
+        margin-bottom: 10px;
+    }
+
+    .vas-payment-methods-icon-box {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+    }
+
+    .vas-payment-methods-icon {
+        width: 13px;
+        height: 13px;
+    }
+
+    .vas-payment-methods-title {
+        font-size: 15px;
+    }
+
+    .vas-payment-methods-body {
+        gap: 12px;
+    }
+
+    .vas-payment-methods-name,
+    .vas-payment-methods-percent {
+        font-size: 12px;
+    }
+
+    .vas-payment-methods-track {
+        height: 5px;
+    }
+
+    .vas-payment-methods-foot {
+        margin-top: 10px;
+        padding-top: 10px;
+        gap: 6px;
+    }
+
+    .vas-payment-methods-foot-text {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 260px), (max-height: 180px) {
+    .vas-payment-methods-card {
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .vas-payment-methods-head {
+        margin-bottom: 8px;
+        gap: 8px;
+    }
+
+    .vas-payment-methods-icon-box {
+        width: 24px;
+        height: 24px;
+    }
+
+    .vas-payment-methods-title {
+        font-size: 13px;
+    }
+
+    .vas-payment-methods-body {
+        gap: 9px;
+    }
+
+    .vas-payment-methods-name,
+    .vas-payment-methods-percent {
+        font-size: 11px;
+    }
+
+    .vas-payment-methods-track {
+        height: 4px;
+    }
+
+    .vas-payment-methods-foot {
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+
+    .vas-payment-methods-why-tag {
+        padding: 2px 6px;
+        font-size: 8px;
+        letter-spacing: 1.1px;
+    }
+
+    .vas-payment-methods-foot-text {
+        font-size: 10px;
+    }
+}

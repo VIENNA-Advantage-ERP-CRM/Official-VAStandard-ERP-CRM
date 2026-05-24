@@ -12,3 +12,15 @@
 @import "../VAS_HighestSellingWidget.css";
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
+
+
+@import "../ClearedAPPaymentWidget.css";
+@import "../PaidThisMonthWidget.css";
+@import "../ScheduledAPPaymentWidget.css";
+@import "../BouncedAPPaymentWidget.css";
+@import "../UpcomingAPRunsWidget.css";
+@import "../RecentAPPaymentsWidget.css";
+
+@import "../PaymentMethodsWidget.css";
+@import "../ReconciliationStatusWidget.css";
+

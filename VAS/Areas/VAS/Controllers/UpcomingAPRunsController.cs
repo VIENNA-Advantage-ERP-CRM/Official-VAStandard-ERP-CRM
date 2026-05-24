@@ -1,0 +1,200 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Web.Mvc;
+using VAdvantage.Classes;
+using VAdvantage.DataBase;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
+
+namespace VIS.Controllers
+{
+    public class UpcomingAPRunsController : Controller
+    {
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetUpcomingAPRuns()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = "Session Expired",
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            IDataReader dr = null;
+
+            try
+            {
+                DateTime dateFrom = DateTime.Today;
+                DateTime dateTo = dateFrom.AddDays(7);
+
+                bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
+
+                string paymentMethodSelect = hasPaymentMethod
+                    ? @"
+                        inv.VA009_PaymentMethod_ID AS PaymentMethod_ID,
+                        pm.Name AS PaymentMethodName,"
+                    : @"
+                        0 AS PaymentMethod_ID,
+                        inv.PaymentRule AS PaymentMethodName,";
+
+                string paymentMethodJoin = hasPaymentMethod
+                    ? @"
+                    LEFT OUTER JOIN VA009_PaymentMethod pm ON (inv.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)"
+                    : string.Empty;
+
+                string invoiceBody = @"
+                    SELECT
+                        inv.C_Invoice_ID,
+                        inv.C_BPartner_ID,
+                        bp.Name AS VendorName,
+                        COALESCE(ips.DueDate, inv.DateAcct) AS DueDate,
+                        inv.C_Currency_ID,
+                        cur.ISO_Code AS CurrencyISO,
+                        cur.CurSymbol AS CurrencySymbol,"
+                        + paymentMethodSelect + @"
+                        CASE
+                            WHEN (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) <= 0 THEN 0
+                            WHEN ips.C_InvoicePaySchedule_ID IS NOT NULL
+                                AND COALESCE(ips.DueAmt,0) > 0
+                                AND ips.DueAmt < (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) THEN ips.DueAmt
+                            ELSE (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0))
+                        END AS OpenAmount
+                    FROM C_Invoice inv
+                    INNER JOIN C_BPartner bp ON (inv.C_BPartner_ID=bp.C_BPartner_ID)
+                    LEFT OUTER JOIN C_InvoicePaySchedule ips ON (inv.C_Invoice_ID=ips.C_Invoice_ID AND ips.IsActive='Y')
+                    LEFT OUTER JOIN (
+                        SELECT
+                            al.C_Invoice_ID,
+                            SUM(COALESCE(al.Amount,0)+COALESCE(al.DiscountAmt,0)+COALESCE(al.WriteOffAmt,0)) AS AllocatedAmt
+                        FROM C_AllocationLine al
+                        INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID)
+                        WHERE ah.IsActive='Y'
+                        AND ah.DocStatus IN ('CO', 'CL')
+                        GROUP BY al.C_Invoice_ID
+                    ) alloc ON (inv.C_Invoice_ID=alloc.C_Invoice_ID)
+                    LEFT OUTER JOIN C_Currency cur ON (inv.C_Currency_ID=cur.C_Currency_ID)"
+                    + paymentMethodJoin + @"
+                    WHERE inv.IsActive='Y'
+                    AND inv.IsSOTrx='N'
+                    AND inv.DocStatus IN ('CO', 'CL')
+                    AND COALESCE(ips.DueDate, inv.DateAcct)>=@DateFrom
+                    AND COALESCE(ips.DueDate, inv.DateAcct)<@DateTo
+                    AND (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) > 0
+                ";
+
+                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(invoiceBody, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+                string sql = @"
+                    WITH UpcomingInvoices AS (
+                        " + invoiceBody + @"
+                    )
+                    SELECT
+                        DueDate,
+                        PaymentMethod_ID,
+                        PaymentMethodName,
+                        C_Currency_ID,
+                        CurrencyISO,
+                        CurrencySymbol,
+                        COUNT(1) AS PaymentCount,
+                        MIN(VendorName) AS VendorName,
+                        SUM(OpenAmount) AS TotalAmount
+                    FROM UpcomingInvoices
+                    WHERE OpenAmount > 0
+                    GROUP BY
+                        DueDate,
+                        PaymentMethod_ID,
+                        PaymentMethodName,
+                        C_Currency_ID,
+                        CurrencyISO,
+                        CurrencySymbol
+                    ORDER BY DueDate ASC, SUM(OpenAmount) DESC
+                ";
+
+                List<SqlParameter> parameters = new List<SqlParameter>
+                {
+                    new SqlParameter("@DateFrom", dateFrom),
+                    new SqlParameter("@DateTo", dateTo)
+                };
+
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+
+                List<object> runs = new List<object>();
+
+                while (dr.Read())
+                {
+                    string paymentMethodName = Util.GetValueOfString(dr["PaymentMethodName"]);
+
+                    if (string.IsNullOrEmpty(paymentMethodName))
+                    {
+                        paymentMethodName = GetMsg(ctx, "VAS_NotSpecified", "Not Specified");
+                    }
+
+                    runs.Add(new
+                    {
+                        dueDate = Util.GetValueOfDateTime(dr["DueDate"]),
+                        paymentMethodId = Util.GetValueOfInt(dr["PaymentMethod_ID"]),
+                        paymentMethodName = paymentMethodName,
+                        paymentCount = Util.GetValueOfInt(dr["PaymentCount"]),
+                        vendorName = Util.GetValueOfString(dr["VendorName"]),
+                        totalAmount = Util.GetValueOfDecimal(dr["TotalAmount"]),
+                        cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
+                        currencyISO = Util.GetValueOfString(dr["CurrencyISO"]),
+                        currencySymbol = Util.GetValueOfString(dr["CurrencySymbol"])
+                    });
+                }
+
+                return Json(new
+                {
+                    title = GetMsg(ctx, "VAS_UpcomingRuns", "Upcoming runs"),
+                    subTitle = GetMsg(ctx, "VAS_Next7Days", "Next 7 days"),
+                    dateFrom = dateFrom,
+                    dateTo = dateTo.AddDays(-1),
+                    runs = runs
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    error = ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        private bool HasInvoicePaymentMethodColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
+                WHERE t.TableName='C_Invoice'
+                AND c.ColumnName='VA009_PaymentMethod_ID'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private string GetMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+            return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
+                ? msg
+                : fallback;
+        }
+    }
+}

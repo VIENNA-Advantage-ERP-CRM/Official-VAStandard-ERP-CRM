@@ -1,0 +1,435 @@
+.vas-recent-ap-payments-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    font-family: Roboto, Arial, sans-serif;
+    overflow: hidden;
+}
+
+    .vas-recent-ap-payments-root,
+    .vas-recent-ap-payments-root * {
+        box-sizing: border-box;
+    }
+
+.vas-recent-ap-payments-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border-radius: 14px;
+    border: 2px solid #ffffff;
+    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58) );
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102c3f;
+}
+
+.vas-recent-ap-payments-head {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.vas-recent-ap-payments-title-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vas-recent-ap-payments-icon-box {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #dff1ff, #bfe4ff);
+    color: #0083da;
+}
+
+.vas-recent-ap-payments-icon {
+    width: 14px;
+    height: 14px;
+    display: block;
+    color: currentColor;
+}
+
+.vas-recent-ap-payments-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.2px;
+    color: #102c3f;
+}
+
+.vas-recent-ap-payments-new {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #0083da;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+    .vas-recent-ap-payments-new:hover {
+        background: rgba(0, 131, 218, 0.06);
+        color: #0069ae;
+    }
+
+.vas-recent-ap-payments-banner {
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 10px;
+    border: 1px solid #bfe4ff;
+    background: linear-gradient(135deg, #eaf8ff 0%, #dcf1ff 100%);
+}
+
+.vas-recent-ap-payments-banner-icon {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    color: #0083da;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.15);
+}
+
+    .vas-recent-ap-payments-banner-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas-recent-ap-payments-banner-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-recent-ap-payments-banner-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #0e5da8;
+}
+
+.vas-recent-ap-payments-banner-sub {
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.25;
+    color: #5f7283;
+}
+
+.vas-recent-ap-payments-review {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid #bfe4ff;
+    background: #ffffff;
+    color: #0083da;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+    .vas-recent-ap-payments-review:hover {
+        background: #f2f9ff;
+    }
+
+.vas-recent-ap-payments-table-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    margin: 0 -4px;
+    padding: 0 4px;
+}
+
+    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar-thumb {
+        background: rgba(16, 44, 63, 0.15);
+        border-radius: 4px;
+    }
+
+.vas-recent-ap-payments-table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .vas-recent-ap-payments-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 10px 8px;
+        border-bottom: 1px solid #edf2f6;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(6px);
+        color: #748494;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.2;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        text-align: left;
+    }
+
+    .vas-recent-ap-payments-table td {
+        padding: 12px 8px;
+        border-bottom: 1px solid #edf2f6;
+        color: #102c3f;
+        font-size: 14px;
+        line-height: 1.25;
+        vertical-align: middle;
+    }
+
+    .vas-recent-ap-payments-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .vas-recent-ap-payments-table tr:hover td {
+        background: rgba(31, 131, 255, 0.04);
+    }
+
+.vas-recent-ap-payments-date {
+    width: 12%;
+    color: #5f7283;
+    white-space: nowrap;
+}
+
+.vas-recent-ap-payments-vendor {
+    width: 24%;
+    font-weight: 700;
+}
+
+.vas-recent-ap-payments-method-col {
+    width: 13%;
+}
+
+.vas-recent-ap-payments-ref {
+    width: 18%;
+    color: #5f7283;
+    font-family: "Roboto Mono", Consolas, monospace;
+    font-size: 12px;
+}
+
+.vas-recent-ap-payments-status-col {
+    width: 18%;
+}
+
+.vas-recent-ap-payments-amount {
+    width: 15%;
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas-recent-ap-payments-cell-text {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-recent-ap-payments-method {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    padding: 4px 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #edf2f6;
+    color: #5f7283;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.vas-recent-ap-payments-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 4px 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+    .vas-recent-ap-payments-status::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+.vas-recent-ap-payments-status-cleared {
+    background: #ccefdd;
+    color: #0c5d38;
+}
+
+.vas-recent-ap-payments-status-intransit {
+    background: #feeec8;
+    color: #8c5a06;
+}
+
+.vas-recent-ap-payments-status-bounced {
+    background: #fad7d7;
+    color: #8f2d2d;
+}
+
+.vas-recent-ap-payments-state {
+    width: 100%;
+    padding: 24px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #748494;
+}
+
+@media (max-width: 620px), (max-height: 260px) {
+    .vas-recent-ap-payments-card {
+        padding: 14px;
+        border-radius: 14px;
+    }
+
+    .vas-recent-ap-payments-head {
+        margin-bottom: 10px;
+    }
+
+    .vas-recent-ap-payments-icon-box {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+    }
+
+    .vas-recent-ap-payments-title {
+        font-size: 15px;
+    }
+
+    .vas-recent-ap-payments-new {
+        font-size: 12px;
+        padding: 3px 6px;
+    }
+
+    .vas-recent-ap-payments-banner {
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .vas-recent-ap-payments-banner-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .vas-recent-ap-payments-banner-title {
+        font-size: 12px;
+    }
+
+    .vas-recent-ap-payments-banner-sub {
+        font-size: 11px;
+    }
+
+    .vas-recent-ap-payments-table td {
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 360px), (max-height: 190px) {
+    .vas-recent-ap-payments-card {
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .vas-recent-ap-payments-banner {
+        display: none;
+    }
+
+    .vas-recent-ap-payments-title {
+        font-size: 13px;
+    }
+
+    .vas-recent-ap-payments-new {
+        display: none;
+    }
+
+    .vas-recent-ap-payments-table {
+        min-width: 520px;
+    }
+
+        .vas-recent-ap-payments-table th {
+            padding: 8px 6px;
+            font-size: 9px;
+        }
+
+        .vas-recent-ap-payments-table td {
+            padding: 8px 6px;
+            font-size: 11px;
+        }
+
+    .vas-recent-ap-payments-method,
+    .vas-recent-ap-payments-status {
+        padding: 3px 8px;
+        font-size: 10px;
+    }
+}
