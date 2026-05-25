@@ -1,0 +1,148 @@
+.vas-inv-root {
+    height: 100%;
+    font-family: Roboto, sans-serif;
+}
+
+.vas-inv-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-inv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 14px;
+}
+
+.vas-inv-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vas-inv-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #EAF8FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.vas-inv-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-inv-alert-banner {
+    margin: 0 16px 12px;
+    background: #FFF8E6;
+    border: 1px solid #F5C94E;
+    border-radius: 10px;
+    padding: 10px 14px;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vas-inv-alert-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.vas-inv-alert-text {
+    flex: 1;
+}
+
+.vas-inv-dup-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7A4F00;
+    margin-bottom: 2px;
+}
+
+.vas-inv-dup-sub {
+    font-size: 12px;
+    color: #9A6500;
+}
+
+.vas-inv-table-wrap {
+    padding: 0 4px 4px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.vas-inv-table-head {
+    display: grid;
+    align-items: center;
+    padding: 6px 16px;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas-inv-th {
+    font-size: 11px;
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.vas-inv-th-customer {
+    font-size: 11px;
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    padding-left: 16px;
+}
+
+.vas-inv-row {
+    display: grid;
+    align-items: center;
+    padding: 13px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.vas-inv-cell-id {
+    font-size: 13px;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-inv-cell-customer {
+    font-size: 13px;
+    color: #3D5166;
+    padding-left: 16px;
+}
+
+.vas-inv-cell-due {
+    font-size: 13px;
+    color: #5F7283;
+}
+
+.vas-inv-status-chip {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vas-inv-cell-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: #102C3F;
+    text-align: right;
+}

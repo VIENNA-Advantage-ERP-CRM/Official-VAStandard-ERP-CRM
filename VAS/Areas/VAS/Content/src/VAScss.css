@@ -1,4 +1,4 @@
-﻿@import "../PaymentRule.css";
+@import "../PaymentRule.css";
 @import "../style.css";
 @import "../PoReceiptTabPanel.css";
 @import "../VPaySelect.css";
@@ -18,9 +18,13 @@
 @import "../AutoAllocatedWidget.css";
 @import "../BouncedChequesWidget.css";
 @import "../CustomerPaidMethodWidget.css";
-
 @import "../CollectionEfficiencyWidget.css";
 @import "../ExpectedReceiptsWidget.css";
 @import "../ExpectedThisWeekWidget.css";
-@import "../TotalAmountReceivedThisMonthWidget.css";
-
+@import "../AgingReceivablesWidget.css";
+@import "../AvgDaysToPayWidget.css";
+@import "../InvoicesWidget.css";
+@import "../OutstandingSalesOrderWidget.css";
+@import "../OverdueWidget.css";
+@import "../PaidthismonthWidget.css";
+@import "../TopDebtorsWidget.css";
