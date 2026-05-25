@@ -81,12 +81,11 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 2 — Top 2 overdue vendors by open amount
             // MRole on join-free C_Invoice base; C_BPartner join and EXTRACT arithmetic in outer query.
-            string baseOverdue = @"SELECT i.C_Invoice_ID, i.VA009_OpenAmount AS OpenAmt, i.C_BPartner_ID, i.DueDate
+            string baseOverdue = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt, i.C_BPartner_ID, i.DueDate
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId + @"
                    AND i.VA009_OpenAmount > 0
@@ -127,12 +126,11 @@ namespace VAS.Areas.VAS.Controllers
             }
 
             // Round-trip 3 — Invoices pending approval (DocStatus = 'IP' = In Process / approval workflow)
-            string basePending = @"SELECT i.C_Invoice_ID, i.GrandTotal
+            string basePending = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus = 'IP'
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             basePending = MRole.GetDefault(ctx).AddAccessSQL(basePending, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -159,17 +157,16 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 4 — GRN mismatch: vendor invoice lines without a matching M_MatchInv record.
             // MRole on join-free C_Invoice base; C_InvoiceLine join and NOT EXISTS check in outer query.
-            string baseGRN = @"SELECT i.C_Invoice_ID
+            string baseGRN = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseGRN = MRole.GetDefault(ctx).AddAccessSQL(baseGRN, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT COUNT(DISTINCT base_i.C_Invoice_ID) AS InvCount, SUM(il.LineNetAmt) AS TotalAmt
+            strQuery = @"SELECT COUNT(DISTINCT base_i.C_Invoice_ID) AS InvCount, SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) AS TotalAmt
                   FROM (" + baseGRN + @") base_i
                  INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = base_i.C_Invoice_ID)
                  WHERE il.IsActive = 'Y'
@@ -195,13 +192,12 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 5 — DPO: average days open invoices have been outstanding this year.
             // EXTRACT arithmetic is in the outer query; MRole sees only the clean base query.
-            string baseDPO = @"SELECT i.C_Invoice_ID, i.VA009_OpenAmount AS OpenAmt, i.DateInvoiced
+            string baseDPO = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt, i.DateInvoiced
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId + @"
                    AND EXTRACT(YEAR FROM i.DateInvoiced) = " + now.Year;
@@ -236,13 +232,12 @@ namespace VAS.Areas.VAS.Controllers
             // Round-trip 6 — Most recent fully-posted vendor invoice from the last 7 days.
             // C_BPartner join and EXTRACT date filter are in the outer query outside MRole scope.
             int sevenDaysAgoInt = (now.AddDays(-7).Year * 12 + now.AddDays(-7).Month) * 31 + now.AddDays(-7).Day;
-            string baseReady = @"SELECT i.C_Invoice_ID, i.GrandTotal, i.C_BPartner_ID, i.DateAcct
+            string baseReady = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.C_BPartner_ID, i.DateAcct
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus = 'CO'
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount = i.GrandTotal
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseReady = MRole.GetDefault(ctx).AddAccessSQL(baseReady, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);

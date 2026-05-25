@@ -62,31 +62,7 @@ namespace VAS.Areas.VAS.Controllers
             int lastMonthYear = prevMonthDate.Year;
             int lastMonthNum = prevMonthDate.Month;
 
-            // Step 1 — Get functional currency from the client accounting schema (rule 12).
-            // The currency filter ensures only primary-currency invoices are included,
-            // preventing multi-currency amounts from distorting the DPO average.
-            int schemaCurrencyId = 0;
-
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
-                    FROM C_AcctSchema cs
-                    INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
-                    INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
-                   WHERE ci.AD_Client_ID = " + clientId + @"
-                     AND ci.IsActive = 'Y'
-                     AND cs.IsActive = 'Y'
-                     AND c.IsActive = 'Y' ";
-
-            strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            DataSet cDs = DB.ExecuteDataset(strQuery, null, null);
-            if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
-            {
-                schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
-            }
-
-            if (schemaCurrencyId == 0) { return result; }
-
-            // Step 2 — Build a simple C_Invoice-only base query and apply MRole to it.
+            // Step 1 — Build a simple C_Invoice-only base query and apply MRole to it.
             // MRole.AddAccessSQL is called only on this short, join-free query to avoid
             // the AccessSqlParser OOM that occurs when the string contains multiple INNER JOINs
             // with EXTRACT arithmetic expressions. The secured inline view is then joined to
@@ -97,13 +73,12 @@ namespace VAS.Areas.VAS.Controllers
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @" ";
 
             baseInvoiceQuery = MRole.GetDefault(ctx).AddAccessSQL(baseInvoiceQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            // Step 2a — Current month DPO.
+            // Step 1a — Current month DPO.
             // Wraps the secured inline view; allocation tables joined outside MRole scope.
             strQuery = @"SELECT ROUND(AVG(
                              (EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
@@ -126,7 +101,7 @@ namespace VAS.Areas.VAS.Controllers
                 result.CurrentMonthDpo = Util.GetValueOfInt(ds.Tables[0].Rows[0]["CurrentMonthDpo"]);
             }
 
-            // Step 2b — Last month DPO.
+            // Step 1b — Last month DPO.
             strQuery = @"SELECT ROUND(AVG(
                              (EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
                            + (EXTRACT(MONTH FROM ah.DateAcct) - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30
@@ -150,7 +125,7 @@ namespace VAS.Areas.VAS.Controllers
 
             result.GapDays = result.CurrentMonthDpo - result.TargetDpo;
 
-            // Step 3 — Sparkline: monthly avg DPO for last 7 months (grouped by allocation month).
+            // Step 2 — Sparkline: monthly avg DPO for last 7 months (grouped by allocation month).
             // Reuses baseInvoiceQuery — MRole already applied in Step 2; not called again here.
             DateTime sevenMonthsAgo = now.AddMonths(-6);
             int sparkYear = sevenMonthsAgo.Year;

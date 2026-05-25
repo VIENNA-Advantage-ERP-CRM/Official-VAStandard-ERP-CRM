@@ -91,7 +91,7 @@ namespace VAS.Areas.VAS.Controllers
             // MRole is applied ONLY on C_Invoice alias "i" (primary physical table).
             // C_InvoicePaySchedule ps is a secondary join — MRole is NOT applied on it.
             string baseQuery = @"SELECT i.C_Invoice_ID, i.DateInvoiced,
-                            COALESCE(ps.VA009_OpenAmnt, i.VA009_OpenAmount) AS OpenAmt,
+                            COALESCE(currencyConvert(COALESCE(ps.VA009_OpenAmnt, i.VA009_OpenAmount), i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt,
                             COALESCE(ps.DueDate, i.DueDate) AS EffectiveDueDate
                        FROM C_Invoice i
                        LEFT OUTER JOIN C_InvoicePaySchedule ps ON (ps.C_Invoice_ID = i.C_Invoice_ID
@@ -101,7 +101,6 @@ namespace VAS.Areas.VAS.Controllers
                         AND i.IsReturnTrx = 'N'
                         AND i.DocStatus IN ('CO', 'CL')
                         AND i.IsActive = 'Y'
-                        AND i.C_Currency_ID = " + schemaCurrencyId + @"
                         AND i.AD_Client_ID = " + clientId + @"
                         AND i.AD_Org_ID = " + orgId;
 

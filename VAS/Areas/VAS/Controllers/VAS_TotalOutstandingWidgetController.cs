@@ -88,13 +88,13 @@ namespace VAS.Areas.VAS.Controllers
             // out-of-memory errors. EXTRACT(YEAR/MONTH FROM col) works in Oracle and Postgres.
             // OpenAmt > 0 identifies invoices with a remaining unpaid balance.
             // AD_Client_ID and AD_Org_ID added explicitly; AddAccessSQL covers role-level access.
-            strQuery = @"SELECT SUM(i.VA009_OpenAmount) AS OutstandingTotal,
+            strQuery = @"SELECT SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS OutstandingTotal,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
                                    AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
-                              THEN i.VA009_OpenAmount ELSE 0 END) AS CurrentMonthOutstanding,
+                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS CurrentMonthOutstanding,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + lastMonthYear + @"
                                    AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
-                              THEN i.VA009_OpenAmount ELSE 0 END) AS LastMonthOutstanding,
+                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthOutstanding,
                          COUNT(i.C_Invoice_ID) AS InvoiceCount,
                          COUNT(DISTINCT i.C_BPartner_ID) AS VendorCount
                     FROM C_Invoice i
@@ -103,7 +103,6 @@ namespace VAS.Areas.VAS.Controllers
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.VA009_OpenAmount > 0
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @" ";
 
@@ -128,14 +127,13 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
                          EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(i.VA009_OpenAmount) AS MonthlyOutstanding
+                         SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyOutstanding
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
-                     AND i.IsReturnTrx = 'N' 
+                     AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.VA009_OpenAmount > 0
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @"
                      AND (EXTRACT(YEAR FROM i.DateInvoiced) * 12 + EXTRACT(MONTH FROM i.DateInvoiced))

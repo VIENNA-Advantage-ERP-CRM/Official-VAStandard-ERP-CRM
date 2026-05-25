@@ -82,13 +82,12 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 2 — Needs Attention: invoices not yet completed/closed (DR, IP, WC, NA).
             // MRole on join-free C_Invoice base.
-            string baseAA = @"SELECT i.C_Invoice_ID, i.GrandTotal
+            string baseAA = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('DR', 'IP', 'WC', 'NA')
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseAA = MRole.GetDefault(ctx).AddAccessSQL(baseAA, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -105,18 +104,17 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 3 — GRN Mismatch: completed invoice lines with no matching M_MatchInv.
             // MRole on join-free C_Invoice base; C_InvoiceLine + NOT EXISTS in outer query.
-            string baseGRN = @"SELECT i.C_Invoice_ID
+            string baseGRN = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseGRN = MRole.GetDefault(ctx).AddAccessSQL(baseGRN, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT COUNT(DISTINCT g.C_Invoice_ID) AS InvCount, SUM(il.LineNetAmt) AS TotalAmt
+            strQuery = @"SELECT COUNT(DISTINCT g.C_Invoice_ID) AS InvCount, SUM(COALESCE(currencyConvert(il.LineNetAmt, g.C_Currency_ID, " + schemaCurrencyId + @", g.DateAcct, g.C_ConversionType_ID, g.AD_Client_ID, g.AD_Org_ID), 0)) AS TotalAmt
                   FROM (" + baseGRN + @") g
                  INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = g.C_Invoice_ID)
                  WHERE il.IsActive = 'Y'
@@ -132,14 +130,13 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 4 — PO Not Raised: invoices with no linked Purchase Order (C_Order_ID IS NULL).
             // C_Order_ID filter is on the base table so MRole can still be applied cleanly.
-            string basePNR = @"SELECT i.C_Invoice_ID, i.GrandTotal
+            string basePNR = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL', 'IP')
                    AND i.IsActive = 'Y'
                    AND i.C_Order_ID IS NULL
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             basePNR = MRole.GetDefault(ctx).AddAccessSQL(basePNR, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -155,14 +152,13 @@ namespace VAS.Areas.VAS.Controllers
             }
 
             // Round-trip 5 — Ready to Pay: completed invoices with outstanding open amount.
-            string baseRTP = @"SELECT i.C_Invoice_ID, i.VA009_OpenAmount AS OpenAmt
+            string baseRTP = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseRTP = MRole.GetDefault(ctx).AddAccessSQL(baseRTP, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -182,7 +178,7 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 6 — Upcoming due payments (next 14 days), sorted by DueDate ascending.
             // MRole on join-free C_Invoice base; C_BPartner join and date filter in outer query.
-            string baseDue = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, i.VA009_OpenAmount AS OpenAmt, i.DueDate
+            string baseDue = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt, i.DueDate
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
@@ -190,7 +186,6 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
                    AND i.DueDate IS NOT NULL
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseDue = MRole.GetDefault(ctx).AddAccessSQL(baseDue, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);

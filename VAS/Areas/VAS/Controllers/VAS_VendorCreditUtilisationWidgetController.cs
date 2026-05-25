@@ -80,14 +80,13 @@ namespace VAS.Areas.VAS.Controllers
             // MRole applied to join-free C_Invoice base.
             // C_BPartner (with SO_CreditLimit > 0) drives the outer SELECT.
             // Open invoice totals are aggregated in a LEFT JOIN subquery.
-            string baseInv = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, i.VA009_OpenAmount AS OpenAmt
+            string baseInv = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseInv = MRole.GetDefault(ctx).AddAccessSQL(baseInv, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);

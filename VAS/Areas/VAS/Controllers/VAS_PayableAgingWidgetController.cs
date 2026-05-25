@@ -88,7 +88,7 @@ namespace VAS.Areas.VAS.Controllers
             string baseQuery = @"SELECT ci.C_Invoice_ID,
                             cs.C_InvoicePaySchedule_ID,
                             cs.DueDate,
-                            COALESCE(cs.VA009_OpenAmnt, cs.DueAmt) AS DueAmt,
+                            COALESCE(currencyConvert(COALESCE(cs.VA009_OpenAmnt, cs.DueAmt), ci.C_Currency_ID, " + schemaCurrencyId + @", ci.DateAcct, ci.C_ConversionType_ID, ci.AD_Client_ID, ci.AD_Org_ID), 0) AS DueAmt,
                             cs.VA009_IsPaid
                        FROM C_Invoice ci
                       INNER JOIN C_InvoicePaySchedule cs ON (cs.C_Invoice_ID = ci.C_Invoice_ID
@@ -98,7 +98,6 @@ namespace VAS.Areas.VAS.Controllers
                         AND ci.IsReturnTrx = 'N'
                         AND ci.DocStatus IN ('CO', 'CL')
                         AND ci.IsActive = 'Y'
-                        AND ci.C_Currency_ID = " + schemaCurrencyId + @"
                         AND ci.AD_Client_ID = " + clientId + @"
                         AND ci.AD_Org_ID = " + orgId;
 

@@ -84,12 +84,11 @@ namespace VAS.Areas.VAS.Controllers
             // Round-trip 2 — CTE aggregation for current and previous FY monthly totals.
             // MRole applied to C_Invoice base query only (join-free to prevent AccessSqlParser OOM).
             // CTE alias MonthlyData is NOT a physical table — MRole is NOT applied to it.
-            string baseQuery = @"SELECT i.C_Invoice_ID, i.GrandTotal, i.DateAcct
+            string baseQuery = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.DateAcct
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId;
 

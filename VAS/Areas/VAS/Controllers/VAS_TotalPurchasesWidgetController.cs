@@ -88,21 +88,20 @@ namespace VAS.Areas.VAS.Controllers
             // AD_Client_ID and AD_Org_ID added explicitly; AddAccessSQL covers role-level access.
             strQuery = @"SELECT SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
-                               THEN i.GrandTotal ELSE 0 END) AS MtdTotal,
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS MtdTotal,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
-                               THEN i.GrandTotal ELSE 0 END) AS YtdTotal,
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS YtdTotal,
                          COUNT(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
                                THEN 1 ELSE NULL END) AS InvoiceCount,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + lastMonthYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
-                               THEN i.GrandTotal ELSE 0 END) AS LastMonthTotal
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @" ";
 
@@ -126,13 +125,12 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
                          EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(i.GrandTotal) AS MonthlyTotal
+                         SUM(COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @"
                      AND (EXTRACT(YEAR FROM i.DateInvoiced) * 12 + EXTRACT(MONTH FROM i.DateInvoiced))

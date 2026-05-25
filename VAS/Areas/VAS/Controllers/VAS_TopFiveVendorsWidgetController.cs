@@ -87,12 +87,11 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 2 — vendor spend aggregation for current FY and prior FY.
             // MRole on join-free C_Invoice base; C_BPartner + C_BP_Group joins in outer query.
-            string baseVendor = @"SELECT i.C_Invoice_ID, i.GrandTotal, i.C_BPartner_ID, i.DateInvoiced
+            string baseVendor = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.C_BPartner_ID, i.DateInvoiced
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.C_Currency_ID = " + schemaCurrencyId + @"
                    AND i.AD_Client_ID = " + clientId + @"
                    AND i.AD_Org_ID = " + orgId;
             baseVendor = MRole.GetDefault(ctx).AddAccessSQL(baseVendor, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);

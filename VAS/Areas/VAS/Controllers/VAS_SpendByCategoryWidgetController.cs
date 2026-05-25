@@ -83,12 +83,11 @@ namespace VAS.Areas.VAS.Controllers
             // Round-trip 2 — category aggregation for current month.
             // MRole applied only to C_Invoice base query (join-free) to avoid OOM in AccessSqlParser.
             // C_InvoiceLine, M_Product, M_Product_Category joins are done outside MRole scope.
-            string baseQuery = @"SELECT i.C_Invoice_ID
+            string baseQuery = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.C_Currency_ID = " + schemaCurrencyId + @"
                      AND i.AD_Client_ID = " + clientId + @"
                      AND i.AD_Org_ID = " + orgId + @"
                      AND EXTRACT(YEAR FROM i.DateAcct) = " + currentYear + @"
@@ -96,7 +95,7 @@ namespace VAS.Areas.VAS.Controllers
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT pc.Name AS CategoryName, SUM(il.LineNetAmt) AS TotalAmount
+            strQuery = @"SELECT pc.Name AS CategoryName, SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) AS TotalAmount
                   FROM (" + baseQuery + @") base_i
                  INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = base_i.C_Invoice_ID)
                  INNER JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
@@ -105,7 +104,7 @@ namespace VAS.Areas.VAS.Controllers
                    AND p.IsActive = 'Y'
                    AND pc.IsActive = 'Y'
                  GROUP BY pc.Name
-                HAVING SUM(il.LineNetAmt) > 0
+                HAVING SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) > 0
                  ORDER BY TotalAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, null, null);
