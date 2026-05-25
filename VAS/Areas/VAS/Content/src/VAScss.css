@@ -12,6 +12,15 @@
 @import "../VAS_HighestSellingWidget.css";
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
+
+@import "../TotalAmountReceivedThisMonthWidget.css";
+@import "../ExpectedThisWeekWidget.css";
+@import "../AutoAllocatedWidget.css";
+@import "../BouncedChequesWidget.css";
+@import "../CustomerPaidMethodWidget.css";
+@import "../CollectionEfficiencyWidget.css";
+@import "../ExpectedReceiptsWidget.css";
+@import "../ExpectedThisWeekWidget.css";
 @import "../VAS_InvoiceOverview.css";
 @import "../VAS_PaymentVoucherPanel.css";
 @import "../AgingReceivablesWidget.css";

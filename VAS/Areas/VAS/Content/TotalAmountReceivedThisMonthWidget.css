@@ -1,0 +1,164 @@
+﻿.vas-tarm-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 0;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-tarm-root,
+    .vas-tarm-root * {
+        box-sizing: border-box;
+    }
+
+    .vas-tarm-root * {
+            background: linear-gradient(135deg, rgba(199,232,255,0.85), rgba(255,255,255,0.65)) !important;
+        }
+.vas-tarm-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(199,232,255,0.85), rgba(255,255,255,0.65)) !important;
+    border: 3px solid #FFFFFF;
+    border-radius: 22px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 16px 18px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.vas-tarm-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-tarm-icon-wrap {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-tarm-icon-wrap svg {
+        width: 22px;
+        height: 22px;
+        stroke: #1567B7;
+    }
+
+.vas-tarm-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #163247;
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tarm-amount-row {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+}
+
+.vas-tarm-amount {
+    display: block;
+    font-size: 58px;
+    font-weight: 800;
+    color: #1567B7;
+    line-height: 1;
+    letter-spacing: -2px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-tarm-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-tarm-why {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(21, 103, 183, 0.14);
+    border-radius: 8px;
+    color: #1677D3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    line-height: 1;
+    padding: 5px 10px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.vas-tarm-desc {
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 400;
+    color: #5E6E7E;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* للأحجام الصغيرة */
+@media (max-width: 340px) {
+    .vas-tarm-card {
+        padding: 12px 14px 10px;
+        border-radius: 16px;
+    }
+
+    .vas-tarm-icon-wrap {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: 10px;
+    }
+
+        .vas-tarm-icon-wrap svg {
+            width: 18px;
+            height: 18px;
+        }
+
+    .vas-tarm-title {
+        font-size: 15px;
+    }
+
+    .vas-tarm-amount {
+        font-size: 36px;
+        letter-spacing: -1px;
+    }
+
+    .vas-tarm-why {
+        font-size: 9px;
+        padding: 4px 7px;
+    }
+
+    .vas-tarm-desc {
+        font-size: 12px;
+    }
+}

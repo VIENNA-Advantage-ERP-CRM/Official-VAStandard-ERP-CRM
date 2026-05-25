@@ -111,10 +111,14 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 
-
-
+import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
+import "../app/widgets/ExpectedThisWeekWidget.js";
+import "../app/widgets/AutoAllocatedWidget.js";
+import "../app/widgets/BouncedChequesWidget.js";
+import "../app/widgets/CustomerPaidMethodWidget.js";
+import "../app/widgets/CollectionEfficiencyWidget.js";
+import "../app/widgets/ExpectedReceiptsWidget.js";
 import "../app/widgets/RequestWidget.js";
-
 import "../app/widgets/AgingReceivablesWidget.js";
 import "../app/widgets/AvgDaysToPayWidget.js";
 import "../app/widgets/InvoicesWidget.js";
