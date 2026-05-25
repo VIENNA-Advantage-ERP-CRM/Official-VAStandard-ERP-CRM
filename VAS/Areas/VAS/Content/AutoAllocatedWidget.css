@@ -1,0 +1,113 @@
+﻿.vas-aa-root {
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-aa-root,
+    .vas-aa-root * {
+        box-sizing: border-box;
+    }
+
+.vas-aa-card {
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: linear-gradient(135deg, #FFF4D9 0%, #FFFDF3 58%, #F8FFF4 100%);
+    border: 3px solid #fff;
+    border-radius: 22px;
+    box-shadow: 0 10px 24px rgba(100, 75, 31, 0.08);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.vas-aa-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.vas-aa-icon-wrap {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-aa-icon-wrap svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas-aa-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #22364A;
+    line-height: 1.1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-aa-percent-row {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+}
+
+.vas-aa-percent {
+    font-size: 34px;
+    font-weight: 800;
+    color: #172D4A;
+    line-height: 1;
+    letter-spacing: -1px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-aa-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-aa-why {
+    background: hsla(0, 0%, 100%, .94);
+    border-radius: 8px;
+    color: #4b80d9;
+    display: inline-flex;
+    font-size: 9px;
+    font-weight: 800;
+    justify-content: center;
+    letter-spacing: 2px;
+    line-height: 1;
+    padding: 4px 6px;
+}
+
+.vas-aa-desc {
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 400;
+    color: #5B6878;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
