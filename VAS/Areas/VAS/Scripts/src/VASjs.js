@@ -122,3 +122,6 @@ import "../app/widgets/OutstandingSalesOrderWidget.js";
 import "../app/widgets/OverdueWidget.js";
 import "../app/widgets/PaidthismonthWidget.js";
 import "../app/widgets/TopDebtorsWidget.js";
+import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+import "../app/tabpanel/VAS_InvoiceOverview.js";
+import "../app/tabpanel/VAS_PaymentVoucherPanel.js";

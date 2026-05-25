@@ -213,6 +213,8 @@
     <Compile Include="Areas\VAS\Controllers\PaidThisMonthController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
@@ -268,7 +270,9 @@
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
+    <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_LeadConversation.css" />
+    <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductUomSetup.css" />
     <Content Include="Areas\VAS\Content\VAS_ProductWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
@@ -325,7 +329,9 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_TimeSheetInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />
