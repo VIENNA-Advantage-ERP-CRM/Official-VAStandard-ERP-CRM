@@ -35,6 +35,26 @@ namespace VIS.Controllers
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
                 DateTime dateTo = dateFrom.AddMonths(1);
 
+                string dateFromText = dateFrom.ToString("yyyy-MM-dd");
+                string dateToText = dateTo.ToString("yyyy-MM-dd");
+
+                string dateFilter = string.Empty;
+
+                if (DB.IsOracle())
+                {
+                    dateFilter = @"
+                        AND p.DateAcct >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
+                        AND p.DateAcct < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
+                    ";
+                }
+                else
+                {
+                    dateFilter = @"
+                        AND p.DateAcct >= DATE '" + dateFromText + @"'
+                        AND p.DateAcct < DATE '" + dateToText + @"'
+                    ";
+                }
+
                 string sql = @"
                     SELECT
                         SUM(p.PayAmt) AS PaidThisMonth,
@@ -42,21 +62,22 @@ namespace VIS.Controllers
                         MAX(cur.ISO_Code) AS CurrencyISO,
                         MAX(cur.CurSymbol) AS CurrencySymbol
                     FROM C_Payment p
-                    LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID=cur.C_Currency_ID)
-                    WHERE p.IsActive='Y'
-                    AND p.IsReceipt=@IsReceipt
+                    LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID = cur.C_Currency_ID)
+                    WHERE p.IsActive = 'Y'
+                    AND p.IsReceipt = @IsReceipt
                     AND p.DocStatus IN ('CO', 'CL')
-                    AND p.DateAcct>=@DateFrom
-                    AND p.DateAcct<@DateTo
-                ";
+                " + dateFilter;
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = MRole.GetDefault(ctx).AddAccessSQL(
+                    sql,
+                    "p",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 List<SqlParameter> parameters = new List<SqlParameter>
                 {
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo)
+                    new SqlParameter("@IsReceipt", "N")
                 };
 
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
@@ -83,8 +104,8 @@ namespace VIS.Controllers
                     cCurrencyId = cCurrencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
-                    dateFrom = dateFrom,
-                    dateTo = dateTo.AddDays(-1)
+                    dateFrom = dateFromText,
+                    dateTo = dateTo.AddDays(-1).ToString("yyyy-MM-dd")
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -107,6 +128,7 @@ namespace VIS.Controllers
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
+
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;

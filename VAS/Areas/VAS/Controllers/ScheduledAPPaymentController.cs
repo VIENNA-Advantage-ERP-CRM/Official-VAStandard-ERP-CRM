@@ -36,20 +36,54 @@ namespace VIS.Controllers
                 DateTime weekFrom = today.AddDays(-daysFromMonday);
                 DateTime weekTo = weekFrom.AddDays(7);
 
-                bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
+                string weekFromText = weekFrom.ToString("yyyy-MM-dd");
+                string weekToText = weekTo.ToString("yyyy-MM-dd");
 
-                string paymentMethodSelect = hasPaymentMethod
-                    ? @"
+                bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
+                string paymentMethodNameColumn = hasPaymentMethod ? GetPaymentMethodNameColumn() : string.Empty;
+
+                string paymentMethodSelect = string.Empty;
+                string paymentMethodJoin = string.Empty;
+
+                if (hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodNameColumn))
+                {
+                    paymentMethodSelect = @"
                         inv.VA009_PaymentMethod_ID AS PaymentMethod_ID,
-                        pm.Name AS PaymentMethodName,"
-                    : @"
+                        pm." + paymentMethodNameColumn + @" AS PaymentMethodName,";
+
+                    paymentMethodJoin = @"
+                    LEFT OUTER JOIN VA009_PaymentMethod pm 
+                        ON (inv.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)";
+                }
+                else if (hasPaymentMethod)
+                {
+                    paymentMethodSelect = @"
+                        inv.VA009_PaymentMethod_ID AS PaymentMethod_ID,
+                        inv.PaymentRule AS PaymentMethodName,";
+                }
+                else
+                {
+                    paymentMethodSelect = @"
                         0 AS PaymentMethod_ID,
                         inv.PaymentRule AS PaymentMethodName,";
+                }
 
-                string paymentMethodJoin = hasPaymentMethod
-                    ? @"
-                    LEFT OUTER JOIN VA009_PaymentMethod pm ON (inv.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)"
-                    : string.Empty;
+                string dateFilter = string.Empty;
+
+                if (DB.IsOracle())
+                {
+                    dateFilter = @"
+                    AND ips.DueDate >= TO_DATE('" + weekFromText + @"', 'YYYY-MM-DD')
+                    AND ips.DueDate < TO_DATE('" + weekToText + @"', 'YYYY-MM-DD')
+                    ";
+                }
+                else
+                {
+                    dateFilter = @"
+                    AND ips.DueDate >= DATE '" + weekFromText + @"'
+                    AND ips.DueDate < DATE '" + weekToText + @"'
+                    ";
+                }
 
                 string invoiceBody = @"
                     SELECT
@@ -58,64 +92,50 @@ namespace VIS.Controllers
                         cur.ISO_Code AS CurrencyISO,
                         cur.CurSymbol AS CurrencySymbol,"
                         + paymentMethodSelect + @"
-                        CASE
-                            WHEN (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) <= 0 THEN 0
-                            WHEN ips.C_InvoicePaySchedule_ID IS NOT NULL
-                                AND COALESCE(ips.DueAmt,0) > 0
-                                AND ips.DueAmt < (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) THEN ips.DueAmt
-                            ELSE (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0))
-                        END AS ScheduledAmount
+                        COALESCE(ips.DueAmt, 0) AS ScheduledAmount
                     FROM C_Invoice inv
-                    LEFT OUTER JOIN C_InvoicePaySchedule ips ON (inv.C_Invoice_ID=ips.C_Invoice_ID AND ips.IsActive='Y')
-                    LEFT OUTER JOIN (
-                        SELECT
-                            al.C_Invoice_ID,
-                            SUM(COALESCE(al.Amount,0)+COALESCE(al.DiscountAmt,0)+COALESCE(al.WriteOffAmt,0)) AS AllocatedAmt
-                        FROM C_AllocationLine al
-                        INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID)
-                        WHERE ah.IsActive='Y'
-                        AND ah.DocStatus IN ('CO', 'CL')
-                        GROUP BY al.C_Invoice_ID
-                    ) alloc ON (inv.C_Invoice_ID=alloc.C_Invoice_ID)
-                    LEFT OUTER JOIN C_Currency cur ON (inv.C_Currency_ID=cur.C_Currency_ID)"
+                    INNER JOIN C_InvoicePaySchedule ips 
+                        ON (inv.C_Invoice_ID = ips.C_Invoice_ID)
+                    LEFT OUTER JOIN C_Currency cur 
+                        ON (inv.C_Currency_ID = cur.C_Currency_ID)"
                     + paymentMethodJoin + @"
-                    WHERE inv.IsActive='Y'
-                    AND inv.IsSOTrx='N'
+                    WHERE inv.IsActive = 'Y'
+                    AND ips.IsActive = 'Y'
+                    AND inv.IsSOTrx = 'N'
                     AND inv.DocStatus IN ('CO', 'CL')
-                    AND COALESCE(ips.DueDate, inv.DateAcct)>=@WeekFrom
-                    AND COALESCE(ips.DueDate, inv.DateAcct)<@WeekTo
-                    AND (inv.GrandTotal-COALESCE(alloc.AllocatedAmt,0)) > 0
-                ";
+                    AND COALESCE(ips.DueAmt, 0) > 0
+                    "
+                    + dateFilter;
 
-                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(invoiceBody, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(
+                    invoiceBody,
+                    "inv",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string sql = @"
-                    WITH ScheduledInvoices AS (
-                        " + invoiceBody + @"
-                    )
                     SELECT
-                        PaymentMethod_ID,
-                        PaymentMethodName,
-                        C_Currency_ID,
-                        CurrencyISO,
-                        CurrencySymbol,
-                        SUM(ScheduledAmount) AS ScheduledAmount
-                    FROM ScheduledInvoices
-                    WHERE ScheduledAmount > 0
+                        x.PaymentMethod_ID,
+                        x.PaymentMethodName,
+                        x.C_Currency_ID,
+                        x.CurrencyISO,
+                        x.CurrencySymbol,
+                        SUM(x.ScheduledAmount) AS ScheduledAmount
+                    FROM (
+                        " + invoiceBody + @"
+                    ) x
                     GROUP BY
-                        PaymentMethod_ID,
-                        PaymentMethodName,
-                        C_Currency_ID,
-                        CurrencyISO,
-                        CurrencySymbol
-                    ORDER BY SUM(ScheduledAmount) DESC
+                        x.PaymentMethod_ID,
+                        x.PaymentMethodName,
+                        x.C_Currency_ID,
+                        x.CurrencyISO,
+                        x.CurrencySymbol
+                    HAVING SUM(x.ScheduledAmount) > 0
+                    ORDER BY ScheduledAmount DESC
                 ";
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@WeekFrom", weekFrom),
-                    new SqlParameter("@WeekTo", weekTo)
-                };
+                List<SqlParameter> parameters = new List<SqlParameter>();
 
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
 
@@ -167,8 +187,8 @@ namespace VIS.Controllers
                     cCurrencyId = cCurrencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
-                    weekFrom = weekFrom,
-                    weekTo = weekTo.AddDays(-1),
+                    weekFrom = weekFromText,
+                    weekTo = weekTo.AddDays(-1).ToString("yyyy-MM-dd"),
                     groups = groups
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -194,9 +214,42 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT COUNT(1)
                 FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
-                WHERE t.TableName='C_Invoice'
-                AND c.ColumnName='VA009_PaymentMethod_ID'
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Invoice'
+                AND c.ColumnName = 'VA009_PaymentMethod_ID'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private string GetPaymentMethodNameColumn()
+        {
+            if (HasColumn("VA009_PaymentMethod", "Name"))
+            {
+                return "Name";
+            }
+
+            if (HasColumn("VA009_PaymentMethod", "Value"))
+            {
+                return "Value";
+            }
+
+            if (HasColumn("VA009_PaymentMethod", "Description"))
+            {
+                return "Description";
+            }
+
+            return string.Empty;
+        }
+
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = '" + tableName + @"'
+                AND c.ColumnName = '" + columnName + @"'
             ";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
@@ -205,6 +258,7 @@ namespace VIS.Controllers
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
+
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;
