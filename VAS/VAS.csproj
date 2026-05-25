@@ -230,6 +230,8 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalDebitController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -280,6 +282,11 @@
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLJournalEntriesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLJournalPostedWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLJournalTotalCreditWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLJournalTotalDebitWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLJournalUnpostedWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
     <Content Include="Areas\VAS\Content\VAS_LeadConversation.css" />
@@ -340,6 +347,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+<<<<<<< Updated upstream
     <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CollectionEfficiencyWidget.js" />
@@ -353,6 +361,13 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\OutstandingSalesOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\OverdueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
+=======
+    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalEntriesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalPostedWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalTotalCreditWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalTotalDebitWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalUnpostedWidget.js" />
+>>>>>>> Stashed changes
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
