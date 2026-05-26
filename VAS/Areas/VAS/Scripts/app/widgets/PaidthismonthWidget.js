@@ -50,7 +50,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalPaidAmount, data.customerCount);
+                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol);
                     }
                 },
                 error: function () {
@@ -75,10 +75,20 @@
             return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
+        /* Build metric markup with the base-currency symbol placed *before* the
+           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+        function formatMetric(value, symbol) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = formatCurrency(Math.abs(value));
+            var symHtml = symbol ? '<span class="vas-ptm-cur">' + symbol + '</span>' : '';
+            return sign + symHtml + absStr;
+        }
+
         /* ── Render metric values ── */
-        function renderMetric(total, count) {
+        function renderMetric(total, count, symbol) {
             if ($metricEl) {
-                $metricEl.text(formatCurrency(total));
+                $metricEl.html(formatMetric(total, symbol));
             }
             if ($whyText) {
                 var customerLabel = count !== 1

@@ -1,10 +1,39 @@
 /**
  * Aging Receivables Widget
- * Purpose - Shows bucketted outstanding invoices in an aging chart format.
+ * Purpose - Shows outstanding (unpaid) sales-invoice amounts bucketed by how far past due
+ *           they are, as a horizontal bar chart on the finance/receivables dashboard.
+ * Design  - Onfinity glass widget (design.md §8): light glass surface, tinted icon well,
+ *           title + subtitle header, bucket rows with a labelled track bar, and a WHY block.
+ *           Amounts are prefixed with the base (accounting-schema) currency symbol.
+ *
+ * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
+ *  #  | Current Text                                          | Message Key            | MsgText
+ * ----+-------------------------------------------------------+------------------------+------------------------------------------------------
+ *  1  | Aging Receivables                                     | VIS_AgingReceivables   | Aging Receivables
+ *  2  | Who owes, how old                                     | VIS_WhoOwesHowOld      | Who owes, how old
+ *  3  | Not yet due                                           | VIS_NotYetDue          | Not yet due
+ *  4  | 1–30 days late                                        | VIS_Days1_30           | 1–30 days late
+ *  5  | 31–60 days                                            | VIS_Days31_60          | 31–60 days
+ *  6  | 61–90 days                                            | VIS_Days61_90          | 61–90 days
+ *  7  | 90+ days                                              | VIS_Days90Plus         | 90+ days
+ *  8  | WHY                                                   | VIS_Why                | WHY
+ *  9  | Older invoices are harder to collect. Focus on the…   | VIS_AgingWhyText       | Older invoices are harder to collect. Focus on the 61+ buckets.
+ *  10 | Loading…                                              | VIS_Loading            | Loading…
+ *  11 | No data                                               | VIS_NoData             | No data
+ * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* Bucket bar colours (green → red as overdue age increases). */
+    var BUCKET_COLORS = {
+        notDue:    'oklch(0.6 0.16 155)',
+        days1_30:  'oklch(0.6 0.16 70)',
+        days31_60: 'oklch(0.6 0.16 40)',
+        days61_90: 'oklch(0.6 0.16 25)',
+        days90Plus:'oklch(0.6 0.16 20)'
+    };
 
     VIS.AgingReceivablesWidget = function () {
 
@@ -14,6 +43,8 @@
         var $root = $('<div class="vas-ar-root">');
 
         var $contentArea;
+        /* Base-currency symbol from the backend; prefixed before every amount. */
+        var currencySymbol = '';
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -41,7 +72,7 @@
             });
         }
 
-        /* ── Format currency ── */
+        /* ── Format the numeric part of an amount (k / M abbreviations) ── */
         function formatCurrency(value) {
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
 
@@ -57,6 +88,33 @@
             return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
+        /* Build amount markup with the base-currency symbol placed *before* the amount;
+           the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+        function formatMetric(value, symbol) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = formatCurrency(Math.abs(value));
+            var symHtml = symbol ? '<span class="vas-ar-cur">' + symbol + '</span>' : '';
+            return sign + symHtml + absStr;
+        }
+
+        /* ── One bucket row: label, amount, and a proportional track bar ── */
+        function buildBucket(label, val, color, maxVal) {
+            var width = (val / maxVal * 100);
+            if (width > 100) width = 100;
+            if (width < 0) width = 0;
+
+            return '<div class="vas-ar-bucket">' +
+                '<div class="vas-ar-bucket-label-wrap">' +
+                '<span>' + label + '</span>' +
+                '<span class="vas-ar-bucket-val">' + formatMetric(val, currencySymbol) + '</span>' +
+                '</div>' +
+                '<div class="vas-ar-bucket-track">' +
+                '<div class="vas-ar-bucket-bar" style="width: ' + width + '%; background: ' + color + ';"></div>' +
+                '</div>' +
+                '</div>';
+        }
+
         /* ── Render bucket chart ── */
         function renderRows(data) {
             if (!$contentArea) return;
@@ -69,6 +127,8 @@
 
             var r = Array.isArray(data) ? data[0] : data; // Handle both arrays and single objects safely
 
+            currencySymbol = r.symbol || '';
+
             var notDue = r.notDueAmount || 0;
             var days1_30 = r.days1To30Amount || 0;
             var days31_60 = r.days31To60Amount || 0;
@@ -79,28 +139,11 @@
             if (maxVal <= 0) maxVal = 1;
 
             var html = '';
-
-            function buildBucket(label, val, color) {
-                var width = (val / maxVal * 100);
-                if (width > 100) width = 100;
-                if (width < 0) width = 0;
-
-                return '<div class="vas-ar-bucket">' +
-                    '<div class="vas-ar-bucket-label-wrap">' +
-                    '<span>' + label + '</span>' +
-                    '<span class="vas-ar-bucket-val">' + formatCurrency(val) + '</span>' +
-                    '</div>' +
-                    '<div class="vas-ar-bucket-track">' +
-                    '<div class="vas-ar-bucket-bar" style="width: ' + width + '%; background: ' + color + ';"></div>' +
-                    '</div>' +
-                    '</div>';
-            }
-
-            html += buildBucket(lbl("VIS_NotYetDue", 'Not yet due'), notDue, 'oklch(0.6 0.16 155)');
-            html += buildBucket(lbl("VIS_Days1_30", '1–30 days late'), days1_30, 'oklch(0.6 0.16 70)');
-            html += buildBucket(lbl("VIS_Days31_60", '31–60 days'), days31_60, 'oklch(0.6 0.16 40)');
-            html += buildBucket(lbl("VIS_Days61_90", '61–90 days'), days61_90, 'oklch(0.6 0.16 25)');
-            html += buildBucket(lbl("VIS_Days90Plus", '90+ days'), days90Plus, 'oklch(0.6 0.16 20)');
+            html += buildBucket(lbl("VIS_NotYetDue", 'Not yet due'), notDue, BUCKET_COLORS.notDue, maxVal);
+            html += buildBucket(lbl("VIS_Days1_30", '1–30 days late'), days1_30, BUCKET_COLORS.days1_30, maxVal);
+            html += buildBucket(lbl("VIS_Days31_60", '31–60 days'), days31_60, BUCKET_COLORS.days31_60, maxVal);
+            html += buildBucket(lbl("VIS_Days61_90", '61–90 days'), days61_90, BUCKET_COLORS.days61_90, maxVal);
+            html += buildBucket(lbl("VIS_Days90Plus", '90+ days'), days90Plus, BUCKET_COLORS.days90Plus, maxVal);
 
             // WHY block
             html += '<div class="vas-ar-why-block">' +

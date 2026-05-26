@@ -1,5 +1,6 @@
 .vas-ar-root {
     height: 100%;
+    width:100%;
     font-family: Roboto, sans-serif;
 }
 
@@ -17,6 +18,8 @@
 .vas-ar-bucket-label-wrap {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
     font-size: 12px;
     margin-bottom: 4px;
     color: #102C3F;
@@ -25,6 +28,15 @@
 .vas-ar-bucket-val {
     font-weight: 600;
     font-family: monospace;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Base-currency symbol prefixed before the amount */
+.vas-ar-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+    vertical-align: baseline;
 }
 
 .vas-ar-bucket-track {

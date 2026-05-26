@@ -22,23 +22,46 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            /* Base (accounting-schema) currency for the client. Cur_Symbol falls back to the
+               ISO code when no display symbol is configured. All bucket amounts below are
+               converted into this currency, so the symbol applies to every figure shown. */
             string schemaCurrencySql = @"
                 SELECT ci.AD_Client_ID,
                        cs.C_Currency_ID AS Acct_Currency_ID,
-                       cur.StdPrecision
+                       cur.StdPrecision,
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
                 INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)";
 
+            /* Days overdue = today − DueDate, built per database.
+               PostgreSQL: CAST(CURRENT_DATE AS DATE) − CAST(ips.DueDate AS DATE) was resolving
+               to an INTERVAL (operator does not exist: interval >= integer), so the bucket
+               BETWEEN comparisons failed. Convert the TIMESTAMP difference into a whole-day
+               NUMERIC via date_part('epoch', ...) / 86400 instead. DueDate is truncated to DATE
+               first so the aging buckets stay whole-day based regardless of any time component.
+               date_part(...) is used in place of EXTRACT(EPOCH FROM ...) so the FROM keyword
+               does not interfere with MRole.AddAccessSQL parsing of the main FROM clause.
+               Oracle: DATE − DATE already yields whole days; TRUNC strips any time part. */
+            string daysOverdueExpr;
+            if (DB.IsPostgreSQL())
+            {
+                daysOverdueExpr = "CAST(date_part('epoch', (CAST(CURRENT_DATE AS TIMESTAMP) - CAST(CAST(ips.DueDate AS DATE) AS TIMESTAMP))) / 86400 AS NUMERIC)";
+            }
+            else
+            {
+                daysOverdueExpr = "(TRUNC(SYSDATE) - TRUNC(ips.DueDate))";
+            }
+
             string bucketedSql = @"
                 SELECT i.AD_Client_ID,
                        CASE
-                           WHEN CAST(ips.DueDate AS DATE) >= CAST(CURRENT_DATE AS DATE) THEN 'Not_Due'
-                           WHEN CAST(CURRENT_DATE AS DATE) - CAST(ips.DueDate AS DATE) BETWEEN 1 AND 30 THEN 'Days_1_30'
-                           WHEN CAST(CURRENT_DATE AS DATE) - CAST(ips.DueDate AS DATE) BETWEEN 31 AND 60 THEN 'Days_31_60'
-                           WHEN CAST(CURRENT_DATE AS DATE) - CAST(ips.DueDate AS DATE) BETWEEN 61 AND 90 THEN 'Days_61_90'
-                           WHEN CAST(CURRENT_DATE AS DATE) - CAST(ips.DueDate AS DATE) BETWEEN 91 AND 120 THEN 'Days_91_120'
-                           WHEN CAST(CURRENT_DATE AS DATE) - CAST(ips.DueDate AS DATE) > 120 THEN 'Days_Over_120'
+                           WHEN " + daysOverdueExpr + @" <= 0 THEN 'Not_Due'
+                           WHEN " + daysOverdueExpr + @" BETWEEN 1 AND 30 THEN 'Days_1_30'
+                           WHEN " + daysOverdueExpr + @" BETWEEN 31 AND 60 THEN 'Days_31_60'
+                           WHEN " + daysOverdueExpr + @" BETWEEN 61 AND 90 THEN 'Days_61_90'
+                           WHEN " + daysOverdueExpr + @" BETWEEN 91 AND 120 THEN 'Days_91_120'
+                           WHEN " + daysOverdueExpr + @" > 120 THEN 'Days_Over_120'
                        END AS Bucket,
                        CASE
                            WHEN i.IsSoTrx='Y' AND i.IsReturnTrx='N'
@@ -98,7 +121,8 @@ namespace VIS.Controllers
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_31_60' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_31_60_Amount,
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_61_90' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_61_90_Amount,
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_91_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_91_120_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_Over_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_Over_120_Amount
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_Over_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_Over_120_Amount,
+                       MAX(sc.Cur_Symbol) AS Currency_Symbol
                 FROM bucketed b
                 INNER JOIN schema_currency sc ON (sc.AD_Client_ID=b.AD_Client_ID)";
 
@@ -118,7 +142,8 @@ namespace VIS.Controllers
                         days31To60Amount = Util.GetValueOfDecimal(dr["Days_31_60_Amount"]),
                         days61To90Amount = Util.GetValueOfDecimal(dr["Days_61_90_Amount"]),
                         days91To120Amount = Util.GetValueOfDecimal(dr["Days_91_120_Amount"]),
-                        daysOver120Amount = Util.GetValueOfDecimal(dr["Days_Over_120_Amount"])
+                        daysOver120Amount = Util.GetValueOfDecimal(dr["Days_Over_120_Amount"]),
+                        symbol = Util.GetValueOfString(dr["Currency_Symbol"])
                     };
                 }
             }
