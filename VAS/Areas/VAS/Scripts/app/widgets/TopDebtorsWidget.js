@@ -28,10 +28,20 @@
         var $root = $('<div class="vas-td-root">');
 
         var $listBody;
+        /* Base-currency symbol from the backend; rendered before each amount. */
+        var currencySymbol = '';
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Escape text taken from the database before it is injected as HTML. */
+        function escapeHtml(s) {
+            if (s == null) return '';
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
         }
 
         /* ── Initialize ── */
@@ -47,25 +57,37 @@
                 type: 'GET',
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
-                    if (Array.isArray(data)) {
-                        renderRows(data);
+                    if (data && typeof data === 'object') {
+                        /* Backend returns { symbol, rows[] }; tolerate a bare array too. */
+                        currencySymbol = data.symbol || '';
+                        renderRows(Array.isArray(data) ? data : (data.rows || []));
                     }
                 },
                 error: function () { /* leave loading placeholder on error */ }
             });
         }
 
-        /* ── Format currency ── */
+        /* ── Format the numeric part of an amount (k / M abbreviations) ── */
         function formatCurrency(value) {
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+            var absVal = Math.abs(Number(value) || 0);
 
-            if (value >= 1000000) {
-                return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (absVal >= 1000000) {
+                return (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             }
-            if (value >= 1000) {
-                return (value / 1000).toFixed(0) + ',' + (value % 1000 < 100 ? (value % 1000 < 10 ? '00' : '0') : '') + (value % 1000);
+            if (absVal >= 1000) {
+                return Math.round(absVal / 1000) + 'k';
             }
-            return value.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+            return absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+        }
+
+        /* Build amount markup with the base-currency symbol placed *before* the amount;
+           the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+        function formatMetric(value, symbol) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var symHtml = symbol ? '<span class="vas-td-cur">' + escapeHtml(symbol) + '</span>' : '';
+            return sign + symHtml + formatCurrency(value);
         }
 
         /* ── Avatar initials ── */
@@ -78,28 +100,17 @@
             return name.substring(0, 2).toUpperCase();
         }
 
-        /* ── Avatar background colors (cycled by index) ── */
-        var AVATAR_COLORS = [
-            { bg: '#DBEAFE', color: '#1E40AF' },
-            { bg: '#FCE7F3', color: '#9D174D' },
-            { bg: '#D1FAE5', color: '#065F46' },
-            { bg: '#FEF3C7', color: '#92400E' },
-            { bg: '#EDE9FE', color: '#5B21B6' },
-            { bg: '#FFE4E6', color: '#9F1239' }
-        ];
-
-        /* ── Risk chip ── */
+        /* ── Risk chip (avatar palette + chip colours live in CSS) ── */
         function riskChip(daysOverdue) {
             var isHighRisk = daysOverdue > 0;
-            var bg    = isHighRisk ? '#FAD7D7' : '#CCEFDD';
-            var color = isHighRisk ? '#8F2D2D' : '#0C5D38';
+            var cls   = isHighRisk ? 'vas-td-chip-risk' : 'vas-td-chip-ontrack';
             var label = isHighRisk ? lbl("VIS_HighRisk", 'HIGH RISK') : lbl("VIS_OnTrack", 'ON TRACK');
-            return '<span class="vas-td-chip" style="background:' + bg + ';color:' + color + ';">' + label + '</span>';
+            return '<span class="vas-td-chip ' + cls + '">' + label + '</span>';
         }
 
         /* ── Overdue label ── */
         function overdueLabel(statusText) {
-            return '<span class="vas-td-overdue-label">' + (statusText || '') + '</span>';
+            return '<span class="vas-td-overdue-label">' + escapeHtml(statusText || '') + '</span>';
         }
 
         /* ── Render rows ── */
@@ -118,37 +129,25 @@
 
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
-                var isLast = (i === rows.length - 1);
-                var ac = AVATAR_COLORS[i % AVATAR_COLORS.length];
                 var initials = avatarInitials(r.customerName);
 
-                var $row = $(
-                    '<div class="vas-td-list-row" style="' +
-                        (isLast ? '' : 'border-bottom:1px solid #EDF2F6;') +
-                    '">' +
+                /* Row divider + hover are handled in CSS; the palette index cycles 0–5. */
+                $listBody.append(
+                    '<div class="vas-td-list-row">' +
                         /* Avatar */
-                        '<div class="vas-td-avatar" style="background:' + ac.bg + ';color:' + ac.color + ';">' + initials + '</div>' +
+                        '<div class="vas-td-avatar vas-td-avatar-' + (i % 6) + '">' + escapeHtml(initials) + '</div>' +
                         /* Name + overdue */
                         '<div class="vas-td-name-wrap">' +
-                            '<div class="vas-td-name">' +
-                                (r.customerName || '—') +
-                            '</div>' +
+                            '<div class="vas-td-name">' + escapeHtml(r.customerName || '—') + '</div>' +
                             '<div class="vas-td-overdue-wrap">' + overdueLabel(r.statusText) + '</div>' +
                         '</div>' +
-                        /* Amount + chip */
+                        /* Amount + risk chip (base-currency symbol before the amount) */
                         '<div class="vas-td-amount-wrap">' +
-                            '<span class="vas-td-amount">' +
-                                formatCurrency(r.unpaidBalance) +
-                            '</span>' +
+                            '<span class="vas-td-amount">' + formatMetric(r.unpaidBalance, currencySymbol) + '</span>' +
                             riskChip(r.daysOverdue) +
                         '</div>' +
                     '</div>'
                 );
-
-                $row.on('mouseenter', function () { $(this).css('background', '#F8FBFF'); });
-                $row.on('mouseleave', function () { $(this).css('background', 'transparent'); });
-
-                $listBody.append($row);
             }
         }
 
