@@ -36,7 +36,8 @@ namespace VIS.Controllers
             string schemaCurrencySql = @"
                 SELECT ci.AD_Client_ID,
                        cs.C_Currency_ID AS Acct_Currency_ID,
-                       cur.StdPrecision
+                       cur.StdPrecision,
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
                 INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)";
@@ -52,7 +53,8 @@ namespace VIS.Controllers
                            i.AD_Client_ID,
                            i.AD_Org_ID
                        ) AS PaidAmount,
-                       sc.StdPrecision
+                       sc.StdPrecision,
+                       sc.Cur_Symbol
                 FROM C_AllocationHdr ah
                 INNER JOIN C_AllocationLine al ON (ah.C_AllocationHdr_ID=al.C_AllocationHdr_ID)
                 INNER JOIN C_InvoicePaySchedule ips ON (al.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID)
@@ -92,11 +94,15 @@ namespace VIS.Controllers
                     " + paidThisMonthDataSql + @"
                 )
                 SELECT ROUND(COALESCE(SUM(PaidAmount), 0), MAX(StdPrecision)) AS Total_Paid_Amount_This_Month,
-                       COUNT(DISTINCT C_BPartner_ID) AS Customers_Paid_This_Month
+                       COUNT(DISTINCT C_BPartner_ID) AS Customers_Paid_This_Month,
+                       MAX(Cur_Symbol) AS Cur_Symbol
                 FROM PaidThisMonthData";
 
             decimal totalPaidAmount = 0;
             int customerCount = 0;
+            /* Base-currency symbol (accounting schema currency); amounts above are
+               already converted to this currency. Carried by the SchemaCurrency CTE. */
+            string currencySymbol = "";
 
             IDataReader dr = null;
 
@@ -108,6 +114,7 @@ namespace VIS.Controllers
                 {
                     totalPaidAmount = Util.GetValueOfDecimal(dr["Total_Paid_Amount_This_Month"]);
                     customerCount = Util.GetValueOfInt(dr["Customers_Paid_This_Month"]);
+                    currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
                 }
             }
             finally
@@ -121,7 +128,8 @@ namespace VIS.Controllers
             var result = new
             {
                 totalPaidAmount = totalPaidAmount,
-                customerCount = customerCount
+                customerCount = customerCount,
+                symbol = currencySymbol
             };
 
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

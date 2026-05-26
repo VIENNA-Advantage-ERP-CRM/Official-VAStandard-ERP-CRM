@@ -345,6 +345,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\CashJournal\VAS_NewCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CollectionEfficiencyWidget.js" />

@@ -1884,3 +1884,110 @@ html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] +
 }
 
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
+
+/* =====================================================================
+   Onfinity New Cash Journal quick-action widget (VAS_NewCashJournalWidget)
+   Spec: PROMPT.md (Cash Journal quick action) - 2x1 footprint.
+   All variables and classes are namespaced 'vas-cj-' so they cannot
+   collide with the app shell or with other widgets on the dashboard.
+   ===================================================================== */
+.vas-cj-qa-root {
+    --vas-cj-primary: #0083DA;
+    --vas-cj-primary-strong: #1F83FF;
+    --vas-cj-primary-soft: #E5F3FB;
+    --vas-cj-text-body: #102C3F;
+    --vas-cj-text-muted: #748494;
+    --vas-cj-text-secondary: #5F7283;
+    --vas-cj-success-strong: #0B6B45;
+    --vas-cj-danger-deep: #A33F3F;
+    --vas-cj-shadow-qa: 0 10px 24px rgba(31, 131, 255, 0.22);
+    --vas-cj-shadow-widget: 0 10px 24px rgba(15, 61, 97, 0.06);
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: block;
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+    color: var(--vas-cj-text-body);
+}
+
+.vas-cj-qa-btn {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+    background: linear-gradient(180deg, rgba(238, 246, 255, 0.85), rgba(255, 255, 255, 0.65));
+    border: 2px solid #FFFFFF;
+    box-shadow: var(--vas-cj-shadow-widget);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.15s ease;
+    font-family: inherit;
+    color: inherit;
+}
+
+.vas-cj-qa-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--vas-cj-shadow-qa);
+}
+
+.vas-cj-qa-btn:focus-visible {
+    outline: 2px solid var(--vas-cj-primary-strong);
+    outline-offset: 2px;
+}
+
+.vas-cj-qa-btn[disabled] {
+    opacity: 0.7;
+    cursor: default;
+    transform: none;
+}
+
+.vas-cj-qa-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    flex-shrink: 0;
+    background: var(--vas-cj-primary-strong);
+    color: #FFFFFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--vas-cj-shadow-qa);
+}
+
+.vas-cj-qa-icon svg {
+    width: 23px;
+    height: 23px;
+}
+
+.vas-cj-qa-text {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.vas-cj-qa-title {
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.12;
+    color: var(--vas-cj-text-body);
+    letter-spacing: -0.1px;
+}
+
+.vas-cj-qa-copy {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--vas-cj-text-muted);
+}
+
+/* RTL: mirror the icon/text order so the icon sits on the right. */
+html[dir='rtl'] .vas-cj-qa-btn {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+/* End New Cash Journal quick-action widget */

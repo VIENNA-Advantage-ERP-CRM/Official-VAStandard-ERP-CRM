@@ -2,13 +2,14 @@
  * Avg Days To Pay Widget
  * Purpose - KPI card showing the weighted-average number of days customers take to pay,
  *           compared to the previous quarter, on the home/finance dashboard.
- * Design  - Matches the dark KPI variant shown in the UI mockup: dark navy surface,
- *           large bold metric with a muted 'd' suffix, and a subtitle comparison line.
+ * Design  - Onfinity glass KPI card (design.md §8): light glass surface, tinted icon
+ *           well, large bold metric with a muted 'd' suffix, and a subtitle comparison
+ *           line. Sizing is em-based so the card scales as a whole inside its grid cell.
  *
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                  | Message Key                    | MsgText
  * ----+-----------------------------------------------+--------------------------------+-----------------------------------------------
- *  1  | Avg days to pay                               | VIS_AvgDaysToPay               | Avg days to pay
+ *  1  | Avg days to pay                               | VAS_AvgDaysToPay               | Avg days to pay
  *  2  | Loading…                                      | VIS_Loading                    | Loading…
  *  3  | No change                                     | VIS_NoChange                   | No change
  * ──────────────────────────────────────────────────────────────────────────────────────
@@ -81,10 +82,10 @@
             var $header = $(
                 '<div class="vas-adtp-header">' +
 
-                    /* Target/bullseye icon well — matches the SVG in the HTML mockup */
+                    /* Target/bullseye icon well — colour comes from CSS (currentColor) */
                     '<div class="vas-adtp-icon">' +
                         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
-                            'stroke="#9AA3B5" stroke-width="1.6" ' +
+                            'stroke="currentColor" stroke-width="1.6" ' +
                             'stroke-linecap="round" stroke-linejoin="round">' +
                             '<circle cx="12" cy="12" r="10"/>' +
                             '<circle cx="12" cy="12" r="6"/>' +
@@ -93,7 +94,7 @@
                     '</div>' +
 
                     '<div class="vas-adtp-title">' +
-                        lbl('VIS_AvgDaysToPay', 'Avg days to pay') +
+                        lbl('VAS_AvgDaysToPay', 'Avg days to pay') +
                     '</div>' +
 
                 '</div>'
