@@ -111,6 +111,8 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 
+import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
+
 import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
 import "../app/widgets/ExpectedThisWeekWidget.js";
 import "../app/widgets/AutoAllocatedWidget.js";
@@ -126,4 +128,3 @@ import "../app/widgets/OutstandingSalesOrderWidget.js";
 import "../app/widgets/OverdueWidget.js";
 import "../app/widgets/PaidthismonthWidget.js";
 import "../app/widgets/TopDebtorsWidget.js";
-
