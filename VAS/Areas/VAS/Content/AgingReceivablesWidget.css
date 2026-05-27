@@ -2,6 +2,21 @@
     height: 100%;
     width:100%;
     font-family: Roboto, sans-serif;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-ar-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
 }
 
 .vas-ar-nodata {

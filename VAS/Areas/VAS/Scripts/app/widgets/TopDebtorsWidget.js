@@ -5,15 +5,14 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key                    | MsgText
  * ----+-----------------------------------------------------------+--------------------------------+-----------------------------------------------------------
- *  1  | Top Debtors                                               | VIS_TopDebtors                 | Top Debtors
+ *  1  | Top Debtors                                               | VIS_TopDebtors                 | Highest Debtors
  *  2  | LARGEST UNPAID BALANCES                                   | VIS_LargestUnpaidBalances      | LARGEST UNPAID BALANCES
  *  3  | Chase all                                                 | VIS_ChaseAll                   | Chase all
  *  4  | days overdue                                              | VIS_DaysOverdue                | days overdue
  *  5  | Not yet overdue                                           | VIS_NotYetOverdue              | Not yet overdue
  *  6  | HIGH RISK                                                 | VIS_HighRisk                   | HIGH RISK
  *  7  | ON TRACK                                                  | VIS_OnTrack                    | ON TRACK
- *  8  | Loading…                                                  | VIS_Loading                    | Loading…
- *  9  | No data                                                   | VIS_NoData                     | No data
+ *  8  | No data                                                   | VIS_NoData                     | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
@@ -30,6 +29,8 @@
         var $listBody;
         /* Base-currency symbol from the backend; rendered before each amount. */
         var currencySymbol = '';
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -44,6 +45,12 @@
             });
         }
 
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
+        }
+
         /* ── Initialize ── */
         this.Initalize = function () {
             createWidget();
@@ -52,6 +59,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'TopDebtors/GetTopDebtors',
                 type: 'GET',
@@ -63,7 +71,8 @@
                         renderRows(Array.isArray(data) ? data : (data.rows || []));
                     }
                 },
-                error: function () { /* leave loading placeholder on error */ }
+                error: function () { /* leave loading placeholder on error */ },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -174,50 +183,31 @@
                         '</div>' +
                         '<div>' +
                             '<div class="vas-td-title">' +
-                                lbl("VIS_TopDebtors", 'Top Debtors') +
+                                lbl("VIS_TopDebtors", 'Highest Debtors') +
                             '</div>' +
                             '<div class="vas-td-subtitle">' +
                                 lbl("VIS_LargestUnpaidBalances", 'LARGEST UNPAID BALANCES') +
                             '</div>' +
                         '</div>' +
                     '</div>' +
-                    /* Right: Chase all link */
-                    '<div class="vas-td-header-right" id="vis-topdebtors-chaseall-' + ($self.AD_UserHomeWidgetID || '') + '">' +
-                        '<span class="vas-td-chase-all">' +
-                            lbl("VIS_ChaseAll", 'Chase all') +
-                        '</span>' +
-                        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
-                            'stroke="#0083DA" stroke-width="2.2" ' +
-                            'stroke-linecap="round" stroke-linejoin="round">' +
-                            '<line x1="7" y1="17" x2="17" y2="7"/>' +
-                            '<polyline points="7 7 17 7 17 17"/>' +
-                        '</svg>' +
-                    '</div>' +
                 '</div>'
             );
 
-            /* ── Scrollable list body ── */
-            $listBody = $(
-                '<div class="vas-td-list-body">' +
-                    '<div class="vas-td-nodata">' +
-                        lbl("VIS_Loading", 'Loading…') +
-                    '</div>' +
-                '</div>'
-            );
+            /* ── Scrollable list body (empty until data loads; the busy overlay covers the wait) ── */
+            $listBody = $('<div class="vas-td-list-body">');
 
             $card.append($header).append($listBody);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-td-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */
         this.refreshWidget = function () {
-            if ($listBody) {
-                $listBody.html(
-                    '<div class="vas-td-nodata">' +
-                        lbl("VIS_Loading", 'Loading…') +
-                    '</div>'
-                );
-            }
             loadData();
         };
 
