@@ -774,6 +774,149 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// Type-ahead search for the Sales Invoice search widget. Matches active sales invoices of the
+        /// session client by document number, customer name, document status (keyword → DocStatus code
+        /// or IsPaid flag), or grand-total amount (when the query is numeric). Completed ('CO') and
+        /// voided ('VO') invoices are excluded. Returns the top N matches
+        /// (newest first), each carrying its own currency symbol/ISO, so the widget can list them and
+        /// zoom the host window's invoice tab to the chosen record. The query is bound as a parameter
+        /// (no SQL injection); MRole is applied on the main physical table (C_Invoice). Oracle/PostgreSQL
+        /// compatible.
+        /// </summary>
+        /// <param name="q">Free-text search term.</param>
+        /// <param name="max">Maximum rows to return (1..25, default 10).</param>
+        /// <returns>JSON { rows[] } where each row has cInvoiceId, documentNo, customerName, grandTotal,
+        /// docStatus, isPaid, dateInvoiced, curSymbol, currencyIso.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SearchInvoices(string q, int max = 10)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            int clientId = ctx.GetAD_Client_ID();
+
+            q = (q ?? "").Trim();
+            if (q.Length == 0)
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = new List<object>() }), JsonRequestBehavior.AllowGet);
+            }
+            if (max <= 0 || max > 25)
+            {
+                max = 10;
+            }
+
+            /* All user input is bound; only fixed, code-controlled literals (status codes) are inlined. */
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@Like", "%" + q.ToUpper() + "%"));
+            parameters.Add(new SqlParameter("@Max", max));
+
+            List<string> ors = new List<string>();
+            ors.Add("UPPER(i.DocumentNo) LIKE @Like");
+            ors.Add("UPPER(bp.Name) LIKE @Like");
+
+            /* Status keyword -> document-status code(s). Codes are constants, safe to inline. */
+            string ql = q.ToLower();
+            List<string> codes = new List<string>();
+            /* Completed ('CO') and voided ('VO') invoices are excluded from search, so those
+               keywords are intentionally not mapped here. */
+            if (ql.Contains("draft")) { codes.Add("'DR'"); }
+            if (ql.Contains("progress")) { codes.Add("'IP'"); }
+            if (ql.Contains("close")) { codes.Add("'CL'"); }
+            if (ql.Contains("approv")) { codes.Add("'AP'"); }
+            if (ql.Contains("complete")) { codes.Add("'CO'"); }
+            if (ql.Contains("invalid")) { codes.Add("'IN'"); }
+            if (ql.Contains("waiting")) { codes.Add("'WP'"); codes.Add("'WC'"); }
+            if (codes.Count > 0)
+            {
+                ors.Add("i.DocStatus IN (" + string.Join(", ", codes) + ")");
+            }
+            /* Paid / unpaid keyword (check 'unpaid' first since it contains 'paid'). */
+            if (ql.Contains("unpaid"))
+            {
+                ors.Add("i.IsPaid='N'");
+            }
+            else if (ql.Contains("paid"))
+            {
+                ors.Add("i.IsPaid='Y'");
+            }
+
+            /* Amount match when the term parses as a number (commas/symbols stripped). */
+            decimal amt;
+            if (decimal.TryParse(q.Replace(",", "").Replace("$", "").Trim(), out amt))
+            {
+                parameters.Add(new SqlParameter("@Amt", amt));
+                ors.Add("i.GrandTotal = @Amt");
+            }
+
+            string selectSql = @"
+                SELECT i.C_Invoice_ID AS C_Invoice_ID,
+                       i.DocumentNo AS Invoice_Document_No,
+                       bp.Name AS Customer_Name,
+                       i.GrandTotal AS Grand_Total,
+                       i.DocStatus AS DocStatus,
+                       i.IsPaid AS IsPaid,
+                       i.DateInvoiced AS Invoice_Date,
+                       cur.ISO_Code AS Currency_ISO,
+                       CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
+                FROM C_Invoice i
+                INNER JOIN C_BPartner bp ON (i.C_BPartner_ID=bp.C_BPartner_ID)
+                INNER JOIN C_Currency cur ON (i.C_Currency_ID=cur.C_Currency_ID)
+                WHERE i.IsSOTrx='Y'
+                  AND i.IsActive='Y'
+                  AND i.DocStatus NOT IN ('RE', 'VO')
+                  AND i.AD_Client_ID=" + clientId + @"
+                  AND (" + string.Join(" OR ", ors) + @")";
+
+            /* MRole only on the main physical table (C_Invoice / alias i). */
+            selectSql = MRole.GetDefault(ctx).AddAccessSQL(
+                selectSql,
+                "i",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = selectSql + @"
+                ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC
+                OFFSET 0 ROWS FETCH NEXT @Max ROWS ONLY";
+
+            List<object> rows = new List<object>();
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                while (dr != null && dr.Read())
+                {
+                    rows.Add(new
+                    {
+                        cInvoiceId = Util.GetValueOfInt(dr["C_Invoice_ID"]),
+                        documentNo = Util.GetValueOfString(dr["Invoice_Document_No"]),
+                        customerName = Util.GetValueOfString(dr["Customer_Name"]),
+                        grandTotal = Util.GetValueOfDecimal(dr["Grand_Total"]),
+                        docStatus = Util.GetValueOfString(dr["DocStatus"]),
+                        isPaid = Util.GetValueOfString(dr["IsPaid"]),
+                        dateInvoiced = dr["Invoice_Date"] != DBNull.Value ? Convert.ToDateTime(dr["Invoice_Date"]).ToString("MMM dd, yyyy") : "",
+                        curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
+                        currencyIso = Util.GetValueOfString(dr["Currency_ISO"])
+                    });
+                }
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+
+            return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// "Keep both" action of the Duplicate Invoice Review dialog: flags every invoice in the
         /// reviewed duplicate set as acknowledged-not-a-duplicate
         /// (C_Invoice.VAS_IsNonDuplicateAcknowledge = 'Y'). Once flagged, GetDuplicates skips the set

@@ -1,0 +1,179 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Sales Invoice Customer Search Widget — full-width (1x9) type-ahead search.
+ * Per the approved search-widget design + design.md "Full-Width Dashboard
+ * Search Widget": the search pill IS the widget (no card wrapper), floats on
+ * the app gradient with equal gutters left & right, sits vertically centered,
+ * and the outer widget stays transparent. The autosuggest dropdown is mounted
+ * on <body> (fixed, anchored to the pill) so the dashboard cell cannot clip it.
+ * All selectors are namespaced vas-sics-* to avoid collisions.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-sics-root {
+    width: 100%;
+    height: 100%;
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+    /* Vertically centered band; transparent so the app gradient shows through. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+}
+
+/* Gutter band — equal empty space left & right; pill floats centered. */
+.vas-sics-esw {
+    width: 100%;
+    max-width: 1500px;
+    --vas-sics-gutter: 9.7%;
+    padding: 0 var(--vas-sics-gutter);
+    margin: 0 auto;
+}
+
+.vas-sics-zone {
+    position: relative;
+    width: 100%;
+}
+
+/* ── Search pill ── */
+.vas-sics-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 56px;
+    padding: 0 14px 0 20px;
+    /* pale tinted glass: faint blue → faint green, matching the app gradient pickup */
+    background: linear-gradient(100deg,
+        rgb(240, 248, 255) 0%,
+        rgb(244, 250, 253) 50%,
+        rgb(247, 252, 247) 100%);
+    /* soft light edge + bright top highlight, no hard border */
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-top-color: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.07),
+                0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.vas-sics-input:focus-within {
+    border-color: #BFE4FF;
+    box-shadow: 0 12px 30px rgba(0, 131, 218, 0.13),
+                0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.vas-sics-search-icon { color: #0083DA; flex-shrink: 0; }
+
+/* High specificity + !important to defeat the global core <input> styling (white background,
+   border, radius, inner padding) so the field reads as part of the seamless glass pill. */
+.vas-sics-input .vas-sics-field,
+.vas-sics-input .vas-sics-field:focus {
+    flex: 1 1 0%;
+    min-width: 0;
+    background: transparent !important;
+    border: 0 none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    line-height: normal;
+    color: #102C3F;
+}
+.vas-sics-input .vas-sics-field::placeholder { color: #788692; }
+
+.vas-sics-clear {
+    width: 32px; height: 32px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: none; cursor: pointer;
+    color: #748494;
+    border-radius: 50%;
+    visibility: hidden;
+    transition: background 150ms ease;
+}
+.vas-sics-clear:hover { background: #F4F7FA; }
+.vas-sics-clear.is-visible { visibility: visible; }
+
+/* ── Autosuggest dropdown (mounted on body, fixed) ── */
+.vas-sics-suggest {
+    position: fixed;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(15, 61, 97, 0.16);
+    padding: 6px;
+    z-index: 1000;
+    display: none;
+    max-height: 420px;
+    overflow-y: auto;
+    font-family: Roboto, sans-serif;
+}
+.vas-sics-suggest.is-open { display: block; }
+.vas-sics-suggest::-webkit-scrollbar { width: 6px; }
+.vas-sics-suggest::-webkit-scrollbar-thumb { background: rgba(15, 61, 97, 0.15); border-radius: 3px; }
+
+.vas-sics-meta {
+    font-size: 11px; color: #748494;
+    padding: 8px 12px 6px; letter-spacing: 0.2px;
+}
+.vas-sics-meta strong { color: #102C3F; font-weight: 700; }
+
+.vas-sics-line {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+.vas-sics-line:hover,
+.vas-sics-line.is-cursor { background: #F4F9FE; }
+
+.vas-sics-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #FFFFFF; font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+}
+.vas-sics-info { min-width: 0; }
+.vas-sics-name {
+    font-size: 14px; font-weight: 700; color: #102C3F;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vas-sics-name mark,
+.vas-sics-rowmeta mark { background: #FFF3DA; color: #9A6500; padding: 0 1px; border-radius: 2px; }
+
+/* Inline text flow so "docNo · amount · status · date" reads as one line and trims cleanly. */
+.vas-sics-rowmeta {
+    font-size: 12px; color: #748494;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.vas-sics-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-inline-end: 6px;
+    vertical-align: middle;
+}
+.vas-sics-cur { margin-inline-end: 0.08em; }
+
+.vas-sics-state,
+.vas-sics-empty {
+    text-align: center;
+    padding: 26px 20px;
+    color: #748494;
+    font-size: 13px;
+}
+.vas-sics-empty strong { color: #102C3F; }
+
+/* small-screen safety */
+@media (max-width: 720px) {
+    .vas-sics-esw { --vas-sics-gutter: 16px; }
+    .vas-sics-input { height: 50px; }
+    .vas-sics-field { font-size: 14px; }
+}
