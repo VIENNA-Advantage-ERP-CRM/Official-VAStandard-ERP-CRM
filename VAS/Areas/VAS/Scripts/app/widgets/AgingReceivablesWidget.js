@@ -18,7 +18,6 @@
  *  7  | 90+ days                                              | VIS_Days90Plus         | 90+ days
  *  8  | WHY                                                   | VIS_Why                | WHY
  *  9  | Older invoices are harder to collect. Focus on the…   | VIS_AgingWhyText       | Older invoices are harder to collect. Focus on the 61+ buckets.
- *  10 | Loading…                                              | VIS_Loading            | Loading…
  *  11 | No data                                               | VIS_NoData             | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
@@ -45,10 +44,18 @@
         var $contentArea;
         /* Base-currency symbol from the backend; prefixed before every amount. */
         var currencySymbol = '';
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -59,6 +66,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'AgingReceivables/GetAgingReceivables',
                 type: 'GET',
@@ -68,7 +76,8 @@
                         renderRows(data);
                     }
                 },
-                error: function () { /* leave loading placeholder on error */ }
+                error: function () { /* leave loading placeholder on error */ },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -147,7 +156,7 @@
 
             // WHY block
             html += '<div class="vas-ar-why-block">' +
-                '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +
+               /* '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +*/
                 lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
                 '</div>';
 
@@ -178,11 +187,17 @@
                 '</div>'
             );
 
+            /* Empty until data loads; the busy overlay covers the wait. */
             $contentArea = $('<div class="vas-ar-content-area">');
-            $contentArea.append('<div class="vas-ar-loading">' + lbl("VIS_Loading", 'Loading…') + '</div>');
 
             $card.append($header).append($contentArea);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-ar-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */

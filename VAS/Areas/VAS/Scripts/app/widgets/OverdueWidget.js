@@ -30,10 +30,18 @@
 
         var $metricEl;
         var $whyText;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -44,6 +52,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'Overdue/GetOverdue',
                 type: 'GET',
@@ -55,7 +64,8 @@
                 },
                 error: function () {
                     /* Leave placeholder values on error */
-                }
+                },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -144,7 +154,7 @@
             );
 
             var $pill = $(
-                '<span class="vas-ovd-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
+                /*'<span class="vas-ovd-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
             );
 
             $whyText = $(
@@ -156,6 +166,12 @@
             $why.append($pill).append($whyText);
             $card.append($header).append($metricEl).append($why);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-ovd-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */
