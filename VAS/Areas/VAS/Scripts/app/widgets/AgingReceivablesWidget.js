@@ -45,10 +45,18 @@
         var $contentArea;
         /* Base-currency symbol from the backend; prefixed before every amount. */
         var currencySymbol = '';
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -59,6 +67,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'AgingReceivables/GetAgingReceivables',
                 type: 'GET',
@@ -68,7 +77,8 @@
                         renderRows(data);
                     }
                 },
-                error: function () { /* leave loading placeholder on error */ }
+                error: function () { /* leave loading placeholder on error */ },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -183,6 +193,12 @@
 
             $card.append($header).append($contentArea);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-ar-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */

@@ -39,11 +39,19 @@
 
         var $metricEl;
         var $whyText;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         /* Resolve a translated label, falling back to readable English text. */
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -54,6 +62,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'OutstandingSalesOrder/GetOutstanding',
                 type: 'GET',
@@ -65,7 +74,8 @@
                 },
                 error: function () {
                     /* Leave placeholder values on error */
-                }
+                },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -146,6 +156,12 @@
                     .append($metricEl)
                     .append($why)
             );
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-oso-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */
