@@ -543,6 +543,7 @@
                         grandTotal: r.grandTotal, currencyIso: r.currencyIso,
                         isSameCustomer: r.isSameCustomer, isSameGrandTotal: r.isSameGrandTotal,
                         isSameCurrency: r.isSameCurrency, isSamePaymentTerm: r.isSamePaymentTerm,
+                        isSameInvoiceDate: r.isSameInvoiceDate,
                         lines: []
                     };
                     order.push(id);
@@ -687,7 +688,7 @@
                 '<div class="vas-dup-fields">' +
                 fieldRow(lbl("VIS_Organization", 'Organization'), val(inv.org), null, inv.org) +
                 fieldRow(lbl("VIS_CustomerName", 'Customer Name'), val(inv.customer), flagState(inv.isSameCustomer), inv.customer) +
-                fieldRow(lbl("VIS_InvoiceDate", 'Invoice Date'), val(inv.date), 'diff', inv.date) +
+                fieldRow(lbl("VIS_InvoiceDate", 'Invoice Date'), val(inv.date), flagState(inv.isSameInvoiceDate), inv.date) +
                 fieldRow(lbl("VIS_SalesOrderNo", 'Sales Order No.'), val(inv.salesOrderNo), null, inv.salesOrderNo) +
                 fieldRow(lbl("VIS_DeliveryOrder", 'Delivery Order'), val(inv.deliveryOrderNo), null, inv.deliveryOrderNo) +
                 fieldRow(lbl("VIS_PaymentTerm", 'Payment Term'), val(inv.paymentTerm), flagState(inv.isSamePaymentTerm), inv.paymentTerm) +
