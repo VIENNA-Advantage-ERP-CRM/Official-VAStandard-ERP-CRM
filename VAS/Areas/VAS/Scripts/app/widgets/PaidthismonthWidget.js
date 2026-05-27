@@ -143,7 +143,7 @@
             );
 
             var $pill = $(
-                '<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
+                /*'<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
             );
 
             $whyText = $(

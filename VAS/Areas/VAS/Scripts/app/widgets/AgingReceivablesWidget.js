@@ -147,7 +147,7 @@
 
             // WHY block
             html += '<div class="vas-ar-why-block">' +
-                '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +
+               /* '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +*/
                 lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
                 '</div>';
 

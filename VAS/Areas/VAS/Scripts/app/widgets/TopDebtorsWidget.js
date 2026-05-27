@@ -5,7 +5,7 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key                    | MsgText
  * ----+-----------------------------------------------------------+--------------------------------+-----------------------------------------------------------
- *  1  | Top Debtors                                               | VIS_TopDebtors                 | Top Debtors
+ *  1  | Top Debtors                                               | VIS_TopDebtors                 | Highest Debtors
  *  2  | LARGEST UNPAID BALANCES                                   | VIS_LargestUnpaidBalances      | LARGEST UNPAID BALANCES
  *  3  | Chase all                                                 | VIS_ChaseAll                   | Chase all
  *  4  | days overdue                                              | VIS_DaysOverdue                | days overdue
@@ -174,7 +174,7 @@
                         '</div>' +
                         '<div>' +
                             '<div class="vas-td-title">' +
-                                lbl("VIS_TopDebtors", 'Top Debtors') +
+                                lbl("VIS_TopDebtors", 'Highest Debtors') +
                             '</div>' +
                             '<div class="vas-td-subtitle">' +
                                 lbl("VIS_LargestUnpaidBalances", 'LARGEST UNPAID BALANCES') +
@@ -183,9 +183,9 @@
                     '</div>' +
                     /* Right: Chase all link */
                     '<div class="vas-td-header-right" id="vis-topdebtors-chaseall-' + ($self.AD_UserHomeWidgetID || '') + '">' +
-                        '<span class="vas-td-chase-all">' +
+                        /*'<span class="vas-td-chase-all">' +
                             lbl("VIS_ChaseAll", 'Chase all') +
-                        '</span>' +
+                        '</span>' +*/
                         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
                             'stroke="#0083DA" stroke-width="2.2" ' +
                             'stroke-linecap="round" stroke-linejoin="round">' +

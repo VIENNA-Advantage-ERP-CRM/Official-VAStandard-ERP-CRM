@@ -137,7 +137,7 @@
             );
 
             var $why = $('<div class="vas-oso-why-wrap">')
-                .append('<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>')
+                /*.append('<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>')*/
                 .append($whyText);
 
             $root.append(
