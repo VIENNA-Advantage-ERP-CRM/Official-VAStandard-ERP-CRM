@@ -12,8 +12,7 @@
  *  5  | Not yet overdue                                           | VIS_NotYetOverdue              | Not yet overdue
  *  6  | HIGH RISK                                                 | VIS_HighRisk                   | HIGH RISK
  *  7  | ON TRACK                                                  | VIS_OnTrack                    | ON TRACK
- *  8  | Loading…                                                  | VIS_Loading                    | Loading…
- *  9  | No data                                                   | VIS_NoData                     | No data
+ *  8  | No data                                                   | VIS_NoData                     | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
@@ -194,14 +193,8 @@
                 '</div>'
             );
 
-            /* ── Scrollable list body ── */
-            $listBody = $(
-                '<div class="vas-td-list-body">' +
-                    '<div class="vas-td-nodata">' +
-                        lbl("VIS_Loading", 'Loading…') +
-                    '</div>' +
-                '</div>'
-            );
+            /* ── Scrollable list body (empty until data loads; the busy overlay covers the wait) ── */
+            $listBody = $('<div class="vas-td-list-body">');
 
             $card.append($header).append($listBody);
             $root.append($card);
@@ -215,13 +208,6 @@
 
         /* ── Refresh ── */
         this.refreshWidget = function () {
-            if ($listBody) {
-                $listBody.html(
-                    '<div class="vas-td-nodata">' +
-                        lbl("VIS_Loading", 'Loading…') +
-                    '</div>'
-                );
-            }
             loadData();
         };
 

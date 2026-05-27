@@ -18,7 +18,6 @@
  *  7  | 90+ days                                              | VIS_Days90Plus         | 90+ days
  *  8  | WHY                                                   | VIS_Why                | WHY
  *  9  | Older invoices are harder to collect. Focus on the…   | VIS_AgingWhyText       | Older invoices are harder to collect. Focus on the 61+ buckets.
- *  10 | Loading…                                              | VIS_Loading            | Loading…
  *  11 | No data                                               | VIS_NoData             | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
@@ -188,8 +187,8 @@
                 '</div>'
             );
 
+            /* Empty until data loads; the busy overlay covers the wait. */
             $contentArea = $('<div class="vas-ar-content-area">');
-            $contentArea.append('<div class="vas-ar-loading">' + lbl("VIS_Loading", 'Loading…') + '</div>');
 
             $card.append($header).append($contentArea);
             $root.append($card);

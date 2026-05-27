@@ -10,7 +10,6 @@
  *  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
  *  2  | Cash received                                       | VIS_CashReceived             | Cash received
  *  3  | WHY                                                 | VIS_Why                      | WHY
- *  4  | Loading…                                            | VIS_Loading                  | Loading…
  *  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
  *  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
  *  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
@@ -156,10 +155,9 @@
                 /*'<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
             );
 
+            /* Empty until data loads; the busy overlay covers the wait. */
             $whyText = $(
-                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text">' +
-                lbl("VIS_Loading", 'Loading…') +
-                '</span>'
+                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text"></span>'
             );
 
             $why.append($pill).append($whyText);
