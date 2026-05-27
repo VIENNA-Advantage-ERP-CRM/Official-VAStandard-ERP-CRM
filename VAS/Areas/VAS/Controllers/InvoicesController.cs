@@ -357,7 +357,8 @@ namespace VIS.Controllers
                            CASE WHEN MIN(si.C_BPartner_ID) OVER () = MAX(si.C_BPartner_ID) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Customer,
                            CASE WHEN MIN(si.Grand_Total) OVER () = MAX(si.Grand_Total) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Grand_Total,
                            CASE WHEN MIN(si.C_Currency_ID) OVER () = MAX(si.C_Currency_ID) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Currency,
-                           CASE WHEN MIN(COALESCE(si.C_PaymentTerm_ID, -1)) OVER () = MAX(COALESCE(si.C_PaymentTerm_ID, -1)) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Payment_Term
+                           CASE WHEN MIN(COALESCE(si.C_PaymentTerm_ID, -1)) OVER () = MAX(COALESCE(si.C_PaymentTerm_ID, -1)) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Payment_Term,
+                           CASE WHEN MIN(si.Invoice_Date) OVER () = MAX(si.Invoice_Date) OVER () THEN 'Y' ELSE 'N' END AS Is_Same_Invoice_Date
                     FROM Selected_Invoices si
                     INNER JOIN AD_Org org ON (org.AD_Org_ID=si.AD_Org_ID)
                     LEFT OUTER JOIN C_PaymentTerm pt ON (pt.C_PaymentTerm_ID=si.C_PaymentTerm_ID)
@@ -404,7 +405,8 @@ namespace VIS.Controllers
                        ld.Is_Same_Customer,
                        ld.Is_Same_Grand_Total,
                        ld.Is_Same_Currency,
-                       ld.Is_Same_Payment_Term
+                       ld.Is_Same_Payment_Term,
+                       ld.Is_Same_Invoice_Date
                 FROM Line_Detail ld
                 ORDER BY ld.Newest_Rank, ld.Line_No";
 
@@ -462,7 +464,8 @@ namespace VIS.Controllers
                         isSameCustomer = Util.GetValueOfString(dr["Is_Same_Customer"]),
                         isSameGrandTotal = Util.GetValueOfString(dr["Is_Same_Grand_Total"]),
                         isSameCurrency = Util.GetValueOfString(dr["Is_Same_Currency"]),
-                        isSamePaymentTerm = Util.GetValueOfString(dr["Is_Same_Payment_Term"])
+                        isSamePaymentTerm = Util.GetValueOfString(dr["Is_Same_Payment_Term"]),
+                        isSameInvoiceDate = Util.GetValueOfString(dr["Is_Same_Invoice_Date"])
                     });
                 }
             }
@@ -809,14 +812,21 @@ namespace VIS.Controllers
                 max = 10;
             }
 
-            /* All user input is bound; only fixed, code-controlled literals (status codes) are inlined. */
+            /* All user input is bound; only fixed, code-controlled literals (status codes) are inlined.
+               Oracle binds parameters by POSITION (not by name), so:
+                 (a) a value used in two places needs two distinct placeholders, each supplied once, and
+                 (b) the parameter list must be built in the exact order the placeholders appear in the
+                     final SQL.
+               Hence @Like1/@Like2 (same value) for the two LIKE clauses, and @Max (the FETCH bind) is
+               added last, after the SQL is assembled. */
             List<SqlParameter> parameters = new List<SqlParameter>();
-            parameters.Add(new SqlParameter("@Like", "%" + q.ToUpper() + "%"));
-            parameters.Add(new SqlParameter("@Max", max));
+            string likeVal = "%" + q.ToUpper() + "%";
 
             List<string> ors = new List<string>();
-            ors.Add("UPPER(i.DocumentNo) LIKE @Like");
-            ors.Add("UPPER(bp.Name) LIKE @Like");
+            parameters.Add(new SqlParameter("@Like1", likeVal));
+            ors.Add("UPPER(i.DocumentNo) LIKE @Like1");
+            parameters.Add(new SqlParameter("@Like2", likeVal));
+            ors.Add("UPPER(bp.Name) LIKE @Like2");
 
             /* Status keyword -> document-status code(s). Codes are constants, safe to inline. */
             string ql = q.ToLower();
@@ -882,6 +892,10 @@ namespace VIS.Controllers
             string sql = selectSql + @"
                 ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC
                 OFFSET 0 ROWS FETCH NEXT @Max ROWS ONLY";
+
+            /* @Max is the FETCH bind — it appears last in the SQL, so for Oracle's positional binding
+               it must be the last parameter added (after @Like1, @Like2 and the optional @Amt). */
+            parameters.Add(new SqlParameter("@Max", max));
 
             List<object> rows = new List<object>();
             IDataReader dr = null;
