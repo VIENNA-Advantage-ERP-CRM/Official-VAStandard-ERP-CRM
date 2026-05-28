@@ -13,6 +13,8 @@
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
 
+@import "../VAS_CreateNewReceipt.css";
+@import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AutoAllocatedWidget.css";

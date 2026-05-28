@@ -256,7 +256,7 @@
             $.ajax({
                 url: VIS.Application.contextUrl + 'Invoices/SearchInvoices',
                 type: 'GET',
-                data: { q: q, max: 10 },
+                data: { q: q, max: 25 },
                 success: function (res) {
                     /* Ignore stale responses (a newer keystroke already fired). */
                     if (mySeq !== reqSeq) return;
