@@ -809,7 +809,7 @@ namespace VIS.Controllers
             }
             if (max <= 0 || max > 25)
             {
-                max = 10;
+                max = 25;
             }
 
             /* All user input is bound; only fixed, code-controlled literals (status codes) are inlined.

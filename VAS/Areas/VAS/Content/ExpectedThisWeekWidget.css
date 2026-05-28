@@ -1,111 +1,106 @@
-﻿/* Widget base */
-.widget {
-    border: 2px solid #FFFFFF;
-    border-radius: 14px;
-    padding: 16px 16px 18px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-    min-height: 0;
-    box-sizing: border-box;
-}
-
-    .widget * {
-        box-sizing: border-box;
-    }
-
-.span-2x1 {
-    grid-column: span 2;
-    grid-row: span 1;
-}
+/* ─────────────────────────────────────────────────────────────────────────
+ * Expected This Week Widget — KPI/Summary glass card + drill-down dialog.
+ * Design source: design.md (Onfinity) + dashboard-widgets.md (tint-success KPI).
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card, 16px on the
+ * dialog). Container queries scale the card on small dashboard cells; media
+ * queries scale the dialog on small viewports.
+ * Namespaced vas-etw-*.
+ * ───────────────────────────────────────────────────────────────────────── */
 
 .vas-etw-root {
     width: 100%;
     height: 100%;
-}
-/* KPI */
-.kpi {
-    padding: 16px;
-    gap: 8px;
-    justify-content: space-between;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
 }
 
-.kpi-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-}
+    .vas-etw-root,
+    .vas-etw-root * {
+        box-sizing: border-box;
+    }
 
-.kpi-icon {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    border-radius: 8px;
+.vas-etw-busy {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255,255,255,0.8);
-    border: 1px solid rgba(255,255,255,0.95);
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── KPI card (glass widget, tint-success) ────────────────────────── */
+
+.vas-etw-card {
+    font-size: 1em;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    /* Tint-success glass surface per design.md — pale green → white. */
+    background: linear-gradient(135deg, rgba(206, 238, 212, 0.78), rgba(255, 255, 255, 0.62));
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+    .vas-etw-card:hover {
+        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-etw-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+.vas-etw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-etw-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-etw-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
-    .kpi-icon svg {
-        width: 15px;
-        height: 15px;
+    .vas-etw-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
     }
 
-.kpi-label {
-    font-size: 16px;
-    color: #102C3F;
-    font-weight: 500;
-    line-height: 1.25;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.kpi-value {
-    font-size: 34px;
-    font-weight: 700;
-    color: #102C3F;
-    line-height: 1;
-    letter-spacing: -1px;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.kpi-why {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: #586575;
-    min-width: 0;
-}
-
-.kpi-why-tag {
-    background: hsla(0, 0%, 100%, .94);
-    border-radius: 8px;
-    color: #4b80d9;
-    display: inline-flex;
-    font-size: 9px;
-    font-weight: 800;
-    justify-content: center;
-    letter-spacing: 2px;
-    line-height: 1;
-    padding: 4px 6px;
-}
-
-.kpi-why-text-tag {
-    color: #5b6878;
-    font-size: 12px;
+.vas-etw-label {
+    font-size: 0.8125em;              /* 13px muted label */
+    color: #748494;
     font-weight: 400;
     min-width: 0;
     overflow: hidden;
@@ -113,66 +108,491 @@
     white-space: nowrap;
 }
 
-.kpi-why span:last-child {
+.vas-etw-view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+    color: #0083DA;
+    font-size: 0.75em;
+    font-weight: 500;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+    .vas-etw-view svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-etw-view:hover {
+        background: rgba(0, 131, 218, 0.08);
+        color: #0069AE;
+    }
+
+/* Big metric — success green to match the tint, with base-currency symbol leading. */
+.vas-etw-metric {
+    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-weight: 700;
+    color: #0B6B45;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-etw-cur {
+    font-size: 1em;
+    font-weight: inherit;
+    margin-inline-end: 0.04em;
+    vertical-align: baseline;
+}
+
+/* Plain "Invoice due in 7 days" detail line (no pill chrome per latest design). */
+.vas-etw-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: 0.75em;
+    color: #5F7283;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Responsive (widget cell) ─────────────────────────────────────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-etw-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-etw-card { font-size: 0.6875em; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Drill-down modal dialog. Attached to <body>; uses fixed positioning
+ * so it sits above the dashboard.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-etw-body-lock {
+    overflow: hidden;
+}
+
+.vas-etw-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-etw-dialog,
+    .vas-etw-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-etw-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-etw-dialog-card {
+    position: relative;
+    width: min(64em, 100%);           /* ~1024px on wide screens */
+    /* Fixed dialog height so it doesn't shrink (or grow) with row count —
+       header/footer stay put, body scrolls when there are more rows than
+       fit. Sized so the empty area below the last row stays small even on a
+       partly-filled page. `min(...)` clamps it on short viewports. */
+    height: min(33em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+.vas-etw-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.vas-etw-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5em;
+    background: #E5F5EA;
+    border: 0.0625em solid #B6E1C2;
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-etw-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-etw-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-etw-dialog-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-etw-dialog-subtitle {
+    margin-top: 0.125em;
+    font-size: 0.8125em;
+    color: #748494;
+    line-height: 1.3;
+}
+
+.vas-etw-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-etw-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-etw-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+/* Body / table */
+.vas-etw-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+/* Busy overlay over the table while a page is being fetched. Same spinner
+   classes (`vis_widgetloader`) used by other widgets in this project. */
+.vas-etw-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+/* `table-layout: fixed` so the per-column widths below win — keeps long
+   Customer / Invoice No. values clipping with ellipsis instead of pushing
+   neighbouring columns off-axis. */
+.vas-etw-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;               /* 14px body */
+}
+
+    .vas-etw-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        background: #FFFFFF;
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-etw-dialog-table thead th.vas-etw-th-amount {
+            text-align: right;
+        }
+
+        .vas-etw-dialog-table thead th.vas-etw-th-currency {
+            text-align: center;
+        }
+
+        .vas-etw-dialog-table thead th.vas-etw-th-duein {
+            text-align: center;
+        }
+
+    .vas-etw-dialog-table tbody td {
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-etw-dialog-table tbody tr:hover td {
+        background: #F8FBFE;
+    }
+
+/* Per-column widths — Customer flexes; everything else fixed so Dates and
+   Amount always have room to render their full value. Order per spec:
+   Invoice No | Invoice date | Customer | Due date | Currency | Due amount | Due in. */
+.vas-etw-th-doc,         .vas-etw-td-doc         { width: 8.5em; }
+.vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 7em; }
+.vas-etw-th-customer,    .vas-etw-td-customer    { width: 12em; }
+.vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 7em; }
+.vas-etw-th-currency,    .vas-etw-td-currency    { width: 5em; text-align: center; }
+.vas-etw-th-amount,      .vas-etw-td-amount      { width: 9em; }
+.vas-etw-th-duein,       .vas-etw-td-duein       { width: 7em; }
+
+.vas-etw-truncate {
+    display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Success KPI */
-.kpi.tint-success {
-    background: linear-gradient(135deg, rgba(220,244,229,0.85), rgba(255,255,255,0.65));
+.vas-etw-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    color: #5F7283;
+    font-size: 0.8125em;
 }
 
-    .kpi.tint-success .kpi-icon {
-        color: #0B6B45;
-        background: rgba(255,255,255,0.9);
-    }
-
-    .kpi.tint-success .kpi-value {
-        color: #0B6B45;
-    }
-
-/* Optional responsive improvement */
-@media (min-width: 340px) {
- 
-
-        .widget.kpi.tint-success .kpi-icon {
-            width: 34px;
-            height: 34px;
-            min-width: 30px;
-            border-radius: 10px;
-        }
-
-            .widget.kpi.tint-success .kpi-icon svg {
-                width: 21px;
-                height: 21px;
-            }
-
-        .widget.kpi.tint-success .kpi-label {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .widget.kpi.tint-success .kpi-value {
-            font-size: 34px;
-            letter-spacing: -2px;
-        }
-
-        .widget.kpi.tint-success .kpi-why-tag {
-            background: hsla(0, 0%, 100%, .94);
-            border-radius: 8px;
-            color: #4b80d9;
-            display: inline-flex;
-            font-size: 9px;
-            font-weight: 800;
-            justify-content: center;
-            letter-spacing: 2px;
-            line-height: 1;
-            padding: 4px 6px;
-        }
-
+.vas-etw-td-invdate,
+.vas-etw-td-duedate {
+    color: #5F7283;
 }
 
+.vas-etw-td-customer {
+    font-weight: 700;
+    color: #102C3F;
+}
 
+.vas-etw-td-currency {
+    text-align: center;
+    color: #5F7283;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.vas-etw-td-amount {
+    text-align: right;
+    font-weight: 700;
+    color: #856404;                   /* amber to match design — image_1 */
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* Inline currency symbol used inside the amount cell. */
+.vas-etw-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+/* ── "Due in" pill (e.g. "3 days") ────────────────────────────────── */
+.vas-etw-td-duein {
+    text-align: center;
+}
+
+.vas-etw-duein-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25em 0.625em;
+    border-radius: 999em;
+    font-size: 0.8125em;
+    font-weight: 600;
+    line-height: 1.2;
+    background: #FCF1D6;              /* pale amber per image_1 */
+    color: #856404;
+    white-space: nowrap;
+}
+
+    /* Stronger amber when the schedule is due today — small urgency cue. */
+    .vas-etw-duein-pill.vas-etw-duein-today {
+        background: #FBE4B8;
+        color: #7A4F00;
+    }
+
+    /* Red tone when the schedule is already overdue (negative days). */
+    .vas-etw-duein-pill.vas-etw-duein-overdue {
+        background: #FBE3E4;
+        color: #A33F3F;
+    }
+
+/* Empty / loading states */
+.vas-etw-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+    background: #FFFFFF;
+}
+
+/* Footer: helper text (left) · compact pager (right). */
+.vas-etw-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-etw-pager-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-etw-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+/* Rounded-square pager buttons per design.md. */
+.vas-etw-pager-btn {
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-etw-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-etw-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-etw-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-etw-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Responsive: collapse to mobile-friendly column widths ────────── */
+
+@media (max-width: 48em) {            /* ~768px tablet */
+    .vas-etw-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-etw-th-doc,         .vas-etw-td-doc         { width: 7.5em; }
+    .vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 6.5em; }
+    .vas-etw-th-customer,    .vas-etw-td-customer    { width: 10em; }
+    .vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 6.5em; }
+    .vas-etw-th-currency,    .vas-etw-td-currency    { width: 4.5em; }
+    .vas-etw-th-amount,      .vas-etw-td-amount      { width: 8em; }
+    .vas-etw-th-duein,       .vas-etw-td-duein       { width: 6em; }
+}
+
+@media (max-width: 36em) {            /* ~576px phone */
+    .vas-etw-dialog {
+        padding: 0;
+    }
+
+    .vas-etw-dialog-table thead th,
+    .vas-etw-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .vas-etw-td-doc {
+        font-size: 0.75em;
+    }
+
+    /* On the narrowest screens drop the Invoice Date column to keep the
+       primary (Invoice No / Customer / Due date / Currency / Amount / Due in)
+       visible without horizontal scrolling. */
+    .vas-etw-th-invdate,
+    .vas-etw-td-invdate {
+        display: none;
+    }
+
+    .vas-etw-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-etw-pager-helper {
+        flex: 1 1 100%;
+        order: 2;
+    }
+
+    .vas-etw-pager { order: 1; }
+}
