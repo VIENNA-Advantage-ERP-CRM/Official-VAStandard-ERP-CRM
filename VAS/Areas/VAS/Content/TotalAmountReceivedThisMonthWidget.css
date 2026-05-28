@@ -1,10 +1,16 @@
-﻿.vas-tarm-root {
+/* ─────────────────────────────────────────────────────────────────────────
+ * Total Amount Received This Month — KPI/Summary glass card + drill-down dialog.
+ * Design source: design.md (Onfinity) + widget.html (KPI shell) + image_1 (dialog).
+ * Per CLAUDE.md project rule: all CSS values are expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card, 16px on the dialog).
+ * Namespaced vas-tarm-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-tarm-root {
     width: 100%;
     height: 100%;
-    min-width: 0;
-    min-height: 0;
-    box-sizing: border-box;
-    padding: 0;
+    container-type: inline-size;
+    position: relative;
     font-family: Roboto, sans-serif;
 }
 
@@ -13,152 +19,571 @@
         box-sizing: border-box;
     }
 
-    .vas-tarm-root * {
-            background: linear-gradient(135deg, rgba(199,232,255,0.85), rgba(255,255,255,0.65)) !important;
-        }
+.vas-tarm-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;          /* 14px */
+    z-index: 999;
+}
+
+/* ── KPI card (glass widget) ────────────────────────────────────────── */
+
 .vas-tarm-card {
+    font-size: 1em;                  /* = 16px from root */
     width: 100%;
     height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    background: linear-gradient(135deg, rgba(199,232,255,0.85), rgba(255,255,255,0.65)) !important;
-    border: 3px solid #FFFFFF;
-    border-radius: 22px;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    padding: 16px 18px 12px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 10px;
+    gap: 0.5em;
+    /* Tint-info glass surface per widget.html — pale blue → white. */
+    background: linear-gradient(135deg, rgba(199, 232, 255, 0.80), rgba(255, 255, 255, 0.62));
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;          /* 14px */
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;        /* 16/16/18 design.md edge spacing */
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease;
 }
 
-.vas-tarm-header {
+    .vas-tarm-card:hover {
+        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-tarm-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+/* ── Header row: icon + label + View hint ─────────────────────────── */
+
+.vas-tarm-head {
     display: flex;
     align-items: center;
-    gap: 14px;
+    justify-content: space-between;
+    gap: 0.625em;
     min-width: 0;
-    flex-shrink: 0;
 }
 
-.vas-tarm-icon-wrap {
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.88);
+.vas-tarm-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-tarm-icon {
+    width: 2em;                       /* design.md icon well ~2rem */
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;          /* ~9px */
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;                   /* link-blue */
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
 
-    .vas-tarm-icon-wrap svg {
-        width: 22px;
-        height: 22px;
-        stroke: #1567B7;
+    .vas-tarm-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
     }
 
-.vas-tarm-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #163247;
-    line-height: 1.2;
+.vas-tarm-label {
+    font-size: 0.8125em;              /* 13px muted label */
+    color: #748494;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.vas-tarm-amount-row {
-    min-width: 0;
-    flex: 1 1 auto;
-    display: flex;
+.vas-tarm-view {
+    display: inline-flex;
     align-items: center;
-}
-
-.vas-tarm-amount {
-    display: block;
-    font-size: 58px;
-    font-weight: 800;
-    color: #1567B7;
-    line-height: 1;
-    letter-spacing: -2px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.vas-tarm-footer {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
+    gap: 0.25em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+    color: #0083DA;
+    font-size: 0.75em;                /* 12px */
+    font-weight: 500;
+    font-family: inherit;
     flex-shrink: 0;
 }
 
-.vas-tarm-why {
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(21, 103, 183, 0.14);
-    border-radius: 8px;
-    color: #1677D3;
+    .vas-tarm-view svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-tarm-view:hover {
+        background: rgba(0, 131, 218, 0.08);
+        color: #0069AE;
+    }
+
+/* ── Metric: big bold info-blue value with currency symbol ───────── */
+
+.vas-tarm-metric {
+    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-weight: 700;
+    color: #106AB0;                   /* link-blue */
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Currency symbol leads the amount and inherits size/weight from the parent. */
+.vas-tarm-cur {
+    font-size: 1em;
+    font-weight: inherit;
+    margin-inline-end: 0.04em;
+    vertical-align: baseline;
+}
+
+/* ── Detail text: "Customer collections so far" ──────────────────── */
+
+.vas-tarm-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: 0.75em;                /* 12px secondary */
+    color: #5F7283;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Responsive (container queries on the widget cell) ────────────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-tarm-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-tarm-card { font-size: 0.6875em; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Drill-down modal dialog (image_1). Attached to <body>; uses fixed
+ * positioning so it sits above the dashboard.
+ * The dialog defines its own font-size base so its measurements do not
+ * inherit the widget cell's scaled-down em base.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-tarm-body-lock {
+    overflow: hidden;
+}
+
+.vas-tarm-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;                   /* = 16px from <body> */
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-tarm-dialog,
+    .vas-tarm-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-tarm-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-tarm-dialog-card {
+    position: relative;
+    width: min(53.75em, 100%);        /* max ~860px */
+    /* Fixed dialog height so the modal does NOT fluctuate based on row count —
+       header/footer stay put, body scrolls when there are more rows than fit,
+       and the empty area below a partial page stays small. `min(...)` clamps
+       on short viewports. */
+    height: min(33em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+.vas-tarm-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.vas-tarm-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5em;
+    background: #EAF4FE;
+    border: 0.0625em solid #BFE4FF;
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-tarm-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-tarm-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-tarm-dialog-title {
+    font-size: 1.125em;               /* 18px design.md title */
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-tarm-dialog-subtitle {
+    margin-top: 0.125em;
+    font-size: 0.8125em;              /* 13px */
+    color: #748494;
+    line-height: 1.3;
+}
+
+.vas-tarm-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 2px;
-    line-height: 1;
-    padding: 5px 10px;
-    text-transform: uppercase;
     flex-shrink: 0;
 }
 
-.vas-tarm-desc {
+    .vas-tarm-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-tarm-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+/* Body / table */
+.vas-tarm-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    /* Side gutter so the table breathes inside the dialog edge. */
+    padding: 0 1.125em;
+    position: relative;
+}
+
+/* Busy overlay over the table while a page is being fetched. Same spinner
+   classes (`vis_widgetloader`) used by other widgets in this project. */
+.vas-tarm-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+/* `table-layout: fixed` lets the per-column widths below win, which is what
+   keeps "Customer" and "Receipt No." text-overflow:ellipsis behaving instead
+   of forcing the table wider and overlapping its neighbours. */
+.vas-tarm-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;               /* 14px body */
+}
+
+    .vas-tarm-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        background: #FFFFFF;
+        font-size: 0.8125em;          /* 13px header */
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-tarm-dialog-table thead th.vas-tarm-th-amount,
+        .vas-tarm-dialog-table thead th.vas-tarm-th-allocated {
+            text-align: right;
+        }
+
+        .vas-tarm-dialog-table thead th.vas-tarm-th-currency {
+            text-align: center;
+        }
+
+    .vas-tarm-dialog-table tbody td {
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-tarm-dialog-table tbody tr:hover td {
+        background: #F8FBFE;
+    }
+
+/* Per-column widths — explicit so long Customer / Receipt No. values truncate
+   with an ellipsis instead of pushing neighbouring columns off-axis.
+   Customer column is the only one that flexes; everything else is fixed so
+   Date and Amount get the room they need to render their full value. */
+.vas-tarm-th-date,        .vas-tarm-td-date        { width: 7.5em; }
+.vas-tarm-th-doc,         .vas-tarm-td-doc         { width: 8em; }
+.vas-tarm-th-customer,    .vas-tarm-td-customer    { width: 14em; }
+.vas-tarm-th-bank,        .vas-tarm-td-bank        { width: 12.5em; }
+.vas-tarm-th-currency,    .vas-tarm-td-currency    { width: 5em; text-align: center; }
+.vas-tarm-th-amount,      .vas-tarm-td-amount      { width: 9em; }
+.vas-tarm-th-allocated,   .vas-tarm-td-allocated   { width: 5em; }
+
+/* Inner span used by truncatable cells (doc / customer / bank). The span gets
+   the ellipsis treatment so the td's padding stays clean. */
+.vas-tarm-truncate {
+    display: block;
     min-width: 0;
-    font-size: 16px;
-    font-weight: 400;
-    color: #5E6E7E;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* للأحجام الصغيرة */
-@media (max-width: 340px) {
-    .vas-tarm-card {
-        padding: 12px 14px 10px;
-        border-radius: 16px;
+.vas-tarm-td-date {
+    color: #748494;
+}
+
+.vas-tarm-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    color: #5F7283;
+    font-size: 0.8125em;
+}
+
+.vas-tarm-td-customer {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-tarm-td-bank {
+    color: #5F7283;
+}
+
+.vas-tarm-td-amount {
+    text-align: right;
+    font-weight: 700;
+    color: #0B6B45;
+    font-variant-numeric: tabular-nums;
+    /* Keep amounts on one line and never let them ellipsis-truncate — the
+       fixed column width above is wide enough for typical totals. */
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.vas-tarm-td-currency {
+    text-align: center;
+    color: #5F7283;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.vas-tarm-td-allocated {
+    text-align: right;
+}
+
+/* Read-only checkbox visuals */
+.vas-tarm-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375em;
+    height: 1.375em;
+    border-radius: 0.3125em;
+    vertical-align: middle;
+}
+
+.vas-tarm-check-on {
+    background: #019D89;
+    color: #FFFFFF;
+    border: 0.0625em solid #019D89;
+}
+
+    .vas-tarm-check-on svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
     }
 
-    .vas-tarm-icon-wrap {
-        width: 34px;
-        height: 34px;
-        min-width: 34px;
-        border-radius: 10px;
+.vas-tarm-check-off {
+    background: #FFFFFF;
+    border: 0.0625em solid #D6DEE6;
+}
+
+/* Inline currency symbol used inside table cells. */
+.vas-tarm-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+/* Empty / loading states */
+.vas-tarm-dialog-loading,
+.vas-tarm-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+    background: #FFFFFF;
+}
+
+/* Footer: helper text (left) · compact pager (right). */
+.vas-tarm-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-tarm-pager-helper {
+    font-size: 0.8125em;              /* 13px helper text */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* Compact pager group: prev arrow + page text + next arrow on one row. */
+.vas-tarm-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+/* Rounded-square pager buttons per design.md (not circular). */
+.vas-tarm-pager-btn {
+    width: 2em;                       /* 32px */
+    height: 2em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;                   /* primary blue chevron */
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-tarm-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
     }
 
-        .vas-tarm-icon-wrap svg {
-            width: 18px;
-            height: 18px;
-        }
-
-    .vas-tarm-title {
-        font-size: 15px;
+    .vas-tarm-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
     }
 
-    .vas-tarm-amount {
-        font-size: 36px;
-        letter-spacing: -1px;
+    .vas-tarm-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
     }
 
-    .vas-tarm-why {
-        font-size: 9px;
-        padding: 4px 7px;
+.vas-tarm-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;               /* 14px */
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Responsive: collapse to mobile-friendly column widths. */
+@media (max-width: 40em) {            /* ~640px */
+    .vas-tarm-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
     }
 
-    .vas-tarm-desc {
-        font-size: 12px;
+    .vas-tarm-dialog-table thead th,
+    .vas-tarm-dialog-table tbody td {
+        padding: 0.625em 0.625em;
     }
+
+    .vas-tarm-td-doc {
+        font-size: 0.75em;
+    }
+
+    .vas-tarm-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-tarm-pager-helper {
+        flex: 1 1 100%;
+        order: 2;
+    }
+
+    .vas-tarm-pager { order: 1; }
 }

@@ -1,15 +1,18 @@
 /**
  * Bounced Cheques Widget
- * Purpose - Show count of bounced cheques from AR receipts.
+ * Purpose - KPI card showing count of bounced cheques from AR receipts.
+ * Design   - Glass KPI/Summary card per design.md / dashboard-widgets.md: glass
+ *            surface, tinted danger icon well, large bold danger-red count,
+ *            ACTION pill + explanatory copy.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text              | Message Key
- * ----+---------------------------+--------------------------------
- *  1  | Bounced cheques           | VIS_BouncedCheques
- *  2  | Customer follow-up        | VIS_CustomerFollowUp
- *  3  | ACTION                    | VIS_Action
- *  4  | Loading…                  | VIS_Loading
- *  5  | No data                   | VIS_NoData
+ *  #  | Current Text                | Message Key
+ * ----+-----------------------------+--------------------------------
+ *  1  | Bounced cheques             | VIS_BouncedCheques
+ *  2  | Awaiting follow-up          | VIS_AwaitingFollowUp
+ *  3  | ACTION                      | VIS_Action
+ *  4  | Customer follow-up required | VIS_CustomerFollowUpRequired
+ *  5  | Loading…                    | VIS_Loading
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
@@ -22,11 +25,18 @@
         this.windowNo;
 
         var $root = $('<div class="vas-bc-root">');
-        var $countText;
+        var $metricEl;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         this.Initalize = function () {
@@ -35,21 +45,13 @@
         };
 
         function loadData() {
-            setLoading();
+            showBusy(true);
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'BouncedCheques/GetBouncedCheques',
                 type: 'GET',
                 success: function (res) {
-                    var data = res;
-
-                    if (typeof data === 'string') {
-                        data = JSON.parse(data);
-                    }
-
-                    if (typeof data === 'string') {
-                        data = JSON.parse(data);
-                    }
+                    var data = typeof res === 'string' ? JSON.parse(res) : res;
 
                     if (data && data.error) {
                         setNoData();
@@ -60,75 +62,60 @@
                 },
                 error: function () {
                     setNoData();
-                }
+                },
+                complete: function () { showBusy(false); }
             });
         }
 
-        function setLoading() {
-            if ($countText) {
-                $countText.text(lbl("VIS_Loading", "Loading…"));
-            }
-        }
-
         function setNoData() {
-            if ($countText) {
-                $countText.text("0");
+            if ($metricEl) {
+                $metricEl.text("0");
             }
         }
 
         function renderCount(data) {
-            var count = 0;
-
-            if (data) {
-                count = data.bouncedChequeCount || 0;
-            }
-
-            if ($countText) {
-                var absVal = count;
-                var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                $countText.text(absVal.toLocaleString(window.navigator.language, {
-                    minimumFractionDigits: stdPrecision,
-                    maximumFractionDigits: stdPrecision
-                }));
+            var count = (data && data.bouncedChequeCount) || 0;
+            if ($metricEl) {
+                $metricEl.text(Number(count).toLocaleString(window.navigator.language));
             }
         }
 
         function createWidget() {
-            var $card = $(
-                '<div class="vas-bc-card">' +
+            var $card = $('<div class="vas-bc-card">');
+
+            var $header = $(
                 '<div class="vas-bc-header">' +
-                '<div class="vas-bc-icon-wrap">' +
-                '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" ' +
-                'stroke="#F3A8A8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
-                '<circle cx="12" cy="12" r="9"/>' +
-                '<line x1="12" y1="7" x2="12" y2="13"/>' +
-                '<line x1="12" y1="17" x2="12.01" y2="17"/>' +
+                '<div class="vas-bc-icon">' +
+                '<svg viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="12" cy="12" r="10"/>' +
+                '<line x1="12" y1="8" x2="12" y2="13"/>' +
+                '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
                 '</svg>' +
                 '</div>' +
-                '<div class="vas-bc-title">' +
-                lbl("VIS_BouncedCheques", "Bounced cheques") +
-                '</div>' +
-                '</div>' +
-
-                '<div class="vas-bc-count-row">' +
-                '<span class="vas-bc-count">' +
-                lbl("VIS_Loading", "Loading…") +
-                '</span>' +
-                '</div>' +
-
-                '<div class="vas-bc-footer">' +
-                '<span class="vas-bc-action">' +
-                lbl("VIS_Action", "ACTION") +
-                '</span>' +
-                '<span class="vas-bc-desc">' +
-                lbl("VIS_CustomerFollowUp", "Customer follow-up") +
-                '</span>' +
+                '<div>' +
+                '<div class="vas-bc-title">' + lbl("VIS_BouncedCheques", "Bounced cheques") + '</div>' +
+                '<div class="vas-bc-subtitle">' + lbl("VIS_AwaitingFollowUp", "Awaiting follow-up") + '</div>' +
                 '</div>' +
                 '</div>'
             );
 
-            $countText = $card.find('.vas-bc-count');
+            $metricEl = $('<div class="vas-bc-metric">—</div>');
+
+            var $why = $('<div class="vas-bc-why-wrap">');
+            /*var $pill = $('<span class="vas-bc-why-pill">' + lbl("VIS_Action", "ACTION") + '</span>');*/
+            var $whyText = $('<span class="vas-bc-why-text">' +
+                lbl("VIS_CustomerFollowUpRequired", "Customer follow-up required") +
+                '</span>');
+
+            $why.append($whyText);
+            $card.append($header).append($metricEl).append($why);
             $root.append($card);
+
+            $busy = $('<div class="vas-bc-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         this.refreshWidget = function () {
@@ -152,8 +139,7 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.BouncedChequesWidget.prototype.widgetSizeChange = function (height, width) {
-    };
+    VIS.BouncedChequesWidget.prototype.widgetSizeChange = function (height, width) { };
 
     VIS.BouncedChequesWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
