@@ -198,7 +198,7 @@ namespace VIS.Controllers
                        Payment.DocumentNo AS Document_No,
                        BPartner.Name AS Customer_Name,
                        COALESCE(Bank.Name, BankAccount.Name) AS Bank_Name,
-                       COALESCE(BankAccount.AccountNo, '') AS Account_No,
+                       COALESCE(BankAccount.AccountNo, N'') AS Account_No,
                        Payment.PaymentAmount AS Pay_Amount,
                        Currency.ISO_Code AS Payment_Currency,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Payment_Currency_Symbol,

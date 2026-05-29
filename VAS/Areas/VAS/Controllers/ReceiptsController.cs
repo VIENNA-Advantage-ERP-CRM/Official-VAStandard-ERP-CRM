@@ -60,16 +60,16 @@ namespace VIS.Controllers
             ors.Add("UPPER(BPartner.Name) LIKE @LikeCust");
 
             parameters.Add(new SqlParameter("@LikeBank", likeVal));
-            ors.Add("UPPER(COALESCE(Bank.Name, '')) LIKE @LikeBank");
+            ors.Add("UPPER(Bank.Name) LIKE @LikeBank");
 
             parameters.Add(new SqlParameter("@LikeAcct", likeVal));
-            ors.Add("UPPER(COALESCE(BankAccount.AccountNo, '')) LIKE @LikeAcct");
+            ors.Add("UPPER(BankAccount.AccountNo) LIKE @LikeAcct");
 
             parameters.Add(new SqlParameter("@LikeCur", likeVal));
             ors.Add("UPPER(Currency.ISO_Code) LIKE @LikeCur");
 
             parameters.Add(new SqlParameter("@LikeInv", likeVal));
-            ors.Add("UPPER(COALESCE(Invoice.DocumentNo, '')) LIKE @LikeInv");
+            ors.Add("UPPER(COALESCE(Invoice.DocumentNo, N'')) LIKE @LikeInv");
 
             /* Some receipts are not linked through C_Payment.C_Invoice_ID — the
                invoice is held in C_PaymentAllocate (one payment can settle many
@@ -128,7 +128,15 @@ namespace VIS.Controllers
                 ors.Add("(Payment.PayAmt = @Amt OR Payment.PaymentAmount = @Amt)");
             }
 
-            string selectSql = @"
+            /* Inner query carries no nested C_Invoice subquery in its SELECT, so
+               MRole.AddAccessSQL sees only the main physical FROM (C_Payment /
+               alias Payment plus its joined lookup tables). The
+               allocated-invoice document-number fallback is resolved by the
+               OUTER wrapper below, AFTER MRole has been applied — otherwise
+               MRole picks up the inner C_Invoice alias and appends an access
+               predicate referring to ALLOCINVOICEDISPLAY.C_INVOICE_ID to the
+               outer WHERE, where that alias is not in scope. */
+            string innerSelectSql = @"
                 SELECT Payment.C_Payment_ID AS Payment_ID,
                        Payment.DocumentNo AS Document_No,
                        BPartner.Name AS Customer_Name,
@@ -136,26 +144,11 @@ namespace VIS.Controllers
                        Payment.DocStatus AS Doc_Status,
                        Payment.IsReconciled AS Is_Reconciled,
                        Payment.IsAllocated AS Is_Allocated,
-                       COALESCE(Bank.Name, '') AS Bank_Name,
-                       COALESCE(BankAccount.AccountNo, '') AS Account_No,
+                       Bank.Name AS Bank_Name,
+                       BankAccount.AccountNo AS Account_No,
                        Currency.ISO_Code AS Currency_ISO,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol,
-                       /* Prefer the direct C_Payment.C_Invoice_ID link; fall back
-                          to the earliest allocated invoice from C_PaymentAllocate
-                          (correlated subquery, so rows are not multiplied). */
-                       COALESCE(
-                           Invoice.DocumentNo,
-                           (
-                               SELECT MIN(AllocInvoiceDisplay.DocumentNo)
-                               FROM C_PaymentAllocate PaymentAllocateDisplay
-                               INNER JOIN C_Invoice AllocInvoiceDisplay
-                                   ON (PaymentAllocateDisplay.C_Invoice_ID=AllocInvoiceDisplay.C_Invoice_ID)
-                               WHERE PaymentAllocateDisplay.C_Payment_ID = Payment.C_Payment_ID
-                                 AND PaymentAllocateDisplay.IsActive = 'Y'
-                                 AND AllocInvoiceDisplay.IsActive = 'Y'
-                           ),
-                           ''
-                       ) AS Invoice_Document_No,
+                       Invoice.DocumentNo AS Direct_Invoice_Document_No,
                        Payment.DateAcct AS Date_Acct
                 FROM C_Payment Payment
                 INNER JOIN C_Currency Currency ON (Payment.C_Currency_ID=Currency.C_Currency_ID)
@@ -170,15 +163,45 @@ namespace VIS.Controllers
                   AND (" + string.Join(" OR ", ors) + @")";
 
             /* MRole only on the main physical table (C_Payment / alias Payment). */
-            selectSql = MRole.GetDefault(ctx).AddAccessSQL(
-                selectSql,
+            innerSelectSql = MRole.GetDefault(ctx).AddAccessSQL(
+                innerSelectSql,
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
 
-            string sql = selectSql + @"
-                ORDER BY Payment.DateAcct DESC, Payment.C_Payment_ID DESC
+            /* Outer wrapper resolves the allocated-invoice fallback document
+               number via a correlated subquery on the inlined-secured rows.
+               MRole is not re-applied here; the inner query is already filtered
+               and the correlated lookup runs in the user's role context. */
+            string sql = @"
+                SELECT Receipts.Payment_ID,
+                       Receipts.Document_No,
+                       Receipts.Customer_Name,
+                       Receipts.Pay_Amount,
+                       Receipts.Doc_Status,
+                       Receipts.Is_Reconciled,
+                       Receipts.Is_Allocated,
+                       Receipts.Bank_Name,
+                       Receipts.Account_No,
+                       Receipts.Currency_ISO,
+                       Receipts.Cur_Symbol,
+                       COALESCE(
+                           Receipts.Direct_Invoice_Document_No,
+                           (
+                               SELECT MIN(AllocInvoiceDisplay.DocumentNo)
+                               FROM C_PaymentAllocate PaymentAllocateDisplay
+                               INNER JOIN C_Invoice AllocInvoiceDisplay
+                                   ON (PaymentAllocateDisplay.C_Invoice_ID=AllocInvoiceDisplay.C_Invoice_ID)
+                               WHERE PaymentAllocateDisplay.C_Payment_ID = Receipts.Payment_ID
+                                 AND PaymentAllocateDisplay.IsActive = 'Y'
+                                 AND AllocInvoiceDisplay.IsActive = 'Y'
+                           ),
+                           N''
+                       ) AS Invoice_Document_No,
+                       Receipts.Date_Acct
+                FROM (" + innerSelectSql + @") Receipts
+                ORDER BY Receipts.Date_Acct DESC, Receipts.Payment_ID DESC
                 OFFSET 0 ROWS FETCH NEXT @Max ROWS ONLY";
 
             /* @Max appears last in the SQL — Oracle's positional binding requires
