@@ -9,6 +9,7 @@ using VAdvantage.DataBase;
 using VAdvantage.ProcessEngine;
 using VAdvantage.Model;
 using ModelLibrary.Classes;
+using ModelLibrary.Model;
 //using ViennaAdvantage.Model;
 
 
@@ -42,9 +43,9 @@ using ModelLibrary.Classes;
 *     the lead's VAS_Opportunity_ID column (if present); C_Project_ID is a project
 *     foreign key and must not hold an opportunity id.
 */
-namespace ViennaAdvantage.Process
+namespace ModelLibrary.Process
 {
-    class LeadToOpportunityVAS : SvrProcess
+    class VAS_LeadToOpportunity : SvrProcess
     {
         int _C_Lead_ID;
         bool IsProspectCreated = false;
@@ -93,14 +94,14 @@ namespace ViennaAdvantage.Process
 
             if (ExCustomer != 0)
             {
-                ViennaAdvantage.Model.X_VAS_Opportunity opp = new ViennaAdvantage.Model.X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
+                X_VAS_Opportunity opp = new X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
                 opp.SetAD_Client_ID(lead.GetAD_Client_ID());
                 opp.SetAD_Org_ID(lead.GetAD_Org_ID());
                 opp.SetC_Lead_ID(lead.GetC_Lead_ID());
                 opp.SetC_BPartner_ID(lead.GetC_BPartner_ID());
 
                 // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
-                if (opp.Get_ColumnIndex("Ref_BPartner_ID") > 0)
+                if (opp.Get_ColumnIndex("Ref_BPartner_ID") >= 0)
                 {
                     opp.Set_Value("Ref_BPartner_ID", lead.GetC_BPartner_ID());
                 }
@@ -152,16 +153,13 @@ namespace ViennaAdvantage.Process
             }
             if (Pospect != 0)
             {
-                ViennaAdvantage.Model.X_VAS_Opportunity opp = new ViennaAdvantage.Model.X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
+                X_VAS_Opportunity opp = new X_VAS_Opportunity(GetCtx(), 0, Get_TrxName());
                 opp.SetAD_Client_ID(lead.GetAD_Client_ID());
                 opp.SetAD_Org_ID(lead.GetAD_Org_ID());
                 opp.SetC_Lead_ID(lead.GetC_Lead_ID());
                 opp.SetC_BPartnerSR_ID(lead.GetRef_BPartner_ID());
                 // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
-                if (opp.Get_ColumnIndex("Ref_BPartner_ID") > 0)
-                {
-                    opp.Set_Value("Ref_BPartner_ID", lead.GetRef_BPartner_ID());
-                }
+                opp.SetRef_BPartner_ID(lead.GetRef_BPartner_ID());
                 opp.SetSalesRep_ID(lead.GetSalesRep_ID());
                 opp.SetC_Campaign_ID(lead.GetC_Campaign_ID());
                 opp.SetAD_User_ID(lead.GetAD_User_ID());
@@ -174,10 +172,8 @@ namespace ViennaAdvantage.Process
 
                 /*Vivek*/
                 // C_EnquiryRdate is not a generated column on X_VAS_Opportunity - copy it only if present.
-                if (opp.Get_ColumnIndex("C_EnquiryRdate") > 0)
-                {
-                    opp.Set_Value("C_EnquiryRdate", lead.GetC_EnquiryRdate());
-                }
+                opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
+                
                 opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
@@ -192,7 +188,7 @@ namespace ViennaAdvantage.Process
                     }
                     // C_Project_ID is a project FK; link the lead to the new opportunity
                     // through its VAS_Opportunity_ID column instead (when available).
-                    if (lead.Get_ColumnIndex("VAS_Opportunity_ID") > 0)
+                    if (lead.Get_ColumnIndex("VAS_Opportunity_ID") >= 0)
                     {
                         lead.Set_Value("VAS_Opportunity_ID", opp.GetVAS_Opportunity_ID());
                     }

@@ -816,7 +816,7 @@
     <Compile Include="Process\ViennaAdvantageProcess\LeadToOpportunity.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="Process\ViennaAdvantageProcess\LeadToOpportunityVAS.cs">
+    <Compile Include="Process\VAS_LeadToOpportunity.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Process\ViennaAdvantageProcess\PaymentOnline.cs">
