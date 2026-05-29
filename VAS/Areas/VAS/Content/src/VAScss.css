@@ -18,6 +18,7 @@
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AutoAllocatedWidget.css";
+@import "../VAS_RecentReceiptsWidget.css";
 @import "../BouncedChequesWidget.css";
 @import "../CustomerPaidMethodWidget.css";
 @import "../CollectionEfficiencyWidget.css";

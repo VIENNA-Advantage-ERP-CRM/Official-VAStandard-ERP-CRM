@@ -99,9 +99,12 @@
     }
 
 .vas-etw-label {
-    font-size: 0.8125em;              /* 13px muted label */
-    color: #748494;
-    font-weight: 400;
+    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
+       Per project request the weight is Bold (700) instead of the spec's
+       Medium (500). */
+    font-size: 1.125em;
+    color: #141414;
+    font-weight: 700;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
