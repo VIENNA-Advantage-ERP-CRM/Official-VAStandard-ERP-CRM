@@ -62,12 +62,19 @@
             var title = getMsg("VAS_NewReceipt", "New Receipt");
             var copy = getMsg("VAS_RecordCustomerPayment", "Record a customer payment");
 
-            /* Plus glyph (Onfinity quick-action style). */
+            /* User-plus glyph — matches the supplied "New Lead" mock. The
+               icon-well CSS already sets color:#FFFFFF on the wrapper, so
+               stroke="currentColor" keeps the glyph white on the blue
+               square. Inline width/height are omitted because
+               .vas-cnr-icon svg already sizes the SVG in em. */
             var iconSvg =
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
-                ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                '<line x1="12" y1="5" x2="12" y2="19"></line>' +
-                '<line x1="5" y1="12" x2="19" y2="12"></line>' +
+                ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' +
+                ' aria-hidden="true" focusable="false">' +
+                '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>' +
+                '<circle cx="9" cy="7" r="4"></circle>' +
+                '<line x1="19" y1="8" x2="19" y2="14"></line>' +
+                '<line x1="22" y1="11" x2="16" y2="11"></line>' +
                 '</svg>';
 
             $btn = $(
