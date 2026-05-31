@@ -35,25 +35,28 @@ namespace VIS.Controllers
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
                 DateTime dateTo = new DateTime(today.Year, today.Month, 1);
 
+                string dateFilter = GetDateFilter("p.DateTrx", dateFrom, dateTo);
+
                 string sql = @"
                     SELECT
                         COUNT(1) AS TotalPayments,
-                        SUM(CASE WHEN p.IsReconciled='Y' THEN 1 ELSE 0 END) AS ClearedPayments
+                        SUM(CASE WHEN p.IsReconciled = 'Y' THEN 1 ELSE 0 END) AS ClearedPayments
                     FROM C_Payment p
-                    WHERE p.IsActive='Y'
-                    AND p.IsReceipt=@IsReceipt
-                    AND p.DateTrx>=@DateFrom
-                    AND p.DateTrx<@DateTo
+                    WHERE p.IsActive = 'Y'
+                    AND p.IsReceipt = @IsReceipt
                     AND p.DocStatus IN ('CO', 'CL')
-                ";
+                " + dateFilter;
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                sql = MRole.GetDefault(ctx).AddAccessSQL(
+                    sql,
+                    "p",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 List<SqlParameter> parameters = new List<SqlParameter>
                 {
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo)
+                    new SqlParameter("@IsReceipt", "N")
                 };
 
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
@@ -81,8 +84,8 @@ namespace VIS.Controllers
                     totalPayments = totalPayments,
                     clearedPayments = clearedPayments,
                     clearedPercentage = clearedPercentage,
-                    dateFrom = dateFrom,
-                    dateTo = dateTo.AddDays(-1)
+                    dateFrom = FormatDate(dateFrom),
+                    dateTo = FormatDate(dateTo.AddDays(-1))
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -102,9 +105,34 @@ namespace VIS.Controllers
             }
         }
 
+        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        {
+            string dateFromText = FormatDate(dateFrom);
+            string dateToText = FormatDate(dateTo);
+
+            if (DB.IsOracle())
+            {
+                return @"
+                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
+                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
+                ";
+            }
+
+            return @"
+                AND " + columnName + @" >= DATE '" + dateFromText + @"'
+                AND " + columnName + @" < DATE '" + dateToText + @"'
+            ";
+        }
+
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
+        }
+
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
+
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;

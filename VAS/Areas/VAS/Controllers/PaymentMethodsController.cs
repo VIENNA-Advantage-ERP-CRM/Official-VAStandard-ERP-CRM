@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -36,14 +35,37 @@ namespace VIS.Controllers
                 DateTime dateTo = dateFrom.AddMonths(1);
 
                 bool hasPaymentMethod = HasPaymentMethodColumn();
+                bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
+                bool hasPaymentMethodValue = hasPaymentMethod && HasPaymentMethodValueColumn();
 
-                string paymentMethodSelect = hasPaymentMethod
-                    ? "pm.Name"
-                    : "p.PaymentRule";
+                string paymentMethodSelect = "p.PaymentRule";
+                string paymentMethodGroupBy = "p.PaymentRule";
+                string paymentMethodJoin = string.Empty;
 
-                string paymentMethodJoin = hasPaymentMethod
-                    ? " LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID) "
-                    : string.Empty;
+                if (hasPaymentMethod)
+                {
+                    paymentMethodJoin = @"
+                    LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)";
+
+                    if (hasPaymentMethodName)
+                    {
+                        paymentMethodSelect = "pm.Name";
+                        paymentMethodGroupBy = "pm.Name";
+                    }
+                    else if (hasPaymentMethodValue)
+                    {
+                        paymentMethodSelect = "pm.Value";
+                        paymentMethodGroupBy = "pm.Value";
+                    }
+                    else
+                    {
+                        paymentMethodSelect = "p.PaymentRule";
+                        paymentMethodGroupBy = "p.PaymentRule";
+                        paymentMethodJoin = string.Empty;
+                    }
+                }
+
+                string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
 
                 string baseSql = @"
                     SELECT
@@ -52,11 +74,11 @@ namespace VIS.Controllers
                         SUM(p.PayAmt) AS PaymentAmount
                     FROM C_Payment p
                     " + paymentMethodJoin + @"
-                    WHERE p.IsActive='Y'
-                    AND p.IsReceipt=@IsReceipt
+                    WHERE p.IsActive = 'Y'
+                    AND p.IsReceipt = @IsReceipt
                     AND p.DocStatus IN ('CO', 'CL')
-                    AND p.DateAcct>=@DateFrom
-                    AND p.DateAcct<@DateTo
+                    "
+                    + dateFilter + @"
                 ";
 
                 baseSql = MRole.GetDefault(ctx).AddAccessSQL(baseSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -68,16 +90,14 @@ namespace VIS.Controllers
                         PaymentAmount
                     FROM (
                         " + baseSql + @"
-                        GROUP BY " + paymentMethodSelect + @"
+                        GROUP BY " + paymentMethodGroupBy + @"
                     ) x
                     ORDER BY PaymentAmount DESC
                 ";
 
-                List<SqlParameter> parameters = new List<SqlParameter>
+                List<System.Data.SqlClient.SqlParameter> parameters = new List<System.Data.SqlClient.SqlParameter>
                 {
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo)
+                    new System.Data.SqlClient.SqlParameter("@IsReceipt", "N")
                 };
 
                 dr = DB.ExecuteReader(sql, parameters.ToArray());
@@ -132,8 +152,8 @@ namespace VIS.Controllers
                     why = GetMsg(ctx, "VAS_Why", "WHY"),
                     description = GetMsg(ctx, "VAS_PaymentMethodWhy", "UPI is cheapest · shift sub-₹2L payments where possible"),
                     totalAmount = totalAmount,
-                    dateFrom = dateFrom,
-                    dateTo = dateTo.AddDays(-1),
+                    dateFrom = FormatDate(dateFrom),
+                    dateTo = FormatDate(dateTo.AddDays(-1)),
                     methods = methods
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -159,12 +179,62 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT COUNT(1)
                 FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
-                WHERE t.TableName='C_Payment'
-                AND c.ColumnName='VA009_PaymentMethod_ID'
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Payment'
+                AND c.ColumnName = 'VA009_PaymentMethod_ID'
             ";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private bool HasPaymentMethodNameColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Name'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private bool HasPaymentMethodValueColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Value'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        {
+            string dateFromText = FormatDate(dateFrom);
+            string dateToText = FormatDate(dateTo);
+
+            if (DB.IsOracle())
+            {
+                return @"
+                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
+                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
+                ";
+            }
+
+            return @"
+                AND " + columnName + @" >= DATE '" + dateFromText + @"'
+                AND " + columnName + @" < DATE '" + dateToText + @"'
+            ";
+        }
+
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)

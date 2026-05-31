@@ -32,16 +32,19 @@ namespace VIS.Controllers
             try
             {
                 bool hasPaymentMethod = HasPaymentMethodColumn();
+                bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
+
+                string paymentMethodDisplayColumn = hasPaymentMethodName ? "pm.Name" : "pm.Value";
 
                 string paymentMethodSelect = hasPaymentMethod
                     ? @"
-                        pm.Name AS PaymentMethodName,"
+                        " + paymentMethodDisplayColumn + @" AS PaymentMethodName,"
                     : @"
                         p.PaymentRule AS PaymentMethodName,";
 
                 string paymentMethodJoin = hasPaymentMethod
                     ? @"
-                    LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)"
+                    LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)"
                     : string.Empty;
 
                 string sql = @"
@@ -61,14 +64,14 @@ namespace VIS.Controllers
                         cur.ISO_Code AS CurrencyISO,
                         cur.CurSymbol AS CurrencySymbol
                     FROM C_Payment p
-                    LEFT OUTER JOIN C_BPartner bp ON (p.C_BPartner_ID=bp.C_BPartner_ID)
-                    LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID=cur.C_Currency_ID)
-                    LEFT OUTER JOIN C_AllocationLine al ON (p.C_Payment_ID=al.C_Payment_ID)
-                    LEFT OUTER JOIN C_Invoice inv ON (al.C_Invoice_ID=inv.C_Invoice_ID)
-                    LEFT OUTER JOIN C_Order ord ON (inv.C_Order_ID=ord.C_Order_ID)"
+                    LEFT OUTER JOIN C_BPartner bp ON (p.C_BPartner_ID = bp.C_BPartner_ID)
+                    LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID = cur.C_Currency_ID)
+                    LEFT OUTER JOIN C_AllocationLine al ON (p.C_Payment_ID = al.C_Payment_ID)
+                    LEFT OUTER JOIN C_Invoice inv ON (al.C_Invoice_ID = inv.C_Invoice_ID)
+                    LEFT OUTER JOIN C_Order ord ON (inv.C_Order_ID = ord.C_Order_ID)"
                     + paymentMethodJoin + @"
-                    WHERE p.IsActive='Y'
-                    AND p.IsReceipt=@IsReceipt
+                    WHERE p.IsActive = 'Y'
+                    AND p.IsReceipt = @IsReceipt
                 ";
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -78,7 +81,7 @@ namespace VIS.Controllers
                         p.C_Payment_ID,
                         p.DateAcct,
                         bp.Name,
-                        " + (hasPaymentMethod ? "pm.Name," : "p.PaymentRule,") + @"
+                        " + (hasPaymentMethod ? paymentMethodDisplayColumn + "," : "p.PaymentRule,") + @"
                         p.DocumentNo,
                         p.DocStatus,
                         p.PayAmt,
@@ -102,8 +105,9 @@ namespace VIS.Controllers
                 while (dr.Read() && payments.Count < 7)
                 {
                     string docStatus = Util.GetValueOfString(dr["DocStatus"]);
-                    string statusType = GetStatusType(docStatus);
-                    string statusName = GetStatusName(ctx, statusType);
+                    string statusType = GetStatusClass(docStatus);
+                    string statusKey = GetStatusMessageKey(docStatus);
+                    string statusName = GetMsg(ctx, statusKey, GetStatusFallback(statusKey));
                     string referenceNo = Util.GetValueOfString(dr["ReferenceNo"]);
                     string hasBusinessRef = Util.GetValueOfString(dr["HasBusinessRef"]);
 
@@ -126,6 +130,7 @@ namespace VIS.Controllers
                         referenceNo = referenceNo,
                         docStatus = docStatus,
                         statusType = statusType,
+                        statusKey = statusKey,
                         statusName = statusName,
                         amount = Util.GetValueOfDecimal(dr["Amount"]),
                         cCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]),
@@ -166,15 +171,28 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT COUNT(1)
                 FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID=c.AD_Table_ID)
-                WHERE t.TableName='C_Payment'
-                AND c.ColumnName='VA009_PaymentMethod_ID'
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Payment'
+                AND c.ColumnName = 'VA009_PaymentMethod_ID'
             ";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
-        private string GetStatusType(string docStatus)
+        private bool HasPaymentMethodNameColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Name'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private string GetStatusClass(string docStatus)
         {
             if (docStatus == "RE" || docStatus == "VO")
             {
@@ -189,19 +207,34 @@ namespace VIS.Controllers
             return "intransit";
         }
 
-        private string GetStatusName(Ctx ctx, string statusType)
+        private string GetStatusMessageKey(string docStatus)
         {
-            if (statusType == "bounced")
+            if (docStatus == "RE" || docStatus == "VO")
             {
-                return GetMsg(ctx, "VAS_Bounced", "Bounced");
+                return "VAS_Bounced";
             }
 
-            if (statusType == "intransit")
+            if (docStatus == "CO" || docStatus == "CL")
             {
-                return GetMsg(ctx, "VAS_InTransit", "In transit");
+                return "VAS_Cleared";
             }
 
-            return GetMsg(ctx, "VAS_Cleared", "Cleared");
+            return "VAS_InTransit";
+        }
+
+        private string GetStatusFallback(string statusKey)
+        {
+            if (statusKey == "VAS_Bounced")
+            {
+                return "Bounced";
+            }
+
+            if (statusKey == "VAS_Cleared")
+            {
+                return "Cleared";
+            }
+
+            return "In transit";
         }
 
         private string GetPaymentMethodName(Ctx ctx, string paymentMethodName)

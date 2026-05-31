@@ -242,11 +242,19 @@
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
             var numericValue = Number(value || 0);
-            var symbol = currencySymbol || currencyISO || '';
+            var stdPrecision = 2;
 
-            return symbol + numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 

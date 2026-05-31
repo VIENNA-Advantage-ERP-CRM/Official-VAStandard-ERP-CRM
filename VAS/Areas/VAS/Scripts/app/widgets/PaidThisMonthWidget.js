@@ -122,31 +122,47 @@
             var numericValue = Number(value || 0);
             var absValue = Math.abs(numericValue);
             var sign = numericValue < 0 ? '-' : '';
-            var symbol = currencySymbol || currencyISO || '';
+            var stdPrecision = getStdPrecision();
 
             if (absValue >= 10000000) {
-                return sign + symbol + formatCompactNumber(absValue / 10000000, 2) + 'Cr';
+                return sign + formatCompactNumber(absValue / 10000000) + 'Cr';
             }
 
             if (absValue >= 100000) {
-                return sign + symbol + formatCompactNumber(absValue / 100000, 2) + 'L';
+                return sign + formatCompactNumber(absValue / 100000) + 'L';
             }
 
             if (absValue >= 1000) {
-                return sign + symbol + formatCompactNumber(absValue / 1000, 2) + 'K';
+                return sign + formatCompactNumber(absValue / 1000) + 'K';
             }
 
-            return sign + symbol + absValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
+            return sign + absValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
         }
 
-        function formatCompactNumber(value, precision) {
+        function formatCompactNumber(value) {
+            var stdPrecision = getStdPrecision();
+
             return Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: precision
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             });
+        }
+
+        function getStdPrecision() {
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return stdPrecision;
         }
 
         function setLoading() {

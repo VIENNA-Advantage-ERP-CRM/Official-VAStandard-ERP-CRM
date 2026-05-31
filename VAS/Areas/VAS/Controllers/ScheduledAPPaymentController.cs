@@ -36,9 +36,6 @@ namespace VIS.Controllers
                 DateTime weekFrom = today.AddDays(-daysFromMonday);
                 DateTime weekTo = weekFrom.AddDays(7);
 
-                string weekFromText = weekFrom.ToString("yyyy-MM-dd");
-                string weekToText = weekTo.ToString("yyyy-MM-dd");
-
                 bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
                 string paymentMethodNameColumn = hasPaymentMethod ? GetPaymentMethodNameColumn() : string.Empty;
 
@@ -68,22 +65,7 @@ namespace VIS.Controllers
                         inv.PaymentRule AS PaymentMethodName,";
                 }
 
-                string dateFilter = string.Empty;
-
-                if (DB.IsOracle())
-                {
-                    dateFilter = @"
-                    AND ips.DueDate >= TO_DATE('" + weekFromText + @"', 'YYYY-MM-DD')
-                    AND ips.DueDate < TO_DATE('" + weekToText + @"', 'YYYY-MM-DD')
-                    ";
-                }
-                else
-                {
-                    dateFilter = @"
-                    AND ips.DueDate >= DATE '" + weekFromText + @"'
-                    AND ips.DueDate < DATE '" + weekToText + @"'
-                    ";
-                }
+                string dateFilter = GetDateFilter("ips.DueDate", weekFrom, weekTo);
 
                 string invoiceBody = @"
                     SELECT
@@ -187,8 +169,8 @@ namespace VIS.Controllers
                     cCurrencyId = cCurrencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
-                    weekFrom = weekFromText,
-                    weekTo = weekTo.AddDays(-1).ToString("yyyy-MM-dd"),
+                    weekFrom = FormatDate(weekFrom),
+                    weekTo = FormatDate(weekTo.AddDays(-1)),
                     groups = groups
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -207,6 +189,30 @@ namespace VIS.Controllers
                     dr.Dispose();
                 }
             }
+        }
+
+        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        {
+            string dateFromText = FormatDate(dateFrom);
+            string dateToText = FormatDate(dateTo);
+
+            if (DB.IsOracle())
+            {
+                return @"
+                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
+                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
+                ";
+            }
+
+            return @"
+                AND " + columnName + @" >= DATE '" + dateFromText + @"'
+                AND " + columnName + @" < DATE '" + dateToText + @"'
+            ";
+        }
+
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
         }
 
         private bool HasInvoicePaymentMethodColumn()

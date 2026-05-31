@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -35,45 +33,29 @@ namespace VIS.Controllers
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
                 DateTime dateTo = dateFrom.AddMonths(1);
 
+                string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
+
                 string sql = @"
                     SELECT
                         COUNT(1) AS TotalPayments,
                         SUM(
                             CASE
-                                WHEN COALESCE(p.IsReconciled,'N')='Y'
-                                AND EXISTS (
-                                    SELECT 1
-                                    FROM C_AllocationLine al
-                                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID=ah.C_AllocationHdr_ID)
-                                    INNER JOIN C_Invoice inv ON (al.C_Invoice_ID=inv.C_Invoice_ID)
-                                    WHERE al.C_Payment_ID=p.C_Payment_ID
-                                    AND ah.IsActive='Y'
-                                    AND ah.DocStatus IN ('CO', 'CL')
-                                    AND inv.IsActive='Y'
-                                    AND inv.IsSOTrx='N'
-                                )
+                                WHEN COALESCE(p.IsReconciled, 'N') = 'Y'
                                 THEN 1
                                 ELSE 0
                             END
                         ) AS MatchedPayments
                     FROM C_Payment p
-                    WHERE p.IsActive='Y'
-                    AND p.IsReceipt=@IsReceipt
+                    WHERE p.IsActive = 'Y'
+                    AND p.IsReceipt = 'N'
                     AND p.DocStatus IN ('CO', 'CL')
-                    AND p.DateAcct>=@DateFrom
-                    AND p.DateAcct<@DateTo
+                    "
+                    + dateFilter + @"
                 ";
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo)
-                };
-
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 int totalPayments = 0;
                 int matchedPayments = 0;
@@ -101,8 +83,8 @@ namespace VIS.Controllers
                     totalPayments = totalPayments,
                     manualMatchCount = manualMatchCount,
                     matchedPercentage = matchedPercentage,
-                    dateFrom = dateFrom,
-                    dateTo = dateTo.AddDays(-1)
+                    dateFrom = FormatDate(dateFrom),
+                    dateTo = FormatDate(dateTo.AddDays(-1))
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -120,6 +102,30 @@ namespace VIS.Controllers
                     dr.Dispose();
                 }
             }
+        }
+
+        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        {
+            string dateFromText = FormatDate(dateFrom);
+            string dateToText = FormatDate(dateTo);
+
+            if (DB.IsOracle())
+            {
+                return @"
+                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
+                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
+                ";
+            }
+
+            return @"
+                AND " + columnName + @" >= DATE '" + dateFromText + @"'
+                AND " + columnName + @" < DATE '" + dateToText + @"'
+            ";
+        }
+
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)

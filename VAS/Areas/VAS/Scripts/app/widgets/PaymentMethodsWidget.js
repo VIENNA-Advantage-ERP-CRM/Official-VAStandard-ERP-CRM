@@ -172,10 +172,37 @@
         }
 
         function formatPercentage(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
+            var numericValue = Number(value || 0);
+            var stdPrecision = getStdPrecision();
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             }) + '%';
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = getStdPrecision();
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+        }
+
+        function getStdPrecision() {
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return stdPrecision;
         }
 
         function setLoading() {

@@ -126,10 +126,19 @@
 
         function formatPercentage(value) {
             var numericValue = Number(value || 0);
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
 
             return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
             }) + '%';
         }
 
