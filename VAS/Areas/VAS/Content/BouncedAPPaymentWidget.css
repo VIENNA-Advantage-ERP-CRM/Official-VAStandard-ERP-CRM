@@ -5,6 +5,7 @@
     min-height: 0;
     box-sizing: border-box;
     font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
     overflow: hidden;
 }
 
@@ -22,12 +23,12 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 16px;
-    gap: 8px;
-    border-radius: 14px;
-    border: 2px solid #1c2940;
+    padding: 1em;
+    gap: 0.6em;
+    border-radius: 1.15em;
+    border: 0.125em solid #1c2940;
     background: #0f1b2d;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #ffffff;
 }
 
@@ -37,26 +38,26 @@
     min-height: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.6em;
     overflow: hidden;
 }
 
 .vas-bounced-ap-payment-icon-box {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.75em;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 0.0625em solid rgba(255, 255, 255, 0.18);
     color: #f4a8a8;
 }
 
 .vas-bounced-ap-payment-icon {
-    width: 15px;
-    height: 15px;
+    width: 1.15em;
+    height: 1.15em;
     display: block;
     color: currentColor;
 }
@@ -67,7 +68,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 0.95em;
     font-weight: 700;
     line-height: 1.2;
     color: #ffffff;
@@ -90,10 +91,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(30px, 13.5vw, 38px);
+    font-size: clamp(1.4em, 8vw, 2.4em);
     font-weight: 700;
     line-height: 1;
-    letter-spacing: -1px;
+    letter-spacing: -0.0625em;
     font-variant-numeric: tabular-nums;
     color: #ffffff;
 }
@@ -104,9 +105,9 @@
     min-height: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5em;
     overflow: hidden;
-    font-size: 12px;
+    font-size: 0.75em;
     color: rgba(255, 255, 255, 0.65);
 }
 
@@ -115,15 +116,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 3px 7px;
-    border-radius: 4px;
+    padding: 0.1875em 0.4375em;
+    border-radius: 0.25em;
     background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 0.0625em solid rgba(255, 255, 255, 0.15);
     color: #ffb4b4;
-    font-size: 9px;
+    font-size: 0.68em;
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: 1.5px;
+    letter-spacing: 0.0938em;
     text-transform: uppercase;
 }
 
@@ -133,105 +134,105 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.25;
     color: rgba(255, 255, 255, 0.65);
 }
 
 .vas-bounced-ap-payment-body.vas-bounced-ap-payment-state .vas-bounced-ap-payment-value {
-    font-size: 18px;
+    font-size: 0.75em;
     font-weight: 500;
     letter-spacing: 0;
     color: rgba(255, 255, 255, 0.65);
 }
 
-@media (max-width: 300px), (max-height: 150px) {
+@media (max-width: 18.75em), (max-height: 9.375em) {
     .vas-bounced-ap-payment-card {
-        padding: 14px;
-        gap: 6px;
-        border-radius: 14px;
+        padding: 0.75em;
+        gap: 0.45em;
+        border-radius: 0.75em;
     }
 
     .vas-bounced-ap-payment-header {
-        gap: 9px;
+        gap: 0.6em;
     }
 
     .vas-bounced-ap-payment-icon-box {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-bounced-ap-payment-icon {
-        width: 15px;
-        height: 15px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-bounced-ap-payment-title {
-        font-size: 14px;
+        font-size: 0.95em;
     }
 
     .vas-bounced-ap-payment-value {
-        font-size: clamp(30px, 13vw, 38px);
+        font-size: clamp(1.4em, 8vw, 2.4em);
         line-height: 1;
-        letter-spacing: -1px;
+        letter-spacing: -0.0625em;
     }
 
     .vas-bounced-ap-payment-footer {
-        gap: 6px;
-        font-size: 11px;
+        gap: 0.375em;
+        font-size: 0.75em;
     }
 
     .vas-bounced-ap-payment-badge {
-        padding: 3px 7px;
-        font-size: 9px;
-        letter-spacing: 1.3px;
+        padding: 0.1875em 0.4375em;
+        font-size: 0.68em;
+        letter-spacing: 0.0813em;
     }
 
     .vas-bounced-ap-payment-desc {
-        font-size: 11px;
+        font-size: 0.75em;
     }
 }
 
-@media (max-width: 230px), (max-height: 120px) {
+@media (max-width: 14.375em), (max-height: 7.5em) {
     .vas-bounced-ap-payment-card {
-        padding: 10px;
-        gap: 4px;
-        border-radius: 12px;
+        padding: 0.75em;
+        gap: 0.45em;
+        border-radius: 0.75em;
     }
 
     .vas-bounced-ap-payment-icon-box {
-        width: 24px;
-        height: 24px;
-        border-radius: 7px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-bounced-ap-payment-icon {
-        width: 13px;
-        height: 13px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-bounced-ap-payment-title {
-        font-size: 12px;
+        font-size: 0.95em;
     }
 
     .vas-bounced-ap-payment-value {
-        font-size: 28px;
+        font-size: clamp(1.4em, 8vw, 2.4em);
     }
 
     .vas-bounced-ap-payment-footer {
-        gap: 5px;
-        font-size: 10px;
+        gap: 0.3125em;
+        font-size: 0.75em;
     }
 
     .vas-bounced-ap-payment-badge {
-        padding: 2px 6px;
-        font-size: 8px;
-        letter-spacing: 1.1px;
+        padding: 0.125em 0.375em;
+        font-size: 0.68em;
+        letter-spacing: 0.0688em;
     }
 
     .vas-bounced-ap-payment-desc {
-        font-size: 10px;
+        font-size: 0.75em;
     }
 }

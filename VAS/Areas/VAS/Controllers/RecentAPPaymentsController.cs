@@ -33,16 +33,29 @@ namespace VIS.Controllers
             {
                 bool hasPaymentMethod = HasPaymentMethodColumn();
                 bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
+                bool hasPaymentMethodValue = hasPaymentMethod && HasPaymentMethodValueColumn();
 
-                string paymentMethodDisplayColumn = hasPaymentMethodName ? "pm.Name" : "pm.Value";
+                string paymentMethodDisplayColumn = string.Empty;
 
-                string paymentMethodSelect = hasPaymentMethod
+                if (hasPaymentMethod)
+                {
+                    if (hasPaymentMethodName)
+                    {
+                        paymentMethodDisplayColumn = "pm.Name";
+                    }
+                    else if (hasPaymentMethodValue)
+                    {
+                        paymentMethodDisplayColumn = "pm.Value";
+                    }
+                }
+
+                string paymentMethodSelect = hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodDisplayColumn)
                     ? @"
                         " + paymentMethodDisplayColumn + @" AS PaymentMethodName,"
                     : @"
                         p.PaymentRule AS PaymentMethodName,";
 
-                string paymentMethodJoin = hasPaymentMethod
+                string paymentMethodJoin = hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodDisplayColumn)
                     ? @"
                     LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)"
                     : string.Empty;
@@ -81,7 +94,7 @@ namespace VIS.Controllers
                         p.C_Payment_ID,
                         p.DateAcct,
                         bp.Name,
-                        " + (hasPaymentMethod ? paymentMethodDisplayColumn + "," : "p.PaymentRule,") + @"
+                        " + (hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodDisplayColumn) ? paymentMethodDisplayColumn + "," : "p.PaymentRule,") + @"
                         p.DocumentNo,
                         p.DocStatus,
                         p.PayAmt,
@@ -107,7 +120,7 @@ namespace VIS.Controllers
                     string docStatus = Util.GetValueOfString(dr["DocStatus"]);
                     string statusType = GetStatusClass(docStatus);
                     string statusKey = GetStatusMessageKey(docStatus);
-                    string statusName = GetMsg(ctx, statusKey, GetStatusFallback(statusKey));
+                    string statusName = GetMsg(ctx, statusKey, Msg.GetMsg(ctx, statusKey));
                     string referenceNo = Util.GetValueOfString(dr["ReferenceNo"]);
                     string hasBusinessRef = Util.GetValueOfString(dr["HasBusinessRef"]);
 
@@ -124,7 +137,7 @@ namespace VIS.Controllers
                     payments.Add(new
                     {
                         paymentId = Util.GetValueOfInt(dr["C_Payment_ID"]),
-                        paymentDate = Util.GetValueOfDateTime(dr["PaymentDate"]),
+                        paymentDate = FormatDate(Util.GetValueOfDateTime(dr["PaymentDate"])),
                         vendorName = Util.GetValueOfString(dr["VendorName"]),
                         paymentMethodName = GetPaymentMethodName(ctx, Util.GetValueOfString(dr["PaymentMethodName"])),
                         referenceNo = referenceNo,
@@ -192,6 +205,19 @@ namespace VIS.Controllers
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
+        private bool HasPaymentMethodValueColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Value'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
         private string GetStatusClass(string docStatus)
         {
             if (docStatus == "RE" || docStatus == "VO")
@@ -222,20 +248,6 @@ namespace VIS.Controllers
             return "VAS_InTransit";
         }
 
-        private string GetStatusFallback(string statusKey)
-        {
-            if (statusKey == "VAS_Bounced")
-            {
-                return "Bounced";
-            }
-
-            if (statusKey == "VAS_Cleared")
-            {
-                return "Cleared";
-            }
-
-            return "In transit";
-        }
 
         private string GetPaymentMethodName(Ctx ctx, string paymentMethodName)
         {
@@ -245,6 +257,11 @@ namespace VIS.Controllers
             }
 
             return paymentMethodName;
+        }
+
+        private string FormatDate(DateTime? date)
+        {
+            return date?.ToString("yyyy-MM-dd");
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)

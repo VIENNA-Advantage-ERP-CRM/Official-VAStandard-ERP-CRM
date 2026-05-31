@@ -5,6 +5,7 @@
     min-height: 0;
     box-sizing: border-box;
     font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
     overflow: hidden;
 }
 
@@ -21,11 +22,11 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 16px;
-    border-radius: 14px;
-    border: 2px solid #ffffff;
+    padding: 1em;
+    border-radius: 1.15em;
+    border: 0.125em solid #ffffff;
     background: linear-gradient( 180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58) );
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #102c3f;
 }
 
@@ -35,8 +36,8 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 0.6em;
+    margin-bottom: 0.75em;
 }
 
 .vas-upcoming-ap-runs-head-left {
@@ -47,14 +48,14 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.6em;
 }
 
 .vas-upcoming-ap-runs-icon-box {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.75em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -63,8 +64,8 @@
 }
 
 .vas-upcoming-ap-runs-icon {
-    width: 14px;
-    height: 14px;
+    width: 1.15em;
+    height: 1.15em;
     display: block;
     color: currentColor;
 }
@@ -74,22 +75,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 17px;
+    font-size: 0.95em;
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125em;
     color: #102c3f;
 }
 
 .vas-upcoming-ap-runs-sub {
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 0.75em;
     font-weight: 500;
     line-height: 1.2;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -109,9 +110,9 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 0;
-    border-bottom: 1px solid #edf2f6;
+    gap: 0.75em;
+    padding: 0.6875em 0;
+    border-bottom: 0.0625em solid #edf2f6;
 }
 
     .vas-upcoming-ap-runs-row:last-child {
@@ -120,9 +121,9 @@
 
 .vas-upcoming-ap-runs-bar {
     flex: 0 0 auto;
-    width: 3px;
-    height: 36px;
-    border-radius: 2px;
+    width: 0.1875em;
+    height: 2.25em;
+    border-radius: 0.125em;
     background: #0083da;
 }
 
@@ -151,18 +152,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 0.75em;
     font-weight: 500;
     line-height: 1.25;
     color: #102c3f;
 }
 
 .vas-upcoming-ap-runs-meta {
-    margin-top: 2px;
+    margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.25;
     color: #748494;
@@ -175,7 +176,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: right;
-    font-size: 15px;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
@@ -188,106 +189,106 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-    font-size: 14px;
+    font-size: 0.75em;
     font-weight: 500;
     color: #748494;
 }
 
-@media (max-width: 360px), (max-height: 220px) {
+@media (max-width: 22.5em), (max-height: 13.75em) {
     .vas-upcoming-ap-runs-card {
-        padding: 14px;
-        border-radius: 14px;
+        padding: 0.75em;
+        border-radius: 0.75em;
     }
 
     .vas-upcoming-ap-runs-head {
-        margin-bottom: 8px;
+        margin-bottom: 0.5em;
     }
 
     .vas-upcoming-ap-runs-icon-box {
-        width: 26px;
-        height: 26px;
-        border-radius: 7px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-upcoming-ap-runs-icon {
-        width: 13px;
-        height: 13px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-upcoming-ap-runs-title {
-        font-size: 15px;
+        font-size: 0.95em;
     }
 
     .vas-upcoming-ap-runs-sub {
-        font-size: 10px;
-        margin-top: 5px;
+        font-size: 0.75em;
+        margin-top: 0.3125em;
     }
 
     .vas-upcoming-ap-runs-row {
-        gap: 10px;
-        padding: 9px 0;
+        gap: 0.45em;
+        padding: 0.5625em 0;
     }
 
     .vas-upcoming-ap-runs-bar {
-        height: 32px;
+        height: 2em;
     }
 
     .vas-upcoming-ap-runs-run-title {
-        font-size: 13px;
+        font-size: 0.75em;
     }
 
     .vas-upcoming-ap-runs-meta {
-        font-size: 11px;
+        font-size: 0.75em;
     }
 
     .vas-upcoming-ap-runs-amount {
         max-width: 40%;
-        font-size: 13px;
+        font-size: 0.75em;
     }
 }
 
-@media (max-width: 260px), (max-height: 165px) {
+@media (max-width: 16.25em), (max-height: 10.3125em) {
     .vas-upcoming-ap-runs-card {
-        padding: 10px;
-        border-radius: 12px;
+        padding: 0.75em;
+        border-radius: 0.75em;
     }
 
     .vas-upcoming-ap-runs-head {
-        margin-bottom: 6px;
+        margin-bottom: 0.375em;
     }
 
     .vas-upcoming-ap-runs-icon-box {
-        width: 24px;
-        height: 24px;
+        width: 2.25em;
+        height: 2.25em;
     }
 
     .vas-upcoming-ap-runs-title {
-        font-size: 13px;
+        font-size: 0.95em;
     }
 
     .vas-upcoming-ap-runs-sub {
-        font-size: 9px;
+        font-size: 0.75em;
     }
 
     .vas-upcoming-ap-runs-row {
-        gap: 8px;
-        padding: 7px 0;
+        gap: 0.45em;
+        padding: 0.4375em 0;
     }
 
     .vas-upcoming-ap-runs-bar {
-        width: 3px;
-        height: 28px;
+        width: 0.1875em;
+        height: 1.75em;
     }
 
     .vas-upcoming-ap-runs-run-title {
-        font-size: 11px;
+        font-size: 0.75em;
     }
 
     .vas-upcoming-ap-runs-meta {
-        font-size: 10px;
+        font-size: 0.75em;
     }
 
     .vas-upcoming-ap-runs-amount {
-        font-size: 11px;
+        font-size: 0.75em;
     }
 }

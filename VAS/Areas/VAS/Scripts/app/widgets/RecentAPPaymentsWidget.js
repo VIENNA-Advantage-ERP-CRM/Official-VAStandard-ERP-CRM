@@ -62,11 +62,10 @@
             );
 
             var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_RecentPayments', 'Recent payments'));
-            var $newPayment = $('<button type="button" class="vas-recent-ap-payments-new">').text(lbl('VAS_NewPayment', '+ New payment'));
-
+            
             $iconBox.append($icon);
             $titleWrap.append($iconBox).append($title);
-            $head.append($titleWrap).append($newPayment);
+            $head.append($titleWrap);
 
             $banner = $('<div class="vas-recent-ap-payments-banner">');
             var $bannerIcon = $(

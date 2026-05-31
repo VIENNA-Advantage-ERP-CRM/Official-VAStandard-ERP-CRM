@@ -5,6 +5,7 @@
     min-height: 0;
     box-sizing: border-box;
     font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
     overflow: hidden;
 }
 
@@ -24,11 +25,11 @@
     flex-direction: column;
     justify-content: space-between;
 
-    padding: 16px;
-    gap: 8px;
+    padding: 1em;
+    gap: 0.6em;
 
-    border-radius: 14px;
-    border: 2px solid #ffffff;
+    border-radius: 1.15em;
+    border: 0.125em solid #ffffff;
 
     background: linear-gradient(
         135deg,
@@ -36,7 +37,7 @@
         rgba(255, 255, 255, 0.65)
     );
 
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #102c3f;
 }
 
@@ -47,7 +48,7 @@
 
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.6em;
 
     overflow: hidden;
 }
@@ -55,22 +56,22 @@
 .vas-cleared-ap-payment-icon-box {
     flex: 0 0 auto;
 
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.75em;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
     background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.95);
+    border: 0.0625em solid rgba(255, 255, 255, 0.95);
     color: #9a6500;
 }
 
 .vas-cleared-ap-payment-icon {
-    width: 15px;
-    height: 15px;
+    width: 1.15em;
+    height: 1.15em;
     display: block;
     color: currentColor;
 }
@@ -83,7 +84,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 
-    font-size: 14px;
+    font-size: 0.95em;
     font-weight: 700;
     line-height: 1.2;
     color: #102c3f;
@@ -110,10 +111,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 
-    font-size: clamp(30px, 13.5vw, 38px);
+    font-size: clamp(1.4em, 8vw, 2.4em);
     font-weight: 700;
     line-height: 1;
-    letter-spacing: -1px;
+    letter-spacing: -0.0625em;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
 }
@@ -125,11 +126,11 @@
 
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 0.375em;
 
     overflow: visible;
 
-    font-size: 11px;
+    font-size: 0.75em;
     color: #586575;
 }
 
@@ -141,17 +142,17 @@
     text-overflow: initial;
     white-space: nowrap;
 
-    padding: 3px 7px;
-    border-radius: 4px;
+    padding: 0.1875em 0.4375em;
+    border-radius: 0.25em;
 
     background: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(0, 131, 218, 0.15);
+    border: 0.0625em solid rgba(0, 131, 218, 0.15);
 
     color: #0083da;
-    font-size: 9px;
+    font-size: 0.68em;
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: 1.2px;
+    letter-spacing: 0.075em;
     text-transform: uppercase;
 }
 
@@ -165,7 +166,7 @@
 
     display: block;
 
-    font-size: 11px;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.25;
     color: #586575;
@@ -175,60 +176,60 @@
 }
 
 .vas-cleared-ap-payment-body.vas-cleared-ap-payment-state .vas-cleared-ap-payment-value {
-    font-size: 18px;
+    font-size: 0.75em;
     font-weight: 500;
     letter-spacing: 0;
     color: #586575;
 }
 
-/* Mini widget: 272 × 138 */
-@media (max-width: 300px), (max-height: 150px) {
+
+@media (max-width: 18.75em), (max-height: 9.375em) {
     .vas-cleared-ap-payment-card {
-        padding: 14px;
-        gap: 6px;
-        border-radius: 14px;
+        padding: 0.75em;
+        gap: 0.45em;
+        border-radius: 0.75em;
     }
 
     .vas-cleared-ap-payment-header {
-        gap: 9px;
+        gap: 0.6em;
     }
 
     .vas-cleared-ap-payment-icon-box {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-cleared-ap-payment-icon {
-        width: 15px;
-        height: 15px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-cleared-ap-payment-title {
-        font-size: 14px;
+        font-size: 0.95em;
         font-weight: 700;
     }
 
     .vas-cleared-ap-payment-value {
-        font-size: 38px;
+        font-size: clamp(1.4em, 8vw, 2.4em);
         line-height: 1;
-        letter-spacing: -1px;
+        letter-spacing: -0.0625em;
     }
 
     .vas-cleared-ap-payment-footer {
-        gap: 5px;
+        gap: 0.3125em;
         align-items: flex-start;
-        font-size: 10.5px;
+        font-size: 0.75em;
     }
 
     .vas-cleared-ap-payment-badge {
-        padding: 3px 6px;
-        font-size: 8px;
-        letter-spacing: 1px;
+        padding: 0.1875em 0.375em;
+        font-size: 0.68em;
+        letter-spacing: 0.0625em;
     }
 
     .vas-cleared-ap-payment-desc {
-        font-size: 10.5px;
+        font-size: 0.75em;
         line-height: 1.25;
         white-space: normal;
         overflow: visible;
@@ -236,46 +237,46 @@
     }
 }
 
-/* Very narrow protection */
-@media (max-width: 230px), (max-height: 120px) {
+
+@media (max-width: 14.375em), (max-height: 7.5em) {
     .vas-cleared-ap-payment-card {
-        padding: 10px;
-        gap: 4px;
-        border-radius: 12px;
+        padding: 0.75em;
+        gap: 0.45em;
+        border-radius: 0.75em;
     }
 
     .vas-cleared-ap-payment-icon-box {
-        width: 24px;
-        height: 24px;
-        border-radius: 7px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-cleared-ap-payment-icon {
-        width: 13px;
-        height: 13px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-cleared-ap-payment-title {
-        font-size: 12px;
+        font-size: 0.95em;
     }
 
     .vas-cleared-ap-payment-value {
-        font-size: 30px;
+        font-size: clamp(1.4em, 8vw, 2.4em);
     }
 
     .vas-cleared-ap-payment-footer {
-        gap: 4px;
-        font-size: 9.5px;
+        gap: 0.25em;
+        font-size: 0.75em;
     }
 
     .vas-cleared-ap-payment-badge {
-        padding: 2px 5px;
-        font-size: 7.5px;
-        letter-spacing: 0.8px;
+        padding: 0.125em 0.3125em;
+        font-size: 0.68em;
+        letter-spacing: 0.05em;
     }
 
     .vas-cleared-ap-payment-desc {
-        font-size: 9.5px;
+        font-size: 0.75em;
         line-height: 1.2;
     }
 }

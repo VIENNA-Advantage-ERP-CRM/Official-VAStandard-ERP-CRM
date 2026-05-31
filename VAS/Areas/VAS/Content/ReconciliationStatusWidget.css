@@ -5,6 +5,7 @@
     min-height: 0;
     box-sizing: border-box;
     font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
     overflow: hidden;
 }
 
@@ -21,11 +22,11 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 16px;
-    border-radius: 14px;
-    border: 2px solid #ffffff;
+    padding: 1em;
+    border-radius: 1.15em;
+    border: 0.125em solid #ffffff;
     background: linear-gradient( 180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58) );
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #102c3f;
 }
 
@@ -35,8 +36,8 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: 0.6em;
+    margin-bottom: 0.875em;
 }
 
 .vas-reconciliation-status-head-left {
@@ -47,14 +48,14 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.6em;
 }
 
 .vas-reconciliation-status-icon-box {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 0.75em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -63,8 +64,8 @@
 }
 
 .vas-reconciliation-status-icon {
-    width: 14px;
-    height: 14px;
+    width: 1.15em;
+    height: 1.15em;
     display: block;
     color: currentColor;
 }
@@ -74,22 +75,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 17px;
+    font-size: 0.95em;
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125em;
     color: #102c3f;
 }
 
 .vas-reconciliation-status-sub {
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 0.75em;
     font-weight: 500;
     line-height: 1.2;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -100,14 +101,14 @@
     min-height: 0;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 1.25em;
     overflow: hidden;
 }
 
 .vas-reconciliation-status-donut {
     flex: 0 0 auto;
-    width: clamp(96px, 28%, 140px);
-    height: clamp(96px, 28%, 140px);
+    width: clamp(6em, 28%, 8.75em);
+    height: clamp(6em, 28%, 8.75em);
     position: relative;
 }
 
@@ -148,24 +149,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(22px, 4vw, 28px);
+    font-size: clamp(1.1em, 6vw, 1.8em);
     font-weight: 700;
     line-height: 1;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.0313em;
     color: #0b6b45;
     font-variant-numeric: tabular-nums;
 }
 
 .vas-reconciliation-status-cap {
     max-width: 90%;
-    margin-top: 4px;
+    margin-top: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10px;
+    font-size: 0.68em;
     font-weight: 500;
     line-height: 1.2;
-    letter-spacing: 1.5px;
+    letter-spacing: 0.0938em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -183,7 +184,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 16px;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.35;
     color: #102c3f;
@@ -191,11 +192,11 @@
 
 .vas-reconciliation-status-subtext {
     min-width: 0;
-    margin-top: 4px;
+    margin-top: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.35;
     color: #748494;
@@ -203,16 +204,16 @@
 
 .vas-reconciliation-status-action {
     align-self: flex-start;
-    margin-top: 14px;
-    padding: 10px 16px;
+    margin-top: 0.875em;
+    padding: 0.625em 1em;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.375em;
     border: none;
-    border-radius: 999px;
+    border-radius: 62.4375em;
     background: #0f1b2d;
     color: #ffffff;
-    font-size: 13px;
+    font-size: 0.75em;
     font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
@@ -221,64 +222,64 @@
 
     .vas-reconciliation-status-action:hover {
         background: #002640;
-        transform: translateY(-1px);
+        transform: translateY(-0.0625em);
     }
 
     .vas-reconciliation-status-action svg {
-        width: 13px;
-        height: 13px;
+        width: 1.15em;
+        height: 1.15em;
         display: block;
     }
 
 .vas-reconciliation-status-state {
     width: 100%;
-    padding: 24px 8px;
+    padding: 1.5em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-    font-size: 14px;
+    font-size: 0.75em;
     font-weight: 500;
     color: #748494;
 }
 
-@media (max-width: 520px), (max-height: 240px) {
+@media (max-width: 32.5em), (max-height: 15em) {
     .vas-reconciliation-status-card {
-        padding: 14px;
-        border-radius: 14px;
+        padding: 0.75em;
+        border-radius: 0.75em;
     }
 
     .vas-reconciliation-status-head {
-        margin-bottom: 10px;
+        margin-bottom: 0.625em;
     }
 
     .vas-reconciliation-status-icon-box {
-        width: 26px;
-        height: 26px;
-        border-radius: 7px;
+        width: 2.25em;
+        height: 2.25em;
+        border-radius: 0.75em;
     }
 
     .vas-reconciliation-status-icon {
-        width: 13px;
-        height: 13px;
+        width: 1.15em;
+        height: 1.15em;
     }
 
     .vas-reconciliation-status-title {
-        font-size: 15px;
+        font-size: 0.95em;
     }
 
     .vas-reconciliation-status-sub {
-        font-size: 10px;
-        margin-top: 5px;
+        font-size: 0.75em;
+        margin-top: 0.3125em;
     }
 
     .vas-reconciliation-status-body {
-        gap: 14px;
+        gap: 0.45em;
     }
 
     .vas-reconciliation-status-donut {
-        width: 96px;
-        height: 96px;
+        width: 6em;
+        height: 6em;
     }
 
     .vas-reconciliation-status-track,
@@ -287,32 +288,32 @@
     }
 
     .vas-reconciliation-status-percent {
-        font-size: 22px;
+        font-size: clamp(1.1em, 6vw, 1.8em);
     }
 
     .vas-reconciliation-status-cap {
-        font-size: 9px;
+        font-size: 0.68em;
     }
 
     .vas-reconciliation-status-strong {
-        font-size: 14px;
+        font-size: 0.75em;
     }
 
     .vas-reconciliation-status-subtext {
-        font-size: 12px;
+        font-size: 0.75em;
     }
 
     .vas-reconciliation-status-action {
-        margin-top: 10px;
-        padding: 8px 13px;
-        font-size: 12px;
+        margin-top: 0.625em;
+        padding: 0.5em 0.8125em;
+        font-size: 0.75em;
     }
 }
 
-@media (max-width: 340px), (max-height: 170px) {
+@media (max-width: 21.25em), (max-height: 10.625em) {
     .vas-reconciliation-status-card {
-        padding: 10px;
-        border-radius: 12px;
+        padding: 0.75em;
+        border-radius: 0.75em;
     }
 
     .vas-reconciliation-status-sub {
@@ -320,12 +321,12 @@
     }
 
     .vas-reconciliation-status-body {
-        gap: 10px;
+        gap: 0.45em;
     }
 
     .vas-reconciliation-status-donut {
-        width: 76px;
-        height: 76px;
+        width: 4.75em;
+        height: 4.75em;
     }
 
     .vas-reconciliation-status-track,
@@ -334,20 +335,20 @@
     }
 
     .vas-reconciliation-status-percent {
-        font-size: 18px;
+        font-size: clamp(1.1em, 6vw, 1.8em);
     }
 
     .vas-reconciliation-status-cap {
-        font-size: 8px;
-        letter-spacing: 1px;
+        font-size: 0.68em;
+        letter-spacing: 0.0625em;
     }
 
     .vas-reconciliation-status-strong {
-        font-size: 12px;
+        font-size: 0.75em;
     }
 
     .vas-reconciliation-status-subtext {
-        font-size: 10px;
+        font-size: 0.75em;
     }
 
     .vas-reconciliation-status-action {
