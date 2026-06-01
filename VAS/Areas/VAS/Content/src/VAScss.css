@@ -15,7 +15,7 @@
 
 
 @import "../ClearedAPPaymentWidget.css";
-@import "../PaidThisMonthWidget.css";
+@import "../PaidThisMonthAPPaymentWidget.css";
 @import "../ScheduledAPPaymentWidget.css";
 @import "../BouncedAPPaymentWidget.css";
 @import "../UpcomingAPRunsWidget.css";

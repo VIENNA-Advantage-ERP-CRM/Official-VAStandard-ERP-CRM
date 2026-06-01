@@ -114,7 +114,7 @@ import "../app/tabpanel/VAS_LeadConversation.js";
 import "../app/widgets/RequestWidget.js";
 
 import "../app/widgets/ClearedAPPaymentWidget.js";
-import "../app/widgets/PaidThisMonthWidget.js";
+import "../app/widgets/PaidThisMonthAPPaymentWidget.js";
 import "../app/widgets/ScheduledAPPaymentWidget.js";
 import "../app/widgets/BouncedAPPaymentWidget.js";
 import "../app/widgets/UpcomingAPRunsWidget.js";
