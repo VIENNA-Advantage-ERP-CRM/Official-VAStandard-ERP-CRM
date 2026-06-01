@@ -144,10 +144,11 @@
 }
 
 .vas-scheduled-ap-payment-body.vas-scheduled-ap-payment-state .vas-scheduled-ap-payment-value {
-    font-size: 0.75em;
-    font-weight: 500;
+   
     letter-spacing: 0;
-    color: #586575;
+    font-size: 2.5em;
+    letter-spacing: -.025em;
+    line-height: 1;
 }
 
 @media (max-width: 18.75em), (max-height: 9.375em) {
