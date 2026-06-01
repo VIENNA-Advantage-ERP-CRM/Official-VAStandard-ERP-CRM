@@ -53,7 +53,7 @@
         function loadData() {
             showBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + 'PaidThisMonth/GetPaidThisMonth',
+                url: VIS.Application.contextUrl + 'PaidThisMonthAPPayment/GetPaidThisMonth',
                 type: 'GET',
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
