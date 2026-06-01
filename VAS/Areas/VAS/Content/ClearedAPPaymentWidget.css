@@ -280,3 +280,75 @@
         line-height: 1.2;
     }
 }
+
+.vas-cleared-ap-payment-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-size: 1em;
+    container-type: inline-size;
+    overflow: hidden;
+}
+
+.vas-cleared-ap-payment-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: 1em;
+    gap: 0.5em;
+    padding: 1em 1em 1.125em;
+    border-radius: 0.875em;
+}
+
+.vas-cleared-ap-payment-header {
+    min-width: 0;
+    gap: 0.625em;
+}
+
+.vas-cleared-ap-payment-icon-box {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+}
+
+.vas-cleared-ap-payment-icon {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-cleared-ap-payment-title {
+    min-width: 0;
+    font-size: 1.125em;
+}
+
+.vas-cleared-ap-payment-value {
+    font-size: 2.5em;
+    line-height: 1;
+    letter-spacing: -0.025em;
+}
+
+.vas-cleared-ap-payment-footer,
+.vas-cleared-ap-payment-desc {
+    font-size: 0.75em;
+}
+
+.vas-cleared-ap-payment-badge,
+.vas-cleared-ap-payment-body.vas-cleared-ap-payment-state .vas-cleared-ap-payment-value {
+    font-size: 0.75em;
+}
+
+@container (max-width: 18.75em) {
+    .vas-cleared-ap-payment-card {
+        font-size: 0.8125em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-cleared-ap-payment-card {
+        font-size: 0.6875em;
+    }
+}

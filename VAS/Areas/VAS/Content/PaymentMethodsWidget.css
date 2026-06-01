@@ -260,24 +260,98 @@
     }
 }
 
+.vas-payment-methods-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-size: 1em;
+    container-type: inline-size;
+    overflow: hidden;
+}
+
+.vas-payment-methods-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: 1em;
+    gap: 0.5em;
+    padding: 1em 1em 1.125em;
+    border-radius: 0.875em;
+}
+
+.vas-payment-methods-head {
+    min-width: 0;
+    gap: 0.625em;
+}
+
+.vas-payment-methods-icon-box {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+}
+
+.vas-payment-methods-icon {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-payment-methods-title {
+    min-width: 0;
+    font-size: 1.125em;
+}
+
+.vas-payment-methods-name,
+.vas-payment-methods-percent,
+.vas-payment-methods-foot-text {
+    font-size: 0.75em;
+}
+
+.vas-payment-methods-why-tag {
+    font-size: 0.75em;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+}
+
+.vas-payment-methods-state {
+    font-size: 0.875em;
+}
+
+@container (max-width: 18.75em) {
+    .vas-payment-methods-card {
+        font-size: 0.8125em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-payment-methods-card {
+        font-size: 0.6875em;
+    }
+}
+
 @media (max-width: 16.25em), (max-height: 11.25em) {
     .vas-payment-methods-card {
-        padding: 0.75em;
-        border-radius: 0.75em;
+        padding: 1em 1em 1.125em;
+        border-radius: 0.875em;
     }
 
     .vas-payment-methods-head {
         margin-bottom: 0.5em;
-        gap: 0.45em;
+        gap: 0.625em;
     }
 
     .vas-payment-methods-icon-box {
-        width: 2.25em;
-        height: 2.25em;
+        width: 2em;
+        height: 2em;
+        min-width: 2em;
+        border-radius: 0.5625em;
     }
 
     .vas-payment-methods-title {
-        font-size: 0.95em;
+        font-size: 1.125em;
     }
 
     .vas-payment-methods-body {
@@ -299,8 +373,9 @@
     }
 
     .vas-payment-methods-why-tag {
-        padding: 0.125em 0.375em;
-        font-size: 0.68em;
+        padding: 0.3125em 0.625em;
+        font-size: 0.75em;
+        border-radius: 999em;
         letter-spacing: 0.0688em;
     }
 

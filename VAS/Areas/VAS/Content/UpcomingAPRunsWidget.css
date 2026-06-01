@@ -292,3 +292,76 @@
         font-size: 0.75em;
     }
 }
+
+.vas-upcoming-ap-runs-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-size: 1em;
+    container-type: inline-size;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: 1em;
+    gap: 0.5em;
+    padding: 1em 1em 1.125em;
+    border-radius: 0.875em;
+}
+
+.vas-upcoming-ap-runs-head,
+.vas-upcoming-ap-runs-head-left,
+.vas-upcoming-ap-runs-title-row {
+    min-width: 0;
+}
+
+.vas-upcoming-ap-runs-head,
+.vas-upcoming-ap-runs-title-row {
+    gap: 0.625em;
+}
+
+.vas-upcoming-ap-runs-icon-box {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+}
+
+.vas-upcoming-ap-runs-icon {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-upcoming-ap-runs-title {
+    min-width: 0;
+    font-size: 1.125em;
+}
+
+.vas-upcoming-ap-runs-sub,
+.vas-upcoming-ap-runs-run-title,
+.vas-upcoming-ap-runs-meta,
+.vas-upcoming-ap-runs-amount {
+    font-size: 0.75em;
+}
+
+.vas-upcoming-ap-runs-state {
+    font-size: 0.875em;
+}
+
+@container (max-width: 18.75em) {
+    .vas-upcoming-ap-runs-card {
+        font-size: 0.8125em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-upcoming-ap-runs-card {
+        font-size: 0.6875em;
+    }
+}
