@@ -53,26 +53,98 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("COALESCE(ips.DueDate, inv.DateAcct)", dateFrom, dateTo);
 
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
                 string invoiceBody = @"
                     SELECT
                         inv.C_Invoice_ID,
                         inv.C_BPartner_ID,
                         bp.Name AS VendorName,
                         COALESCE(ips.DueDate, inv.DateAcct) AS DueDate,
-                        inv.C_Currency_ID,
-                        cur.ISO_Code AS CurrencyISO,
-                        cur.CurSymbol AS CurrencySymbol,"
+                        SchemaCurrency.C_Currency_ID,
+                        SchemaCurrency.ISO_Code AS CurrencyISO,
+                        SchemaCurrency.Cur_Symbol AS CurrencySymbol,
+                        SchemaCurrency.StdPrecision,"
                         + paymentMethodSelect + @"
                         CASE
                             WHEN (inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0)) <= 0 THEN 0
+
                             WHEN ips.C_InvoicePaySchedule_ID IS NOT NULL
                                 AND COALESCE(ips.DueAmt, 0) > 0
-                                AND ips.DueAmt < (inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0)) THEN ips.DueAmt
-                            ELSE (inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0))
+                                AND ips.DueAmt < (inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0))
+                            THEN
+                                CASE
+                                    WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'N'
+                                    THEN CurrencyConvert(
+                                        COALESCE(ips.DueAmt, 0),
+                                        inv.C_Currency_ID,
+                                        SchemaCurrency.C_Currency_ID,
+                                        inv.DateAcct,
+                                        inv.C_ConversionType_ID,
+                                        inv.AD_Client_ID,
+                                        inv.AD_Org_ID
+                                    )
+
+                                    WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'Y'
+                                    THEN -CurrencyConvert(
+                                        COALESCE(ips.DueAmt, 0),
+                                        inv.C_Currency_ID,
+                                        SchemaCurrency.C_Currency_ID,
+                                        inv.DateAcct,
+                                        inv.C_ConversionType_ID,
+                                        inv.AD_Client_ID,
+                                        inv.AD_Org_ID
+                                    )
+
+                                    ELSE 0
+                                END
+
+                            ELSE
+                                CASE
+                                    WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'N'
+                                    THEN CurrencyConvert(
+                                        COALESCE(inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0), 0),
+                                        inv.C_Currency_ID,
+                                        SchemaCurrency.C_Currency_ID,
+                                        inv.DateAcct,
+                                        inv.C_ConversionType_ID,
+                                        inv.AD_Client_ID,
+                                        inv.AD_Org_ID
+                                    )
+
+                                    WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'Y'
+                                    THEN -CurrencyConvert(
+                                        COALESCE(inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0), 0),
+                                        inv.C_Currency_ID,
+                                        SchemaCurrency.C_Currency_ID,
+                                        inv.DateAcct,
+                                        inv.C_ConversionType_ID,
+                                        inv.AD_Client_ID,
+                                        inv.AD_Org_ID
+                                    )
+
+                                    ELSE 0
+                                END
                         END AS OpenAmount
                     FROM C_Invoice inv
                     INNER JOIN C_BPartner bp ON (inv.C_BPartner_ID = bp.C_BPartner_ID)
-                    LEFT OUTER JOIN C_InvoicePaySchedule ips ON (inv.C_Invoice_ID = ips.C_Invoice_ID AND ips.IsActive = 'Y')
+                    INNER JOIN SchemaCurrency SchemaCurrency
+                        ON SchemaCurrency.AD_Client_ID = inv.AD_Client_ID
+                    LEFT OUTER JOIN C_InvoicePaySchedule ips
+                        ON (inv.C_Invoice_ID = ips.C_Invoice_ID AND ips.IsActive = 'Y')
                     LEFT OUTER JOIN (
                         SELECT
                             al.C_Invoice_ID,
@@ -81,8 +153,7 @@ namespace VIS.Controllers
                         WHERE al.IsActive = 'Y'
                         AND al.C_Invoice_ID IS NOT NULL
                         GROUP BY al.C_Invoice_ID
-                    ) alloc ON (inv.C_Invoice_ID = alloc.C_Invoice_ID)
-                    LEFT OUTER JOIN C_Currency cur ON (inv.C_Currency_ID = cur.C_Currency_ID)"
+                    ) alloc ON (inv.C_Invoice_ID = alloc.C_Invoice_ID)"
                     + paymentMethodJoin + @"
                     WHERE inv.IsActive = 'Y'
                     AND inv.IsSOTrx = 'N'
@@ -92,10 +163,18 @@ namespace VIS.Controllers
                     AND (inv.GrandTotal - COALESCE(alloc.AllocatedAmt, 0)) > 0
                 ";
 
-                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(invoiceBody, "inv", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(
+                    invoiceBody,
+                    "inv",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string sql = @"
-                    WITH UpcomingInvoices AS (
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    ),
+                    UpcomingInvoices AS (
                         " + invoiceBody + @"
                     )
                     SELECT
@@ -107,7 +186,10 @@ namespace VIS.Controllers
                         CurrencySymbol,
                         COUNT(1) AS PaymentCount,
                         MIN(VendorName) AS VendorName,
-                        SUM(OpenAmount) AS TotalAmount
+                        ROUND(
+                            COALESCE(SUM(OpenAmount), 0),
+                            MAX(StdPrecision)
+                        ) AS TotalAmount
                     FROM UpcomingInvoices
                     WHERE OpenAmount > 0
                     GROUP BY

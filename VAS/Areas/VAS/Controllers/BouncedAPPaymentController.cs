@@ -37,29 +37,45 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
 
-                string sql = @"
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
+                string bouncedPaymentSql = @"
                     SELECT
                         COUNT(1) AS BouncedPaymentCount
                     FROM C_Payment p
                     WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = @IsReceipt
-                    AND p.DocStatus = @DocStatus
+                    AND p.IsReceipt = 'N'
+                    AND p.DocStatus IN ('RE', 'VO')
                 " + dateFilter;
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(
-                    sql,
+                bouncedPaymentSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    bouncedPaymentSql,
                     "p",
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DocStatus", "RE")
-                };
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + bouncedPaymentSql;
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+            
+                dr = DB.ExecuteReader(sql);
 
                 int bouncedPaymentCount = 0;
 

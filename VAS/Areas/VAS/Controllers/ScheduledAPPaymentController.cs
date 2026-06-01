@@ -67,19 +67,61 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("ips.DueDate", weekFrom, weekTo);
 
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
                 string invoiceBody = @"
                     SELECT
                         inv.C_Invoice_ID,
-                        inv.C_Currency_ID,
-                        cur.ISO_Code AS CurrencyISO,
-                        cur.CurSymbol AS CurrencySymbol,"
+                        SchemaCurrency.C_Currency_ID,
+                        SchemaCurrency.ISO_Code AS CurrencyISO,
+                        SchemaCurrency.Cur_Symbol AS CurrencySymbol,
+                        SchemaCurrency.StdPrecision,"
                         + paymentMethodSelect + @"
-                        COALESCE(ips.DueAmt, 0) AS ScheduledAmount
+                        CASE
+                            -- AP Invoices
+                            WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'N'
+                            THEN CurrencyConvert(
+                                COALESCE(ips.DueAmt, 0),
+                                inv.C_Currency_ID,
+                                SchemaCurrency.C_Currency_ID,
+                                inv.DateAcct,
+                                inv.C_ConversionType_ID,
+                                inv.AD_Client_ID,
+                                inv.AD_Org_ID
+                            )
+
+                            -- AP Credit Notes / Returns subtract
+                            WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'Y'
+                            THEN -CurrencyConvert(
+                                COALESCE(ips.DueAmt, 0),
+                                inv.C_Currency_ID,
+                                SchemaCurrency.C_Currency_ID,
+                                inv.DateAcct,
+                                inv.C_ConversionType_ID,
+                                inv.AD_Client_ID,
+                                inv.AD_Org_ID
+                            )
+
+                            ELSE 0
+                        END AS ScheduledAmount
                     FROM C_Invoice inv
                     INNER JOIN C_InvoicePaySchedule ips 
                         ON (inv.C_Invoice_ID = ips.C_Invoice_ID)
-                    LEFT OUTER JOIN C_Currency cur 
-                        ON (inv.C_Currency_ID = cur.C_Currency_ID)"
+                    INNER JOIN SchemaCurrency SchemaCurrency
+                        ON SchemaCurrency.AD_Client_ID = inv.AD_Client_ID"
                     + paymentMethodJoin + @"
                     WHERE inv.IsActive = 'Y'
                     AND ips.IsActive = 'Y'
@@ -96,14 +138,17 @@ namespace VIS.Controllers
                     MRole.SQL_RO
                 );
 
-                string sql = @"
+                string groupedScheduledSql = @"
                     SELECT
                         x.PaymentMethod_ID,
                         x.PaymentMethodName,
                         x.C_Currency_ID,
                         x.CurrencyISO,
                         x.CurrencySymbol,
-                        SUM(x.ScheduledAmount) AS ScheduledAmount
+                        ROUND(
+                            COALESCE(SUM(x.ScheduledAmount), 0),
+                            MAX(x.StdPrecision)
+                        ) AS ScheduledAmount
                     FROM (
                         " + invoiceBody + @"
                     ) x
@@ -114,12 +159,16 @@ namespace VIS.Controllers
                         x.CurrencyISO,
                         x.CurrencySymbol
                     HAVING SUM(x.ScheduledAmount) > 0
-                    ORDER BY ScheduledAmount DESC
-                ";
+                    ORDER BY ScheduledAmount DESC";
 
-                List<SqlParameter> parameters = new List<SqlParameter>();
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + groupedScheduledSql;
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                
+                dr = DB.ExecuteReader(sql);
 
                 decimal scheduledAmountThisWeek = 0;
                 int cCurrencyId = 0;

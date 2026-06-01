@@ -64,7 +64,7 @@ namespace VIS.Controllers
                     FROM C_Payment p
                     LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID = cur.C_Currency_ID)
                     WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = @IsReceipt
+                    AND p.IsReceipt = 'N'
                     AND p.DocStatus IN ('CO', 'CL')
                 " + dateFilter;
 
@@ -75,12 +75,9 @@ namespace VIS.Controllers
                     MRole.SQL_RO
                 );
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@IsReceipt", "N")
-                };
+            
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 decimal paidThisMonth = 0;
                 int cCurrencyId = 0;

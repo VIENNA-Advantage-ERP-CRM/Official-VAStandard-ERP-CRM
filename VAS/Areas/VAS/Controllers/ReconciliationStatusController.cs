@@ -35,7 +35,22 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
 
-                string sql = @"
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
+                string reconciliationSql = @"
                     SELECT
                         COUNT(1) AS TotalPayments,
                         SUM(
@@ -53,7 +68,18 @@ namespace VIS.Controllers
                     + dateFilter + @"
                 ";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                reconciliationSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    reconciliationSql,
+                    "p",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
+
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + reconciliationSql;
 
                 dr = DB.ExecuteReader(sql);
 

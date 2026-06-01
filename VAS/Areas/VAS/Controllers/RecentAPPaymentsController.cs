@@ -60,7 +60,22 @@ namespace VIS.Controllers
                     LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)"
                     : string.Empty;
 
-                string sql = @"
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
+                string recentPaymentsSql = @"
                     SELECT
                         p.C_Payment_ID,
                         p.DateAcct AS PaymentDate,
@@ -72,24 +87,50 @@ namespace VIS.Controllers
                             ELSE 'N'
                         END AS HasBusinessRef,
                         p.DocStatus,
-                        p.PayAmt AS Amount,
-                        p.C_Currency_ID,
-                        cur.ISO_Code AS CurrencyISO,
-                        cur.CurSymbol AS CurrencySymbol
+
+                        ROUND(
+                            COALESCE(
+                                CASE
+                                    WHEN p.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(p.PayAmt, 0)
+                                    ELSE CurrencyConvert(
+                                        COALESCE(p.PayAmt, 0),
+                                        p.C_Currency_ID,
+                                        SchemaCurrency.C_Currency_ID,
+                                        p.DateAcct,
+                                        p.C_ConversionType_ID,
+                                        p.AD_Client_ID,
+                                        p.AD_Org_ID
+                                    )
+                                END,
+                                0
+                            ),
+                            MAX(SchemaCurrency.StdPrecision)
+                        ) AS Amount,
+
+                        MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+                        MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+                        MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
+
                     FROM C_Payment p
+                    INNER JOIN SchemaCurrency SchemaCurrency
+                        ON SchemaCurrency.AD_Client_ID = p.AD_Client_ID
                     LEFT OUTER JOIN C_BPartner bp ON (p.C_BPartner_ID = bp.C_BPartner_ID)
-                    LEFT OUTER JOIN C_Currency cur ON (p.C_Currency_ID = cur.C_Currency_ID)
                     LEFT OUTER JOIN C_AllocationLine al ON (p.C_Payment_ID = al.C_Payment_ID)
                     LEFT OUTER JOIN C_Invoice inv ON (al.C_Invoice_ID = inv.C_Invoice_ID)
                     LEFT OUTER JOIN C_Order ord ON (inv.C_Order_ID = ord.C_Order_ID)"
                     + paymentMethodJoin + @"
                     WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = @IsReceipt
+                    AND p.IsReceipt = 'N'
                 ";
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                recentPaymentsSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    recentPaymentsSql,
+                    "p",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
-                sql += @"
+                recentPaymentsSql += @"
                     GROUP BY
                         p.C_Payment_ID,
                         p.DateAcct,
@@ -99,17 +140,20 @@ namespace VIS.Controllers
                         p.DocStatus,
                         p.PayAmt,
                         p.C_Currency_ID,
-                        cur.ISO_Code,
-                        cur.CurSymbol
+                        p.C_ConversionType_ID,
+                        p.AD_Client_ID,
+                        p.AD_Org_ID,
+                        SchemaCurrency.C_Currency_ID
                     ORDER BY p.DateAcct DESC, p.C_Payment_ID DESC
                 ";
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@IsReceipt", "N")
-                };
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + recentPaymentsSql;
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 List<object> payments = new List<object>();
                 List<string> autoMatchedRefs = new List<string>();
@@ -247,7 +291,6 @@ namespace VIS.Controllers
 
             return "VAS_InTransit";
         }
-
 
         private string GetPaymentMethodName(Ctx ctx, string paymentMethodName)
         {

@@ -67,23 +67,64 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
 
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
                 string baseSql = @"
                     SELECT
                         " + paymentMethodSelect + @" AS PaymentMethodName,
                         COUNT(1) AS PaymentCount,
-                        SUM(p.PayAmt) AS PaymentAmount
+                        ROUND(
+                            COALESCE(
+                                SUM(
+                                    CASE
+                                        WHEN p.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(p.PayAmt, 0)
+                                        ELSE CurrencyConvert(
+                                            COALESCE(p.PayAmt, 0),
+                                            p.C_Currency_ID,
+                                            SchemaCurrency.C_Currency_ID,
+                                            p.DateAcct,
+                                            p.C_ConversionType_ID,
+                                            p.AD_Client_ID,
+                                            p.AD_Org_ID
+                                        )
+                                    END
+                                ),
+                                0
+                            ),
+                            MAX(SchemaCurrency.StdPrecision)
+                        ) AS PaymentAmount
                     FROM C_Payment p
+                    INNER JOIN SchemaCurrency SchemaCurrency
+                        ON SchemaCurrency.AD_Client_ID = p.AD_Client_ID
                     " + paymentMethodJoin + @"
                     WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = @IsReceipt
+                    AND p.IsReceipt = 'N'
                     AND p.DocStatus IN ('CO', 'CL')
                     "
                     + dateFilter + @"
                 ";
 
-                baseSql = MRole.GetDefault(ctx).AddAccessSQL(baseSql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                baseSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    baseSql,
+                    "p",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
-                string sql = @"
+                string paymentMethodsSql = @"
                     SELECT
                         PaymentMethodName,
                         PaymentCount,
@@ -92,15 +133,16 @@ namespace VIS.Controllers
                         " + baseSql + @"
                         GROUP BY " + paymentMethodGroupBy + @"
                     ) x
-                    ORDER BY PaymentAmount DESC
-                ";
+                    ORDER BY PaymentAmount DESC";
 
-                List<System.Data.SqlClient.SqlParameter> parameters = new List<System.Data.SqlClient.SqlParameter>
-                {
-                    new System.Data.SqlClient.SqlParameter("@IsReceipt", "N")
-                };
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + paymentMethodsSql;
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+         
+                dr = DB.ExecuteReader(sql);
 
                 List<PaymentMethodSummary> rows = new List<PaymentMethodSummary>();
                 decimal totalAmount = 0;

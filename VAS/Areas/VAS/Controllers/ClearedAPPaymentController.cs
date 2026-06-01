@@ -37,29 +37,47 @@ namespace VIS.Controllers
 
                 string dateFilter = GetDateFilter("p.DateTrx", dateFrom, dateTo);
 
-                string sql = @"
+                string schemaCurrencySql = @"
+                    SELECT ClientInfo.AD_Client_ID,
+                           AcctSchema.C_Currency_ID AS C_Currency_ID,
+                           Currency.StdPrecision,
+                           Currency.ISO_Code AS ISO_Code,
+                           CASE
+                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                               ELSE Currency.ISO_Code
+                           END AS Cur_Symbol
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_AcctSchema AcctSchema
+                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
+                    INNER JOIN C_Currency Currency
+                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+
+                string clearedPaymentSql = @"
                     SELECT
                         COUNT(1) AS TotalPayments,
                         SUM(CASE WHEN p.IsReconciled = 'Y' THEN 1 ELSE 0 END) AS ClearedPayments
                     FROM C_Payment p
                     WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = @IsReceipt
+                    AND p.IsReceipt = 'N'
                     AND p.DocStatus IN ('CO', 'CL')
                 " + dateFilter;
 
-                sql = MRole.GetDefault(ctx).AddAccessSQL(
-                    sql,
+                clearedPaymentSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    clearedPaymentSql,
                     "p",
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@IsReceipt", "N")
-                };
+                string sql = @"
+                    WITH SchemaCurrency AS (
+                        " + schemaCurrencySql + @"
+                    )
+                    " + clearedPaymentSql;
 
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+               
+
+                dr = DB.ExecuteReader(sql);
 
                 int totalPayments = 0;
                 int clearedPayments = 0;
