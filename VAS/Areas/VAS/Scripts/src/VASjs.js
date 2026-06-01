@@ -113,6 +113,7 @@ import "../app/tabpanel/VAS_LeadConversation.js";
 
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
 
+import "../app/widgets/VAS_010_CashGlCashInWidget.js";
 import "../app/widgets/VAS_CreateNewReceipt.js";
 import "../app/widgets/VAS_ReceiptSearch.js";
 import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";

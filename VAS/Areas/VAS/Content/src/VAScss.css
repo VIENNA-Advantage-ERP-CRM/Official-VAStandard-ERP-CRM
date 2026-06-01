@@ -13,6 +13,7 @@
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
 
+@import "../VAS_010_CashGlCashInWidget.css";
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
