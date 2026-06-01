@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -55,6 +56,7 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             int orgId = ctx.GetAD_Org_ID();
+            SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
             DateTime now = DateTime.Now;
             int currentYear = now.Year;
             int currentMonth = now.Month;
@@ -73,8 +75,8 @@ namespace VAS.Areas.VAS.Controllers
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = " + clientId + @"
-                     AND i.AD_Org_ID = " + orgId + @" ";
+                     AND i.AD_Client_ID = @ClientID
+                     AND i.AD_Org_ID = @OrgID ";
 
             baseInvoiceQuery = MRole.GetDefault(ctx).AddAccessSQL(baseInvoiceQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -91,11 +93,11 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
-                     AND ah.AD_Client_ID = " + clientId + @"
+                     AND ah.AD_Client_ID = @ClientID
                      AND EXTRACT(YEAR FROM ah.DateAcct) = " + currentYear + @"
                      AND EXTRACT(MONTH FROM ah.DateAcct) = " + currentMonth + @" ";
 
-            DataSet ds = DB.ExecuteDataset(strQuery, null, null);
+            DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 result.CurrentMonthDpo = Util.GetValueOfInt(ds.Tables[0].Rows[0]["CurrentMonthDpo"]);
@@ -113,11 +115,11 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
-                     AND ah.AD_Client_ID = " + clientId + @"
+                     AND ah.AD_Client_ID = @ClientID
                      AND EXTRACT(YEAR FROM ah.DateAcct) = " + lastMonthYear + @"
                      AND EXTRACT(MONTH FROM ah.DateAcct) = " + lastMonthNum + @" ";
 
-            DataSet dsLast = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsLast = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsLast != null && dsLast.Tables.Count > 0 && dsLast.Tables[0].Rows.Count > 0)
             {
                 result.LastMonthDpo = Util.GetValueOfInt(dsLast.Tables[0].Rows[0]["LastMonthDpo"]);
@@ -143,13 +145,13 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus = 'CO'
-                     AND ah.AD_Client_ID = " + clientId + @"
+                     AND ah.AD_Client_ID = @ClientID
                      AND (EXTRACT(YEAR FROM ah.DateAcct) * 12 + EXTRACT(MONTH FROM ah.DateAcct))
                          >= (" + sparkYear + @" * 12 + " + sparkMonth + @")
                    GROUP BY EXTRACT(YEAR FROM ah.DateAcct), EXTRACT(MONTH FROM ah.DateAcct)
                    ORDER BY EXTRACT(YEAR FROM ah.DateAcct), EXTRACT(MONTH FROM ah.DateAcct)";
 
-            DataSet sparkDs = DB.ExecuteDataset(strQuery, null, null);
+            DataSet sparkDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (sparkDs != null && sparkDs.Tables.Count > 0 && sparkDs.Tables[0].Rows.Count > 0)
             {
                 for (int i = 0; i < sparkDs.Tables[0].Rows.Count; i++)

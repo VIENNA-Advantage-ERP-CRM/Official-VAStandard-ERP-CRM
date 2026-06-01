@@ -211,7 +211,7 @@
                             callbacks: {
                                 label: function (ctx) {
                                     if (ctx.raw === null) { return null; }
-                                    return ' ' + ctx.dataset.label + ': ' + sym + fmtShort(ctx.raw);
+                                    return ' ' + ctx.dataset.label + ': ' + sym + fmtShort(ctx.raw, data.StdPrecision);
                                 }
                             }
                         }
@@ -231,7 +231,7 @@
                                 font: { family: 'Roboto, sans-serif', size: 10 },
                                 color: '#748494',
                                 maxTicksLimit: 6,
-                                callback: function (v) { return sym + fmtShort(v); }
+                                callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
                             },
                             border: { display: false }
                         }
@@ -241,15 +241,16 @@
         }
 
         /* ---- Compact amount formatter ---- */
-        function fmtShort(val) {
+        function fmtShort(val, stdPrecision) {
             if (!val || val === 0) { return '0'; }
             var abs   = Math.abs(val);
             var loc   = window.navigator.language;
+            var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
             if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_Crore'); }
             if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_Lakh'); }
             if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_Thousand'); }
-            return abs.toLocaleString(loc, { maximumFractionDigits: 0 });
+            return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 
         /* ---- Busy indicator ---- */

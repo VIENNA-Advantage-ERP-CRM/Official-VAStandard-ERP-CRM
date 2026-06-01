@@ -155,7 +155,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function (ctx) {
-                                    return ' ' + sym + fmtShort(ctx.raw);
+                                    return ' ' + sym + fmtShort(ctx.raw, data.StdPrecision);
                                 }
                             }
                         }
@@ -167,7 +167,7 @@
                                 font: { family: 'Roboto, sans-serif', size: 10 },
                                 color: '#748494',
                                 maxTicksLimit: 6,
-                                callback: function (v) { return sym + fmtShort(v); }
+                                callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
                             },
                             border: { display: false }
                         },
@@ -206,7 +206,7 @@
             var catColors  = cats.map(function (c, i) { return CAT_COLORS[i % CAT_COLORS.length]; });
 
             var totalLabel = VIS.Msg.getMsg('VAS_Total') || 'Total';
-            var centerText = sym + fmtShort(total);
+            var centerText = sym + fmtShort(total, data.StdPrecision);
 
             var centerPlugin = {
                 id: 'vas_sbc_center_' + widgetID,
@@ -259,7 +259,7 @@
                                         var pct   = Math.round((catAmounts[i] / total) * 100);
                                         var trunc = name.length > 14 ? name.slice(0, 14) + '…' : name;
                                         return {
-                                            text: trunc + '  ' + sym + fmtShort(catAmounts[i]) + '  ' + pct + '%',
+                                            text: trunc + '  ' + sym + fmtShort(catAmounts[i], data.StdPrecision) + '  ' + pct + '%',
                                             fillStyle:   catColors[i],
                                             strokeStyle: catColors[i],
                                             hidden: false,
@@ -275,7 +275,7 @@
                                 label: function (ctx) {
                                     var i   = ctx.dataIndex;
                                     var pct = Math.round((catAmounts[i] / total) * 100);
-                                    return ' ' + sym + fmtShort(catAmounts[i]) + '  (' + pct + '%)';
+                                    return ' ' + sym + fmtShort(catAmounts[i], data.StdPrecision) + '  (' + pct + '%)';
                                 }
                             }
                         }
@@ -286,15 +286,16 @@
         }
 
         /* ---- Compact amount formatter ---- */
-        function fmtShort(val) {
+        function fmtShort(val, stdPrecision) {
             if (val === 0 || !val) { return '0'; }
             var abs   = Math.abs(val);
             var loc   = window.navigator.language;
+            var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
             if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_Crore'); }
             if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_Lakh'); }
             if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_Thousand'); }
-            return abs.toLocaleString(loc, { maximumFractionDigits: 0 });
+            return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 
         /* ---- Busy indicator ---- */

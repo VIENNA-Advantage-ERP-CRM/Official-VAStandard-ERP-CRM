@@ -61,7 +61,7 @@
             $container.empty();
 
             var sym      = data.CurSymbol    || '';
-            var prec     = data.StdPrecision || 2;
+            var prec     = VIS.Env.getCtx().getStdPrecision() || data.StdPrecision || 2;
             var vendors  = data.Vendors      || [];
             var breached = data.BreachCount  || 0;
 

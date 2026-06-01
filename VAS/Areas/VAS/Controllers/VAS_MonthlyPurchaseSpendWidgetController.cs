@@ -8,6 +8,7 @@ using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -52,6 +53,8 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             int orgId    = ctx.GetAD_Org_ID();
+            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
             DateTime now = DateTime.Now;
 
             // Fiscal year start year: if current month >= April the FY started this calendar year.
@@ -64,14 +67,14 @@ namespace VAS.Areas.VAS.Controllers
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
-                   WHERE ci.AD_Client_ID = " + clientId + @"
+                   WHERE ci.AD_Client_ID = @ClientID
                      AND ci.IsActive = 'Y'
                      AND cs.IsActive = 'Y'
                      AND c.IsActive = 'Y'";
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, null, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -89,8 +92,8 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE i.IsSOTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = " + clientId + @"
-                     AND i.AD_Org_ID = " + orgId;
+                     AND i.AD_Client_ID = @ClientID
+                     AND i.AD_Org_ID = @OrgID";
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -120,7 +123,7 @@ namespace VAS.Areas.VAS.Controllers
                  GROUP BY FyType, FyMonth
                  ORDER BY FyType, FyMonth";
 
-            DataSet ds = DB.ExecuteDataset(strQuery, null, null);
+            DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
             if (ds != null && ds.Tables.Count > 0)
             {
                 foreach (DataRow row in ds.Tables[0].Rows)

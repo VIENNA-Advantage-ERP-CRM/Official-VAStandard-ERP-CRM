@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -52,6 +53,8 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             int orgId    = ctx.GetAD_Org_ID();
+            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
             DateTime now = DateTime.Now;
             int todayInt   = (now.Year * 12 + now.Month) * 31 + now.Day;
             int plus14Int  = (now.AddDays(14).Year * 12 + now.AddDays(14).Month) * 31 + now.AddDays(14).Day;
@@ -62,13 +65,13 @@ namespace VAS.Areas.VAS.Controllers
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
-                   WHERE ci.AD_Client_ID = " + clientId + @"
+                   WHERE ci.AD_Client_ID = @ClientID
                      AND ci.IsActive = 'Y'
                      AND cs.IsActive = 'Y'
                      AND c.IsActive = 'Y'";
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, null, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -88,14 +91,14 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('DR', 'IP', 'WC', 'NA')
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             baseAA = MRole.GetDefault(ctx).AddAccessSQL(baseAA, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT COUNT(1) AS InvCount, SUM(aa.GrandTotal) AS TotalAmt
                   FROM (" + baseAA + @") aa";
 
-            DataSet dsAA = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsAA = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsAA != null && dsAA.Tables.Count > 0 && dsAA.Tables[0].Rows.Count > 0)
             {
                 result.AwaitingApprovalCount = Util.GetValueOfInt(dsAA.Tables[0].Rows[0]["InvCount"]);
@@ -110,8 +113,8 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.IsReturnTrx = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             baseGRN = MRole.GetDefault(ctx).AddAccessSQL(baseGRN, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT COUNT(DISTINCT g.C_Invoice_ID) AS InvCount, SUM(COALESCE(currencyConvert(il.LineNetAmt, g.C_Currency_ID, " + schemaCurrencyId + @", g.DateAcct, g.C_ConversionType_ID, g.AD_Client_ID, g.AD_Org_ID), 0)) AS TotalAmt
@@ -121,7 +124,7 @@ namespace VAS.Areas.VAS.Controllers
                    AND il.M_Product_ID IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM M_MatchInv mi WHERE mi.C_InvoiceLine_ID = il.C_InvoiceLine_ID AND mi.IsActive = 'Y')";
 
-            DataSet dsGRN = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsGRN = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsGRN != null && dsGRN.Tables.Count > 0 && dsGRN.Tables[0].Rows.Count > 0)
             {
                 result.GrnMismatchCount = Util.GetValueOfInt(dsGRN.Tables[0].Rows[0]["InvCount"]);
@@ -137,14 +140,14 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.DocStatus IN ('CO', 'CL', 'IP')
                    AND i.IsActive = 'Y'
                    AND i.C_Order_ID IS NULL
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             basePNR = MRole.GetDefault(ctx).AddAccessSQL(basePNR, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT COUNT(1) AS InvCount, SUM(pnr.GrandTotal) AS TotalAmt
                   FROM (" + basePNR + @") pnr";
 
-            DataSet dsPNR = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsPNR = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsPNR != null && dsPNR.Tables.Count > 0 && dsPNR.Tables[0].Rows.Count > 0)
             {
                 result.PoNotRaisedCount = Util.GetValueOfInt(dsPNR.Tables[0].Rows[0]["InvCount"]);
@@ -159,14 +162,14 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             baseRTP = MRole.GetDefault(ctx).AddAccessSQL(baseRTP, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT COUNT(1) AS InvCount, SUM(rtp.OpenAmt) AS TotalAmt
                   FROM (" + baseRTP + @") rtp";
 
-            DataSet dsRTP = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsRTP = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsRTP != null && dsRTP.Tables.Count > 0 && dsRTP.Tables[0].Rows.Count > 0)
             {
                 result.ReadyToPayCount = Util.GetValueOfInt(dsRTP.Tables[0].Rows[0]["InvCount"]);
@@ -186,8 +189,8 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
                    AND i.DueDate IS NOT NULL
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             baseDue = MRole.GetDefault(ctx).AddAccessSQL(baseDue, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT bp.Name AS VendorName, d.OpenAmt, d.DueDate
@@ -198,7 +201,7 @@ namespace VAS.Areas.VAS.Controllers
                    AND bp.IsActive = 'Y'
                  ORDER BY ((EXTRACT(YEAR FROM d.DueDate) * 12 + EXTRACT(MONTH FROM d.DueDate)) * 31 + EXTRACT(DAY FROM d.DueDate)) ASC";
 
-            DataSet dsDue = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsDue = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsDue != null && dsDue.Tables.Count > 0)
             {
                 int rowCount = 0;

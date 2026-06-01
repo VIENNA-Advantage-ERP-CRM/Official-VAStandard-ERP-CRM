@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -53,6 +54,8 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             int orgId    = ctx.GetAD_Org_ID();
+            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
@@ -60,13 +63,13 @@ namespace VAS.Areas.VAS.Controllers
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
-                   WHERE ci.AD_Client_ID = " + clientId + @"
+                   WHERE ci.AD_Client_ID = @ClientID
                      AND ci.IsActive = 'Y'
                      AND cs.IsActive = 'Y'
                      AND c.IsActive = 'Y'";
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, null, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -87,8 +90,8 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
                    AND i.VA009_OpenAmount > 0
-                   AND i.AD_Client_ID = " + clientId + @"
-                   AND i.AD_Org_ID = " + orgId;
+                   AND i.AD_Client_ID = @ClientID
+                   AND i.AD_Org_ID = @OrgID";
             baseInv = MRole.GetDefault(ctx).AddAccessSQL(baseInv, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT bp.Name AS VendorName,
@@ -101,12 +104,12 @@ namespace VAS.Areas.VAS.Controllers
                  WHERE bp.IsVendor = 'Y'
                    AND bp.IsActive = 'Y'
                    AND COALESCE(inv_s.CreditUsed, 0) > 0
-                   AND bp.AD_Client_ID = " + clientId + @"
+                   AND bp.AD_Client_ID = @ClientID
                  ORDER BY CASE WHEN bp.SO_CreditLimit > 0
                                THEN COALESCE(inv_s.CreditUsed, 0) / bp.SO_CreditLimit
                                ELSE 0 END DESC";
 
-            DataSet dsCredit = DB.ExecuteDataset(strQuery, null, null);
+            DataSet dsCredit = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsCredit != null && dsCredit.Tables.Count > 0)
             {
                 int breachCount = 0;
