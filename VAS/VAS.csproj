@@ -258,7 +258,7 @@
   <ItemGroup>
     <Content Include="Areas\VAS\Content\AutoAllocatedWidget.css" />
     <Content Include="Areas\VAS\Content\BouncedChequesWidget.css" />
-    <Content Include="Areas\VAS\Content\CollectionEfficiencyWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_001_CollectionEfficiencyWidget.css" />
     <Content Include="Areas\VAS\Content\CustomerPaidMethodWidget.css" />
     <Content Include="Areas\VAS\Content\ExpectedReceiptsWidget.css" />
     <Content Include="Areas\VAS\Content\ExpectedThisWeekWidget.css" />
@@ -350,7 +350,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\CashJournal\VAS_NewCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\CollectionEfficiencyWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_001_CollectionEfficiencyWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CustomerPaidMethodWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
@@ -364,7 +364,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_CreateNewReceipt.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
