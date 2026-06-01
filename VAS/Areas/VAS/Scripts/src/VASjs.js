@@ -126,4 +126,13 @@ import "../app/widgets/OutstandingSalesOrderWidget.js";
 import "../app/widgets/OverdueWidget.js";
 import "../app/widgets/PaidthismonthWidget.js";
 import "../app/widgets/TopDebtorsWidget.js";
-
+import "../app/widgets/GLJournalEntriesWidget.js";
+import "../app/widgets/GLJournalUnpostedWidget.js";
+import "../app/widgets/GLJournalPostedWidget.js";
+import "../app/widgets/GLJournalTotalDebitWidget.js";
+import "../app/widgets/GLJournalTotalCreditWidget.js";
+import "../app/widgets/GLJournalNetDiffWidget.js";
+import "../app/widgets/GLJournalRecentWidget.js";
+import "../app/widgets/GLJournalVolumeWidget.js";
+import "../app/widgets/GLJournalTopMovementWidget.js";
+import "../app/widgets/GLJournalPendingWidget.js";

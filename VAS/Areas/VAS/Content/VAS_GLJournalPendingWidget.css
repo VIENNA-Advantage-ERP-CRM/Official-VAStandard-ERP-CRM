@@ -1,0 +1,223 @@
+/* ==========================================================================
+   VAS GL Journal Pending Action Queue Widget
+   File  : VAS_GLJournalPendingWidget.css
+   Scope : .VAS-gljpq-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljpq-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── Card container ──────────────────────────────────────────────────────── */
+.VAS-gljpq-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, #FAFCFE 0%, #EEF6FF 100%);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljpq-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+    margin-bottom: 0.75em;
+}
+
+/* Icon well — amber/clock theme for "pending" */
+.VAS-gljpq-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(245, 158, 11, 0.12);
+    color: #B45309;
+}
+
+.VAS-gljpq-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+/* Title */
+.VAS-gljpq-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #102C3F;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+/* Item count badge — "9 items" */
+.VAS-gljpq-count {
+    font-size: 0.7em;
+    font-weight: 500;
+    color: #748494;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* ── Scrollable body ─────────────────────────────────────────────────────── */
+.VAS-gljpq-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ── Queue list ──────────────────────────────────────────────────────────── */
+.VAS-gljpq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+}
+
+/* ── Single queue item ───────────────────────────────────────────────────── */
+.VAS-gljpq-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.5em 0.6em;
+    background: #FFFFFF;
+    border-radius: 0.5em;
+    border: 1px solid rgba(0, 131, 218, 0.08);
+    transition: background 0.1s;
+}
+
+.VAS-gljpq-item:hover {
+    background: #F4F9FF;
+}
+
+/* ── Left urgency stripe ─────────────────────────────────────────────────── */
+.VAS-gljpq-mrk {
+    width: 0.22em;
+    align-self: stretch;
+    flex-shrink: 0;
+    border-radius: 999px;
+}
+
+.VAS-gljpq-mrk-danger { background: #EF4444; }
+.VAS-gljpq-mrk-warn   { background: #F59E0B; }
+.VAS-gljpq-mrk-info   { background: #0083DA; }
+
+/* ── Item body (title + meta) ────────────────────────────────────────────── */
+.VAS-gljpq-body-row {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+/* Document number + description */
+.VAS-gljpq-title {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Action · age · user */
+.VAS-gljpq-meta {
+    font-size: 0.7em;
+    font-weight: 400;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* ── Amount ──────────────────────────────────────────────────────────────── */
+.VAS-gljpq-amt {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Empty / error states ────────────────────────────────────────────────── */
+.VAS-gljpq-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 6em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljpq-card {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljpq-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljpq-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljpq-card {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljpq-card {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-gljpq-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljpq-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-gljpq-card {
+        font-size: 11px;
+    }
+}
+
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljpq-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljpq-count {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljpq-item {
+    flex-direction: row-reverse;
+}

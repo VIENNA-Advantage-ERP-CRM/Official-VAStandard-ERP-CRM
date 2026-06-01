@@ -1,0 +1,356 @@
+/* ==========================================================================
+   VAS GL Journal Recent Entries Widget
+   File  : VAS_GLJournalRecentWidget.css
+   Scope : .VAS-gljr-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljr-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── Card container ──────────────────────────────────────────────────────── */
+.VAS-gljr-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFD 100%);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljr-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+    margin-bottom: 0.625em;
+}
+
+/* Icon well */
+.VAS-gljr-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(0, 131, 218, 0.10);
+    color: #004E9A;
+}
+
+.VAS-gljr-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+/* Title */
+.VAS-gljr-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #102C3F;
+    letter-spacing: 0.01em;
+}
+
+/* ── Alert strip ─────────────────────────────────────────────────────────── */
+.VAS-gljr-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    background: #FEF8E7;
+    border: 1px solid #E8A015;
+    border-radius: 0.5em;
+    padding: 0.5em 0.75em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.VAS-gljr-alert-icon {
+    display: flex;
+    align-items: center;
+    color: #C26A00;
+    flex-shrink: 0;
+}
+
+.VAS-gljr-alert-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+.VAS-gljr-alert-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.VAS-gljr-alert-title {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #7A4500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-gljr-alert-desc {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #9A6200;
+    margin-top: 0.1em;
+}
+
+.VAS-gljr-btn-fix {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #7A4500;
+    background: rgba(232, 160, 21, 0.15);
+    border: 1px solid rgba(232, 160, 21, 0.40);
+    border-radius: 0.35em;
+    padding: 0.2em 0.65em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s;
+}
+
+.VAS-gljr-btn-fix:hover {
+    background: rgba(232, 160, 21, 0.28);
+}
+
+/* ── Table wrapper — fills remaining space and scrolls ───────────────────── */
+.VAS-gljr-table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    margin-right: -4px;
+    padding-right: 4px;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.VAS-gljr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8em;
+}
+
+/* Header */
+.VAS-gljr-table thead tr {
+    border-bottom: 1px solid #E2EAF0;
+}
+
+.VAS-gljr-table th {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #748494;
+    text-align: left;
+    padding: 0.4em 0.5em;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.VAS-gljr-table th.VAS-gljr-num,
+.VAS-gljr-table td.VAS-gljr-col-num {
+    text-align: right;
+}
+
+/* Body rows */
+.VAS-gljr-table tbody tr {
+    border-bottom: 1px solid #F0F4F8;
+    transition: background 0.1s;
+}
+
+.VAS-gljr-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.VAS-gljr-row {
+    cursor: pointer;
+}
+
+.VAS-gljr-row:hover {
+    background: rgba(0, 131, 218, 0.04);
+}
+
+/* Unbalanced row — subtle amber tint */
+.VAS-gljr-row-unbal {
+    background: rgba(232, 160, 21, 0.06);
+}
+
+.VAS-gljr-row-unbal:hover {
+    background: rgba(232, 160, 21, 0.12);
+}
+
+/* Cells */
+.VAS-gljr-table td {
+    padding: 0.45em 0.5em;
+    color: #243545;
+    vertical-align: middle;
+}
+
+.VAS-gljr-col-id {
+    font-weight: 600;
+    color: #0083DA;
+    white-space: nowrap;
+}
+
+.VAS-gljr-col-date {
+    color: #748494;
+    white-space: nowrap;
+}
+
+.VAS-gljr-col-desc {
+    max-width: 18em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-gljr-col-num {
+    font-weight: 500;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Empty / error row */
+.VAS-gljr-empty {
+    text-align: center;
+    color: #748494;
+    padding: 1.5em 0;
+}
+
+/* ── Status pills ────────────────────────────────────────────────────────── */
+.VAS-gljr-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75em;
+    font-weight: 500;
+    padding: 0.2em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
+/* Draft */
+.VAS-gljr-pill-draft {
+    background: #EEF2FA;
+    color: #3B6ABD;
+}
+
+/* Posted / Completed / Approved */
+.VAS-gljr-pill-posted {
+    background: #E6F5ED;
+    color: #1A7A45;
+}
+
+/* In Progress / Submitted */
+.VAS-gljr-pill-submit {
+    background: #E8EFFF;
+    color: #3353C4;
+}
+
+/* Pending / Not Approved */
+.VAS-gljr-pill-pending {
+    background: #FFF3E0;
+    color: #C26A00;
+}
+
+/* Voided / Closed */
+.VAS-gljr-pill-voided,
+.VAS-gljr-pill-closed {
+    background: #F0F2F5;
+    color: #5F7283;
+}
+
+/* Reversed */
+.VAS-gljr-pill-reverse {
+    background: #F3EEFF;
+    color: #7B3FBE;
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────────────────── */
+.VAS-gljr-table-wrap::-webkit-scrollbar {
+    width: 4px;
+}
+
+.VAS-gljr-table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.VAS-gljr-table-wrap::-webkit-scrollbar-thumb {
+    background: #D0DCE8;
+    border-radius: 2px;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljr-card {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljr-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljr-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljr-card {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljr-card {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-gljr-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljr-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-gljr-card {
+        font-size: 11px;
+    }
+}
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljr-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljr-btn-new {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljr-alert {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljr-table th,
+html[dir="rtl"] .VAS-gljr-table td {
+    text-align: right;
+}
+
+html[dir="rtl"] .VAS-gljr-table th.VAS-gljr-num,
+html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
+    text-align: left;
+}

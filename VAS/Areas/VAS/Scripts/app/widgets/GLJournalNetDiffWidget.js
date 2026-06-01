@@ -21,13 +21,19 @@
         return (t && t.charAt(0) !== '[') ? t : fallback;
     }
 
+    // Precision is always dynamic from C_Currency.StdPrecision — never hardcoded.
     function formatAmount(amount, precision) {
         var stdPrecision = VIS.Env.getCtx().getStdPrecision();
         var prec  = (typeof precision === 'number' && precision >= 0) ? precision : stdPrecision;
-        var fixed = parseFloat(Math.abs(amount)).toFixed(prec);
-        var parts = fixed.split('.');
-        parts[0]  = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return { main: parts[0], decimal: parts[1] || '00' };
+        var val = parseFloat(Math.abs(amount) || 0);
+        var formatted = val.toLocaleString(window.navigator.language, {
+            minimumFractionDigits: prec,
+            maximumFractionDigits: prec
+        });
+        if (prec > 0) {
+            return { main: formatted.slice(0, formatted.length - prec - 1), decimal: formatted.slice(-prec) };
+        }
+        return { main: formatted, decimal: '' };
     }
 
     // ──────────────────────────────────────────────────────────────────────────

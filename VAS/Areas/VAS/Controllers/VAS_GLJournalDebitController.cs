@@ -1,7 +1,9 @@
 using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -47,9 +49,10 @@ namespace VAS.Controllers
                              + " FROM C_AcctSchema"
                              + " INNER JOIN C_Currency ON (C_AcctSchema.C_Currency_ID = C_Currency.C_Currency_ID)"
                              + " WHERE C_AcctSchema.IsActive = 'Y'"
-                             + " AND C_AcctSchema.AD_Client_ID = " + ctx.GetAD_Client_ID();
+                             + " AND C_AcctSchema.AD_Client_ID = @ClientID";
 
-            DataSet schemaDs = DB.ExecuteDataset(schemaSql, null, null);
+            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
+            DataSet schemaDs = DB.ExecuteDataset(schemaSql, schemaParams, null);
             if (schemaDs != null && schemaDs.Tables[0].Rows.Count > 0)
             {
                 acctSchemaId = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["C_AcctSchema_ID"]);
@@ -66,18 +69,25 @@ namespace VAS.Controllers
                        + " WHERE GL_Journal.PostingType = 'A'"
                        + " AND GL_Journal.IsActive = 'Y'"
                        + " AND GL_JournalLine.IsActive = 'Y'"
-                       + " AND GL_Journal.C_AcctSchema_ID = " + acctSchemaId
-                       + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct) = " + currentYear;
+                       + " AND GL_Journal.C_AcctSchema_ID = @AcctSchemaID"
+                       + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct) = @CurrentYear";
+
+            var sqlParams = new List<SqlParameter>
+            {
+                new SqlParameter("@AcctSchemaID", acctSchemaId),
+                new SqlParameter("@CurrentYear",  currentYear)
+            };
 
             // month = current month only; ytd = full year (year filter above is sufficient)
             if (string.IsNullOrEmpty(period) || string.Compare(period, "ytd", StringComparison.OrdinalIgnoreCase) != 0)
             {
-                sql += " AND EXTRACT(MONTH FROM GL_Journal.DateAcct) = " + currentMonth;
+                sql += " AND EXTRACT(MONTH FROM GL_Journal.DateAcct) = @CurrentMonth";
+                sqlParams.Add(new SqlParameter("@CurrentMonth", currentMonth));
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = DB.ExecuteDataset(sql, sqlParams.ToArray(), null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 total        = Util.GetValueOfDecimal(ds.Tables[0].Rows[0][resultAlias]);
@@ -147,9 +157,10 @@ namespace VAS.Controllers
                              + " FROM C_AcctSchema"
                              + " INNER JOIN C_Currency ON (C_AcctSchema.C_Currency_ID = C_Currency.C_Currency_ID)"
                              + " WHERE C_AcctSchema.IsActive = 'Y'"
-                             + " AND C_AcctSchema.AD_Client_ID = " + ctx.GetAD_Client_ID();
+                             + " AND C_AcctSchema.AD_Client_ID = @ClientID";
 
-            DataSet schemaDs = DB.ExecuteDataset(schemaSql, null, null);
+            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
+            DataSet schemaDs = DB.ExecuteDataset(schemaSql, schemaParams, null);
             if (schemaDs != null && schemaDs.Tables[0].Rows.Count > 0)
             {
                 acctSchemaId = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["C_AcctSchema_ID"]);
@@ -166,17 +177,24 @@ namespace VAS.Controllers
                        + " WHERE GL_Journal.PostingType = 'A'"
                        + " AND GL_Journal.IsActive = 'Y'"
                        + " AND GL_JournalLine.IsActive = 'Y'"
-                       + " AND GL_Journal.C_AcctSchema_ID = " + acctSchemaId
-                       + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct) = " + currentYear;
+                       + " AND GL_Journal.C_AcctSchema_ID = @AcctSchemaID"
+                       + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct) = @CurrentYear";
+
+            var sqlParams = new List<SqlParameter>
+            {
+                new SqlParameter("@AcctSchemaID", acctSchemaId),
+                new SqlParameter("@CurrentYear",  currentYear)
+            };
 
             if (string.IsNullOrEmpty(period) || string.Compare(period, "ytd", StringComparison.OrdinalIgnoreCase) != 0)
             {
-                sql += " AND EXTRACT(MONTH FROM GL_Journal.DateAcct) = " + currentMonth;
+                sql += " AND EXTRACT(MONTH FROM GL_Journal.DateAcct) = @CurrentMonth";
+                sqlParams.Add(new SqlParameter("@CurrentMonth", currentMonth));
             }
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = DB.ExecuteDataset(sql, sqlParams.ToArray(), null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 netDiff      = Util.GetValueOfDecimal(ds.Tables[0].Rows[0]["NetDiff"]);

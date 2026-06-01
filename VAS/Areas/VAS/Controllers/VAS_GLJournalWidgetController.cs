@@ -2,6 +2,7 @@ using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -29,12 +30,17 @@ namespace VAS.Controllers
             string sql = "SELECT COUNT(GL_Journal_ID) AS EntryCount FROM GL_Journal"
                        + " WHERE PostingType = 'A'"
                        + " AND IsActive = 'Y'"
-                       + " AND EXTRACT(MONTH FROM DateAcct) = " + currentMonth
-                       + " AND EXTRACT(YEAR FROM DateAcct) = "  + currentYear;
+                       + " AND EXTRACT(MONTH FROM DateAcct) = @CurrentMonth"
+                       + " AND EXTRACT(YEAR FROM DateAcct) = @CurrentYear";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            SqlParameter[] sqlParams =
+            {
+                new SqlParameter("@CurrentMonth", currentMonth),
+                new SqlParameter("@CurrentYear",  currentYear)
+            };
+            DataSet ds = DB.ExecuteDataset(sql, sqlParams, null);
             if (ds != null && ds.Tables[0].Rows.Count > 0)
             {
                 entryCount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["EntryCount"]);
@@ -93,16 +99,12 @@ namespace VAS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            // Apply MRole independently on each physical table before combining
-            string journalSql = "SELECT Posted FROM GL_Journal WHERE IsActive = 'Y'";
-            journalSql = MRole.GetDefault(ctx).AddAccessSQL(journalSql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string batchSql = "SELECT Posted FROM GL_JournalBatch WHERE IsActive = 'Y'";
-            batchSql = MRole.GetDefault(ctx).AddAccessSQL(batchSql, "GL_JournalBatch", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string sql = "SELECT SUM(CASE WHEN Posted = 'Y' THEN 1 ELSE 0 END) AS PostedCount,"
+            string sql = "SELECT SUM(CASE WHEN GL_Journal.Posted = 'Y' THEN 1 ELSE 0 END) AS PostedCount,"
                        + " COUNT(1) AS TotalCount"
-                       + " FROM (" + journalSql + " UNION ALL " + batchSql + ") AllDocs";
+                       + " FROM GL_Journal"
+                       + " WHERE GL_Journal.IsActive = 'Y'";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             int postedCount = 0;
             int totalCount  = 0;

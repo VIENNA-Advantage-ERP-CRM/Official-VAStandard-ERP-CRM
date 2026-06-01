@@ -28,3 +28,13 @@
 @import "../OverdueWidget.css";
 @import "../PaidthismonthWidget.css";
 @import "../TopDebtorsWidget.css";
+@import "../VAS_GLJournalEntriesWidget.css";
+@import "../VAS_GLJournalUnpostedWidget.css";
+@import "../VAS_GLJournalPostedWidget.css";
+@import "../VAS_GLJournalTotalDebitWidget.css";
+@import "../VAS_GLJournalTotalCreditWidget.css";
+@import "../VAS_GLJournalNetDiffWidget.css";
+@import "../VAS_GLJournalRecentWidget.css";
+@import "../VAS_GLJournalVolumeWidget.css";
+@import "../VAS_GLJournalTopMovementWidget.css";
+@import "../VAS_GLJournalPendingWidget.css";
