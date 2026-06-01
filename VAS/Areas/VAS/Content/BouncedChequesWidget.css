@@ -1,0 +1,139 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Bounced Cheques Widget — KPI/Summary glass card (design.md dashboard widgets).
+ * Glass surface, danger-tinted icon well, large bold danger-red count, ACTION pill.
+ * Em-based inner sizing; container queries scale the card on narrow cells.
+ * Namespaced vas-bc-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-bc-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    font-family: Roboto, sans-serif;
+    position: relative;
+}
+
+.vas-bc-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+.vas-bc-card {
+    font-size: 16px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+}
+
+    .vas-bc-card * {
+        box-sizing: border-box;
+    }
+
+.vas-bc-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    margin-bottom: 0.625em;
+}
+
+.vas-bc-icon {
+    width: 2.25em;
+    height: 2.25em;
+    flex-shrink: 0;
+    border-radius: 0.5em;
+    background: #FBE3E4;              /* pale danger tint */
+    color: #ED1C24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-bc-icon svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+.vas-bc-title {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-bc-subtitle {
+    font-size: 0.6875em;
+    color: #748494;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-top: 0.0625em;
+}
+
+.vas-bc-metric {
+    font-size: 2.5em;
+    font-weight: 700;
+    color: #ED1C24;                   /* danger */
+    line-height: 1;
+    margin-bottom: 0.5em;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-bc-why-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375em;
+    margin-top: auto;
+}
+
+.vas-bc-why-pill {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-top: 0.125em;
+    padding: 0.0625em 0.4375em;
+    border-radius: 999px;
+    background: #FBE3E4;              /* danger pill */
+    color: #B41B22;
+    font-size: 0.5625em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.vas-bc-why-text {
+    font-size: 0.6875em;
+    color: #748494;
+    line-height: 1.45;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@container (max-width: 300px) {
+    .vas-bc-card { font-size: 13px; }
+}
+
+@container (max-width: 220px) {
+    .vas-bc-card { font-size: 11px; }
+}

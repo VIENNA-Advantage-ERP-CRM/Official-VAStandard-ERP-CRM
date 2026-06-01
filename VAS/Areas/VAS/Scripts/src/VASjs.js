@@ -106,9 +106,11 @@ import "../model/CalloutBudget.js";
 import "../app/forms/VAS_ExpectedPayments.js";
 import "../app/forms/VAS_InvoiceMatchedTabPanel.js";
 import "../app/forms/VAS_CashFlowWidget.js";
+
 import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
+
 import "../app/widgets/RequestWidget.js";
 
 import "../app/widgets/ClearedAPPaymentWidget.js";
@@ -122,3 +124,26 @@ import "../app/widgets/RecentAPPaymentsWidget.js";
 import "../app/widgets/PaymentMethodsWidget.js";
 
 import "../app/widgets/ReconciliationStatusWidget.js";
+
+
+import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
+
+import "../app/widgets/VAS_CreateNewReceipt.js";
+import "../app/widgets/VAS_ReceiptSearch.js";
+import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
+import "../app/widgets/ExpectedThisWeekWidget.js";
+import "../app/widgets/AutoAllocatedWidget.js";
+import "../app/widgets/BouncedChequesWidget.js";
+import "../app/widgets/CustomerPaidMethodWidget.js";
+import "../app/widgets/CollectionEfficiencyWidget.js";
+import "../app/widgets/ExpectedReceiptsWidget.js";
+import "../app/widgets/RequestWidget.js";
+import "../app/widgets/AgingReceivablesWidget.js";
+import "../app/widgets/AvgDaysToPayWidget.js";
+import "../app/widgets/InvoicesWidget.js";
+import "../app/widgets/OutstandingSalesOrderWidget.js";
+import "../app/widgets/OverdueWidget.js";
+import "../app/widgets/PaidthismonthWidget.js";
+import "../app/widgets/TopDebtorsWidget.js";
+import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+

@@ -1,0 +1,105 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Avg Days To Pay Widget — KPI/Summary card (Onfinity design system, design.md §8)
+ * Light glass surface, tinted icon well, large neutral metric with a muted 'd'
+ * suffix, and a comparison subtitle. Sizing is em-based off a per-widget base
+ * font-size so the card scales as a whole; container queries reduce that base
+ * on narrow dashboard cells. RTL-safe. Namespaced vas-adtp-* to avoid collisions.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-adtp-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    font-family: Roboto, sans-serif;
+}
+
+.vas-adtp-card {
+    /* Base unit: every inner size below is expressed in em of this value. */
+    font-size: 16px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* Glass widget surface (design.md §8) */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 0.875em;          /* 14px */
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    /* Widget edge spacing: top 16 / right 16 / bottom 18 / left 16 */
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+}
+
+/* ── Header: icon well + title ── */
+.vas-adtp-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;                    /* 10px */
+    margin-bottom: 0.625em;
+}
+
+.vas-adtp-icon {
+    width: 2.25em;                   /* 36px */
+    height: 2.25em;
+    flex-shrink: 0;
+    border-radius: 0.5em;            /* 8px */
+    background: #DFF1FF;             /* pale info/primary tint */
+    color: #0083DA;                  /* drives the currentColor SVG stroke */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-adtp-icon svg {
+    width: 1em;                      /* 16px, overrides inline attrs, scales with base */
+    height: 1em;
+}
+
+.vas-adtp-title {
+    font-size: 0.8125em;             /* 13px */
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.3;
+}
+
+/* ── Metric: large number + muted 'd' suffix (block keeps RTL number order) ── */
+.vas-adtp-metric-wrap {
+    margin-bottom: 0.5em;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-adtp-metric-val {
+    font-size: 2.5em;                /* 40px */
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1;
+}
+
+.vas-adtp-metric-suffix {
+    font-size: 1.25em;               /* 20px */
+    color: #748494;
+    margin-inline-start: 0.1em;
+}
+
+/* ── Subtitle: comparison vs last quarter ── */
+.vas-adtp-subtitle {
+    font-size: 0.6875em;             /* 11px */
+    color: #748494;
+    margin-top: auto;
+    line-height: 1.4;
+}
+
+/* ── Responsive: shrink the whole card by lowering its base font-size on
+ *    narrow dashboard cells. Inner em sizing scales automatically. ── */
+@container (max-width: 300px) {
+    .vas-adtp-card { font-size: 13px; }
+}
+
+@container (max-width: 220px) {
+    .vas-adtp-card { font-size: 11px; }
+}
