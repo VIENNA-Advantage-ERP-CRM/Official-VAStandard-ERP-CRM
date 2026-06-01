@@ -213,6 +213,7 @@
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
     <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\InvoicesController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_003_OnAccountReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
@@ -365,6 +366,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_003_OnAccountReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
