@@ -1,80 +1,116 @@
-﻿.vas-paid-this-month-root {
+﻿.vas-ptm-root {
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
+    container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
-    font-size: 1em;
+    font-size: clamp(1em, 1.4cqi, 1.5em);
+    position: relative;
     overflow: hidden;
 }
 
-    .vas-paid-this-month-root,
-    .vas-paid-this-month-root * {
+    .vas-ptm-root,
+    .vas-ptm-root * {
         box-sizing: border-box;
     }
 
-.vas-paid-this-month-card {
+.vas-ptm-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 10;
+}
+
+.vas-ptm-card {
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 1em;
-    gap: 0.6em;
-    border-radius: 1.15em;
+    overflow: hidden;
+    padding: 0.875em;
+    gap: 0.5em;
     border: 0.125em solid #ffffff;
-    background: linear-gradient( 135deg, rgba(199, 232, 255, 0.85), rgba(255, 255, 255, 0.65) );
+    border-radius: 0.875em;
+    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #102c3f;
 }
 
-.vas-paid-this-month-header {
+.vas-ptm-header {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
     display: flex;
     align-items: center;
-    gap: 0.6em;
+    gap: 0.625em;
     overflow: hidden;
 }
 
-.vas-paid-this-month-icon-box {
+.vas-ptm-icon {
     flex: 0 0 auto;
-    width: 2.25em;
-    height: 2.25em;
-    border-radius: 0.75em;
+    width: 2em;
+    height: 2em;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
     border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    color: #0e5da8;
+    border-radius: 0.625em;
+    background: rgba(255, 255, 255, 0.90);
+    color: #019d89;
 }
 
-.vas-paid-this-month-icon {
-    width: 1.15em;
-    height: 1.15em;
-    display: block;
-    color: currentColor;
-}
+    .vas-ptm-icon svg {
+        width: 1em;
+        height: 1em;
+        display: block;
+        color: currentColor;
+        stroke: currentColor;
+        stroke-width: 0.1125em;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
 
-.vas-paid-this-month-title {
+.vas-ptm-header-text {
     flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-ptm-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.95em;
+    font-size: 0.875em;
     font-weight: 700;
     line-height: 1.2;
     color: #102c3f;
 }
 
-.vas-paid-this-month-body {
+.vas-ptm-subtitle {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #748494;
+}
+
+.vas-ptm-body {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
@@ -83,7 +119,7 @@
     overflow: hidden;
 }
 
-.vas-paid-this-month-value {
+.vas-ptm-metric {
     display: block;
     width: 100%;
     min-width: 0;
@@ -91,223 +127,89 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(1.4em, 8vw, 2.4em);
+    font-size: 1.375em;
     font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.0625em;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
-    color: #102c3f;
+    color: #019d89;
 }
 
-.vas-paid-this-month-footer {
+.vas-ptm-why-wrap {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
     display: flex;
-    align-items: center;
-    gap: 0.5em;
+    align-items: flex-start;
+    gap: 0.375em;
     overflow: hidden;
-    font-size: 0.75em;
-    color: #586575;
+    color: #5f7283;
 }
 
-.vas-paid-this-month-badge {
+.vas-ptm-why-pill {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    max-width: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
-    border-radius: 0.25em;
-    background: rgba(255, 255, 255, 0.85);
     border: 0.0625em solid rgba(0, 131, 218, 0.15);
-    color: #0083da;
-    font-size: 0.68em;
+    border-radius: 62.4375em;
+    background: #dff1ff;
+    color: #106ab0;
+    font-size: 0.6875em;
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: 0.0938em;
+    letter-spacing: 0.075em;
     text-transform: uppercase;
 }
 
-.vas-paid-this-month-desc {
+.vas-ptm-why-text {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.75em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 0.6875em;
     font-weight: 400;
-    line-height: 1.25;
-    color: #586575;
+    line-height: 1.3;
+    color: #5f7283;
 }
 
-.vas-paid-this-month-body.vas-paid-this-month-state .vas-paid-this-month-value {
-    font-size: 0.75em;
-    font-weight: 500;
-    letter-spacing: 0;
-    color: #586575;
+.vas-ptm-root.vas-ptm-compact .vas-ptm-card {
+    padding: 0.75em;
+    gap: 0.375em;
 }
 
-@media (max-width: 18.75em), (max-height: 9.375em) {
-    .vas-paid-this-month-card {
-        padding: 0.75em;
-        gap: 0.45em;
-        border-radius: 0.75em;
-    }
-
-    .vas-paid-this-month-header {
-        gap: 0.6em;
-    }
-
-    .vas-paid-this-month-icon-box {
-        width: 2.25em;
-        height: 2.25em;
-        border-radius: 0.75em;
-    }
-
-    .vas-paid-this-month-icon {
-        width: 1.15em;
-        height: 1.15em;
-    }
-
-    .vas-paid-this-month-title {
-        font-size: 0.95em;
-    }
-
-    .vas-paid-this-month-value {
-        font-size: clamp(1.4em, 8vw, 2.4em);
-        line-height: 1;
-        letter-spacing: -0.0625em;
-    }
-
-    .vas-paid-this-month-footer {
-        gap: 0.375em;
-        font-size: 0.75em;
-    }
-
-    .vas-paid-this-month-badge {
-        padding: 0.1875em 0.4375em;
-        font-size: 0.68em;
-        letter-spacing: 0.0813em;
-    }
-
-    .vas-paid-this-month-desc {
-        font-size: 0.75em;
-    }
+.vas-ptm-root.vas-ptm-compact .vas-ptm-icon {
+    width: 1.75em;
+    height: 1.75em;
 }
 
-.vas-paid-this-month-root {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    font-size: 1em;
-    container-type: inline-size;
-    overflow: hidden;
-}
+    .vas-ptm-root.vas-ptm-compact .vas-ptm-icon svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
 
-.vas-paid-this-month-card {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    font-size: 1em;
-    gap: 0.5em;
-    padding: 1em 1em 1.125em;
-    border-radius: 0.875em;
-}
-
-.vas-paid-this-month-header {
-    min-width: 0;
-    gap: 0.625em;
-}
-
-.vas-paid-this-month-icon-box {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
-}
-
-.vas-paid-this-month-icon {
-    width: 1.125em;
-    height: 1.125em;
-}
-
-.vas-paid-this-month-title {
-    min-width: 0;
+.vas-ptm-root.vas-ptm-compact .vas-ptm-metric {
     font-size: 1.125em;
 }
 
-.vas-paid-this-month-value {
-    font-size: 2.5em;
-    line-height: 1;
-    letter-spacing: -0.025em;
-}
-
-.vas-paid-this-month-footer,
-.vas-paid-this-month-desc {
-    font-size: 0.75em;
-}
-
-.vas-paid-this-month-badge,
-.vas-paid-this-month-body.vas-paid-this-month-state .vas-paid-this-month-value {
-    font-size: 0.75em;
+.vas-ptm-root.vas-ptm-compact .vas-ptm-why-text {
+    -webkit-line-clamp: 1;
 }
 
 @container (max-width: 18.75em) {
-    .vas-paid-this-month-card {
+    .vas-ptm-card {
         font-size: 0.8125em;
     }
 }
 
 @container (max-width: 13.75em) {
-    .vas-paid-this-month-card {
+    .vas-ptm-card {
         font-size: 0.6875em;
-    }
-}
-
-@media (max-width: 14.375em), (max-height: 7.5em) {
-    .vas-paid-this-month-card {
-        padding: 1em 1em 1.125em;
-        gap: 0.5em;
-        border-radius: 0.875em;
-    }
-
-    .vas-paid-this-month-icon-box {
-        width: 2em;
-        height: 2em;
-        min-width: 2em;
-        border-radius: 0.5625em;
-    }
-
-    .vas-paid-this-month-icon {
-        width: 1.125em;
-        height: 1.125em;
-    }
-
-    .vas-paid-this-month-title {
-        font-size: 1.125em;
-    }
-
-    .vas-paid-this-month-value {
-        font-size: 2.5em;
-        line-height: 1;
-        letter-spacing: -0.025em;
-    }
-
-    .vas-paid-this-month-footer {
-        gap: 0.3125em;
-        font-size: 0.75em;
-    }
-
-    .vas-paid-this-month-badge {
-        padding: 0.125em 0.375em;
-        font-size: 0.75em;
-        letter-spacing: 0.0688em;
-    }
-
-    .vas-paid-this-month-desc {
-        font-size: 0.75em;
     }
 }

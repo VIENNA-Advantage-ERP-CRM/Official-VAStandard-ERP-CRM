@@ -1,209 +1,333 @@
+
 /**
- * Paid This Month Widget
- * Purpose - KPI card showing total payments received from customers in the current calendar month.
- * Design   - Matches design2.md KPI/Summary widget: glass surface, tinted success icon,
- *            large bold metric in success green, WHY pill with customer count + explanatory copy.
- *
- * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                                        | Message Key                  | MsgText
- * ----+-----------------------------------------------------+------------------------------+-----------------------------------------------------
- *  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
- *  2  | Cash received                                       | VIS_CashReceived             | Cash received
- *  3  | WHY                                                 | VIS_Why                      | WHY
- *  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
- *  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
- *  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
- *  8  | No payments received this month.                    | VIS_NoPaymentsThisMonth      | No payments received this month.
- * ──────────────────────────────────────────────────────────────────────────────────────
- */
+* Paid This Month Widget
+* Purpose - KPI card showing total payments received from customers in the current calendar month.
+* Design   - Matches design2.md KPI/Summary widget: glass surface, tinted success icon,
+*            large bold metric in success green, WHY pill with customer count + explanatory copy.
+*
+* ── Labels / Message Keys ──────────────────────────────────────────────────────────────
+*  #  | Current Text                                        | Message Key                  | MsgText
+* ----+-----------------------------------------------------+------------------------------+-----------------------------------------------------
+*  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
+*  2  | Cash received                                       | VIS_CashReceived             | Cash received
+*  3  | WHY                                                 | VIS_Why                      | WHY
+*  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
+*  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
+*  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
+*  8  | No payments received this month.                    | VIS_NoPaymentsThisMonth      | No payments received this month.
+* ──────────────────────────────────────────────────────────────────────────────────────
+*/
+
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+    "use strict";
 
-    VIS.PaidthismonthWidget = function () {
+    VIS.PaidThisMonthAPPaymentWidget = function () {
+        var self = this;
 
-        this.frame;
-        this.windowNo;
-        var $self = this;
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
+
         var $root = $('<div class="vas-ptm-root">');
-
-        var $metricEl;
-        var $whyText;
-        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
-        var $busy;
+        var $metricEl = null;
+        var $whyText = null;
+        var $busy = null;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
-            var t = VIS.Msg.getMsg(key);
-            return (t && t.charAt(0) !== '[') ? t : fallback;
+            var text = VIS.Msg.getMsg(key);
+            return text && text !== '[' + key + ']' ? text : fallback;
         }
 
-        /* Toggle the busy/loading overlay. */
         function showBusy(show) {
-            if (!$busy || !$busy[0]) { return; }
-            $busy[0].style.visibility = show ? 'visible' : 'hidden';
+            if ($busy && $busy.length) {
+                $busy.css('visibility', show ? 'visible' : 'hidden');
+            }
         }
 
-        /* ── Initialize ── */
         this.Initalize = function () {
             createWidget();
             loadData();
         };
 
-        /* ── Load data from backend ── */
-        function loadData() {
-            showBusy(true);
-            $.ajax({
-                url: VIS.Application.contextUrl + 'PaidThisMonthAPPayment/GetPaidThisMonth',
-                type: 'GET',
-                success: function (res) {
-                    var data = typeof res === 'string' ? JSON.parse(res) : res;
-                    if (data && !data.error) {
-                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol);
-                    }
-                },
-                error: function () {
-                    /* Leave placeholder values on error */
-                },
-                complete: function () { showBusy(false); }
-            });
-        }
-
-        /* ── Format currency ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
-        }
-
-        /* Build metric markup with the base-currency symbol placed *before* the
-           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
-        function formatMetric(value, symbol) {
-            value = Number(value || 0);
-            var sign = value < 0 ? '-' : '';
-            var absStr = formatCurrency(Math.abs(value));
-            var symHtml = symbol ? '<span class="vas-ptm-cur">' + symbol + '</span>' : '';
-            return sign + symHtml + absStr;
-        }
-
-        /* ── Render metric values ── */
-        function renderMetric(total, count, symbol) {
-            if ($metricEl) {
-                $metricEl.html(formatMetric(total, symbol));
-            }
-            if ($whyText) {
-                var customerLabel = count !== 1
-                    ? lbl("VIS_Customers", 'customers')
-                    : lbl("VIS_Customer", 'customer');
-                var countStr = count > 0
-                    ? lbl("VIS_ReceivedFromCustomers", 'Received from') + ' ' + count + ' ' + customerLabel + ' ' + lbl("VIS_SoFarThisMonth", 'so far this month.')
-                    : lbl("VIS_NoPaymentsThisMonth", 'No payments received this month.');
-                $whyText.text(countStr);
-            }
-        }
-
-        /* ── Build DOM ── */
         function createWidget() {
-            var uid = $self.AD_UserHomeWidgetID || 'ptm';
+            var uid = self.AD_UserHomeWidgetID || 'ptm';
 
-            var $card = $(
-                '<div class="vas-ptm-card">'
-            );
+            var $card = $('<div class="vas-ptm-card">');
+            var $header = $('<div class="vas-ptm-header">');
 
-            /* ── Header row: icon + label ── */
-            var $header = $(
-                '<div class="vas-ptm-header">' +
-
-                /* Icon well — pale green/success tint matching design2.md semantic success surface */
+            var $icon = $(
                 '<div class="vas-ptm-icon">' +
-                /* Checkmark icon (lucide-style inline SVG) */
-                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
-                'stroke="oklch(0.40 0.14 155)" stroke-width="1.8" ' +
-                'stroke-linecap="round" stroke-linejoin="round">' +
-                '<polyline points="20 6 9 17 4 12"/>' +
+                '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
+                '<polyline points="20 6 9 17 4 12"></polyline>' +
                 '</svg>' +
-                '</div>' +
-
-                '<div>' +
-                '<div class="vas-ptm-title">' + lbl("VIS_PaidThisMonth", 'Paid this month') + '</div>' +
-                '<div class="vas-ptm-subtitle">' + lbl("VIS_CashReceived", 'Cash received') + '</div>' +
-                '</div>' +
                 '</div>'
             );
 
-            /* ── Metric value — success green ── */
-            $metricEl = $(
-                '<div id="vis-ptm-metric-' + uid + '" class="vas-ptm-metric">' +
-                '—' +
-                '</div>'
+            var $headerText = $('<div class="vas-ptm-header-text">');
+
+            var $title = $('<div class="vas-ptm-title">').text(
+                lbl('VAS_PaidThisMonth', 'Paid this month')
             );
 
-            /* ── WHY pill + explanatory text ── */
-            var $why = $(
-                '<div class="vas-ptm-why-wrap">'
+            var $subtitle = $('<div class="vas-ptm-subtitle">').text(
+                lbl('VAS_CashPaid', 'Cash paid')
             );
 
-            var $pill = $(
-                /*'<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
+            $headerText.append($title).append($subtitle);
+            $header.append($icon).append($headerText);
+
+            var $body = $('<div class="vas-ptm-body">');
+
+            $metricEl = $('<div>')
+                .attr('id', 'vis-ptm-metric-' + uid)
+                .addClass('vas-ptm-metric')
+                .text('—');
+
+            $body.append($metricEl);
+
+            var $why = $('<div class="vas-ptm-why-wrap">');
+
+            var $pill = $('<span class="vas-ptm-why-pill">').text(
+                lbl('VAS_Why', 'WHY')
             );
 
-            /* Empty until data loads; the busy overlay covers the wait. */
-            $whyText = $(
-                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text"></span>'
-            );
+            $whyText = $('<span>')
+                .attr('id', 'vis-ptm-why-' + uid)
+                .addClass('vas-ptm-why-text')
+                .text(lbl('VAS_Loading', 'Loading'));
 
             $why.append($pill).append($whyText);
-            $card.append($header).append($metricEl).append($why);
-            $root.append($card);
+            $card.append($header).append($body).append($why);
+            $root.empty().append($card);
 
-            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
-               a fetch is in flight; shown for both initial load and refresh. */
-            $busy = $('<div class="vas-ptm-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
-            $busy[0].style.visibility = 'hidden';
+            $busy = $(
+                '<div class="vas-ptm-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
+            );
+
+            $busy.css('visibility', 'hidden');
             $root.append($busy);
         }
 
-        /* ── Refresh ── */
-        this.refreshWidget = function () {
+        function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'PaidThisMonthAPPayment/GetPaidThisMonth',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data = normalizeResponse(response);
+
+                    if (!data || data.error) {
+                        setNoData();
+                        return;
+                    }
+
+                    renderMetric(data);
+                },
+                error: function () {
+                    if (!isDisposed) {
+                        setNoData();
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
+                }
+            });
+        }
+
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (e) {
+                return null;
+            }
+        }
+
+        function renderMetric(data) {
+            var amount = Number(data.value);
+
+            if (isNaN(amount)) {
+                amount = Number(data.paidThisMonth);
+            }
+
+            if (isNaN(amount)) {
+                amount = Number(data.totalPaidAmount);
+            }
+
+            if (isNaN(amount)) {
+                setNoData();
+                return;
+            }
+
+            var symbol = data.currencySymbol || data.symbol || '';
+            var precision = normalizePrecision(data.precision);
+            var vendorCount = Number(data.vendorCount || data.paymentCount || 0);
+
+            if ($metricEl) {
+                $metricEl.text(formatMetric(amount, symbol, precision));
+            }
+
+            if ($whyText) {
+                $whyText.text(getWhyText(vendorCount, data.description));
+            }
+        }
+
+        function getWhyText(vendorCount, fallbackDescription) {
+            if (vendorCount > 0) {
+                var vendorLabel = vendorCount === 1
+                    ? lbl('VAS_Vendor', 'vendor')
+                    : lbl('VAS_Vendors', 'vendors');
+
+                return lbl('VAS_PaidTo', 'Paid to') +
+                    ' ' +
+                    vendorCount +
+                    ' ' +
+                    vendorLabel +
+                    ' ' +
+                    lbl('VAS_SoFarThisMonth', 'so far this month.');
+            }
+
+            return fallbackDescription || lbl('VIS_NoPaymentsThisMonth', 'No payments this month.');
+        }
+
+        function formatMetric(value, symbol, precision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+            var absValue = Math.abs(numericValue);
+
+            return sign + symbol + formatAmount(absValue, precision);
+        }
+
+        function formatAmount(value, precision) {
+            var numericValue = Number(value || 0);
+
+            if (numericValue >= 1000000) {
+                return (numericValue / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            }
+
+            if (numericValue >= 1000) {
+                return Math.round(numericValue / 1000) + 'k';
+            }
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+        }
+
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (!isNaN(stdPrecision) && stdPrecision >= 0) {
+                return stdPrecision;
+            }
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                return 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function setNoData() {
+            if ($metricEl) {
+                $metricEl.text('—');
+            }
+
+            if ($whyText) {
+                $whyText.text(lbl('VAS_NoData', 'No Data'));
+            }
+        }
+
+        this.refreshData = function () {
             loadData();
         };
 
-        /* ── Root accessor ── */
         this.getRoot = function () {
             return $root;
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
+
             $root.remove();
+
+            $metricEl = null;
+            $whyText = null;
+            $busy = null;
         };
     };
 
-    VIS.PaidthismonthWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
-    };
+    VIS.PaidThisMonthAPPaymentWidget = VIS.PaidThisMonthAPPaymentWidget;
 
-    VIS.PaidthismonthWidget.prototype.init = function (windowNo, frame) {
+    VIS.PaidThisMonthAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
-        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
         this.Initalize();
-        this.frame.getContentGrid().append(this.getRoot());
+
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
     };
 
-    VIS.PaidthismonthWidget.prototype.widgetSizeChange = function (height, width) { };
+    VIS.PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+        var $root = this.getRoot();
 
-    VIS.PaidthismonthWidget.prototype.dispose = function () {
+        if (!$root) {
+            return;
+        }
+
+        $root.toggleClass(
+            'vas-ptm-compact',
+            (width && width < 240) || (height && height < 160)
+        );
+    };
+
+    VIS.PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
+        this.refreshData();
+    };
+
+    VIS.PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
-        if (this.frame)
+
+        if (this.frame && this.frame.dispose) {
             this.frame.dispose();
+        }
+
         this.frame = null;
     };
 
