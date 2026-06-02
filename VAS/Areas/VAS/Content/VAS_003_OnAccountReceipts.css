@@ -1,14 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────
- * Expected This Week Widget — KPI/Summary glass card + drill-down dialog.
- * Design source: design.md (Onfinity) + dashboard-widgets.md (tint-success KPI).
- * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * `1em` resolves to the widget's base font-size (16px on the card, 16px on the
- * dialog). Container queries scale the card on small dashboard cells; media
- * queries scale the dialog on small viewports.
- * Namespaced vas-etw-*.
+ * On-account Receipts (Widget 06) — KPI glass card (tint-success) + drill-down
+ * modal. Design source: design.md (Onfinity) + image_2 (card) and image_1
+ * (modal). Per CLAUDE.md project rule, every CSS value is expressed in `em`.
+ * `1em` resolves to the widget's base font-size (16px on card and dialog).
+ * Namespaced vas-oar-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
-.vas-etw-root {
+.vas-oar-root {
     width: 100%;
     height: 100%;
     container-type: inline-size;
@@ -16,12 +14,12 @@
     font-family: Roboto, sans-serif;
 }
 
-    .vas-etw-root,
-    .vas-etw-root * {
+    .vas-oar-root,
+    .vas-oar-root * {
         box-sizing: border-box;
     }
 
-.vas-etw-busy {
+.vas-oar-busy {
     position: absolute;
     inset: 0;
     display: flex;
@@ -32,9 +30,9 @@
     z-index: 999;
 }
 
-/* ── KPI card (glass widget, tint-success) ────────────────────────── */
+/* ── KPI card (glass, tint-success) ─────────────────────────────────── */
 
-.vas-etw-card {
+.vas-oar-card {
     font-size: 1em;
     width: 100%;
     height: 100%;
@@ -42,8 +40,8 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;
-    /* Tint-success glass surface per design.md — pale green → white. */
-    background: linear-gradient(135deg, rgba(206, 238, 212, 0.78), rgba(255, 255, 255, 0.62));
+    /* Pale green → white success tint per image_2. */
+    background: linear-gradient(135deg, rgba(229, 245, 234, 0.85), rgba(255, 255, 255, 0.62));
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
@@ -53,16 +51,18 @@
     transition: box-shadow 180ms ease;
 }
 
-    .vas-etw-card:hover {
+    .vas-oar-card:hover {
         box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
     }
 
-    .vas-etw-card:focus-visible {
-        outline: 0.125em solid #0083DA;
+    .vas-oar-card:focus-visible {
+        outline: 0.125em solid #019D89;
         outline-offset: 0.125em;
     }
 
-.vas-etw-head {
+/* ── Header: icon + label (left) · View hint (right) ──────────────── */
+
+.vas-oar-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -70,15 +70,15 @@
     min-width: 0;
 }
 
-.vas-etw-head-left {
+.vas-oar-head-left {
     display: flex;
     align-items: center;
-    gap: 0.625em;
+    gap: 0.5em;
     min-width: 0;
     flex: 1 1 auto;
 }
 
-.vas-etw-icon {
+.vas-oar-icon {
     width: 2em;
     height: 2em;
     min-width: 2em;
@@ -92,18 +92,16 @@
     flex-shrink: 0;
 }
 
-    .vas-etw-icon svg {
+    .vas-oar-icon svg {
         width: 1.125em;
         height: 1.125em;
         stroke: currentColor;
     }
 
-.vas-etw-label {
-    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
-       Per project request the weight is Bold (700) instead of the spec's
-       Medium (500). */
+/* Widget header label — bold per request. */
+.vas-oar-label {
     font-size: 1.125em;
-    color: #141414;
+    color: #102C3F;
     font-weight: 700;
     min-width: 0;
     overflow: hidden;
@@ -111,7 +109,7 @@
     white-space: nowrap;
 }
 
-.vas-etw-view {
+.vas-oar-view {
     display: inline-flex;
     align-items: center;
     gap: 0.25em;
@@ -120,47 +118,51 @@
     cursor: pointer;
     padding: 0.3125em 0.625em;
     border-radius: 999em;
-    color: #0083DA;
+    color: #0B6B45;
     font-size: 0.75em;
     font-weight: 500;
     font-family: inherit;
     flex-shrink: 0;
 }
 
-    .vas-etw-view svg {
+    .vas-oar-view svg {
         width: 0.875em;
         height: 0.875em;
         stroke: currentColor;
     }
 
-    .vas-etw-view:hover {
-        background: rgba(0, 131, 218, 0.08);
-        color: #0069AE;
+    .vas-oar-view:hover {
+        background: rgba(1, 157, 137, 0.10);
+        color: #0B6B45;
     }
 
-/* Big metric — success green to match the tint, with base-currency symbol leading. */
-.vas-etw-metric {
+/* ── Metric: big deep-green value with currency symbol + underline ─── */
+
+.vas-oar-metric {
     font-size: 2.5em;                 /* 40px design.md KPI value */
     font-weight: 700;
     color: #0B6B45;
-    line-height: 1;
+    line-height: 1.05;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    align-self: flex-start;
+    max-width: 100%;
 }
 
-.vas-etw-cur {
+.vas-oar-cur {
     font-size: 1em;
     font-weight: inherit;
     margin-inline-end: 0.04em;
     vertical-align: baseline;
 }
 
-/* Plain "Invoice due in 7 days" detail line (no pill chrome per latest design). */
-.vas-etw-detail-text {
+/* ── Detail: plain text "N unapplied advances" (no pill) ──────────── */
+
+.vas-oar-detail-text {
     display: block;
     align-self: flex-start;
     max-width: 100%;
@@ -172,26 +174,26 @@
     white-space: nowrap;
 }
 
-/* ── Responsive (widget cell) ─────────────────────────────────────── */
+/* ── Card responsive (container queries on the widget cell) ───────── */
 
 @container (max-width: 18.75em) {     /* < 300px */
-    .vas-etw-card { font-size: 0.8125em; }
+    .vas-oar-card { font-size: 0.8125em; }
 }
 
 @container (max-width: 13.75em) {     /* < 220px */
-    .vas-etw-card { font-size: 0.6875em; }
+    .vas-oar-card { font-size: 0.6875em; }
+    .vas-oar-view span { display: none; }
 }
 
 /* ───────────────────────────────────────────────────────────────────
- * Drill-down modal dialog. Attached to <body>; uses fixed positioning
- * so it sits above the dashboard.
+ * Drill-down modal (image_1). Attached to <body>; fixed positioning.
  * ─────────────────────────────────────────────────────────────────── */
 
-.vas-etw-body-lock {
+.vas-oar-body-lock {
     overflow: hidden;
 }
 
-.vas-etw-dialog {
+.vas-oar-dialog {
     font-family: Roboto, sans-serif;
     font-size: 1em;
     position: fixed;
@@ -203,26 +205,24 @@
     padding: 1.25em;
 }
 
-    .vas-etw-dialog,
-    .vas-etw-dialog * {
+    .vas-oar-dialog,
+    .vas-oar-dialog * {
         box-sizing: border-box;
     }
 
-.vas-etw-dialog-scrim {
+.vas-oar-dialog-scrim {
     position: absolute;
     inset: 0;
     background: rgba(15, 27, 45, 0.42);
     backdrop-filter: blur(0.125em);
 }
 
-.vas-etw-dialog-card {
+.vas-oar-dialog-card {
     position: relative;
-    width: min(64em, 100%);           /* ~1024px on wide screens */
-    /* Fixed dialog height so it doesn't shrink (or grow) with row count —
-       header/footer stay put, body scrolls when there are more rows than
-       fit. Sized so the empty area below the last row stays small even on a
-       partly-filled page. `min(...)` clamps it on short viewports. */
-    height: min(33em, 100%);
+    width: min(62em, 100%);
+    /* Tall enough for a full 10-row page so the body doesn't scroll on a full
+       page; clamps to the viewport on short screens. */
+    height: min(40em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -231,8 +231,7 @@
     overflow: hidden;
 }
 
-/* Header */
-.vas-etw-dialog-header {
+.vas-oar-dialog-header {
     display: flex;
     align-items: flex-start;
     gap: 0.75em;
@@ -241,13 +240,13 @@
     flex-shrink: 0;
 }
 
-.vas-etw-dialog-icon {
+.vas-oar-dialog-icon {
     width: 2.25em;
     height: 2.25em;
     min-width: 2.25em;
     border-radius: 0.5em;
     background: #E5F5EA;
-    border: 0.0625em solid #B6E1C2;
+    border: 0.0625em solid #B7E4C7;
     color: #0B6B45;
     display: flex;
     align-items: center;
@@ -255,32 +254,32 @@
     flex-shrink: 0;
 }
 
-    .vas-etw-dialog-icon svg {
+    .vas-oar-dialog-icon svg {
         width: 1.125em;
         height: 1.125em;
         stroke: currentColor;
     }
 
-.vas-etw-dialog-title-group {
+.vas-oar-dialog-title-group {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.vas-etw-dialog-title {
+.vas-oar-dialog-title {
     font-size: 1.125em;
     font-weight: 700;
     color: #102C3F;
     line-height: 1.2;
 }
 
-.vas-etw-dialog-subtitle {
+.vas-oar-dialog-subtitle {
     margin-top: 0.125em;
     font-size: 0.8125em;
     color: #748494;
     line-height: 1.3;
 }
 
-.vas-etw-dialog-close {
+.vas-oar-dialog-close {
     background: transparent;
     border: 0;
     cursor: pointer;
@@ -294,19 +293,18 @@
     flex-shrink: 0;
 }
 
-    .vas-etw-dialog-close svg {
+    .vas-oar-dialog-close svg {
         width: 1em;
         height: 1em;
         stroke: currentColor;
     }
 
-    .vas-etw-dialog-close:hover {
+    .vas-oar-dialog-close:hover {
         background: #F3F7FB;
         color: #102C3F;
     }
 
-/* Body / table */
-.vas-etw-dialog-body {
+.vas-oar-dialog-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
@@ -314,9 +312,7 @@
     position: relative;
 }
 
-/* Busy overlay over the table while a page is being fetched. Same spinner
-   classes (`vis_widgetloader`) used by other widgets in this project. */
-.vas-etw-dialog-busy {
+.vas-oar-dialog-busy {
     position: absolute;
     inset: 0;
     display: flex;
@@ -326,17 +322,14 @@
     z-index: 5;
 }
 
-/* `table-layout: fixed` so the per-column widths below win — keeps long
-   Customer / Invoice No. values clipping with ellipsis instead of pushing
-   neighbouring columns off-axis. */
-.vas-etw-dialog-table {
+.vas-oar-dialog-table {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 0.875em;               /* 14px body */
+    font-size: 0.875em;
 }
 
-    .vas-etw-dialog-table thead th {
+    .vas-oar-dialog-table thead th {
         position: sticky;
         top: 0;
         background: #FFFFFF;
@@ -351,19 +344,15 @@
         text-overflow: ellipsis;
     }
 
-        .vas-etw-dialog-table thead th.vas-etw-th-amount {
+        .vas-oar-dialog-table thead th.vas-oar-th-amount {
             text-align: right;
         }
 
-        .vas-etw-dialog-table thead th.vas-etw-th-currency {
+        .vas-oar-dialog-table thead th.vas-oar-th-currency {
             text-align: center;
         }
 
-        .vas-etw-dialog-table thead th.vas-etw-th-duein {
-            text-align: center;
-        }
-
-    .vas-etw-dialog-table tbody td {
+    .vas-oar-dialog-table tbody td {
         padding: 0.875em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
         font-size: 0.875em;
@@ -374,22 +363,23 @@
         text-overflow: ellipsis;
     }
 
-    .vas-etw-dialog-table tbody tr:hover td {
+    .vas-oar-dialog-table tbody tr:hover td {
         background: #F8FBFE;
     }
 
-/* Per-column widths — Customer flexes; everything else fixed so Dates and
-   Amount always have room to render their full value. Order per spec:
-   Invoice No | Invoice date | Customer | Due date | Currency | Due amount | Due in. */
-.vas-etw-th-doc,         .vas-etw-td-doc         { width: 8.5em; }
-.vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 7em; }
-.vas-etw-th-customer,    .vas-etw-td-customer    { width: 12em; }
-.vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 7em; }
-.vas-etw-th-currency,    .vas-etw-td-currency    { width: 5em; text-align: center; }
-.vas-etw-th-amount,      .vas-etw-td-amount      { width: 9em; }
-.vas-etw-th-duein,       .vas-etw-td-duein       { width: 7em; }
+/* Column widths. All six are explicit so — with table-layout:fixed — any
+   surplus distributes proportionally across every column instead of being
+   dumped into a single greedy `auto` column (which left a large gap after
+   Customer). Date is wide enough for the full "Jan 09, 2026"; Amount never
+   truncates so the full value always shows (project requirement #8). */
+.vas-oar-th-date,     .vas-oar-td-date     { width: 8em; }
+.vas-oar-th-doc,      .vas-oar-td-doc      { width: 8em; }
+.vas-oar-th-customer, .vas-oar-td-customer { width: 12em; }
+.vas-oar-th-bank,     .vas-oar-td-bank     { width: 13em; }
+.vas-oar-th-currency, .vas-oar-td-currency { width: 6em; text-align: center; }
+.vas-oar-th-amount,   .vas-oar-td-amount   { width: 9.5em; text-align: right; }
 
-.vas-etw-truncate {
+.vas-oar-truncate {
     display: block;
     min-width: 0;
     overflow: hidden;
@@ -397,79 +387,50 @@
     white-space: nowrap;
 }
 
-.vas-etw-td-doc {
+.vas-oar-td-date {
+    color: #748494;
+}
+
+.vas-oar-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
     font-size: 0.8125em;
 }
 
-.vas-etw-td-invdate,
-.vas-etw-td-duedate {
-    color: #5F7283;
-}
-
-.vas-etw-td-customer {
+.vas-oar-td-customer {
     font-weight: 700;
     color: #102C3F;
 }
 
-.vas-etw-td-currency {
+.vas-oar-td-bank {
+    color: #5F7283;
+}
+
+.vas-oar-td-currency {
     text-align: center;
     color: #5F7283;
     font-weight: 500;
     letter-spacing: 0.02em;
 }
 
-.vas-etw-td-amount {
+/* Amount: deep-green, right-aligned, full value — never ellipsis-clipped. */
+.vas-oar-td-amount {
     text-align: right;
     font-weight: 700;
-    color: #856404;                   /* amber to match design — image_1 */
+    color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
 }
 
-/* Inline currency symbol used inside the amount cell. */
-.vas-etw-cur-inline {
+.vas-oar-cur-inline {
     margin-inline-end: 0.2em;
     font-weight: inherit;
     color: inherit;
 }
 
-/* ── "Due in" pill (e.g. "3 days") ────────────────────────────────── */
-.vas-etw-td-duein {
-    text-align: center;
-}
-
-.vas-etw-duein-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25em 0.625em;
-    border-radius: 999em;
-    font-size: 0.8125em;
-    font-weight: 600;
-    line-height: 1.2;
-    background: #FCF1D6;              /* pale amber per image_1 */
-    color: #856404;
-    white-space: nowrap;
-}
-
-    /* Stronger amber when the schedule is due today — small urgency cue. */
-    .vas-etw-duein-pill.vas-etw-duein-today {
-        background: #FBE4B8;
-        color: #7A4F00;
-    }
-
-    /* Red tone when the schedule is already overdue (negative days). */
-    .vas-etw-duein-pill.vas-etw-duein-overdue {
-        background: #FBE3E4;
-        color: #A33F3F;
-    }
-
-/* Empty / loading states */
-.vas-etw-dialog-empty {
+.vas-oar-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
@@ -477,8 +438,8 @@
     background: #FFFFFF;
 }
 
-/* Footer: helper text (left) · compact pager (right). */
-.vas-etw-dialog-footer {
+/* Footer: helper (left) · compact pager (right). */
+.vas-oar-dialog-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -489,7 +450,7 @@
     flex-shrink: 0;
 }
 
-.vas-etw-pager-helper {
+.vas-oar-pager-helper {
     font-size: 0.8125em;
     color: #748494;
     white-space: nowrap;
@@ -499,15 +460,14 @@
     flex: 1 1 auto;
 }
 
-.vas-etw-pager {
+.vas-oar-pager {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
     flex-shrink: 0;
 }
 
-/* Rounded-square pager buttons per design.md. */
-.vas-etw-pager-btn {
+.vas-oar-pager-btn {
     width: 2em;
     height: 2em;
     padding: 0;
@@ -521,23 +481,23 @@
     justify-content: center;
 }
 
-    .vas-etw-pager-btn svg {
+    .vas-oar-pager-btn svg {
         width: 1em;
         height: 1em;
         stroke: currentColor;
     }
 
-    .vas-etw-pager-btn:hover:not(:disabled) {
+    .vas-oar-pager-btn:hover:not(:disabled) {
         background: #EAF8FF;
         border-color: #BFE4FF;
     }
 
-    .vas-etw-pager-btn:disabled {
+    .vas-oar-pager-btn:disabled {
         color: #B8C6D2;
         cursor: default;
     }
 
-.vas-etw-pager-text {
+.vas-oar-pager-text {
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;
@@ -547,55 +507,38 @@
     white-space: nowrap;
 }
 
-/* ── Responsive: collapse to mobile-friendly column widths ────────── */
+/* ── Dialog responsive — small screens ────────────────────────────── */
 
-@media (max-width: 48em) {            /* ~768px tablet */
-    .vas-etw-dialog-card {
+@media (max-width: 40em) {            /* ~640px */
+    .vas-oar-dialog { padding: 0; }
+    .vas-oar-dialog-card {
         width: 100%;
         height: 100%;
+        max-height: 100%;
         border-radius: 0;
     }
 
-    .vas-etw-th-doc,         .vas-etw-td-doc         { width: 7.5em; }
-    .vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 6.5em; }
-    .vas-etw-th-customer,    .vas-etw-td-customer    { width: 10em; }
-    .vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 6.5em; }
-    .vas-etw-th-currency,    .vas-etw-td-currency    { width: 4.5em; }
-    .vas-etw-th-amount,      .vas-etw-td-amount      { width: 8em; }
-    .vas-etw-th-duein,       .vas-etw-td-duein       { width: 6em; }
-}
-
-@media (max-width: 36em) {            /* ~576px phone */
-    .vas-etw-dialog {
-        padding: 0;
-    }
-
-    .vas-etw-dialog-table thead th,
-    .vas-etw-dialog-table tbody td {
+    .vas-oar-dialog-table thead th,
+    .vas-oar-dialog-table tbody td {
         padding: 0.625em 0.5em;
     }
 
-    .vas-etw-td-doc {
-        font-size: 0.75em;
-    }
+    .vas-oar-td-doc { font-size: 0.75em; }
 
-    /* On the narrowest screens drop the Invoice Date column to keep the
-       primary (Invoice No / Customer / Due date / Currency / Amount / Due in)
-       visible without horizontal scrolling. */
-    .vas-etw-th-invdate,
-    .vas-etw-td-invdate {
-        display: none;
-    }
+    /* Drop Bank account + Payment Currency on phones — keep
+       Date/Receipt/Customer/Amount (amount keeps its currency symbol). */
+    .vas-oar-th-bank,
+    .vas-oar-td-bank,
+    .vas-oar-th-currency,
+    .vas-oar-td-currency { display: none; }
 
-    .vas-etw-dialog-footer {
+    .vas-oar-th-amount, .vas-oar-td-amount { width: 9em; }
+
+    .vas-oar-dialog-footer {
         flex-wrap: wrap;
         gap: 0.625em;
     }
 
-    .vas-etw-pager-helper {
-        flex: 1 1 100%;
-        order: 2;
-    }
-
-    .vas-etw-pager { order: 1; }
+    .vas-oar-pager-helper { flex: 1 1 100%; order: 2; text-align: center; }
+    .vas-oar-pager { order: 1; margin: 0 auto; }
 }

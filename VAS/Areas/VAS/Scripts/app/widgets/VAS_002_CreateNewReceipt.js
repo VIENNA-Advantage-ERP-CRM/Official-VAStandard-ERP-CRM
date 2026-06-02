@@ -23,11 +23,11 @@
 
 ; (function (VAS, $) {
 
-    /* CSS lives in VAS/Areas/VAS/Content/VAS_CreateNewReceipt.css.
+    /* CSS lives in VAS/Areas/VAS/Content/VAS_002_CreateNewReceipt.css.
        All classes namespaced `vas-cnr-` so they never collide with
        sibling dashboard widgets. */
 
-    VAS.VAS_CreateNewReceipt = function () {
+    VAS.VAS_002_CreateNewReceipt = function () {
         this.frame;
         this.windowNo;
         this.widgetInfo;
@@ -59,22 +59,20 @@
         function buildSkeleton() {
             $root = $('<div class="vas-cnr-root" id="vas-cnr-root-' + widgetID + '"></div>');
 
-            var title = getMsg("VAS_NewReceipt", "New Receipt");
-            var copy = getMsg("VAS_RecordCustomerPayment", "Record a customer payment");
+            var title = getMsg("VAS_002_NewReceipt", "New Receipt");
+            var copy = getMsg("VAS_002_RecordCustomerPayment", "Record a customer payment");
 
-            /* User-plus glyph — matches the supplied "New Lead" mock. The
-               icon-well CSS already sets color:#FFFFFF on the wrapper, so
-               stroke="currentColor" keeps the glyph white on the blue
-               square. Inline width/height are omitted because
+            /* Plus glyph — matches the supplied mock (white "+" on the blue
+               icon well). The icon-well CSS already sets color:#FFFFFF on the
+               wrapper, so stroke="currentColor" keeps the glyph white on the
+               blue square. Inline width/height are omitted because
                .vas-cnr-icon svg already sizes the SVG in em. */
             var iconSvg =
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
                 ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' +
                 ' aria-hidden="true" focusable="false">' +
-                '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>' +
-                '<circle cx="9" cy="7" r="4"></circle>' +
-                '<line x1="19" y1="8" x2="19" y2="14"></line>' +
-                '<line x1="22" y1="11" x2="16" y2="11"></line>' +
+                '<line x1="12" y1="5" x2="12" y2="19"></line>' +
+                '<line x1="5" y1="12" x2="19" y2="12"></line>' +
                 '</svg>';
 
             $btn = $(
@@ -110,7 +108,7 @@
             }
             catch (err) {
                 if (window.console) {
-                    console.error("VAS_CreateNewReceipt firevalue failed", err);
+                    console.error("VAS_002_CreateNewReceipt firevalue failed", err);
                 }
             }
         }
@@ -141,7 +139,7 @@
     /* ---------------------------------------------------------------- */
     /* Required prototype hooks (same surface as other VAS widgets)     */
     /* ---------------------------------------------------------------- */
-    VAS.VAS_CreateNewReceipt.prototype.init = function (windowNo, frame) {
+    VAS.VAS_002_CreateNewReceipt.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -149,28 +147,28 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VAS.VAS_CreateNewReceipt.prototype.refreshWidget = function () {
+    VAS.VAS_002_CreateNewReceipt.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
     /* Fired on click. The host frame registers itself as the listener
        via addChangeListener() and opens the AR Receipt window in
        new-record mode using the passed windowParam descriptor. */
-    VAS.VAS_CreateNewReceipt.prototype.widgetFirevalueChanged = function (value) {
+    VAS.VAS_002_CreateNewReceipt.prototype.widgetFirevalueChanged = function (value) {
         if (this.listener && typeof this.listener.widgetFirevalueChanged === "function") {
             this.listener.widgetFirevalueChanged(value);
         }
     };
 
-    VAS.VAS_CreateNewReceipt.prototype.addChangeListener = function (listener) {
+    VAS.VAS_002_CreateNewReceipt.prototype.addChangeListener = function (listener) {
         this.listener = listener;
     };
 
-    VAS.VAS_CreateNewReceipt.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_002_CreateNewReceipt.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_CreateNewReceipt.prototype.dispose = function () {
+    VAS.VAS_002_CreateNewReceipt.prototype.dispose = function () {
         if (this.frame && typeof this.frame.dispose === "function") {
             try { this.frame.dispose(); } catch (e) { /* ignore */ }
         }

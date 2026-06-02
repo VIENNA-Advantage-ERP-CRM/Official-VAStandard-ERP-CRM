@@ -1,0 +1,882 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_RecentReceipts Widget — glass dashboard card with an inline paged
+ * receipt table + drill-down receipt-detail modal (summary grid + posted
+ * allocation table).
+ * Design source: the supplied reference HTML + design.md (Onfinity).
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card, 16px on
+ * the dialog). Container queries scale the card on small dashboard cells;
+ * media queries scale the dialog on small viewports.
+ * Namespaced vas-rr-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-rr-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-rr-root,
+    .vas-rr-root * {
+        box-sizing: border-box;
+    }
+
+.vas-rr-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card shell ─────────────────────────────────────────────── */
+
+.vas-rr-card {
+    font-size: 1em;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* ── Header: icon + title (left), "Click a row for full detail" (right) ── */
+
+.vas-rr-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.875em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-rr-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-rr-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-rr-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-rr-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #141414;
+    line-height: 1.15;
+    letter-spacing: -0.00625em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas-rr-head-hint {
+    font-size: 0.75em;
+    color: #717182;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Inline paged table ───────────────────────────────────────────── */
+
+.vas-rr-table-wrap {
+    flex: 1 1 auto;
+    overflow: auto;
+    min-height: 0;
+    margin: 0 -0.25em;
+}
+
+.vas-rr-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .vas-rr-table thead th {
+        position: sticky;
+        top: 0;
+        /* Fully opaque white so scrolling rows never bleed through the
+           header. The card's glass gradient is lightest at the top, so a
+           solid white header blends with it cleanly. z-index keeps the
+           thead above the tbody during scroll. */
+        background: #FFFFFF;
+        z-index: 2;
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.625em 0.5em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-rr-table thead th.vas-rr-th-amount {
+            text-align: right;
+        }
+
+    .vas-rr-table tbody td {
+        padding: 0.875em 0.5em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-rr-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .vas-rr-table tbody tr.vas-rr-tr {
+        cursor: pointer;
+        transition: background-color 120ms ease;
+    }
+
+    .vas-rr-table tbody tr.vas-rr-tr:hover td,
+    .vas-rr-table tbody tr.vas-rr-tr:focus-visible td {
+        background: rgba(31, 131, 255, 0.045);
+    }
+
+    .vas-rr-table tbody tr.vas-rr-tr:focus {
+        outline: none;
+    }
+
+/* Column widths.
+   - Date / Receipt No / Method / Bank account / Amount are fixed-width so
+     their full content (e.g. "May 28, 2026", "Direct Deposit",
+     "+$ 1,428,000.00") never truncates.
+   - Customer is the only flexing column. If the name exceeds its space the
+     `.vas-rr-truncate` span clips with an ellipsis. */
+.vas-rr-th-date,        .vas-rr-td-date        { width: 7.5em; color: #5F7283; font-size: 0.8125em; }
+.vas-rr-th-doc,         .vas-rr-td-doc         { width: 8em; }
+.vas-rr-th-customer,    .vas-rr-td-customer    { width: auto; min-width: 8em; }
+.vas-rr-th-method,      .vas-rr-td-method      { width: 8em; }
+.vas-rr-th-bank,        .vas-rr-td-bank        { width: 9em; color: #5F7283; font-size: 0.8125em; }
+.vas-rr-th-amount,      .vas-rr-td-amount      { width: 10em; text-align: right; }
+
+.vas-rr-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    color: #5F7283;
+    font-size: 0.75em;
+}
+
+.vas-rr-td-customer {
+    font-weight: 700;
+    color: #102C3F;
+    font-size: 0.9375em;
+}
+
+.vas-rr-td-amount {
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    /* Amount must render in full — no ellipsis or clipping. The fixed
+       width above is already wide enough for the largest expected value
+       ("+$ 1,428,000.00"); `overflow: visible` lets a longer string
+       overflow into adjacent space rather than truncating. */
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.vas-rr-td-amount-pos { color: #0B6B45; }
+.vas-rr-td-amount-neg { color: #8F2D2D; }
+
+.vas-rr-amt-sign {
+    margin-inline-end: 0.05em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+.vas-rr-cur-inline {
+    margin-inline-end: 0.15em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+.vas-rr-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Method chip — muted neutral pill matching the reference design. */
+.vas-rr-method-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25em 0.625em;
+    border-radius: 999em;
+    font-size: 0.75em;
+    font-weight: 500;
+    line-height: 1.3;
+    background: #EDF2F6;
+    color: #5F7283;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Empty-state row inside the inline table. */
+.vas-rr-empty {
+    padding: 1.875em 0.75em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+    background: transparent;
+}
+
+/* ── Footer: helper text + compact pager ──────────────────────────── */
+
+.vas-rr-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding-top: 0.625em;
+    border-top: 0.0625em solid #EDF2F6;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas-rr-pager-helper {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-rr-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    flex-shrink: 0;
+}
+
+.vas-rr-pager-btn {
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.4375em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-rr-pager-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-rr-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-rr-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-rr-pager-text {
+    min-width: 2.5em;
+    text-align: center;
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Card responsive (dashboard cell) ────────────────────────────────
+ * Breakpoints are tuned so a normal dashboard cell (≈600px wide and up)
+ * keeps all six columns visible — the design reference. Columns only
+ * fold away on tight cells where their content would otherwise truncate
+ * the customer / amount columns into uselessness. */
+
+@container (max-width: 30em) {        /* ~480px — hide hint + pager helper */
+    .vas-rr-head-hint { display: none; }
+    .vas-rr-pager-helper { display: none; }
+}
+
+@container (max-width: 28em) {        /* ~448px — drop Bank column */
+    .vas-rr-th-bank,
+    .vas-rr-td-bank { display: none; }
+}
+
+@container (max-width: 24em) {        /* ~384px — drop Method column */
+    .vas-rr-th-method,
+    .vas-rr-td-method { display: none; }
+}
+
+@container (max-width: 20em) {        /* ~320px — drop Date column */
+    .vas-rr-th-date,
+    .vas-rr-td-date { display: none; }
+    .vas-rr-card { font-size: 0.875em; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Receipt detail modal — attached to <body>; fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-rr-body-lock {
+    overflow: hidden;
+}
+
+.vas-rr-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+}
+
+    .vas-rr-dialog,
+    .vas-rr-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-rr-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.34);
+    backdrop-filter: blur(0.1875em);
+}
+
+.vas-rr-dialog-card {
+    position: relative;
+    width: 100%;
+    max-width: 45em;             /* ~720px on wide screens */
+    max-height: 86vh;
+    background: #FFFFFF;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 1em;
+    box-shadow: 0 1.875em 5em rgba(15, 61, 97, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-rr-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.125em 1.375em;
+    border-bottom: 0.0625em solid #E4EDF4;
+    flex-shrink: 0;
+}
+
+.vas-rr-dialog-htext {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    min-width: 0;
+}
+
+.vas-rr-dialog-hicon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid #BFE4FF;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-rr-dialog-hicon svg {
+        width: 1.15em;
+        height: 1.15em;
+        stroke: currentColor;
+    }
+
+.vas-rr-dialog-title-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-rr-dialog-title {
+    font-size: 1.125em;
+    font-weight: 500;
+    color: #141414;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rr-dialog-sub {
+    margin-top: 0.125em;
+    font-size: 0.75em;
+    color: #717182;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Header action row — Print pill + Close square stacked horizontally on
+   the right. */
+.vas-rr-dialog-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-rr-dialog-close {
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #141414;
+    flex-shrink: 0;
+}
+
+    .vas-rr-dialog-close:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .vas-rr-dialog-close svg {
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+/* Print button — pale-blue pill with the Onfinity primary tint (#EAF4FE
+   background / #BFE4FF border / #0083DA icon + label). Icon + "Print"
+   label sit side-by-side with em-based spacing. */
+.vas-rr-dialog-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    height: 2em;
+    padding: 0 0.875em 0 0.75em;
+    border: 0.0625em solid #BFE4FF;
+    border-radius: 999em;
+    background: #EAF4FE;
+    color: #0083DA;
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas-rr-dialog-print svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-rr-dialog-print:hover:not(:disabled) {
+        background: #D6EBFB;
+        border-color: #A6D5F8;
+        color: #0069AE;
+    }
+
+    .vas-rr-dialog-print:active:not(:disabled) {
+        background: #C4DDF0;
+    }
+
+    .vas-rr-dialog-print:disabled {
+        color: #B8C6D2;
+        background: #F3F7FB;
+        border-color: #E4EDF4;
+        cursor: default;
+    }
+
+.vas-rr-print-label {
+    white-space: nowrap;
+}
+
+.vas-rr-dialog-body {
+    flex: 1 1 auto;
+    /* Body is a flex column so the receipt-summary section (labels +
+       grid) and the allocation section can coexist with different
+       overflow behaviour: summary is fixed-height, allocation flexes
+       and only its table area scrolls. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+}
+
+.vas-rr-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.7);
+    z-index: 5;
+}
+
+/* ── Section labels ──────────────────────────────────────────────── */
+
+.vas-rr-section-label {
+    font-size: 0.6875em;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #5F7283;
+    font-weight: 700;
+    padding: 1em 1.375em 0;
+    /* Stays anchored; only the allocation table area below scrolls. */
+    flex-shrink: 0;
+}
+
+/* ── Receipt-summary 2-column grid ───────────────────────────────── */
+
+.vas-rr-d-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.75em;
+    padding: 0.5em 1.375em 0.375em;
+    /* Summary grid is fixed-height — its rows never scroll. */
+    flex-shrink: 0;
+}
+
+.vas-rr-d-field {
+    padding: 0.6875em 0 0.5625em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    min-width: 0;
+}
+
+.vas-rr-d-label {
+    font-size: 0.75em;
+    color: #141414;
+    opacity: 0.55;
+}
+
+.vas-rr-d-value {
+    font-size: 0.9375em;
+    color: #141414;
+    margin-top: 0.4375em;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+    .vas-rr-d-value strong {
+        font-weight: 700;
+    }
+
+.vas-rr-d-value-mono {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    font-weight: 400;
+    font-size: 0.9375em;
+    color: #141414;
+}
+
+.vas-rr-d-value-amt,
+.vas-rr-d-value-amt-neg {
+    font-size: 1.25em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    display: inline-block;
+}
+
+.vas-rr-d-value-amt { color: #0B6B45; }
+.vas-rr-d-value-amt-neg { color: #8F2D2D; }
+
+/* ── Allocation section (table + footer / on-account state) ──────── */
+
+.vas-rr-d-alloc {
+    padding: 0.375em 0.375em 1.125em;
+    /* Owns the remaining vertical space inside the modal body. Its own
+       contents are organised in a flex column so only the table wrap
+       below scrolls — the footer stays anchored at the bottom. */
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Outer frame around scrollable table + anchored footer; renders as one
+   bordered/rounded panel even though only the inner table area scrolls. */
+.vas-rr-d-alloc-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 0.5em;
+    border: 0.0625em solid #EDF2F6;
+    border-radius: 0.625em;
+    overflow: hidden;
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scrollable container holding only the allocation table. Sticky thead
+   stays visible while the user scrolls through many allocation rows. */
+.vas-rr-d-alloc-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.vas-rr-alloc-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .vas-rr-alloc-table thead th {
+        background: #FBFDFF;
+        text-align: left;
+        font-size: 0.75em;
+        font-weight: 400;
+        color: #748494;
+        padding: 0.625em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        /* Sticky inside the scroll wrap so the header stays visible
+           while the user scrolls through many allocation rows. */
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+        .vas-rr-alloc-table thead th.vas-rr-d-num {
+            text-align: right;
+        }
+
+    .vas-rr-alloc-table tbody td {
+        padding: 0.6875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .vas-rr-alloc-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+.vas-rr-d-inv-no {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    /* Inherit the table cell's 0.875em so the invoice number reads at
+       the same scale as the other line columns; the previous 0.8125em
+       compounded with the parent and rendered visibly smaller. */
+    font-size: 1em;
+    color: #5F7283;
+}
+
+/* ── Allocation-line type chip (INV / PMT / GL) ──────────────────── */
+
+.vas-rr-type-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25em;
+    padding: 0.125em 0.4375em;
+    border-radius: 0.3125em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    margin-inline-end: 0.5em;
+    vertical-align: 0.0625em;
+    border: 0.0625em solid transparent;
+    white-space: nowrap;
+}
+
+/* Invoice: pale-blue tint, matches the Onfinity primary chip family. */
+.vas-rr-type-inv {
+    background: #EAF4FE;
+    color: #0069AE;
+    border-color: #BFE4FF;
+}
+
+/* Payment-to-payment: success-deep / mint tint. */
+.vas-rr-type-pmt {
+    background: #E5F5EA;
+    color: #0B6B45;
+    border-color: #B6E1C2;
+}
+
+/* GL journal: warning-amber tint. */
+.vas-rr-type-gl {
+    background: #FEEEC8;
+    color: #9A6500;
+    border-color: #F4DBA0;
+}
+
+/* Fallback when LineType is unknown / 'Other'. */
+.vas-rr-type-other {
+    background: #EDF2F6;
+    color: #5F7283;
+    border-color: #E4EDF4;
+}
+
+.vas-rr-d-inv-date {
+    color: #5F7283;
+    font-size: 1em;
+}
+
+.vas-rr-d-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-rr-d-alloc-amt {
+    font-weight: 700;
+    color: #0B6B45;
+}
+
+.vas-rr-alloc-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6875em 0.75em;
+    background: #FBFDFF;
+    border-top: 0.0625em solid #EDF2F6;
+    font-size: 0.8125em;
+    color: #5F7283;
+    gap: 0.75em;
+    flex-wrap: wrap;
+    /* Anchored at the bottom of the frame so the running totals stay
+       visible while the table area above scrolls. */
+    flex-shrink: 0;
+}
+
+    .vas-rr-alloc-foot b {
+        color: #102C3F;
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+    }
+
+/* On-account empty state — dashed hint + warning pill. */
+.vas-rr-alloc-empty {
+    font-size: 0.8125em;
+    color: #748494;
+    padding: 0.875em 0.75em;
+    border: 0.0625em dashed #E4EDF4;
+    border-radius: 0.625em;
+    margin-top: 0.5em;
+}
+
+.vas-rr-onacct-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #9A6500;
+    background: #FEEEC8;
+    border-radius: 999em;
+    padding: 0.25em 0.625em;
+    margin-top: 0.5em;
+}
+
+    .vas-rr-onacct-pill svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+/* ── Dialog responsive ───────────────────────────────────────────── */
+
+@media (max-width: 48em) {            /* ~768px tablet */
+    .vas-rr-dialog {
+        padding: 0;
+    }
+
+    .vas-rr-dialog-card {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+}
+
+@media (max-width: 36em) {            /* ~576px phone — collapse grid to single column */
+    .vas-rr-d-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .vas-rr-section-label,
+    .vas-rr-d-grid,
+    .vas-rr-d-alloc {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .vas-rr-dialog-header {
+        padding: 1em 1em;
+    }
+
+    .vas-rr-alloc-table thead th,
+    .vas-rr-alloc-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    /* Drop the Invoice amount column on phones — Allocated amount stays
+       as the headline number. */
+    .vas-rr-alloc-table thead th:nth-child(3),
+    .vas-rr-alloc-table tbody td:nth-child(3) {
+        display: none;
+    }
+}
