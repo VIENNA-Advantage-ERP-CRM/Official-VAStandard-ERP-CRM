@@ -213,6 +213,7 @@
     <Compile Include="Areas\VAS\Controllers\InOutController.cs" />
     <Compile Include="Areas\VAS\Controllers\InventoryLinesController.cs" />
     <Compile Include="Areas\VAS\Controllers\InvoicesController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_003_OnAccountReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderLineTabPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
@@ -223,6 +224,9 @@
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_011_UnreconciledReceiptsController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_012_TodayReceiptsController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_RecentReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
@@ -259,7 +263,7 @@
   <ItemGroup>
     <Content Include="Areas\VAS\Content\AutoAllocatedWidget.css" />
     <Content Include="Areas\VAS\Content\BouncedChequesWidget.css" />
-    <Content Include="Areas\VAS\Content\CollectionEfficiencyWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_001_CollectionEfficiencyWidget.css" />
     <Content Include="Areas\VAS\Content\CustomerPaidMethodWidget.css" />
     <Content Include="Areas\VAS\Content\ExpectedReceiptsWidget.css" />
     <Content Include="Areas\VAS\Content\ExpectedThisWeekWidget.css" />
@@ -281,6 +285,9 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_003_OnAccountReceipts.css" />
+    <Content Include="Areas\VAS\Content\VAS_011_UnreconciledReceipts.css" />
+    <Content Include="Areas\VAS\Content\VAS_012_TodayReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_AvgDaysToPayWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
@@ -295,6 +302,7 @@
     <Content Include="Areas\VAS\Content\VAS_ProductWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_ReceiptSearch.css" />
+    <Content Include="Areas\VAS\Content\VAS_RecentReceiptsWidget.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
@@ -353,7 +361,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\CashJournal\VAS_NewCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\CollectionEfficiencyWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_001_CollectionEfficiencyWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CustomerPaidMethodWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
@@ -368,8 +376,12 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_CreateNewReceipt.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_003_OnAccountReceipts.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_011_UnreconciledReceipts.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_012_TodayReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />

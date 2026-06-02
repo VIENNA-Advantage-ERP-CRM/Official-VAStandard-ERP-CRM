@@ -18,9 +18,13 @@
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AutoAllocatedWidget.css";
+@import "../VAS_RecentReceiptsWidget.css";
 @import "../BouncedChequesWidget.css";
 @import "../CustomerPaidMethodWidget.css";
-@import "../CollectionEfficiencyWidget.css";
+@import "../VAS_001_CollectionEfficiencyWidget.css";
+@import "../VAS_003_OnAccountReceipts.css";
+@import "../VAS_011_UnreconciledReceipts.css";
+@import "../VAS_012_TodayReceipts.css";
 @import "../ExpectedReceiptsWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../VAS_InvoiceOverview.css";
