@@ -68,8 +68,10 @@ namespace VASLogic.Models
             }
 
             /* SchemaCurrency CTE resolves the accounting-schema (base) currency
-               for the client; it reads only system/reference tables, so no MRole
-               predicate is applied to it. */
+               for the session client; it reads only system/reference tables, so
+               no MRole predicate is applied to it. The AD_Client_ID filter scopes
+               it to the current client so a multi-tenant database yields exactly
+               one base-currency row, not one per client. */
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS Acct_Currency_ID,
@@ -78,7 +80,8 @@ namespace VASLogic.Models
                        Currency.ISO_Code AS Currency_ISO
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
-                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID)";
+                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID)
+                WHERE ClientInfo.AD_Client_ID=" + clientId;
 
             /* CustomerCollections CTE — the main physical table is C_Payment
                (alias Payment). The SELECT/WHERE is built first so MRole can be
