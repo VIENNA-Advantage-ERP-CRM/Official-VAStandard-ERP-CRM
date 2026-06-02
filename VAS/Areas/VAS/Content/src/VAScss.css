@@ -27,6 +27,7 @@
 @import "../VAS_012_TodayReceipts.css";
 @import "../VAS_013_TopCustomerReceipts.css";
 @import "../VAS_014_DailyCollectionTrend.css";
+@import "../VAS_015_OutstandingVsReceived.css";
 @import "../ExpectedReceiptsWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AgingReceivablesWidget.css";

@@ -226,6 +226,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_012_TodayReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_013_TopCustomerReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_014_DailyCollectionTrendController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_015_OutstandingVsReceivedController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RecentReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
@@ -290,6 +291,7 @@
     <Content Include="Areas\VAS\Content\VAS_012_TodayReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_013_TopCustomerReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_014_DailyCollectionTrend.css" />
+    <Content Include="Areas\VAS\Content\VAS_015_OutstandingVsReceived.css" />
     <Content Include="Areas\VAS\Content\VAS_AvgDaysToPayWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
@@ -380,6 +382,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_012_TodayReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_013_TopCustomerReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_014_DailyCollectionTrend.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_015_OutstandingVsReceived.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
