@@ -23,6 +23,7 @@
 @import "../CustomerPaidMethodWidget.css";
 @import "../VAS_001_CollectionEfficiencyWidget.css";
 @import "../VAS_003_OnAccountReceipts.css";
+@import "../VAS_011_UnreconciledReceipts.css";
 @import "../ExpectedReceiptsWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AgingReceivablesWidget.css";
