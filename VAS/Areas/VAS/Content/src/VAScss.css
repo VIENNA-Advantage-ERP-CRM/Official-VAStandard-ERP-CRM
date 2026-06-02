@@ -25,6 +25,7 @@
 @import "../VAS_003_OnAccountReceipts.css";
 @import "../VAS_011_UnreconciledReceipts.css";
 @import "../VAS_012_TodayReceipts.css";
+@import "../VAS_013_TopCustomerReceipts.css";
 @import "../ExpectedReceiptsWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AgingReceivablesWidget.css";
