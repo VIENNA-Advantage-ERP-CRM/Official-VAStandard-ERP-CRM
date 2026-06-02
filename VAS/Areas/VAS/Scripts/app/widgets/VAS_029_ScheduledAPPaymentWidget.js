@@ -20,7 +20,7 @@
 ; (function (VIS, $) {
     "use strict";
 
-    VIS.ScheduledAPPaymentWidget = function () {
+    VIS.VAS_029_ScheduledAPPaymentWidget = function () {
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
@@ -90,7 +90,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'ScheduledAPPayment/GetScheduledAPPaymentThisWeek',
+                url: VIS.Application.contextUrl + 'VAS_029_ScheduledAPPaymentWidget/GetScheduledAPPaymentThisWeek',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -325,7 +325,7 @@
         };
     };
 
-    VIS.ScheduledAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -340,7 +340,7 @@
         }
     };
 
-    VIS.ScheduledAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -353,11 +353,11 @@
         );
     };
 
-    VIS.ScheduledAPPaymentWidget.prototype.refreshWidget = function () {
+    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.ScheduledAPPaymentWidget.prototype.dispose = function () {
+    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {

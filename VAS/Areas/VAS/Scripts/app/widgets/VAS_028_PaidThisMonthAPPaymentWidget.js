@@ -24,7 +24,7 @@
 ; (function (VIS, $) {
     "use strict";
 
-    VIS.PaidThisMonthAPPaymentWidget = function () {
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget = function () {
         var self = this;
 
         this.frame = null;
@@ -124,7 +124,7 @@
             showBusy(true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'PaidThisMonthAPPayment/GetPaidThisMonth',
+                url: VIS.Application.contextUrl + 'VAS_028_PaidThisMonthAPPaymentWidget/GetPaidThisMonth',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -287,9 +287,9 @@
         };
     };
 
-    VIS.PaidThisMonthAPPaymentWidget = VIS.PaidThisMonthAPPaymentWidget;
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget = VIS.VAS_028_PaidThisMonthAPPaymentWidget;
 
-    VIS.PaidThisMonthAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -304,7 +304,7 @@
         }
     };
 
-    VIS.PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -317,11 +317,11 @@
         );
     };
 
-    VIS.PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
+    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {

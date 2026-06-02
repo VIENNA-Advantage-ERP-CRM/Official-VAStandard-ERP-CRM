@@ -15,7 +15,7 @@
 ; (function (VIS, $) {
     "use strict";
 
-    var ClearedAPPaymentWidget = function () {
+    var VAS_027_ClearedAPPaymentWidget = function () {
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
@@ -84,7 +84,7 @@
             setState(lbl('VAS_Loading', 'Loading'), true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'ClearedAPPayment/GetClearedAPPayment',
+                url: VIS.Application.contextUrl + 'VAS_027_ClearedAPPaymentWidget/GetClearedAPPayment',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -195,7 +195,7 @@
         };
     };
 
-    ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VAS_027_ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -210,7 +210,7 @@
         }
     };
 
-    ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS_027_ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -223,11 +223,11 @@
         );
     };
 
-    ClearedAPPaymentWidget.prototype.refreshWidget = function () {
+    VAS_027_ClearedAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    ClearedAPPaymentWidget.prototype.dispose = function () {
+    VAS_027_ClearedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {
@@ -237,6 +237,6 @@
         this.frame = null;
     };
 
-    VIS.ClearedAPPaymentWidget = ClearedAPPaymentWidget;
+    VIS.VAS_027_ClearedAPPaymentWidget = VAS_027_ClearedAPPaymentWidget;
 
 })(VIS, jQuery);

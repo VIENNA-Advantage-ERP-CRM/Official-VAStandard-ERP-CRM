@@ -25,7 +25,7 @@
 
 ; (function (VIS, $) {
 
-    VIS.RecentAPPaymentsWidget = function () {
+    VIS.VAS_032_RecentAPPaymentsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -93,7 +93,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'RecentAPPayments/GetRecentAPPayments',
+                url: VIS.Application.contextUrl + 'VAS_032_RecentAPPaymentsWidget/GetRecentAPPayments',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -295,7 +295,7 @@
         };
     };
 
-    VIS.RecentAPPaymentsWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_032_RecentAPPaymentsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -303,14 +303,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_032_RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.RecentAPPaymentsWidget.prototype.refreshWidget = function () {
+    VIS.VAS_032_RecentAPPaymentsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.RecentAPPaymentsWidget.prototype.dispose = function () {
+    VIS.VAS_032_RecentAPPaymentsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {

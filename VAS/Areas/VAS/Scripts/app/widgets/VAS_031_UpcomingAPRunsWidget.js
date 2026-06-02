@@ -19,7 +19,7 @@
 
 ; (function (VIS, $) {
 
-    VIS.UpcomingAPRunsWidget = function () {
+    VIS.VAS_031_UpcomingAPRunsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -71,7 +71,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'UpcomingAPRuns/GetUpcomingAPRuns',
+                url: VIS.Application.contextUrl + 'VAS_031_UpcomingAPRunsWidget/GetUpcomingAPRuns',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -237,7 +237,7 @@
         };
     };
 
-    VIS.UpcomingAPRunsWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_031_UpcomingAPRunsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -245,14 +245,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.UpcomingAPRunsWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_031_UpcomingAPRunsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.UpcomingAPRunsWidget.prototype.refreshWidget = function () {
+    VIS.VAS_031_UpcomingAPRunsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.UpcomingAPRunsWidget.prototype.dispose = function () {
+    VIS.VAS_031_UpcomingAPRunsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {

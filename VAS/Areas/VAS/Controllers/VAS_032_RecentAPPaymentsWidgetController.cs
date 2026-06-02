@@ -11,7 +11,7 @@ using VIS.Filters;
 
 namespace VIS.Controllers
 {
-    public class RecentAPPaymentsController : Controller
+    public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]

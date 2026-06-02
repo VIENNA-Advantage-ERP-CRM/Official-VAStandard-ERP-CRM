@@ -10,7 +10,7 @@ using VIS.Filters;
 
 namespace VIS.Controllers
 {
-    public class UpcomingAPRunsController : Controller
+    public class VAS_031_UpcomingAPRunsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]

@@ -14,14 +14,14 @@
 @import "../VAS_LeadConversation.css";
 
 
-@import "../ClearedAPPaymentWidget.css";
-@import "../PaidThisMonthAPPaymentWidget.css";
-@import "../ScheduledAPPaymentWidget.css";
-@import "../BouncedAPPaymentWidget.css";
-@import "../UpcomingAPRunsWidget.css";
-@import "../RecentAPPaymentsWidget.css";
+@import "../VAS_027_ClearedAPPaymentWidget.css";
+@import "../VAS_028_PaidThisMonthAPPaymentWidget.css";
+@import "../VAS_029_ScheduledAPPaymentWidget.css";
+@import "../VAS_030_BouncedAPPaymentWidget.css";
+@import "../VAS_031_UpcomingAPRunsWidget.css";
+@import "../VAS_032_RecentAPPaymentsWidget.css";
 
-@import "../PaymentMethodsWidget.css";
+@import "../VAS_033_PaymentMethodsWidget.css";
 @import "../ReconciliationStatusWidget.css";
 
 

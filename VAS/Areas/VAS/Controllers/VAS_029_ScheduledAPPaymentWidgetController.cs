@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -17,7 +16,7 @@ namespace VIS.Controllers
     /// Chronological development:
     ///   <EmployeeCode>   Created Date
     /// </summary>
-    public class ScheduledAPPaymentController : Controller
+    public class VAS_029_ScheduledAPPaymentWidgetController : Controller
     {
         /// <summary>
         /// Gets AP invoice schedule amounts due in the current week, grouped by payment method.
@@ -55,6 +54,47 @@ namespace VIS.Controllers
                 int daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
                 DateTime weekFrom = today.AddDays(-daysFromMonday);
                 DateTime weekTo = weekFrom.AddDays(7);
+                int adClientId = ctx.GetAD_Client_ID();
+
+                bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
+                bool hasPaymentMethodVA009Name = hasPaymentMethod && HasPaymentMethodVA009NameColumn();
+                bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
+                bool hasPaymentMethodValue = hasPaymentMethod && HasPaymentMethodValueColumn();
+
+                string paymentMethodDisplayColumn = string.Empty;
+
+                if (hasPaymentMethodVA009Name)
+                {
+                    paymentMethodDisplayColumn = "PaymentMethod.VA009_Name";
+                }
+                else if (hasPaymentMethodName)
+                {
+                    paymentMethodDisplayColumn = "PaymentMethod.Name";
+                }
+                else if (hasPaymentMethodValue)
+                {
+                    paymentMethodDisplayColumn = "PaymentMethod.Value";
+                }
+
+                string paymentMethodIdSelect = hasPaymentMethod
+                    ? "COALESCE(Invoice.VA009_PaymentMethod_ID,0)"
+                    : "0";
+
+                string paymentMethodNameSelect = hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodDisplayColumn)
+                    ? @"CASE
+        WHEN " + paymentMethodDisplayColumn + @" IS NOT NULL THEN " + paymentMethodDisplayColumn + @"
+        WHEN Invoice.PaymentRule IS NOT NULL THEN Invoice.PaymentRule
+        ELSE ''
+    END"
+                    : @"CASE
+        WHEN Invoice.PaymentRule IS NOT NULL THEN Invoice.PaymentRule
+        ELSE ''
+    END";
+
+                string paymentMethodJoin = hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodDisplayColumn)
+                    ? @"
+LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON (Invoice.VA009_PaymentMethod_ID=PaymentMethod.VA009_PaymentMethod_ID)"
+                    : string.Empty;
 
                 string schemaCurrencySql = @"
 SELECT
@@ -70,65 +110,75 @@ FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
 INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)
 WHERE ClientInfo.IsActive='Y'
-AND ClientInfo.AD_Client_ID=@AD_Client_ID";
+AND ClientInfo.AD_Client_ID=" + adClientId;
+
+                string invoiceBaseSql = @"
+SELECT
+    Invoice.C_Invoice_ID,
+    Invoice.AD_Client_ID,
+    Invoice.AD_Org_ID,
+    Invoice.C_BPartner_ID,
+    Invoice.C_Currency_ID,
+    Invoice.DateAcct,
+    Invoice.C_ConversionType_ID,
+    Invoice.IsReturnTrx,
+    Invoice.PaymentRule"
+    + (hasPaymentMethod ? @",
+    Invoice.VA009_PaymentMethod_ID" : string.Empty) + @"
+FROM C_Invoice Invoice
+WHERE Invoice.IsActive='Y'
+AND Invoice.AD_Client_ID=" + adClientId + @"
+AND Invoice.IsSOTrx='N'
+AND Invoice.DocStatus IN ('CO','CL')";
+
+                invoiceBaseSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    invoiceBaseSql,
+                    "Invoice",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string invoiceBody = @"
 SELECT
-    inv.C_Invoice_ID,
-    inv.C_BPartner_ID,
+    Invoice.C_Invoice_ID,
+    Invoice.C_BPartner_ID,
     SchemaCurrency.C_Currency_ID,
     SchemaCurrency.ISO_Code AS CurrencyISO,
     SchemaCurrency.Cur_Symbol AS CurrencySymbol,
     SchemaCurrency.StdPrecision,
+    " + paymentMethodIdSelect + @" AS PaymentMethod_ID,
+    " + paymentMethodNameSelect + @" AS PaymentMethodName,
     CASE
-        WHEN inv.VA009_PaymentMethod_ID IS NOT NULL THEN inv.VA009_PaymentMethod_ID
-        ELSE 0
-    END AS PaymentMethod_ID,
-    CASE
-        WHEN PaymentMethod.Name IS NOT NULL THEN PaymentMethod.Name
-        WHEN inv.PaymentRule IS NOT NULL THEN inv.PaymentRule
-        ELSE ''
-    END AS PaymentMethodName,
-    CASE
-        WHEN COALESCE(inv.IsReturnTrx,'N')='Y' THEN -CurrencyConvert(
+        WHEN COALESCE(Invoice.IsReturnTrx,'N')='Y' THEN -CurrencyConvert(
             COALESCE(ips.DueAmt,0),
-            inv.C_Currency_ID,
+            Invoice.C_Currency_ID,
             SchemaCurrency.C_Currency_ID,
-            inv.DateAcct,
-            inv.C_ConversionType_ID,
-            inv.AD_Client_ID,
-            inv.AD_Org_ID
+            Invoice.DateAcct,
+            Invoice.C_ConversionType_ID,
+            Invoice.AD_Client_ID,
+            Invoice.AD_Org_ID
         )
         ELSE CurrencyConvert(
             COALESCE(ips.DueAmt,0),
-            inv.C_Currency_ID,
+            Invoice.C_Currency_ID,
             SchemaCurrency.C_Currency_ID,
-            inv.DateAcct,
-            inv.C_ConversionType_ID,
-            inv.AD_Client_ID,
-            inv.AD_Org_ID
+            Invoice.DateAcct,
+            Invoice.C_ConversionType_ID,
+            Invoice.AD_Client_ID,
+            Invoice.AD_Org_ID
         )
     END AS ScheduledAmount
-FROM C_Invoice inv
-INNER JOIN C_InvoicePaySchedule ips ON (inv.C_Invoice_ID=ips.C_Invoice_ID)
-INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=inv.AD_Client_ID)
-LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON (inv.VA009_PaymentMethod_ID=PaymentMethod.VA009_PaymentMethod_ID)
-WHERE inv.IsActive='Y'
-AND ips.IsActive='Y'
-AND inv.AD_Client_ID=@AD_Client_ID
-AND inv.IsSOTrx='N'
-AND inv.DocStatus IN ('CO','CL')
+FROM (
+    " + invoiceBaseSql + @"
+) Invoice
+INNER JOIN C_InvoicePaySchedule ips ON (Invoice.C_Invoice_ID=ips.C_Invoice_ID)
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Invoice.AD_Client_ID)"
+    + paymentMethodJoin + @"
+WHERE ips.IsActive='Y'
 AND COALESCE(ips.VA009_IsPaid,'N')<>'Y'
 AND COALESCE(ips.DueAmt,0)>0
-AND ips.DueDate>=@WeekFrom
-AND ips.DueDate<@WeekTo";
-
-                invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(
-                    invoiceBody,
-                    "inv",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+AND ips.DueDate>=" + GetDateValue(weekFrom) + @"
+AND ips.DueDate<" + GetDateValue(weekTo);
 
                 string sql = @"
 WITH SchemaCurrency AS (
@@ -155,14 +205,7 @@ GROUP BY
 HAVING SUM(ScheduledData.ScheduledAmount)>0
 ORDER BY ScheduledAmount DESC";
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@WeekFrom", weekFrom),
-                    new SqlParameter("@WeekTo", weekTo)
-                };
-
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 decimal scheduledAmountThisWeek = 0;
                 int cCurrencyId = 0;
@@ -243,6 +286,70 @@ ORDER BY ScheduledAmount DESC";
                     dr.Dispose();
                 }
             }
+        }
+
+        private string GetDateValue(DateTime date)
+        {
+            string dateText = date.ToString("yyyy-MM-dd");
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + dateText + "', 'YYYY-MM-DD')";
+            }
+
+            return "'" + dateText + "'";
+        }
+
+        private bool HasInvoicePaymentMethodColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Invoice'
+                AND c.ColumnName = 'VA009_PaymentMethod_ID'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private bool HasPaymentMethodVA009NameColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'VA009_Name'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private bool HasPaymentMethodNameColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Name'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+        }
+
+        private bool HasPaymentMethodValueColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'VA009_PaymentMethod'
+                AND c.ColumnName = 'Value'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
         /// <summary>

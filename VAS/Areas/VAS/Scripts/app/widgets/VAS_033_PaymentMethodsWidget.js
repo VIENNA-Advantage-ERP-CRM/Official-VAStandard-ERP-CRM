@@ -18,7 +18,7 @@
 
 ; (function (VIS, $) {
 
-    VIS.PaymentMethodsWidget = function () {
+    VIS.VAS_033_PaymentMethodsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -71,7 +71,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'PaymentMethods/GetPaymentMethods',
+                url: VIS.Application.contextUrl + 'VAS_033_PaymentMethodsWidget/GetPaymentMethods',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -241,7 +241,7 @@
         };
     };
 
-    VIS.PaymentMethodsWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_033_PaymentMethodsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -249,14 +249,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.PaymentMethodsWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_033_PaymentMethodsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.PaymentMethodsWidget.prototype.refreshWidget = function () {
+    VIS.VAS_033_PaymentMethodsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.PaymentMethodsWidget.prototype.dispose = function () {
+    VIS.VAS_033_PaymentMethodsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {

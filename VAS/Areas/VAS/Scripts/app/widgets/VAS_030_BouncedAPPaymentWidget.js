@@ -19,7 +19,7 @@
 ; (function (VIS, $) {
     "use strict";
 
-    VIS.BouncedAPPaymentWidget = function () {
+    VIS.VAS_030_BouncedAPPaymentWidget = function () {
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
@@ -88,7 +88,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'BouncedAPPayment/GetBouncedAPPayments',
+                url: VIS.Application.contextUrl + 'VAS_030_BouncedAPPaymentWidget/GetBouncedAPPayments',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -195,7 +195,7 @@
         };
     };
 
-    VIS.BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_030_BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -210,7 +210,7 @@
         }
     };
 
-    VIS.BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_030_BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -223,11 +223,11 @@
         );
     };
 
-    VIS.BouncedAPPaymentWidget.prototype.refreshWidget = function () {
+    VIS.VAS_030_BouncedAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.BouncedAPPaymentWidget.prototype.dispose = function () {
+    VIS.VAS_030_BouncedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {

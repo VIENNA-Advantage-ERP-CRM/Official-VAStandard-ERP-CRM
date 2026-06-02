@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -17,7 +16,7 @@ namespace VIS.Controllers
     /// Chronological development:
     ///   <EmployeeCode>   Created Date
     /// </summary>
-    public class BouncedAPPaymentController : Controller
+    public class VAS_030_BouncedAPPaymentWidgetController : Controller
     {
         /// <summary>
         /// Gets outgoing AP payments marked as bounced during the current calendar month.
@@ -54,17 +53,22 @@ namespace VIS.Controllers
                 DateTime today = DateTime.Today;
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
                 DateTime dateTo = dateFrom.AddMonths(1);
+                int adClientId = ctx.GetAD_Client_ID();
+                string executionStatusFilter = HasPaymentExecutionStatusColumn()
+                    ? @"
+AND COALESCE(p.VA009_ExecutionStatus,'')='B'"
+                    : string.Empty;
 
                 string sql = @"
 SELECT
     COUNT(1) AS BouncedPaymentCount
 FROM C_Payment p
 WHERE p.IsActive='Y'
-AND p.AD_Client_ID=@AD_Client_ID
-AND p.IsReceipt=@IsReceipt
-AND p.DateAcct>=@DateFrom
-AND p.DateAcct<@DateTo
-AND COALESCE(p.VA009_ExecutionStatus,'')=@BouncedStatus";
+AND p.AD_Client_ID=" + adClientId + @"
+AND p.IsReceipt='N'
+AND p.DateAcct>=" + GetDateValue(dateFrom) + @"
+AND p.DateAcct<" + GetDateValue(dateTo) + @"
+" + executionStatusFilter;
 
                 sql = MRole.GetDefault(ctx).AddAccessSQL(
                     sql,
@@ -73,16 +77,7 @@ AND COALESCE(p.VA009_ExecutionStatus,'')=@BouncedStatus";
                     MRole.SQL_RO
                 );
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo),
-                    new SqlParameter("@BouncedStatus", "B")
-                };
-
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 int bouncedPaymentCount = 0;
 
@@ -118,6 +113,31 @@ AND COALESCE(p.VA009_ExecutionStatus,'')=@BouncedStatus";
                     dr.Dispose();
                 }
             }
+        }
+
+        private string GetDateValue(DateTime date)
+        {
+            string dateText = date.ToString("yyyy-MM-dd");
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + dateText + "', 'YYYY-MM-DD')";
+            }
+
+            return "'" + dateText + "'";
+        }
+
+        private bool HasPaymentExecutionStatusColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Payment'
+                AND c.ColumnName = 'VA009_ExecutionStatus'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
         /// <summary>

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -14,10 +13,8 @@ namespace VIS.Controllers
     /// <summary>
     /// Module Name : VAS Dashboard
     /// Purpose     : Provides paid-this-month AP payment KPI widget data.
-    /// Chronological development:
-    ///   <EmployeeCode>   Created Date
     /// </summary>
-    public class PaidThisMonthAPPaymentController : Controller
+    public class VAS_028_PaidThisMonthAPPaymentWidgetController : Controller
     {
         /// <summary>
         /// Gets total AP payments posted in the current calendar month.
@@ -54,6 +51,11 @@ namespace VIS.Controllers
                 DateTime today = DateTime.Today;
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
                 DateTime dateTo = dateFrom.AddMonths(1);
+                int adClientId = ctx.GetAD_Client_ID();
+                string executionStatusFilter = HasPaymentExecutionStatusColumn()
+                    ? @"
+AND COALESCE(Payment.VA009_ExecutionStatus,'R') NOT IN ('B','C')"
+                    : string.Empty;
 
                 string schemaCurrencySql = @"
 SELECT
@@ -69,39 +71,52 @@ FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
 INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)
 WHERE ClientInfo.IsActive='Y'
-AND ClientInfo.AD_Client_ID=@AD_Client_ID";
+AND ClientInfo.AD_Client_ID=" + adClientId;
 
-                string paidThisMonthSql = @"
+                string paymentBaseSql = @"
 SELECT
-    p.AD_Client_ID,
-    p.C_BPartner_ID,
-    CASE
-        WHEN p.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(p.PayAmt, 0)
-        ELSE CurrencyConvert(
-            COALESCE(p.PayAmt, 0),
-            p.C_Currency_ID,
-            SchemaCurrency.C_Currency_ID,
-            p.DateAcct,
-            p.C_ConversionType_ID,
-            p.AD_Client_ID,
-            p.AD_Org_ID
-        )
-    END AS PaidAmount
-FROM C_Payment p
-INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=p.AD_Client_ID)
-WHERE p.IsActive='Y'
-AND p.IsReceipt=@IsReceipt
-AND p.DocStatus IN ('CO','CL')
-AND p.DateAcct>=@DateFrom
-AND p.DateAcct<@DateTo
-AND COALESCE(p.VA009_ExecutionStatus,'R') NOT IN ('B','C')";
+    Payment.AD_Client_ID,
+    Payment.AD_Org_ID,
+    Payment.C_BPartner_ID,
+    Payment.C_Currency_ID,
+    Payment.C_ConversionType_ID,
+    Payment.DateAcct,
+    Payment.PayAmt
+FROM C_Payment Payment
+WHERE Payment.IsActive='Y'
+AND Payment.IsReceipt='N'
+AND Payment.DocStatus IN ('CO','CL')
+AND Payment.DateAcct>=" + GetDateValue(dateFrom) + @"
+AND Payment.DateAcct<" + GetDateValue(dateTo) + @"
+" + executionStatusFilter;
 
-                paidThisMonthSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    paidThisMonthSql,
-                    "p",
+                paymentBaseSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    paymentBaseSql,
+                    "Payment",
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
+
+                string paidThisMonthSql = @"
+SELECT
+    Payment.AD_Client_ID,
+    Payment.C_BPartner_ID,
+    CASE
+        WHEN Payment.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(Payment.PayAmt, 0)
+        ELSE CurrencyConvert(
+            COALESCE(Payment.PayAmt, 0),
+            Payment.C_Currency_ID,
+            SchemaCurrency.C_Currency_ID,
+            Payment.DateAcct,
+            Payment.C_ConversionType_ID,
+            Payment.AD_Client_ID,
+            Payment.AD_Org_ID
+        )
+    END AS PaidAmount
+FROM (
+    " + paymentBaseSql + @"
+) Payment
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Payment.AD_Client_ID)";
 
                 string sql = @"
 WITH SchemaCurrency AS (
@@ -120,15 +135,7 @@ SELECT
 FROM SchemaCurrency SchemaCurrency
 LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON (PaidThisMonthData.AD_Client_ID=SchemaCurrency.AD_Client_ID)";
 
-                List<SqlParameter> parameters = new List<SqlParameter>
-                {
-                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@IsReceipt", "N"),
-                    new SqlParameter("@DateFrom", dateFrom),
-                    new SqlParameter("@DateTo", dateTo)
-                };
-
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 decimal paidThisMonth = 0;
                 int vendorCount = 0;
@@ -185,6 +192,31 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON (PaidThisMonthData.AD_Cli
                     dr.Dispose();
                 }
             }
+        }
+
+        private string GetDateValue(DateTime date)
+        {
+            string dateText = date.ToString("yyyy-MM-dd");
+
+            if (DB.IsOracle())
+            {
+                return "TO_DATE('" + dateText + "', 'YYYY-MM-DD')";
+            }
+
+            return "'" + dateText + "'";
+        }
+
+        private bool HasPaymentExecutionStatusColumn()
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Table t
+                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
+                WHERE t.TableName = 'C_Payment'
+                AND c.ColumnName = 'VA009_ExecutionStatus'
+            ";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
         /// <summary>

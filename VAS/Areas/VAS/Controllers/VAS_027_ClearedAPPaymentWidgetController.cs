@@ -9,7 +9,7 @@ using VIS.Filters;
 
 namespace VIS.Controllers
 {
-    public class ClearedAPPaymentController : Controller
+    public class VAS_027_ClearedAPPaymentWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
