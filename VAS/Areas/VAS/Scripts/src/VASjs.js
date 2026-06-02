@@ -124,6 +124,7 @@ import "../app/widgets/CustomerPaidMethodWidget.js";
 import "../app/widgets/VAS_001_CollectionEfficiencyWidget.js";
 import "../app/widgets/VAS_003_OnAccountReceipts.js";
 import "../app/widgets/VAS_011_UnreconciledReceipts.js";
+import "../app/widgets/VAS_012_TodayReceipts.js";
 import "../app/widgets/ExpectedReceiptsWidget.js";
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
