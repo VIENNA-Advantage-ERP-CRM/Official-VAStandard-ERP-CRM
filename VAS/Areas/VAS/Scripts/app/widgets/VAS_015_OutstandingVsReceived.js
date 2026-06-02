@@ -17,7 +17,7 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                                  | Message Key                    | Reused?
  * ----+-----------------------------------------------+--------------------------------+--------
- *  1  | Outstanding vs received                       | VAS_015_OutstandingVsReceived  | new
+ *  1  | Outstanding vs Received                       | VAS_015_OutstandingVsReceived  | new
  *  2  | Receivable balance against collections·6 mo   | VAS_015_Subtitle               | new
  *  3  | Outstanding receivable                        | VAS_015_OutstandingReceivable  | new
  *  4  | Received in period                            | VAS_015_ReceivedInPeriod       | new
@@ -359,7 +359,7 @@
                 '<div class="vas-ovr-head-left">' +
                 '<div class="vas-ovr-icon">' + barLineIconSvg() + '</div>' +
                 '<div class="vas-ovr-title-group">' +
-                '<div class="vas-ovr-title">' + escapeHtml(lbl("VAS_015_OutstandingVsReceived", "Outstanding vs received")) + '</div>' +
+                '<div class="vas-ovr-title">' + escapeHtml(lbl("VAS_015_OutstandingVsReceived", "Outstanding vs Received")) + '</div>' +
                 '<div class="vas-ovr-subtitle">' + escapeHtml(lbl("VAS_015_Subtitle", "Receivable balance against collections · 6 months")) + '</div>' +
                 '</div>' +
                 '</div>' +
