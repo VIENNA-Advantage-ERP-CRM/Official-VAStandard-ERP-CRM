@@ -14,26 +14,27 @@
  * ─────────────────────────────────────────────────────────────────────
  */
 
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+    "use strict";
 
     VIS.ScheduledAPPaymentWidget = function () {
-
-        this.frame;
-        this.windowNo;
-        this.AD_UserHomeWidgetID;
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
 
         var $root = $('<div class="vas-scheduled-ap-payment-root">');
-        var $card;
-        var $title;
-        var $value;
-        var $badge;
-        var $description;
-        var $body;
+        var $card = null;
+        var $value = null;
+        var $description = null;
+        var $body = null;
+
         var groups = [];
         var groupIndex = 0;
         var rotationTimer = null;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -51,13 +52,15 @@
             var $header = $('<div class="vas-scheduled-ap-payment-header">');
             var $iconBox = $('<div class="vas-scheduled-ap-payment-icon-box">');
             var $icon = $(
-                '<svg class="vas-scheduled-ap-payment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<svg class="vas-scheduled-ap-payment-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
                 '<circle cx="12" cy="12" r="10"></circle>' +
                 '<polyline points="12 6 12 12 16 14"></polyline>' +
                 '</svg>'
             );
 
-            $title = $('<div class="vas-scheduled-ap-payment-title">').text(lbl('VAS_Scheduled', 'Scheduled'));
+            var $title = $('<div class="vas-scheduled-ap-payment-title">').text(
+                lbl('VAS_Scheduled', 'Scheduled')
+            );
 
             $iconBox.append($icon);
             $header.append($iconBox).append($title);
@@ -67,7 +70,10 @@
             $body.append($value);
 
             var $footer = $('<div class="vas-scheduled-ap-payment-footer">');
-            $badge = $('<div class="vas-scheduled-ap-payment-badge">').text(lbl('VAS_Why', 'WHY'));
+            var $badge = $('<div class="vas-scheduled-ap-payment-badge">').text(
+                lbl('VAS_Why', 'WHY')
+            );
+
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
             $footer.append($badge).append($description);
@@ -76,6 +82,10 @@
         }
 
         function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
             stopRotation();
             setLoading();
 
@@ -85,17 +95,11 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
-                    var data = response;
-
-                    if (typeof response === 'string') {
-                        try {
-                            data = JSON.parse(response);
-                        }
-                        catch (e) {
-                            setNoData();
-                            return;
-                        }
+                    if (isDisposed) {
+                        return;
                     }
+
+                    var data = normalizeResponse(response);
 
                     if (!data || data.error) {
                         setNoData();
@@ -105,9 +109,24 @@
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        setNoData();
+                    }
                 }
             });
+        }
+
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (e) {
+                return null;
+            }
         }
 
         function renderData(data) {
@@ -120,30 +139,61 @@
                 return;
             }
 
-            var totalAmount = Number(data.scheduledAmountThisWeek);
+            var totalAmount = Number(data.value);
+
+            if (isNaN(totalAmount)) {
+                totalAmount = Number(data.scheduledAmountThisWeek);
+            }
 
             if (isNaN(totalAmount) || totalAmount <= 0) {
                 setNoData();
                 return;
             }
 
-            $value.text(formatCurrencyAmount(totalAmount, data.currencySymbol, data.currencyISO));
-            $description.text(lbl('VAS_ScheduledForPaymentThisWeek', 'Scheduled for payment this week'));
+            $value.text(formatCurrencyAmount(
+                totalAmount,
+                data.currencySymbol || data.symbol,
+                data.precision
+            ));
+
+            $description.text(
+                data.description || lbl('VAS_ScheduledForPaymentThisWeek', 'Scheduled for payment this week')
+            );
+
             $body.removeClass('vas-scheduled-ap-payment-state');
         }
 
         function renderGroup(group, data) {
-            var amount = Number(group.scheduledAmount);
+            if (!group) {
+                setNoData();
+                return;
+            }
+
+            var amount = Number(group.value);
+
+            if (isNaN(amount)) {
+                amount = Number(group.scheduledAmount);
+            }
 
             if (isNaN(amount)) {
                 setNoData();
                 return;
             }
 
+            var precision = normalizePrecision(group.precision || data.precision);
             var paymentMethodName = group.paymentMethodName || lbl('VAS_NotSpecified', 'Not Specified');
-            var footerText = lbl('VAS_QueuedForPaymentMethodRunThisWeek', 'Queued for {0} run this week').replace('{0}', paymentMethodName);
 
-            $value.text(formatCurrencyAmount(amount, group.currencySymbol || data.currencySymbol, group.currencyISO || data.currencyISO));
+            var footerText = lbl(
+                'VAS_QueuedForPaymentMethodRunThisWeek',
+                'Queued for {0} run this week'
+            ).replace('{0}', paymentMethodName);
+
+            $value.text(formatCurrencyAmount(
+                amount,
+                group.currencySymbol || data.currencySymbol || data.symbol,
+                precision
+            ));
+
             $description.text(footerText);
             $body.removeClass('vas-scheduled-ap-payment-state');
         }
@@ -156,7 +206,12 @@
             }
 
             rotationTimer = window.setInterval(function () {
-                groupIndex = groupIndex + 1;
+                if (isDisposed) {
+                    stopRotation();
+                    return;
+                }
+
+                groupIndex += 1;
 
                 if (groupIndex >= groups.length) {
                     groupIndex = 0;
@@ -173,45 +228,48 @@
             }
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, precision) {
             var numericValue = Number(value || 0);
-            var absValue = Math.abs(numericValue);
             var sign = numericValue < 0 ? '-' : '';
+            var absValue = Math.abs(numericValue);
 
-            if (absValue >= 10000000) {
-                return sign + formatCompactNumber(absValue / 10000000) + 'Cr';
+            return sign + (currencySymbol || '') + formatAmount(absValue, normalizePrecision(precision));
+        }
+
+        function formatAmount(value, precision) {
+            var numericValue = Number(value || 0);
+
+            if (numericValue >= 10000000) {
+                return (numericValue / 10000000).toFixed(2).replace(/\.00$/, '') + 'Cr';
             }
 
-            if (absValue >= 100000) {
-                return sign + formatCompactNumber(absValue / 100000) + 'L';
+            if (numericValue >= 100000) {
+                return (numericValue / 100000).toFixed(2).replace(/\.00$/, '') + 'L';
             }
 
-            if (absValue >= 1000) {
-                return sign + formatCompactNumber(absValue / 1000) + 'K';
+            if (numericValue >= 1000) {
+                return Math.round(numericValue / 1000) + 'k';
             }
 
-            return sign + absValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getStdPrecision(),
-                maximumFractionDigits: getStdPrecision()
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
             });
         }
 
-        function formatCompactNumber(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getStdPrecision(),
-                maximumFractionDigits: getStdPrecision()
-            });
-        }
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
 
-        function getStdPrecision() {
-            var stdPrecision = 2;
+            if (!isNaN(stdPrecision) && stdPrecision >= 0) {
+                return stdPrecision;
+            }
 
             if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
                 stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
             }
 
             if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
+                return 2;
             }
 
             return stdPrecision;
@@ -233,11 +291,11 @@
 
         function setNoData() {
             if ($value) {
-                $value.text('0');
+                $value.text(lbl('VAS_NoData', 'No Data'));
             }
 
             if ($description) {
-                $description.text(lbl('VAS_ScheduledForPaymentThisWeek', 'Scheduled for payment this week'));
+                $description.text('');
             }
 
             if ($body) {
@@ -245,7 +303,7 @@
             }
         }
 
-        this.refreshWidget = function () {
+        this.refreshData = function () {
             loadData();
         };
 
@@ -254,12 +312,13 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
             stopRotation();
+
             $root.remove();
+
             $card = null;
-            $title = null;
             $value = null;
-            $badge = null;
             $description = null;
             $body = null;
             groups = [];
@@ -268,23 +327,40 @@
 
     VIS.ScheduledAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
-        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
         this.Initalize();
-        this.frame.getContentGrid().append(this.getRoot());
+
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
     };
 
     VIS.ScheduledAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+        var $root = this.getRoot();
+
+        if (!$root) {
+            return;
+        }
+
+        $root.toggleClass(
+            'vas-scheduled-ap-payment-compact',
+            (width && width < 240) || (height && height < 160)
+        );
     };
 
     VIS.ScheduledAPPaymentWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
+        this.refreshData();
     };
 
     VIS.ScheduledAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
-        if (this.frame) {
+        if (this.frame && this.frame.dispose) {
             this.frame.dispose();
         }
 

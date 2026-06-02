@@ -11,8 +11,18 @@ using VIS.Filters;
 
 namespace VIS.Controllers
 {
+    /// <summary>
+    /// Module Name : VAS Dashboard
+    /// Purpose     : Provides scheduled AP payment KPI widget data grouped by payment method.
+    /// Chronological development:
+    ///   <EmployeeCode>   Created Date
+    /// </summary>
     public class ScheduledAPPaymentController : Controller
     {
+        /// <summary>
+        /// Gets AP invoice schedule amounts due in the current week, grouped by payment method.
+        /// </summary>
+        /// <returns>Scheduled AP payment amounts, currency, precision and grouped payment method rows.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetScheduledAPPaymentThisWeek()
@@ -21,12 +31,22 @@ namespace VIS.Controllers
             {
                 return Json(new
                 {
-                    error = "Session Expired",
+                    error = true,
                     errorText = "Session Expired"
                 }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(new
+                {
+                    error = true,
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
             IDataReader dr = null;
 
             try
@@ -36,100 +56,72 @@ namespace VIS.Controllers
                 DateTime weekFrom = today.AddDays(-daysFromMonday);
                 DateTime weekTo = weekFrom.AddDays(7);
 
-                bool hasPaymentMethod = HasInvoicePaymentMethodColumn();
-                string paymentMethodNameColumn = hasPaymentMethod ? GetPaymentMethodNameColumn() : string.Empty;
-
-                string paymentMethodSelect = string.Empty;
-                string paymentMethodJoin = string.Empty;
-
-                if (hasPaymentMethod && !string.IsNullOrEmpty(paymentMethodNameColumn))
-                {
-                    paymentMethodSelect = @"
-                        inv.VA009_PaymentMethod_ID AS PaymentMethod_ID,
-                        pm." + paymentMethodNameColumn + @" AS PaymentMethodName,";
-
-                    paymentMethodJoin = @"
-                    LEFT OUTER JOIN VA009_PaymentMethod pm 
-                        ON (inv.VA009_PaymentMethod_ID = pm.VA009_PaymentMethod_ID)";
-                }
-                else if (hasPaymentMethod)
-                {
-                    paymentMethodSelect = @"
-                        inv.VA009_PaymentMethod_ID AS PaymentMethod_ID,
-                        inv.PaymentRule AS PaymentMethodName,";
-                }
-                else
-                {
-                    paymentMethodSelect = @"
-                        0 AS PaymentMethod_ID,
-                        inv.PaymentRule AS PaymentMethodName,";
-                }
-
-                string dateFilter = GetDateFilter("ips.DueDate", weekFrom, weekTo);
-
                 string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                    INNER JOIN C_Currency Currency
-                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+SELECT
+    ClientInfo.AD_Client_ID,
+    AcctSchema.C_Currency_ID AS C_Currency_ID,
+    Currency.StdPrecision,
+    Currency.ISO_Code AS ISO_Code,
+    CASE
+        WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+        ELSE Currency.ISO_Code
+    END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive='Y'
+AND ClientInfo.AD_Client_ID=@AD_Client_ID";
 
                 string invoiceBody = @"
-                    SELECT
-                        inv.C_Invoice_ID,
-                        SchemaCurrency.C_Currency_ID,
-                        SchemaCurrency.ISO_Code AS CurrencyISO,
-                        SchemaCurrency.Cur_Symbol AS CurrencySymbol,
-                        SchemaCurrency.StdPrecision,"
-                        + paymentMethodSelect + @"
-                        CASE
-                            -- AP Invoices
-                            WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'N'
-                            THEN CurrencyConvert(
-                                COALESCE(ips.DueAmt, 0),
-                                inv.C_Currency_ID,
-                                SchemaCurrency.C_Currency_ID,
-                                inv.DateAcct,
-                                inv.C_ConversionType_ID,
-                                inv.AD_Client_ID,
-                                inv.AD_Org_ID
-                            )
-
-                            -- AP Credit Notes / Returns subtract
-                            WHEN inv.IsSOTrx = 'N' AND inv.IsReturnTrx = 'Y'
-                            THEN -CurrencyConvert(
-                                COALESCE(ips.DueAmt, 0),
-                                inv.C_Currency_ID,
-                                SchemaCurrency.C_Currency_ID,
-                                inv.DateAcct,
-                                inv.C_ConversionType_ID,
-                                inv.AD_Client_ID,
-                                inv.AD_Org_ID
-                            )
-
-                            ELSE 0
-                        END AS ScheduledAmount
-                    FROM C_Invoice inv
-                    INNER JOIN C_InvoicePaySchedule ips 
-                        ON (inv.C_Invoice_ID = ips.C_Invoice_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON SchemaCurrency.AD_Client_ID = inv.AD_Client_ID"
-                    + paymentMethodJoin + @"
-                    WHERE inv.IsActive = 'Y'
-                    AND ips.IsActive = 'Y'
-                    AND inv.IsSOTrx = 'N'
-                    AND inv.DocStatus IN ('CO', 'CL')
-                    AND COALESCE(ips.DueAmt, 0) > 0
-                    "
-                    + dateFilter;
+SELECT
+    inv.C_Invoice_ID,
+    inv.C_BPartner_ID,
+    SchemaCurrency.C_Currency_ID,
+    SchemaCurrency.ISO_Code AS CurrencyISO,
+    SchemaCurrency.Cur_Symbol AS CurrencySymbol,
+    SchemaCurrency.StdPrecision,
+    CASE
+        WHEN inv.VA009_PaymentMethod_ID IS NOT NULL THEN inv.VA009_PaymentMethod_ID
+        ELSE 0
+    END AS PaymentMethod_ID,
+    CASE
+        WHEN PaymentMethod.Name IS NOT NULL THEN PaymentMethod.Name
+        WHEN inv.PaymentRule IS NOT NULL THEN inv.PaymentRule
+        ELSE ''
+    END AS PaymentMethodName,
+    CASE
+        WHEN COALESCE(inv.IsReturnTrx,'N')='Y' THEN -CurrencyConvert(
+            COALESCE(ips.DueAmt,0),
+            inv.C_Currency_ID,
+            SchemaCurrency.C_Currency_ID,
+            inv.DateAcct,
+            inv.C_ConversionType_ID,
+            inv.AD_Client_ID,
+            inv.AD_Org_ID
+        )
+        ELSE CurrencyConvert(
+            COALESCE(ips.DueAmt,0),
+            inv.C_Currency_ID,
+            SchemaCurrency.C_Currency_ID,
+            inv.DateAcct,
+            inv.C_ConversionType_ID,
+            inv.AD_Client_ID,
+            inv.AD_Org_ID
+        )
+    END AS ScheduledAmount
+FROM C_Invoice inv
+INNER JOIN C_InvoicePaySchedule ips ON (inv.C_Invoice_ID=ips.C_Invoice_ID)
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=inv.AD_Client_ID)
+LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON (inv.VA009_PaymentMethod_ID=PaymentMethod.VA009_PaymentMethod_ID)
+WHERE inv.IsActive='Y'
+AND ips.IsActive='Y'
+AND inv.AD_Client_ID=@AD_Client_ID
+AND inv.IsSOTrx='N'
+AND inv.DocStatus IN ('CO','CL')
+AND COALESCE(ips.VA009_IsPaid,'N')<>'Y'
+AND COALESCE(ips.DueAmt,0)>0
+AND ips.DueDate>=@WeekFrom
+AND ips.DueDate<@WeekTo";
 
                 invoiceBody = MRole.GetDefault(ctx).AddAccessSQL(
                     invoiceBody,
@@ -138,48 +130,52 @@ namespace VIS.Controllers
                     MRole.SQL_RO
                 );
 
-                string groupedScheduledSql = @"
-                    SELECT
-                        x.PaymentMethod_ID,
-                        x.PaymentMethodName,
-                        x.C_Currency_ID,
-                        x.CurrencyISO,
-                        x.CurrencySymbol,
-                        ROUND(
-                            COALESCE(SUM(x.ScheduledAmount), 0),
-                            MAX(x.StdPrecision)
-                        ) AS ScheduledAmount
-                    FROM (
-                        " + invoiceBody + @"
-                    ) x
-                    GROUP BY
-                        x.PaymentMethod_ID,
-                        x.PaymentMethodName,
-                        x.C_Currency_ID,
-                        x.CurrencyISO,
-                        x.CurrencySymbol
-                    HAVING SUM(x.ScheduledAmount) > 0
-                    ORDER BY ScheduledAmount DESC";
-
                 string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    )
-                    " + groupedScheduledSql;
+WITH SchemaCurrency AS (
+    " + schemaCurrencySql + @"
+),
+ScheduledData AS (
+    " + invoiceBody + @"
+)
+SELECT
+    ScheduledData.PaymentMethod_ID,
+    ScheduledData.PaymentMethodName,
+    ScheduledData.C_Currency_ID,
+    ScheduledData.CurrencyISO,
+    ScheduledData.CurrencySymbol,
+    MAX(ScheduledData.StdPrecision) AS StdPrecision,
+    ROUND(COALESCE(SUM(ScheduledData.ScheduledAmount),0),MAX(ScheduledData.StdPrecision)) AS ScheduledAmount
+FROM ScheduledData ScheduledData
+GROUP BY
+    ScheduledData.PaymentMethod_ID,
+    ScheduledData.PaymentMethodName,
+    ScheduledData.C_Currency_ID,
+    ScheduledData.CurrencyISO,
+    ScheduledData.CurrencySymbol
+HAVING SUM(ScheduledData.ScheduledAmount)>0
+ORDER BY ScheduledAmount DESC";
 
-                
-                dr = DB.ExecuteReader(sql);
+                List<SqlParameter> parameters = new List<SqlParameter>
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@WeekFrom", weekFrom),
+                    new SqlParameter("@WeekTo", weekTo)
+                };
+
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
 
                 decimal scheduledAmountThisWeek = 0;
                 int cCurrencyId = 0;
+                int precision = 2;
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
                 List<object> groups = new List<object>();
 
-                while (dr.Read())
+                while (dr != null && dr.Read())
                 {
                     decimal scheduledAmount = Util.GetValueOfDecimal(dr["ScheduledAmount"]);
                     int groupCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
+                    int groupPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                     string groupCurrencyISO = Util.GetValueOfString(dr["CurrencyISO"]);
                     string groupCurrencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]);
                     string paymentMethodName = Util.GetValueOfString(dr["PaymentMethodName"]);
@@ -194,40 +190,49 @@ namespace VIS.Controllers
                     if (cCurrencyId == 0)
                     {
                         cCurrencyId = groupCurrencyId;
+                        precision = groupPrecision;
                         currencyISO = groupCurrencyISO;
                         currencySymbol = groupCurrencySymbol;
                     }
 
                     groups.Add(new
                     {
-                        paymentMethodId = Util.GetValueOfInt(dr["PaymentMethod_ID"]),
                         paymentMethodName = paymentMethodName,
-                        scheduledAmount = scheduledAmount,
+                        value = decimal.Round(scheduledAmount, groupPrecision),
+                        scheduledAmount = decimal.Round(scheduledAmount, groupPrecision),
                         cCurrencyId = groupCurrencyId,
                         currencyISO = groupCurrencyISO,
-                        currencySymbol = groupCurrencySymbol
+                        currencySymbol = groupCurrencySymbol,
+                        symbol = groupCurrencySymbol,
+                        precision = groupPrecision
                     });
                 }
+
+                scheduledAmountThisWeek = decimal.Round(scheduledAmountThisWeek, precision);
 
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_Scheduled", "Scheduled"),
                     badge = GetMsg(ctx, "VAS_Why", "WHY"),
                     description = GetMsg(ctx, "VAS_ScheduledForPaymentThisWeek", "Scheduled for payment this week"),
+                    value = scheduledAmountThisWeek,
                     scheduledAmountThisWeek = scheduledAmountThisWeek,
+                    groups = groups,
                     cCurrencyId = cCurrencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
-                    weekFrom = FormatDate(weekFrom),
-                    weekTo = FormatDate(weekTo.AddDays(-1)),
-                    groups = groups
+                    symbol = currencySymbol,
+                    precision = precision,
+                    dateFrom = FormatDate(weekFrom),
+                    dateTo = FormatDate(weekTo.AddDays(-1))
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
             {
                 return Json(new
                 {
-                    error = ex.Message
+                    error = true,
+                    errorText = ex.Message
                 }, JsonRequestBehavior.AllowGet);
             }
             finally
@@ -240,76 +245,13 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
-        {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
-
-            if (DB.IsOracle())
-            {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
-            }
-
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
-        }
-
-        private string FormatDate(DateTime date)
-        {
-            return date.ToString("yyyy-MM-dd");
-        }
-
-        private bool HasInvoicePaymentMethodColumn()
-        {
-            string sql = @"
-                SELECT COUNT(1)
-                FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
-                WHERE t.TableName = 'C_Invoice'
-                AND c.ColumnName = 'VA009_PaymentMethod_ID'
-            ";
-
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
-        }
-
-        private string GetPaymentMethodNameColumn()
-        {
-            if (HasColumn("VA009_PaymentMethod", "Name"))
-            {
-                return "Name";
-            }
-
-            if (HasColumn("VA009_PaymentMethod", "Value"))
-            {
-                return "Value";
-            }
-
-            if (HasColumn("VA009_PaymentMethod", "Description"))
-            {
-                return "Description";
-            }
-
-            return string.Empty;
-        }
-
-        private bool HasColumn(string tableName, string columnName)
-        {
-            string sql = @"
-                SELECT COUNT(1)
-                FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
-                WHERE t.TableName = '" + tableName + @"'
-                AND c.ColumnName = '" + columnName + @"'
-            ";
-
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
-        }
-
+        /// <summary>
+        /// Gets translated message text by key with fallback.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="key">Message key.</param>
+        /// <param name="fallback">Fallback text.</param>
+        /// <returns>Translated or fallback message text.</returns>
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
@@ -317,6 +259,16 @@ namespace VIS.Controllers
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;
+        }
+
+        /// <summary>
+        /// Formats date values returned to the widget.
+        /// </summary>
+        /// <param name="date">Date value.</param>
+        /// <returns>Date formatted as yyyy-MM-dd.</returns>
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
         }
     }
 }

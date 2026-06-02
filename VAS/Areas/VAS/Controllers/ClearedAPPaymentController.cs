@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -32,25 +30,11 @@ namespace VIS.Controllers
             try
             {
                 DateTime today = DateTime.Today;
+
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
                 DateTime dateTo = new DateTime(today.Year, today.Month, 1);
 
                 string dateFilter = GetDateFilter("p.DateTrx", dateFrom, dateTo);
-
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                    INNER JOIN C_Currency Currency
-                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
 
                 string clearedPaymentSql = @"
                     SELECT
@@ -69,15 +53,7 @@ namespace VIS.Controllers
                     MRole.SQL_RO
                 );
 
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    )
-                    " + clearedPaymentSql;
-
-               
-
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(clearedPaymentSql);
 
                 int totalPayments = 0;
                 int clearedPayments = 0;
@@ -99,9 +75,14 @@ namespace VIS.Controllers
                     title = GetMsg(ctx, "VAS_Cleared", "Cleared"),
                     badge = GetMsg(ctx, "VAS_Why", "WHY"),
                     description = GetMsg(ctx, "VAS_APPaymentClearedWhy", "Of last month's AP payments reconciled"),
+
+                    value = clearedPercentage,
+                    clearedPercentage = clearedPercentage,
+
                     totalPayments = totalPayments,
                     clearedPayments = clearedPayments,
-                    clearedPercentage = clearedPercentage,
+
+                    precision = 2,
                     dateFrom = FormatDate(dateFrom),
                     dateTo = FormatDate(dateTo.AddDays(-1))
                 }, JsonRequestBehavior.AllowGet);
@@ -110,7 +91,8 @@ namespace VIS.Controllers
             {
                 return Json(new
                 {
-                    error = ex.Message
+                    error = ex.Message,
+                    errorText = ex.Message
                 }, JsonRequestBehavior.AllowGet);
             }
             finally
@@ -137,8 +119,8 @@ namespace VIS.Controllers
             }
 
             return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
+                AND " + columnName + @" >= '" + dateFromText + @"'
+                AND " + columnName + @" < '" + dateToText + @"'
             ";
         }
 

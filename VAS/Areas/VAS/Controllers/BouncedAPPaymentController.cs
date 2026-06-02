@@ -11,8 +11,18 @@ using VIS.Filters;
 
 namespace VIS.Controllers
 {
+    /// <summary>
+    /// Module Name : VAS Dashboard
+    /// Purpose     : Provides bounced AP payment KPI widget data.
+    /// Chronological development:
+    ///   <EmployeeCode>   Created Date
+    /// </summary>
     public class BouncedAPPaymentController : Controller
     {
+        /// <summary>
+        /// Gets outgoing AP payments marked as bounced during the current calendar month.
+        /// </summary>
+        /// <returns>Bounced AP payment count and reporting date range.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetBouncedAPPayments()
@@ -21,12 +31,22 @@ namespace VIS.Controllers
             {
                 return Json(new
                 {
-                    error = "Session Expired",
+                    error = true,
                     errorText = "Session Expired"
                 }, JsonRequestBehavior.AllowGet);
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(new
+                {
+                    error = true,
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
             IDataReader dr = null;
 
             try
@@ -35,51 +55,38 @@ namespace VIS.Controllers
                 DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
                 DateTime dateTo = dateFrom.AddMonths(1);
 
-                string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
+                string sql = @"
+SELECT
+    COUNT(1) AS BouncedPaymentCount
+FROM C_Payment p
+WHERE p.IsActive='Y'
+AND p.AD_Client_ID=@AD_Client_ID
+AND p.IsReceipt=@IsReceipt
+AND p.DateAcct>=@DateFrom
+AND p.DateAcct<@DateTo
+AND COALESCE(p.VA009_ExecutionStatus,'')=@BouncedStatus";
 
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                    INNER JOIN C_Currency Currency
-                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
-
-                string bouncedPaymentSql = @"
-                    SELECT
-                        COUNT(1) AS BouncedPaymentCount
-                    FROM C_Payment p
-                    WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = 'N'
-                    AND p.DocStatus IN ('RE', 'VO')
-                " + dateFilter;
-
-                bouncedPaymentSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    bouncedPaymentSql,
+                sql = MRole.GetDefault(ctx).AddAccessSQL(
+                    sql,
                     "p",
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
 
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    )
-                    " + bouncedPaymentSql;
+                List<SqlParameter> parameters = new List<SqlParameter>
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@IsReceipt", "N"),
+                    new SqlParameter("@DateFrom", dateFrom),
+                    new SqlParameter("@DateTo", dateTo),
+                    new SqlParameter("@BouncedStatus", "B")
+                };
 
-            
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
 
                 int bouncedPaymentCount = 0;
 
-                if (dr.Read())
+                if (dr != null && dr.Read())
                 {
                     bouncedPaymentCount = Util.GetValueOfInt(dr["BouncedPaymentCount"]);
                 }
@@ -89,6 +96,7 @@ namespace VIS.Controllers
                     title = GetMsg(ctx, "VAS_Bounced", "Bounced"),
                     badge = GetMsg(ctx, "VAS_Action", "Action"),
                     description = GetMsg(ctx, "VAS_NeedReissue", "Need re-issue"),
+                    value = bouncedPaymentCount,
                     bouncedPaymentCount = bouncedPaymentCount,
                     dateFrom = FormatDate(dateFrom),
                     dateTo = FormatDate(dateTo.AddDays(-1))
@@ -98,7 +106,8 @@ namespace VIS.Controllers
             {
                 return Json(new
                 {
-                    error = ex.Message
+                    error = true,
+                    errorText = ex.Message
                 }, JsonRequestBehavior.AllowGet);
             }
             finally
@@ -111,30 +120,13 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
-        {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
-
-            if (DB.IsOracle())
-            {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
-            }
-
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
-        }
-
-        private string FormatDate(DateTime date)
-        {
-            return date.ToString("yyyy-MM-dd");
-        }
-
+        /// <summary>
+        /// Gets translated message text by key with fallback.
+        /// </summary>
+        /// <param name="ctx">User context.</param>
+        /// <param name="key">Message key.</param>
+        /// <param name="fallback">Fallback text.</param>
+        /// <returns>Translated or fallback message text.</returns>
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
@@ -142,6 +134,16 @@ namespace VIS.Controllers
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;
+        }
+
+        /// <summary>
+        /// Formats date values returned to the widget.
+        /// </summary>
+        /// <param name="date">Date value.</param>
+        /// <returns>Date formatted as yyyy-MM-dd.</returns>
+        private string FormatDate(DateTime date)
+        {
+            return date.ToString("yyyy-MM-dd");
         }
     }
 }

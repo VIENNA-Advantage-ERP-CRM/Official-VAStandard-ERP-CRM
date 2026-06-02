@@ -2,39 +2,173 @@
  * Cleared AP Payment
  * Purpose - Shows the percentage of AP payments from the previous calendar month that have been reconciled.
  *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Cleared                              | VAS_Cleared
- *  2  | WHY                                  | VAS_Why
- *  3  | Of last month's AP payments reconciled | VAS_APPaymentClearedWhy
- *  4  | Loading                              | VAS_Loading
- *  5  | No Data                              | VAS_NoData
- * ─────────────────────────────────────────────────────────────────────
+ * Labels / Message Keys
+ * 1 | Cleared                                | VAS_Cleared
+ * 2 | WHY                                    | VAS_Why
+ * 3 | Of last month's AP payments reconciled | VAS_APPaymentClearedWhy
+ * 4 | Loading                                | VAS_Loading
+ * 5 | No Data                                | VAS_NoData
  */
 
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+    "use strict";
 
-    VIS.ClearedAPPaymentWidget = function () {
+    var ClearedAPPaymentWidget = function () {
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
 
-        this.frame;
-        this.windowNo;
-        this.AD_UserHomeWidgetID;
-
-        var $self = this;
-        var $root = $('<div class="vas-cleared-ap-payment-root">');
-        var $card;
-        var $title;
-        var $value;
-        var $badge;
-        var $description;
-        var $body;
+        var $root = $('<div class="vas-finance-kpi-root">');
+        var $card = null;
+        var $value = null;
+        var $body = null;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        function createWidget() {
+            $card = $('<div class="vas-finance-kpi-card">');
+
+            var $header = $('<div class="vas-finance-kpi-header">');
+
+            var $iconBox = $('<div class="vas-finance-kpi-icon-box">');
+
+            var $icon = $(
+                '<svg class="vas-finance-kpi-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+                '<path fill="currentColor" d="M9.2 16.6 4.95 12.35 6.36 10.94 9.2 13.77 17.64 5.34 19.05 6.75z"></path>' +
+                '</svg>'
+            );
+
+            var $title = $('<div class="vas-finance-kpi-title">').text(
+                lbl('VAS_Cleared', 'Cleared')
+            );
+
+            $iconBox.append($icon);
+            $header.append($iconBox).append($title);
+
+            $body = $('<div class="vas-finance-kpi-body">');
+
+            $value = $('<div class="vas-finance-kpi-value">').text(
+                lbl('VAS_Loading', 'Loading')
+            );
+
+            $body.append($value);
+
+            var $footer = $('<div class="vas-finance-kpi-footer">');
+
+            var $badge = $('<div class="vas-finance-kpi-badge">').text(
+                lbl('VAS_Why', 'WHY')
+            );
+
+            var $description = $('<div class="vas-finance-kpi-desc">').text(
+                lbl('VAS_APPaymentClearedWhy', "Of last month's AP payments reconciled")
+            );
+
+            $footer.append($badge).append($description);
+
+            $card.append($header).append($body).append($footer);
+
+            $root.empty().append($card);
+        }
+
+        function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
+            setState(lbl('VAS_Loading', 'Loading'), true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'ClearedAPPayment/GetClearedAPPayment',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data = normalizeResponse(response);
+
+                    if (!data || data.error) {
+                        setState(lbl('VAS_NoData', 'No Data'), true);
+                        return;
+                    }
+
+                    renderData(data);
+                },
+
+                error: function () {
+                    if (!isDisposed) {
+                        setState(lbl('VAS_NoData', 'No Data'), true);
+                    }
+                }
+            });
+        }
+
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (e) {
+                return null;
+            }
+        }
+
+        function renderData(data) {
+            var percentage = Number(data.value);
+
+            if (isNaN(percentage)) {
+                percentage = Number(data.clearedPercentage);
+            }
+
+            if (isNaN(percentage)) {
+                setState(lbl('VAS_NoData', 'No Data'), true);
+                return;
+            }
+
+            percentage = Math.max(0, Math.min(percentage, 100));
+
+            setState(formatPercent(percentage, data.precision), false);
+        }
+
+        function formatPercent(value, precision) {
+            var stdPrecision = normalizePrecision(precision);
+
+            return Number(value || 0).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            }) + '%';
+        }
+
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                return 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function setState(text, isStateText) {
+            if ($value) {
+                $value.text(text);
+            }
+
+            if ($body) {
+                $body.toggleClass('vas-finance-kpi-state', !!isStateText);
+            }
         }
 
         this.Initalize = function () {
@@ -42,127 +176,7 @@
             loadData();
         };
 
-        function createWidget() {
-            $card = $('<div class="vas-cleared-ap-payment-card">');
-
-            var $header = $('<div class="vas-cleared-ap-payment-header">');
-            var $iconBox = $('<div class="vas-cleared-ap-payment-icon-box">');
-            var $icon = $(
-                '<svg class="vas-cleared-ap-payment-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-                '<path fill="currentColor" d="M9.2 16.6 4.95 12.35 6.36 10.94 9.2 13.77 17.64 5.34 19.05 6.75z"></path>' +
-                '</svg>'
-            );
-
-            $title = $('<div class="vas-cleared-ap-payment-title">').text(lbl('VAS_Cleared', 'Cleared'));
-            $iconBox.append($icon);
-            $header.append($iconBox).append($title);
-
-            $body = $('<div class="vas-cleared-ap-payment-body">');
-            $value = $('<div class="vas-cleared-ap-payment-value">');
-            $body.append($value);
-
-            var $footer = $('<div class="vas-cleared-ap-payment-footer">');
-            $badge = $('<div class="vas-cleared-ap-payment-badge">').text(lbl('VAS_Why', 'WHY'));
-            $description = $('<div class="vas-cleared-ap-payment-desc">').text(lbl('VAS_APPaymentClearedWhy', "Of last month's AP payments reconciled"));
-            $footer.append($badge).append($description);
-
-            $card.append($header).append($body).append($footer);
-            $root.empty().append($card);
-        }
-
-        function loadData() {
-            setLoading();
-
-            $.ajax({
-                url: VIS.Application.contextUrl + 'ClearedAPPayment/GetClearedAPPayment',
-                type: 'GET',
-                dataType: 'json',
-                cache: false,
-                success: function (response) {
-                    var data = response;
-
-                    if (typeof response === 'string') {
-                        try {
-                            data = JSON.parse(response);
-                        }
-                        catch (e) {
-                            setNoData();
-                            return;
-                        }
-                    }
-
-                    if (!data || data.error) {
-                        setNoData();
-                        return;
-                    }
-
-                    renderData(data);
-                },
-                error: function () {
-                    setNoData();
-                }
-            });
-        }
-
-        function renderData(data) {
-            var percentage = Number(data.clearedPercentage);
-
-            if (isNaN(percentage)) {
-                setNoData();
-                return;
-            }
-
-            if (percentage < 0) {
-                percentage = 0;
-            }
-
-            if (percentage > 100) {
-                percentage = 100;
-            }
-
-            $value.text(formatPercentage(percentage));
-            $body.removeClass('vas-cleared-ap-payment-state');
-        }
-
-        function formatPercentage(value) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = 2;
-
-            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
-            }
-
-            if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
-            }
-
-            return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            }) + '%';
-        }
-
-        function setLoading() {
-            if ($value) {
-                $value.text(lbl('VAS_Loading', 'Loading'));
-            }
-
-            if ($body) {
-                $body.addClass('vas-cleared-ap-payment-state');
-            }
-        }
-
-        function setNoData() {
-            if ($value) {
-                $value.text(lbl('VAS_NoData', 'No Data'));
-            }
-
-            if ($body) {
-                $body.addClass('vas-cleared-ap-payment-state');
-            }
-        }
-
-        this.refreshWidget = function () {
+        this.refreshData = function () {
             loadData();
         };
 
@@ -171,51 +185,58 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
+
             $root.remove();
+
             $card = null;
-            $title = null;
             $value = null;
-            $badge = null;
-            $description = null;
             $body = null;
         };
     };
 
-    VIS.ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
-        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
         this.Initalize();
-        this.frame.getContentGrid().append(this.getRoot());
+
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
     };
 
-    VIS.ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
             return;
         }
 
-        if ((width && width < 240) || (height && height < 160)) {
-            $root.addClass('vas-cleared-ap-payment-compact');
-        }
-        else {
-            $root.removeClass('vas-cleared-ap-payment-compact');
-        }
+        $root.toggleClass(
+            'vas-finance-kpi-compact',
+            (width && width < 240) || (height && height < 160)
+        );
     };
 
-    VIS.ClearedAPPaymentWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
+    ClearedAPPaymentWidget.prototype.refreshWidget = function () {
+        this.refreshData();
     };
 
-    VIS.ClearedAPPaymentWidget.prototype.dispose = function () {
+    ClearedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
-        if (this.frame) {
+        if (this.frame && this.frame.dispose) {
             this.frame.dispose();
         }
 
         this.frame = null;
     };
+
+    VIS.ClearedAPPaymentWidget = ClearedAPPaymentWidget;
 
 })(VIS, jQuery);

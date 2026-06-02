@@ -1,354 +1,173 @@
-.vas-cleared-ap-payment-root {
+.vas-finance-kpi-root {
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
+    container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
-    font-size: 1em;
+    font-size: clamp(1em, 1.4cqi, 1.5em);
     overflow: hidden;
 }
 
-.vas-cleared-ap-payment-root,
-.vas-cleared-ap-payment-root * {
-    box-sizing: border-box;
-}
+    .vas-finance-kpi-root,
+    .vas-finance-kpi-root * {
+        box-sizing: border-box;
+    }
 
-.vas-cleared-ap-payment-card {
+.vas-finance-kpi-card {
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
-
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-
-    padding: 1em;
-    gap: 0.6em;
-
-    border-radius: 1.15em;
+    overflow: hidden;
+    padding: 0.875em;
+    gap: 0.5em;
     border: 0.125em solid #ffffff;
-
-    background: linear-gradient(
-        135deg,
-        rgba(254, 235, 210, 0.85),
-        rgba(255, 255, 255, 0.65)
-    );
-
+    border-radius: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     color: #102c3f;
 }
 
-.vas-cleared-ap-payment-header {
+.vas-finance-kpi-header {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
-
     display: flex;
     align-items: center;
-    gap: 0.6em;
-
+    gap: 0.625em;
     overflow: hidden;
 }
 
-.vas-cleared-ap-payment-icon-box {
+.vas-finance-kpi-icon-box {
     flex: 0 0 auto;
-
-    width: 2.25em;
-    height: 2.25em;
-    border-radius: 0.75em;
-
+    width: 2em;
+    height: 2em;
     display: flex;
     align-items: center;
     justify-content: center;
-
-    background: rgba(255, 255, 255, 0.9);
     border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    color: #9a6500;
+    border-radius: 0.625em;
+    background: rgba(255, 255, 255, 0.90);
+    color: #0083da;
 }
 
-.vas-cleared-ap-payment-icon {
-    width: 1.15em;
-    height: 1.15em;
+.vas-finance-kpi-icon {
+    width: 1em;
+    height: 1em;
     display: block;
     color: currentColor;
 }
 
-.vas-cleared-ap-payment-title {
+.vas-finance-kpi-title {
     flex: 1 1 auto;
     min-width: 0;
-
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-
-    font-size: 0.95em;
+    font-size: 0.875em;
     font-weight: 700;
     line-height: 1.2;
     color: #102c3f;
 }
 
-.vas-cleared-ap-payment-body {
+.vas-finance-kpi-body {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-
     display: flex;
     align-items: center;
-
     overflow: hidden;
 }
 
-.vas-cleared-ap-payment-value {
+.vas-finance-kpi-value {
     display: block;
     width: 100%;
     min-width: 0;
     max-width: 100%;
-
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-
-    font-size: clamp(1.4em, 8vw, 2.4em);
+    font-size: 2.125em;
     font-weight: 700;
     line-height: 1;
-    letter-spacing: -0.0625em;
+    letter-spacing: -0.035em;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
 }
 
-.vas-cleared-ap-payment-footer {
+.vas-finance-kpi-footer {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
-
     display: flex;
     align-items: flex-start;
     gap: 0.375em;
-
-    overflow: visible;
-
-    font-size: 0.75em;
-    color: #586575;
+    overflow: hidden;
+    color: #5f7283;
 }
 
-.vas-cleared-ap-payment-badge {
+.vas-finance-kpi-badge {
     flex: 0 0 auto;
-
     max-width: none;
-    overflow: visible;
-    text-overflow: initial;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-
     padding: 0.1875em 0.4375em;
-    border-radius: 0.25em;
-
-    background: rgba(255, 255, 255, 0.85);
     border: 0.0625em solid rgba(0, 131, 218, 0.15);
-
+    border-radius: 0.25em;
+    background: rgba(255, 255, 255, 0.85);
     color: #0083da;
-    font-size: 0.68em;
+    font-size: 0.6875em;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.075em;
     text-transform: uppercase;
 }
 
-.vas-cleared-ap-payment-desc {
+.vas-finance-kpi-desc {
     flex: 1 1 auto;
     min-width: 0;
-
-    overflow: visible;
-    text-overflow: initial;
-    white-space: normal;
-
-    display: block;
-
-    font-size: 0.75em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 0.6875em;
     font-weight: 400;
-    line-height: 1.25;
-    color: #586575;
-
-    word-break: normal;
-    overflow-wrap: normal;
+    line-height: 1.3;
+    color: #5f7283;
 }
 
-.vas-cleared-ap-payment-body.vas-cleared-ap-payment-state .vas-cleared-ap-payment-value {
+.vas-finance-kpi-body.vas-finance-kpi-state .vas-finance-kpi-value {
     font-size: 0.75em;
     font-weight: 500;
     letter-spacing: 0;
-    color: #586575;
+    color: #5f7283;
 }
 
-
-@media (max-width: 18.75em), (max-height: 9.375em) {
-    .vas-cleared-ap-payment-card {
-        padding: 0.75em;
-        gap: 0.45em;
-        border-radius: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-header {
-        gap: 0.6em;
-    }
-
-    .vas-cleared-ap-payment-icon-box {
-        width: 2.25em;
-        height: 2.25em;
-        border-radius: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-icon {
-        width: 1.15em;
-        height: 1.15em;
-    }
-
-    .vas-cleared-ap-payment-title {
-        font-size: 0.95em;
-        font-weight: 700;
-    }
-
-    .vas-cleared-ap-payment-value {
-        font-size: clamp(1.4em, 8vw, 2.4em);
-        line-height: 1;
-        letter-spacing: -0.0625em;
-    }
-
-    .vas-cleared-ap-payment-footer {
-        gap: 0.3125em;
-        align-items: flex-start;
-        font-size: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-badge {
-        padding: 0.1875em 0.375em;
-        font-size: 0.68em;
-        letter-spacing: 0.0625em;
-    }
-
-    .vas-cleared-ap-payment-desc {
-        font-size: 0.75em;
-        line-height: 1.25;
-        white-space: normal;
-        overflow: visible;
-        text-overflow: initial;
-    }
+.vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-card {
+    padding: 0.75em;
+    gap: 0.375em;
 }
 
-
-@media (max-width: 14.375em), (max-height: 7.5em) {
-    .vas-cleared-ap-payment-card {
-        padding: 0.75em;
-        gap: 0.45em;
-        border-radius: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-icon-box {
-        width: 2.25em;
-        height: 2.25em;
-        border-radius: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-icon {
-        width: 1.15em;
-        height: 1.15em;
-    }
-
-    .vas-cleared-ap-payment-title {
-        font-size: 0.95em;
-    }
-
-    .vas-cleared-ap-payment-value {
-        font-size: clamp(1.4em, 8vw, 2.4em);
-    }
-
-    .vas-cleared-ap-payment-footer {
-        gap: 0.25em;
-        font-size: 0.75em;
-    }
-
-    .vas-cleared-ap-payment-badge {
-        padding: 0.125em 0.3125em;
-        font-size: 0.68em;
-        letter-spacing: 0.05em;
-    }
-
-    .vas-cleared-ap-payment-desc {
-        font-size: 0.75em;
-        line-height: 1.2;
-    }
+.vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-icon-box {
+    width: 1.75em;
+    height: 1.75em;
 }
 
-.vas-cleared-ap-payment-root {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    font-size: 1em;
-    container-type: inline-size;
-    overflow: hidden;
+.vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-icon {
+    width: 0.875em;
+    height: 0.875em;
 }
 
-.vas-cleared-ap-payment-card {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    font-size: 1em;
-    gap: 0.5em;
-    padding: 1em 1em 1.125em;
-    border-radius: 0.875em;
+.vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-value {
+    font-size: 1.75em;
 }
 
-.vas-cleared-ap-payment-header {
-    min-width: 0;
-    gap: 0.625em;
-}
-
-.vas-cleared-ap-payment-icon-box {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
-}
-
-.vas-cleared-ap-payment-icon {
-    width: 1.125em;
-    height: 1.125em;
-}
-
-.vas-cleared-ap-payment-title {
-    min-width: 0;
-    font-size: 1.125em;
-}
-
-.vas-cleared-ap-payment-value {
-    font-size: 2.5em;
-    line-height: 1;
-    letter-spacing: -0.025em;
-}
-
-.vas-cleared-ap-payment-footer,
-.vas-cleared-ap-payment-desc {
-    font-size: 0.75em;
-}
-
-.vas-cleared-ap-payment-badge,
-.vas-cleared-ap-payment-body.vas-cleared-ap-payment-state .vas-cleared-ap-payment-value {
-    font-size: 0.75em;
-}
-
-@container (max-width: 18.75em) {
-    .vas-cleared-ap-payment-card {
-        font-size: 0.8125em;
-    }
-}
-
-@container (max-width: 13.75em) {
-    .vas-cleared-ap-payment-card {
-        font-size: 0.6875em;
-    }
+.vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-desc {
+    -webkit-line-clamp: 1;
 }

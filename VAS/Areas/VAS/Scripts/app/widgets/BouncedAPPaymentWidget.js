@@ -13,23 +13,23 @@
  * ─────────────────────────────────────────────────────────────────────
  */
 
+
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+    "use strict";
 
     VIS.BouncedAPPaymentWidget = function () {
-
-        this.frame;
-        this.windowNo;
-        this.AD_UserHomeWidgetID;
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
 
         var $root = $('<div class="vas-bounced-ap-payment-root">');
-        var $card;
-        var $title;
-        var $value;
-        var $badge;
-        var $description;
-        var $body;
+        var $card = null;
+        var $value = null;
+        var $description = null;
+        var $body = null;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -46,14 +46,17 @@
 
             var $header = $('<div class="vas-bounced-ap-payment-header">');
             var $iconBox = $('<div class="vas-bounced-ap-payment-icon-box">');
+
             var $icon = $(
-                '<svg class="vas-bounced-ap-payment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<svg class="vas-bounced-ap-payment-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
                 '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>' +
                 '<line x1="4" y1="22" x2="4" y2="15"></line>' +
                 '</svg>'
             );
 
-            $title = $('<div class="vas-bounced-ap-payment-title">').text(lbl('VAS_Bounced', 'Bounced'));
+            var $title = $('<div class="vas-bounced-ap-payment-title">').text(
+                lbl('VAS_Bounced', 'Bounced')
+            );
 
             $iconBox.append($icon);
             $header.append($iconBox).append($title);
@@ -63,8 +66,14 @@
             $body.append($value);
 
             var $footer = $('<div class="vas-bounced-ap-payment-footer">');
-            $badge = $('<div class="vas-bounced-ap-payment-badge">').text(lbl('VAS_Action', 'Action'));
-            $description = $('<div class="vas-bounced-ap-payment-desc">').text(lbl('VAS_NeedReissue', 'Need re-issue'));
+
+            var $badge = $('<div class="vas-bounced-ap-payment-badge">').text(
+                lbl('VAS_Action', 'Action')
+            );
+
+            $description = $('<div class="vas-bounced-ap-payment-desc">').text(
+                lbl('VAS_NeedReissue', 'Need re-issue')
+            );
 
             $footer.append($badge).append($description);
             $card.append($header).append($body).append($footer);
@@ -72,6 +81,10 @@
         }
 
         function loadData() {
+            if (isDisposed) {
+                return;
+            }
+
             setLoading();
 
             $.ajax({
@@ -80,17 +93,11 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
-                    var data = response;
-
-                    if (typeof response === 'string') {
-                        try {
-                            data = JSON.parse(response);
-                        }
-                        catch (e) {
-                            setNoData();
-                            return;
-                        }
+                    if (isDisposed) {
+                        return;
                     }
+
+                    var data = normalizeResponse(response);
 
                     if (!data || data.error) {
                         setNoData();
@@ -100,13 +107,32 @@
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        setNoData();
+                    }
                 }
             });
         }
 
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (e) {
+                return null;
+            }
+        }
+
         function renderData(data) {
-            var count = Number(data.bouncedPaymentCount);
+            var count = Number(data.value);
+
+            if (isNaN(count)) {
+                count = Number(data.bouncedPaymentCount);
+            }
 
             if (isNaN(count)) {
                 setNoData();
@@ -114,6 +140,11 @@
             }
 
             $value.text(formatCount(count));
+
+            if ($description && data.description) {
+                $description.text(data.description);
+            }
+
             $body.removeClass('vas-bounced-ap-payment-state');
         }
 
@@ -144,7 +175,7 @@
             }
         }
 
-        this.refreshWidget = function () {
+        this.refreshData = function () {
             loadData();
         };
 
@@ -153,11 +184,12 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
+
             $root.remove();
+
             $card = null;
-            $title = null;
             $value = null;
-            $badge = null;
             $description = null;
             $body = null;
         };
@@ -165,23 +197,40 @@
 
     VIS.BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
-        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
         this.Initalize();
-        this.frame.getContentGrid().append(this.getRoot());
+
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
     };
 
     VIS.BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+        var $root = this.getRoot();
+
+        if (!$root) {
+            return;
+        }
+
+        $root.toggleClass(
+            'vas-bounced-ap-payment-compact',
+            (width && width < 240) || (height && height < 160)
+        );
     };
 
     VIS.BouncedAPPaymentWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
+        this.refreshData();
     };
 
     VIS.BouncedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
-        if (this.frame) {
+        if (this.frame && this.frame.dispose) {
             this.frame.dispose();
         }
 
