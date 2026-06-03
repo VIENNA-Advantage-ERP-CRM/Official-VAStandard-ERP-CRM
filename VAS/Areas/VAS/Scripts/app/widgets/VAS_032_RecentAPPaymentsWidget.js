@@ -21,9 +21,9 @@
  * ─────────────────────────────────────────────────────────────────────
  */
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     VAS.VAS_032_RecentAPPaymentsWidget = function () {
 
