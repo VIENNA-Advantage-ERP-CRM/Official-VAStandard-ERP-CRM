@@ -81,25 +81,38 @@
 
         /* Compact-amount formatter: 10M→Cr, 100K→L, 1K→K; falls back to locale
            formatting for amounts under 1,000. */
-        function formatCompactAmount(value) {
+        function getDisplayPrecision(precision) {
+            var displayPrecision = Number(precision);
+
+            if (isNaN(displayPrecision) || displayPrecision < 0) {
+                try {
+                    if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                        displayPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+                    }
+                } catch (e) { displayPrecision = 2; }
+            }
+
+            if (isNaN(displayPrecision) || displayPrecision < 0) {
+                displayPrecision = 2;
+            }
+
+            return Math.min(displayPrecision, 2);
+        }
+
+        function formatCompactAmount(value, precision) {
             value = Number(value || 0);
 
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
+            //if (value >= 10000000) {
+            //    return (value / 10000000).toFixed(precision).replace(/\.00$/, "") + "Cr";
+            //}
+            //if (value >= 100000) {
+            //    return (value / 100000).toFixed(precision).replace(/\.00$/, "") + "L";
+            //}
+            //if (value >= 1000) {
+            //    return (value / 1000).toFixed(precision).replace(/\.00$/, "") + "K";
+            //}
 
-            var stdPrecision = 2;
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            } catch (e) { stdPrecision = 2; }
+            var stdPrecision = getDisplayPrecision(precision);
 
             return value.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
@@ -112,13 +125,14 @@
             var todayCount  = Number((data && data.todayCount)     || 0);
             var avgAmount   = Number((data && data.avgDailyAmount) || 0);
             var symbol      = (data && data.symbol) || "";
+            var precision   = data && data.precision;
 
             /* Value: currency symbol + compact amount */
             var sym = symbol
                 ? '<span class="vas-cashgl-cur">' + escapeHtml(symbol) + '</span>'
                 : '';
             if ($valueEl) {
-                $valueEl.html(sym + escapeHtml(formatCompactAmount(todayAmount)));
+                $valueEl.html( escapeHtml(formatCompactAmount(todayAmount, precision)));
             }
 
             /* Delta: % change vs 7-day average */
@@ -143,7 +157,7 @@
             var rcptLabel = todayCount === 1
                 ? lbl("VAS_010_Receipt",  "receipt")
                 : lbl("VAS_010_Receipts", "receipts");
-            var metaText = lbl("VAS_010_Vs7DayAvg", "vs 7-day avg")
+            var metaText = lbl("VAS_010_Vs7DayAvg", "7-day avg")
                 + ' · ' + todayCount + ' ' + rcptLabel;
 
             if ($deltaEl) { $deltaEl.html(deltaHtml); }
