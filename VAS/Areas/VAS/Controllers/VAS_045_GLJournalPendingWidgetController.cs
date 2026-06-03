@@ -20,7 +20,7 @@ namespace VAS.Controllers
     /// MRole is applied on GL_Journal before ORDER BY.
     /// Age and urgency marker are computed in C# from GL_Journal.Created timestamp.
     /// </summary>
-    public class VAS_GLJournalPendingController : Controller
+    public class VAS_045_GLJournalPendingWidgetController : Controller
     {
         /// <summary>
         /// Returns pending GL journals (DocStatus IN DR, IP, AP, NA) ordered oldest-first,

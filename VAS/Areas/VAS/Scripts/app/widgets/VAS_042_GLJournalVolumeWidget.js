@@ -5,15 +5,15 @@
  *            Supports a Week / Month period toggle.
  * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_JournalVolumeByDay, VAS_CountVsValue,
-    //            VAS_Week, VAS_Month,
-    //            VAS_Posted, VAS_Weekend, VAS_ThisWeek, VAS_NetValueTrend
+    // Labels   : VAS_042_JournalVolumeByDay, VAS_042_CountVsValue,
+    //            VAS_042_Week, VAS_042_Month,
+    //            VAS_042_Posted, VAS_042_Weekend, VAS_042_ThisWeek, VAS_042_NetValueTrend
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -143,7 +143,7 @@
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    VIS.GLJournalVolumeWidget = function () {
+    VAS.VAS_042_GLJournalVolumeWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -189,10 +189,10 @@
                 // ── Header ────────────────────────────────────────────────────
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljv-icon">' + barIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
+                +   '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
                 +   '<span class="VAS-gljv-sub" id="VAS-gljv-sub-' + id + '">—</span>'
                 +   '<button class="VAS-gljv-toggle" id="VAS-gljv-toggle-' + id + '">'
-                +     lbl('VAS_Month', 'Month') + ' ▾'
+                +     lbl('VAS_042_Month', 'Month') + ' ▾'
                 +   '</button>'
                 + '</div>'
 
@@ -203,19 +203,19 @@
                 + '<div class="VAS-gljv-legend">'
                 +   '<div class="VAS-gljv-leg-item">'
                 +     '<span class="VAS-gljv-swatch VAS-gljv-sw-posted"></span>'
-                +     lbl('VAS_Posted', 'Posted')
+                +     lbl('VAS_042_Posted', 'Posted')
                 +   '</div>'
                 +   '<div class="VAS-gljv-leg-item">'
                 +     '<span class="VAS-gljv-swatch VAS-gljv-sw-weekend"></span>'
-                +     lbl('VAS_Weekend', 'Weekend')
+                +     lbl('VAS_042_Weekend', 'Weekend')
                 +   '</div>'
                 +   '<div class="VAS-gljv-leg-item">'
                 +     '<span class="VAS-gljv-swatch VAS-gljv-sw-week"></span>'
-                +     lbl('VAS_ThisWeek', 'This week')
+                +     lbl('VAS_042_ThisWeek', 'This week')
                 +   '</div>'
                 +   '<div class="VAS-gljv-leg-item">'
                 +     '<span class="VAS-gljv-swatch VAS-gljv-sw-trend"></span>'
-                +     lbl('VAS_NetValueTrend', 'Net value trend')
+                +     lbl('VAS_042_NetValueTrend', 'Net value trend')
                 +   '</div>'
                 + '</div>'
 
@@ -227,7 +227,7 @@
             $root.find('#VAS-gljv-toggle-' + id).on('click', function () {
                 activePeriod = (activePeriod === 'month') ? 'week' : 'month';
                 $(this).text(
-                    lbl(activePeriod === 'month' ? 'VAS_Month' : 'VAS_Week',
+                    lbl(activePeriod === 'month' ? 'VAS_042_Month' : 'VAS_042_Week',
                         activePeriod === 'month' ? 'Month' : 'Week') + ' ▾'
                 );
                 showBusy(true);
@@ -237,7 +237,7 @@
 
         function loadData() {
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalVolume/GetVolumeByDay',
+                url      : baseUrl + 'VAS/VAS_042_GLJournalVolumeWidget/GetVolumeByDay',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -251,7 +251,7 @@
                             $root.find('#VAS-gljv-sub-' + id).text(
                                 (data.PeriodLabel || '').toUpperCase()
                                 + ' · '
-                                + lbl('VAS_CountVsValue', 'Count vs Value')
+                                + lbl('VAS_042_CountVsValue', 'Count vs Value')
                             );
                             // Inject SVG
                             $root.find('#VAS-gljv-chart-' + id).html(buildSVG(data.Days));
@@ -284,9 +284,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalVolumeWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_042_GLJournalVolumeWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalVolumeWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_042_GLJournalVolumeWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -294,12 +294,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalVolumeWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_042_GLJournalVolumeWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalVolumeWidget.prototype.dispose = function () {
+    VAS.VAS_042_GLJournalVolumeWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

@@ -5,13 +5,13 @@
  *            schema base currency. Supports month / YTD period toggle.
  * Tables   : GL_Journal, GL_JournalLine, C_ElementValue, C_AcctSchema, C_Currency
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_TopLedgerMovement, VAS_ByValue, VAS_Month, VAS_YTD
+    // Labels   : VAS_043_TopLedgerMovement, VAS_043_ByValue, VAS_043_Month, VAS_043_YTD
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -38,7 +38,7 @@
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    VIS.GLJournalTopMovementWidget = function () {
+    VAS.VAS_043_GLJournalTopMovementWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -82,10 +82,10 @@
 
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljtm-icon">' + listIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
-                +   '<span class="VAS-gljtm-sub">' + lbl('VAS_ByValue', 'by value') + '</span>'
+                +   '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
+                +   '<span class="VAS-gljtm-sub">' + lbl('VAS_043_ByValue', 'by value') + '</span>'
                 +   '<button class="VAS-gljtm-toggle" id="VAS-gljtm-toggle-' + id + '">'
-                +     lbl('VAS_Month', 'Month')
+                +     lbl('VAS_043_Month', 'Month')
                 +   '</button>'
                 + '</div>'
 
@@ -98,8 +98,8 @@
             $root.find('#VAS-gljtm-toggle-' + id).on('click', function () {
                 activePeriod = (activePeriod === 'month') ? 'ytd' : 'month';
                 $(this).text(activePeriod === 'month'
-                    ? lbl('VAS_Month', 'Month')
-                    : lbl('VAS_YTD', 'YTD'));
+                    ? lbl('VAS_043_Month', 'Month')
+                    : lbl('VAS_043_YTD', 'YTD'));
                 showBusy(true);
                 loadData();
             });
@@ -107,7 +107,7 @@
 
         function loadData() {
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalTopMovement/GetTopMovement',
+                url: baseUrl + 'VAS/VAS_043_GLJournalTopMovementWidget/GetTopMovement',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -179,9 +179,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalTopMovementWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_043_GLJournalTopMovementWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalTopMovementWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_043_GLJournalTopMovementWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -189,12 +189,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalTopMovementWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_043_GLJournalTopMovementWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalTopMovementWidget.prototype.dispose = function () {
+    VAS.VAS_043_GLJournalTopMovementWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

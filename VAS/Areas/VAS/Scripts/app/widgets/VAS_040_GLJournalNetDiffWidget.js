@@ -5,15 +5,15 @@
  *            When the result is zero the books are in balance.
  * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_NetDifference, VAS_DrMinusCr, VAS_Status,
-    //            VAS_BooksInBalance, VAS_DebitExceedsCredit, VAS_CreditExceedsDebit,
-    //            VAS_YTD
+    // Labels   : VAS_040_NetDifference, VAS_040_DrMinusCr, VAS_040_Status,
+    //            VAS_040_BooksInBalance, VAS_040_DebitExceedsCredit, VAS_040_CreditExceedsDebit,
+    //            VAS_040_YTD
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -37,7 +37,7 @@
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    VIS.GLJournalNetDiffWidget = function () {
+    VAS.VAS_040_GLJournalNetDiffWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -85,16 +85,16 @@
 
                 + '<div class="w-head">'
                 +   '<div class="w-icon">' + svgIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_NetDifference', 'Net Difference') + '</div>'
+                +   '<div class="w-title">' + lbl('VAS_040_NetDifference', 'Net Difference') + '</div>'
                 +   '<div class="VAS-gljnd-period-toggle" id="VAS-gljnd-toggle-' + id + '">'
                 +     '<span class="VAS-gljnd-period VAS-gljnd-period-active" data-period="month"'
                 +       ' id="VAS-gljnd-mon-' + id + '">—</span>'
                 +     '<span class="VAS-gljnd-sep">&middot;</span>'
                 +     '<span class="VAS-gljnd-period" data-period="ytd">'
-                +       lbl('VAS_YTD', 'YTD')
+                +       lbl('VAS_040_YTD', 'YTD')
                 +     '</span>'
                 +   '</div>'
-                +   '<span class="VAS-gljnd-drcr">' + lbl('VAS_DrMinusCr', 'DR − CR') + '</span>'
+                +   '<span class="VAS-gljnd-drcr">' + lbl('VAS_040_DrMinusCr', 'DR − CR') + '</span>'
                 + '</div>'
 
                 + '<div class="kpi-value" id="VAS-gljnd-val-' + id + '">'
@@ -104,7 +104,7 @@
                 + '</div>'
 
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_Status', 'Status') + '</span>'
+                +   '<span class="kpi-why-label">' + lbl('VAS_040_Status', 'Status') + '</span>'
                 +   '<span class="kpi-why-text VAS-gljnd-status" id="VAS-gljnd-status-' + id + '">&mdash;</span>'
                 + '</div>'
 
@@ -133,7 +133,7 @@
 
         function loadData() {
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalDebit/GetNetDifference',
+                url      : baseUrl + 'VAS/VAS_037_GLJournalTotalDebitWidget/GetNetDifference',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -156,16 +156,16 @@
                             if (data.IsBalanced) {
                                 $valueWrap.addClass('VAS-gljnd-balanced');
                                 $statusText.addClass('VAS-gljnd-status-ok');
-                                $statusText.text(lbl('VAS_BooksInBalance',
+                                $statusText.text(lbl('VAS_040_BooksInBalance',
                                     'Books are in balance · ledger ready for posting.'));
                             } else if (data.NetDiff > 0) {
                                 $valueWrap.addClass('VAS-gljnd-unbalanced');
                                 $statusText.addClass('VAS-gljnd-status-warn');
-                                $statusText.text(lbl('VAS_DebitExceedsCredit', 'Debit exceeds credit.'));
+                                $statusText.text(lbl('VAS_040_DebitExceedsCredit', 'Debit exceeds credit.'));
                             } else {
                                 $valueWrap.addClass('VAS-gljnd-unbalanced');
                                 $statusText.addClass('VAS-gljnd-status-warn');
-                                $statusText.text(lbl('VAS_CreditExceedsDebit', 'Credit exceeds debit.'));
+                                $statusText.text(lbl('VAS_040_CreditExceedsDebit', 'Credit exceeds debit.'));
                             }
                         } else {
                             $mainNum.text('—');
@@ -193,9 +193,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalNetDiffWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_040_GLJournalNetDiffWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalNetDiffWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_040_GLJournalNetDiffWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -203,12 +203,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalNetDiffWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_040_GLJournalNetDiffWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalNetDiffWidget.prototype.dispose = function () {
+    VAS.VAS_040_GLJournalNetDiffWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

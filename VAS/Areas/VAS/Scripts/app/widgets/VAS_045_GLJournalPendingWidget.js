@@ -5,13 +5,13 @@
  *            age, and amount.
  * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency, AD_User
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_PendingActionQueue, VAS_Items, VAS_Overdue
+    // Labels   : VAS_045_PendingActionQueue, VAS_045_Items, VAS_045_Overdue
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -38,7 +38,7 @@
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    VIS.GLJournalPendingWidget = function () {
+    VAS.VAS_045_GLJournalPendingWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -80,7 +80,7 @@
 
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljpq-icon">' + clockIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_PendingActionQueue', 'Pending Action Queue') + '</div>'
+                +   '<div class="w-title">' + lbl('VAS_045_PendingActionQueue', 'Pending Action Queue') + '</div>'
                 +   '<span class="VAS-gljpq-count" id="VAS-gljpq-count-' + id + '"></span>'
                 + '</div>'
 
@@ -93,7 +93,7 @@
 
         function loadData() {
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalPending/GetPendingQueue',
+                url      : baseUrl + 'VAS/VAS_045_GLJournalPendingWidget/GetPendingQueue',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -126,7 +126,7 @@
 
             // Update item count in header
             $root.find('#VAS-gljpq-count-' + id).text(
-                data.TotalCount + ' ' + lbl('VAS_Items', 'items')
+                data.TotalCount + ' ' + lbl('VAS_045_Items', 'items')
             );
 
             if (queue.length === 0) {
@@ -142,7 +142,7 @@
                 if (item.Description) { titleStr += ' · ' + esc(item.Description); }
 
                 var ageLabel = item.IsOverdue
-                    ? item.AgeStr + ' ' + lbl('VAS_Overdue', 'overdue')
+                    ? item.AgeStr + ' ' + lbl('VAS_045_Overdue', 'overdue')
                     : item.AgeStr;
 
                 var metaParts = [esc(item.ActionLabel), esc(ageLabel)];
@@ -173,9 +173,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalPendingWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_045_GLJournalPendingWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalPendingWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_045_GLJournalPendingWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -183,12 +183,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalPendingWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_045_GLJournalPendingWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalPendingWidget.prototype.dispose = function () {
+    VAS.VAS_045_GLJournalPendingWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

@@ -1,17 +1,17 @@
 /* ==========================================================================
-   VAS GL Journal Pending Action Queue Widget
-   File  : VAS_GLJournalPendingWidget.css
-   Scope : .VAS-gljpq-root
+   VAS GL Journal Top Ledger Movement Widget
+   File  : VAS_043_GLJournalTopMovementWidget.css
+   Scope : .VAS-gljtm-root
    ========================================================================== */
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
-.VAS-gljpq-root {
+.VAS-gljtm-root {
     height: 100%;
     width: 100%;
 }
 
 /* ── Card container ──────────────────────────────────────────────────────── */
-.VAS-gljpq-card {
+.VAS-gljtm-card {
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -25,7 +25,7 @@
 }
 
 /* ── Header row ──────────────────────────────────────────────────────────── */
-.VAS-gljpq-root .w-head {
+.VAS-gljtm-root .w-head {
     display: flex;
     align-items: center;
     gap: 0.5em;
@@ -33,8 +33,8 @@
     margin-bottom: 0.75em;
 }
 
-/* Icon well — amber/clock theme for "pending" */
-.VAS-gljpq-icon {
+/* Icon well */
+.VAS-gljtm-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -42,18 +42,18 @@
     height: 1.75em;
     flex-shrink: 0;
     border-radius: 0.375em;
-    background: rgba(245, 158, 11, 0.12);
-    color: #B45309;
+    background: rgba(0, 131, 218, 0.10);
+    color: #004E9A;
 }
 
-.VAS-gljpq-icon svg {
+.VAS-gljtm-icon svg {
     width: 1em;
     height: 1em;
     stroke: currentColor;
 }
 
 /* Title */
-.VAS-gljpq-root .w-title {
+.VAS-gljtm-root .w-title {
     font-size: 0.8125em;
     font-weight: 600;
     color: #102C3F;
@@ -61,10 +61,10 @@
     white-space: nowrap;
 }
 
-/* Item count badge — "9 items" */
-.VAS-gljpq-count {
+/* "by value" sub-label */
+.VAS-gljtm-sub {
     font-size: 0.7em;
-    font-weight: 500;
+    font-weight: 400;
     color: #748494;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -72,82 +72,76 @@
     white-space: nowrap;
 }
 
+/* Month / YTD toggle */
+.VAS-gljtm-toggle {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.07);
+    border: 1px solid rgba(0, 131, 218, 0.20);
+    border-radius: 0.35em;
+    padding: 0.2em 0.55em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s;
+    white-space: nowrap;
+}
+
+.VAS-gljtm-toggle:hover {
+    background: rgba(0, 131, 218, 0.14);
+}
+
 /* ── Scrollable body ─────────────────────────────────────────────────────── */
-.VAS-gljpq-body {
+.VAS-gljtm-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
-/* ── Queue list ──────────────────────────────────────────────────────────── */
-.VAS-gljpq-list {
+/* ── Account list ────────────────────────────────────────────────────────── */
+.VAS-gljtm-list {
     display: flex;
     flex-direction: column;
-    gap: 0.35em;
+    gap: 0.55em;
 }
 
-/* ── Single queue item ───────────────────────────────────────────────────── */
-.VAS-gljpq-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-    padding: 0.5em 0.6em;
-    background: #FFFFFF;
-    border-radius: 0.5em;
-    border: 1px solid rgba(0, 131, 218, 0.08);
-    transition: background 0.1s;
-}
-
-.VAS-gljpq-item:hover {
-    background: #F4F9FF;
-}
-
-/* ── Left urgency stripe ─────────────────────────────────────────────────── */
-.VAS-gljpq-mrk {
-    width: 0.22em;
-    align-self: stretch;
-    flex-shrink: 0;
-    border-radius: 999px;
-}
-
-.VAS-gljpq-mrk-danger { background: #EF4444; }
-.VAS-gljpq-mrk-warn   { background: #F59E0B; }
-.VAS-gljpq-mrk-info   { background: #0083DA; }
-
-/* ── Item body (title + meta) ────────────────────────────────────────────── */
-.VAS-gljpq-body-row {
-    flex: 1;
-    min-width: 0;
+/* ── Single account row ──────────────────────────────────────────────────── */
+.VAS-gljtm-row {
     display: flex;
     flex-direction: column;
-    gap: 0.15em;
+    gap: 0.2em;
 }
 
-/* Document number + description */
-.VAS-gljpq-title {
+/* Row header: label + value */
+.VAS-gljtm-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+/* Account label (code + name) */
+.VAS-gljtm-label {
     font-size: 0.8em;
-    font-weight: 600;
+    font-weight: 500;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
 }
 
-/* Action · age · user */
-.VAS-gljpq-meta {
-    font-size: 0.7em;
+/* Account search key (e.g. "4001") */
+.VAS-gljtm-acct {
+    font-size: 0.85em;
     font-weight: 400;
     color: #748494;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    margin-right: 0.4em;
 }
 
-/* ── Amount ──────────────────────────────────────────────────────────────── */
-.VAS-gljpq-amt {
+/* Net movement value */
+.VAS-gljtm-val {
     font-size: 0.8em;
     font-weight: 600;
     color: #102C3F;
@@ -155,8 +149,31 @@
     flex-shrink: 0;
 }
 
-/* ── Empty / error states ────────────────────────────────────────────────── */
-.VAS-gljpq-empty {
+/* ── Bar track ───────────────────────────────────────────────────────────── */
+.VAS-gljtm-track {
+    height: 0.45em;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+/* ── Bar fill — blue (debit-heavy) ──────────────────────────────────────── */
+.VAS-gljtm-fill {
+    height: 100%;
+    width: var(--bar-w, 0%);
+    border-radius: 999px;
+    background: #0083DA;
+    transition: width 0.4s ease;
+}
+
+/* ── Bar fill — green (credit-heavy) ────────────────────────────────────── */
+.VAS-gljtm-fill-cr {
+    background: #019D89;
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.VAS-gljtm-loading,
+.VAS-gljtm-empty {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -167,57 +184,57 @@
 
 /* ── Responsive scaling ──────────────────────────────────────────────────── */
 @media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-gljpq-card {
+    .vis-editModeWidget .VAS-gljtm-card {
         font-size: 10px;
     }
 }
 
 @media screen and (max-width: 1366px) {
-    .VAS-gljpq-card {
+    .VAS-gljtm-card {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-gljpq-card {
+    .vis-editModeWidget .VAS-gljtm-card {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 1024px) {
-    .VAS-gljpq-card {
+    .VAS-gljtm-card {
         font-size: 9px;
     }
 
-    .vis-editModeWidget .VAS-gljpq-card {
+    .vis-editModeWidget .VAS-gljtm-card {
         font-size: 6px;
     }
 }
 
 @media screen and (max-width: 768px) {
-    .VAS-gljpq-card {
+    .VAS-gljtm-card {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-gljpq-card {
+    .vis-editModeWidget .VAS-gljtm-card {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 480px) {
-    .VAS-gljpq-card {
+    .VAS-gljtm-card {
         font-size: 11px;
     }
 }
 
 /* ── RTL support ─────────────────────────────────────────────────────────── */
-html[dir="rtl"] .VAS-gljpq-root .w-head {
+html[dir="rtl"] .VAS-gljtm-root .w-head {
     flex-direction: row-reverse;
 }
 
-html[dir="rtl"] .VAS-gljpq-count {
+html[dir="rtl"] .VAS-gljtm-sub {
     margin-left: unset;
     margin-right: auto;
 }
 
-html[dir="rtl"] .VAS-gljpq-item {
+html[dir="rtl"] .VAS-gljtm-row-head {
     flex-direction: row-reverse;
 }

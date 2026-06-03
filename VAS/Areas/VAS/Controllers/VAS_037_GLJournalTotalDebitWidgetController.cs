@@ -19,7 +19,7 @@ namespace VAS.Controllers
     /// All widgets support a month / YTD period toggle and display amounts
     /// in the primary accounting schema base currency (C_AcctSchema → C_Currency).
     /// </summary>
-    public class VAS_GLJournalDebitController : Controller
+    public class VAS_037_GLJournalTotalDebitWidgetController : Controller
     {
         // ── Shared helper ─────────────────────────────────────────────────────
         /// <summary>

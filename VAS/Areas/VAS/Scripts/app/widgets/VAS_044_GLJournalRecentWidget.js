@@ -6,15 +6,15 @@
  *            An alert strip highlights the first unbalanced entry found.
  * Tables   : GL_Journal, GL_JournalLine, AD_Ref_List, C_AcctSchema, C_Currency
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_RecentJournalEntries, VAS_IsUnbalancedBy,
-    //            VAS_MultiCurrencyRounding, VAS_Fix, VAS_Hash, VAS_Date,
-    //            VAS_Description, VAS_Status, VAS_Debit, VAS_Credit
+    // Labels   : VAS_044_RecentJournalEntries, VAS_044_IsUnbalancedBy,
+    //            VAS_044_MultiCurrencyRounding, VAS_044_Fix, VAS_044_Hash, VAS_044_Date,
+    //            VAS_044_Description, VAS_044_Status, VAS_044_Debit, VAS_044_Credit
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -54,7 +54,7 @@
     };
 
     // ──────────────────────────────────────────────────────────────────────────
-    VIS.GLJournalRecentWidget = function () {
+    VAS.VAS_044_GLJournalRecentWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -106,7 +106,7 @@
                 // ── Header ──────────────────────────────────────────────────
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljr-icon">' + docIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_RecentJournalEntries', 'Recent Journal Entries') + '</div>'
+                +   '<div class="w-title">' + lbl('VAS_044_RecentJournalEntries', 'Recent Journal Entries') + '</div>'
                 + '</div>'
 
                 // ── Alert strip (hidden until an unbalanced entry is found) ──
@@ -115,11 +115,11 @@
                 +   '<div class="VAS-gljr-alert-body">'
                 +     '<div class="VAS-gljr-alert-title" id="VAS-gljr-alert-title-' + id + '"></div>'
                 +     '<div class="VAS-gljr-alert-desc">'
-                +       lbl('VAS_MultiCurrencyRounding', 'Possible rounding on multi-currency conversion.')
+                +       lbl('VAS_044_MultiCurrencyRounding', 'Possible rounding on multi-currency conversion.')
                 +     '</div>'
                 +   '</div>'
                 +   '<button class="VAS-gljr-btn-fix" id="VAS-gljr-btn-fix-' + id + '">'
-                +     lbl('VAS_Fix', 'Fix')
+                +     lbl('VAS_044_Fix', 'Fix')
                 +   '</button>'
                 + '</div>'
 
@@ -128,12 +128,12 @@
                 +   '<table class="VAS-gljr-table">'
                 +     '<thead>'
                 +       '<tr>'
-                +         '<th>' + lbl('VAS_Hash', '#') + '</th>'
-                +         '<th>' + lbl('VAS_Date', 'Date') + '</th>'
-                +         '<th>' + lbl('VAS_Description', 'Description') + '</th>'
-                +         '<th>' + lbl('VAS_Status', 'Status') + '</th>'
-                +         '<th class="VAS-gljr-num">' + lbl('VAS_Debit', 'Debit') + '</th>'
-                +         '<th class="VAS-gljr-num">' + lbl('VAS_Credit', 'Credit') + '</th>'
+                +         '<th>' + lbl('VAS_044_Hash', '#') + '</th>'
+                +         '<th>' + lbl('VAS_044_Date', 'Date') + '</th>'
+                +         '<th>' + lbl('VAS_044_Description', 'Description') + '</th>'
+                +         '<th>' + lbl('VAS_044_Status', 'Status') + '</th>'
+                +         '<th class="VAS-gljr-num">' + lbl('VAS_044_Debit', 'Debit') + '</th>'
+                +         '<th class="VAS-gljr-num">' + lbl('VAS_044_Credit', 'Credit') + '</th>'
                 +       '</tr>'
                 +     '</thead>'
                 +     '<tbody id="VAS-gljr-tbody-' + id + '">'
@@ -165,7 +165,7 @@
 
         function loadData() {
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalRecent/GetRecentEntries',
+                url      : baseUrl + 'VAS/VAS_044_GLJournalRecentWidget/GetRecentEntries',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -201,7 +201,7 @@
                 var sym  = data.CurSymbol || data.ISOCode || '';
                 $root.find('#VAS-gljr-alert-title-' + id).text(
                     esc(u.DocumentNo) + ' '
-                    + lbl('VAS_IsUnbalancedBy', 'is unbalanced by')
+                    + lbl('VAS_044_IsUnbalancedBy', 'is unbalanced by')
                     + ' ' + sym + diff
                 );
                 $root.find('#VAS-gljr-btn-fix-' + id).data('journal-id', u.GL_Journal_ID);
@@ -257,9 +257,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalRecentWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_044_GLJournalRecentWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalRecentWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_044_GLJournalRecentWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -267,12 +267,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalRecentWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_044_GLJournalRecentWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalRecentWidget.prototype.dispose = function () {
+    VAS.VAS_044_GLJournalRecentWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

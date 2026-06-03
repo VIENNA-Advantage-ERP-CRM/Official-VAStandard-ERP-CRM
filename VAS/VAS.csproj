@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -220,10 +220,10 @@
     <Compile Include="Areas\VAS\Controllers\PaidThisMonthController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalPendingController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalRecentController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalTopMovementController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalVolumeController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_042_GLJournalVolumeWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
@@ -236,8 +236,8 @@
     <Compile Include="Areas\VAS\Controllers\ProductContainerController.cs" />
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalDebitController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_GLJournalWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_037_GLJournalTotalDebitWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_041_GLJournalEntriesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -288,11 +288,16 @@
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLJournalEntriesWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLJournalPostedWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLJournalTotalCreditWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLJournalTotalDebitWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLJournalUnpostedWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_045_GLJournalPendingWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_044_GLJournalRecentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_043_GLJournalTopMovementWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_042_GLJournalVolumeWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_040_GLJournalNetDiffWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_039_GLJournalPostedWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_038_GLJournalTotalCreditWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_037_GLJournalTotalDebitWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_036_GLJournalUnpostedWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_InventoryLines.css" />
     <Content Include="Areas\VAS\Content\VAS_LeadConversation.css" />
@@ -366,11 +371,16 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\OutstandingSalesOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\OverdueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalEntriesWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalPostedWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalTotalCreditWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalTotalDebitWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\GLJournalUnpostedWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_041_GLJournalEntriesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_039_GLJournalPostedWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_038_GLJournalTotalCreditWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_037_GLJournalTotalDebitWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_036_GLJournalUnpostedWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_045_GLJournalPendingWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_044_GLJournalRecentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_043_GLJournalTopMovementWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_042_GLJournalVolumeWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_040_GLJournalNetDiffWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />

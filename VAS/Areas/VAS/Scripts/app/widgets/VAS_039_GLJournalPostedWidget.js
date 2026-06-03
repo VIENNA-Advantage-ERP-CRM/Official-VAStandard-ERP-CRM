@@ -1,16 +1,16 @@
 /**
- * GL Journal Unposted KPI Widget
- * Purpose  : Display the count of GL Journal documents that are not yet posted
- *            (DocStatus IN 'DR','CO','CL' AND Posted = 'N').
- * Table    : GL_Journal
+ * GL Journal Posted KPI Widget
+ * Purpose  : Display the percentage of posted documents across
+ *            GL_Journal and GL_JournalBatch.
+ * Tables   : GL_Journal, GL_JournalBatch
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_GLJUnposted, VAS_Why, VAS_DraftsWaiting
+    // Labels   : VAS_039_GLJPosted, VAS_039_Why, VAS_039_PostedDocuments
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -18,15 +18,14 @@
         return (t && t.charAt(0) !== '[') ? t : fallback;
     }
 
-    VIS.GLJournalUnpostedWidget = function () {
+    VAS.VAS_039_GLJournalPostedWidget = function () {
 
         this.frame;
         this.windowNo;
-        var $self    = this;
-        var $root    = $('<div class="VAS-glju-root">');
+        var $self   = this;
+        var $root   = $('<div class="VAS-gljp-root">');
         var $kpiValue;
-        var $whyText;
-        var baseUrl  = VIS.Application.contextUrl;
+        var baseUrl = VIS.Application.contextUrl;
 
         this.Initalize = function () {
             createWidget();
@@ -37,7 +36,7 @@
         };
 
         function createBusyIndicator() {
-            var $bsy = $('<div id="VAS-glju-busy-' + $self.AD_UserHomeWidgetID
+            var $bsy = $('<div id="VAS-gljp-busy-' + $self.AD_UserHomeWidgetID
                 + '" class="vis-busyindicatorouterwrap">'
                 + '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
                 + '</div>');
@@ -45,43 +44,42 @@
         }
 
         function showBusy(show) {
-            var $b = $root.find('#VAS-glju-busy-' + $self.AD_UserHomeWidgetID);
+            var $b = $root.find('#VAS-gljp-busy-' + $self.AD_UserHomeWidgetID);
             if (show) { $b.show(); } else { $b.hide(); }
         }
 
         function createWidget() {
             var svgIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
                 + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-                + '<line x1="4" y1="22" x2="4" y2="15"></line>'
-                + '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>'
+                + '<polyline points="20 6 9 17 4 12"></polyline>'
                 + '</svg>';
 
             var id = $self.AD_UserHomeWidgetID;
 
-            var html = '<div class="kpi kpi-amber">'
+            var html = '<div class="kpi kpi-cream">'
                 + '<div class="w-head">'
                 +   '<div class="w-icon">' + svgIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_GLJUnposted', 'Unposted') + '</div>'
+                +   '<div class="w-title">' + lbl('VAS_039_GLJPosted', 'Posted') + '</div>'
                 + '</div>'
-                + '<div class="kpi-value warning" id="VAS-glju-val-' + id + '">—</div>'
+                + '<div class="kpi-value success" id="VAS-gljp-val-' + id + '">'
+                +   '<span class="VAS-gljp-num">—</span>'
+                +   '<span class="VAS-gljp-pct">%</span>'
+                + '</div>'
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_Why', 'Why') + '</span>'
-                +   '<span class="kpi-why-text" id="VAS-glju-why-' + id + '">'
-                +     lbl('VAS_DraftsWaiting', 'Drafts waiting to be approved + posted.')
-                +   '</span>'
+                +   '<span class="kpi-why-label">' + lbl('VAS_039_Why', 'Why') + '</span>'
+                +   '<span class="kpi-why-text">' + lbl('VAS_039_PostedDocuments', 'Posted documents.') + '</span>'
                 + '</div>'
                 + '</div>';
 
             $root.append(html);
 
-            $kpiValue = $root.find('#VAS-glju-val-' + id);
-            $whyText  = $root.find('#VAS-glju-why-' + id);
+            $kpiValue = $root.find('#VAS-gljp-val-' + id);
         }
 
         function loadData() {
             showBusy(true);
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalWidget/GetUnpostedCount',
+                url      : baseUrl + 'VAS/VAS_041_GLJournalEntriesWidget/GetPostedPercentage',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -89,33 +87,30 @@
                     try {
                         var data = JSON.parse(result);
                         if (data) {
-                            $kpiValue.text(typeof data.UnpostedCount === 'number' ? data.UnpostedCount : 0);
+                            $kpiValue.find('.VAS-gljp-num').text(typeof data.Percentage === 'number' ? data.Percentage : 0);
                         } else {
-                            $kpiValue.text(0);
-                            $whyText.text(lbl('VIS_NoData', 'No data available.'));
+                            $kpiValue.find('.VAS-gljp-num').text(0);
                         }
                     } catch (e) {
-                        $kpiValue.text('—');
-                        $whyText.text(lbl('VIS_Error', 'Error loading data.'));
+                        $kpiValue.find('.VAS-gljp-num').text('—');
                     }
                     showBusy(false);
                 },
                 error: function () {
-                    $kpiValue.text('—');
-                    $whyText.text(lbl('VIS_Error', 'Error loading data.'));
+                    $kpiValue.find('.VAS-gljp-num').text('—');
                     showBusy(false);
                 }
             });
         }
 
-        this.refreshWidget    = function () { $kpiValue.text('—'); loadData(); };
+        this.refreshWidget    = function () { $kpiValue.find('.VAS-gljp-num').text('—'); loadData(); };
         this.getRoot          = function () { return $root; };
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalUnpostedWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_039_GLJournalPostedWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalUnpostedWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_039_GLJournalPostedWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -123,12 +118,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalUnpostedWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_039_GLJournalPostedWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalUnpostedWidget.prototype.dispose = function () {
+    VAS.VAS_039_GLJournalPostedWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

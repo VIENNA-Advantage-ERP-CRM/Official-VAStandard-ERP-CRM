@@ -9,7 +9,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Controllers
 {
-    public class VAS_GLJournalWidgetController : Controller
+    public class VAS_041_GLJournalEntriesWidgetController : Controller
     {
         /// <summary>
         /// Returns the count of actual GL Journal entries (PostingType='A')

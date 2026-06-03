@@ -20,7 +20,7 @@ namespace VAS.Controllers
     /// GROUP BY / ORDER BY are appended after MRole so the access filters
     /// remain inside the WHERE clause and do not corrupt the query structure.
     /// </summary>
-    public class VAS_GLJournalRecentController : Controller
+    public class VAS_044_GLJournalRecentWidgetController : Controller
     {
         /// <summary>
         /// Returns the 6 most recent GL Journal documents for the current client

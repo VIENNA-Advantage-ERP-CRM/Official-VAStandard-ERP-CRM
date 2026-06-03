@@ -1,18 +1,17 @@
 /* ==========================================================================
-   VAS GL Journal Entries KPI Widget
-   File  : VAS_GLJournalEntriesWidget.css
-   Scope : .VAS-glje-root  — all rules are scoped to this prefix so they
-           cannot bleed into other widgets on the same page.
+   VAS GL Journal Unposted KPI Widget
+   File  : VAS_036_GLJournalUnpostedWidget.css
+   Scope : .VAS-glju-root
    ========================================================================== */
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
-.VAS-glje-root {
+.VAS-glju-root {
     height: 100%;
     width: 100%;
 }
 
 /* ── KPI card container ──────────────────────────────────────────────────── */
-.VAS-glje-root .kpi {
+.VAS-glju-root .kpi {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -27,37 +26,39 @@
     box-sizing: border-box;
 }
 
-/* Blue-tint variant — pale info palette from the design system */
-.VAS-glje-root .kpi.kpi-blue {
-    background: linear-gradient(145deg, rgba(234, 248, 255, 0.95) 0%, rgba(202, 237, 255, 0.80) 100%);
+/* Amber-tint variant — warning palette from the design system */
+.VAS-glju-root .kpi.kpi-amber {
+    background: linear-gradient(145deg, rgba(255, 248, 235, 0.97) 0%, rgba(255, 234, 180, 0.80) 100%);
 }
 
 /* ── Widget header row ───────────────────────────────────────────────────── */
-.VAS-glje-root .w-head {
+.VAS-glju-root .w-head {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
-/* Icon well */
-.VAS-glje-root .w-icon {
+/* Icon well — amber tint background, amber stroke */
+.VAS-glju-root .w-icon {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 1.75em;
     height: 1.75em;
     flex-shrink: 0;
-    color: #0083DA;
+    border-radius: 0.375em;
+    background: rgba(215, 139, 16, 0.13);
+    color: #9A6500;
 }
 
-.VAS-glje-root .w-icon svg {
+.VAS-glju-root .w-icon svg {
     width: 1.125em;
     height: 1.125em;
     stroke: currentColor;
 }
 
-/* Title / period label */
-.VAS-glje-root .w-title {
+/* Title label */
+.VAS-glju-root .w-title {
     flex: 1;
     font-size: 0.8125em;
     font-weight: 400;
@@ -69,7 +70,7 @@
 }
 
 /* Zoom / navigate icon link */
-.VAS-glje-zoom {
+.VAS-glju-zoom {
     display: flex;
     align-items: center;
     flex-shrink: 0;
@@ -80,35 +81,39 @@
     transition: opacity 0.15s, color 0.15s;
 }
 
-.VAS-glje-zoom:hover {
+.VAS-glju-zoom:hover {
     opacity: 1;
-    color: #0083DA;
+    color: #D78B10;
 }
 
-/* ── KPI value (the large count number) ─────────────────────────────────── */
-.VAS-glje-root .kpi-value {
+/* ── KPI value — amber/warning color ────────────────────────────────────── */
+.VAS-glju-root .kpi-value {
     font-size: 2.125em;
     font-weight: 700;
-    color: #102C3F;
     line-height: 1;
     letter-spacing: -0.01em;
+    color: #102C3F;
+}
+
+.VAS-glju-root .kpi-value.warning {
+    color: #D78B10;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
-.VAS-glje-root .kpi-why {
+.VAS-glju-root .kpi-why {
     display: flex;
     align-items: flex-start;
     gap: 0.4em;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
     padding: 0.45em 0.6em;
-    border: 1px solid rgba(0, 131, 218, 0.12);
+    border: 1px solid rgba(215, 139, 16, 0.18);
 }
 
-.VAS-glje-root .kpi-why-label {
+.VAS-glju-root .kpi-why-label {
     font-size: 0.6875em;
     font-weight: 700;
-    color: #0083DA;
+    color: #D78B10;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
@@ -116,7 +121,7 @@
     line-height: 1.4;
 }
 
-.VAS-glje-root .kpi-why-text {
+.VAS-glju-root .kpi-why-text {
     font-size: 0.6875em;
     font-weight: 400;
     color: #5F7283;
@@ -125,52 +130,52 @@
 
 /* ── Responsive scaling ──────────────────────────────────────────────────── */
 @media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-glje-root .kpi {
+    .vis-editModeWidget .VAS-glju-root .kpi {
         font-size: 10px;
     }
 }
 
 @media screen and (max-width: 1366px) {
-    .VAS-glje-root .kpi {
+    .VAS-glju-root .kpi {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-glje-root .kpi {
+    .vis-editModeWidget .VAS-glju-root .kpi {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 1024px) {
-    .VAS-glje-root .kpi {
+    .VAS-glju-root .kpi {
         font-size: 9px;
     }
 
-    .vis-editModeWidget .VAS-glje-root .kpi {
+    .vis-editModeWidget .VAS-glju-root .kpi {
         font-size: 6px;
     }
 }
 
 @media screen and (max-width: 768px) {
-    .VAS-glje-root .kpi {
+    .VAS-glju-root .kpi {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-glje-root .kpi {
+    .vis-editModeWidget .VAS-glju-root .kpi {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 480px) {
-    .VAS-glje-root .kpi {
+    .VAS-glju-root .kpi {
         font-size: 11px;
     }
 }
 
 /* RTL support */
-html[dir="rtl"] .VAS-glje-root .w-head {
+html[dir="rtl"] .VAS-glju-root .w-head {
     flex-direction: row-reverse;
 }
 
-html[dir="rtl"] .VAS-glje-root .kpi-why {
+html[dir="rtl"] .VAS-glju-root .kpi-why {
     flex-direction: row-reverse;
 }

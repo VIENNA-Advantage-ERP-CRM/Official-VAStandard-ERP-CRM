@@ -4,13 +4,13 @@
  *            posted in the current calendar month.
  * Table    : GL_Journal
  */
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_GLJEntries, VAS_Why, VAS_AllJournalEntries
+    // Labels   : VAS_041_GLJEntries, VAS_041_Why, VAS_041_AllJournalEntries
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -18,7 +18,7 @@
         return (t && t.charAt(0) !== '[') ? t : fallback;
     }
 
-    VIS.GLJournalEntriesWidget = function () {
+    VAS.VAS_041_GLJournalEntriesWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -64,12 +64,12 @@
                 + '<div class="w-head">'
                 +   '<div class="w-icon">' + svgIcon + '</div>'
                 +   '<div class="w-title" id="VAS-glje-title-' + id + '">'
-                +     lbl('VAS_GLJEntries', 'Entries') + ' &middot; &mdash;'
+                +     lbl('VAS_041_GLJEntries', 'Entries') + ' &middot; &mdash;'
                 +   '</div>'
                 + '</div>'
                 + '<div class="kpi-value" id="VAS-glje-val-' + id + '">—</div>'
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_Why', 'Why') + '</span>'
+                +   '<span class="kpi-why-label">' + lbl('VAS_041_Why', 'Why') + '</span>'
                 +   '<span class="kpi-why-text" id="VAS-glje-why-' + id + '">&mdash;</span>'
                 + '</div>'
                 + '</div>';
@@ -84,7 +84,7 @@
         function loadData() {
             showBusy(true);
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_GLJournalWidget/GetMonthlyEntryCount',
+                url      : baseUrl + 'VAS/VAS_041_GLJournalEntriesWidget/GetMonthlyEntryCount',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
@@ -92,9 +92,9 @@
                     try {
                         var data = JSON.parse(result);
                         if (data) {
-                            $titleEl.html(lbl('VAS_GLJEntries', 'Entries') + ' &middot; ' + (data.MonthAbbr || ''));
+                            $titleEl.html(lbl('VAS_041_GLJEntries', 'Entries') + ' &middot; ' + (data.MonthAbbr || ''));
                             $kpiValue.text(typeof data.EntryCount === 'number' ? data.EntryCount : 0);
-                            $whyText.text(lbl('VAS_AllJournalEntries', 'All journal entries posted in') + ' ' + (data.MonthName || '') + '.');
+                            $whyText.text(lbl('VAS_041_AllJournalEntries', 'All journal entries posted in') + ' ' + (data.MonthName || '') + '.');
                         } else {
                             $kpiValue.text(0);
                             $whyText.text(lbl('VIS_NoData', 'No data available.'));
@@ -123,9 +123,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VIS.GLJournalEntriesWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_041_GLJournalEntriesWidget.prototype.refreshWidget = function () {};
 
-    VIS.GLJournalEntriesWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_041_GLJournalEntriesWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo            = windowNo;
@@ -133,12 +133,12 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.GLJournalEntriesWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_041_GLJournalEntriesWidget.prototype.widgetSizeChange = function (height, width) {};
 
-    VIS.GLJournalEntriesWidget.prototype.dispose = function () {
+    VAS.VAS_041_GLJournalEntriesWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

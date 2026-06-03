@@ -1,17 +1,17 @@
 /* ==========================================================================
-   VAS GL Journal Total Debit KPI Widget
-   File  : VAS_GLJournalTotalDebitWidget.css
-   Scope : .VAS-gljtd-root
+   VAS GL Journal Total Credit KPI Widget
+   File  : VAS_038_GLJournalTotalCreditWidget.css
+   Scope : .VAS-gljtc-root
    ========================================================================== */
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
-.VAS-gljtd-root {
+.VAS-gljtc-root {
     height: 100%;
     width: 100%;
 }
 
 /* ── KPI card container ──────────────────────────────────────────────────── */
-.VAS-gljtd-root .kpi {
+.VAS-gljtc-root .kpi {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -19,27 +19,27 @@
     padding: 1em;
     border-radius: 0.875em;
     border: 2px solid #FFFFFF;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    box-shadow: 0 10px 24px rgba(0, 83, 180, 0.06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
 }
 
-/* Green/success tint variant */
-.VAS-gljtd-root .kpi.kpi-green {
-    background: linear-gradient(145deg, rgba(240, 255, 250, 0.97) 0%, rgba(200, 242, 228, 0.80) 100%);
+/* Blue tint variant */
+.VAS-gljtc-root .kpi.kpi-blue {
+    background: linear-gradient(145deg, rgba(234, 248, 255, 0.97) 0%, rgba(194, 228, 255, 0.80) 100%);
 }
 
 /* ── Header row ──────────────────────────────────────────────────────────── */
-.VAS-gljtd-root .w-head {
+.VAS-gljtc-root .w-head {
     display: flex;
     align-items: center;
     gap: 0.5em;
 }
 
-/* Icon well — green tint */
-.VAS-gljtd-root .w-icon {
+/* Icon well — blue tint */
+.VAS-gljtc-root .w-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -47,18 +47,18 @@
     height: 1.75em;
     flex-shrink: 0;
     border-radius: 0.375em;
-    background: rgba(1, 157, 137, 0.13);
-    color: #0B6B45;
+    background: rgba(0, 131, 218, 0.13);
+    color: #004E9A;
 }
 
-.VAS-gljtd-root .w-icon svg {
+.VAS-gljtc-root .w-icon svg {
     width: 1.125em;
     height: 1.125em;
     stroke: currentColor;
 }
 
 /* Title label */
-.VAS-gljtd-root .w-title {
+.VAS-gljtc-root .w-title {
     font-size: 0.8125em;
     font-weight: 400;
     color: #5F7283;
@@ -69,7 +69,7 @@
 }
 
 /* ── Period toggle (APR · YTD) — pushed to far right of header ───────────── */
-.VAS-gljtd-period-toggle {
+.VAS-gljtc-period-toggle {
     display: flex;
     align-items: center;
     gap: 0.35em;
@@ -77,7 +77,7 @@
     flex-shrink: 0;
 }
 
-.VAS-gljtd-period {
+.VAS-gljtc-period {
     font-size: 0.75em;
     font-weight: 500;
     color: #748494;
@@ -88,23 +88,23 @@
     user-select: none;
 }
 
-.VAS-gljtd-period:hover {
-    color: #019D89;
+.VAS-gljtc-period:hover {
+    color: #0083DA;
 }
 
-.VAS-gljtd-period-active {
-    color: #019D89;
+.VAS-gljtc-period-active {
+    color: #0083DA;
     font-weight: 700;
 }
 
-.VAS-gljtd-sep {
+.VAS-gljtc-sep {
     font-size: 0.75em;
     color: #C0CBD3;
     user-select: none;
 }
 
 /* ── KPI value ───────────────────────────────────────────────────────────── */
-.VAS-gljtd-root .kpi-value {
+.VAS-gljtc-root .kpi-value {
     display: flex;
     align-items: baseline;
     gap: 0;
@@ -113,7 +113,7 @@
 }
 
 /* Currency prefix — small, muted */
-.VAS-gljtd-prefix {
+.VAS-gljtc-prefix {
     font-size: 0.65em;
     font-weight: 500;
     color: #5F7283;
@@ -123,34 +123,34 @@
 }
 
 /* Main integer part — large and bold */
-.VAS-gljtd-main {
+.VAS-gljtc-main {
     font-size: 2.25em;
     font-weight: 700;
     letter-spacing: -0.02em;
 }
 
 /* Decimal part — smaller and muted */
-.VAS-gljtd-decimal {
+.VAS-gljtc-decimal {
     font-size: 1.125em;
     font-weight: 400;
     color: #748494;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
-.VAS-gljtd-root .kpi-why {
+.VAS-gljtc-root .kpi-why {
     display: flex;
     align-items: flex-start;
     gap: 0.4em;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
     padding: 0.45em 0.6em;
-    border: 1px solid rgba(1, 157, 137, 0.15);
+    border: 1px solid rgba(0, 131, 218, 0.15);
 }
 
-.VAS-gljtd-root .kpi-why-label {
+.VAS-gljtc-root .kpi-why-label {
     font-size: 0.6875em;
     font-weight: 700;
-    color: #019D89;
+    color: #0083DA;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
@@ -158,7 +158,7 @@
     line-height: 1.4;
 }
 
-.VAS-gljtd-root .kpi-why-text {
+.VAS-gljtc-root .kpi-why-text {
     font-size: 0.6875em;
     font-weight: 400;
     color: #5F7283;
@@ -167,57 +167,57 @@
 
 /* ── Responsive scaling ──────────────────────────────────────────────────── */
 @media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-gljtd-root .kpi {
+    .vis-editModeWidget .VAS-gljtc-root .kpi {
         font-size: 10px;
     }
 }
 
 @media screen and (max-width: 1366px) {
-    .VAS-gljtd-root .kpi {
+    .VAS-gljtc-root .kpi {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-gljtd-root .kpi {
+    .vis-editModeWidget .VAS-gljtc-root .kpi {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 1024px) {
-    .VAS-gljtd-root .kpi {
+    .VAS-gljtc-root .kpi {
         font-size: 9px;
     }
 
-    .vis-editModeWidget .VAS-gljtd-root .kpi {
+    .vis-editModeWidget .VAS-gljtc-root .kpi {
         font-size: 6px;
     }
 }
 
 @media screen and (max-width: 768px) {
-    .VAS-gljtd-root .kpi {
+    .VAS-gljtc-root .kpi {
         font-size: 10px;
     }
 
-    .vis-editModeWidget .VAS-gljtd-root .kpi {
+    .vis-editModeWidget .VAS-gljtc-root .kpi {
         font-size: 7px;
     }
 }
 
 @media screen and (max-width: 480px) {
-    .VAS-gljtd-root .kpi {
+    .VAS-gljtc-root .kpi {
         font-size: 11px;
     }
 }
 
 /* RTL support */
-html[dir="rtl"] .VAS-gljtd-root .w-head {
+html[dir="rtl"] .VAS-gljtc-root .w-head {
     flex-direction: row-reverse;
 }
 
-html[dir="rtl"] .VAS-gljtd-period-toggle {
+html[dir="rtl"] .VAS-gljtc-period-toggle {
     margin-left: unset;
     margin-right: auto;
 }
 
-html[dir="rtl"] .VAS-gljtd-root .kpi-why {
+html[dir="rtl"] .VAS-gljtc-root .kpi-why {
     flex-direction: row-reverse;
 }

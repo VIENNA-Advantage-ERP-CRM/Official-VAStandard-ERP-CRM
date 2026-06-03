@@ -22,7 +22,7 @@ namespace VAS.Controllers
     /// Date range filtering uses integer YYYYMMDD comparisons so the query
     /// works on both Oracle and PostgreSQL without date-literal syntax.
     /// </summary>
-    public class VAS_GLJournalVolumeController : Controller
+    public class VAS_042_GLJournalVolumeWidgetController : Controller
     {
         /// <summary>
         /// Returns one entry per calendar day in the requested period,

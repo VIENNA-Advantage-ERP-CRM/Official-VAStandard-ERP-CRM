@@ -22,7 +22,7 @@ namespace VAS.Controllers
     /// remain inside the WHERE clause and do not corrupt the query structure.
     /// Date range filtering uses integer YYYYMMDD comparisons for Oracle/PostgreSQL compatibility.
     /// </summary>
-    public class VAS_GLJournalTopMovementController : Controller
+    public class VAS_043_GLJournalTopMovementWidgetController : Controller
     {
         /// <summary>
         /// Returns the top 10 accounts by absolute net movement for posted GL journals
