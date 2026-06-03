@@ -5,8 +5,9 @@
     min-height: 0;
     box-sizing: border-box;
     container-type: inline-size;
+    contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(1em, 1.4cqi, 1.5em);
+    font-size: clamp(0.875rem, 1.4cqi, 1.25rem);
     position: relative;
     overflow: hidden;
 }
@@ -72,6 +73,7 @@
         width: 1em;
         height: 1em;
         display: block;
+        flex: 0 0 auto;
         color: currentColor;
         stroke: currentColor;
         stroke-width: 0.1125em;
@@ -127,7 +129,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 1.375em;
+    font-size: clamp(1.125em, 5.5cqi, 1.375em);
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.025em;
@@ -147,16 +149,17 @@
 }
 
 .vas-ptm-why-pill {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     display: inline-flex;
     align-items: center;
-    max-width: none;
+    min-width: 0;
+    max-width: 45%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
     border: 0.0625em solid rgba(0, 131, 218, 0.15);
-    border-radius: 62.4375em;
+    border-radius: 999em;
     background: #dff1ff;
     color: #106ab0;
     font-size: 0.6875em;
@@ -170,13 +173,14 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
     color: #5f7283;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
 }
 
 .vas-ptm-root.vas-ptm-compact .vas-ptm-card {
@@ -187,6 +191,7 @@
 .vas-ptm-root.vas-ptm-compact .vas-ptm-icon {
     width: 1.75em;
     height: 1.75em;
+    border-radius: 0.5625em;
 }
 
     .vas-ptm-root.vas-ptm-compact .vas-ptm-icon svg {
@@ -195,21 +200,64 @@
     }
 
 .vas-ptm-root.vas-ptm-compact .vas-ptm-metric {
-    font-size: 1.125em;
+    font-size: clamp(1em, 5cqi, 1.125em);
 }
 
 .vas-ptm-root.vas-ptm-compact .vas-ptm-why-text {
     -webkit-line-clamp: 1;
+    line-clamp: 1;
 }
 
-@container (max-width: 18.75em) {
+@container (max-width: 300px) {
     .vas-ptm-card {
+        padding: 0.75em;
+        gap: 0.375em;
+    }
+
+    .vas-ptm-title {
         font-size: 0.8125em;
+    }
+
+    .vas-ptm-subtitle {
+        font-size: 0.625em;
+    }
+
+    .vas-ptm-metric {
+        font-size: clamp(1em, 5.5cqi, 1.25em);
     }
 }
 
-@container (max-width: 13.75em) {
+@container (max-width: 220px) {
     .vas-ptm-card {
-        font-size: 0.6875em;
+        padding: 0.625em;
+        gap: 0.3125em;
+    }
+
+    .vas-ptm-icon {
+        width: 1.625em;
+        height: 1.625em;
+        border-radius: 0.5em;
+    }
+
+        .vas-ptm-icon svg {
+            width: 0.8125em;
+            height: 0.8125em;
+        }
+
+    .vas-ptm-title {
+        font-size: 0.75em;
+    }
+
+    .vas-ptm-subtitle {
+        font-size: 0.5625em;
+    }
+
+    .vas-ptm-metric {
+        font-size: clamp(0.9375em, 6cqi, 1.125em);
+    }
+
+    .vas-ptm-why-pill,
+    .vas-ptm-why-text {
+        font-size: 0.625em;
     }
 }
