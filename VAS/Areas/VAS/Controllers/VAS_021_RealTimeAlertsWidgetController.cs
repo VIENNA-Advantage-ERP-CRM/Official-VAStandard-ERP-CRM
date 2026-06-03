@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Real-Time Alerts Widget
  * Created Date   : 14 May 2026
@@ -16,7 +16,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_RealTimeAlertsWidgetController : Controller
+    public class VAS_021_RealTimeAlertsWidgetController : Controller
     {
         string strQuery = "";
 

@@ -1,34 +1,36 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
- * Purpose        : Total Outstanding KPI Widget
- *                  Shows total outstanding AP balance, invoice count,
- *                  vendor count, trend vs last month, and a 7-month sparkline.
+ * Purpose        : Overdue Payables KPI Widget
+ *                  Shows total overdue AP balance, invoice count,
+ *                  average days past due, trend vs last month,
+ *                  and a 7-month sparkline in the background.
  * chronological  : Development
  * Created Date   : 13 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys used in this file (add via System Messages):
- *   VAS_TotalOutstanding  => "Total Outstanding"
- *   VAS_Invoices          => "Invoices"
- *   VAS_Vendors           => "Vendors"
- *   VAS_Worsening         => "worsening"
- *   VAS_Improving         => "improving"
- *   VAS_Crore             => "Cr"
- *   VAS_Lakh              => "L"
- *   VAS_Thousand          => "K"
- *   VAS_Million           => "M"
- *   VAS_Billion           => "B"
- *   VAS_Trillion          => "T"
+ *   VAS_018_OverduePayables  => "Overdue Payables"
+ *   VAS_018_Invoices         => "Invoices"
+ *   VAS_018_AvgDpd           => "Avg DPD"
+ *   VAS_018_DaySuffix        => "d"
+ *   VAS_018_Critical         => "critical"
+ *   VAS_018_Improving        => "improving"
+ *   VAS_018_Crore            => "Cr"
+ *   VAS_018_Lakh             => "L"
+ *   VAS_018_Thousand         => "K"
+ *   VAS_018_Million          => "M"
+ *   VAS_018_Billion          => "B"
+ *   VAS_018_Trillion         => "T"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_TotalOutstandingWidget = function () {
+    VAS.VAS_018_OverduePayablesWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-towdg-root">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-opwdg-root">');
         var $container;
         var widgetID = null;
 
@@ -45,7 +47,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_TotalOutstandingWidget/GetTotalOutstandingKpi',
+                url: VIS.Application.contextUrl + 'VAS/VAS_018_OverduePayablesWidget/GetOverduePayablesKpi',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -61,9 +63,9 @@
             });
         };
 
-        /* ---- Build the root shell (empty container, filled after load) ---- */
+        /* ---- Build the root shell ---- */
         function buildShell() {
-            $container = $('<div class="vas-towdg-container" id="vas_towdg_cont_' + widgetID + '">');
+            $container = $('<div class="vas-opwdg-container" id="vas_opwdg_cont_' + widgetID + '">');
             $root.append($container);
         }
 
@@ -72,41 +74,42 @@
             $container.empty();
 
             var sym = data.CurSymbol || '';
-            var outstandingFormatted = formatAmount(data.OutstandingTotal, data.StdPrecision);
+            var overdueFormatted = formatAmount(data.OverdueTotal, data.StdPrecision);
 
             var trendPct = 0;
-            if (data.LastMonthOutstanding && data.LastMonthOutstanding !== 0) {
-                trendPct = ((data.CurrentMonthOutstanding - data.LastMonthOutstanding) / Math.abs(data.LastMonthOutstanding)) * 100;
-            } else if (data.CurrentMonthOutstanding > 0) {
+            if (data.LastMonthOverdue && data.LastMonthOverdue !== 0) {
+                trendPct = ((data.CurrentMonthOverdue - data.LastMonthOverdue) / Math.abs(data.LastMonthOverdue)) * 100;
+            } else if (data.CurrentMonthOverdue > 0) {
                 trendPct = 100;
             }
 
-            // For outstanding: positive (more owed) = worsening; negative (less owed) = improving.
-            // Arrow direction reflects financial health, not raw amount: worsening = down arrow.
-            var isWorsening = trendPct >= 0;
-            var trendClass = isWorsening ? 'vas-towdg-trend-down' : 'vas-towdg-trend-up';
+            // For overdue: positive (more overdue) = critical (bad), negative (less) = improving.
+            // Arrow direction reflects financial health: worsening = down arrow.
+            var isCritical = trendPct >= 0;
+            var trendClass = isCritical ? 'vas-opwdg-trend-down' : 'vas-opwdg-trend-up';
             var trendSign = trendPct >= 0 ? '+' : '';
-            var trendWord = isWorsening ? VIS.Msg.getMsg('VAS_Worsening') : VIS.Msg.getMsg('VAS_Improving');
-            var arrowPoints = isWorsening ? '6 9 12 15 18 9' : '18 15 12 9 6 15';
+            var trendWord = isCritical ? VIS.Msg.getMsg('VAS_018_Critical') : VIS.Msg.getMsg('VAS_018_Improving');
+            var arrowPoints = isCritical ? '6 9 12 15 18 9' : '18 15 12 9 6 15';
 
+            var avgDpdDisplay = data.AvgDpd + VIS.Msg.getMsg('VAS_018_DaySuffix');
             var sparkSvg = buildSparklineSvg(data.SparklineData || []);
 
-            var html = '<div class="vas-towdg-label">' + VIS.Msg.getMsg('VAS_TotalOutstanding') + '</div>'
-                + '<div class="vas-towdg-value" id="vas_towdg_val_' + widgetID + '">'
-                +   sym + outstandingFormatted
+            var html = '<div class="vas-opwdg-label">' + VIS.Msg.getMsg('VAS_018_OverduePayables') + '</div>'
+                + '<div class="vas-opwdg-value" id="vas_opwdg_val_' + widgetID + '">'
+                +   sym + overdueFormatted
                 + '</div>'
-                + '<div class="vas-towdg-pills-row">'
-                +   '<div class="vas-towdg-pill">'
-                +     '<span class="vas-towdg-pill-label">' + VIS.Msg.getMsg('VAS_Invoices') + '</span>'
-                +     '<span class="vas-towdg-pill-value">' + data.InvoiceCount + '</span>'
+                + '<div class="vas-opwdg-pills-row">'
+                +   '<div class="vas-opwdg-pill">'
+                +     '<span class="vas-opwdg-pill-label">' + VIS.Msg.getMsg('VAS_018_Invoices') + '</span>'
+                +     '<span class="vas-opwdg-pill-value">' + data.InvoiceCount + '</span>'
                 +   '</div>'
-                +   '<div class="vas-towdg-pill">'
-                +     '<span class="vas-towdg-pill-label">' + VIS.Msg.getMsg('VAS_Vendors') + '</span>'
-                +     '<span class="vas-towdg-pill-value">' + data.VendorCount + '</span>'
+                +   '<div class="vas-opwdg-pill">'
+                +     '<span class="vas-opwdg-pill-label">' + VIS.Msg.getMsg('VAS_018_AvgDpd') + '</span>'
+                +     '<span class="vas-opwdg-pill-value">' + avgDpdDisplay + '</span>'
                 +   '</div>'
                 + '</div>'
-                + '<div class="vas-towdg-trend-row ' + trendClass + '">'
-                +   '<svg class="vas-towdg-trend-icon" viewBox="0 0 24 24" fill="none"'
+                + '<div class="vas-opwdg-trend-row ' + trendClass + '">'
+                +   '<svg class="vas-opwdg-trend-icon" viewBox="0 0 24 24" fill="none"'
                 +       ' stroke="currentColor" stroke-width="2.5"'
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
                 +     '<polyline points="' + arrowPoints + '"/>'
@@ -129,19 +132,19 @@
             var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
 
             if (absNumber >= 1000000000000) {
-                unit = VIS.Msg.getMsg('VAS_Trillion');
+                unit = VIS.Msg.getMsg('VAS_018_Trillion');
                 formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000000000) {
-                unit = VIS.Msg.getMsg('VAS_Billion');
+                unit = VIS.Msg.getMsg('VAS_018_Billion');
                 formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 10000000) {
-                unit = VIS.Msg.getMsg('VAS_Crore');
+                unit = VIS.Msg.getMsg('VAS_018_Crore');
                 formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 100000) {
-                unit = VIS.Msg.getMsg('VAS_Lakh');
+                unit = VIS.Msg.getMsg('VAS_018_Lakh');
                 formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000) {
-                unit = VIS.Msg.getMsg('VAS_Thousand');
+                unit = VIS.Msg.getMsg('VAS_018_Thousand');
                 formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
             } else {
                 formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
@@ -164,10 +167,10 @@
                 var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
                 pts.push(x.toFixed(1) + ',' + y.toFixed(1));
             }
-            return '<svg class="vas-towdg-sparkline" width="' + W + '" height="' + H
+            return '<svg class="vas-opwdg-sparkline" width="' + W + '" height="' + H
                 + '" viewBox="0 0 ' + W + ' ' + H + '">'
                 + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#D14545" stroke-width="2.2" stroke-linecap="round"/>'
+                + ' stroke="#D78B10" stroke-width="2.2" stroke-linecap="round"/>'
                 + '</svg>';
         }
 
@@ -191,7 +194,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_TotalOutstandingWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_018_OverduePayablesWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -203,15 +206,15 @@
         }, 50);
     };
 
-    VAS.VAS_TotalOutstandingWidget.prototype.refreshWidget = function () {
+    VAS.VAS_018_OverduePayablesWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_TotalOutstandingWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_018_OverduePayablesWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_TotalOutstandingWidget.prototype.dispose = function () {
+    VAS.VAS_018_OverduePayablesWidget.prototype.dispose = function () {
         if (this.frame) {
             this.frame.dispose();
         }

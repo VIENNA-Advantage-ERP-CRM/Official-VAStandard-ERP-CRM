@@ -1,36 +1,33 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
- * Purpose        : Overdue Payables KPI Widget
- *                  Shows total overdue AP balance, invoice count,
- *                  average days past due, trend vs last month,
- *                  and a 7-month sparkline in the background.
+ * Purpose        : Total Purchases (MTD) KPI Widget
+ *                  Shows MTD total, YTD total, invoice count,
+ *                  trend vs last month, and a 7-month sparkline.
  * chronological  : Development
- * Created Date   : 13 May 2026
+ * Created Date   : 12 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys used in this file (add via System Messages):
- *   VAS_OverduePayables  => "Overdue Payables"
- *   VAS_Invoices         => "Invoices"
- *   VAS_AvgDpd           => "Avg DPD"
- *   VAS_DaySuffix        => "d"
- *   VAS_Critical         => "critical"
- *   VAS_Improving        => "improving"
- *   VAS_Crore            => "Cr"
- *   VAS_Lakh             => "L"
- *   VAS_Thousand         => "K"
- *   VAS_Million          => "M"
- *   VAS_Billion          => "B"
- *   VAS_Trillion         => "T"
+ *   VAS_025_TotalPurchasesMTD  => "Total Purchases (MTD)"
+ *   VAS_025_YTD                => "YTD"
+ *   VAS_025_INV                => "INV"
+ *   VAS_025_VsLastMonth        => "vs last month"
+ *   VAS_025_Crore              => "Cr"
+ *   VAS_025_Lakh               => "L"
+ *   VAS_025_Thousand           => "K"
+ *   VAS_025_Million            => "M"
+ *   VAS_025_Billion            => "B"
+ *   VAS_025_Trillion           => "T"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_OverduePayablesWidget = function () {
+    VAS.VAS_025_TotalPurchasesWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-opwdg-root">');
+        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-tpwidg-root">');
         var $container;
         var widgetID = null;
 
@@ -47,7 +44,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_OverduePayablesWidget/GetOverduePayablesKpi',
+                url: VIS.Application.contextUrl + 'VAS/VAS_025_TotalPurchasesWidget/GetTotalPurchasesKpi',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -63,9 +60,9 @@
             });
         };
 
-        /* ---- Build the root shell ---- */
+        /* ---- Build the root shell (empty container, filled after load) ---- */
         function buildShell() {
-            $container = $('<div class="vas-opwdg-container" id="vas_opwdg_cont_' + widgetID + '">');
+            $container = $('<div class="vas-tpwidg-container" id="vas_tpwidg_cont_' + widgetID + '">');
             $root.append($container);
         }
 
@@ -74,47 +71,44 @@
             $container.empty();
 
             var sym = data.CurSymbol || '';
-            var overdueFormatted = formatAmount(data.OverdueTotal, data.StdPrecision);
+            var mtdFormatted = formatAmount(data.MtdTotal, data.StdPrecision);
+            var ytdFormatted = formatAmount(data.YtdTotal, data.StdPrecision);
 
             var trendPct = 0;
-            if (data.LastMonthOverdue && data.LastMonthOverdue !== 0) {
-                trendPct = ((data.CurrentMonthOverdue - data.LastMonthOverdue) / Math.abs(data.LastMonthOverdue)) * 100;
-            } else if (data.CurrentMonthOverdue > 0) {
+            if (data.LastMonthTotal && data.LastMonthTotal !== 0) {
+                trendPct = ((data.MtdTotal - data.LastMonthTotal) / Math.abs(data.LastMonthTotal)) * 100;
+            } else if (data.MtdTotal > 0) {
                 trendPct = 100;
             }
+            var trendUp = trendPct >= 0;
+            var trendClass = trendUp ? 'vas-tpwidg-trend-up' : 'vas-tpwidg-trend-down';
+            var trendSign = trendUp ? '+' : '';
+            // Up arrow: 18,15 → 12,9 → 6,15  |  Down arrow: 6,9 → 12,15 → 18,9
+            var arrowPoints = trendUp ? '18 15 12 9 6 15' : '6 9 12 15 18 9';
 
-            // For overdue: positive (more overdue) = critical (bad), negative (less) = improving.
-            // Arrow direction reflects financial health: worsening = down arrow.
-            var isCritical = trendPct >= 0;
-            var trendClass = isCritical ? 'vas-opwdg-trend-down' : 'vas-opwdg-trend-up';
-            var trendSign = trendPct >= 0 ? '+' : '';
-            var trendWord = isCritical ? VIS.Msg.getMsg('VAS_Critical') : VIS.Msg.getMsg('VAS_Improving');
-            var arrowPoints = isCritical ? '6 9 12 15 18 9' : '18 15 12 9 6 15';
-
-            var avgDpdDisplay = data.AvgDpd + VIS.Msg.getMsg('VAS_DaySuffix');
             var sparkSvg = buildSparklineSvg(data.SparklineData || []);
 
-            var html = '<div class="vas-opwdg-label">' + VIS.Msg.getMsg('VAS_OverduePayables') + '</div>'
-                + '<div class="vas-opwdg-value" id="vas_opwdg_val_' + widgetID + '">'
-                +   sym + overdueFormatted
+            var html = '<div class="vas-tpwidg-label">' + VIS.Msg.getMsg('VAS_025_TotalPurchasesMTD') + '</div>'
+                + '<div class="vas-tpwidg-value" id="vas_tpwidg_val_' + widgetID + '">'
+                +   sym + mtdFormatted
                 + '</div>'
-                + '<div class="vas-opwdg-pills-row">'
-                +   '<div class="vas-opwdg-pill">'
-                +     '<span class="vas-opwdg-pill-label">' + VIS.Msg.getMsg('VAS_Invoices') + '</span>'
-                +     '<span class="vas-opwdg-pill-value">' + data.InvoiceCount + '</span>'
+                + '<div class="vas-tpwidg-pills-row">'
+                +   '<div class="vas-tpwidg-pill">'
+                +     '<span class="vas-tpwidg-pill-label">' + VIS.Msg.getMsg('VAS_025_YTD') + '</span>'
+                +     '<span class="vas-tpwidg-pill-value">' + sym + ytdFormatted + '</span>'
                 +   '</div>'
-                +   '<div class="vas-opwdg-pill">'
-                +     '<span class="vas-opwdg-pill-label">' + VIS.Msg.getMsg('VAS_AvgDpd') + '</span>'
-                +     '<span class="vas-opwdg-pill-value">' + avgDpdDisplay + '</span>'
+                +   '<div class="vas-tpwidg-pill">'
+                +     '<span class="vas-tpwidg-pill-label">' + VIS.Msg.getMsg('VAS_025_INV') + '</span>'
+                +     '<span class="vas-tpwidg-pill-value">' + data.InvoiceCount + '</span>'
                 +   '</div>'
                 + '</div>'
-                + '<div class="vas-opwdg-trend-row ' + trendClass + '">'
-                +   '<svg class="vas-opwdg-trend-icon" viewBox="0 0 24 24" fill="none"'
+                + '<div class="vas-tpwidg-trend-row ' + trendClass + '">'
+                +   '<svg class="vas-tpwidg-trend-icon" viewBox="0 0 24 24" fill="none"'
                 +       ' stroke="currentColor" stroke-width="2.5"'
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
                 +     '<polyline points="' + arrowPoints + '"/>'
                 +   '</svg>'
-                +   trendSign + Math.abs(trendPct).toFixed(1) + '% ' + trendWord
+                +   trendSign + Math.abs(trendPct).toFixed(1) + '% ' + VIS.Msg.getMsg('VAS_025_VsLastMonth')
                 + '</div>'
                 + sparkSvg;
 
@@ -132,19 +126,19 @@
             var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
 
             if (absNumber >= 1000000000000) {
-                unit = VIS.Msg.getMsg('VAS_Trillion');
+                unit = VIS.Msg.getMsg('VAS_025_Trillion');
                 formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000000000) {
-                unit = VIS.Msg.getMsg('VAS_Billion');
+                unit = VIS.Msg.getMsg('VAS_025_Billion');
                 formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 10000000) {
-                unit = VIS.Msg.getMsg('VAS_Crore');
+                unit = VIS.Msg.getMsg('VAS_025_Crore');
                 formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 100000) {
-                unit = VIS.Msg.getMsg('VAS_Lakh');
+                unit = VIS.Msg.getMsg('VAS_025_Lakh');
                 formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000) {
-                unit = VIS.Msg.getMsg('VAS_Thousand');
+                unit = VIS.Msg.getMsg('VAS_025_Thousand');
                 formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
             } else {
                 formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
@@ -167,10 +161,10 @@
                 var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
                 pts.push(x.toFixed(1) + ',' + y.toFixed(1));
             }
-            return '<svg class="vas-opwdg-sparkline" width="' + W + '" height="' + H
+            return '<svg class="vas-tpwidg-sparkline" width="' + W + '" height="' + H
                 + '" viewBox="0 0 ' + W + ' ' + H + '">'
                 + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#D78B10" stroke-width="2.2" stroke-linecap="round"/>'
+                + ' stroke="#0083DA" stroke-width="2.2" stroke-linecap="round"/>'
                 + '</svg>';
         }
 
@@ -194,7 +188,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_OverduePayablesWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_025_TotalPurchasesWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -206,15 +200,15 @@
         }, 50);
     };
 
-    VAS.VAS_OverduePayablesWidget.prototype.refreshWidget = function () {
+    VAS.VAS_025_TotalPurchasesWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_OverduePayablesWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_025_TotalPurchasesWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_OverduePayablesWidget.prototype.dispose = function () {
+    VAS.VAS_025_TotalPurchasesWidget.prototype.dispose = function () {
         if (this.frame) {
             this.frame.dispose();
         }

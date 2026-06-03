@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Monthly Purchase Spend Trend Widget
  * Created Date   : 14 May 2026
@@ -15,7 +15,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_MonthlyPurchaseSpendWidgetController : Controller
+    public class VAS_017_MonthlyPurchaseSpendWidgetController : Controller
     {
         string strQuery = "";
 

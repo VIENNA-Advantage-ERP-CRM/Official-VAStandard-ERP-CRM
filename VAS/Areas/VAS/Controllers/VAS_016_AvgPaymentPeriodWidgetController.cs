@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Avg Payment Period (DPO) KPI Widget
  * chronological  : Development
@@ -17,7 +17,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_AvgPaymentPeriodWidgetController : Controller
+    public class VAS_016_AvgPaymentPeriodWidgetController : Controller
     {
         string strQuery = "";
 

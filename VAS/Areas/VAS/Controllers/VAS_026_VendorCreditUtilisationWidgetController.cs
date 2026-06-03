@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Vendor Credit Utilisation Widget
  * Created Date   : 14 May 2026
@@ -16,7 +16,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_VendorCreditUtilisationWidgetController : Controller
+    public class VAS_026_VendorCreditUtilisationWidgetController : Controller
     {
         string strQuery = "";
 

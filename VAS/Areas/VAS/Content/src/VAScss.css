@@ -12,15 +12,15 @@
 @import "../VAS_HighestSellingWidget.css";
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
-@import "../VAS_TotalPurchasesWidget.css";
-@import "../VAS_TotalOutstandingWidget.css";
-@import "../VAS_OverduePayablesWidget.css";
-@import "../VAS_AvgPaymentPeriodWidget.css";
-@import "../VAS_PayableAgingWidget.css";
-@import "../VAS_MonthlyPurchaseSpendWidget.css";
-@import "../VAS_SpendByCategoryWidget.css";
-@import "../VAS_RealTimeAlertsWidget.css";
-@import "../VAS_TopFiveVendorsWidget.css";
-@import "../VAS_PendingInvoicesWidget.css";
-@import "../VAS_VendorCreditUtilisationWidget.css";
+@import "../VAS_025_TotalPurchasesWidget.css";
+@import "../VAS_024_TotalOutstandingWidget.css";
+@import "../VAS_018_OverduePayablesWidget.css";
+@import "../VAS_016_AvgPaymentPeriodWidget.css";
+@import "../VAS_019_PayableAgingWidget.css";
+@import "../VAS_017_MonthlyPurchaseSpendWidget.css";
+@import "../VAS_022_SpendByCategoryWidget.css";
+@import "../VAS_021_RealTimeAlertsWidget.css";
+@import "../VAS_023_TopFiveVendorsWidget.css";
+@import "../VAS_020_PendingInvoicesWidget.css";
+@import "../VAS_026_VendorCreditUtilisationWidget.css";
 

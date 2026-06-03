@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Avg Payment Period (DPO) KPI Widget
  *                  Shows average days payable outstanding, target vs gap,
@@ -8,17 +8,17 @@
  * Created by     : Humam Yousif
  *
  * AD_Message keys used in this file (add via System Messages):
- *   VAS_AvgPaymentPeriodDpo  => "Avg Payment Period (DPO)"
- *   VAS_Target               => "Target"
- *   VAS_Gap                  => "Gap"
- *   VAS_Days                 => "days"
- *   VAS_DaySuffix            => "d"
- *   VAS_VsLastMonth          => "vs last month"
+ *   VAS_016_AvgPaymentPeriodDpo  => "Avg Payment Period (DPO)"
+ *   VAS_016_Target               => "Target"
+ *   VAS_016_Gap                  => "Gap"
+ *   VAS_016_Days                 => "days"
+ *   VAS_016_DaySuffix            => "d"
+ *   VAS_016_VsLastMonth          => "vs last month"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_AvgPaymentPeriodWidget = function () {
+    VAS.VAS_016_AvgPaymentPeriodWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -40,7 +40,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_AvgPaymentPeriodWidget/GetAvgPaymentPeriodKpi',
+                url: VIS.Application.contextUrl + 'VAS/VAS_016_AvgPaymentPeriodWidget/GetAvgPaymentPeriodKpi',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -66,8 +66,8 @@
         function renderKpi(data) {
             $container.empty();
 
-            var daySuffix = VIS.Msg.getMsg('VAS_DaySuffix');
-            var days = VIS.Msg.getMsg('VAS_Days');
+            var daySuffix = VIS.Msg.getMsg('VAS_016_DaySuffix');
+            var days = VIS.Msg.getMsg('VAS_016_Days');
 
             // Trend: difference in days (absolute, not percentage)
             var daysDiff = (data.CurrentMonthDpo || 0) - (data.LastMonthDpo || 0);
@@ -83,17 +83,17 @@
 
             var sparkSvg = buildSparklineSvg(data.SparklineData || []);
 
-            var html = '<div class="vas-apwdg-label">' + VIS.Msg.getMsg('VAS_AvgPaymentPeriodDpo') + '</div>'
+            var html = '<div class="vas-apwdg-label">' + VIS.Msg.getMsg('VAS_016_AvgPaymentPeriodDpo') + '</div>'
                 + '<div class="vas-apwdg-value" id="vas_apwdg_val_' + widgetID + '">'
                 +   (data.CurrentMonthDpo || 0) + ' ' + days
                 + '</div>'
                 + '<div class="vas-apwdg-pills-row">'
                 +   '<div class="vas-apwdg-pill">'
-                +     '<span class="vas-apwdg-pill-label">' + VIS.Msg.getMsg('VAS_Target') + '</span>'
+                +     '<span class="vas-apwdg-pill-label">' + VIS.Msg.getMsg('VAS_016_Target') + '</span>'
                 +     '<span class="vas-apwdg-pill-value">' + (data.TargetDpo || 0) + daySuffix + '</span>'
                 +   '</div>'
                 +   '<div class="vas-apwdg-pill">'
-                +     '<span class="vas-apwdg-pill-label">' + VIS.Msg.getMsg('VAS_Gap') + '</span>'
+                +     '<span class="vas-apwdg-pill-label">' + VIS.Msg.getMsg('VAS_016_Gap') + '</span>'
                 +     '<span class="vas-apwdg-pill-value ' + gapClass + '">' + gapSign + gapDays + daySuffix + '</span>'
                 +   '</div>'
                 + '</div>'
@@ -103,7 +103,7 @@
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
                 +     '<polyline points="' + arrowPoints + '"/>'
                 +   '</svg>'
-                +   trendSign + Math.abs(daysDiff) + ' ' + days + ' ' + VIS.Msg.getMsg('VAS_VsLastMonth')
+                +   trendSign + Math.abs(daysDiff) + ' ' + days + ' ' + VIS.Msg.getMsg('VAS_016_VsLastMonth')
                 + '</div>'
                 + sparkSvg;
 
@@ -151,7 +151,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_AvgPaymentPeriodWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_016_AvgPaymentPeriodWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -163,15 +163,15 @@
         }, 50);
     };
 
-    VAS.VAS_AvgPaymentPeriodWidget.prototype.refreshWidget = function () {
+    VAS.VAS_016_AvgPaymentPeriodWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_AvgPaymentPeriodWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_016_AvgPaymentPeriodWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_AvgPaymentPeriodWidget.prototype.dispose = function () {
+    VAS.VAS_016_AvgPaymentPeriodWidget.prototype.dispose = function () {
         if (this.frame) {
             this.frame.dispose();
         }

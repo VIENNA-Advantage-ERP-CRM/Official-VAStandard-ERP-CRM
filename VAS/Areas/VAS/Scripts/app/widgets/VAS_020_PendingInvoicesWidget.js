@@ -1,19 +1,19 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Pending Invoices Widget
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_PendingInvoices     => "Pending Invoices"
- *   VAS_NeedsAttention      => "Needs Attention"
- *   VAS_GRNMismatch         => "GRN Mismatch"
- *   VAS_PONotRaised         => "PO Not Raised"
- *   VAS_ReadyToPay          => "Ready to Pay"
- *   VAS_UpcomingPaymentsDue => "Upcoming Payments Due"
- *   VAS_Pending             => "pending"
- *   VAS_NoDuePayments       => "No payments due in the next 14 days"
- *   VAS_Value               => "value"
+ *   VAS_020_PendingInvoices     => "Pending Invoices"
+ *   VAS_020_NeedsAttention      => "Needs Attention"
+ *   VAS_020_GRNMismatch         => "GRN Mismatch"
+ *   VAS_020_PONotRaised         => "PO Not Raised"
+ *   VAS_020_ReadyToPay          => "Ready to Pay"
+ *   VAS_020_UpcomingPaymentsDue => "Upcoming Payments Due"
+ *   VAS_020_Pending             => "pending"
+ *   VAS_020_NoDuePayments       => "No payments due in the next 14 days"
+ *   VAS_020_Value               => "value"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -26,7 +26,7 @@
         rtp: '#019D89'    // Ready to Pay — green
     };
 
-    VAS.VAS_PendingInvoicesWidget = function () {
+    VAS.VAS_020_PendingInvoicesWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -50,7 +50,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_PendingInvoicesWidget/GetPendingInvoices',
+                url: VIS.Application.contextUrl + 'VAS/VAS_020_PendingInvoicesWidget/GetPendingInvoices',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -87,26 +87,26 @@
                             '<polyline points="14 2 14 8 20 8"/>' +
                             '<line x1="9" y1="15" x2="15" y2="15"/>' +
                         '</svg>' +
-                        piEsc(VIS.Msg.getMsg('VAS_PendingInvoices') || 'Pending Invoices') +
+                        piEsc(VIS.Msg.getMsg('VAS_020_PendingInvoices') || 'Pending Invoices') +
                     '</div>' +
                     (tot > 0
-                        ? '<span class="vas-piawdg-badge">' + tot + ' ' + (VIS.Msg.getMsg('VAS_Pending') || 'pending') + '</span>'
+                        ? '<span class="vas-piawdg-badge">' + tot + ' ' + (VIS.Msg.getMsg('VAS_020_Pending') || 'pending') + '</span>'
                         : '') +
                 '</div>' +
 
                 /* KPI 2×2 grid */
                 '<div class="vas-piawdg-kpi-grid">' +
                     piKpiBox(
-                        VIS.Msg.getMsg('VAS_NeedsAttention') || 'Needs Attention',
+                        VIS.Msg.getMsg('VAS_020_NeedsAttention') || 'Needs Attention',
                         data.AwaitingApprovalCount, data.AwaitingApprovalAmt, sym, prec, 'vas-piawdg-kpi-val--aa') +
                     piKpiBox(
-                        VIS.Msg.getMsg('VAS_GRNMismatch') || 'GRN Mismatch',
+                        VIS.Msg.getMsg('VAS_020_GRNMismatch') || 'GRN Mismatch',
                         data.GrnMismatchCount, data.GrnMismatchAmt, sym, prec, 'vas-piawdg-kpi-val--grn') +
                     piKpiBox(
-                        VIS.Msg.getMsg('VAS_PONotRaised') || 'PO Not Raised',
+                        VIS.Msg.getMsg('VAS_020_PONotRaised') || 'PO Not Raised',
                         data.PoNotRaisedCount, data.PoNotRaisedAmt, sym, prec, 'vas-piawdg-kpi-val--pnr') +
                     piKpiBox(
-                        VIS.Msg.getMsg('VAS_ReadyToPay') || 'Ready to Pay',
+                        VIS.Msg.getMsg('VAS_020_ReadyToPay') || 'Ready to Pay',
                         data.ReadyToPayCount, data.ReadyToPayAmt, sym, prec, 'vas-piawdg-kpi-val--rtp') +
                 '</div>' +
 
@@ -114,13 +114,13 @@
 
                 /* Upcoming due section */
                 '<div class="vas-piawdg-due-header">' +
-                    (VIS.Msg.getMsg('VAS_UpcomingPaymentsDue') || 'Upcoming Payments Due') +
+                    (VIS.Msg.getMsg('VAS_020_UpcomingPaymentsDue') || 'Upcoming Payments Due') +
                 '</div>' +
                 '<div class="vas-piawdg-due-list">';
 
             var dueItems = data.DueItems || [];
             if (dueItems.length === 0) {
-                html += '<div class="vas-piawdg-due-empty">' + (VIS.Msg.getMsg('VAS_NoDuePayments') || 'No payments due in the next 14 days') + '</div>';
+                html += '<div class="vas-piawdg-due-empty">' + (VIS.Msg.getMsg('VAS_020_NoDuePayments') || 'No payments due in the next 14 days') + '</div>';
             } else {
                 for (var i = 0; i < dueItems.length; i++) {
                     var item       = dueItems[i];
@@ -149,7 +149,7 @@
                 '<div class="vas-piawdg-kpi-box">' +
                     '<div class="vas-piawdg-kpi-lbl">' + piEsc(label) + '</div>' +
                     '<div class="vas-piawdg-kpi-val ' + colorClass + '">' + (count || 0) + '</div>' +
-                    '<div class="vas-piawdg-kpi-sub">' + piFmt(amount || 0, sym, prec) + ' ' + (VIS.Msg.getMsg('VAS_Value') || 'value') + '</div>' +
+                    '<div class="vas-piawdg-kpi-sub">' + piFmt(amount || 0, sym, prec) + ' ' + (VIS.Msg.getMsg('VAS_020_Value') || 'value') + '</div>' +
                 '</div>'
             );
         }
@@ -194,7 +194,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_PendingInvoicesWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_020_PendingInvoicesWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -204,15 +204,15 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_PendingInvoicesWidget.prototype.refreshWidget = function () {
+    VAS.VAS_020_PendingInvoicesWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_PendingInvoicesWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_020_PendingInvoicesWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_PendingInvoicesWidget.prototype.dispose = function () {
+    VAS.VAS_020_PendingInvoicesWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

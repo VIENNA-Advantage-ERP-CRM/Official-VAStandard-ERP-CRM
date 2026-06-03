@@ -1,27 +1,27 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Monthly Purchase Spend Trend Widget (line chart)
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_MonthlyPurchaseSpend => "Monthly Purchase Spend"
- *   VAS_ThisYear             => "This year"
- *   VAS_LastYear             => "Last year"
- *   VAS_Monthly              => "Monthly"
- *   VAS_Quarterly            => "Quarterly"
- *   VAS_Q1                   => "Q1"
- *   VAS_Q2                   => "Q2"
- *   VAS_Q3                   => "Q3"
- *   VAS_Q4                   => "Q4"
- *   VAS_Crore                => "Cr"
- *   VAS_Lakh                 => "L"
- *   VAS_Thousand             => "K"
+ *   VAS_017_MonthlyPurchaseSpend => "Monthly Purchase Spend"
+ *   VAS_017_ThisYear             => "This year"
+ *   VAS_017_LastYear             => "Last year"
+ *   VAS_017_Monthly              => "Monthly"
+ *   VAS_017_Quarterly            => "Quarterly"
+ *   VAS_017_Q1                   => "Q1"
+ *   VAS_017_Q2                   => "Q2"
+ *   VAS_017_Q3                   => "Q3"
+ *   VAS_017_Q4                   => "Q4"
+ *   VAS_017_Crore                => "Cr"
+ *   VAS_017_Lakh                 => "L"
+ *   VAS_017_Thousand             => "K"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_MonthlyPurchaseSpendWidget = function () {
+    VAS.VAS_017_MonthlyPurchaseSpendWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -48,7 +48,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_MonthlyPurchaseSpendWidget/GetMonthlyPurchaseSpend',
+                url: VIS.Application.contextUrl + 'VAS/VAS_017_MonthlyPurchaseSpendWidget/GetMonthlyPurchaseSpend',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -83,25 +83,25 @@
                 +       '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>'
                 +       '<polyline points="17 6 23 6 23 12"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_MonthlyPurchaseSpend') + ' — ' + fyLbl
+                +     VIS.Msg.getMsg('VAS_017_MonthlyPurchaseSpend') + ' — ' + fyLbl
                 +   '</div>'
                 +   '<div class="vas-mpswdg-header-right">'
                 +     '<div class="vas-mpswdg-legend">'
                 +       '<span class="vas-mpswdg-legend-item">'
                 +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-solid"></span>'
-                +         VIS.Msg.getMsg('VAS_ThisYear')
+                +         VIS.Msg.getMsg('VAS_017_ThisYear')
                 +       '</span>'
                 +       '<span class="vas-mpswdg-legend-item">'
                 +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-dashed"></span>'
-                +         VIS.Msg.getMsg('VAS_LastYear')
+                +         VIS.Msg.getMsg('VAS_017_LastYear')
                 +       '</span>'
                 +     '</div>'
                 +     '<div class="vas-mpswdg-tabs">'
                 +       '<button class="vas-mpswdg-tab vas-mpswdg-tab-active" data-mode="monthly">'
-                +         VIS.Msg.getMsg('VAS_Monthly')
+                +         VIS.Msg.getMsg('VAS_017_Monthly')
                 +       '</button>'
                 +       '<button class="vas-mpswdg-tab" data-mode="quarterly">'
-                +         VIS.Msg.getMsg('VAS_Quarterly')
+                +         VIS.Msg.getMsg('VAS_017_Quarterly')
                 +       '</button>'
                 +     '</div>'
                 +   '</div>'
@@ -149,10 +149,10 @@
                     ly[9] + ly[10] + ly[11]
                 ];
                 xLabels = [
-                    VIS.Msg.getMsg('VAS_Q1'),
-                    VIS.Msg.getMsg('VAS_Q2'),
-                    VIS.Msg.getMsg('VAS_Q3'),
-                    VIS.Msg.getMsg('VAS_Q4')
+                    VIS.Msg.getMsg('VAS_017_Q1'),
+                    VIS.Msg.getMsg('VAS_017_Q2'),
+                    VIS.Msg.getMsg('VAS_017_Q3'),
+                    VIS.Msg.getMsg('VAS_017_Q4')
                 ];
             } else {
                 /* Indian FY: Apr(3)→Mar(2); generate locale-aware month abbreviations */
@@ -174,7 +174,7 @@
                     labels: xLabels,
                     datasets: [
                         {
-                            label: VIS.Msg.getMsg('VAS_ThisYear') || 'This year',
+                            label: VIS.Msg.getMsg('VAS_017_ThisYear') || 'This year',
                             data: d1,
                             borderColor: '#0083DA',
                             backgroundColor: 'rgba(0,131,218,0.10)',
@@ -188,7 +188,7 @@
                             borderWidth: 2
                         },
                         {
-                            label: VIS.Msg.getMsg('VAS_LastYear') || 'Last year',
+                            label: VIS.Msg.getMsg('VAS_017_LastYear') || 'Last year',
                             data: d2,
                             borderColor: 'rgba(0,131,218,0.38)',
                             backgroundColor: 'transparent',
@@ -247,9 +247,9 @@
             var loc   = window.navigator.language;
             var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_Crore'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_Lakh'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_Thousand'); }
+            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_017_Crore'); }
+            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_017_Lakh'); }
+            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_017_Thousand'); }
             return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 
@@ -275,7 +275,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_MonthlyPurchaseSpendWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_017_MonthlyPurchaseSpendWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -285,11 +285,11 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_MonthlyPurchaseSpendWidget.prototype.refreshWidget = function () {
+    VAS.VAS_017_MonthlyPurchaseSpendWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_MonthlyPurchaseSpendWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_017_MonthlyPurchaseSpendWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
@@ -297,7 +297,7 @@
         }
     };
 
-    VAS.VAS_MonthlyPurchaseSpendWidget.prototype.dispose = function () {
+    VAS.VAS_017_MonthlyPurchaseSpendWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

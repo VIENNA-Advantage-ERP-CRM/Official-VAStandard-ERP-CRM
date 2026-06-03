@@ -1,19 +1,19 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Vendor Credit Utilisation Widget
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_VendorCreditUtil  => "Vendor Credit Utilisation"
- *   VAS_Breached          => "breached"
- *   VAS_BreachedChip      => "Breached"
- *   VAS_NoCreditVendors   => "No vendors with a credit limit configured"
+ *   VAS_026_VendorCreditUtil  => "Vendor Credit Utilisation"
+ *   VAS_026_Breached          => "breached"
+ *   VAS_026_BreachedChip      => "Breached"
+ *   VAS_026_NoCreditVendors   => "No vendors with a credit limit configured"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_VendorCreditUtilisationWidget = function () {
+    VAS.VAS_026_VendorCreditUtilisationWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -37,7 +37,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_VendorCreditUtilisationWidget/GetVendorCreditUtilisation',
+                url: VIS.Application.contextUrl + 'VAS/VAS_026_VendorCreditUtilisationWidget/GetVendorCreditUtilisation',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -74,17 +74,17 @@
                             '<rect x="1" y="4" width="22" height="16" rx="2"/>' +
                             '<line x1="1" y1="10" x2="23" y2="10"/>' +
                         '</svg>' +
-                        vcuEsc(VIS.Msg.getMsg('VAS_VendorCreditUtil') || 'Vendor Credit Utilisation') +
+                        vcuEsc(VIS.Msg.getMsg('VAS_026_VendorCreditUtil') || 'Vendor Credit Utilisation') +
                     '</div>' +
                     (breached > 0
                         ? '<span class="vas-vcuwdg-badge">' + breached + ' ' +
-                          vcuEsc(VIS.Msg.getMsg('VAS_Breached') || 'breached') + '</span>'
+                          vcuEsc(VIS.Msg.getMsg('VAS_026_Breached') || 'breached') + '</span>'
                         : '') +
                 '</div>' +
                 '<div class="vas-vcuwdg-list">';
 
             if (vendors.length === 0) {
-                html += '<div class="vas-vcuwdg-empty">' + (VIS.Msg.getMsg('VAS_NoCreditVendors') || 'No vendors with a credit limit configured') + '</div>';
+                html += '<div class="vas-vcuwdg-empty">' + (VIS.Msg.getMsg('VAS_026_NoCreditVendors') || 'No vendors with a credit limit configured') + '</div>';
             } else {
                 for (var i = 0; i < vendors.length; i++) {
                     html += vcuBuildRow(vendors[i], sym, prec);
@@ -103,7 +103,7 @@
             var valClass   = pct >= 100 ? 'vas-vcuwdg-prog-val--breached' : 'vas-vcuwdg-prog-val--normal';
             var breachChip = v.IsBreached
                 ? '<span class="vas-vcuwdg-breach-chip">' +
-                  vcuEsc(VIS.Msg.getMsg('VAS_BreachedChip') || 'Breached') + '</span>'
+                  vcuEsc(VIS.Msg.getMsg('VAS_026_BreachedChip') || 'Breached') + '</span>'
                 : '';
             var pctStr = Math.round(pct) + '%';
             var amtStr = vcuFmt(v.CreditUsed, sym, prec) + '/' + vcuFmt(v.CreditLimit, sym, prec);
@@ -165,7 +165,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_VendorCreditUtilisationWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_026_VendorCreditUtilisationWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -175,15 +175,15 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_VendorCreditUtilisationWidget.prototype.refreshWidget = function () {
+    VAS.VAS_026_VendorCreditUtilisationWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_VendorCreditUtilisationWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_026_VendorCreditUtilisationWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_VendorCreditUtilisationWidget.prototype.dispose = function () {
+    VAS.VAS_026_VendorCreditUtilisationWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

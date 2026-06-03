@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Overdue Payables KPI Widget
  * chronological  : Development
@@ -17,7 +17,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_OverduePayablesWidgetController : Controller
+    public class VAS_018_OverduePayablesWidgetController : Controller
     {
         string strQuery = "";
 

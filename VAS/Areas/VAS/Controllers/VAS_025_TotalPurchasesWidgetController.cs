@@ -1,8 +1,8 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
- * Purpose        : Controller for Total Outstanding KPI Widget
+ * Purpose        : Controller for Total Purchases (MTD) KPI Widget
  * chronological  : Development
- * Created Date   : 13 May 2026
+ * Created Date   : 12 May 2026
  * Created by     : Humam Yousif
  ***********************************************************/
 using CoreLibrary.DataBase;
@@ -17,7 +17,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_TotalOutstandingWidgetController : Controller
+    public class VAS_025_TotalPurchasesWidgetController : Controller
     {
         string strQuery = "";
 
@@ -28,25 +28,24 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Returns total outstanding AP balance, invoice count, vendor count,
-        /// month-over-month trend data, currency info from accounting schema,
-        /// and 7-month sparkline data.
+        /// Returns MTD/YTD purchase totals, invoice count, trend vs last month,
+        /// currency info from accounting schema, and 7-month sparkline data.
         /// </summary>
-        public JsonResult GetTotalOutstandingKpi()
+        public JsonResult GetTotalPurchasesKpi()
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                OutstandingKpiResult result = BuildKpiResult(ctx);
+                PurchasesKpiResult result = BuildKpiResult(ctx);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
-        private OutstandingKpiResult BuildKpiResult(Ctx ctx)
+        private PurchasesKpiResult BuildKpiResult(Ctx ctx)
         {
-            OutstandingKpiResult result = new OutstandingKpiResult();
+            PurchasesKpiResult result = new PurchasesKpiResult();
             result.SparklineData = new List<decimal>();
 
             int clientId = ctx.GetAD_Client_ID();
@@ -89,22 +88,22 @@ namespace VAS.Areas.VAS.Controllers
             // Step 2 — KPI aggregation.
             // Flat CASE/WHEN with EXTRACT avoids nested subqueries that cause MRole parser
             // out-of-memory errors. EXTRACT(YEAR/MONTH FROM col) works in Oracle and Postgres.
-            // OpenAmt > 0 identifies invoices with a remaining unpaid balance.
             // AD_Client_ID and AD_Org_ID added explicitly; AddAccessSQL covers role-level access.
-            strQuery = @"SELECT SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS OutstandingTotal,
+            strQuery = @"SELECT SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
+                                    AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS MtdTotal,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
-                                   AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
-                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS CurrentMonthOutstanding,
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS YtdTotal,
+                         COUNT(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
+                                    AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
+                               THEN 1 ELSE NULL END) AS InvoiceCount,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + lastMonthYear + @"
-                                   AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
-                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthOutstanding,
-                         COUNT(i.C_Invoice_ID) AS InvoiceCount,
-                         COUNT(DISTINCT i.C_BPartner_ID) AS VendorCount
+                                    AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
-                     AND i.VA009_OpenAmount > 0
                      AND i.IsActive = 'Y'
                      AND i.AD_Client_ID = @ClientID
                      AND i.AD_Org_ID = @OrgID ";
@@ -115,27 +114,25 @@ namespace VAS.Areas.VAS.Controllers
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 DataRow row = ds.Tables[0].Rows[0];
-                result.OutstandingTotal = Util.GetValueOfDecimal(row["OutstandingTotal"]);
-                result.CurrentMonthOutstanding = Util.GetValueOfDecimal(row["CurrentMonthOutstanding"]);
-                result.LastMonthOutstanding = Util.GetValueOfDecimal(row["LastMonthOutstanding"]);
+                result.MtdTotal = Util.GetValueOfDecimal(row["MtdTotal"]);
+                result.YtdTotal = Util.GetValueOfDecimal(row["YtdTotal"]);
                 result.InvoiceCount = Util.GetValueOfInt(row["InvoiceCount"]);
-                result.VendorCount = Util.GetValueOfInt(row["VendorCount"]);
+                result.LastMonthTotal = Util.GetValueOfDecimal(row["LastMonthTotal"]);
             }
 
-            // Step 3 — Sparkline: monthly outstanding balances for last 7 months.
-            // Uses EXTRACT arithmetic to avoid date literals (Oracle + Postgres safe).
+            // Step 3 — Sparkline: monthly totals for last 7 months.
+            // Arithmetic on EXTRACT avoids date literals (Oracle + Postgres safe).
             DateTime sevenMonthsAgo = now.AddMonths(-6);
             int sparkYear = sevenMonthsAgo.Year;
             int sparkMonth = sevenMonthsAgo.Month;
 
             strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
                          EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyOutstanding
+                         SUM(COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.IsReturnTrx = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
-                     AND i.VA009_OpenAmount > 0
                      AND i.IsActive = 'Y'
                      AND i.AD_Client_ID = @ClientID
                      AND i.AD_Org_ID = @OrgID
@@ -151,20 +148,19 @@ namespace VAS.Areas.VAS.Controllers
             {
                 for (int i = 0; i < sparkDs.Tables[0].Rows.Count; i++)
                 {
-                    result.SparklineData.Add(Util.GetValueOfDecimal(sparkDs.Tables[0].Rows[i]["MonthlyOutstanding"]));
+                    result.SparklineData.Add(Util.GetValueOfDecimal(sparkDs.Tables[0].Rows[i]["MonthlyTotal"]));
                 }
             }
 
             return result;
         }
 
-        public class OutstandingKpiResult
+        public class PurchasesKpiResult
         {
-            public decimal OutstandingTotal { get; set; }
-            public decimal CurrentMonthOutstanding { get; set; }
-            public decimal LastMonthOutstanding { get; set; }
+            public decimal MtdTotal { get; set; }
+            public decimal YtdTotal { get; set; }
             public int InvoiceCount { get; set; }
-            public int VendorCount { get; set; }
+            public decimal LastMonthTotal { get; set; }
             public string CurSymbol { get; set; }
             public int StdPrecision { get; set; }
             public List<decimal> SparklineData { get; set; }

@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Pending Invoices Widget
  * Created Date   : 14 May 2026
@@ -16,7 +16,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_PendingInvoicesWidgetController : Controller
+    public class VAS_020_PendingInvoicesWidgetController : Controller
     {
         string strQuery = "";
 

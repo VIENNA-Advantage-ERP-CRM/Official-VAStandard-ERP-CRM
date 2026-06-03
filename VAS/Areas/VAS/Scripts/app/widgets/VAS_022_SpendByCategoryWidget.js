@@ -1,17 +1,17 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Spend by Category (MTD) Widget — horizontal bar + donut
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_SpendByCategoryMTD => "Spend by Category (MTD)"
- *   VAS_Bar                => "Bar"
- *   VAS_Donut              => "Donut"
- *   VAS_Total              => "Total"
- *   VAS_Crore              => "Cr"
- *   VAS_Lakh               => "L"
- *   VAS_Thousand           => "K"
+ *   VAS_022_SpendByCategoryMTD => "Spend by Category (MTD)"
+ *   VAS_022_Bar                => "Bar"
+ *   VAS_022_Donut              => "Donut"
+ *   VAS_022_Total              => "Total"
+ *   VAS_022_Crore              => "Cr"
+ *   VAS_022_Lakh               => "L"
+ *   VAS_022_Thousand           => "K"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -23,7 +23,7 @@
         '#AD1457', '#F57F17', '#006064', '#4E342E'
     ];
 
-    VAS.VAS_SpendByCategoryWidget = function () {
+    VAS.VAS_022_SpendByCategoryWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -50,7 +50,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_SpendByCategoryWidget/GetSpendByCategory',
+                url: VIS.Application.contextUrl + 'VAS/VAS_022_SpendByCategoryWidget/GetSpendByCategory',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -83,14 +83,14 @@
                 +       '<rect x="10" y="8" width="4" height="13"/>'
                 +       '<rect x="18" y="1" width="4" height="20"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_SpendByCategoryMTD')
+                +     VIS.Msg.getMsg('VAS_022_SpendByCategoryMTD')
                 +   '</div>'
                 +   '<div class="vas-sbcwdg-tabs">'
                 +     '<button class="vas-sbcwdg-tab vas-sbcwdg-tab-active" data-view="bar">'
-                +       VIS.Msg.getMsg('VAS_Bar')
+                +       VIS.Msg.getMsg('VAS_022_Bar')
                 +     '</button>'
                 +     '<button class="vas-sbcwdg-tab" data-view="pie">'
-                +       VIS.Msg.getMsg('VAS_Donut')
+                +       VIS.Msg.getMsg('VAS_022_Donut')
                 +     '</button>'
                 +   '</div>'
                 + '</div>'
@@ -205,11 +205,11 @@
             var catAmounts = cats.map(function (c) { return c.Amount; });
             var catColors  = cats.map(function (c, i) { return CAT_COLORS[i % CAT_COLORS.length]; });
 
-            var totalLabel = VIS.Msg.getMsg('VAS_Total') || 'Total';
+            var totalLabel = VIS.Msg.getMsg('VAS_022_Total') || 'Total';
             var centerText = sym + fmtShort(total, data.StdPrecision);
 
             var centerPlugin = {
-                id: 'vas_sbc_center_' + widgetID,
+                id: 'VAS_022_sbc_center_' + widgetID,
                 afterDraw: function (chart) {
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right)  / 2;
@@ -292,9 +292,9 @@
             var loc   = window.navigator.language;
             var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_Crore'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_Lakh'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_Thousand'); }
+            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_022_Crore'); }
+            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_022_Lakh'); }
+            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_022_Thousand'); }
             return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 
@@ -320,7 +320,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_SpendByCategoryWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_022_SpendByCategoryWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -330,11 +330,11 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_SpendByCategoryWidget.prototype.refreshWidget = function () {
+    VAS.VAS_022_SpendByCategoryWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_SpendByCategoryWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_022_SpendByCategoryWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
@@ -342,7 +342,7 @@
         }
     };
 
-    VAS.VAS_SpendByCategoryWidget.prototype.dispose = function () {
+    VAS.VAS_022_SpendByCategoryWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

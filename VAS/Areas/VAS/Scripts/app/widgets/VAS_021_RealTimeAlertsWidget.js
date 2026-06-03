@@ -5,14 +5,14 @@
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_RealTimeAlerts => "Real-time Alerts"
- *   VAS_NoAlerts       => "No alerts - all clear"
- *   VAS_Dismiss        => "Dismiss"
+ *   VAS_021_RealTimeAlerts => "Real-time Alerts"
+ *   VAS_021_NoAlerts       => "No alerts - all clear"
+ *   VAS_021_Dismiss        => "Dismiss"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_RealTimeAlertsWidget = function () {
+    VAS.VAS_021_RealTimeAlertsWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -34,7 +34,7 @@
 
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_RealTimeAlertsWidget/GetAlerts',
+                url: VIS.Application.contextUrl + 'VAS/VAS_021_RealTimeAlertsWidget/GetAlerts',
                 dataType: 'json',
                 async: true,
                 success: function (res) {
@@ -60,7 +60,7 @@
             $container.empty();
 
             var alerts = (data && data.Alerts) ? data.Alerts : [];
-            var title = VIS.Msg.getMsg('VAS_RealTimeAlerts') || 'Real-time Alerts';
+            var title = VIS.Msg.getMsg('VAS_021_RealTimeAlerts') || 'Real-time Alerts';
             var badgeHtml = alerts.length > 0 ? '<span class="vas-rtawdg-badge">' + alerts.length + '</span>' : '';
 
             var html =
@@ -83,7 +83,7 @@
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
                             '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
                         '</svg>' +
-                        (VIS.Msg.getMsg('VAS_NoAlerts') || 'No alerts - all clear') +
+                        (VIS.Msg.getMsg('VAS_021_NoAlerts') || 'No alerts - all clear') +
                     '</div>';
             } else {
                 for (var i = 0; i < alerts.length; i++) {
@@ -107,7 +107,7 @@
                                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
                                     '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
                                 '</svg>' +
-                                (VIS.Msg.getMsg('VAS_NoAlerts') || 'No alerts - all clear') +
+                                (VIS.Msg.getMsg('VAS_021_NoAlerts') || 'No alerts - all clear') +
                             '</div>'
                         );
                     } else {
@@ -126,7 +126,7 @@
                         '<div class="vas-rtawdg-al-title">' + rtaEsc(alert.Title || '') + '</div>' +
                         '<div class="vas-rtawdg-al-sub">' + rtaEsc(alert.Subtitle || '') + '</div>' +
                     '</div>' +
-                    '<button class="vas-rtawdg-dismiss" title="' + rtaEsc(VIS.Msg.getMsg('VAS_Dismiss') || 'Dismiss') + '">x</button>' +
+                    '<button class="vas-rtawdg-dismiss" title="' + rtaEsc(VIS.Msg.getMsg('VAS_021_Dismiss') || 'Dismiss') + '">x</button>' +
                 '</div>'
             );
         }
@@ -157,7 +157,7 @@
         };
     };
 
-    VAS.VAS_RealTimeAlertsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_021_RealTimeAlertsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -167,15 +167,15 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_RealTimeAlertsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_021_RealTimeAlertsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_RealTimeAlertsWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_021_RealTimeAlertsWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_RealTimeAlertsWidget.prototype.dispose = function () {
+    VAS.VAS_021_RealTimeAlertsWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
         this.windowNo = null;

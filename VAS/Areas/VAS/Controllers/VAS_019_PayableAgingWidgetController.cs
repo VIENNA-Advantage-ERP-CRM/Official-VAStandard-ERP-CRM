@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Controller for Payable Aging + Payment Health KPI Widget
  * chronological  : Development
@@ -15,7 +15,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_PayableAgingWidgetController : Controller
+    public class VAS_019_PayableAgingWidgetController : Controller
     {
         string strQuery = "";
 

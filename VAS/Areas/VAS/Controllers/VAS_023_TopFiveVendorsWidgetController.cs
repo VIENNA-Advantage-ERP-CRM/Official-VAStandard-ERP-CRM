@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Top Five Vendors by Spend Widget
  * Created Date   : 14 May 2026
@@ -16,7 +16,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_TopFiveVendorsWidgetController : Controller
+    public class VAS_023_TopFiveVendorsWidgetController : Controller
     {
         string strQuery = "";
 

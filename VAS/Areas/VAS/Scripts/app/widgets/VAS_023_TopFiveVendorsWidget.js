@@ -1,13 +1,13 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Top Five Vendors by Spend Widget
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_Top5VendorsBySpend => "Top 5 Vendors by Spend"
- *   VAS_VendorSpendDist    => "Vendor Spend Distribution"
- *   VAS_Total              => "Total"
+ *   VAS_023_Top5VendorsBySpend => "Top 5 Vendors by Spend"
+ *   VAS_023_VendorSpendDist    => "Vendor Spend Distribution"
+ *   VAS_023_Total              => "Total"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -24,7 +24,7 @@
     /* Vibrant segment colours for the donut chart */
     var DONUT_COLORS = ['#1F83FF', '#7B68EE', '#FF9500', '#E84040', '#00B894'];
 
-    VAS.VAS_TopFiveVendorsWidget = function () {
+    VAS.VAS_023_TopFiveVendorsWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -50,7 +50,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_TopFiveVendorsWidget/GetTopFiveVendors',
+                url: VIS.Application.contextUrl + 'VAS/VAS_023_TopFiveVendorsWidget/GetTopFiveVendors',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -86,7 +86,7 @@
                             '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>' +
                             '<path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>' +
                         '</svg>' +
-                        t5vEsc(VIS.Msg.getMsg('VAS_Top5VendorsBySpend') || 'Top 5 Vendors by Spend') +
+                        t5vEsc(VIS.Msg.getMsg('VAS_023_Top5VendorsBySpend') || 'Top 5 Vendors by Spend') +
                     '</div>' +
                     '<span class="vas-t5vwdg-fy-chip">' + t5vEsc(fyLabel) + '</span>' +
                 '</div>' +
@@ -123,7 +123,7 @@
                         ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
                         '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>' +
                     '</svg>' +
-                    t5vEsc(VIS.Msg.getMsg('VAS_VendorSpendDist') || 'Vendor Spend Distribution') +
+                    t5vEsc(VIS.Msg.getMsg('VAS_023_VendorSpendDist') || 'Vendor Spend Distribution') +
                 '</div>' +
                 '<div class="vas-t5vwdg-chart-wrap">' +
                     '<canvas class="vas-t5vwdg-canvas" id="vas_t5vwdg_cv_' + widgetID + '"></canvas>' +
@@ -158,11 +158,11 @@
             }
 
             var centerText  = sym + t5vShort(total);
-            var totalLabel  = VIS.Msg.getMsg('VAS_Total') || 'Total';
+            var totalLabel  = VIS.Msg.getMsg('VAS_023_Total') || 'Total';
             var bgColors    = DONUT_COLORS.slice(0, n);
 
             var centerPlugin = {
-                id: 'vas_t5v_center_' + widgetID,
+                id: 'VAS_023_t5v_center_' + widgetID,
                 afterDraw: function (chart) {
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right)  / 2;
@@ -292,7 +292,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_TopFiveVendorsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_023_TopFiveVendorsWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -302,11 +302,11 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_TopFiveVendorsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_023_TopFiveVendorsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_TopFiveVendorsWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_023_TopFiveVendorsWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
@@ -314,7 +314,7 @@
         }
     };
 
-    VAS.VAS_TopFiveVendorsWidget.prototype.dispose = function () {
+    VAS.VAS_023_TopFiveVendorsWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

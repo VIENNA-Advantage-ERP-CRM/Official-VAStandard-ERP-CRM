@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Spend by Category (MTD) Widget
  * Created Date   : 14 May 2026
@@ -16,7 +16,7 @@ using VAdvantage.Utility;
 
 namespace VAS.Areas.VAS.Controllers
 {
-    public class VAS_SpendByCategoryWidgetController : Controller
+    public class VAS_022_SpendByCategoryWidgetController : Controller
     {
         string strQuery = "";
 

@@ -1,4 +1,4 @@
-/************************************************************
+﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Payable Aging + Payment Health KPI Widget
  * chronological  : Development
@@ -6,29 +6,29 @@
  * Created by     : Humam Yousif
  *
  * AD_Message keys needed (add via System Messages):
- *   VAS_PayableAging     => "Payable Aging"
- *   VAS_PaymentHealth    => "Payment Health"
- *   VAS_Overdue          => "overdue"
- *   VAS_Aging0to30       => "0–30d"
- *   VAS_Aging31to60      => "31–60d"
- *   VAS_Aging61to90      => "61–90d"
- *   VAS_Aging90Plus      => "90+d"
- *   VAS_PaidOnTime       => "Paid on time"
- *   VAS_Paid             => "Paid"
- *   VAS_Pending          => "Pending"
- *   VAS_OverdueLabel     => "Overdue"
- *   VAS_InvSuffix        => "inv."
- *   VAS_Crore            => "Cr"
- *   VAS_Lakh             => "L"
- *   VAS_Thousand         => "K"
- *   VAS_Million          => "M"
- *   VAS_Billion          => "B"
- *   VAS_Trillion         => "T"
+ *   VAS_019_PayableAging     => "Payable Aging"
+ *   VAS_019_PaymentHealth    => "Payment Health"
+ *   VAS_019_Overdue          => "overdue"
+ *   VAS_019_Aging0to30       => "0–30d"
+ *   VAS_019_Aging31to60      => "31–60d"
+ *   VAS_019_Aging61to90      => "61–90d"
+ *   VAS_019_Aging90Plus      => "90+d"
+ *   VAS_019_PaidOnTime       => "Paid on time"
+ *   VAS_019_Paid             => "Paid"
+ *   VAS_019_Pending          => "Pending"
+ *   VAS_019_OverdueLabel     => "Overdue"
+ *   VAS_019_InvSuffix        => "inv."
+ *   VAS_019_Crore            => "Cr"
+ *   VAS_019_Lakh             => "L"
+ *   VAS_019_Thousand         => "K"
+ *   VAS_019_Million          => "M"
+ *   VAS_019_Billion          => "B"
+ *   VAS_019_Trillion         => "T"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_PayableAgingWidget = function () {
+    VAS.VAS_019_PayableAgingWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
@@ -54,7 +54,7 @@
         /* ---- Data load ---- */
         this.intialLoad = function () {
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS/VAS_PayableAgingWidget/GetPayableAgingKpi',
+                url: VIS.Application.contextUrl + 'VAS/VAS_019_PayableAgingWidget/GetPayableAgingKpi',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -96,17 +96,17 @@
                 +       '<circle cx="12" cy="12" r="10"/>'
                 +       '<polyline points="12 6 12 12 16 14"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_PayableAging')
+                +     VIS.Msg.getMsg('VAS_019_PayableAging')
                 +   '</div>'
-                +   '<span class="vas-pawdg-chip">' + data.OverdueCount + ' ' + VIS.Msg.getMsg('VAS_Overdue') + '</span>'
+                +   '<span class="vas-pawdg-chip">' + data.OverdueCount + ' ' + VIS.Msg.getMsg('VAS_019_Overdue') + '</span>'
                 + '</div>'
 
                 /* ---- Aging bars ---- */
                 + '<div class="vas-pawdg-aging-bars">'
-                +   buildAgingRow('VAS_Aging0to30',  data.Bucket0to30,  data.Count0to30,  totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--green')
-                +   buildAgingRow('VAS_Aging31to60', data.Bucket31to60, data.Count31to60, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--amber')
-                +   buildAgingRow('VAS_Aging61to90', data.Bucket61to90, data.Count61to90, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--orange')
-                +   buildAgingRow('VAS_Aging90Plus', data.Bucket90Plus, data.Count90Plus, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--red')
+                +   buildAgingRow('VAS_019_Aging0to30',  data.Bucket0to30,  data.Count0to30,  totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--green')
+                +   buildAgingRow('VAS_019_Aging31to60', data.Bucket31to60, data.Count31to60, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--amber')
+                +   buildAgingRow('VAS_019_Aging61to90', data.Bucket61to90, data.Count61to90, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--orange')
+                +   buildAgingRow('VAS_019_Aging90Plus', data.Bucket90Plus, data.Count90Plus, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--red')
                 + '</div>'
 
                 /* ---- Divider ---- */
@@ -118,7 +118,7 @@
                 +       ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
                 +     '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'
                 +   '</svg>'
-                +   VIS.Msg.getMsg('VAS_PaymentHealth')
+                +   VIS.Msg.getMsg('VAS_019_PaymentHealth')
                 + '</div>'
 
                 /* ---- Donut (Chart.js) ---- */
@@ -130,9 +130,9 @@
 
                 /* ---- Legend ---- */
                 + '<div class="vas-pawdg-legend">'
-                +   buildLegendRow('vas-pawdg-dot--ok',   VIS.Msg.getMsg('VAS_PaidOnTime'),   sym + formatAmount(data.PaidAmount,    data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
-                +   buildLegendRow('vas-pawdg-dot--info', VIS.Msg.getMsg('VAS_Pending'),       sym + formatAmount(data.PendingAmount, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
-                +   buildLegendRow('vas-pawdg-dot--err',  VIS.Msg.getMsg('VAS_OverdueLabel'),  sym + formatAmount(data.OverdueAmount, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
+                +   buildLegendRow('vas-pawdg-dot--ok',   VIS.Msg.getMsg('VAS_019_PaidOnTime'),   sym + formatAmount(data.PaidAmount,    data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
+                +   buildLegendRow('vas-pawdg-dot--info', VIS.Msg.getMsg('VAS_019_Pending'),       sym + formatAmount(data.PendingAmount, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
+                +   buildLegendRow('vas-pawdg-dot--err',  VIS.Msg.getMsg('VAS_019_OverdueLabel'),  sym + formatAmount(data.OverdueAmount, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
                 + '</div>';
 
             $container.html(html);
@@ -164,7 +164,7 @@
                     : Math.round((data.PaidAmount / totalAll) * 100);
 
             var centerPlugin = {
-                id: 'vas_pawdg_center_' + widgetID,
+                id: 'VAS_019_pawdg_center_' + widgetID,
                 afterDraw: function (chart) {
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right) / 2;
@@ -178,7 +178,7 @@
                     ctx.fillText(pct + '%', cx, cy - fs * 0.6);
                     ctx.font      = fs + 'px Roboto, sans-serif';
                     ctx.fillStyle = '#748494';
-                    ctx.fillText(VIS.Msg.getMsg('VAS_Paid') || 'Paid', cx, cy + fs * 0.9);
+                    ctx.fillText(VIS.Msg.getMsg('VAS_019_Paid') || 'Paid', cx, cy + fs * 0.9);
                     ctx.restore();
                 }
             };
@@ -187,9 +187,9 @@
                 type: 'doughnut',
                 data: {
                     labels: [
-                        VIS.Msg.getMsg('VAS_PaidOnTime')   || 'Paid on time',
-                        VIS.Msg.getMsg('VAS_Pending')      || 'Pending',
-                        VIS.Msg.getMsg('VAS_OverdueLabel') || 'Overdue'
+                        VIS.Msg.getMsg('VAS_019_PaidOnTime')   || 'Paid on time',
+                        VIS.Msg.getMsg('VAS_019_Pending')      || 'Pending',
+                        VIS.Msg.getMsg('VAS_019_OverdueLabel') || 'Overdue'
                     ],
                     datasets: [{
                         data: [data.PaidAmount, data.PendingAmount, data.OverdueAmount],
@@ -224,7 +224,7 @@
         function buildAgingRow(msgKey, amount, count, totalOpen, sym, stdPrecision, colorClass) {
             var pct    = totalOpen > 0 ? Math.round((amount / totalOpen) * 100) : 0;
             var amtFmt = sym + formatAmount(amount, stdPrecision);
-            var cntFmt = count + ' ' + VIS.Msg.getMsg('VAS_InvSuffix');
+            var cntFmt = count + ' ' + VIS.Msg.getMsg('VAS_019_InvSuffix');
             return '<div class="vas-pawdg-aging-row">'
                 + '<div class="vas-pawdg-ag-lbl">' + VIS.Msg.getMsg(msgKey) + '</div>'
                 + '<div class="vas-pawdg-ag-track">'
@@ -255,19 +255,19 @@
             var opts2   = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
             var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
             if (absNumber >= 1000000000000) {
-                unit      = VIS.Msg.getMsg('VAS_Trillion');
+                unit      = VIS.Msg.getMsg('VAS_019_Trillion');
                 formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000000000) {
-                unit      = VIS.Msg.getMsg('VAS_Billion');
+                unit      = VIS.Msg.getMsg('VAS_019_Billion');
                 formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 10000000) {
-                unit      = VIS.Msg.getMsg('VAS_Crore');
+                unit      = VIS.Msg.getMsg('VAS_019_Crore');
                 formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 100000) {
-                unit      = VIS.Msg.getMsg('VAS_Lakh');
+                unit      = VIS.Msg.getMsg('VAS_019_Lakh');
                 formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000) {
-                unit      = VIS.Msg.getMsg('VAS_Thousand');
+                unit      = VIS.Msg.getMsg('VAS_019_Thousand');
                 formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
             } else {
                 formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
@@ -302,7 +302,7 @@
     };
 
     /* ---- Prototype ---- */
-    VAS.VAS_PayableAgingWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_019_PayableAgingWidget.prototype.init = function (windowNo, frame) {
         this.frame      = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo   = windowNo;
@@ -312,11 +312,11 @@
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
 
-    VAS.VAS_PayableAgingWidget.prototype.refreshWidget = function () {
+    VAS.VAS_019_PayableAgingWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_PayableAgingWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_019_PayableAgingWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
@@ -324,7 +324,7 @@
         }
     };
 
-    VAS.VAS_PayableAgingWidget.prototype.dispose = function () {
+    VAS.VAS_019_PayableAgingWidget.prototype.dispose = function () {
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;
