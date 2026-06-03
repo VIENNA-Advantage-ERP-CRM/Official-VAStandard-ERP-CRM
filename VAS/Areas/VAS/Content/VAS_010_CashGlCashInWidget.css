@@ -66,8 +66,9 @@
 
 /* KPI label — body token (0.8125em / 13px at base), muted. */
 .vas-cashgl-label {
-    font-size: 0.8125em;
-    font-weight: 400;
+    font-size: 1.125em;
+    font-weight: 700;
+
     color: #5F7283;
     line-height: 1.3;
 }
