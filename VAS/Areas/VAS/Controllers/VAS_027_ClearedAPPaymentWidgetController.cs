@@ -9,6 +9,12 @@ using VIS.Filters;
 
 namespace VAS.Controllers
 {
+    /*
+     * Labels / Message Keys
+     * 1 | Cleared                                | VAS_027_messageCleared
+     * 2 | WHY                                    | VAS_027_messageWhy
+     * 3 | Of last month's AP payments reconciled | VAS_027_messageAPPaymentClearedWhy
+     */
     public class VAS_027_ClearedAPPaymentWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]

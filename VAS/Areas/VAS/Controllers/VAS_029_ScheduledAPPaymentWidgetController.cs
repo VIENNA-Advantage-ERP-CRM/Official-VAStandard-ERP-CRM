@@ -16,6 +16,13 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   <EmployeeCode>   Created Date
     /// </summary>
+    /*
+     * Labels / Message Keys
+     * 1 | Scheduled                       | VAS_029_MessageScheduled
+     * 2 | WHY                             | VAS_029_MessageWhy
+     * 3 | Scheduled for payment this week | VAS_029_MessageScheduledForPaymentThisWeek
+     * 4 | Not Specified                   | VAS_029_MessageNotSpecified
+     */
     public class VAS_029_ScheduledAPPaymentWidgetController : Controller
     {
         /// <summary>

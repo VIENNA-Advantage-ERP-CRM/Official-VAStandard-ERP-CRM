@@ -16,6 +16,12 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   <EmployeeCode>   Created Date
     /// </summary>
+    /*
+     * Labels / Message Keys
+     * 1 | Bounced       | VAS_030_MessageBounced
+     * 2 | Action        | VAS_030_MessageAction
+     * 3 | Need re-issue | VAS_030_MessageNeedReissue
+     */
     public class VAS_030_BouncedAPPaymentWidgetController : Controller
     {
         /// <summary>

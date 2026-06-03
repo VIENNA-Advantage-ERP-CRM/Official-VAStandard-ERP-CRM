@@ -10,6 +10,13 @@ using VIS.Filters;
 
 namespace VAS.Controllers
 {
+    /*
+     * Labels / Message Keys
+     * 1 | Payment methods                                        | VAS_033_MessagePaymentMethods
+     * 2 | WHY                                                    | VAS_033_MessageWhy
+     * 3 | UPI is cheapest - shift sub-2L payments where possible | VAS_033_MessagePaymentMethodWhy
+     * 4 | Not Specified                                          | VAS_033_MessageNotSpecified
+     */
     public class VAS_033_PaymentMethodsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]

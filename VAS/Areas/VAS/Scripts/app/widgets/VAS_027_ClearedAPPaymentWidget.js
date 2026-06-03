@@ -195,7 +195,7 @@
         };
     };
 
-    VAS_027_ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_027_ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -210,7 +210,7 @@
         }
     };
 
-    VAS_027_ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_027_ClearedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {

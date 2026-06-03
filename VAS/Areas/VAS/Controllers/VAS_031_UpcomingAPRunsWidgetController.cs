@@ -8,8 +8,14 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
+    /*
+     * Labels / Message Keys
+     * 1 | Upcoming runs | VAS_031_MessageUpcomingRuns
+     * 2 | Next 7 days   | VAS_031_MessageNext7Days
+     * 3 | Not Specified | VAS_031_MessageNotSpecified
+     */
     public class VAS_031_UpcomingAPRunsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]

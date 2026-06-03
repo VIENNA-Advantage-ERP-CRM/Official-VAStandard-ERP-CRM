@@ -11,6 +11,16 @@ using VIS.Filters;
 
 namespace VAS.Controllers
 {
+    /*
+     * Labels / Message Keys
+     * 1 | Recent payments | VAS_032_MessageRecentPayments
+     * 2 | + New payment   | VAS_032_MessageNewPayment
+     * 3 | Review          | VAS_032_MessageReview
+     * 4 | Bounced         | VAS_032_MessageBounced
+     * 5 | Cleared         | VAS_032_MessageCleared
+     * 6 | In transit      | VAS_032_MessageInTransit
+     * 7 | Not Specified   | VAS_032_MessageNotSpecified
+     */
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]

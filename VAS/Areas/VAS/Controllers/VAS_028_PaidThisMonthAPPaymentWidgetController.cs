@@ -14,6 +14,13 @@ namespace VAS.Controllers
     /// Module Name : VAS Dashboard
     /// Purpose     : Provides paid-this-month AP payment KPI widget data.
     /// </summary>
+    /*
+     * Labels / Message Keys
+     * 1 | Paid this month                 | VAS_028_MessagePaidThisMonth
+     * 2 | Cash paid                       | VAS_028_MessageCashPaid
+     * 3 | WHY                             | VAS_028_MessageWhy
+     * 4 | Outgoing payments posted so far | VAS_028_MessageOutgoingPaymentsPostedSoFar
+     */
     public class VAS_028_PaidThisMonthAPPaymentWidgetController : Controller
     {
         /// <summary>
