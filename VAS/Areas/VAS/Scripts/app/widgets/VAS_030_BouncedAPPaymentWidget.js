@@ -5,21 +5,21 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Bounced                              | VAS_Bounced
- *  2  | Action                               | VAS_Action
- *  3  | Need re-issue                        | VAS_NeedReissue
- *  4  | Loading                              | VAS_Loading
- *  5  | No Data                              | VAS_NoData
+ *  1  | Bounced                              | VAS_030_MessageBounced
+ *  2  | Action                               | VAS_030_MessageAction
+ *  3  | Need re-issue                        | VAS_030_MessageNeedReissue
+ *  4  | Loading                              | VAS_030_MessageLoading
+ *  5  | No Data                              | VAS_030_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
     "use strict";
 
-    VIS.VAS_030_BouncedAPPaymentWidget = function () {
+    VAS.VAS_030_BouncedAPPaymentWidget = function () {
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
@@ -55,7 +55,7 @@
             );
 
             var $title = $('<div class="vas-bounced-ap-payment-title">').text(
-                lbl('VAS_Bounced', 'Bounced')
+                lbl('VAS_030_MessageBounced', 'Bounced')
             );
 
             $iconBox.append($icon);
@@ -68,11 +68,11 @@
             var $footer = $('<div class="vas-bounced-ap-payment-footer">');
 
             var $badge = $('<div class="vas-bounced-ap-payment-badge">').text(
-                lbl('VAS_Action', 'Action')
+                lbl('VAS_030_MessageAction', 'Action')
             );
 
             $description = $('<div class="vas-bounced-ap-payment-desc">').text(
-                lbl('VAS_NeedReissue', 'Need re-issue')
+                lbl('VAS_030_MessageNeedReissue', 'Need re-issue')
             );
 
             $footer.append($badge).append($description);
@@ -157,7 +157,7 @@
 
         function setLoading() {
             if ($value) {
-                $value.text(lbl('VAS_Loading', 'Loading'));
+                $value.text(lbl('VAS_030_MessageLoading', 'Loading'));
             }
 
             if ($body) {
@@ -167,7 +167,7 @@
 
         function setNoData() {
             if ($value) {
-                $value.text(lbl('VAS_NoData', 'No Data'));
+                $value.text(lbl('VAS_030_MessageNoData', 'No Data'));
             }
 
             if ($body) {
@@ -195,7 +195,7 @@
         };
     };
 
-    VIS.VAS_030_BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -210,7 +210,7 @@
         }
     };
 
-    VIS.VAS_030_BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -223,11 +223,11 @@
         );
     };
 
-    VIS.VAS_030_BouncedAPPaymentWidget.prototype.refreshWidget = function () {
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.VAS_030_BouncedAPPaymentWidget.prototype.dispose = function () {
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {
@@ -237,4 +237,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

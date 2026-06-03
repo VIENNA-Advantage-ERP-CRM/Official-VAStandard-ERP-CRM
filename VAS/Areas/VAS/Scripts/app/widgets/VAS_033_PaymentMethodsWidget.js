@@ -5,20 +5,20 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Payment methods                      | VAS_PaymentMethods
- *  2  | WHY                                  | VAS_Why
- *  3  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_PaymentMethodWhy
- *  4  | Loading                              | VAS_Loading
- *  5  | No Data                              | VAS_NoData
- *  6  | Not Specified                        | VAS_NotSpecified
+ *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
+ *  2  | WHY                                  | VAS_033_MessageWhy
+ *  3  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_033_MessagePaymentMethodWhy
+ *  4  | Loading                              | VAS_033_MessageLoading
+ *  5  | No Data                              | VAS_033_MessageNoData
+ *  6  | Not Specified                        | VAS_033_MessageNotSpecified
  * ─────────────────────────────────────────────────────────────────────
  */
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
-    VIS.VAS_033_PaymentMethodsWidget = function () {
+    VAS.VAS_033_PaymentMethodsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -50,7 +50,7 @@
                 '<path d="M22 12A10 10 0 0 0 12 2v10z"></path>' +
                 '</svg>'
             );
-            var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_PaymentMethods', 'Payment methods'));
+            var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
 
             $iconBox.append($icon);
             $head.append($iconBox).append($title);
@@ -58,8 +58,8 @@
             $body = $('<div class="vas-payment-methods-body">');
 
             $foot = $('<div class="vas-payment-methods-foot">');
-            var $whyTag = $('<span class="vas-payment-methods-why-tag">').text(lbl('VAS_Why', 'WHY'));
-            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_PaymentMethodWhy', 'UPI is cheapest · shift sub-₹2L payments where possible'));
+            var $whyTag = $('<span class="vas-payment-methods-why-tag">').text(lbl('VAS_033_MessageWhy', 'WHY'));
+            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest · shift sub-₹2L payments where possible'));
 
             $foot.append($whyTag).append($whyText);
 
@@ -118,7 +118,7 @@
         }
 
         function createMethodRow(method) {
-            var methodName = method.paymentMethodName || lbl('VAS_NotSpecified', 'Not Specified');
+            var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
             var percentage = Number(method.percentage || 0);
 
             if (isNaN(percentage)) {
@@ -211,7 +211,7 @@
             }
 
             if ($body) {
-                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_Loading', 'Loading')));
+                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_033_MessageLoading', 'Loading')));
             }
         }
 
@@ -221,7 +221,7 @@
             }
 
             if ($body) {
-                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_NoData', 'No Data')));
+                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_033_MessageNoData', 'No Data')));
             }
         }
 
@@ -241,7 +241,7 @@
         };
     };
 
-    VIS.VAS_033_PaymentMethodsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_033_PaymentMethodsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -249,14 +249,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.VAS_033_PaymentMethodsWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_033_PaymentMethodsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.VAS_033_PaymentMethodsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_033_PaymentMethodsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.VAS_033_PaymentMethodsWidget.prototype.dispose = function () {
+    VAS.VAS_033_PaymentMethodsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {
@@ -266,4 +266,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

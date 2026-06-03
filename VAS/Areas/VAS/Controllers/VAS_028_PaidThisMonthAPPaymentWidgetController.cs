@@ -8,7 +8,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     /// <summary>
     /// Module Name : VAS Dashboard
@@ -158,10 +158,10 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON (PaidThisMonthData.AD_Cli
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_PaidThisMonth", "Paid this month"),
-                    subtitle = GetMsg(ctx, "VAS_CashPaid", "Cash paid"),
-                    badge = GetMsg(ctx, "VAS_Why", "WHY"),
-                    description = GetMsg(ctx, "VAS_OutgoingPaymentsPostedSoFar", "Outgoing payments posted so far"),
+                    title = GetMsg(ctx, "VAS_028_MessagePaidThisMonth", "Paid this month"),
+                    subtitle = GetMsg(ctx, "VAS_028_MessageCashPaid", "Cash paid"),
+                    badge = GetMsg(ctx, "VAS_028_MessageWhy", "WHY"),
+                    description = GetMsg(ctx, "VAS_028_MessageOutgoingPaymentsPostedSoFar", "Outgoing payments posted so far"),
                     value = paidThisMonth,
                     paidThisMonth = paidThisMonth,
                     totalPaidAmount = paidThisMonth,

@@ -8,7 +8,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     /// <summary>
     /// Module Name : VAS Dashboard
@@ -88,9 +88,9 @@ AND p.DateAcct<" + GetDateValue(dateTo) + @"
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_Bounced", "Bounced"),
-                    badge = GetMsg(ctx, "VAS_Action", "Action"),
-                    description = GetMsg(ctx, "VAS_NeedReissue", "Need re-issue"),
+                    title = GetMsg(ctx, "VAS_030_MessageBounced", "Bounced"),
+                    badge = GetMsg(ctx, "VAS_030_MessageAction", "Action"),
+                    description = GetMsg(ctx, "VAS_030_MessageNeedReissue", "Need re-issue"),
                     value = bouncedPaymentCount,
                     bouncedPaymentCount = bouncedPaymentCount,
                     dateFrom = FormatDate(dateFrom),

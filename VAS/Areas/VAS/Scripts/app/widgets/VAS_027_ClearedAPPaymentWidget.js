@@ -3,16 +3,16 @@
  * Purpose - Shows the percentage of AP payments from the previous calendar month that have been reconciled.
  *
  * Labels / Message Keys
- * 1 | Cleared                                | VAS_Cleared
- * 2 | WHY                                    | VAS_Why
- * 3 | Of last month's AP payments reconciled | VAS_APPaymentClearedWhy
- * 4 | Loading                                | VAS_Loading
- * 5 | No Data                                | VAS_NoData
+ * 1 | Cleared                                | VAS_027_messageCleared
+ * 2 | WHY                                    | VAS_027_messageWhy
+ * 3 | Of last month's AP payments reconciled | VAS_027_messageAPPaymentClearedWhy
+ * 4 | Loading                                | VAS_027_messageLoading
+ * 5 | No Data                                | VAS_027_messageNoData
  */
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
     "use strict";
 
     var VAS_027_ClearedAPPaymentWidget = function () {
@@ -45,7 +45,7 @@
             );
 
             var $title = $('<div class="vas-finance-kpi-title">').text(
-                lbl('VAS_Cleared', 'Cleared')
+                lbl('VAS_027_messageCleared', 'Cleared')
             );
 
             $iconBox.append($icon);
@@ -54,7 +54,7 @@
             $body = $('<div class="vas-finance-kpi-body">');
 
             $value = $('<div class="vas-finance-kpi-value">').text(
-                lbl('VAS_Loading', 'Loading')
+                lbl('VAS_027_messageLoading', 'Loading')
             );
 
             $body.append($value);
@@ -62,11 +62,11 @@
             var $footer = $('<div class="vas-finance-kpi-footer">');
 
             var $badge = $('<div class="vas-finance-kpi-badge">').text(
-                lbl('VAS_Why', 'WHY')
+                lbl('VAS_027_messageWhy', 'WHY')
             );
 
             var $description = $('<div class="vas-finance-kpi-desc">').text(
-                lbl('VAS_APPaymentClearedWhy', "Of last month's AP payments reconciled")
+                lbl('VAS_027_messageAPPaymentClearedWhy', "Of last month's AP payments reconciled")
             );
 
             $footer.append($badge).append($description);
@@ -81,7 +81,7 @@
                 return;
             }
 
-            setState(lbl('VAS_Loading', 'Loading'), true);
+            setState(lbl('VAS_027_messageLoading', 'Loading'), true);
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_027_ClearedAPPaymentWidget/GetClearedAPPayment',
@@ -97,7 +97,7 @@
                     var data = normalizeResponse(response);
 
                     if (!data || data.error) {
-                        setState(lbl('VAS_NoData', 'No Data'), true);
+                        setState(lbl('VAS_027_messageNoData', 'No Data'), true);
                         return;
                     }
 
@@ -106,7 +106,7 @@
 
                 error: function () {
                     if (!isDisposed) {
-                        setState(lbl('VAS_NoData', 'No Data'), true);
+                        setState(lbl('VAS_027_messageNoData', 'No Data'), true);
                     }
                 }
             });
@@ -133,7 +133,7 @@
             }
 
             if (isNaN(percentage)) {
-                setState(lbl('VAS_NoData', 'No Data'), true);
+                setState(lbl('VAS_027_messageNoData', 'No Data'), true);
                 return;
             }
 
@@ -223,11 +223,11 @@
         );
     };
 
-    VAS_027_ClearedAPPaymentWidget.prototype.refreshWidget = function () {
+    VAS.VAS_027_ClearedAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VAS_027_ClearedAPPaymentWidget.prototype.dispose = function () {
+    VAS.VAS_027_ClearedAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {
@@ -237,6 +237,6 @@
         this.frame = null;
     };
 
-    VIS.VAS_027_ClearedAPPaymentWidget = VAS_027_ClearedAPPaymentWidget;
+    VAS.VAS_027_ClearedAPPaymentWidget = VAS_027_ClearedAPPaymentWidget;
 
-})(VIS, jQuery);
+})(VAS, jQuery);

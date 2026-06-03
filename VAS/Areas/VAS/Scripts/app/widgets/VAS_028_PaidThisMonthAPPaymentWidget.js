@@ -8,23 +8,25 @@
 * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
 *  #  | Current Text                                        | Message Key                  | MsgText
 * ----+-----------------------------------------------------+------------------------------+-----------------------------------------------------
-*  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
-*  2  | Cash received                                       | VIS_CashReceived             | Cash received
-*  3  | WHY                                                 | VIS_Why                      | WHY
-*  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
-*  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
-*  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
-*  8  | No payments received this month.                    | VIS_NoPaymentsThisMonth      | No payments received this month.
+*  1  | Paid this month                                     | VAS_028_MessagePaidThisMonth | Paid this month
+*  2  | Cash paid                                           | VAS_028_MessageCashPaid      | Cash paid
+*  3  | WHY                                                 | VAS_028_MessageWhy           | WHY
+*  4  | Paid to                                             | VAS_028_MessagePaidTo        | Paid to
+*  5  | vendor / vendors                                    | VAS_028_MessageVendor / VAS_028_MessageVendors | vendor / vendors
+*  6  | so far this month.                                  | VAS_028_MessageSoFarThisMonth | so far this month.
+*  7  | Loading                                             | VAS_028_MessageLoading       | Loading
+*  8  | No Data                                             | VAS_028_MessageNoData        | No Data
+*  9  | No payments this month.                             | VAS_028_MessageNoPaymentsThisMonth | No payments this month.
 * ──────────────────────────────────────────────────────────────────────────────────────
 */
 
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
     "use strict";
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget = function () {
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget = function () {
         var self = this;
 
         this.frame = null;
@@ -70,11 +72,11 @@
             var $headerText = $('<div class="vas-ptm-header-text">');
 
             var $title = $('<div class="vas-ptm-title">').text(
-                lbl('VAS_PaidThisMonth', 'Paid this month')
+                lbl('VAS_028_MessagePaidThisMonth', 'Paid this month')
             );
 
             var $subtitle = $('<div class="vas-ptm-subtitle">').text(
-                lbl('VAS_CashPaid', 'Cash paid')
+                lbl('VAS_028_MessageCashPaid', 'Cash paid')
             );
 
             $headerText.append($title).append($subtitle);
@@ -92,13 +94,13 @@
             var $why = $('<div class="vas-ptm-why-wrap">');
 
             var $pill = $('<span class="vas-ptm-why-pill">').text(
-                lbl('VAS_Why', 'WHY')
+                lbl('VAS_028_MessageWhy', 'WHY')
             );
 
             $whyText = $('<span>')
                 .attr('id', 'vis-ptm-why-' + uid)
                 .addClass('vas-ptm-why-text')
-                .text(lbl('VAS_Loading', 'Loading'));
+                .text(lbl('VAS_028_MessageLoading', 'Loading'));
 
             $why.append($pill).append($whyText);
             $card.append($header).append($body).append($why);
@@ -200,19 +202,19 @@
         function getWhyText(vendorCount, fallbackDescription) {
             if (vendorCount > 0) {
                 var vendorLabel = vendorCount === 1
-                    ? lbl('VAS_Vendor', 'vendor')
-                    : lbl('VAS_Vendors', 'vendors');
+                    ? lbl('VAS_028_MessageVendor', 'vendor')
+                    : lbl('VAS_028_MessageVendors', 'vendors');
 
-                return lbl('VAS_PaidTo', 'Paid to') +
+                return lbl('VAS_028_MessagePaidTo', 'Paid to') +
                     ' ' +
                     vendorCount +
                     ' ' +
                     vendorLabel +
                     ' ' +
-                    lbl('VAS_SoFarThisMonth', 'so far this month.');
+                    lbl('VAS_028_MessageSoFarThisMonth', 'so far this month.');
             }
 
-            return fallbackDescription || lbl('VIS_NoPaymentsThisMonth', 'No payments this month.');
+            return fallbackDescription || lbl('VAS_028_MessageNoPaymentsThisMonth', 'No payments this month.');
         }
 
         function formatMetric(value, symbol, precision) {
@@ -264,7 +266,7 @@
             }
 
             if ($whyText) {
-                $whyText.text(lbl('VAS_NoData', 'No Data'));
+                $whyText.text(lbl('VAS_028_MessageNoData', 'No Data'));
             }
         }
 
@@ -287,9 +289,9 @@
         };
     };
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget = VIS.VAS_028_PaidThisMonthAPPaymentWidget;
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget = VAS.VAS_028_PaidThisMonthAPPaymentWidget;
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -304,7 +306,7 @@
         }
     };
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -317,11 +319,11 @@
         );
     };
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
+    VAS.VAS_028_PaidThisMonthAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {
@@ -331,4 +333,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

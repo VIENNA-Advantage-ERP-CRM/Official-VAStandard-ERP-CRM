@@ -5,22 +5,22 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Scheduled                            | VAS_Scheduled
- *  2  | WHY                                  | VAS_Why
- *  3  | Queued for {0} run this week         | VAS_QueuedForPaymentMethodRunThisWeek
- *  4  | Scheduled for payment this week      | VAS_ScheduledForPaymentThisWeek
- *  5  | Loading                              | VAS_Loading
- *  6  | No Data                              | VAS_NoData
+ *  1  | Scheduled                            | VAS_029_MessageScheduled
+ *  2  | WHY                                  | VAS_029_MessageWhy
+ *  3  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
+ *  4  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
+ *  5  | Loading                              | VAS_029_MessageLoading
+ *  6  | No Data                              | VAS_029_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
     "use strict";
 
-    VIS.VAS_029_ScheduledAPPaymentWidget = function () {
+    VAS.VAS_029_ScheduledAPPaymentWidget = function () {
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
@@ -59,7 +59,7 @@
             );
 
             var $title = $('<div class="vas-scheduled-ap-payment-title">').text(
-                lbl('VAS_Scheduled', 'Scheduled')
+                lbl('VAS_029_MessageScheduled', 'Scheduled')
             );
 
             $iconBox.append($icon);
@@ -71,7 +71,7 @@
 
             var $footer = $('<div class="vas-scheduled-ap-payment-footer">');
             var $badge = $('<div class="vas-scheduled-ap-payment-badge">').text(
-                lbl('VAS_Why', 'WHY')
+                lbl('VAS_029_MessageWhy', 'WHY')
             );
 
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
@@ -157,7 +157,7 @@
             ));
 
             $description.text(
-                data.description || lbl('VAS_ScheduledForPaymentThisWeek', 'Scheduled for payment this week')
+                data.description || lbl('VAS_029_MessageScheduledForPaymentThisWeek', 'Scheduled for payment this week')
             );
 
             $body.removeClass('vas-scheduled-ap-payment-state');
@@ -181,10 +181,10 @@
             }
 
             var precision = normalizePrecision(group.precision || data.precision);
-            var paymentMethodName = group.paymentMethodName || lbl('VAS_NotSpecified', 'Not Specified');
+            var paymentMethodName = group.paymentMethodName || lbl('VAS_029_MessageNotSpecified', 'Not Specified');
 
             var footerText = lbl(
-                'VAS_QueuedForPaymentMethodRunThisWeek',
+                'VAS_029_MessageQueuedForPaymentMethodRunThisWeek',
                 'Queued for {0} run this week'
             ).replace('{0}', paymentMethodName);
 
@@ -277,7 +277,7 @@
 
         function setLoading() {
             if ($value) {
-                $value.text(lbl('VAS_Loading', 'Loading'));
+                $value.text(lbl('VAS_029_MessageLoading', 'Loading'));
             }
 
             if ($description) {
@@ -291,7 +291,7 @@
 
         function setNoData() {
             if ($value) {
-                $value.text(lbl('VAS_NoData', 'No Data'));
+                $value.text(lbl('VAS_029_MessageNoData', 'No Data'));
             }
 
             if ($description) {
@@ -325,7 +325,7 @@
         };
     };
 
-    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_029_ScheduledAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
 
@@ -340,7 +340,7 @@
         }
     };
 
-    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_029_ScheduledAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
         var $root = this.getRoot();
 
         if (!$root) {
@@ -353,11 +353,11 @@
         );
     };
 
-    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.refreshWidget = function () {
+    VAS.VAS_029_ScheduledAPPaymentWidget.prototype.refreshWidget = function () {
         this.refreshData();
     };
 
-    VIS.VAS_029_ScheduledAPPaymentWidget.prototype.dispose = function () {
+    VAS.VAS_029_ScheduledAPPaymentWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame && this.frame.dispose) {
@@ -367,4 +367,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

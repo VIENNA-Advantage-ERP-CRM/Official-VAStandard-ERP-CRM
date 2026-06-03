@@ -8,7 +8,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     public class VAS_033_PaymentMethodsWidgetController : Controller
     {
@@ -169,7 +169,7 @@ namespace VIS.Controllers
 
                     if (string.IsNullOrEmpty(paymentMethodName))
                     {
-                        paymentMethodName = GetMsg(ctx, "VAS_NotSpecified", "Not Specified");
+                        paymentMethodName = GetMsg(ctx, "VAS_033_MessageNotSpecified", "Not Specified");
                     }
 
                     decimal percentage = 0;
@@ -190,9 +190,9 @@ namespace VIS.Controllers
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_PaymentMethods", "Payment methods"),
-                    why = GetMsg(ctx, "VAS_Why", "WHY"),
-                    description = GetMsg(ctx, "VAS_PaymentMethodWhy", "UPI is cheapest · shift sub-₹2L payments where possible"),
+                    title = GetMsg(ctx, "VAS_033_MessagePaymentMethods", "Payment methods"),
+                    why = GetMsg(ctx, "VAS_033_MessageWhy", "WHY"),
+                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "UPI is cheapest · shift sub-₹2L payments where possible"),
                     totalAmount = totalAmount,
                     dateFrom = FormatDate(dateFrom),
                     dateTo = FormatDate(dateTo.AddDays(-1)),

@@ -5,19 +5,19 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Recent payments                      | VAS_RecentPayments
- *  2  | + New payment                        | VAS_NewPayment
- *  3  | Review                               | VAS_Review
- *  4  | {0} payments auto-matched to bills   | VAS_PaymentsAutoMatchedToBills
- *  5  | Aura reconciled {0} based on amount + vendor | VAS_AuraReconciledBasedOnAmountVendor
- *  6  | Date                                 | VAS_Date
- *  7  | Vendor                               | VAS_Vendor
- *  8  | Method                               | VAS_Method
- *  9  | Ref                                  | VAS_Ref
- * 10  | Status                               | VAS_Status
- * 11  | Amount                               | VAS_Amount
- * 12  | Loading                              | VAS_Loading
- * 13  | No Data                              | VAS_NoData
+ *  1  | Recent payments                      | VAS_032_MessageRecentPayments
+ *  2  | + New payment                        | VAS_032_MessageNewPayment
+ *  3  | Review                               | VAS_032_MessageReview
+ *  4  | {0} payments auto-matched to bills   | VAS_032_MessagePaymentsAutoMatchedToBills
+ *  5  | Aura reconciled {0} based on amount + vendor | VAS_032_MessageAuraReconciledBasedOnAmountVendor
+ *  6  | Date                                 | VAS_032_MessageDate
+ *  7  | Vendor                               | VAS_032_MessageVendor
+ *  8  | Method                               | VAS_032_MessageMethod
+ *  9  | Ref                                  | VAS_032_MessageRef
+ * 10  | Status                               | VAS_032_MessageStatus
+ * 11  | Amount                               | VAS_032_MessageAmount
+ * 12  | Loading                              | VAS_032_MessageLoading
+ * 13  | No Data                              | VAS_032_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -61,7 +61,7 @@
                 '</svg>'
             );
 
-            var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_RecentPayments', 'Recent payments'));
+            var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_032_MessageRecentPayments', 'Recent payments'));
             
             $iconBox.append($icon);
             $titleWrap.append($iconBox).append($title);
@@ -78,7 +78,7 @@
             var $bannerText = $('<div class="vas-recent-ap-payments-banner-text">');
             $bannerTitle = $('<div class="vas-recent-ap-payments-banner-title">');
             $bannerSub = $('<div class="vas-recent-ap-payments-banner-sub">');
-            var $review = $('<button type="button" class="vas-recent-ap-payments-review">').text(lbl('VAS_Review', 'Review'));
+            var $review = $('<button type="button" class="vas-recent-ap-payments-review">').text(lbl('VAS_032_MessageReview', 'Review'));
 
             $bannerText.append($bannerTitle).append($bannerSub);
             $banner.append($bannerIcon).append($bannerText).append($review);
@@ -147,11 +147,11 @@
             $banner.show();
 
             $bannerTitle.text(
-                lbl('VAS_PaymentsAutoMatchedToBills', '{0} payments auto-matched to bills').replace('{0}', count.toLocaleString(window.navigator.language))
+                lbl('VAS_032_MessagePaymentsAutoMatchedToBills', '{0} payments auto-matched to bills').replace('{0}', count.toLocaleString(window.navigator.language))
             );
 
             $bannerSub.text(
-                lbl('VAS_AuraReconciledBasedOnAmountVendor', 'Aura reconciled {0} based on amount + vendor').replace('{0}', refs || count.toLocaleString(window.navigator.language))
+                lbl('VAS_032_MessageAuraReconciledBasedOnAmountVendor', 'Aura reconciled {0} based on amount + vendor').replace('{0}', refs || count.toLocaleString(window.navigator.language))
             );
         }
 
@@ -161,12 +161,12 @@
             var $headerRow = $('<tr>');
 
             $headerRow
-                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_Date', 'Date')))
-                .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_Vendor', 'Vendor')))
-                .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_Method', 'Method')))
-                .append($('<th class="vas-recent-ap-payments-ref">').text(lbl('VAS_Ref', 'Ref')))
-                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_Status', 'Status')))
-                .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_Amount', 'Amount')));
+                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Date')))
+                .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
+                .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
+                .append($('<th class="vas-recent-ap-payments-ref">').text(lbl('VAS_032_MessageRef', 'Ref')))
+                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Status')))
+                .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_032_MessageAmount', 'Amount')));
 
             $thead.append($headerRow);
             $table.append($thead);
@@ -189,8 +189,8 @@
 
             $row
                 .append($('<td class="vas-recent-ap-payments-date">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatDate(payment.paymentDate))))
-                .append($('<td class="vas-recent-ap-payments-vendor">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.vendorName || lbl('VAS_NotSpecified', 'Not Specified'))))
-                .append($('<td class="vas-recent-ap-payments-method-col">').append($('<span class="vas-recent-ap-payments-method">').text(payment.paymentMethodName || lbl('VAS_NotSpecified', 'Not Specified'))))
+                .append($('<td class="vas-recent-ap-payments-vendor">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
+                .append($('<td class="vas-recent-ap-payments-method-col">').append($('<span class="vas-recent-ap-payments-method">').text(payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
                 .append($('<td class="vas-recent-ap-payments-ref">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.referenceNo || '')))
                 .append($('<td class="vas-recent-ap-payments-status-col">').append($('<span class="vas-recent-ap-payments-status">').addClass(statusClass).text(statusText)))
                 .append($('<td class="vas-recent-ap-payments-amount">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatCurrencyAmount(payment.amount, payment.currencySymbol, payment.currencyISO))));
@@ -212,14 +212,14 @@
 
         function getStatusText(statusType) {
             if (statusType === 'bounced') {
-                return lbl('VAS_Bounced', 'Bounced');
+                return lbl('VAS_032_MessageBounced', 'Bounced');
             }
 
             if (statusType === 'intransit') {
-                return lbl('VAS_InTransit', 'In transit');
+                return lbl('VAS_032_MessageInTransit', 'In transit');
             }
 
-            return lbl('VAS_Cleared', 'Cleared');
+            return lbl('VAS_032_MessageCleared', 'Cleared');
         }
 
         function formatDate(value) {
@@ -263,7 +263,7 @@
             }
 
             if ($tableWrap) {
-                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_Loading', 'Loading')));
+                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_032_MessageLoading', 'Loading')));
             }
         }
 
@@ -273,7 +273,7 @@
             }
 
             if ($tableWrap) {
-                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_NoData', 'No Data')));
+                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_032_MessageNoData', 'No Data')));
             }
         }
 
@@ -295,7 +295,7 @@
         };
     };
 
-    VIS.VAS_032_RecentAPPaymentsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -303,14 +303,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.VAS_032_RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.VAS_032_RecentAPPaymentsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.VAS_032_RecentAPPaymentsWidget.prototype.dispose = function () {
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {
@@ -320,4 +320,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

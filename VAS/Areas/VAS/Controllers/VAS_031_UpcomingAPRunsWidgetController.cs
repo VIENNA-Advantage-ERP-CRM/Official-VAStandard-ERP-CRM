@@ -212,7 +212,7 @@ namespace VIS.Controllers
 
                     if (string.IsNullOrEmpty(paymentMethodName))
                     {
-                        paymentMethodName = GetMsg(ctx, "VAS_NotSpecified", "Not Specified");
+                        paymentMethodName = GetMsg(ctx, "VAS_031_MessageNotSpecified", "Not Specified");
                     }
 
                     runs.Add(new
@@ -231,8 +231,8 @@ namespace VIS.Controllers
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_UpcomingRuns", "Upcoming runs"),
-                    subTitle = GetMsg(ctx, "VAS_Next7Days", "Next 7 days"),
+                    title = GetMsg(ctx, "VAS_031_MessageUpcomingRuns", "Upcoming runs"),
+                    subTitle = GetMsg(ctx, "VAS_031_MessageNext7Days", "Next 7 days"),
                     dateFrom = FormatDate(dateFrom),
                     dateTo = FormatDate(dateTo.AddDays(-1)),
                     runs = runs

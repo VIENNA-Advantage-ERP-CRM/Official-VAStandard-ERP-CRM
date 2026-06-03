@@ -9,7 +9,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
@@ -198,9 +198,9 @@ namespace VIS.Controllers
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_RecentPayments", "Recent payments"),
-                    newPaymentText = GetMsg(ctx, "VAS_NewPayment", "+ New payment"),
-                    reviewText = GetMsg(ctx, "VAS_Review", "Review"),
+                    title = GetMsg(ctx, "VAS_032_MessageRecentPayments", "Recent payments"),
+                    newPaymentText = GetMsg(ctx, "VAS_032_MessageNewPayment", "+ New payment"),
+                    reviewText = GetMsg(ctx, "VAS_032_MessageReview", "Review"),
                     autoMatchedCount = autoMatchedCount,
                     autoMatchedRefs = autoMatchedRefs,
                     payments = payments
@@ -281,22 +281,22 @@ namespace VIS.Controllers
         {
             if (docStatus == "RE" || docStatus == "VO")
             {
-                return "VAS_Bounced";
+                return "VAS_032_MessageBounced";
             }
 
             if (docStatus == "CO" || docStatus == "CL")
             {
-                return "VAS_Cleared";
+                return "VAS_032_MessageCleared";
             }
 
-            return "VAS_InTransit";
+            return "VAS_032_MessageInTransit";
         }
 
         private string GetPaymentMethodName(Ctx ctx, string paymentMethodName)
         {
             if (string.IsNullOrEmpty(paymentMethodName))
             {
-                return GetMsg(ctx, "VAS_NotSpecified", "Not Specified");
+                return GetMsg(ctx, "VAS_032_MessageNotSpecified", "Not Specified");
             }
 
             return paymentMethodName;

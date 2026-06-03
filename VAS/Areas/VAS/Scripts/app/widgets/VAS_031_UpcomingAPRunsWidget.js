@@ -5,21 +5,21 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Upcoming runs                        | VAS_UpcomingRuns
- *  2  | Next 7 days                          | VAS_Next7Days
- *  3  | Batch                                | VAS_Batch
- *  4  | payment                              | VAS_Payment
- *  5  | payments                             | VAS_Payments
- *  6  | Loading                              | VAS_Loading
- *  7  | No Data                              | VAS_NoData
+ *  1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
+ *  2  | Next 7 days                          | VAS_031_MessageNext7Days
+ *  3  | Batch                                | VAS_031_MessageBatch
+ *  4  | payment                              | VAS_031_MessagePayment
+ *  5  | payments                             | VAS_031_MessagePayments
+ *  6  | Loading                              | VAS_031_MessageLoading
+ *  7  | No Data                              | VAS_031_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
-    VIS.VAS_031_UpcomingAPRunsWidget = function () {
+    VAS.VAS_031_UpcomingAPRunsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -53,8 +53,8 @@
                 '</svg>'
             );
 
-            var $title = $('<div class="vas-upcoming-ap-runs-title">').text(lbl('VAS_UpcomingRuns', 'Upcoming runs'));
-            var $sub = $('<div class="vas-upcoming-ap-runs-sub">').text(lbl('VAS_Next7Days', 'Next 7 days'));
+            var $title = $('<div class="vas-upcoming-ap-runs-title">').text(lbl('VAS_031_MessageUpcomingRuns', 'Upcoming runs'));
+            var $sub = $('<div class="vas-upcoming-ap-runs-sub">').text(lbl('VAS_031_MessageNext7Days', 'Next 7 days'));
 
             $iconBox.append($icon);
             $titleRow.append($iconBox).append($title);
@@ -117,7 +117,7 @@
         }
 
         function createRunRow(run) {
-            var paymentMethodName = run.paymentMethodName || lbl('VAS_NotSpecified', 'Not Specified');
+            var paymentMethodName = run.paymentMethodName || lbl('VAS_031_MessageNotSpecified', 'Not Specified');
             var paymentCount = Number(run.paymentCount || 0);
             var amount = Number(run.totalAmount || 0);
             var dueDateText = formatDate(run.dueDate);
@@ -143,13 +143,13 @@
                 return paymentMethodName + ' · ' + vendorName;
             }
 
-            return paymentMethodName + ' ' + lbl('VAS_Batch', 'Batch');
+            return paymentMethodName + ' ' + lbl('VAS_031_MessageBatch', 'Batch');
         }
 
         function getPaymentLabel(paymentCount) {
             return paymentCount === 1
-                ? lbl('VAS_Payment', 'payment')
-                : lbl('VAS_Payments', 'payments');
+                ? lbl('VAS_031_MessagePayment', 'payment')
+                : lbl('VAS_031_MessagePayments', 'payments');
         }
 
         function getPaymentMethodClass(paymentMethodName) {
@@ -212,13 +212,13 @@
 
         function setLoading() {
             if ($body) {
-                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_Loading', 'Loading')));
+                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_031_MessageLoading', 'Loading')));
             }
         }
 
         function setNoData() {
             if ($body) {
-                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_NoData', 'No Data')));
+                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_031_MessageNoData', 'No Data')));
             }
         }
 
@@ -237,7 +237,7 @@
         };
     };
 
-    VIS.VAS_031_UpcomingAPRunsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -245,14 +245,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.VAS_031_UpcomingAPRunsWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.VAS_031_UpcomingAPRunsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.VAS_031_UpcomingAPRunsWidget.prototype.dispose = function () {
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {
@@ -262,4 +262,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);

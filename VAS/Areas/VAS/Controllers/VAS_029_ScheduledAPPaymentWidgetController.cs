@@ -8,7 +8,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     /// <summary>
     /// Module Name : VAS Dashboard
@@ -225,7 +225,7 @@ ORDER BY ScheduledAmount DESC";
 
                     if (string.IsNullOrEmpty(paymentMethodName))
                     {
-                        paymentMethodName = GetMsg(ctx, "VAS_NotSpecified", "Not Specified");
+                        paymentMethodName = GetMsg(ctx, "VAS_029_MessageNotSpecified", "Not Specified");
                     }
 
                     scheduledAmountThisWeek += scheduledAmount;
@@ -255,9 +255,9 @@ ORDER BY ScheduledAmount DESC";
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_Scheduled", "Scheduled"),
-                    badge = GetMsg(ctx, "VAS_Why", "WHY"),
-                    description = GetMsg(ctx, "VAS_ScheduledForPaymentThisWeek", "Scheduled for payment this week"),
+                    title = GetMsg(ctx, "VAS_029_MessageScheduled", "Scheduled"),
+                    badge = GetMsg(ctx, "VAS_029_MessageWhy", "WHY"),
+                    description = GetMsg(ctx, "VAS_029_MessageScheduledForPaymentThisWeek", "Scheduled for payment this week"),
                     value = scheduledAmountThisWeek,
                     scheduledAmountThisWeek = scheduledAmountThisWeek,
                     groups = groups,

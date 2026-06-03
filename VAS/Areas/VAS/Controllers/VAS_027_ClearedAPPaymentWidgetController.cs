@@ -7,7 +7,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     public class VAS_027_ClearedAPPaymentWidgetController : Controller
     {
@@ -72,9 +72,9 @@ namespace VIS.Controllers
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_Cleared", "Cleared"),
-                    badge = GetMsg(ctx, "VAS_Why", "WHY"),
-                    description = GetMsg(ctx, "VAS_APPaymentClearedWhy", "Of last month's AP payments reconciled"),
+                    title = GetMsg(ctx, "VAS_027_messageCleared", "Cleared"),
+                    badge = GetMsg(ctx, "VAS_027_messageWhy", "WHY"),
+                    description = GetMsg(ctx, "VAS_027_messageAPPaymentClearedWhy", "Of last month's AP payments reconciled"),
 
                     value = clearedPercentage,
                     clearedPercentage = clearedPercentage,
