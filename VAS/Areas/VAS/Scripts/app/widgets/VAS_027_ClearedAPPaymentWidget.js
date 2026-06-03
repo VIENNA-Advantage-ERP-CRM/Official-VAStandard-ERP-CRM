@@ -195,6 +195,8 @@
         };
     };
 
+    VAS.VAS_027_ClearedAPPaymentWidget = VAS_027_ClearedAPPaymentWidget;
+
     VAS.VAS_027_ClearedAPPaymentWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
@@ -236,7 +238,5 @@
 
         this.frame = null;
     };
-
-    VAS.VAS_027_ClearedAPPaymentWidget = VAS_027_ClearedAPPaymentWidget;
 
 })(VAS, jQuery);

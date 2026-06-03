@@ -25,7 +25,7 @@
 
 ; (function (VIS, $) {
 
-    VIS.VAS_032_RecentAPPaymentsWidget = function () {
+    VAS.VAS_032_RecentAPPaymentsWidget = function () {
 
         this.frame;
         this.windowNo;
