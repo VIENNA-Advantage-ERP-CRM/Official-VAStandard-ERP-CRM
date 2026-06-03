@@ -23,8 +23,7 @@
  *  4  | peak                          | VAS_014_Peak                 | new
  *  5  | 14-day average                | VAS_014_FourteenDayAverage   | new
  *  6  | / day                         | VAS_014_PerDay               | new
- *  7  | Export                        | Export                       | reused
- *  8  | No Data Found                 | VIS_NoDataFound              | reused
+ *  7  | No Data Found                 | VIS_NoDataFound              | reused
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -366,7 +365,6 @@
                 '<div class="vas-dct-subtitle">' + escapeHtml(lbl("VAS_014_Subtitle", "Cash inflow · last 14 days")) + '</div>' +
                 '</div>' +
                 '</div>' +
-                '<button type="button" class="vas-dct-export">' + escapeHtml(lbl("Export", "Export")) + '</button>' +
                 '</div>' +
 
                 '<div class="vas-dct-chart"></div>' +

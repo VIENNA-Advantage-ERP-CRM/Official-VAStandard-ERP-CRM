@@ -266,7 +266,7 @@
     <Content Include="Areas\VAS\Content\BouncedChequesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_001_CollectionEfficiencyWidget.css" />
     <Content Include="Areas\VAS\Content\CustomerPaidMethodWidget.css" />
-    <Content Include="Areas\VAS\Content\ExpectedReceiptsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_034_ExpectedReceipts.css" />
     <Content Include="Areas\VAS\Content\ExpectedThisWeekWidget.css" />
     <Content Include="Areas\VAS\Content\AgingReceivablesWidget.css" />
     <Content Include="Areas\VAS\Content\AvgDaysToPayWidget.css" />
@@ -364,7 +364,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_001_CollectionEfficiencyWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CustomerPaidMethodWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedReceiptsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_034_ExpectedReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
