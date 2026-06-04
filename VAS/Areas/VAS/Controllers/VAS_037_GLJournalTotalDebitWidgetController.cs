@@ -19,6 +19,10 @@ namespace VAS.Controllers
     /// All widgets support a month / YTD period toggle and display amounts
     /// in the primary accounting schema base currency (C_AcctSchema → C_Currency).
     /// </summary>
+    ///  ─── Messages used in this file ───────────────────────────────────
+    // Messages : VAS_037_InvalidColumn, VAS_037_InvalidAlias
+    // ───────────────────────────────────────────────────────────────────────────
+
     public class VAS_037_GLJournalTotalDebitWidgetController : Controller
     {
         // ── Shared helper ─────────────────────────────────────────────────────
@@ -61,9 +65,32 @@ namespace VAS.Controllers
                 stdPrecision = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["StdPrecision"]);
             }
 
+
+            if (amountColumn != "AmtAcctDr" && amountColumn != "AmtAcctCr")
+            {
+                return Json(
+                    new
+                    {
+                        error = Msg.GetMsg(Env.GetCtx(), "VAS_037_InvalidColumn") ?? "Invalid Column"
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
+            if (resultAlias != "TotalDebit" && resultAlias != "TotalCredit")
+            {
+                return Json(
+                    new
+                    {
+                        error = Msg.GetMsg(Env.GetCtx(), "VAS_037_InvalidAlias") ?? "Invalid Alias"
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
             // ── Step 2: Aggregate only journals that belong to that schema ────
-            string sql = "SELECT SUM(GL_JournalLine. @AmountColumn) AS @resultAlias ,"
-                       + " COUNT(DISTINCT GL_Journal.GL_Journal_ID) AS JournalCount"
+            string sql = "SELECT SUM(GL_JournalLine." + amountColumn + ") AS " + resultAlias + ","
+                   + " COUNT(DISTINCT GL_Journal.GL_Journal_ID) AS JournalCount"
                        + " FROM GL_Journal"
                        + " INNER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID)"
                        + " WHERE GL_Journal.PostingType = 'A'"
@@ -75,9 +102,7 @@ namespace VAS.Controllers
             var sqlParams = new List<SqlParameter>
             {
                 new SqlParameter("@AcctSchemaID", acctSchemaId),
-                new SqlParameter("@CurrentYear",  currentYear),
-                new SqlParameter("@AmountColumn", amountColumn),
-                new SqlParameter("@ResultAlias", resultAlias)
+                new SqlParameter("@CurrentYear",  currentYear)
             };
 
             // month = current month only; ytd = full year (year filter above is sufficient)
