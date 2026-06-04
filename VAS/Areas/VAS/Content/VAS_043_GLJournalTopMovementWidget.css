@@ -1,0 +1,240 @@
+/* ==========================================================================
+   VAS GL Journal Top Ledger Movement Widget
+   File  : VAS_043_GLJournalTopMovementWidget.css
+   Scope : .VAS-gljtm-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljtm-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── Card container ──────────────────────────────────────────────────────── */
+.VAS-gljtm-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, #FAFCFE 0%, #EEF6FF 100%);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljtm-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+    margin-bottom: 0.75em;
+}
+
+/* Icon well */
+.VAS-gljtm-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(0, 131, 218, 0.10);
+    color: #004E9A;
+}
+
+.VAS-gljtm-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+/* Title */
+.VAS-gljtm-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #102C3F;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+/* "by value" sub-label */
+.VAS-gljtm-sub {
+    font-size: 0.7em;
+    font-weight: 400;
+    color: #748494;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* Month / YTD toggle */
+.VAS-gljtm-toggle {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.07);
+    border: 1px solid rgba(0, 131, 218, 0.20);
+    border-radius: 0.35em;
+    padding: 0.2em 0.55em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s;
+    white-space: nowrap;
+}
+
+.VAS-gljtm-toggle:hover {
+    background: rgba(0, 131, 218, 0.14);
+}
+
+/* ── Scrollable body ─────────────────────────────────────────────────────── */
+.VAS-gljtm-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ── Account list ────────────────────────────────────────────────────────── */
+.VAS-gljtm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55em;
+}
+
+/* ── Single account row ──────────────────────────────────────────────────── */
+.VAS-gljtm-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+}
+
+/* Row header: label + value */
+.VAS-gljtm-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+/* Account label (code + name) */
+.VAS-gljtm-label {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* Account search key (e.g. "4001") */
+.VAS-gljtm-acct {
+    font-size: 0.85em;
+    font-weight: 400;
+    color: #748494;
+    margin-right: 0.4em;
+}
+
+/* Net movement value */
+.VAS-gljtm-val {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Bar track ───────────────────────────────────────────────────────────── */
+.VAS-gljtm-track {
+    height: 0.45em;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+/* ── Bar fill — blue (debit-heavy) ──────────────────────────────────────── */
+.VAS-gljtm-fill {
+    height: 100%;
+    width: var(--bar-w, 0%);
+    border-radius: 999px;
+    background: #0083DA;
+    transition: width 0.4s ease;
+}
+
+/* ── Bar fill — green (credit-heavy) ────────────────────────────────────── */
+.VAS-gljtm-fill-cr {
+    background: #019D89;
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.VAS-gljtm-loading,
+.VAS-gljtm-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 6em;
+    font-size: 0.8em;
+    color: #748494;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljtm-card {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljtm-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljtm-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljtm-card {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljtm-card {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-gljtm-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljtm-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-gljtm-card {
+        font-size: 11px;
+    }
+}
+
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljtm-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljtm-sub {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljtm-row-head {
+    flex-direction: row-reverse;
+}
