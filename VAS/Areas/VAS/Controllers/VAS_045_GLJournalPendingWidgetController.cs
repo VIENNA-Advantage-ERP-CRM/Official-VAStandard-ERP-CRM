@@ -85,7 +85,7 @@ namespace VAS.Controllers
                            + " WHERE jl.GL_Journal_ID=GL_Journal.GL_Journal_ID AND jl.IsActive='Y') AS TotalDebit,"
                            + " AD_User.Name AS UserName"
                            + " FROM GL_Journal"
-                           + " LEFT OUTER JOIN AD_User ON (GL_Journal.CreatedBy=AD_User.AD_User_ID)"
+                           + " INNER JOIN AD_User ON (GL_Journal.CreatedBy=AD_User.AD_User_ID)"
                            + " WHERE GL_Journal.DocStatus IN ('DR','IP','AP','NA')"
                            + " AND GL_Journal.IsActive='Y'"
                            + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";

@@ -67,7 +67,7 @@ namespace VAS.Controllers
                            + " COALESCE(SUM(GL_JournalLine.AmtAcctDr),0) AS TotalDebit,"
                            + " COALESCE(SUM(GL_JournalLine.AmtAcctCr),0) AS TotalCredit"
                            + " FROM GL_Journal"
-                           + " LEFT OUTER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID=GL_JournalLine.GL_Journal_ID"
+                           + " INNER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID=GL_JournalLine.GL_Journal_ID"
                            + " AND GL_JournalLine.IsActive='Y')"
                            + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
                            + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
