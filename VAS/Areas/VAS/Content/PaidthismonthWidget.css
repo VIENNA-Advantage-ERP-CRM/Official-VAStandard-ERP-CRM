@@ -66,10 +66,10 @@
     justify-content: center;
 }
 
-    .vas-ptm-icon svg {
-        width: 1em;                      /* 16px, overrides inline attrs, scales with base */
-        height: 1em;
-    }
+.vas-ptm-icon svg {
+    width: 1em;                      /* 16px, overrides inline attrs, scales with base */
+    height: 1em;
+}
 
 .vas-ptm-title {
     font-size: 0.8125em;             /* 13px */
