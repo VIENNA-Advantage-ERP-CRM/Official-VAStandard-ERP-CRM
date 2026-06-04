@@ -173,7 +173,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_045_GLJournalPendingWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_045_GLJournalPendingWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_045_GLJournalPendingWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

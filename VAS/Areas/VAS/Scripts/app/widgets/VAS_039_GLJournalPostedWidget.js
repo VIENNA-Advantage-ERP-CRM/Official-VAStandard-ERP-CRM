@@ -108,7 +108,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_039_GLJournalPostedWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_039_GLJournalPostedWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_039_GLJournalPostedWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

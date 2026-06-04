@@ -284,7 +284,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_042_GLJournalVolumeWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_042_GLJournalVolumeWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_042_GLJournalVolumeWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

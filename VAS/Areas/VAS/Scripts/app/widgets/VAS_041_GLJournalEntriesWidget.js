@@ -123,7 +123,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_041_GLJournalEntriesWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_041_GLJournalEntriesWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_041_GLJournalEntriesWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

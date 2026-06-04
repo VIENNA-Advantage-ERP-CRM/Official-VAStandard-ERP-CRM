@@ -174,7 +174,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_038_GLJournalTotalCreditWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_038_GLJournalTotalCreditWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_038_GLJournalTotalCreditWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;

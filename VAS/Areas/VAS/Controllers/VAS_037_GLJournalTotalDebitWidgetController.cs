@@ -62,7 +62,7 @@ namespace VAS.Controllers
             }
 
             // ── Step 2: Aggregate only journals that belong to that schema ────
-            string sql = "SELECT SUM(GL_JournalLine." + amountColumn + ") AS " + resultAlias + ","
+            string sql = "SELECT SUM(GL_JournalLine. @AmountColumn) AS @resultAlias ,"
                        + " COUNT(DISTINCT GL_Journal.GL_Journal_ID) AS JournalCount"
                        + " FROM GL_Journal"
                        + " INNER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID)"
@@ -75,7 +75,9 @@ namespace VAS.Controllers
             var sqlParams = new List<SqlParameter>
             {
                 new SqlParameter("@AcctSchemaID", acctSchemaId),
-                new SqlParameter("@CurrentYear",  currentYear)
+                new SqlParameter("@CurrentYear",  currentYear),
+                new SqlParameter("@AmountColumn", amountColumn),
+                new SqlParameter("@ResultAlias", resultAlias)
             };
 
             // month = current month only; ytd = full year (year filter above is sufficient)

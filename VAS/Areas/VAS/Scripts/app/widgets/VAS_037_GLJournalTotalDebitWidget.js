@@ -186,7 +186,9 @@
         this.disposeComponent = function () { $root.remove(); };
     };
 
-    VAS.VAS_037_GLJournalTotalDebitWidget.prototype.refreshWidget = function () {};
+    VAS.VAS_037_GLJournalTotalDebitWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
 
     VAS.VAS_037_GLJournalTotalDebitWidget.prototype.init = function (windowNo, frame) {
         this.frame               = frame;
