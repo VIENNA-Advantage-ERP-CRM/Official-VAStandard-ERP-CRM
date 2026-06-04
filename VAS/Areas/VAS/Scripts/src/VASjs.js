@@ -123,7 +123,7 @@ import "../app/widgets/VAS_032_RecentAPPaymentsWidget.js";
 
 import "../app/widgets/VAS_033_PaymentMethodsWidget.js";
 
-import "../app/widgets/ReconciliationStatusWidget.js";
+import "../app/widgets/VAS_046_ReconciliationStatusWidget.js";
 
 
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";

@@ -5,14 +5,14 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Reconciliation status                | VAS_ReconciliationStatus
- *  2  | Matched to bills + bank              | VAS_MatchedToBillsBank
- *  3  | Matched                              | VAS_Matched
- *  4  | {0} auto-matched                     | VAS_PercentageAutoMatched
- *  5  | {0} payments need manual match       | VAS_PaymentsNeedManualMatch
- *  6  | Review unmatched                     | VAS_ReviewUnmatched
- *  7  | Loading                              | VAS_Loading
- *  8  | No Data                              | VAS_NoData
+ *  1  | Reconciliation status                | VAS_046_ReconciliationStatus
+ *  2  | Matched to bills + bank              | VAS_046_MatchedToBillsBank
+ *  3  | Matched                              | VAS_046_Matched
+ *  4  | {0} auto-matched                     | VAS_046_PercentageAutoMatched
+ *  5  | {0} payments need manual match       | VAS_046_PaymentsNeedManualMatch
+ *  6  | Review unmatched                     | VAS_046_ReviewUnmatched
+ *  7  | Loading                              | VAS_046_Loading
+ *  8  | No Data                              | VAS_046_NoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -20,7 +20,7 @@
 
 ; (function (VIS, $) {
 
-    VIS.ReconciliationStatusWidget = function () {
+    VIS.VAS_046_ReconciliationStatusWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -60,8 +60,8 @@
                 '</svg>'
             );
 
-            var $title = $('<div class="vas-reconciliation-status-title">').text(lbl('VAS_ReconciliationStatus', 'Reconciliation status'));
-            var $sub = $('<div class="vas-reconciliation-status-sub">').text(lbl('VAS_MatchedToBillsBank', 'Matched to bills + bank'));
+            var $title = $('<div class="vas-reconciliation-status-title">').text(lbl('VAS_046_ReconciliationStatus', 'Reconciliation status'));
+            var $sub = $('<div class="vas-reconciliation-status-sub">').text(lbl('VAS_046_MatchedToBillsBank', 'Matched to bills + bank'));
 
             $iconBox.append($icon);
             $titleRow.append($iconBox).append($title);
@@ -82,7 +82,7 @@
 
             var $center = $('<div class="vas-reconciliation-status-center">');
             $percent = $('<span class="vas-reconciliation-status-percent">');
-            var $cap = $('<span class="vas-reconciliation-status-cap">').text(lbl('VAS_Matched', 'Matched'));
+            var $cap = $('<span class="vas-reconciliation-status-cap">').text(lbl('VAS_046_Matched', 'Matched'));
 
             $center.append($percent).append($cap);
             $donut.append($svg).append($center);
@@ -99,7 +99,7 @@
                 '</svg>'
             );
 
-            $action.append(document.createTextNode(lbl('VAS_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
+            $action.append(document.createTextNode(lbl('VAS_046_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
             $meta.append($strong).append($subText).append($action);
 
             $body.append($donut).append($meta);
@@ -168,8 +168,8 @@
             $percent.text(percentageText);
             $progress.attr('stroke-dasharray', percentage + ' 100');
 
-            $strong.text(lbl('VAS_PercentageAutoMatched', '{0} auto-matched').replace('{0}', percentageText));
-            $subText.text(lbl('VAS_PaymentsNeedManualMatch', '{0} payments need manual match').replace('{0}', manualCount.toLocaleString(window.navigator.language)));
+            $strong.text(lbl('VAS_046_PercentageAutoMatched', '{0} auto-matched').replace('{0}', percentageText));
+            $subText.text(lbl('VAS_046_PaymentsNeedManualMatch', '{0} payments need manual match').replace('{0}', manualCount.toLocaleString(window.navigator.language)));
         }
 
         function formatPercentage(value) {
@@ -212,7 +212,7 @@
             }
 
             if ($state) {
-                $state.text(lbl('VAS_Loading', 'Loading')).show();
+                $state.text(lbl('VAS_046_Loading', 'Loading')).show();
             }
         }
 
@@ -222,7 +222,7 @@
             }
 
             if ($state) {
-                $state.text(lbl('VAS_NoData', 'No Data')).show();
+                $state.text(lbl('VAS_046_NoData', 'No Data')).show();
             }
         }
 
@@ -246,7 +246,7 @@
         };
     };
 
-    VIS.ReconciliationStatusWidget.prototype.init = function (windowNo, frame) {
+    VIS.VAS_046_ReconciliationStatusWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -254,14 +254,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.ReconciliationStatusWidget.prototype.widgetSizeChange = function (height, width) {
+    VIS.VAS_046_ReconciliationStatusWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.ReconciliationStatusWidget.prototype.refreshWidget = function () {
+    VIS.VAS_046_ReconciliationStatusWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.ReconciliationStatusWidget.prototype.dispose = function () {
+    VIS.VAS_046_ReconciliationStatusWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {
