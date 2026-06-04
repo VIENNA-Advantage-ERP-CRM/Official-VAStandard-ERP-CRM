@@ -1,0 +1,274 @@
+﻿/**
+ * Reconciliation status
+ * Purpose - Shows the percentage of outgoing AP payments matched to bills and bank reconciliation.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Reconciliation status                | VAS_ReconciliationStatus
+ *  2  | Matched to bills + bank              | VAS_MatchedToBillsBank
+ *  3  | Matched                              | VAS_Matched
+ *  4  | {0} auto-matched                     | VAS_PercentageAutoMatched
+ *  5  | {0} payments need manual match       | VAS_PaymentsNeedManualMatch
+ *  6  | Review unmatched                     | VAS_ReviewUnmatched
+ *  7  | Loading                              | VAS_Loading
+ *  8  | No Data                              | VAS_NoData
+ * ─────────────────────────────────────────────────────────────────────
+ */
+
+; VIS = window.VIS || {};
+
+; (function (VIS, $) {
+
+    VIS.ReconciliationStatusWidget = function () {
+
+        this.frame;
+        this.windowNo;
+        this.AD_UserHomeWidgetID;
+
+        var $root = $('<div class="vas-reconciliation-status-root">');
+        var $card;
+        var $body;
+        var $state;
+        var $progress;
+        var $percent;
+        var $strong;
+        var $subText;
+
+        function lbl(key, fallback) {
+            var text = VIS.Msg.getMsg(key);
+            return text && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        this.Initalize = function () {
+            createWidget();
+            loadData();
+        };
+
+        function createWidget() {
+            $card = $('<div class="vas-reconciliation-status-card">');
+
+            var $head = $('<div class="vas-reconciliation-status-head">');
+            var $headLeft = $('<div class="vas-reconciliation-status-head-left">');
+            var $titleRow = $('<div class="vas-reconciliation-status-title-row">');
+            var $iconBox = $('<span class="vas-reconciliation-status-icon-box">');
+            var $icon = $(
+                '<svg class="vas-reconciliation-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<circle cx="12" cy="12" r="10"></circle>' +
+                '<circle cx="12" cy="12" r="6"></circle>' +
+                '<circle cx="12" cy="12" r="2"></circle>' +
+                '</svg>'
+            );
+
+            var $title = $('<div class="vas-reconciliation-status-title">').text(lbl('VAS_ReconciliationStatus', 'Reconciliation status'));
+            var $sub = $('<div class="vas-reconciliation-status-sub">').text(lbl('VAS_MatchedToBillsBank', 'Matched to bills + bank'));
+
+            $iconBox.append($icon);
+            $titleRow.append($iconBox).append($title);
+            $headLeft.append($titleRow).append($sub);
+            $head.append($headLeft);
+
+            $body = $('<div class="vas-reconciliation-status-body">');
+
+            var $donut = $('<div class="vas-reconciliation-status-donut">');
+            var $svg = $(
+                '<svg viewBox="0 0 140 140" aria-hidden="true" focusable="false">' +
+                '<circle class="vas-reconciliation-status-track" cx="70" cy="70" r="56"></circle>' +
+                '<circle class="vas-reconciliation-status-progress" cx="70" cy="70" r="56" pathLength="100" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>' +
+                '</svg>'
+            );
+
+            $progress = $svg.find('.vas-reconciliation-status-progress');
+
+            var $center = $('<div class="vas-reconciliation-status-center">');
+            $percent = $('<span class="vas-reconciliation-status-percent">');
+            var $cap = $('<span class="vas-reconciliation-status-cap">').text(lbl('VAS_Matched', 'Matched'));
+
+            $center.append($percent).append($cap);
+            $donut.append($svg).append($center);
+
+            var $meta = $('<div class="vas-reconciliation-status-meta">');
+            $strong = $('<div class="vas-reconciliation-status-strong">');
+            $subText = $('<div class="vas-reconciliation-status-subtext">');
+
+            var $action = $('<button type="button" class="vas-reconciliation-status-action">');
+            var $actionIcon = $(
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+                '<line x1="7" y1="17" x2="17" y2="7"></line>' +
+                '<polyline points="7 7 17 7 17 17"></polyline>' +
+                '</svg>'
+            );
+
+            $action.append(document.createTextNode(lbl('VAS_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
+            $meta.append($strong).append($subText).append($action);
+
+            $body.append($donut).append($meta);
+            $state = $('<div class="vas-reconciliation-status-state">').hide();
+
+            $card.append($head).append($body).append($state);
+            $root.empty().append($card);
+        }
+
+        function loadData() {
+            setLoading();
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'ReconciliationStatus/GetReconciliationStatus',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (response) {
+                    var data = response;
+
+                    if (typeof response === 'string') {
+                        try {
+                            data = JSON.parse(response);
+                        }
+                        catch (e) {
+                            setNoData();
+                            return;
+                        }
+                    }
+
+                    if (!data || data.error) {
+                        setNoData();
+                        return;
+                    }
+
+                    renderData(data);
+                },
+                error: function () {
+                    setNoData();
+                }
+            });
+        }
+
+        function renderData(data) {
+            var percentage = Number(data.matchedPercentage);
+            var manualCount = Number(data.manualMatchCount || 0);
+
+            if (isNaN(percentage)) {
+                setNoData();
+                return;
+            }
+
+            if (percentage < 0) {
+                percentage = 0;
+            }
+
+            if (percentage > 100) {
+                percentage = 100;
+            }
+
+            var percentageText = formatPercentage(percentage);
+
+            $state.hide();
+            $body.show();
+
+            $percent.text(percentageText);
+            $progress.attr('stroke-dasharray', percentage + ' 100');
+
+            $strong.text(lbl('VAS_PercentageAutoMatched', '{0} auto-matched').replace('{0}', percentageText));
+            $subText.text(lbl('VAS_PaymentsNeedManualMatch', '{0} payments need manual match').replace('{0}', manualCount.toLocaleString(window.navigator.language)));
+        }
+
+        function formatPercentage(value) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = getStdPrecision();
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            }) + '%';
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = getStdPrecision();
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+        }
+
+        function getStdPrecision() {
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function setLoading() {
+            if ($body) {
+                $body.hide();
+            }
+
+            if ($state) {
+                $state.text(lbl('VAS_Loading', 'Loading')).show();
+            }
+        }
+
+        function setNoData() {
+            if ($body) {
+                $body.hide();
+            }
+
+            if ($state) {
+                $state.text(lbl('VAS_NoData', 'No Data')).show();
+            }
+        }
+
+        this.refreshWidget = function () {
+            loadData();
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+
+        this.disposeComponent = function () {
+            $root.remove();
+            $card = null;
+            $body = null;
+            $state = null;
+            $progress = null;
+            $percent = null;
+            $strong = null;
+            $subText = null;
+        };
+    };
+
+    VIS.ReconciliationStatusWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        this.windowNo = windowNo;
+        this.Initalize();
+        this.frame.getContentGrid().append(this.getRoot());
+    };
+
+    VIS.ReconciliationStatusWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    VIS.ReconciliationStatusWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
+
+    VIS.ReconciliationStatusWidget.prototype.dispose = function () {
+        this.disposeComponent();
+
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
+
+})(VIS, jQuery);

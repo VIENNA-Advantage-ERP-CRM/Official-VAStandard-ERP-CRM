@@ -111,6 +111,21 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 
+import "../app/widgets/RequestWidget.js";
+
+import "../app/widgets/VAS_027_ClearedAPPaymentWidget.js";
+import "../app/widgets/VAS_028_PaidThisMonthAPPaymentWidget.js";
+import "../app/widgets/VAS_029_ScheduledAPPaymentWidget.js";
+import "../app/widgets/VAS_030_BouncedAPPaymentWidget.js";
+import "../app/widgets/VAS_031_UpcomingAPRunsWidget.js";
+import "../app/widgets/VAS_032_RecentAPPaymentsWidget.js";
+
+
+import "../app/widgets/VAS_033_PaymentMethodsWidget.js";
+
+import "../app/widgets/ReconciliationStatusWidget.js";
+
+
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
 
 import "../app/widgets/VAS_010_CashGlCashInWidget.js";

@@ -13,7 +13,20 @@
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
 
+
+@import "../VAS_027_ClearedAPPaymentWidget.css";
+@import "../VAS_028_PaidThisMonthAPPaymentWidget.css";
+@import "../VAS_029_ScheduledAPPaymentWidget.css";
+@import "../VAS_030_BouncedAPPaymentWidget.css";
+@import "../VAS_031_UpcomingAPRunsWidget.css";
+@import "../VAS_032_RecentAPPaymentsWidget.css";
+
+@import "../VAS_033_PaymentMethodsWidget.css";
+@import "../ReconciliationStatusWidget.css";
+
+
 @import "../VAS_010_CashGlCashInWidget.css";
+
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
