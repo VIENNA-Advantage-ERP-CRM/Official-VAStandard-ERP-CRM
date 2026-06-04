@@ -1,0 +1,783 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Match Suggestions (Widget 19) — 6x3 glass list card + match-review modal.
+ * Design source: design.md (Onfinity) + PROMPT.md "Widget 19 — Match
+ * suggestions". Per CLAUDE.md project rule, every CSS value is in `em`
+ * (the card clamp() endpoints follow the shared big-screen scaling fix).
+ * Namespaced vas-msug-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-msug-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-msug-root,
+    .vas-msug-root * {
+        box-sizing: border-box;
+    }
+
+.vas-msug-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card (6x3) ──────────────────────────────────────────────── */
+
+.vas-msug-card {
+    /* Scales with the cell on large dashboards; cqi resolves against
+       .vas-msug-root (container-type: inline-size). 6-col-wide footprint,
+       so a gentler factor than the 1x1 KPI cards. */
+    font-size: clamp(16px, 2.2cqi, 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+}
+
+/* ── Header: icon well + title / subtitle ──────────────────────────── */
+
+.vas-msug-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-msug-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-msug-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-msug-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-msug-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-msug-title {
+    font-size: 0.97em;
+    color: #102C3F;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-msug-subtitle {
+    font-size: 0.75em;
+    color: #717182;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Suggestion rows ───────────────────────────────────────────────── */
+
+.vas-msug-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    margin-top: 0.5em;
+}
+
+.vas-msug-nodata {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+}
+
+.vas-msug-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.25em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    cursor: pointer;
+    min-width: 0;
+}
+
+    .vas-msug-row:hover {
+        background: rgba(0, 131, 218, 0.04);
+    }
+
+    .vas-msug-row:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: -0.125em;
+        border-radius: 0.375em;
+    }
+
+.vas-msug-rail {
+    width: 0.1875em;
+    align-self: stretch;
+    border-radius: 999em;
+    background: #1F83FF;
+    flex-shrink: 0;
+}
+
+.vas-msug-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Customer · amount sit side by side, left-aligned (image_1). */
+.vas-msug-row-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.375em;
+    min-width: 0;
+}
+
+.vas-msug-customer {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: #102C3F;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-msug-row-sep {
+    font-size: 0.9375em;
+    color: #748494;
+    flex-shrink: 0;
+}
+
+.vas-msug-row-amount {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-msug-meta {
+    margin-top: 0.125em;
+    font-size: 0.75em;
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Confidence chip: pill, light tinted bg + leading dot. */
+.vas-msug-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border-radius: 999em;
+    padding: 0.25em 0.75em;
+    font-size: 0.75em;
+    font-weight: 700;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vas-msug-tag-dot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.vas-msug-tag-high {
+    color: #0B6B45;
+    background: rgba(1, 157, 137, 0.12);
+}
+
+.vas-msug-tag-review {
+    color: #9A6500;
+    background: rgba(215, 139, 16, 0.14);
+}
+
+.vas-msug-tag-low {
+    color: #A33F3F;
+    background: rgba(237, 28, 36, 0.10);
+}
+
+.vas-msug-chevron {
+    color: #748494;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+    .vas-msug-chevron svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+/* ── Footer: info + open-form link on one line, pager below ───────── */
+
+.vas-msug-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5em;
+    padding-top: 0.625em;
+    flex-shrink: 0;
+}
+
+/* Top row: info (left) · open-form link (right). */
+.vas-msug-footer-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    min-width: 0;
+}
+
+.vas-msug-footer-info {
+    font-size: 0.8125em;
+    color: #5F7283;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+}
+
+    .vas-msug-footer-info b {
+        color: #102C3F;
+        font-weight: 700;
+    }
+
+/* Bottom row: pager only (collapsed entirely when there is one page). */
+.vas-msug-footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1em;
+    min-width: 0;
+}
+
+.vas-msug-openform {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #106AB0;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .vas-msug-openform svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-msug-openform:hover {
+        color: #0069AE;
+        text-decoration: underline;
+    }
+
+.vas-msug-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-msug-page-btn {
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-msug-page-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-msug-page-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-msug-page-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-msug-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Card responsive ───────────────────────────────────────────────── */
+
+@container (max-width: 26.25em) {     /* < 420px */
+    .vas-msug-card { font-size: 0.8125em; }
+    .vas-msug-meta { white-space: normal; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Match-review modal (centered, white, max-width ~880px ⇒ 55em).
+ * Attached to <body>; fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-msug-body-lock {
+    overflow: hidden;
+}
+
+.vas-msug-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-msug-dialog,
+    .vas-msug-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-msug-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-msug-dialog-card {
+    position: relative;
+    width: min(55em, 100%);
+    max-height: 100%;
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-msug-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 1em 1em 0.75em 1.25em;
+    flex-shrink: 0;
+}
+
+.vas-msug-dialog-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-msug-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-msug-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-msug-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+/* 1 — confidence banner: score + verdict. */
+.vas-msug-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin: 0 1.25em;
+    padding: 0.75em 1em;
+    border-radius: 0.625em;
+    flex-shrink: 0;
+}
+
+    .vas-msug-banner:empty {
+        display: none;
+    }
+
+.vas-msug-banner-high {
+    background: rgba(1, 157, 137, 0.12);
+    border: 0.0625em solid rgba(1, 157, 137, 0.3);
+    color: #0B6B45;
+}
+
+.vas-msug-banner-review {
+    background: rgba(215, 139, 16, 0.12);
+    border: 0.0625em solid rgba(215, 139, 16, 0.3);
+    color: #9A6500;
+}
+
+.vas-msug-banner-low {
+    background: rgba(237, 28, 36, 0.08);
+    border: 0.0625em solid rgba(209, 69, 69, 0.3);
+    color: #A33F3F;
+}
+
+.vas-msug-banner-score {
+    font-size: 1.5em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.vas-msug-banner-verdict {
+    font-size: 0.9375em;
+    font-weight: 500;
+}
+
+.vas-msug-dialog-body {
+    flex: 1 1 auto;
+    min-height: 10em;
+    overflow: auto;
+    padding: 0.75em 1.25em;
+    position: relative;
+}
+
+.vas-msug-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+/* 2 — two-pane compare with a link arrow. */
+.vas-msug-compare {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5em;
+}
+
+.vas-msug-pane {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.625em;
+    padding: 0.75em 0.875em;
+    background: #FBFDFF;
+}
+
+.vas-msug-pane-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: #106AB0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-bottom: 0.5em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    margin-bottom: 0.375em;
+}
+
+.vas-msug-pane-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-msug-pane-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.3125em 0;
+    min-width: 0;
+}
+
+.vas-msug-pane-label {
+    font-size: 0.8125em;
+    color: #748494;
+    flex-shrink: 0;
+}
+
+.vas-msug-pane-value {
+    font-size: 0.875em;
+    color: #102C3F;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-msug-amount-received {
+    color: #0B6B45;
+    font-weight: 700;
+}
+
+.vas-msug-amount-open {
+    color: #9A6500;
+    font-weight: 700;
+}
+
+.vas-msug-link-arrow {
+    align-self: center;
+    color: #0083DA;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+    .vas-msug-link-arrow svg {
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+/* 3 — balance strip: exact (green) or short (amber). */
+.vas-msug-balance {
+    margin-top: 0.75em;
+    padding: 0.625em 1em;
+    border-radius: 0.625em;
+    font-size: 0.875em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.vas-msug-balance-exact {
+    background: rgba(1, 157, 137, 0.12);
+    color: #0B6B45;
+}
+
+.vas-msug-balance-short {
+    background: rgba(215, 139, 16, 0.14);
+    color: #9A6500;
+}
+
+/* 4 — "why this match" signal list. */
+.vas-msug-why {
+    margin-top: 0.75em;
+}
+
+.vas-msug-why-title {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: #102C3F;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.375em;
+}
+
+.vas-msug-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    padding: 0.4375em 0;
+    border-bottom: 0.0625em solid #EDF2F6;
+}
+
+    .vas-msug-check:last-child {
+        border-bottom: 0;
+    }
+
+.vas-msug-check-icon {
+    width: 1.375em;
+    height: 1.375em;
+    min-width: 1.375em;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.0625em;
+}
+
+    .vas-msug-check-icon svg {
+        width: 0.75em;
+        height: 0.75em;
+        stroke: currentColor;
+    }
+
+.vas-msug-check-ok .vas-msug-check-icon {
+    background: rgba(1, 157, 137, 0.12);
+    color: #019D89;
+}
+
+.vas-msug-check-warn .vas-msug-check-icon {
+    background: rgba(215, 139, 16, 0.14);
+    color: #D78B10;
+}
+
+.vas-msug-check-text {
+    min-width: 0;
+}
+
+.vas-msug-check-title {
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.vas-msug-check-detail {
+    font-size: 0.75em;
+    color: #748494;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 5 — footer: Skip + Apply allocation / Apply as part-payment. */
+.vas-msug-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+    padding: 0.75em 1.25em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-msug-btn-skip {
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FFFFFF;
+    color: #5F7283;
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 500;
+    padding: 0.5em 1.125em;
+    cursor: pointer;
+}
+
+    .vas-msug-btn-skip:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+.vas-msug-btn-apply {
+    border: 0;
+    border-radius: 0.5em;
+    background: #0083DA;
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 500;
+    padding: 0.5em 1.125em;
+    cursor: pointer;
+}
+
+    .vas-msug-btn-apply:hover:not(:disabled) {
+        background: #0069AE;
+    }
+
+    .vas-msug-btn-apply:active:not(:disabled) {
+        background: #004F83;
+    }
+
+    .vas-msug-btn-apply:disabled {
+        background: rgba(0, 131, 218, 0.35);
+        cursor: default;
+    }
+
+/* ── Dialog responsive — small screens ────────────────────────────── */
+
+@media (max-width: 40em) {            /* ~640px */
+    .vas-msug-dialog { padding: 0; }
+
+    .vas-msug-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    /* Stack the compare panes; rotate the link arrow downwards. */
+    .vas-msug-compare { flex-direction: column; }
+    .vas-msug-link-arrow { transform: rotate(90deg); }
+}

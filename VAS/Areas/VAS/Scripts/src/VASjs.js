@@ -130,6 +130,7 @@ import "../app/widgets/VAS_013_TopCustomerReceipts.js";
 import "../app/widgets/VAS_014_DailyCollectionTrend.js";
 import "../app/widgets/VAS_015_OutstandingVsReceived.js";
 import "../app/widgets/VAS_034_ExpectedReceipts.js";
+import "../app/widgets/VAS_035_MatchSuggestions.js";
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
 import "../app/widgets/AvgDaysToPayWidget.js";
