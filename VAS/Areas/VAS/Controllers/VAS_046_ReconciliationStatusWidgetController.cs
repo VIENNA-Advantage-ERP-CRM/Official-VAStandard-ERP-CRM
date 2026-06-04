@@ -7,7 +7,7 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
     public class VAS_046_ReconciliationStatusWidgetController : Controller
     {

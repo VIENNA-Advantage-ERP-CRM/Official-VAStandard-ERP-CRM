@@ -16,11 +16,11 @@
  * ─────────────────────────────────────────────────────────────────────
  */
 
-; VIS = window.VIS || {};
+; VAS = window.VAS || {};
 
-; (function (VIS, $) {
+; (function (VAS, $) {
 
-    VIS.VAS_046_ReconciliationStatusWidget = function () {
+    VAS.VAS_046_ReconciliationStatusWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -246,7 +246,7 @@
         };
     };
 
-    VIS.VAS_046_ReconciliationStatusWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_046_ReconciliationStatusWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
         this.windowNo = windowNo;
@@ -254,14 +254,14 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VIS.VAS_046_ReconciliationStatusWidget.prototype.widgetSizeChange = function (height, width) {
+    VAS.VAS_046_ReconciliationStatusWidget.prototype.widgetSizeChange = function (height, width) {
     };
 
-    VIS.VAS_046_ReconciliationStatusWidget.prototype.refreshWidget = function () {
+    VAS.VAS_046_ReconciliationStatusWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VIS.VAS_046_ReconciliationStatusWidget.prototype.dispose = function () {
+    VAS.VAS_046_ReconciliationStatusWidget.prototype.dispose = function () {
         this.disposeComponent();
 
         if (this.frame) {
@@ -271,4 +271,4 @@
         this.frame = null;
     };
 
-})(VIS, jQuery);
+})(VAS, jQuery);
