@@ -145,6 +145,10 @@
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
+    <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
+    <Compile Include="Models\VAS_013_TopCustomerReceiptsModel.cs" />
+    <Compile Include="Models\VAS_014_DailyCollectionTrendModel.cs" />
+    <Compile Include="Models\VAS_015_OutstandingVsReceivedModel.cs" />
     <Compile Include="Models\VAS_SentEmailDocModel.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
     <Compile Include="Models\VAS_PaymentWidgetModel.cs" />

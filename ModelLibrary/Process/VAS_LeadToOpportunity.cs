@@ -99,7 +99,10 @@ namespace ModelLibrary.Process
                 opp.SetAD_Org_ID(lead.GetAD_Org_ID());
                 opp.SetC_Lead_ID(lead.GetC_Lead_ID());
                 opp.SetC_BPartner_ID(lead.GetC_BPartner_ID());
-
+                if (lead.Get_ColumnIndex("VAS_LeadNextStep_ID") >= 0)
+                {
+                    opp.SetVAS_LeadNextStep_ID(Util.GetValueOfInt(lead.Get_Value("VAS_LeadNextStep_ID")));
+                }
                 // Addde by Bharat on 19 Feb 2018 to set Ref Partner/Prospect
                 if (opp.Get_ColumnIndex("Ref_BPartner_ID") >= 0)
                 {
@@ -118,9 +121,9 @@ namespace ModelLibrary.Process
 
                 opp.SetIsOpportunity(true);
                 opp.Set_Value("C_EnquiryRdate", lead.GetC_EnquiryRdate());
-               
+
                 opp.SetC_BPartnerSR_ID(lead.GetC_BPartner_ID());
- 
+
                 opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
@@ -173,7 +176,7 @@ namespace ModelLibrary.Process
                 /*Vivek*/
                 // C_EnquiryRdate is not a generated column on X_VAS_Opportunity - copy it only if present.
                 opp.SetC_EnquiryRdate(lead.GetC_EnquiryRdate());
-                
+
                 opp.SkipAIAssistantThreadUpdate = true;
                 if (opp.Save())
                 {
@@ -197,7 +200,7 @@ namespace ModelLibrary.Process
                     lead.SetProcessed(true);
                     lead.Save();
                     // Send Opportunity Data to Knowledge Base
-                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(),Get_Trx(),GetCtx());
+                    VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());
                     // Send Lead Data to Knowledge Base
                     VAS_CommonMethod.SendInfoToAI(FromTableID, lead.Get_ID(), Get_Trx(), GetCtx());
                     return Msg.GetMsg(GetCtx(), "OpprtunityGenerateDone");

@@ -70,9 +70,12 @@
     }
 
 .vas-bc-title {
-    font-size: 0.8125em;
-    font-weight: 600;
-    color: #102C3F;
+    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
+       Per project request the weight is Bold (700) instead of the spec's
+       Medium (500). */
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #141414;
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
